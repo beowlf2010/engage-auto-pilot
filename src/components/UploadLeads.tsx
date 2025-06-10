@@ -1,18 +1,19 @@
-import { useState, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import CSVFieldMapper from "./CSVFieldMapper";
-import { createPhoneNumbers, getPrimaryPhone } from "@/utils/phoneUtils";
+import UploadArea from "./upload-leads/UploadArea";
+import UploadResult from "./upload-leads/UploadResult";
+import CSVTemplateCard from "./upload-leads/CSVTemplateCard";
+import PhonePriorityCard from "./upload-leads/PhonePriorityCard";
+import ImportFeaturesCard from "./upload-leads/ImportFeaturesCard";
+import { parseCSV } from "./upload-leads/csvParsingUtils";
+import { processLeads } from "./upload-leads/processLeads";
 import { 
-  Upload, 
-  FileText, 
-  CheckCircle, 
   AlertCircle,
-  Download,
-  Users,
   ArrowLeft
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface UploadLeadsProps {
   user: {
@@ -21,12 +22,10 @@ interface UploadLeadsProps {
 }
 
 const UploadLeads = ({ user }: UploadLeadsProps) => {
-  const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [csvData, setCsvData] = useState<{headers: string[], rows: any[], sample: Record<string, string>} | null>(null);
   const [showMapper, setShowMapper] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Check permissions
@@ -41,44 +40,6 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       </div>
     );
   }
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFiles(e.dataTransfer.files);
-    }
-  };
-
-  const parseCSV = (text: string) => {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length < 2) throw new Error('CSV must have at least a header and one data row');
-    
-    const headers = lines[0].split(',').map(h => h.trim()); // Changed from tab to comma separation
-    const rows = lines.slice(1).map(line => {
-      const values = line.split(',');
-      const row: Record<string, string> = {};
-      headers.forEach((header, index) => {
-        row[header] = values[index]?.trim() || '';
-      });
-      return row;
-    });
-
-    const sample = rows[0] || {};
-    return { headers, rows, sample };
-  };
 
   const handleFiles = async (files: FileList) => {
     const file = files[0];
@@ -115,50 +76,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
     
     try {
       // Process the CSV data with the field mapping
-      const processedLeads = csvData.rows.map(row => {
-        // Create phone numbers with priority
-        const phoneNumbers = createPhoneNumbers(
-          row[mapping.cellphone] || '',
-          row[mapping.dayphone] || '',
-          row[mapping.evephone] || ''
-        );
-
-        const primaryPhone = getPrimaryPhone(phoneNumbers);
-        
-        // Combine vehicle information
-        const vehicleParts = [
-          row[mapping.vehicleYear] || '',
-          row[mapping.vehicleMake] || '',
-          row[mapping.vehicleModel] || ''
-        ].filter(Boolean);
-        
-        const vehicleInterest = vehicleParts.length > 0 ? vehicleParts.join(' ') : 'Not specified';
-
-        // Handle contact preferences
-        const doNotCall = row[mapping.doNotCall]?.toLowerCase() === 'true';
-        const doNotEmail = row[mapping.doNotEmail]?.toLowerCase() === 'true';
-
-        return {
-          firstName: row[mapping.firstName] || '',
-          lastName: row[mapping.lastName] || '',
-          middleName: row[mapping.middleName] || '',
-          phoneNumbers,
-          primaryPhone,
-          email: row[mapping.email] || '',
-          emailAlt: row[mapping.emailAlt] || '',
-          address: row[mapping.address] || '',
-          city: row[mapping.city] || '',
-          state: row[mapping.state] || '',
-          postalCode: row[mapping.postalCode] || '',
-          vehicleInterest,
-          vehicleVIN: row[mapping.vehicleVIN] || '',
-          source: row[mapping.source] || 'CSV Import',
-          salesPersonName: [row[mapping.salesPersonFirstName], row[mapping.salesPersonLastName]].filter(Boolean).join(' '),
-          doNotCall,
-          doNotEmail,
-          doNotMail: row[mapping.doNotMail]?.toLowerCase() === 'true'
-        };
-      });
+      const processedLeads = processLeads(csvData, mapping);
 
       // Filter out leads without valid phone numbers
       const validLeads = processedLeads.filter(lead => lead.primaryPhone);
@@ -198,19 +116,6 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
         variant: "destructive"
       });
     }
-  };
-
-  const downloadTemplate = () => {
-    const csvContent = `dealerid	leadstatustypename	LeadTypeName	LeadTypeID	CustomerCreatedUTC	LeadCreatedUTC	leadsourcename	SalesPersonFirstName	SalesPersonLastName	firstname	lastname	middlename	address	city	state	postalcode	dayphone	evephone	cellphone	email	emailalt	VehicleYear	VehicleMake	VehicleModel	VehicleVIN	VehicleStockNumber	SoldDateUTC	DoNotCall	DoNotEmail	DoNotMail
-18648	New	Internet	1	1/10/2025 16:46	3/17/2025 18:15	Website	John	Doe	Sarah	Johnson		123 Main St	Anytown	AL	12345	2513593158	2513685175	2513593158	sarah@email.com	sarah.alt@email.com	2021	Tesla	Model 3	5YJSA1E63MF431691	X431691A		FALSE	FALSE	FALSE`;
-    
-    const blob = new Blob([csvContent], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'leads_template.txt';
-    a.click();
-    window.URL.revokeObjectURL(url);
   };
 
   if (showMapper && csvData) {
@@ -254,168 +159,20 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upload Area */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Upload className="w-5 h-5" />
-              <span>Upload CSV File</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragActive 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-slate-300 hover:border-slate-400'
-              }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-            >
-              {uploading ? (
-                <div className="space-y-4">
-                  <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  <p className="text-slate-600">Processing your file with phone priority system...</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                    <FileText className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-medium text-slate-800 mb-2">
-                      Drop your CSV file here
-                    </p>
-                    <p className="text-slate-600 mb-4">
-                      or click to browse and select a file
-                    </p>
-                    <Button 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="mx-auto"
-                    >
-                      Choose File
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".csv,.txt"
-                      onChange={(e) => e.target.files && handleFiles(e.target.files)}
-                      className="hidden"
-                    />
-                  </div>
-                  <p className="text-sm text-slate-500">
-                    Supported formats: CSV and TXT files
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Upload Result */}
-            {uploadResult && (
-              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-green-800 mb-2">
-                      Upload completed successfully!
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                      <div>
-                        <span className="text-green-700">Total rows:</span>
-                        <span className="font-medium ml-2">{uploadResult.totalRows}</span>
-                      </div>
-                      <div>
-                        <span className="text-green-700">Imported:</span>
-                        <span className="font-medium ml-2">{uploadResult.successfulImports}</span>
-                      </div>
-                      <div>
-                        <span className="text-green-700">Errors:</span>
-                        <span className="font-medium ml-2">{uploadResult.errors}</span>
-                      </div>
-                      <div>
-                        <span className="text-green-700">Multiple phones:</span>
-                        <span className="font-medium ml-2">{uploadResult.phoneNumberStats?.multipleNumbers || 0}</span>
-                      </div>
-                    </div>
-                    <div className="text-xs text-green-700">
-                      <p>✓ Phone priority: Cell → Day → Evening</p>
-                      <p>✓ Contact preferences applied</p>
-                      <p>✓ Duplicate phone numbers removed</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div>
+          <UploadArea onFilesSelected={handleFiles} uploading={uploading} />
+          
+          {/* Upload Result */}
+          {uploadResult && (
+            <UploadResult result={uploadResult} />
+          )}
+        </div>
 
         {/* Instructions & Template */}
         <div className="space-y-6">
-          {/* CSV Template */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Download className="w-5 h-5" />
-                <span>CSV Template</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-slate-600 mb-4">
-                Download our template matching your current CSV format
-              </p>
-              <Button variant="outline" onClick={downloadTemplate} className="w-full">
-                <Download className="w-4 h-4 mr-2" />
-                Download Template
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Phone Priority System */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Phone Priority System</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">1. Cell Phone</span>
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Primary</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">2. Day Phone</span>
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Secondary</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">3. Evening Phone</span>
-                  <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Tertiary</span>
-                </div>
-                <div className="text-xs text-slate-500 pt-2 border-t">
-                  Finn AI will start with cell phone and automatically rotate to backup numbers if needed
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Distribution Rules */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span>Import Features</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-sm text-slate-600">
-                <p>• Smart field mapping with auto-detection</p>
-                <p>• Multiple phone number support with priority</p>
-                <p>• Automatic phone number deduplication</p>
-                <p>• Contact preference enforcement (Do Not Call/Email)</p>
-                <p>• Vehicle information combination</p>
-                <p>• Salesperson assignment matching</p>
-              </div>
-            </CardContent>
-          </Card>
+          <CSVTemplateCard />
+          <PhonePriorityCard />
+          <ImportFeaturesCard />
         </div>
       </div>
     </div>
