@@ -20,7 +20,7 @@ export const toggleFinnAI = async (leadId: string | number, currentState: boolea
         // Set next AI send time if enabling AI (24 hours from now)
         next_ai_send_at: newState ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null
       })
-      .eq('id', leadId);
+      .eq('id', String(leadId));
 
     if (error) {
       console.error('Error toggling Finn AI:', error);
