@@ -4,6 +4,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { useConversations } from "@/hooks/useConversations";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
 import LeadsList from "@/components/LeadsList";
@@ -17,6 +18,9 @@ const Index = () => {
   const { toast } = useToast();
   const { conversations } = useConversations();
   const unreadCount = useUnreadCount(conversations);
+  
+  // Initialize real-time notifications
+  useRealtimeNotifications();
 
   if (loading || !profile) {
     return (

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { fetchConversations } from '@/services/conversationsService';
 import { fetchMessages, sendMessage as sendMessageService } from '@/services/messagesService';
+import { supabase } from '@/integrations/supabase/client';
 import type { ConversationData, MessageData } from '@/types/conversation';
 
 export const useConversations = () => {
@@ -44,6 +45,86 @@ export const useConversations = () => {
       console.error('Error in sendMessage:', error);
     }
   };
+
+  // Set up real-time listeners for conversation updates
+  useEffect(() => {
+    if (!profile) return;
+
+    // Listen for new messages to refresh conversations list
+    const conversationChannel = supabase
+      .channel('conversation-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          // Refresh conversations when new messages arrive
+          loadConversations();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          // Refresh conversations when messages are updated
+          loadConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(conversationChannel);
+    };
+  }, [profile]);
+
+  // Set up real-time listener for current conversation messages
+  useEffect(() => {
+    if (!messages.length) return;
+
+    const currentLeadId = messages[0]?.leadId;
+    if (!currentLeadId) return;
+
+    const messageChannel = supabase
+      .channel(`messages-${currentLeadId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+          filter: `lead_id=eq.${currentLeadId}`
+        },
+        () => {
+          // Refresh messages for current conversation
+          loadMessages(currentLeadId);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `lead_id=eq.${currentLeadId}`
+        },
+        () => {
+          // Refresh messages when status updates
+          loadMessages(currentLeadId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(messageChannel);
+    };
+  }, [messages]);
 
   useEffect(() => {
     if (profile) {

@@ -33,26 +33,38 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
 
     if (conversationsError) throw conversationsError;
 
-    // Group conversations by lead
+    // Group conversations by lead and calculate unread counts
     const conversationMap = new Map();
+    const unreadCountMap = new Map();
+
     conversationsData?.forEach(conv => {
       const leadId = conv.lead_id;
+      
+      // Track latest conversation
       if (!conversationMap.has(leadId) || 
           new Date(conv.sent_at) > new Date(conversationMap.get(leadId).sent_at)) {
         conversationMap.set(leadId, conv);
+      }
+
+      // Count unread incoming messages
+      if (conv.direction === 'in' && !conv.read_at) {
+        const currentCount = unreadCountMap.get(leadId) || 0;
+        unreadCountMap.set(leadId, currentCount + 1);
       }
     });
 
     // Transform leads data to include conversation info
     const transformedConversations = leadsData?.map(lead => {
       const latestConv = conversationMap.get(lead.id);
+      const unreadCount = unreadCountMap.get(lead.id) || 0;
+      
       return {
         leadId: lead.id,
         leadName: `${lead.first_name} ${lead.last_name}`,
         leadPhone: lead.phone_numbers.find(p => p.is_primary)?.number || 
                   lead.phone_numbers[0]?.number || '',
         vehicleInterest: lead.vehicle_interest,
-        unreadCount: latestConv && latestConv.direction === 'in' && !latestConv.read_at ? 1 : 0,
+        unreadCount,
         lastMessage: latestConv?.body || 'No messages yet',
         lastMessageTime: latestConv ? new Date(latestConv.sent_at).toLocaleTimeString() : '',
         status: lead.status,
@@ -79,5 +91,20 @@ export const assignCurrentUserToLead = async (leadId: string, profileId: string)
   } catch (error) {
     console.error('Error assigning lead:', error);
     return false;
+  }
+};
+
+export const markMessagesAsRead = async (leadId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('conversations')
+      .update({ read_at: new Date().toISOString() })
+      .eq('lead_id', leadId)
+      .eq('direction', 'in')
+      .is('read_at', null);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
   }
 };

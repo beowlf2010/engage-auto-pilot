@@ -5,6 +5,7 @@ import ConversationsList from "./inbox/ConversationsList";
 import ChatView from "./inbox/ChatView";
 import ConversationMemory from "./ConversationMemory";
 import { useConversations } from "@/hooks/useConversations";
+import { markMessagesAsRead } from "@/services/conversationsService";
 
 interface SmartInboxProps {
   user: {
@@ -39,9 +40,12 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     }
   };
 
-  const handleSelectConversation = (leadId: string) => {
+  const handleSelectConversation = async (leadId: string) => {
     setSelectedLead(leadId);
-    fetchMessages(leadId);
+    await fetchMessages(leadId);
+    
+    // Mark messages as read when viewing the conversation
+    await markMessagesAsRead(leadId);
   };
 
   const handleToggleMemory = () => {
