@@ -1,5 +1,5 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -8,111 +8,118 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
-
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Parse the form data from Twilio
     const formData = await req.formData()
-    const twilioData = Object.fromEntries(formData.entries())
+    const from = formData.get('From') as string
+    const body = formData.get('Body') as string
+    const messageId = formData.get('MessageSid') as string
 
-    console.log('Received Twilio webhook:', twilioData)
+    console.log('Received SMS from:', from, 'Body:', body)
 
-    const {
-      From: fromNumber,
-      Body: messageBody,
-      MessageSid: twilioMessageId,
-      To: toNumber
-    } = twilioData
+    // Normalize the phone number
+    const normalizedPhone = from.replace(/[^\d]/g, '')
+    const formattedPhone = normalizedPhone.length === 10 ? `+1${normalizedPhone}` : `+${normalizedPhone}`
 
-    if (!fromNumber || !messageBody) {
-      console.error('Missing required fields:', { fromNumber, messageBody })
-      return new Response('Missing required fields', { status: 400, headers: corsHeaders })
-    }
-
-    // Normalize the phone number (remove +1 prefix for matching)
-    const normalizedFrom = fromNumber.toString().replace(/^\+?1?/, '').replace(/\D/g, '')
-    
-    console.log('Looking for lead with phone number:', normalizedFrom)
-
-    // Find the lead associated with this phone number
+    // Find the lead by phone number
     const { data: phoneData, error: phoneError } = await supabase
       .from('phone_numbers')
-      .select('lead_id, leads!inner(*)')
-      .or(`number.ilike.%${normalizedFrom}%,number.ilike.%${fromNumber}%`)
-      .limit(1)
+      .select('lead_id')
+      .eq('number', formattedPhone)
       .single()
 
     if (phoneError || !phoneData) {
-      console.error('No lead found for phone number:', normalizedFrom, phoneError)
-      
-      // Still return 200 to Twilio to avoid retries
-      return new Response('Phone number not found in system', { 
-        status: 200, 
-        headers: corsHeaders 
+      console.log('No lead found for phone number:', formattedPhone)
+      return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
       })
     }
 
-    console.log('Found lead:', phoneData.lead_id)
-
-    // Check if this message already exists (prevent duplicates)
-    const { data: existingMessage } = await supabase
-      .from('conversations')
-      .select('id')
-      .eq('twilio_message_id', twilioMessageId)
-      .single()
-
-    if (existingMessage) {
-      console.log('Message already exists, skipping:', twilioMessageId)
-      return new Response('Message already processed', { 
-        status: 200, 
-        headers: corsHeaders 
-      })
-    }
-
-    // Insert the incoming message
-    const { data: newMessage, error: insertError } = await supabase
+    // Store the incoming message
+    const { error: msgError } = await supabase
       .from('conversations')
       .insert({
         lead_id: phoneData.lead_id,
         direction: 'in',
-        body: messageBody.toString(),
+        body: body,
         sent_at: new Date().toISOString(),
-        sms_status: 'delivered',
-        twilio_message_id: twilioMessageId.toString(),
-        ai_generated: false
+        twilio_message_id: messageId
       })
-      .select()
-      .single()
 
-    if (insertError) {
-      console.error('Error inserting message:', insertError)
-      return new Response('Database error', { status: 500, headers: corsHeaders })
+    if (msgError) {
+      console.error('Error storing message:', msgError)
+      return new Response('Error', { status: 500, headers: corsHeaders })
     }
 
-    console.log('Successfully processed incoming message:', newMessage.id)
+    // Extract and store memory from the incoming message
+    await extractAndStoreMemory(phoneData.lead_id, body, 'in')
 
-    return new Response('Message processed successfully', { 
-      status: 200, 
-      headers: corsHeaders 
+    console.log('Message stored successfully')
+
+    return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
     })
 
   } catch (error) {
-    console.error('Webhook error:', error)
-    return new Response('Internal server error', { 
-      status: 500, 
-      headers: corsHeaders 
-    })
+    console.error('Error processing webhook:', error)
+    return new Response('Error', { status: 500, headers: corsHeaders })
   }
 })
+
+// Memory extraction function (simplified version)
+async function extractAndStoreMemory(leadId: string, messageBody: string, direction: 'in' | 'out') {
+  if (direction !== 'in') return;
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const memories = [];
+    const lowerMessage = messageBody.toLowerCase();
+
+    // Extract preferences
+    if (lowerMessage.includes('budget') || lowerMessage.includes('price') || lowerMessage.includes('afford')) {
+      memories.push({
+        lead_id: leadId,
+        content: `Budget concerns mentioned in: "${messageBody}"`,
+        memory_type: 'preference',
+        confidence: 0.7
+      });
+    }
+
+    if (lowerMessage.includes('financing') || lowerMessage.includes('payment') || lowerMessage.includes('loan')) {
+      memories.push({
+        lead_id: leadId,
+        content: 'Interested in financing options',
+        memory_type: 'preference',
+        confidence: 0.8
+      });
+    }
+
+    if (lowerMessage.includes('test drive') || lowerMessage.includes('see the car') || lowerMessage.includes('visit')) {
+      memories.push({
+        lead_id: leadId,
+        content: 'Interested in test driving',
+        memory_type: 'preference',
+        confidence: 0.9
+      });
+    }
+
+    // Store memories
+    for (const memory of memories) {
+      await supabase
+        .from('conversation_memory')
+        .insert(memory);
+    }
+  } catch (error) {
+    console.error('Error storing conversation memory:', error);
+  }
+}

@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { scheduleNextAIMessage } from './aiMessageService';
 
 export interface ToggleAIResult {
   success: boolean;
@@ -17,8 +18,10 @@ export const toggleFinnAI = async (leadId: string | number, currentState: boolea
       .from('leads')
       .update({ 
         ai_opt_in: newState,
-        // Set next AI send time if enabling AI (24 hours from now)
-        next_ai_send_at: newState ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null
+        // Reset AI stage when enabling
+        ai_stage: newState ? 'initial' : null,
+        // Set next AI send time if enabling AI (immediate for initial contact)
+        next_ai_send_at: newState ? new Date().toISOString() : null
       })
       .eq('id', String(leadId));
 
@@ -30,6 +33,11 @@ export const toggleFinnAI = async (leadId: string | number, currentState: boolea
         variant: "destructive"
       });
       return { success: false, newState: currentState, error: error.message };
+    }
+
+    // If enabling AI, schedule the next message
+    if (newState) {
+      await scheduleNextAIMessage(String(leadId));
     }
 
     // Show success toast

@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { MessageData } from '@/types/conversation';
 import { assignCurrentUserToLead } from './conversationsService';
+import { extractAndStoreMemory } from './aiMemoryService';
 
 export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
   try {
@@ -77,6 +78,11 @@ export const sendMessage = async (
       .single();
 
     if (dbError) throw dbError;
+
+    // Store memory from outgoing messages too if AI generated
+    if (aiGenerated) {
+      await extractAndStoreMemory(leadId, body, 'out');
+    }
 
     const primaryPhone = leadData.phone_numbers.find(p => p.is_primary)?.number || 
                         leadData.phone_numbers[0]?.number;
