@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { useConversations } from "@/hooks/useConversations";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
 import LeadsList from "@/components/LeadsList";
@@ -13,6 +15,8 @@ const Index = () => {
   const [activeView, setActiveView] = useState("dashboard");
   const { profile, loading } = useAuth();
   const { toast } = useToast();
+  const { conversations } = useConversations();
+  const unreadCount = useUnreadCount(conversations);
 
   if (loading || !profile) {
     return (
@@ -54,7 +58,12 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
-      <Sidebar user={user} activeView={activeView} onViewChange={setActiveView} />
+      <Sidebar 
+        user={user} 
+        activeView={activeView} 
+        onViewChange={setActiveView}
+        unreadCount={unreadCount}
+      />
       <main className="flex-1 overflow-hidden">
         <div className="h-full p-6">
           {renderContent()}

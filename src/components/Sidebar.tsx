@@ -1,4 +1,3 @@
-
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
@@ -20,9 +19,10 @@ interface SidebarProps {
   };
   activeView: string;
   onViewChange: (view: string) => void;
+  unreadCount?: number;
 }
 
-const Sidebar = ({ user, activeView, onViewChange }: SidebarProps) => {
+const Sidebar = ({ user, activeView, onViewChange, unreadCount = 0 }: SidebarProps) => {
   const menuItems = [
     {
       id: "dashboard",
@@ -41,7 +41,7 @@ const Sidebar = ({ user, activeView, onViewChange }: SidebarProps) => {
       label: "Smart Inbox",
       icon: MessageSquare,
       roles: ["sales", "manager", "admin"],
-      badge: "3" // Mock unread count
+      badge: unreadCount > 0 ? unreadCount.toString() : undefined
     },
     {
       id: "upload",
