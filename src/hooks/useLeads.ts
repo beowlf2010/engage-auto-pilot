@@ -36,10 +36,10 @@ export const useLeads = () => {
 
       if (leadsError) throw leadsError;
 
-      // Fetch conversation data for all leads
+      // Fetch conversation data for all leads - include read_at field
       const { data: conversationsData, error: conversationsError } = await supabase
         .from('conversations')
-        .select('lead_id, body, sent_at, direction')
+        .select('lead_id, body, sent_at, direction, read_at')
         .order('sent_at', { ascending: false });
 
       if (conversationsError) throw conversationsError;
