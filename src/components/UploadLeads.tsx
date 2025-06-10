@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import CSVFieldMapper from "./CSVFieldMapper";
@@ -8,6 +9,7 @@ import PhonePriorityCard from "./upload-leads/PhonePriorityCard";
 import ImportFeaturesCard from "./upload-leads/ImportFeaturesCard";
 import { parseCSV } from "./upload-leads/csvParsingUtils";
 import { processLeads } from "./upload-leads/processLeads";
+import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
 import { 
   AlertCircle,
   ArrowLeft
@@ -74,59 +76,85 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
     setUploading(true);
     
     try {
+      console.log('Starting lead processing with mapping:', mapping);
+      
       // Process the CSV data with the field mapping and duplicate detection
       const processingResult = processLeads(csvData, mapping);
+      console.log('CSV processing complete:', {
+        validLeads: processingResult.validLeads.length,
+        duplicates: processingResult.duplicates.length,
+        errors: processingResult.errors.length
+      });
 
-      // Simulate processing time with real-time feedback
-      setTimeout(() => {
-        const mockResult = {
-          totalRows: csvData.rows.length,
-          successfulImports: processingResult.validLeads.length,
-          errors: processingResult.errors.length,
-          duplicates: processingResult.duplicates.length,
-          fileName: 'leads.csv',
-          phoneNumberStats: {
-            cellOnly: processingResult.validLeads.filter(l => l.phoneNumbers.length === 1 && l.phoneNumbers[0].type === 'cell').length,
-            multipleNumbers: processingResult.validLeads.filter(l => l.phoneNumbers.length > 1).length,
-            dayPrimary: processingResult.validLeads.filter(l => l.phoneNumbers.length > 0 && l.phoneNumbers[0].type === 'day').length
-          },
-          duplicateDetails: processingResult.duplicates.map(d => ({
-            rowIndex: d.rowIndex,
-            duplicateType: d.duplicateType,
-            leadName: `${d.lead.firstName} ${d.lead.lastName}`,
-            conflictingName: `${d.conflictingLead.firstName} ${d.conflictingLead.lastName}`
-          }))
-        };
-        
-        setUploadResult(mockResult);
-        setUploading(false);
-        setShowMapper(false);
-        
-        console.log('Processing complete:', {
-          validLeads: processingResult.validLeads.length,
-          duplicates: processingResult.duplicates.length,
-          errors: processingResult.errors.length
+      // Insert leads to database
+      const insertResult = await insertLeadsToDatabase(processingResult.validLeads);
+      console.log('Database insertion complete:', insertResult);
+
+      // Combine CSV duplicates with database duplicates
+      const allDuplicates = [
+        ...processingResult.duplicates.map(d => ({
+          rowIndex: d.rowIndex,
+          duplicateType: d.duplicateType,
+          leadName: `${d.lead.firstName} ${d.lead.lastName}`,
+          conflictingName: `${d.conflictingLead.firstName} ${d.conflictingLead.lastName}` 
+        })),
+        ...insertResult.duplicates.map(d => ({
+          rowIndex: d.rowIndex,
+          duplicateType: d.duplicateType,
+          leadName: `${d.leadData.firstName} ${d.leadData.lastName}`,
+          conflictingName: 'Existing database record'
+        }))
+      ];
+
+      const result = {
+        totalRows: csvData.rows.length,
+        successfulImports: insertResult.successfulInserts,
+        errors: processingResult.errors.length + insertResult.errors.length,
+        duplicates: allDuplicates.length,
+        fileName: 'leads.csv',
+        phoneNumberStats: {
+          cellOnly: processingResult.validLeads.filter(l => l.phoneNumbers.length === 1 && l.phoneNumbers[0].type === 'cell').length,
+          multipleNumbers: processingResult.validLeads.filter(l => l.phoneNumbers.length > 1).length,
+          dayPrimary: processingResult.validLeads.filter(l => l.phoneNumbers.length > 0 && l.phoneNumbers[0].type === 'day').length
+        },
+        duplicateDetails: allDuplicates
+      };
+      
+      setUploadResult(result);
+      setUploading(false);
+      setShowMapper(false);
+      
+      console.log('Upload process complete:', result);
+      
+      if (allDuplicates.length > 0) {
+        toast({
+          title: "Upload completed with duplicates detected",
+          description: `${insertResult.successfulInserts} leads imported, ${allDuplicates.length} duplicates skipped`,
+          variant: "default"
         });
-        
-        if (processingResult.duplicates.length > 0) {
-          toast({
-            title: "Upload completed with duplicates detected",
-            description: `${processingResult.validLeads.length} leads imported, ${processingResult.duplicates.length} duplicates skipped`,
-            variant: "default"
-          });
-        } else {
-          toast({
-            title: "Upload successful!",
-            description: `${processingResult.validLeads.length} leads imported with no duplicates`,
-          });
-        }
-      }, 3000);
+      } else {
+        toast({
+          title: "Upload successful!",
+          description: `${insertResult.successfulInserts} leads imported with no duplicates`,
+        });
+      }
+
+      // Log any insertion errors
+      if (insertResult.errors.length > 0) {
+        console.error('Database insertion errors:', insertResult.errors);
+        toast({
+          title: "Some leads failed to import",
+          description: `${insertResult.errors.length} leads failed due to database errors`,
+          variant: "destructive"
+        });
+      }
       
     } catch (error) {
       setUploading(false);
+      console.error('Upload error:', error);
       toast({
         title: "Processing error",
-        description: "Error processing the CSV data",
+        description: "Error processing the CSV data or saving to database",
         variant: "destructive"
       });
     }

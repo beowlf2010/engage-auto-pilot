@@ -2,7 +2,7 @@
 import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText } from "lucide-react";
+import { Upload, FileText, Database } from "lucide-react";
 
 interface UploadAreaProps {
   onFilesSelected: (files: FileList) => void;
@@ -56,7 +56,13 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
           {uploading ? (
             <div className="space-y-4">
               <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-slate-600">Processing your file with phone priority system...</p>
+              <div className="space-y-2">
+                <p className="text-slate-600 font-medium">Processing and saving leads...</p>
+                <div className="flex items-center justify-center space-x-2 text-sm text-slate-500">
+                  <Database className="w-4 h-4" />
+                  <span>Validating duplicates and inserting to database</span>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
