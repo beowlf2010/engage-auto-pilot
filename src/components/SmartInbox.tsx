@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import FinnAvatar from "./FinnAvatar";
 import ConversationMemory from "./ConversationMemory";
+import { useConversations } from "@/hooks/useConversations";
 import { 
   Send, 
   Bot, 
@@ -14,7 +16,8 @@ import {
   Phone,
   Car,
   MessageSquare,
-  Brain
+  Brain,
+  Loader2
 } from "lucide-react";
 
 interface SmartInboxProps {
@@ -25,81 +28,10 @@ interface SmartInboxProps {
 }
 
 const SmartInbox = ({ user }: SmartInboxProps) => {
-  const [selectedLead, setSelectedLead] = useState(1);
+  const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [showMemory, setShowMemory] = useState(false);
-
-  // Mock conversations data
-  const conversations = [
-    {
-      leadId: 1,
-      leadName: "Sarah Johnson",
-      leadPhone: "+1-555-0123",
-      vehicleInterest: "Tesla Model 3",
-      unreadCount: 2,
-      lastMessage: "What are the financing options?",
-      lastMessageTime: "2:30 PM",
-      status: "engaged",
-      salespersonId: "1"
-    },
-    {
-      leadId: 2,
-      leadName: "Mike Chen", 
-      leadPhone: "+1-555-0124",
-      vehicleInterest: "BMW X5",
-      unreadCount: 0,
-      lastMessage: "Thanks for the information!",
-      lastMessageTime: "11:45 AM",
-      status: "engaged",
-      salespersonId: "2"
-    },
-    {
-      leadId: 3,
-      leadName: "Emma Wilson",
-      leadPhone: "+1-555-0125", 
-      vehicleInterest: "Audi A4",
-      unreadCount: 1,
-      lastMessage: "When can I schedule a test drive?",
-      lastMessageTime: "Yesterday",
-      status: "new",
-      salespersonId: "1"
-    }
-  ];
-
-  const messages = [
-    {
-      id: 1,
-      leadId: 1,
-      direction: "in",
-      body: "Hi! I'm interested in the Tesla Model 3. Can you tell me more about it?",
-      sentAt: "2024-06-10 09:30:00",
-      aiGenerated: false
-    },
-    {
-      id: 2,
-      leadId: 1,
-      direction: "out", 
-      body: "Hello Sarah! This is Finn, your Internet Sales Specialist. I'd be happy to help you with the Tesla Model 3. It's an excellent choice with amazing features like autopilot, supercharging network access, and incredible efficiency. Would you like to schedule a test drive?\n\n- Finn, Internet Sales Specialist",
-      sentAt: "2024-06-10 09:35:00",
-      aiGenerated: true
-    },
-    {
-      id: 3,
-      leadId: 1,
-      direction: "in",
-      body: "That sounds great! What are the financing options?",
-      sentAt: "2024-06-10 14:20:00",
-      aiGenerated: false
-    },
-    {
-      id: 4,
-      leadId: 1,
-      direction: "in",
-      body: "Also, do you have any current promotions?",
-      sentAt: "2024-06-10 14:22:00",
-      aiGenerated: false
-    }
-  ];
+  const { conversations, messages, loading, fetchMessages, sendMessage } = useConversations();
 
   // Filter conversations based on user role
   const filteredConversations = conversations.filter(conv => 
@@ -107,18 +39,37 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   );
 
   const selectedConversation = filteredConversations.find(conv => conv.leadId === selectedLead);
-  const conversationMessages = messages.filter(msg => msg.leadId === selectedLead);
 
   const canReply = (conv: any) => {
     return user.role === "manager" || user.role === "admin" || conv.salespersonId === user.id;
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (newMessage.trim() && selectedConversation && canReply(selectedConversation)) {
-      console.log("Sending message:", newMessage);
+      await sendMessage(selectedLead!, newMessage);
       setNewMessage("");
     }
   };
+
+  const handleSelectConversation = (leadId: string) => {
+    setSelectedLead(leadId);
+    fetchMessages(leadId);
+  };
+
+  useEffect(() => {
+    if (filteredConversations.length > 0 && !selectedLead) {
+      const firstConv = filteredConversations[0];
+      handleSelectConversation(firstConv.leadId);
+    }
+  }, [filteredConversations, selectedLead]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-8rem)] flex space-x-6">
@@ -137,7 +88,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
               {filteredConversations.map((conv) => (
                 <div
                   key={conv.leadId}
-                  onClick={() => setSelectedLead(conv.leadId)}
+                  onClick={() => handleSelectConversation(conv.leadId)}
                   className={`p-4 cursor-pointer border-b border-slate-100 hover:bg-slate-50 transition-colors ${
                     selectedLead === conv.leadId ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
                   }`}
@@ -226,7 +177,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
             {/* Messages */}
             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-              {conversationMessages.map((message) => (
+              {messages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
@@ -303,7 +254,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
       {/* Finn's Memory Panel */}
       {showMemory && selectedLead && (
-        <ConversationMemory leadId={selectedLead} />
+        <ConversationMemory leadId={parseInt(selectedLead)} />
       )}
     </div>
   );

@@ -9,13 +9,274 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      conversation_memory: {
+        Row: {
+          confidence: number | null
+          content: string
+          created_at: string
+          id: string
+          lead_id: string
+          memory_type: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number | null
+          content: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          memory_type: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number | null
+          content?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          memory_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_memory_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          ai_generated: boolean
+          body: string
+          created_at: string
+          direction: string
+          id: string
+          lead_id: string
+          read_at: string | null
+          sent_at: string
+        }
+        Insert: {
+          ai_generated?: boolean
+          body: string
+          created_at?: string
+          direction: string
+          id?: string
+          lead_id: string
+          read_at?: string | null
+          sent_at?: string
+        }
+        Update: {
+          ai_generated?: boolean
+          body?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          lead_id?: string
+          read_at?: string | null
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          address: string | null
+          ai_opt_in: boolean
+          ai_stage: string | null
+          city: string | null
+          created_at: string
+          do_not_call: boolean
+          do_not_email: boolean
+          do_not_mail: boolean
+          email: string | null
+          email_alt: string | null
+          first_name: string
+          id: string
+          last_name: string
+          middle_name: string | null
+          next_ai_send_at: string | null
+          postal_code: string | null
+          salesperson_id: string | null
+          source: string
+          state: string | null
+          status: string
+          updated_at: string
+          vehicle_interest: string
+          vehicle_make: string | null
+          vehicle_model: string | null
+          vehicle_vin: string | null
+          vehicle_year: string | null
+        }
+        Insert: {
+          address?: string | null
+          ai_opt_in?: boolean
+          ai_stage?: string | null
+          city?: string | null
+          created_at?: string
+          do_not_call?: boolean
+          do_not_email?: boolean
+          do_not_mail?: boolean
+          email?: string | null
+          email_alt?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          middle_name?: string | null
+          next_ai_send_at?: string | null
+          postal_code?: string | null
+          salesperson_id?: string | null
+          source?: string
+          state?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_interest: string
+          vehicle_make?: string | null
+          vehicle_model?: string | null
+          vehicle_vin?: string | null
+          vehicle_year?: string | null
+        }
+        Update: {
+          address?: string | null
+          ai_opt_in?: boolean
+          ai_stage?: string | null
+          city?: string | null
+          created_at?: string
+          do_not_call?: boolean
+          do_not_email?: boolean
+          do_not_mail?: boolean
+          email?: string | null
+          email_alt?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          middle_name?: string | null
+          next_ai_send_at?: string | null
+          postal_code?: string | null
+          salesperson_id?: string | null
+          source?: string
+          state?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_interest?: string
+          vehicle_make?: string | null
+          vehicle_model?: string | null
+          vehicle_vin?: string | null
+          vehicle_year?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phone_numbers: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          last_attempt: string | null
+          lead_id: string
+          number: string
+          priority: number
+          status: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          last_attempt?: string | null
+          lead_id: string
+          number: string
+          priority?: number
+          status?: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          last_attempt?: string | null
+          lead_id?: string
+          number?: string
+          priority?: number
+          status?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_numbers_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          phone: string | null
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          phone?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          phone?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      normalize_phone: {
+        Args: { phone_input: string }
+        Returns: string
+      }
+      set_primary_phone: {
+        Args: { p_lead_id: string; p_phone_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

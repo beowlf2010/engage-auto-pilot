@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PhoneNumberDisplay from "./PhoneNumberDisplay";
-import { createPhoneNumbers, getPrimaryPhone } from "@/utils/phoneUtils";
+import { useLeads } from "@/hooks/useLeads";
 import { 
   Search, 
   Filter, 
@@ -15,7 +15,8 @@ import {
   User,
   Car,
   Clock,
-  Users
+  Users,
+  Loader2
 } from "lucide-react";
 
 interface LeadsListProps {
@@ -28,76 +29,10 @@ interface LeadsListProps {
 const LeadsList = ({ user }: LeadsListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { leads, loading } = useLeads();
 
-  // Mock leads data with enhanced phone number support
-  const mockLeads = [
-    {
-      id: 1,
-      firstName: "Sarah",
-      lastName: "Johnson",
-      phoneNumbers: createPhoneNumbers("2513593158", "2513685175", "2513593158"),
-      email: "sarah.j@email.com",
-      vehicleInterest: "Tesla Model 3",
-      source: "Website",
-      status: "engaged",
-      salesperson: "John Doe",
-      salespersonId: "1",
-      aiOptIn: true,
-      aiStage: "follow_up_2",
-      nextAiSendAt: "2024-06-10 14:30:00",
-      createdAt: "2024-06-08 09:15:00",
-      lastMessage: "Interested in financing options - Finn",
-      unreadCount: 2,
-      doNotCall: false
-    },
-    {
-      id: 2,
-      firstName: "Mike",
-      lastName: "Chen",
-      phoneNumbers: createPhoneNumbers("5551234567", "5557654321", "5559876543"),
-      email: "mike.chen@email.com",
-      vehicleInterest: "BMW X5",
-      source: "Facebook Ad",
-      status: "new",
-      salesperson: "Jane Smith",
-      salespersonId: "2",
-      aiOptIn: true,
-      aiStage: "initial",
-      nextAiSendAt: "2024-06-10 16:00:00",
-      createdAt: "2024-06-10 08:30:00",
-      lastMessage: null,
-      unreadCount: 0,
-      doNotCall: false
-    },
-    {
-      id: 3,
-      firstName: "Emma",
-      lastName: "Wilson",
-      phoneNumbers: createPhoneNumbers("", "5555551234", "5555555678"),
-      email: "emma.w@email.com",
-      vehicleInterest: "Audi A4",
-      source: "Referral",
-      status: "paused",
-      salesperson: "John Doe",
-      salespersonId: "1",
-      aiOptIn: false,
-      aiStage: null,
-      nextAiSendAt: null,
-      createdAt: "2024-06-05 14:20:00",
-      lastMessage: "Please stop messaging",
-      unreadCount: 0,
-      doNotCall: true
-    }
-  ];
-
-  // Add primary phone to each lead
-  const enhancedLeads = mockLeads.map(lead => ({
-    ...lead,
-    primaryPhone: getPrimaryPhone(lead.phoneNumbers)
-  }));
-
-  // Filter leads based on user role
-  const filteredLeads = enhancedLeads.filter(lead => {
+  // Filter leads based on user role and search/status filters
+  const filteredLeads = leads.filter(lead => {
     const matchesSearch = searchTerm === "" || 
       `${lead.firstName} ${lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.vehicleInterest.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -130,6 +65,14 @@ const LeadsList = ({ user }: LeadsListProps) => {
     // In real app, this would update the lead's primary phone
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -137,7 +80,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Leads</h1>
           <p className="text-slate-600 mt-1">
-            {user.role === "sales" ? "Your assigned leads with multi-phone support" : "All leads with phone priority system"}
+            {user.role === "sales" ? "Your assigned leads" : "All leads in the system"}
           </p>
         </div>
         <div className="flex items-center space-x-3 mt-4 md:mt-0">
@@ -171,7 +114,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
             {!canEdit(lead) && (
               <div className="absolute top-2 right-2">
                 <Badge variant="secondary" className="text-xs">
-                  Owner-only
+                  View-only
                 </Badge>
               </div>
             )}
@@ -278,7 +221,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
         ))}
       </div>
 
-      {filteredLeads.length === 0 && (
+      {filteredLeads.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Users className="w-8 h-8 text-slate-400" />

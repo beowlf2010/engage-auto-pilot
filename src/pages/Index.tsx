@@ -1,5 +1,6 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
@@ -8,35 +9,31 @@ import UploadLeads from "@/components/UploadLeads";
 import Settings from "@/components/Settings";
 import SmartInbox from "@/components/SmartInbox";
 
-// Mock user data - in real app this would come from Supabase JWT
-const mockUser = {
-  id: "1",
-  email: "john.doe@dealership.com",
-  role: "manager", // sales, manager, admin
-  firstName: "John",
-  lastName: "Doe",
-  phone: "+1234567890"
-};
-
 const Index = () => {
   const [activeView, setActiveView] = useState("dashboard");
-  const [user] = useState(mockUser);
+  const { profile, loading } = useAuth();
   const { toast } = useToast();
 
-  // Simulate push notifications for incoming messages
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.95) { // 5% chance every 5 seconds
-        toast({
-          title: "New Message Received",
-          description: "Sarah Johnson replied to your follow-up",
-          duration: 5000,
-        });
-      }
-    }, 5000);
+  if (loading || !profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
-    return () => clearInterval(interval);
-  }, [toast]);
+  // Transform profile data to match expected user structure
+  const user = {
+    id: profile.id,
+    email: profile.email,
+    role: profile.role,
+    firstName: profile.first_name,
+    lastName: profile.last_name,
+    phone: profile.phone
+  };
 
   const renderContent = () => {
     switch (activeView) {
