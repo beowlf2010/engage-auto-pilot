@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Car } from "lucide-react";
+import { MessageSquare, Car, Plus } from "lucide-react";
 
 interface Conversation {
   leadId: string;
@@ -60,6 +60,12 @@ const ConversationsList = ({
                       {!canReply(conv) && (
                         <Badge variant="secondary" className="text-xs">
                           View-only
+                        </Badge>
+                      )}
+                      {!conv.salespersonId && (
+                        <Badge variant="outline" className="text-xs flex items-center space-x-1">
+                          <Plus className="w-3 h-3" />
+                          <span>Unassigned</span>
                         </Badge>
                       )}
                     </div>

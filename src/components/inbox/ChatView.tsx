@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Phone, Car, Brain, Send, User, MessageSquare } from "lucide-react";
+import { Phone, Car, Brain, Send, User, MessageSquare, Plus } from "lucide-react";
 import MessageBubble from "./MessageBubble";
 
 interface Conversation {
@@ -44,11 +44,17 @@ const ChatView = ({
   onToggleMemory 
 }: ChatViewProps) => {
   const [newMessage, setNewMessage] = useState("");
+  const [sending, setSending] = useState(false);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (newMessage.trim() && selectedConversation && canReply(selectedConversation)) {
-      onSendMessage(newMessage);
-      setNewMessage("");
+      setSending(true);
+      try {
+        await onSendMessage(newMessage);
+        setNewMessage("");
+      } finally {
+        setSending(false);
+      }
     }
   };
 
@@ -63,6 +69,9 @@ const ChatView = ({
       </Card>
     );
   }
+
+  const userCanReply = canReply(selectedConversation);
+  const isUnassigned = !selectedConversation.salespersonId;
 
   return (
     <Card className="flex-1 flex flex-col">
@@ -95,6 +104,12 @@ const ChatView = ({
             <Badge className={selectedConversation.status === 'engaged' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}>
               {selectedConversation.status}
             </Badge>
+            {isUnassigned && (
+              <Badge variant="outline" className="flex items-center space-x-1">
+                <Plus className="w-3 h-3" />
+                <span>Unassigned</span>
+              </Badge>
+            )}
             <Button 
               variant="outline" 
               size="sm"
@@ -112,39 +127,65 @@ const ChatView = ({
 
       {/* Messages */}
       <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))}
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-slate-500">
+            <div className="text-center">
+              <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              <p>No messages yet</p>
+              <p className="text-sm">Start the conversation by sending a message below</p>
+            </div>
+          </div>
+        ) : (
+          messages.map((message) => (
+            <MessageBubble key={message.id} message={message} />
+          ))
+        )}
       </CardContent>
 
       {/* Message Input */}
       <div className="border-t border-slate-200 p-4">
-        {canReply(selectedConversation) ? (
-          <div className="flex space-x-2">
-            <Textarea
-              placeholder="Type your message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              className="flex-1 min-h-[80px] resize-none"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-            />
-            <Button 
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim()}
-              className="px-6"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+        {userCanReply ? (
+          <div className="space-y-2">
+            {isUnassigned && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                <div className="flex items-center space-x-2">
+                  <Plus className="w-4 h-4" />
+                  <span>This lead will be assigned to you when you send the first message.</span>
+                </div>
+              </div>
+            )}
+            <div className="flex space-x-2">
+              <Textarea
+                placeholder="Type your message..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                className="flex-1 min-h-[80px] resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                disabled={sending}
+              />
+              <Button 
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || sending}
+                className="px-6"
+              >
+                {sending ? (
+                  <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="text-center py-4 text-slate-500">
             <User className="w-6 h-6 mx-auto mb-2" />
             <p>You can only view this conversation</p>
+            <p className="text-sm mt-1">This lead is assigned to another salesperson</p>
           </div>
         )}
       </div>

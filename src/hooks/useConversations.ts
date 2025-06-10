@@ -13,29 +13,34 @@ export const useConversations = () => {
     if (!profile) return;
 
     try {
-      // Get latest conversation for each lead
-      const { data: conversationsData, error } = await supabase
-        .from('conversations')
+      // Get all leads with their basic info and phone numbers
+      const { data: leadsData, error: leadsError } = await supabase
+        .from('leads')
         .select(`
-          *,
-          leads (
-            id,
-            first_name,
-            last_name,
-            vehicle_interest,
-            status,
-            salesperson_id,
-            phone_numbers (
-              number,
-              is_primary
-            )
+          id,
+          first_name,
+          last_name,
+          vehicle_interest,
+          status,
+          salesperson_id,
+          phone_numbers (
+            number,
+            is_primary
           )
         `)
+        .order('created_at', { ascending: false });
+
+      if (leadsError) throw leadsError;
+
+      // Get latest conversation for each lead
+      const { data: conversationsData, error: conversationsError } = await supabase
+        .from('conversations')
+        .select('*')
         .order('sent_at', { ascending: false });
 
-      if (error) throw error;
+      if (conversationsError) throw conversationsError;
 
-      // Group by lead and get latest message
+      // Group conversations by lead
       const conversationMap = new Map();
       conversationsData?.forEach(conv => {
         const leadId = conv.lead_id;
@@ -45,18 +50,22 @@ export const useConversations = () => {
         }
       });
 
-      const transformedConversations = Array.from(conversationMap.values()).map(conv => ({
-        leadId: conv.lead_id,
-        leadName: `${conv.leads.first_name} ${conv.leads.last_name}`,
-        leadPhone: conv.leads.phone_numbers.find(p => p.is_primary)?.number || 
-                  conv.leads.phone_numbers[0]?.number || '',
-        vehicleInterest: conv.leads.vehicle_interest,
-        unreadCount: conv.direction === 'in' && !conv.read_at ? 1 : 0,
-        lastMessage: conv.body,
-        lastMessageTime: new Date(conv.sent_at).toLocaleTimeString(),
-        status: conv.leads.status,
-        salespersonId: conv.leads.salesperson_id
-      }));
+      // Transform leads data to include conversation info
+      const transformedConversations = leadsData?.map(lead => {
+        const latestConv = conversationMap.get(lead.id);
+        return {
+          leadId: lead.id,
+          leadName: `${lead.first_name} ${lead.last_name}`,
+          leadPhone: lead.phone_numbers.find(p => p.is_primary)?.number || 
+                    lead.phone_numbers[0]?.number || '',
+          vehicleInterest: lead.vehicle_interest,
+          unreadCount: latestConv && latestConv.direction === 'in' && !latestConv.read_at ? 1 : 0,
+          lastMessage: latestConv?.body || 'No messages yet',
+          lastMessageTime: latestConv ? new Date(latestConv.sent_at).toLocaleTimeString() : '',
+          status: lead.status,
+          salespersonId: lead.salesperson_id
+        };
+      }) || [];
 
       setConversations(transformedConversations);
     } catch (error) {
@@ -93,8 +102,49 @@ export const useConversations = () => {
     }
   };
 
+  const assignCurrentUserToLead = async (leadId: string) => {
+    if (!profile) return false;
+
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ salesperson_id: profile.id })
+        .eq('id', leadId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error assigning lead:', error);
+      return false;
+    }
+  };
+
   const sendMessage = async (leadId: string, body: string, aiGenerated = false) => {
     try {
+      // Get the lead info
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .select(`
+          salesperson_id,
+          phone_numbers (
+            number,
+            is_primary
+          )
+        `)
+        .eq('id', leadId)
+        .single();
+
+      if (leadError) throw leadError;
+
+      // If lead is unassigned and user is trying to send a message, assign them
+      if (!leadData.salesperson_id && profile) {
+        const assigned = await assignCurrentUserToLead(leadId);
+        if (!assigned) {
+          console.error('Failed to assign lead to current user');
+          return;
+        }
+      }
+
       // First, save the message to the database
       const { data: messageData, error: dbError } = await supabase
         .from('conversations')
@@ -110,20 +160,6 @@ export const useConversations = () => {
         .single();
 
       if (dbError) throw dbError;
-
-      // Get the lead's phone number
-      const { data: leadData, error: leadError } = await supabase
-        .from('leads')
-        .select(`
-          phone_numbers (
-            number,
-            is_primary
-          )
-        `)
-        .eq('id', leadId)
-        .single();
-
-      if (leadError) throw leadError;
 
       const primaryPhone = leadData.phone_numbers.find(p => p.is_primary)?.number || 
                           leadData.phone_numbers[0]?.number;
@@ -186,8 +222,9 @@ export const useConversations = () => {
           .eq('id', messageData.id);
       }
 
-      // Refresh messages to show updated status
+      // Refresh messages and conversations to show updated status
       await fetchMessages(leadId);
+      await fetchConversations();
     } catch (error) {
       console.error('Error sending message:', error);
     }

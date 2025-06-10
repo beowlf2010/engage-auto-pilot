@@ -20,17 +20,21 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   // Filter conversations based on user role
   const filteredConversations = conversations.filter(conv => 
-    user.role === "manager" || user.role === "admin" || conv.salespersonId === user.id
+    user.role === "manager" || user.role === "admin" || conv.salespersonId === user.id || !conv.salespersonId
   );
 
   const selectedConversation = filteredConversations.find(conv => conv.leadId === selectedLead);
 
   const canReply = (conv: any) => {
-    return user.role === "manager" || user.role === "admin" || conv.salespersonId === user.id;
+    // Managers and admins can reply to any conversation
+    if (user.role === "manager" || user.role === "admin") return true;
+    
+    // Sales users can reply to their own leads or unassigned leads
+    return conv.salespersonId === user.id || !conv.salespersonId;
   };
 
   const handleSendMessage = async (message: string) => {
-    if (selectedLead && selectedConversation && canReply(selectedConversation)) {
+    if (selectedLead && selectedConversation) {
       await sendMessage(selectedLead, message);
     }
   };
