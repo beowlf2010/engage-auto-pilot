@@ -127,7 +127,7 @@ export const useLeads = () => {
           status: lead.status,
           salesperson: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : 'Unassigned',
           salespersonId: lead.salesperson_id,
-          aiOptIn: lead.ai_opt_in,
+          aiOptIn: lead.ai_opt_in || false, // Ensure this defaults to false
           aiStage: lead.ai_stage,
           nextAiSendAt: lead.next_ai_send_at,
           createdAt: lead.created_at,
