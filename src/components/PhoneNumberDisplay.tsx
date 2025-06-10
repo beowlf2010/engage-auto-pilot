@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Phone, PhoneCall } from "lucide-react";
 import { PhoneNumber } from "@/types/lead";
+import { formatPhoneForDisplay } from "@/utils/phoneUtils";
 
 interface PhoneNumberDisplayProps {
   phoneNumbers: PhoneNumber[];
@@ -39,7 +40,7 @@ const PhoneNumberDisplay = ({
     return (
       <div className="flex items-center space-x-2">
         <Phone className="w-4 h-4 text-slate-500" />
-        <span className="text-sm">{primaryPhone}</span>
+        <span className="text-sm">{formatPhoneForDisplay(primaryPhone)}</span>
         {phoneNumbers.length > 1 && (
           <Badge variant="secondary" className="text-xs">
             +{phoneNumbers.length - 1} more
@@ -55,7 +56,7 @@ const PhoneNumberDisplay = ({
         <div key={index} className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Phone className="w-4 h-4 text-slate-500" />
-            <span className="text-sm">{phone.number}</span>
+            <span className="text-sm">{formatPhoneForDisplay(phone.number)}</span>
             <Badge className={getPhoneTypeColor(phone.type)}>
               {getPhoneTypeLabel(phone.type)} - Priority {phone.priority}
             </Badge>

@@ -28,8 +28,22 @@ export interface DuplicateCheckResult {
   conflictingLead?: ProcessedLead;
 }
 
+// Normalize phone to E.164 format for comparison
 const normalizePhone = (phone: string): string => {
-  return phone.replace(/\D/g, '');
+  const digits = phone.replace(/\D/g, '');
+  
+  // Handle 10-digit numbers - add +1
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  
+  // Handle 11-digit numbers starting with 1
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  
+  // Return as-is if already in correct format or unknown format
+  return phone;
 };
 
 const normalizeEmail = (email: string): string => {
