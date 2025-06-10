@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Phone, Car, Brain, Send, User, MessageSquare, Plus } from "lucide-react";
+import { Phone, Car, Brain, Send, User, MessageSquare, Plus, Loader2 } from "lucide-react";
 import MessageBubble from "./MessageBubble";
+import { toggleFinnAI } from "@/services/finnAIService";
 
 interface Conversation {
   leadId: string;
@@ -15,6 +16,7 @@ interface Conversation {
   vehicleInterest: string;
   status: string;
   salespersonId: string;
+  aiOptIn?: boolean;
 }
 
 interface Message {
@@ -45,6 +47,7 @@ const ChatView = ({
 }: ChatViewProps) => {
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [togglingAI, setTogglingAI] = useState(false);
 
   const handleSendMessage = async () => {
     if (newMessage.trim() && selectedConversation && canReply(selectedConversation)) {
@@ -56,6 +59,23 @@ const ChatView = ({
         setSending(false);
       }
     }
+  };
+
+  const handleFinnAIToggle = async () => {
+    if (!selectedConversation || !canReply(selectedConversation)) return;
+    
+    setTogglingAI(true);
+    
+    const result = await toggleFinnAI(selectedConversation.leadId, selectedConversation.aiOptIn || false);
+    
+    if (result.success) {
+      // Update the conversation object locally
+      if (selectedConversation) {
+        selectedConversation.aiOptIn = result.newState;
+      }
+    }
+    
+    setTogglingAI(false);
   };
 
   if (!selectedConversation) {
@@ -118,8 +138,20 @@ const ChatView = ({
               <Brain className="w-4 h-4 mr-1" />
               Finn's Memory
             </Button>
-            <Button variant="outline" size="sm">
-              Toggle Finn AI
+            <Button 
+              variant={selectedConversation.aiOptIn ? "destructive" : "outline"} 
+              size="sm"
+              onClick={handleFinnAIToggle}
+              disabled={!userCanReply || togglingAI}
+            >
+              {togglingAI ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <>
+                  <Brain className="w-4 h-4 mr-1" />
+                  {selectedConversation.aiOptIn ? "Disable" : "Enable"} Finn
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -142,7 +174,6 @@ const ChatView = ({
         )}
       </CardContent>
 
-      {/* Message Input */}
       <div className="border-t border-slate-200 p-4">
         {userCanReply ? (
           <div className="space-y-2">

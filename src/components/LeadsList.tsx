@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PhoneNumberDisplay from "./PhoneNumberDisplay";
 import { useLeads } from "@/hooks/useLeads";
+import { toggleFinnAI } from "@/services/finnAIService";
 import { 
   Search, 
   Filter, 
@@ -34,7 +35,8 @@ const LeadsList = ({ user }: LeadsListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [contactFilter, setContactFilter] = useState("all");
-  const { leads, loading } = useLeads();
+  const [togglingAI, setTogglingAI] = useState<Set<number>>(new Set());
+  const { leads, loading, refetch } = useLeads();
 
   // Filter leads based on user role and search/status filters
   const filteredLeads = leads.filter(lead => {
@@ -98,6 +100,25 @@ const LeadsList = ({ user }: LeadsListProps) => {
   const handlePhoneSelect = (leadId: number, phoneNumber: string) => {
     console.log(`Switching lead ${leadId} to phone ${phoneNumber}`);
     // In real app, this would update the lead's primary phone
+  };
+
+  const handleFinnAIToggle = async (lead: any) => {
+    if (!canEdit(lead)) return;
+    
+    setTogglingAI(prev => new Set(prev).add(lead.id));
+    
+    const result = await toggleFinnAI(lead.id, lead.aiOptIn);
+    
+    if (result.success) {
+      // Refetch leads to get updated state
+      await refetch();
+    }
+    
+    setTogglingAI(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(lead.id);
+      return newSet;
+    });
   };
 
   if (loading) {
@@ -314,9 +335,14 @@ const LeadsList = ({ user }: LeadsListProps) => {
                   size="sm" 
                   variant={lead.aiOptIn ? "destructive" : "default"} 
                   className="px-3"
-                  disabled={!canEdit(lead)}
+                  disabled={!canEdit(lead) || togglingAI.has(lead.id)}
+                  onClick={() => handleFinnAIToggle(lead)}
                 >
-                  <Bot className="w-4 h-4" />
+                  {togglingAI.has(lead.id) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Bot className="w-4 h-4" />
+                  )}
                 </Button>
               </div>
             </CardContent>
