@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import CSVFieldMapper from "./CSVFieldMapper";
@@ -75,37 +74,52 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
     setUploading(true);
     
     try {
-      // Process the CSV data with the field mapping
-      const processedLeads = processLeads(csvData, mapping);
+      // Process the CSV data with the field mapping and duplicate detection
+      const processingResult = processLeads(csvData, mapping);
 
-      // Filter out leads without valid phone numbers
-      const validLeads = processedLeads.filter(lead => lead.primaryPhone);
-      
-      // Simulate processing time
+      // Simulate processing time with real-time feedback
       setTimeout(() => {
         const mockResult = {
           totalRows: csvData.rows.length,
-          successfulImports: validLeads.length,
-          errors: csvData.rows.length - validLeads.length,
-          duplicates: 0, // Would be calculated in real implementation
+          successfulImports: processingResult.validLeads.length,
+          errors: processingResult.errors.length,
+          duplicates: processingResult.duplicates.length,
           fileName: 'leads.csv',
           phoneNumberStats: {
-            cellOnly: validLeads.filter(l => l.phoneNumbers.length === 1 && l.phoneNumbers[0].type === 'cell').length,
-            multipleNumbers: validLeads.filter(l => l.phoneNumbers.length > 1).length,
-            dayPrimary: validLeads.filter(l => l.phoneNumbers.length > 0 && l.phoneNumbers[0].type === 'day').length
-          }
+            cellOnly: processingResult.validLeads.filter(l => l.phoneNumbers.length === 1 && l.phoneNumbers[0].type === 'cell').length,
+            multipleNumbers: processingResult.validLeads.filter(l => l.phoneNumbers.length > 1).length,
+            dayPrimary: processingResult.validLeads.filter(l => l.phoneNumbers.length > 0 && l.phoneNumbers[0].type === 'day').length
+          },
+          duplicateDetails: processingResult.duplicates.map(d => ({
+            rowIndex: d.rowIndex,
+            duplicateType: d.duplicateType,
+            leadName: `${d.lead.firstName} ${d.lead.lastName}`,
+            conflictingName: `${d.conflictingLead.firstName} ${d.conflictingLead.lastName}`
+          }))
         };
         
         setUploadResult(mockResult);
         setUploading(false);
         setShowMapper(false);
         
-        console.log('Processed leads:', validLeads);
-        
-        toast({
-          title: "Upload successful!",
-          description: `${mockResult.successfulImports} leads imported with phone priority system`,
+        console.log('Processing complete:', {
+          validLeads: processingResult.validLeads.length,
+          duplicates: processingResult.duplicates.length,
+          errors: processingResult.errors.length
         });
+        
+        if (processingResult.duplicates.length > 0) {
+          toast({
+            title: "Upload completed with duplicates detected",
+            description: `${processingResult.validLeads.length} leads imported, ${processingResult.duplicates.length} duplicates skipped`,
+            variant: "default"
+          });
+        } else {
+          toast({
+            title: "Upload successful!",
+            description: `${processingResult.validLeads.length} leads imported with no duplicates`,
+          });
+        }
       }, 3000);
       
     } catch (error) {
