@@ -13,7 +13,8 @@ import {
   Bot,
   User,
   Car,
-  Clock
+  Clock,
+  Users
 } from "lucide-react";
 
 interface LeadsListProps {
@@ -44,7 +45,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
       aiStage: "follow_up_2",
       nextAiSendAt: "2024-06-10 14:30:00",
       createdAt: "2024-06-08 09:15:00",
-      lastMessage: "Interested in financing options",
+      lastMessage: "Interested in financing options - Finn",
       unreadCount: 2
     },
     {
@@ -178,7 +179,10 @@ const LeadsList = ({ user }: LeadsListProps) => {
                 </div>
                 <div className="flex items-center space-x-1">
                   {lead.aiOptIn && (
-                    <Bot className="w-4 h-4 text-blue-500" title="AI enabled" />
+                    <div className="flex items-center space-x-1 text-blue-500" title="Finn AI enabled">
+                      <Bot className="w-4 h-4" />
+                      <span className="text-xs font-medium">Finn</span>
+                    </div>
                   )}
                   <User className="w-4 h-4 text-slate-400" />
                 </div>
@@ -218,7 +222,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
               {lead.aiOptIn && lead.nextAiSendAt && (
                 <div className="flex items-center space-x-2 text-xs text-slate-500">
                   <Clock className="w-3 h-3" />
-                  <span>Next AI follow-up: {new Date(lead.nextAiSendAt).toLocaleString()}</span>
+                  <span>Next Finn follow-up: {new Date(lead.nextAiSendAt).toLocaleString()}</span>
                 </div>
               )}
 
@@ -238,6 +242,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
                   variant={lead.aiOptIn ? "destructive" : "default"} 
                   className="px-3"
                   disabled={!canEdit(lead)}
+                  title={lead.aiOptIn ? "Disable Finn AI" : "Enable Finn AI"}
                 >
                   <Bot className="w-4 h-4" />
                 </Button>

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarContent, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Send, 
   Bot, 
@@ -76,7 +76,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
       id: 2,
       leadId: 1,
       direction: "out", 
-      body: "Hello Sarah! I'd be happy to help you with the Tesla Model 3. It's an excellent choice with amazing features like autopilot, supercharging network access, and incredible efficiency. Would you like to schedule a test drive?",
+      body: "Hello Sarah! This is Finn, your Internet Sales Specialist. I'd be happy to help you with the Tesla Model 3. It's an excellent choice with amazing features like autopilot, supercharging network access, and incredible efficiency. Would you like to schedule a test drive?\n\n- Finn, Internet Sales Specialist",
       sentAt: "2024-06-10 09:35:00",
       aiGenerated: true
     },
@@ -208,7 +208,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
                     {selectedConversation.status}
                   </Badge>
                   <Button variant="outline" size="sm">
-                    Toggle AI
+                    Toggle Finn AI
                   </Button>
                 </div>
               </div>
@@ -226,7 +226,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
                       ? 'bg-blue-500 text-white' 
                       : 'bg-slate-100 text-slate-800'
                   } rounded-lg p-3`}>
-                    <p className="text-sm">{message.body}</p>
+                    <p className="text-sm whitespace-pre-line">{message.body}</p>
                     <div className={`flex items-center justify-between mt-2 text-xs ${
                       message.direction === 'out' ? 'text-blue-100' : 'text-slate-500'
                     }`}>
@@ -234,7 +234,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
                       {message.aiGenerated && (
                         <div className="flex items-center space-x-1">
                           <Bot className="w-3 h-3" />
-                          <span>AI</span>
+                          <span>Finn</span>
                         </div>
                       )}
                     </div>
