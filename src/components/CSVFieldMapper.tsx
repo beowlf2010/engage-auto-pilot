@@ -45,79 +45,100 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
     lastName: ''
   });
 
-  // Improved auto-detection with flexible matching
+  // Improved auto-detection with exact and flexible matching
   const normalizeFieldName = (name: string): string => {
     return name.toLowerCase().replace(/[^a-z0-9]/g, '');
   };
 
-  const findBestMatch = (targetField: string, headers: string[]): string => {
-    const normalizedTarget = normalizeFieldName(targetField);
+  const findBestMatch = (targetPatterns: string[], headers: string[]): string => {
+    console.log('Finding match for patterns:', targetPatterns, 'in headers:', headers);
     
-    // Exact match first
-    for (const header of headers) {
-      if (normalizeFieldName(header) === normalizedTarget) {
-        return header;
+    // First try exact matches (case insensitive)
+    for (const pattern of targetPatterns) {
+      for (const header of headers) {
+        if (header.toLowerCase() === pattern.toLowerCase()) {
+          console.log('Exact match found:', header, 'for pattern:', pattern);
+          return header;
+        }
       }
     }
     
-    // Partial matches
-    for (const header of headers) {
-      const normalizedHeader = normalizeFieldName(header);
-      if (normalizedHeader.includes(normalizedTarget) || normalizedTarget.includes(normalizedHeader)) {
-        return header;
+    // Then try normalized matches
+    for (const pattern of targetPatterns) {
+      const normalizedPattern = normalizeFieldName(pattern);
+      for (const header of headers) {
+        const normalizedHeader = normalizeFieldName(header);
+        if (normalizedHeader === normalizedPattern) {
+          console.log('Normalized match found:', header, 'for pattern:', pattern);
+          return header;
+        }
+      }
+    }
+    
+    // Finally try partial matches
+    for (const pattern of targetPatterns) {
+      const normalizedPattern = normalizeFieldName(pattern);
+      for (const header of headers) {
+        const normalizedHeader = normalizeFieldName(header);
+        if (normalizedHeader.includes(normalizedPattern) || normalizedPattern.includes(normalizedHeader)) {
+          console.log('Partial match found:', header, 'for pattern:', pattern);
+          return header;
+        }
       }
     }
     
     return '';
   };
 
-  // Auto-detect common field mappings with improved logic
+  // Auto-detect common field mappings with improved patterns
   useEffect(() => {
+    console.log('Starting auto-detection with headers:', csvHeaders);
+    console.log('Sample data:', sampleData);
+    
     const autoMapping: FieldMapping = {
       firstName: '',
       lastName: ''
     };
 
-    // Define field mapping patterns
+    // Define comprehensive field mapping patterns for your specific CSV format
     const fieldPatterns: Record<keyof FieldMapping, string[]> = {
-      firstName: ['firstname', 'first_name', 'fname'],
-      lastName: ['lastname', 'last_name', 'lname'],
-      middleName: ['middlename', 'middle_name', 'mname'],
-      cellphone: ['cellphone', 'cell_phone', 'mobile', 'cell'],
-      dayphone: ['dayphone', 'day_phone', 'workphone', 'work_phone'],
-      evephone: ['evephone', 'eve_phone', 'eveningphone', 'evening_phone'],
-      email: ['email', 'emailaddress', 'email_address'],
-      emailAlt: ['emailalt', 'email_alt', 'alternatemail', 'secondary_email'],
-      address: ['address', 'street', 'streetaddress'],
+      firstName: ['firstname', 'first_name', 'fname', 'first name'],
+      lastName: ['lastname', 'last_name', 'lname', 'last name'],
+      middleName: ['middlename', 'middle_name', 'mname', 'middle name'],
+      cellphone: ['cellphone', 'cell_phone', 'mobile', 'cell', 'cell phone'],
+      dayphone: ['dayphone', 'day_phone', 'workphone', 'work_phone', 'day phone', 'work phone'],
+      evephone: ['evephone', 'eve_phone', 'eveningphone', 'evening_phone', 'evening phone'],
+      email: ['email', 'emailaddress', 'email_address', 'email address'],
+      emailAlt: ['emailalt', 'email_alt', 'alternatemail', 'secondary_email', 'email alt', 'alternate email'],
+      address: ['address', 'street', 'streetaddress', 'street address'],
       city: ['city'],
       state: ['state', 'province'],
-      postalCode: ['postalcode', 'postal_code', 'zipcode', 'zip_code', 'zip'],
-      vehicleYear: ['vehicleyear', 'vehicle_year', 'year'],
-      vehicleMake: ['vehiclemake', 'vehicle_make', 'make'],
-      vehicleModel: ['vehiclemodel', 'vehicle_model', 'model'],
-      vehicleVIN: ['vehiclevin', 'vehicle_vin', 'vin'],
-      vehicleStockNumber: ['vehiclestocknumber', 'vehicle_stock_number', 'stocknumber', 'stock_number'],
-      source: ['leadsourcename', 'lead_source_name', 'source', 'lead_source'],
-      salesPersonFirstName: ['salespersonfirstname', 'salesperson_first_name', 'sales_first_name'],
-      salesPersonLastName: ['salespersonlastname', 'salesperson_last_name', 'sales_last_name'],
-      doNotCall: ['donotcall', 'do_not_call', 'dnc'],
-      doNotEmail: ['donotemail', 'do_not_email', 'dne'],
-      doNotMail: ['donotmail', 'do_not_mail', 'dnm'],
-      leadType: ['leadtypename', 'lead_type_name', 'leadtype', 'lead_type'],
-      dealerId: ['dealerid', 'dealer_id', 'dealer']
+      postalCode: ['postalcode', 'postal_code', 'zipcode', 'zip_code', 'zip', 'postal code', 'zip code'],
+      vehicleYear: ['vehicleyear', 'vehicle_year', 'year', 'vehicle year'],
+      vehicleMake: ['vehiclemake', 'vehicle_make', 'make', 'vehicle make'],
+      vehicleModel: ['vehiclemodel', 'vehicle_model', 'model', 'vehicle model'],
+      vehicleVIN: ['vehiclevin', 'vehicle_vin', 'vin', 'vehicle vin'],
+      vehicleStockNumber: ['vehiclestocknumber', 'vehicle_stock_number', 'stocknumber', 'stock_number', 'vehicle stock number', 'stock number'],
+      source: ['leadsourcename', 'lead_source_name', 'source', 'lead_source', 'lead source name', 'lead source'],
+      salesPersonFirstName: ['salespersonfirstname', 'salesperson_first_name', 'sales_first_name', 'salesperson first name'],
+      salesPersonLastName: ['salespersonlastname', 'salesperson_last_name', 'sales_last_name', 'salesperson last name'],
+      doNotCall: ['donotcall', 'do_not_call', 'dnc', 'do not call'],
+      doNotEmail: ['donotemail', 'do_not_email', 'dne', 'do not email'],
+      doNotMail: ['donotmail', 'do_not_mail', 'dnm', 'do not mail'],
+      leadType: ['leadtypename', 'lead_type_name', 'leadtype', 'lead_type', 'lead type name', 'lead type'],
+      dealerId: ['dealerid', 'dealer_id', 'dealer', 'dealer id']
     };
 
     // Apply pattern matching for each field
     Object.entries(fieldPatterns).forEach(([fieldKey, patterns]) => {
-      for (const pattern of patterns) {
-        const match = findBestMatch(pattern, csvHeaders);
-        if (match) {
-          autoMapping[fieldKey as keyof FieldMapping] = match;
-          break;
-        }
+      const match = findBestMatch(patterns, csvHeaders);
+      if (match) {
+        autoMapping[fieldKey as keyof FieldMapping] = match;
+        console.log(`Auto-detected ${fieldKey}:`, match);
       }
     });
 
+    console.log('Final auto-mapping:', autoMapping);
     setMapping(autoMapping);
   }, [csvHeaders]);
 
@@ -126,7 +147,13 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
 
   const getSampleValue = (fieldKey: keyof FieldMapping): string => {
     const headerName = mapping[fieldKey];
-    return headerName && sampleData[headerName] ? sampleData[headerName] : '';
+    if (!headerName || !sampleData) {
+      return '';
+    }
+    
+    const value = sampleData[headerName];
+    console.log(`Getting sample for ${fieldKey} (${headerName}):`, value);
+    return value || '';
   };
 
   const isAutoDetected = (fieldKey: keyof FieldMapping): boolean => {
@@ -215,7 +242,7 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
           )}
         </CardTitle>
         <p className="text-sm text-slate-600">
-          {Object.keys(mapping).filter(key => mapping[key as keyof FieldMapping]).length} of {csvHeaders.length} fields auto-detected
+          {Object.values(mapping).filter(value => value).length} of {csvHeaders.length} fields auto-detected
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -226,34 +253,37 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
               <span>{section.title}</span>
             </h4>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {section.fields.map(({ key, label, required }) => (
-                <div key={key}>
-                  <label className="block text-sm font-medium mb-1 flex items-center space-x-2">
-                    <span>{label}</span>
-                    {required && (
-                      <Badge variant="destructive" className="text-xs">Required</Badge>
+              {section.fields.map(({ key, label, required }) => {
+                const sampleValue = getSampleValue(key);
+                return (
+                  <div key={key}>
+                    <label className="block text-sm font-medium mb-1 flex items-center space-x-2">
+                      <span>{label}</span>
+                      {required && (
+                        <Badge variant="destructive" className="text-xs">Required</Badge>
+                      )}
+                      {isAutoDetected(key) && (
+                        <Badge variant="secondary" className="text-xs">Auto-detected</Badge>
+                      )}
+                    </label>
+                    <select
+                      value={mapping[key] || ''}
+                      onChange={(e) => setMapping({...mapping, [key]: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                    >
+                      <option value="">Select field...</option>
+                      {csvHeaders.map(header => (
+                        <option key={header} value={header}>{header}</option>
+                      ))}
+                    </select>
+                    {sampleValue && (
+                      <p className="text-xs text-slate-500 mt-1 bg-slate-50 px-2 py-1 rounded truncate">
+                        Sample: {sampleValue}
+                      </p>
                     )}
-                    {isAutoDetected(key) && (
-                      <Badge variant="secondary" className="text-xs">Auto-detected</Badge>
-                    )}
-                  </label>
-                  <select
-                    value={mapping[key] || ''}
-                    onChange={(e) => setMapping({...mapping, [key]: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
-                  >
-                    <option value="">Select field...</option>
-                    {csvHeaders.map(header => (
-                      <option key={header} value={header}>{header}</option>
-                    ))}
-                  </select>
-                  {getSampleValue(key) && (
-                    <p className="text-xs text-slate-500 mt-1 bg-slate-50 px-2 py-1 rounded">
-                      Sample: {getSampleValue(key)}
-                    </p>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -264,7 +294,7 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
             disabled={!isValid}
             className="w-full"
           >
-            Continue with Field Mapping ({Object.keys(mapping).filter(key => mapping[key as keyof FieldMapping]).length} fields mapped)
+            Continue with Field Mapping ({Object.values(mapping).filter(value => value).length} fields mapped)
           </Button>
         </div>
       </CardContent>
