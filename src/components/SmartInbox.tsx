@@ -17,7 +17,10 @@ import {
   Car,
   MessageSquare,
   Brain,
-  Loader2
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  XCircle
 } from "lucide-react";
 
 interface SmartInboxProps {
@@ -54,6 +57,20 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const handleSelectConversation = (leadId: string) => {
     setSelectedLead(leadId);
     fetchMessages(leadId);
+  };
+
+  const getSMSStatusIcon = (status: string, error?: string) => {
+    switch (status) {
+      case 'sent':
+      case 'delivered':
+        return <CheckCircle className="w-3 h-3 text-green-500" />;
+      case 'pending':
+        return <Clock className="w-3 h-3 text-yellow-500" />;
+      case 'failed':
+        return <XCircle className="w-3 h-3 text-red-500" title={error} />;
+      default:
+        return <AlertCircle className="w-3 h-3 text-gray-500" />;
+    }
   };
 
   useEffect(() => {
@@ -196,12 +213,20 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
                         message.direction === 'out' ? 'text-blue-100' : 'text-slate-500'
                       }`}>
                         <span>{new Date(message.sentAt).toLocaleTimeString()}</span>
-                        {message.aiGenerated && (
-                          <div className="flex items-center space-x-1">
-                            <Bot className="w-3 h-3" />
-                            <span>Finn</span>
-                          </div>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          {message.aiGenerated && (
+                            <div className="flex items-center space-x-1">
+                              <Bot className="w-3 h-3" />
+                              <span>Finn</span>
+                            </div>
+                          )}
+                          {message.direction === 'out' && message.smsStatus && (
+                            <div className="flex items-center space-x-1">
+                              {getSMSStatusIcon(message.smsStatus, message.smsError)}
+                              <span className="text-xs">SMS</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

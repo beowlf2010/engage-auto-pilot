@@ -57,6 +57,9 @@ export type Database = {
           lead_id: string
           read_at: string | null
           sent_at: string
+          sms_error: string | null
+          sms_status: string | null
+          twilio_message_id: string | null
         }
         Insert: {
           ai_generated?: boolean
@@ -67,6 +70,9 @@ export type Database = {
           lead_id: string
           read_at?: string | null
           sent_at?: string
+          sms_error?: string | null
+          sms_status?: string | null
+          twilio_message_id?: string | null
         }
         Update: {
           ai_generated?: boolean
@@ -77,6 +83,9 @@ export type Database = {
           lead_id?: string
           read_at?: string | null
           sent_at?: string
+          sms_error?: string | null
+          sms_status?: string | null
+          twilio_message_id?: string | null
         }
         Relationships: [
           {

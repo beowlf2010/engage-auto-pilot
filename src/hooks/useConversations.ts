@@ -82,7 +82,9 @@ export const useConversations = () => {
         direction: msg.direction,
         body: msg.body,
         sentAt: msg.sent_at,
-        aiGenerated: msg.ai_generated
+        aiGenerated: msg.ai_generated,
+        smsStatus: msg.sms_status,
+        smsError: msg.sms_error
       })) || [];
 
       setMessages(transformedMessages);
@@ -93,19 +95,98 @@ export const useConversations = () => {
 
   const sendMessage = async (leadId: string, body: string, aiGenerated = false) => {
     try {
-      const { error } = await supabase
+      // First, save the message to the database
+      const { data: messageData, error: dbError } = await supabase
         .from('conversations')
         .insert({
           lead_id: leadId,
           direction: 'out',
           body,
           ai_generated: aiGenerated,
-          sent_at: new Date().toISOString()
+          sent_at: new Date().toISOString(),
+          sms_status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      // Get the lead's phone number
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .select(`
+          phone_numbers (
+            number,
+            is_primary
+          )
+        `)
+        .eq('id', leadId)
+        .single();
+
+      if (leadError) throw leadError;
+
+      const primaryPhone = leadData.phone_numbers.find(p => p.is_primary)?.number || 
+                          leadData.phone_numbers[0]?.number;
+
+      if (!primaryPhone) {
+        // Update message status to failed if no phone number
+        await supabase
+          .from('conversations')
+          .update({ 
+            sms_status: 'failed',
+            sms_error: 'No phone number available'
+          })
+          .eq('id', messageData.id);
+        
+        console.error('No phone number found for lead');
+        await fetchMessages(leadId);
+        return;
+      }
+
+      // Send SMS via Twilio Edge Function
+      try {
+        const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
+          body: {
+            to: primaryPhone,
+            body,
+            conversationId: messageData.id
+          }
         });
 
-      if (error) throw error;
+        if (smsError) throw smsError;
 
-      // Refresh messages
+        if (smsResult.success) {
+          // Update message with Twilio message ID and status
+          await supabase
+            .from('conversations')
+            .update({ 
+              sms_status: smsResult.status || 'sent',
+              twilio_message_id: smsResult.twilioMessageId
+            })
+            .eq('id', messageData.id);
+        } else {
+          // Update message status to failed
+          await supabase
+            .from('conversations')
+            .update({ 
+              sms_status: 'failed',
+              sms_error: smsResult.error
+            })
+            .eq('id', messageData.id);
+        }
+      } catch (smsError) {
+        console.error('SMS sending failed:', smsError);
+        // Update message status to failed
+        await supabase
+          .from('conversations')
+          .update({ 
+            sms_status: 'failed',
+            sms_error: smsError.message
+          })
+          .eq('id', messageData.id);
+      }
+
+      // Refresh messages to show updated status
       await fetchMessages(leadId);
     } catch (error) {
       console.error('Error sending message:', error);
