@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +17,9 @@ import {
   Car,
   Clock,
   Users,
-  Loader2
+  Loader2,
+  CheckCircle,
+  AlertTriangle
 } from "lucide-react";
 
 interface LeadsListProps {
@@ -29,6 +32,7 @@ interface LeadsListProps {
 const LeadsList = ({ user }: LeadsListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [messageFilter, setMessageFilter] = useState("all");
   const { leads, loading } = useLeads();
 
   // Filter leads based on user role and search/status filters
@@ -40,10 +44,14 @@ const LeadsList = ({ user }: LeadsListProps) => {
     
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
     
+    const matchesMessageFilter = messageFilter === "all" || 
+      (messageFilter === "messaged" && lead.hasBeenMessaged) ||
+      (messageFilter === "not_messaged" && !lead.hasBeenMessaged);
+    
     const hasAccess = user.role === "manager" || user.role === "admin" || 
       lead.salespersonId === user.id;
     
-    return matchesSearch && matchesStatus && hasAccess;
+    return matchesSearch && matchesStatus && matchesMessageFilter && hasAccess;
   });
 
   const getStatusColor = (status: string) => {
@@ -54,6 +62,24 @@ const LeadsList = ({ user }: LeadsListProps) => {
       case "closed": return "bg-gray-100 text-gray-800";
       default: return "bg-gray-100 text-gray-800";
     }
+  };
+
+  const getMessageStatusBadge = (lead: any) => {
+    if (!lead.hasBeenMessaged) {
+      return (
+        <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          Not Contacted
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+        <CheckCircle className="w-3 h-3 mr-1" />
+        {lead.messageCount} message{lead.messageCount !== 1 ? 's' : ''}
+      </Badge>
+    );
   };
 
   const canEdit = (lead: any) => {
@@ -104,7 +130,59 @@ const LeadsList = ({ user }: LeadsListProps) => {
             <option value="paused">Paused</option>
             <option value="closed">Closed</option>
           </select>
+          <select
+            value={messageFilter}
+            onChange={(e) => setMessageFilter(e.target.value)}
+            className="px-3 py-2 border border-slate-300 rounded-md bg-white text-sm"
+          >
+            <option value="all">All Messages</option>
+            <option value="not_messaged">Not Contacted</option>
+            <option value="messaged">Contacted</option>
+          </select>
         </div>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-5 h-5 text-orange-500" />
+              <div>
+                <p className="text-sm text-slate-600">Not Contacted</p>
+                <p className="text-2xl font-bold text-slate-800">
+                  {filteredLeads.filter(lead => !lead.hasBeenMessaged).length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="text-sm text-slate-600">Contacted</p>
+                <p className="text-2xl font-bold text-slate-800">
+                  {filteredLeads.filter(lead => lead.hasBeenMessaged).length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Users className="w-5 h-5 text-blue-500" />
+              <div>
+                <p className="text-sm text-slate-600">Total Leads</p>
+                <p className="text-2xl font-bold text-slate-800">
+                  {filteredLeads.length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Leads Grid */}
@@ -125,10 +203,11 @@ const LeadsList = ({ user }: LeadsListProps) => {
                   <CardTitle className="text-lg">
                     {lead.firstName} {lead.lastName}
                   </CardTitle>
-                  <div className="flex items-center space-x-2 mt-1">
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
                     <Badge className={getStatusColor(lead.status)}>
                       {lead.status}
                     </Badge>
+                    {getMessageStatusBadge(lead)}
                     {lead.unreadCount > 0 && (
                       <Badge variant="destructive" className="text-xs">
                         {lead.unreadCount} new
@@ -181,8 +260,9 @@ const LeadsList = ({ user }: LeadsListProps) => {
                 <div className="p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-start space-x-2">
                     <MessageSquare className="w-4 h-4 text-slate-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-slate-700">{lead.lastMessage}</p>
+                    <div className="flex-1">
+                      <p className="text-sm text-slate-700 line-clamp-2">{lead.lastMessage}</p>
+                      <p className="text-xs text-slate-500 mt-1">{lead.lastMessageTime}</p>
                     </div>
                   </div>
                 </div>
