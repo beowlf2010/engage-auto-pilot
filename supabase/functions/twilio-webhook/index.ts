@@ -73,7 +73,7 @@ serve(async (req) => {
   }
 })
 
-// Memory extraction function (simplified version)
+// Enhanced memory extraction function with inventory awareness
 async function extractAndStoreMemory(leadId: string, messageBody: string, direction: 'in' | 'out') {
   if (direction !== 'in') return;
 
@@ -108,6 +108,26 @@ async function extractAndStoreMemory(leadId: string, messageBody: string, direct
       memories.push({
         lead_id: leadId,
         content: 'Interested in test driving',
+        memory_type: 'preference',
+        confidence: 0.9
+      });
+    }
+
+    // Extract vehicle preferences
+    if (lowerMessage.includes('color') || lowerMessage.includes('mileage') || lowerMessage.includes('year')) {
+      memories.push({
+        lead_id: leadId,
+        content: `Specific vehicle requirements mentioned: "${messageBody}"`,
+        memory_type: 'preference',
+        confidence: 0.8
+      });
+    }
+
+    // Extract trade-in interest
+    if (lowerMessage.includes('trade') || lowerMessage.includes('current car') || lowerMessage.includes('my car')) {
+      memories.push({
+        lead_id: leadId,
+        content: 'Has trade-in vehicle',
         memory_type: 'preference',
         confidence: 0.9
       });

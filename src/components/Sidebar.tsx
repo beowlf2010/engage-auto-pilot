@@ -1,121 +1,149 @@
 
-import { cn } from "@/lib/utils";
+import { useState } from "react";
 import { 
-  LayoutDashboard, 
+  Home, 
   Users, 
   MessageSquare, 
   Upload, 
   Settings,
-  Car
+  Car,
+  Menu,
+  X,
+  LogOut
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface SidebarProps {
   user: {
-    id: string;
-    email: string;
-    role: string;
     firstName: string;
     lastName: string;
+    role: string;
   };
   activeView: string;
   onViewChange: (view: string) => void;
-  unreadCount?: number;
+  unreadCount: number;
 }
 
-const Sidebar = ({ user, activeView, onViewChange, unreadCount = 0 }: SidebarProps) => {
-  const menuItems = [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: LayoutDashboard,
-      roles: ["sales", "manager", "admin"]
-    },
-    {
-      id: "leads",
-      label: "Leads",
-      icon: Users,
-      roles: ["sales", "manager", "admin"]
-    },
-    {
-      id: "inbox",
-      label: "Smart Inbox",
-      icon: MessageSquare,
-      roles: ["sales", "manager", "admin"],
-      badge: unreadCount > 0 ? unreadCount.toString() : undefined
-    },
-    {
-      id: "upload",
-      label: "Upload Leads",
-      icon: Upload,
-      roles: ["manager", "admin"]
-    },
-    {
-      id: "settings",
-      label: "Settings",
-      icon: Settings,
-      roles: ["sales", "manager", "admin"]
+const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account",
+      });
+    } catch (error) {
+      toast({
+        title: "Error signing out",
+        description: "There was a problem signing you out",
+        variant: "destructive",
+      });
     }
+  };
+
+  const navigation = [
+    { id: "dashboard", label: "Dashboard", icon: Home },
+    { id: "leads", label: "Leads", icon: Users },
+    { 
+      id: "inbox", 
+      label: "Smart Inbox", 
+      icon: MessageSquare,
+      badge: unreadCount > 0 ? unreadCount : undefined
+    },
+    ...(["manager", "admin"].includes(user.role) ? [
+      { id: "upload", label: "Upload Leads", icon: Upload },
+      { id: "inventory", label: "Upload Inventory", icon: Car }
+    ] : []),
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  const filteredItems = menuItems.filter(item => 
-    item.roles.includes(user.role)
-  );
-
   return (
-    <div className="w-64 bg-white shadow-xl border-r border-slate-200">
-      {/* Logo & Branding */}
-      <div className="p-6 border-b border-slate-200">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
-            <Car className="w-5 h-5 text-white" />
-          </div>
+    <div className={`bg-white border-r border-slate-200 transition-all duration-300 ${
+      isCollapsed ? "w-20" : "w-64"
+    } flex flex-col h-screen`}>
+      {/* Header */}
+      <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+        {!isCollapsed && (
           <div>
-            <h1 className="text-lg font-bold text-slate-800">Auto Lead AI</h1>
-            <p className="text-xs text-slate-500">CRM System</p>
+            <h1 className="font-bold text-xl text-slate-800">CRM</h1>
+            <p className="text-sm text-slate-600">Sales Dashboard</p>
           </div>
-        </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="p-2"
+        >
+          {isCollapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
+        </Button>
       </div>
 
       {/* User Info */}
-      <div className="p-4 border-b border-slate-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-semibold text-sm">
+      {!isCollapsed && (
+        <div className="p-4 border-b border-slate-200">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
               {user.firstName[0]}{user.lastName[0]}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-800 truncate">
-              {user.firstName} {user.lastName}
-            </p>
-            <p className="text-xs text-slate-500 capitalize">{user.role}</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-800 truncate">
+                {user.firstName} {user.lastName}
+              </p>
+              <p className="text-xs text-slate-600 capitalize">{user.role}</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Navigation */}
-      <nav className="p-4 space-y-2">
-        {filteredItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onViewChange(item.id)}
-            className={cn(
-              "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200",
-              activeView === item.id
-                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-            )}
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="flex-1 font-medium">{item.label}</span>
-            {item.badge && (
-              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                {item.badge}
-              </span>
-            )}
-          </button>
-        ))}
+      <nav className="flex-1 p-4 space-y-2">
+        {navigation.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeView === item.id;
+          
+          return (
+            <Button
+              key={item.id}
+              variant={isActive ? "default" : "ghost"}
+              className={`w-full justify-start ${isCollapsed ? "px-3" : ""}`}
+              onClick={() => onViewChange(item.id)}
+            >
+              <Icon className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
+              {!isCollapsed && (
+                <>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {item.badge && (
+                    <Badge variant="destructive" className="ml-2">
+                      {item.badge}
+                    </Badge>
+                  )}
+                </>
+              )}
+            </Button>
+          );
+        })}
       </nav>
+
+      {/* Sign Out */}
+      <div className="p-4 border-t border-slate-200">
+        <Button
+          variant="ghost"
+          className={`w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 ${
+            isCollapsed ? "px-3" : ""
+          }`}
+          onClick={handleSignOut}
+        >
+          <LogOut className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
+          {!isCollapsed && "Sign Out"}
+        </Button>
+      </div>
     </div>
   );
 };

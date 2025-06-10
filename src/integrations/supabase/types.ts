@@ -97,6 +97,129 @@ export type Database = {
           },
         ]
       }
+      inventory: {
+        Row: {
+          body_style: string | null
+          carfax_url: string | null
+          color_exterior: string | null
+          color_interior: string | null
+          condition: string
+          created_at: string
+          days_in_inventory: number | null
+          dealer_notes: string | null
+          description: string | null
+          drivetrain: string | null
+          engine: string | null
+          features: string[] | null
+          fuel_type: string | null
+          id: string
+          images: string[] | null
+          location: string | null
+          make: string
+          mileage: number | null
+          model: string
+          msrp: number | null
+          price: number | null
+          sold_at: string | null
+          status: string
+          stock_number: string | null
+          transmission: string | null
+          trim: string | null
+          updated_at: string
+          vin: string
+          year: number | null
+        }
+        Insert: {
+          body_style?: string | null
+          carfax_url?: string | null
+          color_exterior?: string | null
+          color_interior?: string | null
+          condition?: string
+          created_at?: string
+          days_in_inventory?: number | null
+          dealer_notes?: string | null
+          description?: string | null
+          drivetrain?: string | null
+          engine?: string | null
+          features?: string[] | null
+          fuel_type?: string | null
+          id?: string
+          images?: string[] | null
+          location?: string | null
+          make: string
+          mileage?: number | null
+          model: string
+          msrp?: number | null
+          price?: number | null
+          sold_at?: string | null
+          status?: string
+          stock_number?: string | null
+          transmission?: string | null
+          trim?: string | null
+          updated_at?: string
+          vin: string
+          year?: number | null
+        }
+        Update: {
+          body_style?: string | null
+          carfax_url?: string | null
+          color_exterior?: string | null
+          color_interior?: string | null
+          condition?: string
+          created_at?: string
+          days_in_inventory?: number | null
+          dealer_notes?: string | null
+          description?: string | null
+          drivetrain?: string | null
+          engine?: string | null
+          features?: string[] | null
+          fuel_type?: string | null
+          id?: string
+          images?: string[] | null
+          location?: string | null
+          make?: string
+          mileage?: number | null
+          model?: string
+          msrp?: number | null
+          price?: number | null
+          sold_at?: string | null
+          status?: string
+          stock_number?: string | null
+          transmission?: string | null
+          trim?: string | null
+          updated_at?: string
+          vin?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
+      lead_inventory_interests: {
+        Row: {
+          created_at: string
+          id: string
+          interest_type: string
+          inventory_id: string
+          lead_id: string
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          interest_type?: string
+          inventory_id: string
+          lead_id: string
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          interest_type?: string
+          inventory_id?: string
+          lead_id?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           address: string | null
@@ -109,16 +232,23 @@ export type Database = {
           do_not_mail: boolean
           email: string | null
           email_alt: string | null
+          financing_needed: boolean | null
           first_name: string
           id: string
           last_name: string
           middle_name: string | null
           next_ai_send_at: string | null
           postal_code: string | null
+          preferred_mileage_max: number | null
+          preferred_price_max: number | null
+          preferred_price_min: number | null
+          preferred_year_max: number | null
+          preferred_year_min: number | null
           salesperson_id: string | null
           source: string
           state: string | null
           status: string
+          trade_in_vehicle: string | null
           updated_at: string
           vehicle_interest: string
           vehicle_make: string | null
@@ -137,16 +267,23 @@ export type Database = {
           do_not_mail?: boolean
           email?: string | null
           email_alt?: string | null
+          financing_needed?: boolean | null
           first_name: string
           id?: string
           last_name: string
           middle_name?: string | null
           next_ai_send_at?: string | null
           postal_code?: string | null
+          preferred_mileage_max?: number | null
+          preferred_price_max?: number | null
+          preferred_price_min?: number | null
+          preferred_year_max?: number | null
+          preferred_year_min?: number | null
           salesperson_id?: string | null
           source?: string
           state?: string | null
           status?: string
+          trade_in_vehicle?: string | null
           updated_at?: string
           vehicle_interest: string
           vehicle_make?: string | null
@@ -165,16 +302,23 @@ export type Database = {
           do_not_mail?: boolean
           email?: string | null
           email_alt?: string | null
+          financing_needed?: boolean | null
           first_name?: string
           id?: string
           last_name?: string
           middle_name?: string | null
           next_ai_send_at?: string | null
           postal_code?: string | null
+          preferred_mileage_max?: number | null
+          preferred_price_max?: number | null
+          preferred_price_min?: number | null
+          preferred_year_max?: number | null
+          preferred_year_min?: number | null
           salesperson_id?: string | null
           source?: string
           state?: string | null
           status?: string
+          trade_in_vehicle?: string | null
           updated_at?: string
           vehicle_interest?: string
           vehicle_make?: string | null
@@ -236,6 +380,36 @@ export type Database = {
           },
         ]
       }
+      pricing_disclaimers: {
+        Row: {
+          created_at: string
+          disclaimer_text: string
+          disclaimer_type: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          disclaimer_text: string
+          disclaimer_type?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          disclaimer_text?: string
+          disclaimer_type?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -274,6 +448,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      find_matching_inventory: {
+        Args: { p_lead_id: string }
+        Returns: {
+          inventory_id: string
+          match_score: number
+          vin: string
+          year: number
+          make: string
+          model: string
+          price: number
+        }[]
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -284,6 +470,10 @@ export type Database = {
       }
       set_primary_phone: {
         Args: { p_lead_id: string; p_phone_id: string }
+        Returns: undefined
+      }
+      update_inventory_days: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
     }

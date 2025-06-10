@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +10,7 @@ import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
 import LeadsList from "@/components/LeadsList";
 import UploadLeads from "@/components/UploadLeads";
+import InventoryUpload from "@/components/InventoryUpload";
 import Settings from "@/components/Settings";
 import SmartInbox from "@/components/SmartInbox";
 
@@ -54,6 +56,8 @@ const Index = () => {
         return <SmartInbox user={user} />;
       case "upload":
         return <UploadLeads user={user} />;
+      case "inventory":
+        return <InventoryUpload user={user} />;
       case "settings":
         return <Settings user={user} />;
       default:

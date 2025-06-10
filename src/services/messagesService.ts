@@ -1,149 +1,125 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import type { MessageData } from '@/types/conversation';
-import { assignCurrentUserToLead } from './conversationsService';
+import { toast } from '@/hooks/use-toast';
 import { extractAndStoreMemory } from './aiMemoryService';
-
-export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
-  try {
-    const { data: messagesData, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('sent_at', { ascending: true });
-
-    if (error) throw error;
-
-    const transformedMessages = messagesData?.map(msg => ({
-      id: msg.id,
-      leadId: msg.lead_id,
-      direction: msg.direction as 'in' | 'out',
-      body: msg.body,
-      sentAt: msg.sent_at,
-      aiGenerated: msg.ai_generated || false,
-      smsStatus: msg.sms_status || undefined,
-      smsError: msg.sms_error || undefined
-    })) || [];
-
-    return transformedMessages;
-  } catch (error) {
-    console.error('Error fetching messages:', error);
-    return [];
-  }
-};
+import { addDisclaimersToMessage, validateMessageForCompliance } from './pricingDisclaimerService';
 
 export const sendMessage = async (
   leadId: string, 
-  body: string, 
+  message: string, 
   profile: any, 
-  aiGenerated = false
-): Promise<void> => {
+  isAI: boolean = false
+) => {
   try {
-    // Get the lead info
-    const { data: leadData, error: leadError } = await supabase
-      .from('leads')
-      .select(`
-        salesperson_id,
-        phone_numbers (
-          number,
-          is_primary
-        )
-      `)
-      .eq('id', leadId)
-      .single();
-
-    if (leadError) throw leadError;
-
-    // If lead is unassigned and user is trying to send a message, assign them
-    if (!leadData.salesperson_id && profile) {
-      const assigned = await assignCurrentUserToLead(leadId, profile.id);
-      if (!assigned) {
-        console.error('Failed to assign lead to current user');
-        return;
-      }
+    // Validate compliance for pricing content
+    const compliance = validateMessageForCompliance(message);
+    
+    if (!compliance.isCompliant && !isAI) {
+      // For manual messages, warn but don't block
+      toast({
+        title: "Pricing Compliance Warning",
+        description: "This message contains pricing but may be missing disclaimers. Please review.",
+        variant: "default"
+      });
     }
 
-    // First, save the message to the database
-    const { data: messageData, error: dbError } = await supabase
+    // For AI messages, automatically add disclaimers
+    let finalMessage = message;
+    if (isAI && compliance.hasPrice && !compliance.hasDisclaimer) {
+      finalMessage = await addDisclaimersToMessage(message, {
+        isInventoryRelated: true, // Assume AI messages are often inventory-related
+        mentionsFinancing: message.toLowerCase().includes('financ'),
+        mentionsTradeIn: message.toLowerCase().includes('trade'),
+        mentionsLease: message.toLowerCase().includes('lease')
+      });
+    }
+
+    // Get lead's primary phone number
+    const { data: phoneData, error: phoneError } = await supabase
+      .from('phone_numbers')
+      .select('number')
+      .eq('lead_id', leadId)
+      .eq('is_primary', true)
+      .single();
+
+    if (phoneError || !phoneData) {
+      throw new Error('No primary phone number found for this lead');
+    }
+
+    // Store the conversation record first
+    const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
       .insert({
         lead_id: leadId,
+        body: finalMessage,
         direction: 'out',
-        body,
-        ai_generated: aiGenerated,
+        ai_generated: isAI,
         sent_at: new Date().toISOString(),
         sms_status: 'pending'
       })
       .select()
       .single();
 
-    if (dbError) throw dbError;
-
-    // Store memory from outgoing messages too if AI generated
-    if (aiGenerated) {
-      await extractAndStoreMemory(leadId, body, 'out');
+    if (conversationError) {
+      throw conversationError;
     }
 
-    const primaryPhone = leadData.phone_numbers.find(p => p.is_primary)?.number || 
-                        leadData.phone_numbers[0]?.number;
-
-    if (!primaryPhone) {
-      // Update message status to failed if no phone number
-      await supabase
-        .from('conversations')
-        .update({ 
-          sms_status: 'failed',
-          sms_error: 'No phone number available'
-        })
-        .eq('id', messageData.id);
-      
-      console.error('No phone number found for lead');
-      return;
-    }
-
-    // Send SMS via Twilio Edge Function
-    try {
-      const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
-        body: {
-          to: primaryPhone,
-          body,
-          conversationId: messageData.id
-        }
-      });
-
-      if (smsError) throw smsError;
-
-      if (smsResult.success) {
-        // Update message with Twilio message ID and status
-        await supabase
-          .from('conversations')
-          .update({ 
-            sms_status: smsResult.status || 'sent',
-            twilio_message_id: smsResult.twilioMessageId
-          })
-          .eq('id', messageData.id);
-      } else {
-        // Update message status to failed
-        await supabase
-          .from('conversations')
-          .update({ 
-            sms_status: 'failed',
-            sms_error: smsResult.error
-          })
-          .eq('id', messageData.id);
+    // Send SMS via Supabase Edge Function
+    const { data, error } = await supabase.functions.invoke('send-sms', {
+      body: {
+        to: phoneData.number,
+        message: finalMessage,
+        conversationId: conversation.id
       }
-    } catch (smsError) {
-      console.error('SMS sending failed:', smsError);
-      // Update message status to failed
+    });
+
+    if (error) {
+      // Update conversation with error status
       await supabase
         .from('conversations')
-        .update({ 
+        .update({
           sms_status: 'failed',
-          sms_error: smsError.message
+          sms_error: error.message
         })
-        .eq('id', messageData.id);
+        .eq('id', conversation.id);
+      
+      throw error;
     }
+
+    // Update conversation with success status and Twilio message ID
+    await supabase
+      .from('conversations')
+      .update({
+        sms_status: 'sent',
+        twilio_message_id: data?.messageSid
+      })
+      .eq('id', conversation.id);
+
+    // Store memory from outgoing message
+    await extractAndStoreMemory(leadId, finalMessage, 'out');
+
+    console.log(`Message sent successfully to lead ${leadId}`);
+    
+    // Show compliance info if disclaimers were added
+    if (finalMessage !== message) {
+      toast({
+        title: "Message Sent with Disclaimers",
+        description: "Pricing disclaimers were automatically added for compliance",
+      });
+    } else {
+      toast({
+        title: "Message Sent",
+        description: "Your message has been delivered",
+      });
+    }
+
   } catch (error) {
     console.error('Error sending message:', error);
+    toast({
+      title: "Failed to send message",
+      description: error instanceof Error ? error.message : "Unknown error occurred",
+      variant: "destructive"
+    });
+    throw error;
   }
 };

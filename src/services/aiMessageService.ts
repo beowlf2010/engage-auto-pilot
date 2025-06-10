@@ -1,103 +1,148 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { getLeadMemory } from './aiMemoryService';
+import { findMatchingInventory } from './inventoryService';
+import { addDisclaimersToMessage, detectsPricing } from './pricingDisclaimerService';
 
 export interface AIMessageTemplate {
-  id: string;
-  name: string;
-  content: string;
   stage: string;
+  template: string;
   delayHours: number;
 }
 
-export const defaultTemplates: AIMessageTemplate[] = [
+const AI_MESSAGE_TEMPLATES: AIMessageTemplate[] = [
   {
-    id: 'initial',
-    name: 'Initial Contact',
-    content: "Hi {firstName}! Thanks for your interest in the {vehicleInterest}. I'd love to help you find the perfect vehicle. When would be a good time to chat?",
     stage: 'initial',
+    template: `Hi {firstName}! I'm Finn from the dealership. I see you're interested in {vehicleInterest}. {inventoryMessage} Would you like to schedule a time to see it?`,
     delayHours: 0
   },
   {
-    id: 'followup1',
-    name: 'Follow-up 1',
-    content: "Hi {firstName}, just wanted to follow up on your interest in the {vehicleInterest}. We have some great financing options available. Would you like to schedule a test drive?",
-    stage: 'followup1',
-    delayHours: 48
+    stage: 'follow_up_1',
+    template: `Hi {firstName}, just wanted to follow up on {vehicleInterest}. {inventoryMessage} {availabilityMessage} Any questions I can help with?`,
+    delayHours: 24
   },
   {
-    id: 'followup2',
-    name: 'Follow-up 2',
-    content: "Hi {firstName}, I wanted to reach out one more time about the {vehicleInterest}. We're running some special promotions this month. Are you still interested in learning more?",
-    stage: 'followup2',
-    delayHours: 120
+    stage: 'follow_up_2',
+    template: `Hey {firstName}! {inventoryMessage} {pricingMessage} Would you like to come in for a test drive this week?`,
+    delayHours: 72
+  },
+  {
+    stage: 'follow_up_3',
+    template: `Hi {firstName}, {memoryMessage} {inventoryMessage} We're here to help when you're ready!`,
+    delayHours: 168
   }
 ];
 
+const generateInventoryMessage = async (leadId: string, vehicleInterest: string) => {
+  try {
+    const matchingInventory = await findMatchingInventory(leadId);
+    
+    if (matchingInventory.length === 0) {
+      return {
+        inventoryMessage: "We have several vehicles that might interest you.",
+        availabilityMessage: "Let me know what specific features you're looking for!",
+        pricingMessage: "",
+        context: { isInventoryRelated: false }
+      };
+    }
+
+    const topMatch = matchingInventory[0];
+    const price = topMatch.price ? `$${topMatch.price.toLocaleString()}` : '';
+    
+    let inventoryMessage = `I have a ${topMatch.year} ${topMatch.make} ${topMatch.model}`;
+    if (price) {
+      inventoryMessage += ` priced at ${price}`;
+    }
+    inventoryMessage += ` that matches what you're looking for.`;
+
+    const availabilityMessage = matchingInventory.length > 1 
+      ? `We also have ${matchingInventory.length - 1} other similar vehicles available.`
+      : "This one is perfect for your needs!";
+
+    const pricingMessage = price 
+      ? `The ${topMatch.year} ${topMatch.make} ${topMatch.model} is priced at ${price}.`
+      : "";
+
+    return {
+      inventoryMessage,
+      availabilityMessage,
+      pricingMessage,
+      context: { 
+        isInventoryRelated: true,
+        mentionsFinancing: false,
+        mentionsTradeIn: false,
+        mentionsLease: false
+      }
+    };
+  } catch (error) {
+    console.error('Error generating inventory message:', error);
+    return {
+      inventoryMessage: "We have several vehicles that might interest you.",
+      availabilityMessage: "Let me know what you're looking for!",
+      pricingMessage: "",
+      context: { isInventoryRelated: false }
+    };
+  }
+};
+
 export const generateAIMessage = async (leadId: string): Promise<string | null> => {
   try {
-    // Get lead information
+    // Get lead data
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select(`
-        *,
-        conversation_memory (
-          content,
-          memory_type,
-          confidence
-        ),
-        conversations (
-          body,
-          direction,
-          sent_at
-        )
-      `)
+      .select('*')
       .eq('id', leadId)
       .single();
 
-    if (leadError) throw leadError;
-
-    // Determine the appropriate message stage
-    const conversations = lead.conversations || [];
-    const aiMessages = conversations.filter(c => c.direction === 'out');
-    const currentStage = lead.ai_stage || 'initial';
-    
-    let nextStage = currentStage;
-    if (currentStage === 'initial' && aiMessages.length >= 1) {
-      nextStage = 'followup1';
-    } else if (currentStage === 'followup1' && aiMessages.length >= 2) {
-      nextStage = 'followup2';
-    } else if (currentStage === 'followup2' && aiMessages.length >= 3) {
-      // Max follow-ups reached
+    if (leadError || !lead) {
+      console.error('Error fetching lead:', leadError);
       return null;
     }
 
-    // Get the template for this stage
-    const template = defaultTemplates.find(t => t.stage === nextStage);
-    if (!template) return null;
-
-    // Personalize the message
-    let message = template.content
-      .replace(/{firstName}/g, lead.first_name)
-      .replace(/{lastName}/g, lead.last_name)
-      .replace(/{vehicleInterest}/g, lead.vehicle_interest);
-
-    // Add memory-based personalization if available
-    const preferences = lead.conversation_memory?.filter(m => m.memory_type === 'preference') || [];
-    if (preferences.length > 0) {
-      const highConfidencePrefs = preferences.filter(p => p.confidence > 0.8);
-      if (highConfidencePrefs.length > 0) {
-        message += ` I noticed you mentioned ${highConfidencePrefs[0].content}.`;
-      }
+    // Get current AI stage
+    const currentStage = lead.ai_stage || 'initial';
+    
+    // Find next stage
+    const currentIndex = AI_MESSAGE_TEMPLATES.findIndex(t => t.stage === currentStage);
+    if (currentIndex === -1 || currentIndex >= AI_MESSAGE_TEMPLATES.length - 1) {
+      console.log('No more AI messages for this lead');
+      return null;
     }
 
-    // Update lead's AI stage
-    await supabase
-      .from('leads')
-      .update({ ai_stage: nextStage })
-      .eq('id', leadId);
+    const template = AI_MESSAGE_TEMPLATES[currentIndex];
+    
+    // Get lead memory for personalization
+    const memory = await getLeadMemory(leadId);
+    const memoryInsights = memory
+      .filter(m => m.memory_type === 'preference')
+      .slice(0, 2)
+      .map(m => m.content)
+      .join('. ');
 
+    // Generate inventory-specific content
+    const inventoryData = await generateInventoryMessage(leadId, lead.vehicle_interest);
+
+    // Replace template variables
+    let message = template.template
+      .replace(/{firstName}/g, lead.first_name)
+      .replace(/{lastName}/g, lead.last_name)
+      .replace(/{vehicleInterest}/g, lead.vehicle_interest)
+      .replace(/{inventoryMessage}/g, inventoryData.inventoryMessage)
+      .replace(/{availabilityMessage}/g, inventoryData.availabilityMessage)
+      .replace(/{pricingMessage}/g, inventoryData.pricingMessage)
+      .replace(/{memoryMessage}/g, memoryInsights || 'Hope you\'re doing well!');
+
+    // Clean up any leftover placeholders
+    message = message.replace(/{[^}]*}/g, '').replace(/\s+/g, ' ').trim();
+
+    // Add pricing disclaimers if needed
+    if (detectsPricing(message)) {
+      message = await addDisclaimersToMessage(message, inventoryData.context);
+    }
+
+    console.log(`Generated AI message for ${lead.first_name}: ${message}`);
     return message;
+
   } catch (error) {
     console.error('Error generating AI message:', error);
     return null;
@@ -106,35 +151,38 @@ export const generateAIMessage = async (leadId: string): Promise<string | null> 
 
 export const scheduleNextAIMessage = async (leadId: string): Promise<void> => {
   try {
+    // Get current stage
     const { data: lead, error } = await supabase
       .from('leads')
       .select('ai_stage')
       .eq('id', leadId)
       .single();
 
-    if (error) throw error;
+    if (error || !lead) return;
 
     const currentStage = lead.ai_stage || 'initial';
-    let nextTemplate: AIMessageTemplate | undefined;
+    const currentIndex = AI_MESSAGE_TEMPLATES.findIndex(t => t.stage === currentStage);
+    
+    // Move to next stage
+    if (currentIndex < AI_MESSAGE_TEMPLATES.length - 1) {
+      const nextTemplate = AI_MESSAGE_TEMPLATES[currentIndex + 1];
+      const nextSendTime = new Date();
+      nextSendTime.setHours(nextSendTime.getHours() + nextTemplate.delayHours);
 
-    if (currentStage === 'initial') {
-      nextTemplate = defaultTemplates.find(t => t.stage === 'followup1');
-    } else if (currentStage === 'followup1') {
-      nextTemplate = defaultTemplates.find(t => t.stage === 'followup2');
-    }
-
-    if (nextTemplate) {
-      const nextSendTime = new Date(Date.now() + nextTemplate.delayHours * 60 * 60 * 1000);
-      
       await supabase
         .from('leads')
-        .update({ next_ai_send_at: nextSendTime.toISOString() })
+        .update({
+          ai_stage: nextTemplate.stage,
+          next_ai_send_at: nextSendTime.toISOString()
+        })
         .eq('id', leadId);
     } else {
-      // No more follow-ups, clear the schedule
+      // No more messages, clear schedule
       await supabase
         .from('leads')
-        .update({ next_ai_send_at: null })
+        .update({
+          next_ai_send_at: null
+        })
         .eq('id', leadId);
     }
   } catch (error) {
