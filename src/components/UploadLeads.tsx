@@ -66,9 +66,9 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
     const lines = text.split('\n').filter(line => line.trim());
     if (lines.length < 2) throw new Error('CSV must have at least a header and one data row');
     
-    const headers = lines[0].split('\t').map(h => h.trim()); // Tab-separated based on your sample
+    const headers = lines[0].split(',').map(h => h.trim()); // Changed from tab to comma separation
     const rows = lines.slice(1).map(line => {
-      const values = line.split('\t');
+      const values = line.split(',');
       const row: Record<string, string> = {};
       headers.forEach((header, index) => {
         row[header] = values[index]?.trim() || '';
