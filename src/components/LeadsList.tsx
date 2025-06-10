@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -179,7 +178,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
                 </div>
                 <div className="flex items-center space-x-1">
                   {lead.aiOptIn && (
-                    <div className="flex items-center space-x-1 text-blue-500" title="Finn AI enabled">
+                    <div className="flex items-center space-x-1 text-blue-500">
                       <Bot className="w-4 h-4" />
                       <span className="text-xs font-medium">Finn</span>
                     </div>
@@ -242,7 +241,6 @@ const LeadsList = ({ user }: LeadsListProps) => {
                   variant={lead.aiOptIn ? "destructive" : "default"} 
                   className="px-3"
                   disabled={!canEdit(lead)}
-                  title={lead.aiOptIn ? "Disable Finn AI" : "Enable Finn AI"}
                 >
                   <Bot className="w-4 h-4" />
                 </Button>

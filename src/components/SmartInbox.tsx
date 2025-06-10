@@ -1,10 +1,11 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import FinnAvatar from "./FinnAvatar";
+import ConversationMemory from "./ConversationMemory";
 import { 
   Send, 
   Bot, 
@@ -12,7 +13,8 @@ import {
   Clock,
   Phone,
   Car,
-  MessageSquare
+  MessageSquare,
+  Brain
 } from "lucide-react";
 
 interface SmartInboxProps {
@@ -25,6 +27,7 @@ interface SmartInboxProps {
 const SmartInbox = ({ user }: SmartInboxProps) => {
   const [selectedLead, setSelectedLead] = useState(1);
   const [newMessage, setNewMessage] = useState("");
+  const [showMemory, setShowMemory] = useState(false);
 
   // Mock conversations data
   const conversations = [
@@ -112,7 +115,6 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   const handleSendMessage = () => {
     if (newMessage.trim() && selectedConversation && canReply(selectedConversation)) {
-      // In real app, this would send via API
       console.log("Sending message:", newMessage);
       setNewMessage("");
     }
@@ -207,6 +209,14 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
                   <Badge className={selectedConversation.status === 'engaged' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}>
                     {selectedConversation.status}
                   </Badge>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowMemory(!showMemory)}
+                  >
+                    <Brain className="w-4 h-4 mr-1" />
+                    Finn's Memory
+                  </Button>
                   <Button variant="outline" size="sm">
                     Toggle Finn AI
                   </Button>
@@ -221,22 +231,27 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
                   key={message.id}
                   className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`max-w-[70%] ${
-                    message.direction === 'out' 
-                      ? 'bg-blue-500 text-white' 
-                      : 'bg-slate-100 text-slate-800'
-                  } rounded-lg p-3`}>
-                    <p className="text-sm whitespace-pre-line">{message.body}</p>
-                    <div className={`flex items-center justify-between mt-2 text-xs ${
-                      message.direction === 'out' ? 'text-blue-100' : 'text-slate-500'
-                    }`}>
-                      <span>{new Date(message.sentAt).toLocaleTimeString()}</span>
-                      {message.aiGenerated && (
-                        <div className="flex items-center space-x-1">
-                          <Bot className="w-3 h-3" />
-                          <span>Finn</span>
-                        </div>
-                      )}
+                  <div className="flex items-start space-x-2 max-w-[70%]">
+                    {message.direction === 'out' && message.aiGenerated && (
+                      <FinnAvatar size="sm" />
+                    )}
+                    <div className={`${
+                      message.direction === 'out' 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-slate-100 text-slate-800'
+                    } rounded-lg p-3`}>
+                      <p className="text-sm whitespace-pre-line">{message.body}</p>
+                      <div className={`flex items-center justify-between mt-2 text-xs ${
+                        message.direction === 'out' ? 'text-blue-100' : 'text-slate-500'
+                      }`}>
+                        <span>{new Date(message.sentAt).toLocaleTimeString()}</span>
+                        {message.aiGenerated && (
+                          <div className="flex items-center space-x-1">
+                            <Bot className="w-3 h-3" />
+                            <span>Finn</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -285,6 +300,11 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           </Card>
         )}
       </div>
+
+      {/* Finn's Memory Panel */}
+      {showMemory && selectedLead && (
+        <ConversationMemory leadId={selectedLead} />
+      )}
     </div>
   );
 };
