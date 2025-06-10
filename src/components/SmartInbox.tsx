@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,7 +66,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
       case 'pending':
         return <Clock className="w-3 h-3 text-yellow-500" />;
       case 'failed':
-        return <XCircle className="w-3 h-3 text-red-500" title={error} />;
+        return <XCircle className="w-3 h-3 text-red-500" />;
       default:
         return <AlertCircle className="w-3 h-3 text-gray-500" />;
     }
