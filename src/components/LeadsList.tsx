@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PhoneNumberDisplay from "./PhoneNumberDisplay";
+import { createPhoneNumbers, getPrimaryPhone } from "@/utils/phoneUtils";
 import { 
   Search, 
   Filter, 
@@ -27,13 +29,13 @@ const LeadsList = ({ user }: LeadsListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Mock leads data
+  // Mock leads data with enhanced phone number support
   const mockLeads = [
     {
       id: 1,
       firstName: "Sarah",
       lastName: "Johnson",
-      phone: "+1-555-0123",
+      phoneNumbers: createPhoneNumbers("2513593158", "2513685175", "2513593158"),
       email: "sarah.j@email.com",
       vehicleInterest: "Tesla Model 3",
       source: "Website",
@@ -45,13 +47,14 @@ const LeadsList = ({ user }: LeadsListProps) => {
       nextAiSendAt: "2024-06-10 14:30:00",
       createdAt: "2024-06-08 09:15:00",
       lastMessage: "Interested in financing options - Finn",
-      unreadCount: 2
+      unreadCount: 2,
+      doNotCall: false
     },
     {
       id: 2,
       firstName: "Mike",
       lastName: "Chen",
-      phone: "+1-555-0124",
+      phoneNumbers: createPhoneNumbers("5551234567", "5557654321", "5559876543"),
       email: "mike.chen@email.com",
       vehicleInterest: "BMW X5",
       source: "Facebook Ad",
@@ -63,13 +66,14 @@ const LeadsList = ({ user }: LeadsListProps) => {
       nextAiSendAt: "2024-06-10 16:00:00",
       createdAt: "2024-06-10 08:30:00",
       lastMessage: null,
-      unreadCount: 0
+      unreadCount: 0,
+      doNotCall: false
     },
     {
       id: 3,
       firstName: "Emma",
       lastName: "Wilson",
-      phone: "+1-555-0125",
+      phoneNumbers: createPhoneNumbers("", "5555551234", "5555555678"),
       email: "emma.w@email.com",
       vehicleInterest: "Audi A4",
       source: "Referral",
@@ -81,15 +85,23 @@ const LeadsList = ({ user }: LeadsListProps) => {
       nextAiSendAt: null,
       createdAt: "2024-06-05 14:20:00",
       lastMessage: "Please stop messaging",
-      unreadCount: 0
+      unreadCount: 0,
+      doNotCall: true
     }
   ];
 
+  // Add primary phone to each lead
+  const enhancedLeads = mockLeads.map(lead => ({
+    ...lead,
+    primaryPhone: getPrimaryPhone(lead.phoneNumbers)
+  }));
+
   // Filter leads based on user role
-  const filteredLeads = mockLeads.filter(lead => {
+  const filteredLeads = enhancedLeads.filter(lead => {
     const matchesSearch = searchTerm === "" || 
       `${lead.firstName} ${lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.vehicleInterest.toLowerCase().includes(searchTerm.toLowerCase());
+      lead.vehicleInterest.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.primaryPhone.includes(searchTerm);
     
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
     
@@ -113,6 +125,11 @@ const LeadsList = ({ user }: LeadsListProps) => {
     return user.role === "manager" || user.role === "admin" || lead.salespersonId === user.id;
   };
 
+  const handlePhoneSelect = (leadId: number, phoneNumber: string) => {
+    console.log(`Switching lead ${leadId} to phone ${phoneNumber}`);
+    // In real app, this would update the lead's primary phone
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -120,14 +137,14 @@ const LeadsList = ({ user }: LeadsListProps) => {
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Leads</h1>
           <p className="text-slate-600 mt-1">
-            {user.role === "sales" ? "Your assigned leads" : "All leads in the system"}
+            {user.role === "sales" ? "Your assigned leads with multi-phone support" : "All leads with phone priority system"}
           </p>
         </div>
         <div className="flex items-center space-x-3 mt-4 md:mt-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input
-              placeholder="Search leads..."
+              placeholder="Search leads, names, phones..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 w-64"
@@ -174,6 +191,11 @@ const LeadsList = ({ user }: LeadsListProps) => {
                         {lead.unreadCount} new
                       </Badge>
                     )}
+                    {lead.doNotCall && (
+                      <Badge variant="outline" className="text-xs text-red-600">
+                        Do Not Call
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-1">
@@ -189,12 +211,18 @@ const LeadsList = ({ user }: LeadsListProps) => {
             </CardHeader>
 
             <CardContent className="space-y-4">
-              {/* Contact Info */}
+              {/* Phone Numbers */}
+              <div>
+                <PhoneNumberDisplay 
+                  phoneNumbers={lead.phoneNumbers}
+                  primaryPhone={lead.primaryPhone}
+                  onPhoneSelect={(phone) => handlePhoneSelect(lead.id, phone)}
+                  compact={lead.phoneNumbers.length === 1}
+                />
+              </div>
+
+              {/* Other Contact Info */}
               <div className="space-y-2">
-                <div className="flex items-center space-x-2 text-sm text-slate-600">
-                  <Phone className="w-4 h-4" />
-                  <span>{lead.phone}</span>
-                </div>
                 <div className="flex items-center space-x-2 text-sm text-slate-600">
                   <Mail className="w-4 h-4" />
                   <span>{lead.email}</span>
@@ -231,7 +259,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
                   size="sm" 
                   variant="outline" 
                   className="flex-1"
-                  disabled={!canEdit(lead)}
+                  disabled={!canEdit(lead) || lead.doNotCall}
                 >
                   <MessageSquare className="w-4 h-4 mr-1" />
                   Message
