@@ -16,12 +16,12 @@ export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
     const transformedMessages = messagesData?.map(msg => ({
       id: msg.id,
       leadId: msg.lead_id,
-      direction: msg.direction,
+      direction: msg.direction as 'in' | 'out',
       body: msg.body,
       sentAt: msg.sent_at,
-      aiGenerated: msg.ai_generated,
-      smsStatus: msg.sms_status,
-      smsError: msg.sms_error
+      aiGenerated: msg.ai_generated || false,
+      smsStatus: msg.sms_status || undefined,
+      smsError: msg.sms_error || undefined
     })) || [];
 
     return transformedMessages;
