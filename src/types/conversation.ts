@@ -1,0 +1,23 @@
+
+export interface ConversationData {
+  leadId: string;
+  leadName: string;
+  leadPhone: string;
+  vehicleInterest: string;
+  unreadCount: number;
+  lastMessage: string;
+  lastMessageTime: string;
+  status: string;
+  salespersonId: string;
+}
+
+export interface MessageData {
+  id: string;
+  leadId: string;
+  direction: 'in' | 'out';
+  body: string;
+  sentAt: string;
+  aiGenerated?: boolean;
+  smsStatus?: string;
+  smsError?: string;
+}
