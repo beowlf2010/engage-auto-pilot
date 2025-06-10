@@ -3,6 +3,33 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { extractAndStoreMemory } from './aiMemoryService';
 import { addDisclaimersToMessage, validateMessageForCompliance } from './pricingDisclaimerService';
+import type { MessageData } from '@/types/conversation';
+
+export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('sent_at', { ascending: true });
+
+    if (error) throw error;
+
+    return data?.map(msg => ({
+      id: msg.id,
+      leadId: msg.lead_id,
+      direction: msg.direction as 'in' | 'out',
+      body: msg.body,
+      sentAt: msg.sent_at,
+      aiGenerated: msg.ai_generated,
+      smsStatus: msg.sms_status,
+      smsError: msg.sms_error
+    })) || [];
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    return [];
+  }
+};
 
 export const sendMessage = async (
   leadId: string, 
