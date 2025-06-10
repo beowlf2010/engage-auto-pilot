@@ -7,7 +7,7 @@ import UploadResult from "./upload-leads/UploadResult";
 import CSVTemplateCard from "./upload-leads/CSVTemplateCard";
 import PhonePriorityCard from "./upload-leads/PhonePriorityCard";
 import ImportFeaturesCard from "./upload-leads/ImportFeaturesCard";
-import { parseCSV } from "./upload-leads/csvParsingUtils";
+import { parseInventoryFile } from "@/utils/fileParsingUtils";
 import { processLeads } from "./upload-leads/processLeads";
 import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
 import { 
@@ -45,26 +45,35 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
   const handleFiles = async (files: FileList) => {
     const file = files[0];
     
-    if (!file.name.endsWith('.csv') && !file.name.endsWith('.txt')) {
+    const validExtensions = ['.csv', '.xlsx', '.xls', '.txt'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    if (!validExtensions.includes(fileExtension)) {
       toast({
         title: "Invalid file format",
-        description: "Please upload a CSV or TXT file",
+        description: "Please upload a CSV, Excel, or TXT file",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      const text = await file.text();
-      const parsed = parseCSV(text);
+      console.log(`Processing ${file.name}...`);
+      const parsed = await parseInventoryFile(file);
       setCsvData(parsed);
       setShowMapper(true);
       
-      console.log('Parsed CSV:', parsed);
+      console.log(`Parsed ${parsed.fileType} file:`, parsed);
+      
+      toast({
+        title: "File processed successfully",
+        description: `${parsed.fileType.toUpperCase()} file with ${parsed.rows.length} rows is ready for field mapping`,
+      });
     } catch (error) {
+      console.error('File parsing error:', error);
       toast({
         title: "Error parsing file",
-        description: "Could not parse the CSV file. Please check the format.",
+        description: error instanceof Error ? error.message : "Could not parse the file. Please check the format.",
         variant: "destructive"
       });
     }
@@ -78,9 +87,9 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
     try {
       console.log('Starting lead processing with mapping:', mapping);
       
-      // Process the CSV data with the field mapping and duplicate detection
+      // Process the data with the field mapping and duplicate detection
       const processingResult = processLeads(csvData, mapping);
-      console.log('CSV processing complete:', {
+      console.log('Processing complete:', {
         validLeads: processingResult.validLeads.length,
         duplicates: processingResult.duplicates.length,
         errors: processingResult.errors.length
@@ -90,7 +99,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       const insertResult = await insertLeadsToDatabase(processingResult.validLeads);
       console.log('Database insertion complete:', insertResult);
 
-      // Combine CSV duplicates with database duplicates
+      // Combine duplicates
       const allDuplicates = [
         ...processingResult.duplicates.map(d => ({
           rowIndex: d.rowIndex,
@@ -111,7 +120,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
         successfulImports: insertResult.successfulInserts,
         errors: processingResult.errors.length + insertResult.errors.length,
         duplicates: allDuplicates.length,
-        fileName: 'leads.csv',
+        fileName: 'leads file',
         phoneNumberStats: {
           cellOnly: processingResult.validLeads.filter(l => l.phoneNumbers.length === 1 && l.phoneNumbers[0].type === 'cell').length,
           multipleNumbers: processingResult.validLeads.filter(l => l.phoneNumbers.length > 1).length,
@@ -139,7 +148,6 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
         });
       }
 
-      // Log any insertion errors
       if (insertResult.errors.length > 0) {
         console.error('Database insertion errors:', insertResult.errors);
         toast({
@@ -154,7 +162,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       console.error('Upload error:', error);
       toast({
         title: "Processing error",
-        description: "Error processing the CSV data or saving to database",
+        description: "Error processing the data or saving to database",
         variant: "destructive"
       });
     }
@@ -173,9 +181,9 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
             <span>Back to Upload</span>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Map CSV Fields</h1>
+            <h1 className="text-3xl font-bold text-slate-800">Map Fields</h1>
             <p className="text-slate-600 mt-1">
-              Configure how your CSV columns map to our system fields
+              Configure how your file columns map to our system fields
             </p>
           </div>
         </div>
@@ -195,7 +203,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       <div>
         <h1 className="text-3xl font-bold text-slate-800">Upload Leads</h1>
         <p className="text-slate-600 mt-1">
-          Import leads with multiple phone numbers and automatic priority handling
+          Import leads from CSV or Excel files with automatic field mapping
         </p>
       </div>
 

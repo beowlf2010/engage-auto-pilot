@@ -2,7 +2,7 @@
 import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, Database } from "lucide-react";
+import { Upload, FileText, Database, FileSpreadsheet } from "lucide-react";
 
 interface UploadAreaProps {
   onFilesSelected: (files: FileList) => void;
@@ -38,7 +38,7 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Upload className="w-5 h-5" />
-          <span>Upload CSV File</span>
+          <span>Upload File</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -67,11 +67,11 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
           ) : (
             <div className="space-y-4">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                <FileText className="w-8 h-8 text-blue-600" />
+                <FileSpreadsheet className="w-8 h-8 text-blue-600" />
               </div>
               <div>
                 <p className="text-lg font-medium text-slate-800 mb-2">
-                  Drop your CSV file here
+                  Drop your file here
                 </p>
                 <p className="text-slate-600 mb-4">
                   or click to browse and select a file
@@ -85,14 +85,26 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.txt"
+                  accept=".csv,.xlsx,.xls,.txt"
                   onChange={(e) => e.target.files && onFilesSelected(e.target.files)}
                   className="hidden"
                 />
               </div>
-              <p className="text-sm text-slate-500">
-                Supported formats: CSV and TXT files
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-slate-500 font-medium">
+                  Supported formats:
+                </p>
+                <div className="flex items-center justify-center space-x-4 text-xs text-slate-500">
+                  <span className="flex items-center space-x-1">
+                    <FileSpreadsheet className="w-3 h-3" />
+                    <span>Excel (.xlsx, .xls)</span>
+                  </span>
+                  <span className="flex items-center space-x-1">
+                    <FileText className="w-3 h-3" />
+                    <span>CSV, TXT</span>
+                  </span>
+                </div>
+              </div>
             </div>
           )}
         </div>
