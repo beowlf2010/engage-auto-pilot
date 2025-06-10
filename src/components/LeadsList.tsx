@@ -19,7 +19,9 @@ import {
   Users,
   Loader2,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  MessageCircle,
+  ArrowRightLeft
 } from "lucide-react";
 
 interface LeadsListProps {
@@ -32,7 +34,7 @@ interface LeadsListProps {
 const LeadsList = ({ user }: LeadsListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [messageFilter, setMessageFilter] = useState("all");
+  const [contactFilter, setContactFilter] = useState("all");
   const { leads, loading } = useLeads();
 
   // Filter leads based on user role and search/status filters
@@ -44,14 +46,12 @@ const LeadsList = ({ user }: LeadsListProps) => {
     
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
     
-    const matchesMessageFilter = messageFilter === "all" || 
-      (messageFilter === "messaged" && lead.hasBeenMessaged) ||
-      (messageFilter === "not_messaged" && !lead.hasBeenMessaged);
+    const matchesContactFilter = contactFilter === "all" || lead.contactStatus === contactFilter;
     
     const hasAccess = user.role === "manager" || user.role === "admin" || 
       lead.salespersonId === user.id;
     
-    return matchesSearch && matchesStatus && matchesMessageFilter && hasAccess;
+    return matchesSearch && matchesStatus && matchesContactFilter && hasAccess;
   });
 
   const getStatusColor = (status: string) => {
@@ -64,22 +64,32 @@ const LeadsList = ({ user }: LeadsListProps) => {
     }
   };
 
-  const getMessageStatusBadge = (lead: any) => {
-    if (!lead.hasBeenMessaged) {
-      return (
-        <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
-          <AlertTriangle className="w-3 h-3 mr-1" />
-          Not Contacted
-        </Badge>
-      );
+  const getContactStatusBadge = (lead: any) => {
+    switch (lead.contactStatus) {
+      case 'no_contact':
+        return (
+          <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            No Contact
+          </Badge>
+        );
+      case 'contact_attempted':
+        return (
+          <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50">
+            <ArrowRightLeft className="w-3 h-3 mr-1" />
+            Contact Attempted ({lead.outgoingCount})
+          </Badge>
+        );
+      case 'response_received':
+        return (
+          <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+            <MessageCircle className="w-3 h-3 mr-1" />
+            Response Received ({lead.incomingCount})
+          </Badge>
+        );
+      default:
+        return null;
     }
-    
-    return (
-      <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
-        <CheckCircle className="w-3 h-3 mr-1" />
-        {lead.messageCount} message{lead.messageCount !== 1 ? 's' : ''}
-      </Badge>
-    );
   };
 
   const canEdit = (lead: any) => {
@@ -131,27 +141,28 @@ const LeadsList = ({ user }: LeadsListProps) => {
             <option value="closed">Closed</option>
           </select>
           <select
-            value={messageFilter}
-            onChange={(e) => setMessageFilter(e.target.value)}
+            value={contactFilter}
+            onChange={(e) => setContactFilter(e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-md bg-white text-sm"
           >
-            <option value="all">All Messages</option>
-            <option value="not_messaged">Not Contacted</option>
-            <option value="messaged">Contacted</option>
+            <option value="all">All Contact</option>
+            <option value="no_contact">No Contact</option>
+            <option value="contact_attempted">Contact Attempted</option>
+            <option value="response_received">Response Received</option>
           </select>
         </div>
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <AlertTriangle className="w-5 h-5 text-orange-500" />
               <div>
-                <p className="text-sm text-slate-600">Not Contacted</p>
+                <p className="text-sm text-slate-600">No Contact</p>
                 <p className="text-2xl font-bold text-slate-800">
-                  {filteredLeads.filter(lead => !lead.hasBeenMessaged).length}
+                  {filteredLeads.filter(lead => lead.contactStatus === 'no_contact').length}
                 </p>
               </div>
             </div>
@@ -160,11 +171,11 @@ const LeadsList = ({ user }: LeadsListProps) => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
+              <ArrowRightLeft className="w-5 h-5 text-blue-500" />
               <div>
-                <p className="text-sm text-slate-600">Contacted</p>
+                <p className="text-sm text-slate-600">Contact Attempted</p>
                 <p className="text-2xl font-bold text-slate-800">
-                  {filteredLeads.filter(lead => lead.hasBeenMessaged).length}
+                  {filteredLeads.filter(lead => lead.contactStatus === 'contact_attempted').length}
                 </p>
               </div>
             </div>
@@ -173,7 +184,20 @@ const LeadsList = ({ user }: LeadsListProps) => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Users className="w-5 h-5 text-blue-500" />
+              <MessageCircle className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="text-sm text-slate-600">Response Received</p>
+                <p className="text-2xl font-bold text-slate-800">
+                  {filteredLeads.filter(lead => lead.contactStatus === 'response_received').length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Users className="w-5 h-5 text-purple-500" />
               <div>
                 <p className="text-sm text-slate-600">Total Leads</p>
                 <p className="text-2xl font-bold text-slate-800">
@@ -207,7 +231,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
                     <Badge className={getStatusColor(lead.status)}>
                       {lead.status}
                     </Badge>
-                    {getMessageStatusBadge(lead)}
+                    {getContactStatusBadge(lead)}
                     {lead.unreadCount > 0 && (
                       <Badge variant="destructive" className="text-xs">
                         {lead.unreadCount} new

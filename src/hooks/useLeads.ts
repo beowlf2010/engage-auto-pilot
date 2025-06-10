@@ -48,6 +48,8 @@ export const useLeads = () => {
       const conversationMap = new Map();
       const messageCountMap = new Map();
       const unreadCountMap = new Map();
+      const outgoingCountMap = new Map();
+      const incomingCountMap = new Map();
 
       conversationsData?.forEach(conv => {
         const leadId = conv.lead_id;
@@ -61,10 +63,22 @@ export const useLeads = () => {
         const currentCount = messageCountMap.get(leadId) || 0;
         messageCountMap.set(leadId, currentCount + 1);
 
-        // Count unread incoming messages
-        if (conv.direction === 'in' && !conv.read_at) {
-          const currentUnread = unreadCountMap.get(leadId) || 0;
-          unreadCountMap.set(leadId, currentUnread + 1);
+        // Count outgoing messages (contact attempts)
+        if (conv.direction === 'out') {
+          const currentOutgoing = outgoingCountMap.get(leadId) || 0;
+          outgoingCountMap.set(leadId, currentOutgoing + 1);
+        }
+
+        // Count incoming messages (responses received)
+        if (conv.direction === 'in') {
+          const currentIncoming = incomingCountMap.get(leadId) || 0;
+          incomingCountMap.set(leadId, currentIncoming + 1);
+
+          // Count unread incoming messages
+          if (!conv.read_at) {
+            const currentUnread = unreadCountMap.get(leadId) || 0;
+            unreadCountMap.set(leadId, currentUnread + 1);
+          }
         }
       });
 
@@ -72,7 +86,17 @@ export const useLeads = () => {
       const transformedLeads = leadsData?.map(lead => {
         const latestConv = conversationMap.get(lead.id);
         const messageCount = messageCountMap.get(lead.id) || 0;
+        const outgoingCount = outgoingCountMap.get(lead.id) || 0;
+        const incomingCount = incomingCountMap.get(lead.id) || 0;
         const unreadCount = unreadCountMap.get(lead.id) || 0;
+        
+        // Determine contact status
+        let contactStatus = 'no_contact';
+        if (incomingCount > 0) {
+          contactStatus = 'response_received';
+        } else if (outgoingCount > 0) {
+          contactStatus = 'contact_attempted';
+        }
         
         return {
           id: lead.id,
@@ -111,23 +135,30 @@ export const useLeads = () => {
           lastMessageTime: latestConv ? new Date(latestConv.sent_at).toLocaleString() : null,
           unreadCount: unreadCount,
           messageCount: messageCount,
-          hasBeenMessaged: messageCount > 0,
+          outgoingCount: outgoingCount,
+          incomingCount: incomingCount,
+          contactStatus: contactStatus,
+          hasBeenMessaged: messageCount > 0, // Keep for backward compatibility
           doNotCall: lead.do_not_call,
           doNotEmail: lead.do_not_email,
           doNotMail: lead.do_not_mail
         };
       }) || [];
 
-      // Sort leads: uncontacted first, then by last message time
+      // Sort leads: no contact first, then contact attempted, then response received
       transformedLeads.sort((a, b) => {
-        if (a.hasBeenMessaged !== b.hasBeenMessaged) {
-          return a.hasBeenMessaged ? 1 : -1; // Not messaged first
+        const statusOrder = { 'no_contact': 0, 'contact_attempted': 1, 'response_received': 2 };
+        
+        if (a.contactStatus !== b.contactStatus) {
+          return statusOrder[a.contactStatus] - statusOrder[b.contactStatus];
         }
-        if (a.hasBeenMessaged && b.hasBeenMessaged) {
-          // Both messaged, sort by last message time (newest first)
+        
+        if (a.contactStatus === 'response_received' && b.contactStatus === 'response_received') {
+          // Both have responses, sort by last message time (newest first)
           return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
         }
-        // Both not messaged, sort by created date (newest first)
+        
+        // Same status, sort by created date (newest first)
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
 
