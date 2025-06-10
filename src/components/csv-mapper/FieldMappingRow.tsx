@@ -24,6 +24,7 @@ const FieldMappingRow = ({
   const getSampleValue = (fieldKey: keyof FieldMapping): string => {
     const headerName = mapping[fieldKey];
     if (!headerName || !sampleData) {
+      console.log(`No sample data for ${fieldKey}: headerName=${headerName}, sampleData exists=${!!sampleData}`);
       return '';
     }
     
