@@ -1,3 +1,4 @@
+
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
@@ -5,8 +6,7 @@ import {
   MessageSquare, 
   Upload, 
   Settings,
-  Car,
-  Bell
+  Car
 } from "lucide-react";
 
 interface SidebarProps {
@@ -116,16 +116,6 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount = 0 }: SidebarPro
           </button>
         ))}
       </nav>
-
-      {/* Notification Status */}
-      <div className="absolute bottom-4 left-4 right-4">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-          <div className="flex items-center space-x-2">
-            <Bell className="w-4 h-4 text-green-600" />
-            <span className="text-sm text-green-700">Push notifications enabled</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
