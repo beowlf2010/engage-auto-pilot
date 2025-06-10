@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +76,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
         return (
           <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50">
             <ArrowRightLeft className="w-3 h-3 mr-1" />
-            Contact Attempted ({lead.outgoingCount})
+            No Contact Attempted ({lead.outgoingCount})
           </Badge>
         );
       case 'response_received':
@@ -147,7 +146,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
           >
             <option value="all">All Contact</option>
             <option value="no_contact">No Contact</option>
-            <option value="contact_attempted">Contact Attempted</option>
+            <option value="contact_attempted">No Contact Attempted</option>
             <option value="response_received">Response Received</option>
           </select>
         </div>
@@ -173,7 +172,7 @@ const LeadsList = ({ user }: LeadsListProps) => {
             <div className="flex items-center space-x-2">
               <ArrowRightLeft className="w-5 h-5 text-blue-500" />
               <div>
-                <p className="text-sm text-slate-600">Contact Attempted</p>
+                <p className="text-sm text-slate-600">No Contact Attempted</p>
                 <p className="text-2xl font-bold text-slate-800">
                   {filteredLeads.filter(lead => lead.contactStatus === 'contact_attempted').length}
                 </p>
