@@ -76,22 +76,59 @@ export const validateAndProcessInventoryRows = async (
         continue;
       }
 
-      // For GM Global orders without VIN, use stock_number as unique identifier
-      let upsertConfig;
+      // Enhanced upsert logic to handle both VIN and stock_number conflicts
+      let upsertResult;
+      
       if (isGmGlobal && !hasValidVin && hasValidStockNumber) {
-        upsertConfig = { onConflict: 'stock_number' };
         console.log(`Row ${i + 1}: Using stock_number "${inventoryItem.stock_number}" as identifier for GM Global order without VIN`);
+        
+        // For GM Global orders without VIN, check if stock_number already exists
+        const { data: existingByStock } = await supabase
+          .from('inventory')
+          .select('id')
+          .eq('stock_number', inventoryItem.stock_number)
+          .maybeSingle();
+
+        if (existingByStock) {
+          // Update existing record
+          upsertResult = await supabase
+            .from('inventory')
+            .update(inventoryItem)
+            .eq('stock_number', inventoryItem.stock_number)
+            .select();
+        } else {
+          // Insert new record
+          upsertResult = await supabase
+            .from('inventory')
+            .insert(inventoryItem)
+            .select();
+        }
       } else {
-        upsertConfig = { onConflict: 'vin' };
+        // Regular VIN-based upsert
+        const { data: existingByVin } = await supabase
+          .from('inventory')
+          .select('id')
+          .eq('vin', inventoryItem.vin)
+          .maybeSingle();
+
+        if (existingByVin) {
+          // Update existing record
+          upsertResult = await supabase
+            .from('inventory')
+            .update(inventoryItem)
+            .eq('vin', inventoryItem.vin)
+            .select();
+        } else {
+          // Insert new record
+          upsertResult = await supabase
+            .from('inventory')
+            .insert(inventoryItem)
+            .select();
+        }
       }
 
-      // Upsert inventory item
-      const { error } = await supabase
-        .from('inventory')
-        .upsert(inventoryItem, upsertConfig);
-
-      if (error) {
-        errors.push(`Row ${i + 1}: Database error for ${hasValidVin ? `VIN ${inventoryItem.vin}` : `Order ${inventoryItem.stock_number}`}: ${error.message}`);
+      if (upsertResult.error) {
+        errors.push(`Row ${i + 1}: Database error for ${hasValidVin ? `VIN ${inventoryItem.vin}` : `Order ${inventoryItem.stock_number}`}: ${upsertResult.error.message}`);
         errorCount++;
       } else {
         successCount++;
