@@ -1,5 +1,5 @@
 
-import { getFieldValue, extractRPOCodes, findVINInRow, findMakeInRow, findModelInRow, findYearInRow } from './fieldExtractor';
+import { getFieldValue, extractRPOCodes, findVINInRow, findMakeInRow, findModelInRow, findYearInRow, extractGMGlobalStatus, extractOptionDescriptions } from './fieldExtractor';
 
 // Enhanced mapping function that handles GM Global specific fields with smart detection
 export const mapRowToInventoryItem = (
@@ -76,7 +76,21 @@ export const mapRowToInventoryItem = (
     'Mileage', 'Odometer', 'Miles', 'Current Mileage', 'Odo'
   ])) || undefined;
 
+  // Enhanced RPO and option extraction
   const rpoCodes = extractRPOCodes(row);
+  const optionDescriptions = extractOptionDescriptions(row);
+
+  // CRITICAL FIX: Extract actual GM Global status instead of hardcoding
+  let status = 'available'; // Default for regular inventory
+  if (condition === 'gm_global') {
+    const gmStatus = extractGMGlobalStatus(row);
+    if (gmStatus) {
+      status = gmStatus; // Use actual GM status code (5000, 4200, etc.)
+      console.log(`✓ Using GM Global status: ${status}`);
+    } else {
+      console.log('⚠ No GM Global status found, defaulting to available');
+    }
+  }
 
   // Map condition to database-compatible condition
   const dbCondition: 'new' | 'used' = condition === 'used' ? 'used' : 'new';
@@ -88,7 +102,9 @@ export const mapRowToInventoryItem = (
   console.log('Year:', year);
   console.log('Stock Number:', stockNumber);
   console.log('Condition:', dbCondition);
+  console.log('Status:', status);
   console.log('RPO Codes:', rpoCodes);
+  console.log('Option Descriptions:', optionDescriptions);
   console.log('===================================');
 
   return {
@@ -112,11 +128,11 @@ export const mapRowToInventoryItem = (
     rebates: parseFloat(getFieldValue(row, ['Rebates', 'rebates', 'REBATES', 'Incentives', 'incentives'])) || undefined,
     pack: parseFloat(getFieldValue(row, ['Pack', 'pack', 'PACK', 'DealerPack', 'Dealer_Pack'])) || undefined,
     condition: dbCondition,
-    status: 'available',
+    status: status, // Now uses actual GM Global status codes
     rpo_codes: rpoCodes.length > 0 ? rpoCodes : undefined,
-    rpo_descriptions: undefined, // Will be populated later if available
+    rpo_descriptions: optionDescriptions.length > 0 ? optionDescriptions : undefined, // Store option descriptions
     source_report: condition === 'gm_global' ? 'orders_all' as any : undefined,
-    full_option_blob: row, // Store complete raw data
+    full_option_blob: row, // Store complete raw data for future analysis
     first_seen_at: new Date().toISOString(),
     last_seen_at: new Date().toISOString(),
     upload_history_id: uploadHistoryId,
