@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,7 +51,7 @@ const ChatView = ({
   const [localAiOptIn, setLocalAiOptIn] = useState(selectedConversation?.aiOptIn || false);
 
   // Update local state when conversation changes
-  useState(() => {
+  useEffect(() => {
     setLocalAiOptIn(selectedConversation?.aiOptIn || false);
   }, [selectedConversation?.aiOptIn]);
 
