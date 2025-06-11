@@ -11,7 +11,8 @@ export const useConversations = () => {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
-  const channelsRef = useRef<any[]>([]);
+  const conversationChannelRef = useRef<any>(null);
+  const messageChannelRef = useRef<any>(null);
   const currentLeadIdRef = useRef<string | null>(null);
 
   const loadConversations = async () => {
@@ -32,6 +33,9 @@ export const useConversations = () => {
       const messagesData = await fetchMessages(leadId);
       setMessages(messagesData);
       currentLeadIdRef.current = leadId;
+      
+      // Set up message channel for this specific lead
+      setupMessageChannel(leadId);
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -49,35 +53,25 @@ export const useConversations = () => {
     }
   };
 
-  // Cleanup function to remove all channels
-  const cleanupChannels = () => {
-    console.log('Cleaning up channels:', channelsRef.current.length);
-    channelsRef.current.forEach(channel => {
-      try {
-        supabase.removeChannel(channel);
-      } catch (error) {
-        console.error('Error removing channel:', error);
-      }
-    });
-    channelsRef.current = [];
-  };
-
-  // Single effect to handle all real-time subscriptions
-  useEffect(() => {
+  // Setup conversation channel (once per profile)
+  const setupConversationChannel = () => {
     if (!profile) return;
 
-    // Cleanup any existing channels first
-    cleanupChannels();
+    // Cleanup existing conversation channel
+    if (conversationChannelRef.current) {
+      try {
+        console.log('Removing existing conversation channel');
+        supabase.removeChannel(conversationChannelRef.current);
+      } catch (error) {
+        console.error('Error removing conversation channel:', error);
+      }
+      conversationChannelRef.current = null;
+    }
 
-    // Create unique channel names
-    const conversationChannelName = `conversation-updates-${profile.id}-${Date.now()}`;
-    const messageChannelName = currentLeadIdRef.current 
-      ? `messages-${currentLeadIdRef.current}-${Date.now()}`
-      : null;
-
-    // Create conversation updates channel
-    const conversationChannel = supabase
-      .channel(conversationChannelName)
+    const channelName = `conversation-updates-${profile.id}-${Date.now()}`;
+    
+    const channel = supabase
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -103,65 +97,96 @@ export const useConversations = () => {
         }
       );
 
-    // Subscribe to conversation channel
-    conversationChannel.subscribe((status) => {
+    channel.subscribe((status) => {
       console.log('Conversation channel status:', status);
       if (status === 'SUBSCRIBED') {
-        channelsRef.current.push(conversationChannel);
+        conversationChannelRef.current = channel;
       }
     });
+  };
 
-    // Create message channel if we have a current lead
-    if (messageChannelName && currentLeadIdRef.current) {
-      const messageChannel = supabase
-        .channel(messageChannelName)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'conversations',
-            filter: `lead_id=eq.${currentLeadIdRef.current}`
-          },
-          () => {
-            console.log(`New message for lead ${currentLeadIdRef.current}, refreshing...`);
-            if (currentLeadIdRef.current) {
-              loadMessages(currentLeadIdRef.current);
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'conversations',
-            filter: `lead_id=eq.${currentLeadIdRef.current}`
-          },
-          () => {
-            console.log(`Message updated for lead ${currentLeadIdRef.current}, refreshing...`);
-            if (currentLeadIdRef.current) {
-              loadMessages(currentLeadIdRef.current);
-            }
-          }
-        );
-
-      // Subscribe to message channel
-      messageChannel.subscribe((status) => {
-        console.log('Message channel status:', status);
-        if (status === 'SUBSCRIBED') {
-          channelsRef.current.push(messageChannel);
-        }
-      });
+  // Setup message channel for specific lead
+  const setupMessageChannel = (leadId: string) => {
+    // Cleanup existing message channel
+    if (messageChannelRef.current) {
+      try {
+        console.log('Removing existing message channel');
+        supabase.removeChannel(messageChannelRef.current);
+      } catch (error) {
+        console.error('Error removing message channel:', error);
+      }
+      messageChannelRef.current = null;
     }
 
-    return cleanupChannels;
-  }, [profile, currentLeadIdRef.current]);
+    const channelName = `messages-${leadId}-${Date.now()}`;
+    
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+          filter: `lead_id=eq.${leadId}`
+        },
+        () => {
+          console.log(`New message for lead ${leadId}, refreshing...`);
+          if (currentLeadIdRef.current === leadId) {
+            loadMessages(leadId);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `lead_id=eq.${leadId}`
+        },
+        () => {
+          console.log(`Message updated for lead ${leadId}, refreshing...`);
+          if (currentLeadIdRef.current === leadId) {
+            loadMessages(leadId);
+          }
+        }
+      );
 
+    channel.subscribe((status) => {
+      console.log('Message channel status:', status);
+      if (status === 'SUBSCRIBED') {
+        messageChannelRef.current = channel;
+      }
+    });
+  };
+
+  // Setup conversation channel when profile is available
   useEffect(() => {
     if (profile) {
+      setupConversationChannel();
       loadConversations();
     }
+
+    return () => {
+      // Cleanup both channels on unmount
+      if (conversationChannelRef.current) {
+        try {
+          console.log('Cleaning up conversation channel');
+          supabase.removeChannel(conversationChannelRef.current);
+        } catch (error) {
+          console.error('Error removing conversation channel:', error);
+        }
+      }
+      if (messageChannelRef.current) {
+        try {
+          console.log('Cleaning up message channel');
+          supabase.removeChannel(messageChannelRef.current);
+        } catch (error) {
+          console.error('Error removing message channel:', error);
+        }
+      }
+    };
   }, [profile]);
 
   return { 
