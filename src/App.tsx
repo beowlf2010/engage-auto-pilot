@@ -24,6 +24,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/upload-inventory-report" element={<Index />} />
             <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />
+            <Route path="/inventory-upload" element={<InventoryLayout page="inventory-upload" />} />
             <Route path="/vehicle-detail/:identifier" element={<InventoryLayout page="vehicle-detail" />} />
             <Route path="/rpo-insights" element={<InventoryLayout page="rpo-insights" />} />
             <Route path="*" element={<NotFound />} />

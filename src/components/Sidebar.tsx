@@ -78,7 +78,7 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
       id: "inventory-upload", 
       label: "Upload Inventory", 
       icon: Car,
-      internalView: "inventory"
+      path: "/inventory-upload"
     },
     { 
       id: "rpo-insights", 
@@ -172,39 +172,21 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
 
             {inventoryNavigation.map((item) => {
               const Icon = item.icon;
-              const isActive = item.path ? 
-                location.pathname === item.path : 
-                (activeView === item.internalView && !isInventoryRoute);
+              const isActive = location.pathname === item.path;
               
-              if (item.path) {
-                return (
-                  <Link key={item.id} to={item.path}>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      className={`w-full justify-start ${isCollapsed ? "px-3" : ""}`}
-                    >
-                      <Icon className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
-                      {!isCollapsed && (
-                        <span className="flex-1 text-left">{item.label}</span>
-                      )}
-                    </Button>
-                  </Link>
-                );
-              } else {
-                return (
+              return (
+                <Link key={item.id} to={item.path}>
                   <Button
-                    key={item.id}
                     variant={isActive ? "default" : "ghost"}
                     className={`w-full justify-start ${isCollapsed ? "px-3" : ""}`}
-                    onClick={() => onViewChange(item.internalView!)}
                   >
                     <Icon className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
                     {!isCollapsed && (
                       <span className="flex-1 text-left">{item.label}</span>
                     )}
                   </Button>
-                );
-              }
+                </Link>
+              );
             })}
           </>
         )}

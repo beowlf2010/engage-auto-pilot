@@ -6,12 +6,13 @@ import { useConversations } from "@/hooks/useConversations";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import Sidebar from "@/components/Sidebar";
 import InventoryDashboard from "@/components/InventoryDashboard";
+import InventoryUpload from "@/components/InventoryUpload";
 import VehicleDetail from "@/components/VehicleDetail";
 import RPOInsights from "@/components/RPOInsights";
 import BreadcrumbNav from "@/components/inventory/BreadcrumbNav";
 
 interface InventoryLayoutProps {
-  page: 'dashboard' | 'vehicle-detail' | 'rpo-insights';
+  page: 'dashboard' | 'inventory-upload' | 'vehicle-detail' | 'rpo-insights';
 }
 
 const InventoryLayout = ({ page }: InventoryLayoutProps) => {
@@ -45,6 +46,8 @@ const InventoryLayout = ({ page }: InventoryLayoutProps) => {
     switch (page) {
       case 'dashboard':
         return <InventoryDashboard />;
+      case 'inventory-upload':
+        return <InventoryUpload user={user} />;
       case 'vehicle-detail':
         return <VehicleDetail />;
       case 'rpo-insights':

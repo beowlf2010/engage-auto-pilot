@@ -9,7 +9,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Package, BarChart3, Car } from "lucide-react";
+import { Home, Package, BarChart3, Car, Upload } from "lucide-react";
 
 const BreadcrumbNav = () => {
   const location = useLocation();
@@ -21,6 +21,14 @@ const BreadcrumbNav = () => {
       return [
         { label: 'Dashboard', path: '/', icon: Home },
         { label: 'Inventory Dashboard', current: true, icon: Package }
+      ];
+    }
+    
+    if (path === '/inventory-upload') {
+      return [
+        { label: 'Dashboard', path: '/', icon: Home },
+        { label: 'Inventory', path: '/inventory-dashboard', icon: Package },
+        { label: 'Upload Inventory', current: true, icon: Upload }
       ];
     }
     
