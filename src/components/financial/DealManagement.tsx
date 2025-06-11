@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -122,7 +123,26 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     return current - original;
   };
 
-  // Calculate summary totals by category
+  const getAdjustedGrossProfit = (deal: Deal) => {
+    const baseGross = deal.gross_profit || 0;
+    const isUsedCar = deal.stock_number && (deal.stock_number.toUpperCase().startsWith('B') || deal.stock_number.toUpperCase().startsWith('X'));
+    return isUsedCar ? baseGross - packAdjustment : baseGross;
+  };
+
+  // Define filteredDeals first
+  const filteredDeals = deals.filter(deal => {
+    const matchesSearch = !searchTerm || 
+      deal.stock_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      deal.buyer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      deal.year_model?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filterType === "all" || deal.deal_type === filterType;
+    const matchesProfitFilter = !showProfitChanges || hasProfitChanges(deal);
+    
+    return matchesSearch && matchesFilter && matchesProfitFilter;
+  });
+
+  // Calculate summary totals by category - now filteredDeals is available
   const calculateSummaryTotals = () => {
     const totals = {
       newRetail: { units: 0, gross: 0, fi: 0, total: 0 },
@@ -168,18 +188,6 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
 
   const summaryTotals = calculateSummaryTotals();
 
-  const filteredDeals = deals.filter(deal => {
-    const matchesSearch = !searchTerm || 
-      deal.stock_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deal.buyer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deal.year_model?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filterType === "all" || deal.deal_type === filterType;
-    const matchesProfitFilter = !showProfitChanges || hasProfitChanges(deal);
-    
-    return matchesSearch && matchesFilter && matchesProfitFilter;
-  });
-
   const formatCurrency = (value?: number) => {
     if (!value) return "$0";
     return new Intl.NumberFormat('en-US', {
@@ -188,12 +196,6 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
-  };
-
-  const getAdjustedGrossProfit = (deal: Deal) => {
-    const baseGross = deal.gross_profit || 0;
-    const isUsedCar = deal.stock_number && (deal.stock_number.toUpperCase().startsWith('B') || deal.stock_number.toUpperCase().startsWith('X'));
-    return isUsedCar ? baseGross - packAdjustment : baseGross;
   };
 
   const getDealTypeBadgeColor = (dealType?: string) => {
