@@ -16,21 +16,22 @@ const InventoryMetrics = ({ className }: InventoryMetricsProps) => {
         .from('inventory')
         .select('*', { count: 'exact', head: true });
 
-      const { count: availableVehicles } = await supabase
+      // Count vehicles with status '5000' (GM Global available) as "New on Lot"
+      const { count: newOnLot } = await supabase
         .from('inventory')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'available');
+        .eq('status', '5000');
 
       const { data: avgDaysData } = await supabase
         .from('inventory')
         .select('days_in_inventory')
-        .eq('status', 'available')
+        .eq('status', '5000')
         .not('days_in_inventory', 'is', null);
 
       const { data: priceData } = await supabase
         .from('inventory')
         .select('price')
-        .eq('status', 'available')
+        .eq('status', '5000')
         .not('price', 'is', null);
 
       const avgDays = avgDaysData?.length 
@@ -43,7 +44,7 @@ const InventoryMetrics = ({ className }: InventoryMetricsProps) => {
 
       return {
         totalVehicles: totalVehicles || 0,
-        availableVehicles: availableVehicles || 0,
+        newOnLot: newOnLot || 0,
         avgDaysInInventory: avgDays,
         avgPrice: avgPrice
       };
@@ -88,13 +89,13 @@ const InventoryMetrics = ({ className }: InventoryMetricsProps) => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-slate-600">
-            Available
+            New on Lot
           </CardTitle>
           <div className="w-4 h-4 bg-green-500 rounded-full"></div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">{metrics.availableVehicles}</div>
-          <p className="text-xs text-slate-500">Ready for sale</p>
+          <div className="text-2xl font-bold text-green-600">{metrics.newOnLot}</div>
+          <p className="text-xs text-slate-500">Status 5000</p>
         </CardContent>
       </Card>
 
@@ -122,7 +123,7 @@ const InventoryMetrics = ({ className }: InventoryMetricsProps) => {
           <div className="text-2xl font-bold text-slate-800">
             ${metrics.avgPrice.toLocaleString()}
           </div>
-          <p className="text-xs text-slate-500">Available inventory</p>
+          <p className="text-xs text-slate-500">New on lot inventory</p>
         </CardContent>
       </Card>
     </div>
