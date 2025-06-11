@@ -1,14 +1,17 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, AlertCircle, FileText, CheckCircle, FileSpreadsheet } from "lucide-react";
+import { Upload, AlertCircle, FileText, CheckCircle, FileSpreadsheet, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { parseInventoryFile } from "@/utils/fileParsingUtils";
+import { parseEnhancedInventoryFile, mapRowToInventoryItem, getSheetInfo, type SheetInfo } from "@/utils/enhancedFileParsingUtils";
+import { storeUploadedFile, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
+import UploadHistoryViewer from "./inventory-upload/UploadHistoryViewer";
+import SheetSelector from "./inventory-upload/SheetSelector";
 
 interface InventoryUploadProps {
   user: {
+    id: string;
     role: string;
   };
 }
@@ -17,6 +20,10 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | 'certified'>('used');
+  const [showHistory, setShowHistory] = useState(false);
+  const [showSheetSelector, setShowSheetSelector] = useState(false);
+  const [sheetsInfo, setSheetsInfo] = useState<SheetInfo[]>([]);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   // Check permissions
@@ -48,13 +55,44 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
       return;
     }
 
-    setUploading(true);
     setSelectedCondition(condition);
+    setPendingFile(file);
+
+    // Check if it's an Excel file with multiple sheets
+    if (fileExtension === '.xlsx' || fileExtension === '.xls') {
+      try {
+        const sheets = await getSheetInfo(file);
+        if (sheets.length > 1) {
+          setSheetsInfo(sheets);
+          setShowSheetSelector(true);
+          return;
+        }
+      } catch (error) {
+        console.error('Error getting sheet info:', error);
+      }
+    }
+
+    // Process single sheet or CSV file
+    await processFile(file, condition);
+    
+    // Reset the input
+    event.target.value = '';
+  };
+
+  const processFile = async (file: File, condition: 'new' | 'used' | 'certified', selectedSheet?: string) => {
+    setUploading(true);
+    let uploadRecord: UploadHistoryRecord | null = null;
     
     try {
       console.log(`Processing ${file.name} as ${condition} inventory...`);
-      const parsed = await parseInventoryFile(file);
-      console.log(`Parsed ${parsed.fileType} file with ${parsed.rows.length} rows`);
+      
+      // Store the original file first
+      uploadRecord = await storeUploadedFile(file, user.id, 'inventory', condition);
+      console.log('File stored with ID:', uploadRecord.id);
+      
+      // Parse the file with enhanced parsing
+      const parsed = await parseEnhancedInventoryFile(file, selectedSheet);
+      console.log(`Parsed ${parsed.fileType} file with ${parsed.rows.length} rows, format: ${parsed.formatType}`);
       
       let successCount = 0;
       let errorCount = 0;
@@ -62,29 +100,8 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
 
       for (const row of parsed.rows) {
         try {
-          // Map columns to database fields with more flexible column matching
-          const inventoryItem = {
-            vin: row.VIN || row.vin || row.Vin || '',
-            stock_number: row.stock_number || row.stock || row.Stock || row.StockNumber || null,
-            year: parseInt(row.year || row.Year || row.MODEL_YEAR || '') || null,
-            make: row.make || row.Make || row.MAKE || '',
-            model: row.model || row.Model || row.MODEL || '',
-            trim: row.trim || row.Trim || row.TRIM || null,
-            body_style: row.body_style || row.style || row.BodyStyle || row.BODY_STYLE || null,
-            color_exterior: row.color_exterior || row.exterior_color || row.ExteriorColor || row.EXTERIOR_COLOR || null,
-            color_interior: row.color_interior || row.interior_color || row.InteriorColor || row.INTERIOR_COLOR || null,
-            mileage: parseInt(row.mileage || row.Mileage || row.MILEAGE || row.odometer || '') || null,
-            price: parseFloat(row.price || row.Price || row.PRICE || row.asking_price || '') || null,
-            msrp: parseFloat(row.msrp || row.MSRP || row.list_price || '') || null,
-            condition: condition, // Use the selected condition
-            status: (row.status || row.Status || 'available').toLowerCase(),
-            fuel_type: row.fuel_type || row.fuel || row.FuelType || row.FUEL_TYPE || null,
-            transmission: row.transmission || row.trans || row.Transmission || row.TRANSMISSION || null,
-            drivetrain: row.drivetrain || row.drive || row.Drivetrain || row.DRIVETRAIN || null,
-            engine: row.engine || row.Engine || row.ENGINE || null,
-            description: row.description || row.Description || row.DESCRIPTION || null,
-            location: row.location || row.Location || row.LOCATION || 'lot'
-          };
+          // Use enhanced mapping function
+          const inventoryItem = mapRowToInventoryItem(row, condition, uploadRecord.id);
 
           // Validate required fields
           if (!inventoryItem.vin || !inventoryItem.make || !inventoryItem.model) {
@@ -112,14 +129,25 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
         }
       }
 
+      // Update upload history with results
+      await updateUploadHistory(uploadRecord.id, {
+        total_rows: parsed.rows.length,
+        successful_imports: successCount,
+        failed_imports: errorCount,
+        processing_status: 'completed',
+        error_details: errors.length > 0 ? errors.slice(0, 10).join('\n') : undefined
+      });
+
       setUploadResult({
         total: parsed.rows.length,
         success: successCount,
         errors: errorCount,
-        errorDetails: errors.slice(0, 10), // Show first 10 errors
+        errorDetails: errors.slice(0, 10),
         fileType: parsed.fileType,
         fileName: file.name,
-        condition: condition
+        condition: condition,
+        formatType: parsed.formatType,
+        uploadId: uploadRecord.id
       });
 
       toast({
@@ -130,6 +158,15 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
 
     } catch (error) {
       console.error('Upload error:', error);
+      
+      // Update upload history with error
+      if (uploadRecord) {
+        await updateUploadHistory(uploadRecord.id, {
+          processing_status: 'failed',
+          error_details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+      
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Error processing the file",
@@ -137,10 +174,54 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
       });
     } finally {
       setUploading(false);
-      // Reset the input
-      event.target.value = '';
+      setPendingFile(null);
+      setShowSheetSelector(false);
     }
   };
+
+  const handleSheetSelected = (sheetName: string) => {
+    if (pendingFile) {
+      processFile(pendingFile, selectedCondition, sheetName);
+    }
+  };
+
+  if (showHistory) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Upload History</h2>
+            <p className="text-slate-600 mt-1">View and manage your inventory upload history</p>
+          </div>
+          <Button onClick={() => setShowHistory(false)} variant="outline">
+            Back to Upload
+          </Button>
+        </div>
+        <UploadHistoryViewer userId={user.id} />
+      </div>
+    );
+  }
+
+  if (showSheetSelector) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Select Sheet</h2>
+            <p className="text-slate-600 mt-1">Choose which sheet to import from your Excel file</p>
+          </div>
+          <Button onClick={() => setShowSheetSelector(false)} variant="outline">
+            Cancel
+          </Button>
+        </div>
+        <SheetSelector 
+          sheets={sheetsInfo} 
+          onSheetSelected={handleSheetSelected}
+          fileName={pendingFile?.name || ''}
+        />
+      </div>
+    );
+  }
 
   const uploadButtons = [
     {
@@ -168,11 +249,17 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">Upload Inventory</h2>
-        <p className="text-slate-600 mt-1">
-          Import your vehicle inventory from CSV or Excel files
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Upload Inventory</h2>
+          <p className="text-slate-600 mt-1">
+            Import your vehicle inventory from CSV or Excel files with permanent storage
+          </p>
+        </div>
+        <Button onClick={() => setShowHistory(true)} variant="outline" className="flex items-center space-x-2">
+          <History className="w-4 h-4" />
+          <span>View History</span>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -226,24 +313,36 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
           <Card className="p-6">
             <div className="flex items-center space-x-2 mb-4">
               <FileSpreadsheet className="w-5 h-5 text-green-600" />
-              <h3 className="text-lg font-medium">Supported File Formats</h3>
+              <h3 className="text-lg font-medium">Enhanced File Support</h3>
             </div>
             
             <div className="space-y-2 text-sm mb-4">
               <div className="flex justify-between">
                 <span className="font-medium">Excel Files</span>
-                <span className="text-slate-600">.xlsx, .xls</span>
+                <span className="text-slate-600">.xlsx, .xls (Multi-sheet)</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-medium">CSV Files</span>
                 <span className="text-slate-600">.csv</span>
               </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Formats Detected</span>
+                <span className="text-slate-600">Vauto, GM Global</span>
+              </div>
             </div>
             
-            <div className="bg-blue-50 border border-blue-200 rounded p-3">
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
               <p className="text-sm text-blue-800">
-                <strong>New Feature:</strong> You can now upload Excel files directly! 
-                No need to convert to CSV first.
+                <strong>New:</strong> Comprehensive field capture including pricing, 
+                warranty, history, and dealer-specific data. Original files are 
+                permanently stored for your records.
+              </p>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded p-3">
+              <p className="text-sm text-green-800">
+                <strong>Auto-Detection:</strong> System automatically detects Vauto 
+                New, Vauto Used, and GM Global formats for optimized field mapping.
               </p>
             </div>
           </Card>
@@ -251,37 +350,30 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
           <Card className="p-6">
             <div className="flex items-center space-x-2 mb-4">
               <FileText className="w-5 h-5 text-green-600" />
-              <h3 className="text-lg font-medium">Required Columns</h3>
+              <h3 className="text-lg font-medium">Comprehensive Data Capture</h3>
             </div>
             
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="font-medium">VIN</span>
-                <span className="text-slate-600">Required</span>
+                <span className="font-medium">Required Fields</span>
+                <span className="text-slate-600">VIN, Make, Model</span>
               </div>
               <div className="flex justify-between">
-                <span className="font-medium">Make</span>
-                <span className="text-slate-600">Required</span>
+                <span className="font-medium">Pricing Fields</span>
+                <span className="text-slate-600">MSRP, Invoice, Wholesale</span>
               </div>
               <div className="flex justify-between">
-                <span className="font-medium">Model</span>
-                <span className="text-slate-600">Required</span>
+                <span className="font-medium">Dealer Data</span>
+                <span className="text-slate-600">Pack, Holdback, Incentives</span>
               </div>
               <div className="flex justify-between">
-                <span>Year, Price, Mileage</span>
-                <span className="text-slate-600">Optional</span>
+                <span className="font-medium">Vehicle History</span>
+                <span className="text-slate-600">Accidents, Owners, Records</span>
               </div>
               <div className="flex justify-between">
-                <span>Stock Number, Trim</span>
-                <span className="text-slate-600">Optional</span>
+                <span className="font-medium">Warranty Info</span>
+                <span className="text-slate-600">Type, Duration, Coverage</span>
               </div>
-            </div>
-            
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-              <p className="text-xs text-yellow-800">
-                <strong>Note:</strong> Column names are flexible - the system will automatically 
-                detect common variations like "VIN", "vin", "Vin", etc.
-              </p>
             </div>
           </Card>
         </div>
@@ -294,8 +386,13 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
             <CheckCircle className="w-5 h-5 text-green-600" />
             <h3 className="text-lg font-medium">Upload Results</h3>
             <span className="text-sm text-slate-600">
-              ({uploadResult.fileType.toUpperCase()} file: {uploadResult.fileName})
+              ({uploadResult.fileType.toUpperCase()}: {uploadResult.fileName})
             </span>
+            {uploadResult.formatType && (
+              <span className="text-sm font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                {uploadResult.formatType.replace('_', ' ').toUpperCase()}
+              </span>
+            )}
           </div>
           
           <div className="grid grid-cols-3 gap-4 mb-4">
@@ -315,7 +412,7 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
 
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <p className="text-sm text-blue-800">
-              <strong>Condition Set:</strong> All vehicles were imported as "{uploadResult.condition}" condition.
+              <strong>File Stored:</strong> Original file permanently stored with ID: {uploadResult.uploadId?.slice(-8)}
             </p>
           </div>
 

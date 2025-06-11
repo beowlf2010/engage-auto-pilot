@@ -99,99 +99,212 @@ export type Database = {
       }
       inventory: {
         Row: {
+          accidents_reported: number | null
+          acquisition_date: string | null
+          age_group: string | null
           body_style: string | null
+          book_value: number | null
           carfax_url: string | null
+          cash_down_payment: number | null
+          certification_type: string | null
           color_exterior: string | null
           color_interior: string | null
           condition: string
           created_at: string
           days_in_inventory: number | null
           dealer_notes: string | null
+          dealer_pack: number | null
           description: string | null
           drivetrain: string | null
           engine: string | null
+          expected_sale_date: string | null
+          factory_warranty_remaining: boolean | null
           features: string[] | null
+          finance_payment: number | null
           fuel_type: string | null
+          holdback: number | null
           id: string
           images: string[] | null
+          incentives: number | null
+          internet_price: number | null
+          invoice_cost: number | null
+          key_count: number | null
+          lease_payment: number | null
+          lien_holder: string | null
           location: string | null
+          lot_location: string | null
           make: string
           mileage: number | null
           model: string
           msrp: number | null
+          photos_urls: string[] | null
+          previous_owners: number | null
           price: number | null
+          profit_margin: number | null
+          reconditioning_cost: number | null
+          sales_rep: string | null
+          service_records_available: boolean | null
           sold_at: string | null
+          source_acquired: string | null
           status: string
           stock_number: string | null
+          title_status: string | null
+          trade_value: number | null
           transmission: string | null
           trim: string | null
+          turn_goal_days: number | null
           updated_at: string
+          upload_history_id: string | null
+          vehicle_history_report: string | null
           vin: string
+          warranty_miles: number | null
+          warranty_months: number | null
+          warranty_type: string | null
+          wholesale_cost: number | null
+          window_sticker_url: string | null
           year: number | null
         }
         Insert: {
+          accidents_reported?: number | null
+          acquisition_date?: string | null
+          age_group?: string | null
           body_style?: string | null
+          book_value?: number | null
           carfax_url?: string | null
+          cash_down_payment?: number | null
+          certification_type?: string | null
           color_exterior?: string | null
           color_interior?: string | null
           condition?: string
           created_at?: string
           days_in_inventory?: number | null
           dealer_notes?: string | null
+          dealer_pack?: number | null
           description?: string | null
           drivetrain?: string | null
           engine?: string | null
+          expected_sale_date?: string | null
+          factory_warranty_remaining?: boolean | null
           features?: string[] | null
+          finance_payment?: number | null
           fuel_type?: string | null
+          holdback?: number | null
           id?: string
           images?: string[] | null
+          incentives?: number | null
+          internet_price?: number | null
+          invoice_cost?: number | null
+          key_count?: number | null
+          lease_payment?: number | null
+          lien_holder?: string | null
           location?: string | null
+          lot_location?: string | null
           make: string
           mileage?: number | null
           model: string
           msrp?: number | null
+          photos_urls?: string[] | null
+          previous_owners?: number | null
           price?: number | null
+          profit_margin?: number | null
+          reconditioning_cost?: number | null
+          sales_rep?: string | null
+          service_records_available?: boolean | null
           sold_at?: string | null
+          source_acquired?: string | null
           status?: string
           stock_number?: string | null
+          title_status?: string | null
+          trade_value?: number | null
           transmission?: string | null
           trim?: string | null
+          turn_goal_days?: number | null
           updated_at?: string
+          upload_history_id?: string | null
+          vehicle_history_report?: string | null
           vin: string
+          warranty_miles?: number | null
+          warranty_months?: number | null
+          warranty_type?: string | null
+          wholesale_cost?: number | null
+          window_sticker_url?: string | null
           year?: number | null
         }
         Update: {
+          accidents_reported?: number | null
+          acquisition_date?: string | null
+          age_group?: string | null
           body_style?: string | null
+          book_value?: number | null
           carfax_url?: string | null
+          cash_down_payment?: number | null
+          certification_type?: string | null
           color_exterior?: string | null
           color_interior?: string | null
           condition?: string
           created_at?: string
           days_in_inventory?: number | null
           dealer_notes?: string | null
+          dealer_pack?: number | null
           description?: string | null
           drivetrain?: string | null
           engine?: string | null
+          expected_sale_date?: string | null
+          factory_warranty_remaining?: boolean | null
           features?: string[] | null
+          finance_payment?: number | null
           fuel_type?: string | null
+          holdback?: number | null
           id?: string
           images?: string[] | null
+          incentives?: number | null
+          internet_price?: number | null
+          invoice_cost?: number | null
+          key_count?: number | null
+          lease_payment?: number | null
+          lien_holder?: string | null
           location?: string | null
+          lot_location?: string | null
           make?: string
           mileage?: number | null
           model?: string
           msrp?: number | null
+          photos_urls?: string[] | null
+          previous_owners?: number | null
           price?: number | null
+          profit_margin?: number | null
+          reconditioning_cost?: number | null
+          sales_rep?: string | null
+          service_records_available?: boolean | null
           sold_at?: string | null
+          source_acquired?: string | null
           status?: string
           stock_number?: string | null
+          title_status?: string | null
+          trade_value?: number | null
           transmission?: string | null
           trim?: string | null
+          turn_goal_days?: number | null
           updated_at?: string
+          upload_history_id?: string | null
+          vehicle_history_report?: string | null
           vin?: string
+          warranty_miles?: number | null
+          warranty_months?: number | null
+          warranty_type?: string | null
+          wholesale_cost?: number | null
+          window_sticker_url?: string | null
           year?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_upload_history_id_fkey"
+            columns: ["upload_history_id"]
+            isOneToOne: false
+            referencedRelation: "upload_history"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_inventory_interests: {
         Row: {
@@ -440,6 +553,63 @@ export type Database = {
           phone?: string | null
           role?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      upload_history: {
+        Row: {
+          created_at: string
+          duplicate_count: number
+          error_details: string | null
+          failed_imports: number
+          file_size: number
+          file_type: string
+          id: string
+          inventory_condition: string | null
+          original_filename: string
+          processed_at: string | null
+          processing_status: string
+          stored_filename: string
+          successful_imports: number
+          total_rows: number
+          upload_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duplicate_count?: number
+          error_details?: string | null
+          failed_imports?: number
+          file_size: number
+          file_type: string
+          id?: string
+          inventory_condition?: string | null
+          original_filename: string
+          processed_at?: string | null
+          processing_status?: string
+          stored_filename: string
+          successful_imports?: number
+          total_rows?: number
+          upload_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duplicate_count?: number
+          error_details?: string | null
+          failed_imports?: number
+          file_size?: number
+          file_type?: string
+          id?: string
+          inventory_condition?: string | null
+          original_filename?: string
+          processed_at?: string | null
+          processing_status?: string
+          stored_filename?: string
+          successful_imports?: number
+          total_rows?: number
+          upload_type?: string
+          user_id?: string
         }
         Relationships: []
       }
