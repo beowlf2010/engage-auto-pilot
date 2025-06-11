@@ -1,8 +1,7 @@
 
 import FinancialUpload from "./FinancialUpload";
-import FinancialMetrics from "./FinancialMetrics";
 import DealManagement from "./DealManagement";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FinancialDashboardProps {
@@ -17,8 +16,27 @@ interface FinancialDashboardProps {
 }
 
 const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
-  const [packAdjustment, setPackAdjustment] = useState(0);
-  const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(false);
+  // Load pack adjustment from localStorage
+  const [packAdjustment, setPackAdjustment] = useState(() => {
+    const saved = localStorage.getItem('packAdjustment');
+    return saved ? Number(saved) : 0;
+  });
+  
+  const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(() => {
+    const saved = localStorage.getItem('packAdjustmentEnabled');
+    return saved === 'true';
+  });
+
+  // Save pack adjustment to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('packAdjustment', packAdjustment.toString());
+  }, [packAdjustment]);
+
+  useEffect(() => {
+    localStorage.setItem('packAdjustmentEnabled', packAdjustmentEnabled.toString());
+  }, [packAdjustmentEnabled]);
+
+  const effectivePackAdjustment = packAdjustmentEnabled ? packAdjustment : 0;
 
   return (
     <div className="space-y-6">
@@ -46,7 +64,7 @@ const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
           </label>
           {packAdjustmentEnabled && (
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-slate-600">$</span>
+              <span className="text-sm text-slate-600">+$</span>
               <input
                 type="number"
                 value={packAdjustment}
@@ -61,23 +79,16 @@ const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
       </div>
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+      <Tabs defaultValue="deals" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="deals">Deal Management</TabsTrigger>
           <TabsTrigger value="upload">Upload Data</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <FinancialMetrics 
-            packAdjustment={packAdjustmentEnabled ? packAdjustment : 0} 
-          />
-        </TabsContent>
-
         <TabsContent value="deals" className="space-y-6">
           <DealManagement 
             user={{ id: user.id, role: user.role }} 
-            packAdjustment={packAdjustmentEnabled ? packAdjustment : 0}
+            packAdjustment={effectivePackAdjustment}
           />
         </TabsContent>
 
