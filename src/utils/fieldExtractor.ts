@@ -31,6 +31,52 @@ export const getFieldValue = (row: Record<string, any>, possibleFields: string[]
   return '';
 };
 
+// Enhanced vAuto vehicle parsing that extracts components from combined vehicle field
+export const parseVautoVehicleField = (vehicleString: string): { year?: string, make?: string, model?: string } => {
+  if (!vehicleString) return {};
+  
+  console.log('=== VAUTO VEHICLE PARSING ===');
+  console.log('Input:', vehicleString);
+  
+  // Remove common prefixes and clean the string
+  const cleaned = vehicleString.replace(/^(Vehicle:\s*|Vehicle\s*)/i, '').trim();
+  
+  // Split by spaces and analyze
+  const parts = cleaned.split(/\s+/);
+  
+  if (parts.length >= 3) {
+    // Try to identify year (4 digits), make, and model
+    const yearPattern = /^\d{4}$/;
+    let year, make, model;
+    
+    // Look for year pattern
+    const yearIndex = parts.findIndex(part => yearPattern.test(part));
+    
+    if (yearIndex !== -1) {
+      year = parts[yearIndex];
+      
+      // Take the next parts as make and model
+      if (yearIndex + 1 < parts.length) {
+        make = parts[yearIndex + 1];
+      }
+      if (yearIndex + 2 < parts.length) {
+        // Join remaining parts as model (in case model has multiple words)
+        model = parts.slice(yearIndex + 2).join(' ');
+      }
+    } else {
+      // No clear year, assume first part is make, rest is model
+      make = parts[0];
+      model = parts.slice(1).join(' ');
+    }
+    
+    console.log(`✓ Parsed vAuto vehicle: Year=${year}, Make=${make}, Model=${model}`);
+    return { year, make, model };
+  }
+  
+  console.log('✗ Could not parse vAuto vehicle field');
+  return {};
+};
+
 // Smart VIN detection that scans all columns for VIN patterns
 export const findVINInRow = (row: Record<string, any>): string => {
   console.log('=== SMART VIN DETECTION ===');
@@ -70,7 +116,7 @@ export const isValidVIN = (vin: string): boolean => {
   return cleanVin.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(cleanVin);
 };
 
-// Smart make detection with GM division mapping
+// Enhanced make detection with vAuto parsing and GM division mapping
 export const findMakeInRow = (row: Record<string, any>): string => {
   console.log('=== SMART MAKE DETECTION ===');
   
@@ -84,7 +130,7 @@ export const findMakeInRow = (row: Record<string, any>): string => {
     'SAT': 'Saturn',
     'HUM': 'Hummer',
     'OLD': 'Oldsmobile',
-    'A2V': 'Chevrolet', // Added missing A2V code
+    'A2V': 'Chevrolet',
     'A1C': 'Chevrolet',
     'A1F': 'Chevrolet',
     'A2U': 'Buick',
@@ -92,7 +138,17 @@ export const findMakeInRow = (row: Record<string, any>): string => {
     'A3G': 'GMC'
   };
   
-  // First try standard make fields
+  // Check for vAuto vehicle field first
+  const vehicleField = getFieldValue(row, ['Vehicle', 'vehicle', 'Vehicle:']);
+  if (vehicleField) {
+    const parsed = parseVautoVehicleField(vehicleField);
+    if (parsed.make) {
+      console.log(`✓ Found make from vAuto vehicle field: ${parsed.make}`);
+      return parsed.make;
+    }
+  }
+  
+  // Try standard make fields
   const makeFields = [
     'Division', 'Make', 'Brand', 'Manufacturer',
     'GM Division', 'Vehicle Make', 'Auto Make'
@@ -143,11 +199,21 @@ export const findMakeInRow = (row: Record<string, any>): string => {
   return '';
 };
 
-// Smart model detection that looks for vehicle model patterns
+// Enhanced model detection with vAuto parsing
 export const findModelInRow = (row: Record<string, any>): string => {
   console.log('=== SMART MODEL DETECTION ===');
   
-  // First try standard model fields
+  // Check for vAuto vehicle field first
+  const vehicleField = getFieldValue(row, ['Vehicle', 'vehicle', 'Vehicle:']);
+  if (vehicleField) {
+    const parsed = parseVautoVehicleField(vehicleField);
+    if (parsed.model) {
+      console.log(`✓ Found model from vAuto vehicle field: ${parsed.model}`);
+      return parsed.model;
+    }
+  }
+  
+  // Try standard model fields
   const modelFields = [
     'Model', 'Vehicle Model', 'Product',
     'Model Name', 'Series Model', 'Product Name',
@@ -180,16 +246,26 @@ export const findModelInRow = (row: Record<string, any>): string => {
   return '';
 };
 
-// Smart year detection with validation
+// Enhanced year detection with vAuto parsing
 export const findYearInRow = (row: Record<string, any>): string => {
   console.log('=== SMART YEAR DETECTION ===');
+  
+  // Check for vAuto vehicle field first
+  const vehicleField = getFieldValue(row, ['Vehicle', 'vehicle', 'Vehicle:']);
+  if (vehicleField) {
+    const parsed = parseVautoVehicleField(vehicleField);
+    if (parsed.year && isValidYear(parsed.year)) {
+      console.log(`✓ Found year from vAuto vehicle field: ${parsed.year}`);
+      return parsed.year;
+    }
+  }
   
   const yearFields = [
     'Year', 'Model Year', 'MY', 'Vehicle Year',
     'Model_Year', 'Yr'
   ];
   
-  // Try standard year fields first
+  // Try standard year fields
   for (const field of yearFields) {
     const value = getFieldValue(row, [field]);
     if (value && isValidYear(value)) {

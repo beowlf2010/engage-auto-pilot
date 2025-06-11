@@ -136,9 +136,68 @@ const InventoryDashboard = () => {
     }
   };
 
+  // Enhanced vehicle title formatting that prevents duplication
   const formatVehicleTitle = (vehicle: any) => {
-    const parts = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean);
-    return parts.join(' ');
+    const year = vehicle.year ? String(vehicle.year) : '';
+    const make = vehicle.make || '';
+    const model = vehicle.model || '';
+    const trim = vehicle.trim || '';
+
+    // Check if make or model already contains the year to prevent duplication
+    const makeContainsYear = make.includes(year);
+    const modelContainsYear = model.includes(year);
+    
+    // Check if make and model are duplicates or if model contains make
+    const makeAndModelSame = make.toLowerCase() === model.toLowerCase();
+    const modelContainsMake = model.toLowerCase().includes(make.toLowerCase()) && make.length > 2;
+
+    console.log('Vehicle title debug:', { year, make, model, trim, makeContainsYear, modelContainsYear, makeAndModelSame, modelContainsMake });
+
+    let parts: string[] = [];
+
+    // Add year only if it's not already in make or model
+    if (year && !makeContainsYear && !modelContainsYear) {
+      parts.push(year);
+    }
+
+    // Handle make
+    if (make && !makeAndModelSame) {
+      // If model contains make, skip adding make separately
+      if (!modelContainsMake) {
+        parts.push(make);
+      }
+    }
+
+    // Handle model
+    if (model && !makeAndModelSame) {
+      parts.push(model);
+    } else if (!model && make) {
+      // If no model but we have make, use make
+      parts.push(make);
+    }
+
+    // Add trim if available and not already included
+    if (trim && !parts.some(part => part.toLowerCase().includes(trim.toLowerCase()))) {
+      parts.push(trim);
+    }
+
+    const result = parts.filter(Boolean).join(' ');
+    console.log('Final vehicle title:', result);
+    
+    return result || 'Unknown Vehicle';
+  };
+
+  // Enhanced description extraction from vAuto data
+  const getVehicleDescription = (vehicle: any) => {
+    if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
+      // Look for vAuto description fields
+      const blob = vehicle.full_option_blob;
+      const description = blob.Description || blob.description || blob.Details || blob.details;
+      if (description && typeof description === 'string' && description.length > 10) {
+        return description.substring(0, 100) + '...';
+      }
+    }
+    return null;
   };
 
   const formatPrice = (price: number) => {
@@ -290,7 +349,7 @@ const InventoryDashboard = () => {
         </div>
       </Card>
 
-      {/* vAuto-Style Inventory Table */}
+      {/* Enhanced Inventory Table */}
       <Card>
         <Table>
           <TableHeader>
@@ -330,101 +389,108 @@ const InventoryDashboard = () => {
                 </TableRow>
               ))
             ) : (
-              inventory?.map((vehicle) => (
-                <TableRow key={vehicle.id} className="hover:bg-slate-50">
-                  <TableCell>
-                    <div>
-                      <div className="font-medium text-slate-800">
-                        {formatVehicleTitle(vehicle)}
+              inventory?.map((vehicle) => {
+                const vehicleDescription = getVehicleDescription(vehicle);
+                
+                return (
+                  <TableRow key={vehicle.id} className="hover:bg-slate-50">
+                    <TableCell>
+                      <div>
+                        <div className="font-medium text-slate-800">
+                          {formatVehicleTitle(vehicle)}
+                        </div>
+                        {vehicle.color_exterior && (
+                          <div className="text-sm text-slate-600">{vehicle.color_exterior}</div>
+                        )}
+                        {vehicleDescription && (
+                          <div className="text-xs text-slate-500 mt-1">{vehicleDescription}</div>
+                        )}
                       </div>
-                      {vehicle.color_exterior && (
-                        <div className="text-sm text-slate-600">{vehicle.color_exterior}</div>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <div className="font-medium">
+                        {vehicle.stock_number || 'N/A'}
+                      </div>
+                      {isGMGlobalOrder(vehicle) && !vehicle.vin && (
+                        <div className="text-xs text-slate-500">GM Global Order</div>
                       )}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="font-medium">
-                      {vehicle.stock_number || 'N/A'}
-                    </div>
-                    {isGMGlobalOrder(vehicle) && !vehicle.vin && (
-                      <div className="text-xs text-slate-500">GM Global Order</div>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    {vehicle.price && (
-                      <div className="font-semibold text-slate-800">
-                        {formatPrice(vehicle.price)}
-                      </div>
-                    )}
-                    {vehicle.msrp && vehicle.msrp !== vehicle.price && (
-                      <div className="text-sm text-slate-500 line-through">
-                        MSRP: {formatPrice(vehicle.msrp)}
-                      </div>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    {isGMGlobalOrder(vehicle) && vehicle.status ? (
-                      <Badge className={getGMGlobalStatus(vehicle.status).color}>
-                        {getGMGlobalStatus(vehicle.status).label}
-                      </Badge>
-                    ) : vehicle.condition === 'new' && vehicle.status ? (
-                      <Badge className="bg-green-100 text-green-800">
-                        {vehicle.status}
-                      </Badge>
-                    ) : (
-                      <span className="text-slate-500">-</span>
-                    )}
-                    {vehicle.expected_sale_date && (
-                      <div className="text-xs text-slate-500 mt-1 flex items-center">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        ETA: {new Date(vehicle.expected_sale_date).toLocaleDateString()}
-                      </div>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="text-sm">
-                      {vehicle.days_in_inventory !== null ? (
-                        <div>{vehicle.days_in_inventory} days</div>
+                    </TableCell>
+                    
+                    <TableCell>
+                      {vehicle.price && (
+                        <div className="font-semibold text-slate-800">
+                          {formatPrice(vehicle.price)}
+                        </div>
+                      )}
+                      {vehicle.msrp && vehicle.msrp !== vehicle.price && (
+                        <div className="text-sm text-slate-500 line-through">
+                          MSRP: {formatPrice(vehicle.msrp)}
+                        </div>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      {isGMGlobalOrder(vehicle) && vehicle.status ? (
+                        <Badge className={getGMGlobalStatus(vehicle.status).color}>
+                          {getGMGlobalStatus(vehicle.status).label}
+                        </Badge>
+                      ) : vehicle.condition === 'new' && vehicle.status ? (
+                        <Badge className="bg-green-100 text-green-800">
+                          {vehicle.status}
+                        </Badge>
                       ) : (
                         <span className="text-slate-500">-</span>
                       )}
-                      {vehicle.leads_count > 0 && (
-                        <div className="text-blue-600">{vehicle.leads_count} leads</div>
+                      {vehicle.expected_sale_date && (
+                        <div className="text-xs text-slate-500 mt-1 flex items-center">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          ETA: {new Date(vehicle.expected_sale_date).toLocaleDateString()}
+                        </div>
                       )}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    {vehicle.rpo_codes && vehicle.rpo_codes.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {vehicle.rpo_codes.slice(0, 3).map((code) => (
-                          <Badge key={code} variant="outline" className="text-xs">
-                            {code}
-                          </Badge>
-                        ))}
-                        {vehicle.rpo_codes.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{vehicle.rpo_codes.length - 3}
-                          </Badge>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <div className="text-sm">
+                        {vehicle.days_in_inventory !== null ? (
+                          <div>{vehicle.days_in_inventory} days</div>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                        {vehicle.leads_count > 0 && (
+                          <div className="text-blue-600">{vehicle.leads_count} leads</div>
                         )}
                       </div>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Link to={`/vehicle-detail/${vehicle.stock_number || vehicle.vin || vehicle.id}`}>
-                      <Button variant="outline" size="sm" className="flex items-center space-x-1">
-                        <Eye className="w-4 h-4" />
-                        <span>View</span>
-                      </Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    
+                    <TableCell>
+                      {vehicle.rpo_codes && vehicle.rpo_codes.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {vehicle.rpo_codes.slice(0, 3).map((code) => (
+                            <Badge key={code} variant="outline" className="text-xs">
+                              {code}
+                            </Badge>
+                          ))}
+                          {vehicle.rpo_codes.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{vehicle.rpo_codes.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      <Link to={`/vehicle-detail/${vehicle.stock_number || vehicle.vin || vehicle.id}`}>
+                        <Button variant="outline" size="sm" className="flex items-center space-x-1">
+                          <Eye className="w-4 h-4" />
+                          <span>View</span>
+                        </Button>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -441,3 +507,5 @@ const InventoryDashboard = () => {
 };
 
 export default InventoryDashboard;
+
+</edits_to_apply>
