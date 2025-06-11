@@ -103,8 +103,8 @@ export const validateAndProcessInventoryRows = async (
             .insert(inventoryItem)
             .select();
         }
-      } else {
-        // Regular VIN-based upsert
+      } else if (hasValidVin) {
+        // Regular VIN-based upsert (only when VIN is not null)
         const { data: existingByVin } = await supabase
           .from('inventory')
           .select('id')
@@ -125,6 +125,11 @@ export const validateAndProcessInventoryRows = async (
             .insert(inventoryItem)
             .select();
         }
+      } else {
+        // This should not happen due to validation above, but handle gracefully
+        errors.push(`Row ${i + 1}: No valid identifier found (VIN or Order Number)`);
+        errorCount++;
+        continue;
       }
 
       if (upsertResult.error) {

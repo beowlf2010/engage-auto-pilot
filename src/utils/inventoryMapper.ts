@@ -18,10 +18,13 @@ export const mapRowToInventoryItem = (
   });
 
   // Use smart detection for critical fields
-  const vin = findVINInRow(row);
+  const detectedVin = findVINInRow(row);
   const make = findMakeInRow(row);
   const model = findModelInRow(row);
   const year = findYearInRow(row);
+
+  // For VIN, set to null if not found (instead of empty string to avoid constraint violations)
+  const vin = detectedVin && detectedVin.length >= 10 ? detectedVin : null;
 
   // For stock number, try multiple approaches
   let stockNumber = '';
@@ -89,7 +92,7 @@ export const mapRowToInventoryItem = (
   console.log('===================================');
 
   return {
-    vin: vin || '',
+    vin: vin, // This will be null if no valid VIN found, preventing constraint violations
     stock_number: stockNumber || undefined,
     year: year ? parseInt(year) : undefined,
     make: make || '',
