@@ -30,7 +30,7 @@ export interface Lead {
   nextAiSendAt?: string;
   createdAt: string;
   lastMessage?: string;
-  lastMessageTime?: string; // Add this missing property
+  lastMessageTime?: string;
   unreadCount: number;
   doNotCall: boolean;
   doNotEmail: boolean;
@@ -39,5 +39,11 @@ export interface Lead {
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleVIN?: string;
-  contactStatus: 'no_contact' | 'contact_attempted' | 'response_received'; // Add this missing property
+  contactStatus: 'no_contact' | 'contact_attempted' | 'response_received';
+  // New enhanced AI tracking fields
+  aiMessagesSent?: number;
+  aiLastMessageStage?: string;
+  aiSequencePaused?: boolean;
+  aiPauseReason?: string;
+  aiResumeAt?: string;
 }

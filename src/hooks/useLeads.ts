@@ -127,7 +127,7 @@ export const useLeads = () => {
           status: lead.status,
           salesperson: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : 'Unassigned',
           salespersonId: lead.salesperson_id,
-          aiOptIn: lead.ai_opt_in || false, // Ensure this defaults to false
+          aiOptIn: lead.ai_opt_in || false,
           aiStage: lead.ai_stage,
           nextAiSendAt: lead.next_ai_send_at,
           createdAt: lead.created_at,
@@ -138,10 +138,16 @@ export const useLeads = () => {
           outgoingCount: outgoingCount,
           incomingCount: incomingCount,
           contactStatus: contactStatus,
-          hasBeenMessaged: messageCount > 0, // Keep for backward compatibility
+          hasBeenMessaged: messageCount > 0,
           doNotCall: lead.do_not_call,
           doNotEmail: lead.do_not_email,
-          doNotMail: lead.do_not_mail
+          doNotMail: lead.do_not_mail,
+          // New enhanced AI tracking fields
+          aiMessagesSent: lead.ai_messages_sent || 0,
+          aiLastMessageStage: lead.ai_last_message_stage,
+          aiSequencePaused: lead.ai_sequence_paused || false,
+          aiPauseReason: lead.ai_pause_reason,
+          aiResumeAt: lead.ai_resume_at
         };
       }) || [];
 

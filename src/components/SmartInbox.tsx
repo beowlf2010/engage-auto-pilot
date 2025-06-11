@@ -6,8 +6,9 @@ import ConversationsList from "./inbox/ConversationsList";
 import ChatView from "./inbox/ChatView";
 import ConversationMemory from "./ConversationMemory";
 import { useRealtimeInbox } from "@/hooks/useRealtimeInbox";
-import { useAIScheduler } from "@/hooks/useAIScheduler";
+import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
 import { markMessagesAsRead, assignCurrentUserToLead } from "@/services/conversationsService";
+import { trackLeadResponse } from "@/services/enhancedAIMessageService";
 import { toast } from "@/hooks/use-toast";
 
 interface SmartInboxProps {
@@ -22,7 +23,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [showMemory, setShowMemory] = useState(false);
   const { conversations, messages, loading, fetchMessages, sendMessage, refetch } = useRealtimeInbox();
-  const { processing: aiProcessing } = useAIScheduler();
+  const { processing: aiProcessing } = useEnhancedAIScheduler();
 
   // Filter conversations based on user role
   const filteredConversations = conversations.filter(conv => 
@@ -69,6 +70,14 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const handleSelectConversation = async (leadId: string) => {
     setSelectedLead(leadId);
     await fetchMessages(leadId);
+    
+    // Check if this lead has incoming messages to track as responses
+    const incomingMessages = messages.filter(msg => msg.direction === 'in');
+    if (incomingMessages.length > 0) {
+      // Track the most recent incoming message as a response
+      const latestIncoming = incomingMessages[incomingMessages.length - 1];
+      await trackLeadResponse(leadId, new Date(latestIncoming.sentAt));
+    }
     
     // Mark messages as read when viewing the conversation
     await markMessagesAsRead(leadId);

@@ -9,6 +9,131 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_message_analytics: {
+        Row: {
+          created_at: string
+          day_of_week: number | null
+          hour_of_day: number | null
+          id: string
+          inventory_mentioned: Json | null
+          lead_id: string
+          message_content: string
+          message_stage: string
+          responded_at: string | null
+          response_time_hours: number | null
+          sent_at: string
+          template_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          day_of_week?: number | null
+          hour_of_day?: number | null
+          id?: string
+          inventory_mentioned?: Json | null
+          lead_id: string
+          message_content: string
+          message_stage: string
+          responded_at?: string | null
+          response_time_hours?: number | null
+          sent_at?: string
+          template_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number | null
+          hour_of_day?: number | null
+          id?: string
+          inventory_mentioned?: Json | null
+          lead_id?: string
+          message_content?: string
+          message_stage?: string
+          responded_at?: string | null
+          response_time_hours?: number | null
+          sent_at?: string
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_message_analytics_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "ai_message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_message_templates: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          response_rate: number | null
+          stage: string
+          template: string
+          total_responses: number | null
+          total_sent: number | null
+          updated_at: string
+          variant_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          response_rate?: number | null
+          stage: string
+          template: string
+          total_responses?: number | null
+          total_sent?: number | null
+          updated_at?: string
+          variant_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          response_rate?: number | null
+          stage?: string
+          template?: string
+          total_responses?: number | null
+          total_sent?: number | null
+          updated_at?: string
+          variant_name?: string
+        }
+        Relationships: []
+      }
+      ai_schedule_config: {
+        Row: {
+          created_at: string
+          day_offset: number
+          id: string
+          is_active: boolean
+          messages_per_day: number
+          preferred_hours: number[] | null
+          stage_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_offset: number
+          id?: string
+          is_active?: boolean
+          messages_per_day?: number
+          preferred_hours?: number[] | null
+          stage_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_offset?: number
+          id?: string
+          is_active?: boolean
+          messages_per_day?: number
+          preferred_hours?: number[] | null
+          stage_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conversation_memory: {
         Row: {
           confidence: number | null
@@ -369,10 +494,60 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_response_patterns: {
+        Row: {
+          avg_response_time_hours: number | null
+          best_response_days: number[] | null
+          best_response_hours: number[] | null
+          created_at: string
+          id: string
+          inventory_responsiveness: Json | null
+          last_response_at: string | null
+          lead_id: string
+          preferred_content_types: string[] | null
+          total_messages_sent: number | null
+          total_responses: number | null
+          updated_at: string
+        }
+        Insert: {
+          avg_response_time_hours?: number | null
+          best_response_days?: number[] | null
+          best_response_hours?: number[] | null
+          created_at?: string
+          id?: string
+          inventory_responsiveness?: Json | null
+          last_response_at?: string | null
+          lead_id: string
+          preferred_content_types?: string[] | null
+          total_messages_sent?: number | null
+          total_responses?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avg_response_time_hours?: number | null
+          best_response_days?: number[] | null
+          best_response_hours?: number[] | null
+          created_at?: string
+          id?: string
+          inventory_responsiveness?: Json | null
+          last_response_at?: string | null
+          lead_id?: string
+          preferred_content_types?: string[] | null
+          total_messages_sent?: number | null
+          total_responses?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           address: string | null
+          ai_last_message_stage: string | null
+          ai_messages_sent: number | null
           ai_opt_in: boolean
+          ai_pause_reason: string | null
+          ai_resume_at: string | null
+          ai_sequence_paused: boolean | null
           ai_stage: string | null
           city: string | null
           created_at: string
@@ -407,7 +582,12 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_last_message_stage?: string | null
+          ai_messages_sent?: number | null
           ai_opt_in?: boolean
+          ai_pause_reason?: string | null
+          ai_resume_at?: string | null
+          ai_sequence_paused?: boolean | null
           ai_stage?: string | null
           city?: string | null
           created_at?: string
@@ -442,7 +622,12 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_last_message_stage?: string | null
+          ai_messages_sent?: number | null
           ai_opt_in?: boolean
+          ai_pause_reason?: string | null
+          ai_resume_at?: string | null
+          ai_sequence_paused?: boolean | null
           ai_stage?: string | null
           city?: string | null
           created_at?: string
