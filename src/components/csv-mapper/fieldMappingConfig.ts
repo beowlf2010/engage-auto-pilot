@@ -1,5 +1,5 @@
 
-import { User, Phone, Mail, Car, Users, Shield } from "lucide-react";
+import { User, Phone, Mail, Car, Users, Shield, Activity } from "lucide-react";
 import { FieldMapping } from './types';
 
 export interface FieldDefinition {
@@ -63,9 +63,10 @@ export const fieldSections: FieldSection[] = [
     ]
   },
   {
-    title: "Salesperson Assignment",
-    icon: Users,
+    title: "Lead Status & Assignment",
+    icon: Activity,
     fields: [
+      { key: 'status', label: 'Lead Status (Active/Sold/Bad/etc.)', required: false },
       { key: 'salesPersonFirstName', label: 'Salesperson First Name', required: false },
       { key: 'salesPersonLastName', label: 'Salesperson Last Name', required: false }
     ]

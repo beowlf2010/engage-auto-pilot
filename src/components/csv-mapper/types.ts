@@ -25,4 +25,5 @@ export interface FieldMapping {
   doNotMail?: string;
   leadType?: string;
   dealerId?: string;
+  status?: string;
 }

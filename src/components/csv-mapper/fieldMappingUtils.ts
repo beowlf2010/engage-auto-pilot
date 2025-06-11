@@ -89,7 +89,8 @@ export const performAutoDetection = (csvHeaders: string[]): FieldMapping => {
     doNotEmail: ['DoNotEmail', 'donotemail', 'do_not_email', 'dne', 'do not email', 'no email'],
     doNotMail: ['DoNotMail', 'donotmail', 'do_not_mail', 'dnm', 'do not mail', 'no mail'],
     leadType: ['LeadTypeName', 'leadtypename', 'lead_type_name', 'leadtype', 'lead_type', 'lead type name', 'lead type', 'type'],
-    dealerId: ['dealerid', 'dealer_id', 'dealer', 'dealer id', 'dealership id']
+    dealerId: ['dealerid', 'dealer_id', 'dealer', 'dealer id', 'dealership id'],
+    status: ['status', 'leadstatus', 'lead_status', 'lead status', 'state', 'condition', 'active', 'sold', 'bad', 'lead_state']
   };
 
   // Apply pattern matching for each field

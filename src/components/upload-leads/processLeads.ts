@@ -16,6 +16,49 @@ export interface ProcessingResult {
   }>;
 }
 
+// Map VIN Evolution and other external statuses to our system statuses
+const mapStatusToSystemStatus = (inputStatus: string): string => {
+  if (!inputStatus) return 'new';
+  
+  const normalizedStatus = inputStatus.toLowerCase().trim();
+  
+  // VIN Evolution status mappings
+  const statusMappings: Record<string, string> = {
+    'active': 'active',
+    'sold': 'sold', 
+    'bad': 'bad',
+    'pending': 'pending',
+    'new': 'new',
+    'engaged': 'engaged',
+    'contacted': 'contacted',
+    'follow up': 'follow_up',
+    'follow_up': 'follow_up',
+    'not interested': 'not_interested',
+    'not_interested': 'not_interested',
+    'paused': 'paused',
+    'closed': 'closed',
+    'lost': 'lost',
+    // Common variations
+    'hot': 'engaged',
+    'warm': 'follow_up',
+    'cold': 'paused',
+    'dead': 'bad',
+    'complete': 'closed',
+    'completed': 'closed',
+    'converted': 'closed'
+  };
+  
+  const mappedStatus = statusMappings[normalizedStatus];
+  if (mappedStatus) {
+    console.log(`Mapped status '${inputStatus}' to '${mappedStatus}'`);
+    return mappedStatus;
+  }
+  
+  // If no mapping found, default to 'new' and log for review
+  console.log(`Unknown status '${inputStatus}' defaulted to 'new'`);
+  return 'new';
+};
+
 export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
   const validLeads: ProcessedLead[] = [];
   const duplicates: ProcessingResult['duplicates'] = [];
@@ -54,6 +97,9 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
       const doNotCall = row[mapping.doNotCall]?.toLowerCase() === 'true';
       const doNotEmail = row[mapping.doNotEmail]?.toLowerCase() === 'true';
 
+      // Map the status from CSV to our system status
+      const mappedStatus = mapStatusToSystemStatus(row[mapping.status] || '');
+
       const newLead: ProcessedLead = {
         firstName: row[mapping.firstName] || '',
         lastName: row[mapping.lastName] || '',
@@ -72,7 +118,8 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
         salesPersonName: [row[mapping.salesPersonFirstName], row[mapping.salesPersonLastName]].filter(Boolean).join(' '),
         doNotCall,
         doNotEmail,
-        doNotMail: row[mapping.doNotMail]?.toLowerCase() === 'true'
+        doNotMail: row[mapping.doNotMail]?.toLowerCase() === 'true',
+        status: mappedStatus
       };
 
       // Check for duplicates against already processed leads
@@ -88,7 +135,7 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
         console.log(`Duplicate found at row ${index + 1}: ${duplicateCheck.duplicateType} conflict`);
       } else {
         validLeads.push(newLead);
-        console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName}`);
+        console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status})`);
       }
 
     } catch (error) {

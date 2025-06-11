@@ -119,7 +119,7 @@ const insertSingleLead = async (lead: ProcessedLead): Promise<LeadInsertResult> 
         do_not_call: lead.doNotCall,
         do_not_email: lead.doNotEmail,
         do_not_mail: lead.doNotMail,
-        status: 'new'
+        status: lead.status || 'new'
       })
       .select('id')
       .single();
@@ -187,7 +187,7 @@ export const insertLeadsToDatabase = async (leads: ProcessedLead[]): Promise<Bul
     
     if (result.success) {
       successfulInserts++;
-      console.log(`Successfully inserted lead ${i + 1}/${leadsToInsert.length}: ${lead.firstName} ${lead.lastName}`);
+      console.log(`Successfully inserted lead ${i + 1}/${leadsToInsert.length}: ${lead.firstName} ${lead.lastName} (Status: ${lead.status})`);
     } else {
       errors.push({
         leadData: lead,

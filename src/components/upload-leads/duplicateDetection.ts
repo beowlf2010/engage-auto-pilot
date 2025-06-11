@@ -1,108 +1,111 @@
 
-import { PhoneNumber } from '@/types/lead';
+import { PhoneNumber } from "@/types/lead";
 
 export interface ProcessedLead {
   firstName: string;
   lastName: string;
-  middleName?: string;
+  middleName: string;
   phoneNumbers: PhoneNumber[];
   primaryPhone: string;
   email: string;
-  emailAlt?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  postalCode?: string;
+  emailAlt: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
   vehicleInterest: string;
-  vehicleVIN?: string;
+  vehicleVIN: string;
   source: string;
   salesPersonName: string;
   doNotCall: boolean;
   doNotEmail: boolean;
   doNotMail: boolean;
+  status: string;
 }
 
-export interface DuplicateCheckResult {
+export interface DuplicateCheck {
   isDuplicate: boolean;
-  duplicateType: 'phone' | 'email' | 'name' | null;
+  duplicateType?: 'phone' | 'email' | 'name';
   conflictingLead?: ProcessedLead;
 }
 
-// Normalize phone to E.164 format for comparison
 const normalizePhone = (phone: string): string => {
-  const digits = phone.replace(/\D/g, '');
-  
-  // Handle 10-digit numbers - add +1
-  if (digits.length === 10) {
-    return `+1${digits}`;
-  }
-  
-  // Handle 11-digit numbers starting with 1
-  if (digits.length === 11 && digits.startsWith('1')) {
-    return `+${digits}`;
-  }
-  
-  // Return as-is if already in correct format or unknown format
-  return phone;
-};
-
-const normalizeEmail = (email: string): string => {
-  return email.toLowerCase().trim();
+  return phone.replace(/\D/g, '');
 };
 
 const normalizeName = (firstName: string, lastName: string): string => {
   return `${firstName.toLowerCase().trim()} ${lastName.toLowerCase().trim()}`;
 };
 
-export const checkForDuplicate = (
-  newLead: ProcessedLead,
-  existingLeads: ProcessedLead[]
-): DuplicateCheckResult => {
+const normalizeEmail = (email: string): string => {
+  return email.toLowerCase().trim();
+};
+
+export const checkForDuplicate = (newLead: ProcessedLead, existingLeads: ProcessedLead[]): DuplicateCheck => {
   // Check for phone number duplicates (highest priority)
   if (newLead.primaryPhone) {
-    const newPhone = normalizePhone(newLead.primaryPhone);
-    for (const existing of existingLeads) {
-      if (existing.primaryPhone) {
-        const existingPhone = normalizePhone(existing.primaryPhone);
-        if (newPhone === existingPhone) {
+    const normalizedNewPhone = normalizePhone(newLead.primaryPhone);
+    
+    for (const existingLead of existingLeads) {
+      if (existingLead.primaryPhone) {
+        const normalizedExistingPhone = normalizePhone(existingLead.primaryPhone);
+        if (normalizedNewPhone === normalizedExistingPhone) {
           return {
             isDuplicate: true,
             duplicateType: 'phone',
-            conflictingLead: existing
+            conflictingLead: existingLead
           };
         }
       }
-    }
-  }
-
-  // Check for email duplicates
-  if (newLead.email) {
-    const newEmail = normalizeEmail(newLead.email);
-    for (const existing of existingLeads) {
-      if (existing.email) {
-        const existingEmail = normalizeEmail(existing.email);
-        if (newEmail === existingEmail) {
+      
+      // Also check against all phone numbers of existing lead
+      for (const phoneNumber of existingLead.phoneNumbers) {
+        const normalizedExistingPhone = normalizePhone(phoneNumber.number);
+        if (normalizedNewPhone === normalizedExistingPhone) {
           return {
             isDuplicate: true,
-            duplicateType: 'email',
-            conflictingLead: existing
+            duplicateType: 'phone',
+            conflictingLead: existingLead
           };
         }
       }
     }
   }
 
-  // Check for name duplicates (lowest priority)
+  // Check for email duplicates (medium priority)
+  if (newLead.email) {
+    const normalizedNewEmail = normalizeEmail(newLead.email);
+    
+    for (const existingLead of existingLeads) {
+      if (existingLead.email && normalizeEmail(existingLead.email) === normalizedNewEmail) {
+        return {
+          isDuplicate: true,
+          duplicateType: 'email',
+          conflictingLead: existingLead
+        };
+      }
+      if (existingLead.emailAlt && normalizeEmail(existingLead.emailAlt) === normalizedNewEmail) {
+        return {
+          isDuplicate: true,
+          duplicateType: 'email',
+          conflictingLead: existingLead
+        };
+      }
+    }
+  }
+
+  // Check for name duplicates (lowest priority, only if both first and last name match)
   if (newLead.firstName && newLead.lastName) {
-    const newName = normalizeName(newLead.firstName, newLead.lastName);
-    for (const existing of existingLeads) {
-      if (existing.firstName && existing.lastName) {
-        const existingName = normalizeName(existing.firstName, existing.lastName);
-        if (newName === existingName) {
+    const normalizedNewName = normalizeName(newLead.firstName, newLead.lastName);
+    
+    for (const existingLead of existingLeads) {
+      if (existingLead.firstName && existingLead.lastName) {
+        const normalizedExistingName = normalizeName(existingLead.firstName, existingLead.lastName);
+        if (normalizedNewName === normalizedExistingName) {
           return {
             isDuplicate: true,
             duplicateType: 'name',
-            conflictingLead: existing
+            conflictingLead: existingLead
           };
         }
       }
@@ -110,7 +113,6 @@ export const checkForDuplicate = (
   }
 
   return {
-    isDuplicate: false,
-    duplicateType: null
+    isDuplicate: false
   };
 };
