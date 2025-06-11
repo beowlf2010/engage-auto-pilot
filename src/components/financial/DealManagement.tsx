@@ -106,7 +106,7 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     }
   };
 
-  const hasProfit Changes = (deal: Deal) => {
+  const hasProfitChanges = (deal: Deal) => {
     return deal.original_gross_profit !== undefined && 
            (deal.gross_profit !== deal.original_gross_profit || 
             deal.fi_profit !== deal.original_fi_profit);
