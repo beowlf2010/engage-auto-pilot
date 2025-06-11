@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, FileSpreadsheet, AlertCircle, TrendingUp } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, TrendingUp, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { parseFinancialFile } from "@/utils/financialFileParser";
 import { insertFinancialData } from "@/utils/financialDataOperations";
@@ -61,12 +61,16 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
     setUploadResult(null);
 
     try {
+      console.log('Starting financial file upload:', file.name);
+      
       // Parse the financial file
       const { deals, summary, fileName } = await parseFinancialFile(file);
 
       if (deals.length === 0) {
-        throw new Error('No valid deals found in the file');
+        throw new Error('No valid deals found in the file. Please check that you uploaded a DMS Sales Analysis Detail report.');
       }
+
+      console.log(`Parsed ${deals.length} deals successfully`);
 
       // Create upload history record
       const { data: uploadHistory, error: uploadError } = await supabase
@@ -85,6 +89,7 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
         .single();
 
       if (uploadError) {
+        console.error('Upload history error:', uploadError);
         throw uploadError;
       }
 
@@ -116,14 +121,16 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
 
     } catch (error) {
       console.error('Financial upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+      
       setUploadResult({
         status: 'error',
-        message: error instanceof Error ? error.message : 'Upload failed'
+        message: errorMessage
       });
       
       toast({
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "Please try again",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -138,7 +145,7 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
       <div>
         <h2 className="text-2xl font-bold text-slate-800">Upload Financial Data</h2>
         <p className="text-slate-600 mt-1">
-          Import daily DMS sales analysis reports to track profit and performance
+          Import daily DMS Sales Analysis Detail reports to track profit and performance
         </p>
       </div>
 
@@ -181,7 +188,7 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
                   <div className="text-center">
                     <FileSpreadsheet className="w-8 h-8 text-blue-500 mx-auto mb-2" />
                     <p className="text-sm font-medium text-gray-700">Click to upload Excel file</p>
-                    <p className="text-xs text-gray-500">Supports .xlsx and .xls formats</p>
+                    <p className="text-xs text-gray-500">DMS Sales Analysis Detail Report (.xlsx, .xls)</p>
                   </div>
                 )}
               </label>
@@ -194,28 +201,30 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <TrendingUp className="w-5 h-5" />
-              <span>What Gets Tracked</span>
+              <span>Expected Format</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2 text-sm text-slate-600">
-              <li className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span>Individual deal records (stock #, buyer, amounts)</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>Daily profit snapshots (new vs used)</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                <span>Monthly/yearly performance trends</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                <span>F&I profit tracking</span>
-              </li>
-            </ul>
+            <div className="space-y-3 text-sm text-slate-600">
+              <div>
+                <p className="font-medium text-slate-700 mb-1">Required Columns:</p>
+                <ul className="space-y-1 ml-4">
+                  <li>• Age (days in inventory)</li>
+                  <li>• Stock # (stock number)</li>
+                  <li>• Yr Model (year/model)</li>
+                  <li>• Buyer (customer name)</li>
+                  <li>• Sale (sale amount)</li>
+                  <li>• Cost (cost amount)</li>
+                  <li>• Gross (gross profit)</li>
+                  <li>• F&I (finance profit)</li>
+                </ul>
+              </div>
+              <div className="pt-2 border-t">
+                <p className="text-xs text-slate-500">
+                  Upload your DMS Sales Analysis Detail report exactly as exported from your DMS system.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -226,9 +235,7 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
           <CardContent className="pt-6">
             <div className="flex items-start space-x-3">
               {uploadResult.status === 'success' ? (
-                <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mt-0.5">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
+                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
               ) : (
                 <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
               )}
@@ -241,6 +248,7 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
                     <p>Total Units: {uploadResult.summary.totalUnits}</p>
                     <p>Total Gross: ${uploadResult.summary.totalGross?.toLocaleString()}</p>
                     <p>F&I Profit: ${uploadResult.summary.totalFiProfit?.toLocaleString()}</p>
+                    <p>New/Used: {uploadResult.summary.newUnits}/{uploadResult.summary.usedUnits}</p>
                   </div>
                 )}
               </div>

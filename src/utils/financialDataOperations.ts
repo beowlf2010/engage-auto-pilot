@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { DealRecord, FinancialSummary } from './financialFileParser';
+import { DealRecord, FinancialSummary } from './dmsFileParser';
 
 export const insertFinancialData = async (
   deals: DealRecord[],
@@ -75,22 +75,36 @@ export const insertFinancialData = async (
 };
 
 export const getMonthlyRetailSummary = async () => {
-  const { data, error } = await supabase
-    .from('v_monthly_retail_summary')
-    .select('*')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('v_monthly_retail_summary')
+      .select('*')
+      .single();
 
-  if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows found"
-    console.error('Error fetching monthly summary:', error);
-    throw error;
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows found"
+      console.error('Error fetching monthly summary:', error);
+      throw error;
+    }
+
+    // Return default values if no data found
+    return data || {
+      new_units_mtd: 0,
+      new_gross_mtd: 0,
+      used_units_mtd: 0,
+      used_gross_mtd: 0,
+      total_units_mtd: 0,
+      total_profit_mtd: 0
+    };
+  } catch (error) {
+    console.error('Error in getMonthlyRetailSummary:', error);
+    // Return default values on any error
+    return {
+      new_units_mtd: 0,
+      new_gross_mtd: 0,
+      used_units_mtd: 0,
+      used_gross_mtd: 0,
+      total_units_mtd: 0,
+      total_profit_mtd: 0
+    };
   }
-
-  return data || {
-    new_units_mtd: 0,
-    new_gross_mtd: 0,
-    used_units_mtd: 0,
-    used_gross_mtd: 0,
-    total_units_mtd: 0,
-    total_profit_mtd: 0
-  };
 };
