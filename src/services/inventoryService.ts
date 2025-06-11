@@ -13,25 +13,36 @@ export interface InventoryItem {
   body_style?: string;
   color_exterior?: string;
   color_interior?: string;
+  engine?: string;
+  transmission?: string;
+  drivetrain?: string;
+  fuel_type?: string;
   mileage?: number;
   price?: number;
   msrp?: number;
+  invoice?: number;
+  rebates?: number;
+  pack?: number;
   condition: 'new' | 'used' | 'certified';
   status: 'available' | 'sold' | 'pending' | 'service' | 'wholesale';
-  fuel_type?: string;
-  transmission?: string;
-  drivetrain?: string;
-  engine?: string;
+  source_report?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
+  rpo_codes?: string[];
+  rpo_descriptions?: string[];
+  full_option_blob?: any;
+  first_seen_at?: string;
+  last_seen_at?: string;
+  sold_at?: string;
+  days_in_inventory?: number;
+  leads_count?: number;
   features?: string[];
   description?: string;
   dealer_notes?: string;
   images?: string[];
   carfax_url?: string;
-  days_in_inventory: number;
   location?: string;
+  upload_history_id?: string;
   created_at: string;
   updated_at: string;
-  sold_at?: string;
 }
 
 export interface PricingDisclaimer {
@@ -46,6 +57,8 @@ export const getInventory = async (filters?: {
   make?: string;
   model?: string;
   status?: string;
+  sourceReport?: string;
+  rpoCode?: string;
   priceMin?: number;
   priceMax?: number;
   yearMin?: number;
@@ -65,6 +78,12 @@ export const getInventory = async (filters?: {
     }
     if (filters?.status) {
       query = query.eq('status', filters.status);
+    }
+    if (filters?.sourceReport) {
+      query = query.eq('source_report', filters.sourceReport);
+    }
+    if (filters?.rpoCode) {
+      query = query.contains('rpo_codes', [filters.rpoCode]);
     }
     if (filters?.priceMin) {
       query = query.gte('price', filters.priceMin);
@@ -150,5 +169,38 @@ export const addInventoryInterest = async (leadId: string, inventoryId: string, 
       description: "Failed to record interest",
       variant: "destructive"
     });
+  }
+};
+
+export const updateInventoryLeadsCount = async () => {
+  try {
+    const { error } = await supabase.rpc('update_inventory_leads_count');
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating leads count:', error);
+    throw error;
+  }
+};
+
+export const markMissingVehiclesSold = async (uploadId: string) => {
+  try {
+    const { error } = await supabase.rpc('mark_missing_vehicles_sold', {
+      p_upload_id: uploadId
+    });
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error marking vehicles as sold:', error);
+    throw error;
+  }
+};
+
+export const getRPOAnalytics = async () => {
+  try {
+    const { data, error } = await supabase.rpc('get_rpo_analytics');
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching RPO analytics:', error);
+    return [];
   }
 };

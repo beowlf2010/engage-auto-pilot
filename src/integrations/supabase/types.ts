@@ -121,14 +121,19 @@ export type Database = {
           factory_warranty_remaining: boolean | null
           features: string[] | null
           finance_payment: number | null
+          first_seen_at: string | null
           fuel_type: string | null
+          full_option_blob: Json | null
           holdback: number | null
           id: string
           images: string[] | null
           incentives: number | null
           internet_price: number | null
+          invoice: number | null
           invoice_cost: number | null
           key_count: number | null
+          last_seen_at: string | null
+          leads_count: number | null
           lease_payment: number | null
           lien_holder: string | null
           location: string | null
@@ -137,15 +142,22 @@ export type Database = {
           mileage: number | null
           model: string
           msrp: number | null
+          pack: number | null
           photos_urls: string[] | null
           previous_owners: number | null
           price: number | null
           profit_margin: number | null
+          rebates: number | null
           reconditioning_cost: number | null
+          rpo_codes: string[] | null
+          rpo_descriptions: string[] | null
           sales_rep: string | null
           service_records_available: boolean | null
           sold_at: string | null
           source_acquired: string | null
+          source_report:
+            | Database["public"]["Enums"]["source_report_type"]
+            | null
           status: string
           stock_number: string | null
           title_status: string | null
@@ -187,14 +199,19 @@ export type Database = {
           factory_warranty_remaining?: boolean | null
           features?: string[] | null
           finance_payment?: number | null
+          first_seen_at?: string | null
           fuel_type?: string | null
+          full_option_blob?: Json | null
           holdback?: number | null
           id?: string
           images?: string[] | null
           incentives?: number | null
           internet_price?: number | null
+          invoice?: number | null
           invoice_cost?: number | null
           key_count?: number | null
+          last_seen_at?: string | null
+          leads_count?: number | null
           lease_payment?: number | null
           lien_holder?: string | null
           location?: string | null
@@ -203,15 +220,22 @@ export type Database = {
           mileage?: number | null
           model: string
           msrp?: number | null
+          pack?: number | null
           photos_urls?: string[] | null
           previous_owners?: number | null
           price?: number | null
           profit_margin?: number | null
+          rebates?: number | null
           reconditioning_cost?: number | null
+          rpo_codes?: string[] | null
+          rpo_descriptions?: string[] | null
           sales_rep?: string | null
           service_records_available?: boolean | null
           sold_at?: string | null
           source_acquired?: string | null
+          source_report?:
+            | Database["public"]["Enums"]["source_report_type"]
+            | null
           status?: string
           stock_number?: string | null
           title_status?: string | null
@@ -253,14 +277,19 @@ export type Database = {
           factory_warranty_remaining?: boolean | null
           features?: string[] | null
           finance_payment?: number | null
+          first_seen_at?: string | null
           fuel_type?: string | null
+          full_option_blob?: Json | null
           holdback?: number | null
           id?: string
           images?: string[] | null
           incentives?: number | null
           internet_price?: number | null
+          invoice?: number | null
           invoice_cost?: number | null
           key_count?: number | null
+          last_seen_at?: string | null
+          leads_count?: number | null
           lease_payment?: number | null
           lien_holder?: string | null
           location?: string | null
@@ -269,15 +298,22 @@ export type Database = {
           mileage?: number | null
           model?: string
           msrp?: number | null
+          pack?: number | null
           photos_urls?: string[] | null
           previous_owners?: number | null
           price?: number | null
           profit_margin?: number | null
+          rebates?: number | null
           reconditioning_cost?: number | null
+          rpo_codes?: string[] | null
+          rpo_descriptions?: string[] | null
           sales_rep?: string | null
           service_records_available?: boolean | null
           sold_at?: string | null
           source_acquired?: string | null
+          source_report?:
+            | Database["public"]["Enums"]["source_report_type"]
+            | null
           status?: string
           stock_number?: string | null
           title_status?: string | null
@@ -618,6 +654,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_leads_count: {
+        Args: { p_vin: string; p_stock_number: string }
+        Returns: number
+      }
       find_matching_inventory: {
         Args: { p_lead_id: string }
         Returns: {
@@ -634,6 +674,20 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_rpo_analytics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          rpo_code: string
+          total_vehicles: number
+          sold_vehicles: number
+          avg_days_to_sell: number
+          total_sales_value: number
+        }[]
+      }
+      mark_missing_vehicles_sold: {
+        Args: { p_upload_id: string }
+        Returns: undefined
+      }
       normalize_phone: {
         Args: { phone_input: string }
         Returns: string
@@ -646,9 +700,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      update_inventory_leads_count: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      source_report_type: "new_car_main_view" | "merch_inv_view" | "orders_all"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -763,6 +821,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      source_report_type: ["new_car_main_view", "merch_inv_view", "orders_all"],
+    },
   },
 } as const
