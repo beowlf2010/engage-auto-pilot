@@ -17,7 +17,6 @@ export const useRealtimeNotifications = () => {
   const { toast } = useToast();
   const notificationPermission = useRef<NotificationPermission>('default');
   const channelRef = useRef<any>(null);
-  const channelNameRef = useRef<string | null>(null);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -36,18 +35,18 @@ export const useRealtimeNotifications = () => {
     if (!profile) return;
 
     // Cleanup existing channel
-    if (channelRef.current && channelNameRef.current) {
+    if (channelRef.current) {
       try {
-        console.log('Removing existing notification channel:', channelNameRef.current);
+        console.log('Removing existing notification channel');
         supabase.removeChannel(channelRef.current);
       } catch (error) {
         console.error('Error removing existing notification channel:', error);
       }
+      channelRef.current = null;
     }
 
     // Create new channel with unique name
     const channelName = `incoming-messages-notifications-${profile.id}-${Date.now()}`;
-    channelNameRef.current = channelName;
 
     const channel = supabase
       .channel(channelName)
@@ -118,9 +117,9 @@ export const useRealtimeNotifications = () => {
     });
 
     return () => {
-      if (channelRef.current && channelNameRef.current) {
+      if (channelRef.current) {
         try {
-          console.log('Cleaning up notification channel:', channelNameRef.current);
+          console.log('Cleaning up notification channel');
           supabase.removeChannel(channelRef.current);
         } catch (error) {
           console.error('Error removing notification channel:', error);

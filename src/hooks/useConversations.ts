@@ -11,7 +11,7 @@ export const useConversations = () => {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
-  const channelsRef = useRef<Set<string>>(new Set());
+  const channelsRef = useRef<any[]>([]);
   const currentLeadIdRef = useRef<string | null>(null);
 
   const loadConversations = async () => {
@@ -51,18 +51,15 @@ export const useConversations = () => {
 
   // Cleanup function to remove all channels
   const cleanupChannels = () => {
-    console.log('Cleaning up channels:', Array.from(channelsRef.current));
-    channelsRef.current.forEach(channelName => {
+    console.log('Cleaning up channels:', channelsRef.current.length);
+    channelsRef.current.forEach(channel => {
       try {
-        const channel = supabase.getChannel(channelName);
-        if (channel) {
-          supabase.removeChannel(channel);
-        }
+        supabase.removeChannel(channel);
       } catch (error) {
         console.error('Error removing channel:', error);
       }
     });
-    channelsRef.current.clear();
+    channelsRef.current = [];
   };
 
   // Single effect to handle all real-time subscriptions
@@ -110,7 +107,7 @@ export const useConversations = () => {
     conversationChannel.subscribe((status) => {
       console.log('Conversation channel status:', status);
       if (status === 'SUBSCRIBED') {
-        channelsRef.current.add(conversationChannelName);
+        channelsRef.current.push(conversationChannel);
       }
     });
 
@@ -153,7 +150,7 @@ export const useConversations = () => {
       messageChannel.subscribe((status) => {
         console.log('Message channel status:', status);
         if (status === 'SUBSCRIBED') {
-          channelsRef.current.add(messageChannelName);
+          channelsRef.current.push(messageChannel);
         }
       });
     }
