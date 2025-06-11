@@ -281,7 +281,7 @@ export const mapRowToInventoryItem = (
       price: parseFloat(getFieldValue(['Price', 'MSRP', 'Selling Price', 'Retail Price'])) || undefined,
       msrp: parseFloat(getFieldValue(['MSRP', 'Retail Price', 'List Price', 'Suggested Retail'])) || undefined,
       invoice: parseFloat(getFieldValue(['Invoice', 'Invoice Price', 'Dealer Cost'])) || undefined,
-      condition: 'new', // GM Global orders are typically new vehicles
+      condition: 'new' as const, // GM Global orders are typically new vehicles
       status: 'available',
       source_report: 'gm_orders' as any,
       full_option_blob: row,
@@ -376,8 +376,8 @@ export const mapRowToInventoryItem = (
     console.log('Defaulting to GM for GM orders');
   }
 
-  // Map gm_global condition to database-compatible condition
-  const dbCondition = condition === 'gm_global' ? 'new' : condition;
+  // Map condition to database-compatible condition (remove gm_global comparison)
+  const dbCondition = condition === 'new' ? 'new' : 'used';
 
   return {
     vin: vin || '',
