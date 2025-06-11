@@ -2,10 +2,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface SummaryTotals {
-  newRetail: { units: number; gross: number; fi: number; total: number; sales: number };
-  usedRetail: { units: number; gross: number; fi: number; total: number; sales: number };
-  dealerTrade: { units: number; gross: number; fi: number; total: number; sales: number };
-  wholesale: { units: number; gross: number; fi: number; total: number; sales: number };
+  newRetail: { units: number; gross: number; fi: number; total: number };
+  usedRetail: { units: number; gross: number; fi: number; total: number };
+  dealerTrade: { units: number; gross: number; fi: number; total: number };
+  wholesale: { units: number; gross: number; fi: number; total: number };
 }
 
 interface DealSummaryCardsProps {
@@ -32,9 +32,6 @@ const DealSummaryCards = ({
             {summaryTotals.newRetail.units} units
           </div>
           <div className="text-sm text-gray-600">
-            Sales: {formatCurrency(summaryTotals.newRetail.sales)}
-          </div>
-          <div className="text-sm text-gray-600">
             Gross: {formatCurrency(summaryTotals.newRetail.gross)}
           </div>
           <div className="text-sm text-gray-600">
@@ -51,8 +48,8 @@ const DealSummaryCards = ({
           <CardTitle className="text-sm font-medium">
             Used Retail
             {packAdjustmentEnabled && localPackAdjustment > 0 && (
-              <span className="text-xs text-orange-600 ml-1">
-                (Pack: ${localPackAdjustment})
+              <span className="text-xs text-green-600 ml-1">
+                (+${localPackAdjustment})
               </span>
             )}
           </CardTitle>
@@ -60,9 +57,6 @@ const DealSummaryCards = ({
         <CardContent>
           <div className="text-lg font-bold text-green-600">
             {summaryTotals.usedRetail.units} units
-          </div>
-          <div className="text-sm text-gray-600">
-            Sales: {formatCurrency(summaryTotals.usedRetail.sales)}
           </div>
           <div className="text-sm text-gray-600">
             Gross: {formatCurrency(summaryTotals.usedRetail.gross)}
@@ -85,9 +79,6 @@ const DealSummaryCards = ({
             {summaryTotals.dealerTrade.units} units
           </div>
           <div className="text-sm text-gray-600">
-            Sales: {formatCurrency(summaryTotals.dealerTrade.sales)}
-          </div>
-          <div className="text-sm text-gray-600">
             Gross: {formatCurrency(summaryTotals.dealerTrade.gross)}
           </div>
           <div className="text-sm text-gray-600">
@@ -106,9 +97,6 @@ const DealSummaryCards = ({
         <CardContent>
           <div className="text-lg font-bold text-orange-600">
             {summaryTotals.wholesale.units} units
-          </div>
-          <div className="text-sm text-gray-600">
-            Sales: {formatCurrency(summaryTotals.wholesale.sales)}
           </div>
           <div className="text-sm text-gray-600">
             Gross: {formatCurrency(summaryTotals.wholesale.gross)}

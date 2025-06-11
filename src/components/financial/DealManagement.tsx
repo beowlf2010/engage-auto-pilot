@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +16,6 @@ interface Deal {
   stock_number?: string;
   year_model?: string;
   buyer_name?: string;
-  sale_amount?: number;
   gross_profit?: number;
   fi_profit?: number;
   total_profit?: number;
@@ -176,7 +174,7 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     const baseGross = deal.gross_profit || 0;
     const isUsedCar = deal.stock_number && (deal.stock_number.toUpperCase().startsWith('B') || deal.stock_number.toUpperCase().startsWith('X'));
     const adjustmentToApply = packAdjustmentEnabled ? localPackAdjustment : 0;
-    return isUsedCar ? baseGross - adjustmentToApply : baseGross;
+    return isUsedCar ? baseGross + adjustmentToApply : baseGross;
   };
 
   // Define filteredDeals first
@@ -195,10 +193,10 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
   // Calculate summary totals directly from filtered deals
   const calculateSummaryTotals = () => {
     const totals = {
-      newRetail: { units: 0, gross: 0, fi: 0, total: 0, sales: 0 },
-      usedRetail: { units: 0, gross: 0, fi: 0, total: 0, sales: 0 },
-      dealerTrade: { units: 0, gross: 0, fi: 0, total: 0, sales: 0 },
-      wholesale: { units: 0, gross: 0, fi: 0, total: 0, sales: 0 }
+      newRetail: { units: 0, gross: 0, fi: 0, total: 0 },
+      usedRetail: { units: 0, gross: 0, fi: 0, total: 0 },
+      dealerTrade: { units: 0, gross: 0, fi: 0, total: 0 },
+      wholesale: { units: 0, gross: 0, fi: 0, total: 0 }
     };
 
     filteredDeals.forEach(deal => {
@@ -207,7 +205,6 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
       const adjustedGross = getAdjustedGrossProfit(deal);
       const fiProfit = deal.fi_profit || 0;
       const totalProfit = adjustedGross + fiProfit;
-      const saleAmount = deal.sale_amount || 0;
 
       if (dealType === 'retail') {
         if (vehicleType === 'new') {
@@ -215,26 +212,22 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
           totals.newRetail.gross += adjustedGross;
           totals.newRetail.fi += fiProfit;
           totals.newRetail.total += totalProfit;
-          totals.newRetail.sales += saleAmount;
         } else {
           totals.usedRetail.units++;
           totals.usedRetail.gross += adjustedGross;
           totals.usedRetail.fi += fiProfit;
           totals.usedRetail.total += totalProfit;
-          totals.usedRetail.sales += saleAmount;
         }
       } else if (dealType === 'dealer_trade') {
         totals.dealerTrade.units++;
         totals.dealerTrade.gross += adjustedGross;
         totals.dealerTrade.fi += fiProfit;
         totals.dealerTrade.total += totalProfit;
-        totals.dealerTrade.sales += saleAmount;
       } else if (dealType === 'wholesale') {
         totals.wholesale.units++;
         totals.wholesale.gross += adjustedGross;
         totals.wholesale.fi += fiProfit;
         totals.wholesale.total += totalProfit;
-        totals.wholesale.sales += saleAmount;
       }
     });
 

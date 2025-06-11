@@ -9,7 +9,6 @@ interface Deal {
   stock_number?: string;
   year_model?: string;
   buyer_name?: string;
-  sale_amount?: number;
   gross_profit?: number;
   fi_profit?: number;
   total_profit?: number;
@@ -115,7 +114,6 @@ const DealsTable = ({
             <th className="text-left p-3 font-medium text-gray-600">Type</th>
             <th className="text-left p-3 font-medium text-gray-600">Vehicle</th>
             <th className="text-left p-3 font-medium text-gray-600">Customer</th>
-            <th className="text-right p-3 font-medium text-gray-600">Sale Amount</th>
             <th className="text-right p-3 font-medium text-gray-600">Gross Profit</th>
             <th className="text-right p-3 font-medium text-gray-600">F&I Profit</th>
             <th className="text-right p-3 font-medium text-gray-600">Total Profit</th>
@@ -151,14 +149,11 @@ const DealsTable = ({
                 {deal.buyer_name || '-'}
               </td>
               <td className="p-3 text-sm text-right">
-                {formatCurrency(deal.sale_amount)}
-              </td>
-              <td className="p-3 text-sm text-right">
                 <div>
                   {formatCurrency(getAdjustedGrossProfit(deal))}
                   {packAdjustmentEnabled && localPackAdjustment > 0 && deal.stock_number?.toUpperCase().match(/^[BX]/) && (
-                    <div className="text-xs text-orange-600">
-                      (Adj: -${localPackAdjustment})
+                    <div className="text-xs text-green-600">
+                      (+${localPackAdjustment})
                     </div>
                   )}
                   {deal.original_gross_profit && deal.gross_profit !== deal.original_gross_profit && (

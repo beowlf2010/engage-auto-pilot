@@ -23,7 +23,7 @@ const PackAdjustmentControls = ({
           <span>Pack Adjustment Settings</span>
         </CardTitle>
         <CardDescription>
-          Configure pack adjustment to be deducted from used vehicle gross profit
+          Configure pack adjustment to be added to used vehicle gross profit
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -47,7 +47,7 @@ const PackAdjustmentControls = ({
                 className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
                 placeholder="0"
               />
-              <span className="text-xs text-slate-500">per used vehicle</span>
+              <span className="text-xs text-slate-500">added per used vehicle</span>
             </div>
           )}
         </div>
