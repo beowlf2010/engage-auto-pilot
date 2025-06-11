@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import InventoryLayout from "./components/InventoryLayout";
-import FinancialDashboard from "./pages/FinancialDashboard";
 
 const queryClient = new QueryClient();
 
@@ -27,13 +26,13 @@ const App = () => (
             <Route path="/inbox" element={<Index />} />
             <Route path="/upload-leads" element={<Index />} />
             <Route path="/settings" element={<Index />} />
+            <Route path="/financial-dashboard" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/upload-inventory-report" element={<Index />} />
             <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />
             <Route path="/inventory-upload" element={<InventoryLayout page="inventory-upload" />} />
             <Route path="/vehicle-detail/:identifier" element={<InventoryLayout page="vehicle-detail" />} />
             <Route path="/rpo-insights" element={<InventoryLayout page="rpo-insights" />} />
-            <Route path="/financial-dashboard" element={<FinancialDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

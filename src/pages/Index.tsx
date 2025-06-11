@@ -10,6 +10,7 @@ import LeadsList from "@/components/LeadsList";
 import SmartInbox from "@/components/SmartInbox";
 import UploadLeads from "@/components/UploadLeads";
 import Settings from "@/components/Settings";
+import FinancialDashboard from "@/components/financial/FinancialDashboard";
 
 const Index = () => {
   const location = useLocation();
@@ -31,6 +32,8 @@ const Index = () => {
       setActiveView("upload");
     } else if (path === '/settings') {
       setActiveView("settings");
+    } else if (path === '/financial-dashboard') {
+      setActiveView("financial-dashboard");
     }
   }, [location.pathname]);
 
@@ -66,6 +69,8 @@ const Index = () => {
         return <UploadLeads user={user} />;
       case "settings":
         return <Settings user={user} />;
+      case "financial-dashboard":
+        return <FinancialDashboard user={user} />;
       default:
         return <Dashboard user={user} />;
     }
