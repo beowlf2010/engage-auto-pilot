@@ -155,8 +155,8 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {/* Main Navigation */}
         <div className="space-y-1">
-          {navigationItems.map(renderNavItem)}
-          {isManagerOrAdmin && managerItems.map(renderNavItem)}
+          {navigationItems.map(item => renderNavItem(item))}
+          {isManagerOrAdmin && managerItems.map(item => renderNavItem(item))}
         </div>
 
         {/* Inventory Section */}
