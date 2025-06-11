@@ -222,6 +222,60 @@ export type Database = {
           },
         ]
       }
+      deals: {
+        Row: {
+          age: number | null
+          buyer_name: string | null
+          cost_amount: number | null
+          created_at: string
+          deal_type: string | null
+          fi_profit: number | null
+          gross_profit: number | null
+          id: string
+          sale_amount: number | null
+          stock_number: string | null
+          total_profit: number | null
+          updated_at: string
+          upload_date: string
+          upload_history_id: string | null
+          year_model: string | null
+        }
+        Insert: {
+          age?: number | null
+          buyer_name?: string | null
+          cost_amount?: number | null
+          created_at?: string
+          deal_type?: string | null
+          fi_profit?: number | null
+          gross_profit?: number | null
+          id?: string
+          sale_amount?: number | null
+          stock_number?: string | null
+          total_profit?: number | null
+          updated_at?: string
+          upload_date: string
+          upload_history_id?: string | null
+          year_model?: string | null
+        }
+        Update: {
+          age?: number | null
+          buyer_name?: string | null
+          cost_amount?: number | null
+          created_at?: string
+          deal_type?: string | null
+          fi_profit?: number | null
+          gross_profit?: number | null
+          id?: string
+          sale_amount?: number | null
+          stock_number?: string | null
+          total_profit?: number | null
+          updated_at?: string
+          upload_date?: string
+          upload_history_id?: string | null
+          year_model?: string | null
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           accidents_reported: number | null
@@ -777,6 +831,57 @@ export type Database = {
         }
         Relationships: []
       }
+      profit_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          new_gross: number
+          new_units: number
+          snapshot_date: string
+          total_fi_profit: number
+          total_gross: number
+          total_profit: number
+          total_sales: number
+          total_units: number
+          updated_at: string
+          upload_history_id: string | null
+          used_gross: number
+          used_units: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_gross?: number
+          new_units?: number
+          snapshot_date: string
+          total_fi_profit?: number
+          total_gross?: number
+          total_profit?: number
+          total_sales?: number
+          total_units?: number
+          updated_at?: string
+          upload_history_id?: string | null
+          used_gross?: number
+          used_units?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_gross?: number
+          new_units?: number
+          snapshot_date?: string
+          total_fi_profit?: number
+          total_gross?: number
+          total_profit?: number
+          total_sales?: number
+          total_units?: number
+          updated_at?: string
+          upload_history_id?: string | null
+          used_gross?: number
+          used_units?: number
+        }
+        Relationships: []
+      }
       upload_history: {
         Row: {
           created_at: string
@@ -836,7 +941,18 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_monthly_retail_summary: {
+        Row: {
+          month: string | null
+          new_gross_mtd: number | null
+          new_units_mtd: number | null
+          total_profit_mtd: number | null
+          total_units_mtd: number | null
+          used_gross_mtd: number | null
+          used_units_mtd: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_leads_count: {
@@ -888,6 +1004,22 @@ export type Database = {
       update_inventory_leads_count: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      upsert_profit_snapshot: {
+        Args: {
+          p_date: string
+          p_total_units: number
+          p_total_sales: number
+          p_total_gross: number
+          p_total_fi_profit: number
+          p_total_profit: number
+          p_new_units: number
+          p_new_gross: number
+          p_used_units: number
+          p_used_gross: number
+          p_upload_history_id: string
+        }
+        Returns: string
       }
     }
     Enums: {
