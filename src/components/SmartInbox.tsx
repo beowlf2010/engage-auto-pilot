@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import ConversationsList from "./inbox/ConversationsList";
 import ChatView from "./inbox/ChatView";
@@ -17,6 +18,7 @@ interface SmartInboxProps {
 }
 
 const SmartInbox = ({ user }: SmartInboxProps) => {
+  const [searchParams] = useSearchParams();
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [showMemory, setShowMemory] = useState(false);
   const { conversations, messages, loading, fetchMessages, sendMessage, refetch } = useRealtimeInbox();
@@ -81,12 +83,24 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     setShowMemory(!showMemory);
   };
 
+  // Handle pre-selection from URL parameter
   useEffect(() => {
+    const leadIdFromUrl = searchParams.get('leadId');
+    if (leadIdFromUrl && filteredConversations.length > 0) {
+      // Check if the lead exists in conversations
+      const conversation = filteredConversations.find(conv => conv.leadId === leadIdFromUrl);
+      if (conversation) {
+        handleSelectConversation(leadIdFromUrl);
+        return;
+      }
+    }
+
+    // Default selection if no URL parameter or conversation not found
     if (filteredConversations.length > 0 && !selectedLead) {
       const firstConv = filteredConversations[0];
       handleSelectConversation(firstConv.leadId);
     }
-  }, [filteredConversations, selectedLead]);
+  }, [filteredConversations, selectedLead, searchParams]);
 
   if (loading) {
     return (
