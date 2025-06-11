@@ -112,7 +112,7 @@ export const mapRowToInventoryItem = (
     status: 'available',
     rpo_codes: rpoCodes.length > 0 ? rpoCodes : undefined,
     rpo_descriptions: undefined, // Will be populated later if available
-    source_report: condition === 'gm_global' ? 'gm_orders' as any : undefined,
+    source_report: condition === 'gm_global' ? 'orders_all' as any : undefined,
     full_option_blob: row, // Store complete raw data
     first_seen_at: new Date().toISOString(),
     last_seen_at: new Date().toISOString(),

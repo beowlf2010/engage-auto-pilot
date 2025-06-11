@@ -74,7 +74,7 @@ export const isValidVIN = (vin: string): boolean => {
 export const findMakeInRow = (row: Record<string, any>): string => {
   console.log('=== SMART MAKE DETECTION ===');
   
-  // GM Division code mapping
+  // Enhanced GM Division code mapping with additional codes
   const gmDivisionMap: Record<string, string> = {
     'AKO': 'Buick',
     'CHV': 'Chevrolet',
@@ -83,7 +83,13 @@ export const findMakeInRow = (row: Record<string, any>): string => {
     'PON': 'Pontiac',
     'SAT': 'Saturn',
     'HUM': 'Hummer',
-    'OLD': 'Oldsmobile'
+    'OLD': 'Oldsmobile',
+    'A2V': 'Chevrolet', // Added missing A2V code
+    'A1C': 'Chevrolet',
+    'A1F': 'Chevrolet',
+    'A2U': 'Buick',
+    'A2W': 'Cadillac',
+    'A3G': 'GMC'
   };
   
   // First try standard make fields
