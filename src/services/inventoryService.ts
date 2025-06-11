@@ -158,6 +158,9 @@ export const addInventoryInterest = async (leadId: string, inventoryId: string, 
 
     if (error) throw error;
     
+    // Update leads count for this inventory item
+    await updateInventoryLeadsCount();
+    
     toast({
       title: "Interest Recorded",
       description: "Lead interest in vehicle has been noted",
@@ -202,5 +205,32 @@ export const getRPOAnalytics = async () => {
   } catch (error) {
     console.error('Error fetching RPO analytics:', error);
     return [];
+  }
+};
+
+// Sync inventory data after upload
+export const syncInventoryData = async (uploadId: string) => {
+  try {
+    console.log('Starting inventory data sync...');
+    
+    // Mark missing vehicles as sold
+    await markMissingVehiclesSold(uploadId);
+    
+    // Update leads count for all vehicles
+    await updateInventoryLeadsCount();
+    
+    console.log('Inventory data sync completed');
+    
+    toast({
+      title: "Sync Complete",
+      description: "Inventory data has been synchronized with leads",
+    });
+  } catch (error) {
+    console.error('Error syncing inventory data:', error);
+    toast({
+      title: "Sync Warning",
+      description: "Inventory uploaded but some sync operations failed",
+      variant: "destructive"
+    });
   }
 };

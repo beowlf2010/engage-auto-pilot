@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, 
   Users, 
@@ -9,8 +10,15 @@ import {
   Clock,
   Target,
   Phone,
-  Mail
+  Mail,
+  Car,
+  Package,
+  BarChart3,
+  Eye
 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DashboardProps {
   user: {
@@ -20,6 +28,35 @@ interface DashboardProps {
 }
 
 const Dashboard = ({ user }: DashboardProps) => {
+  // Fetch inventory stats for managers/admins
+  const { data: inventoryStats } = useQuery({
+    queryKey: ['dashboard-inventory-stats'],
+    queryFn: async () => {
+      if (!["manager", "admin"].includes(user.role)) return null;
+
+      const { count: totalVehicles } = await supabase
+        .from('inventory')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: availableVehicles } = await supabase
+        .from('inventory')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'available');
+
+      const { count: soldVehicles } = await supabase
+        .from('inventory')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'sold');
+
+      return {
+        totalVehicles: totalVehicles || 0,
+        availableVehicles: availableVehicles || 0,
+        soldVehicles: soldVehicles || 0
+      };
+    },
+    enabled: ["manager", "admin"].includes(user.role)
+  });
+
   // Mock data - in real app this would come from API
   const stats = {
     totalLeads: user.role === "sales" ? 45 : 187,
@@ -138,6 +175,103 @@ const Dashboard = ({ user }: DashboardProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Inventory Management Section for Managers/Admins */}
+      {["manager", "admin"].includes(user.role) && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-800">Inventory Management</h2>
+            <Link to="/inventory-dashboard">
+              <Button variant="outline" className="flex items-center space-x-2">
+                <Eye className="w-4 h-4" />
+                <span>View Full Dashboard</span>
+              </Button>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {inventoryStats && (
+              <>
+                <Card className="hover:shadow-lg transition-shadow duration-200">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-slate-600">
+                      Total Inventory
+                    </CardTitle>
+                    <Package className="h-4 w-4 text-blue-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-slate-800">{inventoryStats.totalVehicles}</div>
+                    <Link to="/inventory-dashboard" className="text-xs text-blue-600 hover:underline">
+                      View details →
+                    </Link>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow duration-200">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-slate-600">
+                      Available
+                    </CardTitle>
+                    <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">{inventoryStats.availableVehicles}</div>
+                    <p className="text-xs text-slate-500">Ready for sale</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow duration-200">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-slate-600">
+                      Sold This Month
+                    </CardTitle>
+                    <TrendingUp className="h-4 w-4 text-blue-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-slate-800">{inventoryStats.soldVehicles}</div>
+                    <Link to="/rpo-insights" className="text-xs text-blue-600 hover:underline">
+                      View analytics →
+                    </Link>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-slate-800">Upload Inventory</h3>
+                  <p className="text-sm text-slate-600">Import new vehicle data</p>
+                </div>
+                <Link to="/upload-inventory-report">
+                  <Button size="sm" className="flex items-center space-x-2">
+                    <Car className="w-4 h-4" />
+                    <span>Upload</span>
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-slate-800">RPO Insights</h3>
+                  <p className="text-sm text-slate-600">Analyze options performance</p>
+                </div>
+                <Link to="/rpo-insights">
+                  <Button variant="outline" size="sm" className="flex items-center space-x-2">
+                    <BarChart3 className="w-4 h-4" />
+                    <span>View</span>
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* AI Performance & Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
