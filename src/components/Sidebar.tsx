@@ -10,13 +10,14 @@ import {
   Menu,
   X,
   LogOut,
-  Package
+  Package,
+  BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   user: {
@@ -32,6 +33,7 @@ interface SidebarProps {
 const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { toast } = useToast();
+  const location = useLocation();
 
   const handleSignOut = async () => {
     try {
@@ -59,22 +61,36 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
       badge: unreadCount > 0 ? unreadCount : undefined
     },
     ...(["manager", "admin"].includes(user.role) ? [
-      { id: "upload", label: "Upload Leads", icon: Upload },
-      { id: "inventory", label: "Upload Inventory", icon: Car }
+      { id: "upload", label: "Upload Leads", icon: Upload }
     ] : []),
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  // Add inventory management section for managers/admins
+  // Inventory management section for managers/admins
   const inventoryNavigation = ["manager", "admin"].includes(user.role) ? [
     { 
       id: "inventory-dashboard", 
-      label: "Inventory Dashboard", 
+      label: "Dashboard", 
       icon: Package,
-      isExternal: true,
       path: "/inventory-dashboard"
+    },
+    { 
+      id: "inventory-upload", 
+      label: "Upload Inventory", 
+      icon: Car,
+      internalView: "inventory"
+    },
+    { 
+      id: "rpo-insights", 
+      label: "RPO Insights", 
+      icon: BarChart3,
+      path: "/rpo-insights"
     }
   ] : [];
+
+  const isInventoryRoute = location.pathname.startsWith('/inventory') || 
+                          location.pathname.startsWith('/vehicle-detail') || 
+                          location.pathname.startsWith('/rpo-insights');
 
   return (
     <div className={`bg-white border-r border-slate-200 transition-all duration-300 ${
@@ -119,7 +135,7 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
       <nav className="flex-1 p-4 space-y-2">
         {navigation.map((item) => {
           const Icon = item.icon;
-          const isActive = activeView === item.id;
+          const isActive = activeView === item.id && !isInventoryRoute;
           
           return (
             <Button
@@ -144,31 +160,54 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
         })}
 
         {/* Inventory Management Section */}
-        {inventoryNavigation.length > 0 && !isCollapsed && (
-          <div className="pt-4">
-            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider px-3 pb-2">
-              Inventory
-            </div>
-          </div>
-        )}
+        {inventoryNavigation.length > 0 && (
+          <>
+            {!isCollapsed && (
+              <div className="pt-4">
+                <div className="text-xs font-medium text-slate-500 uppercase tracking-wider px-3 pb-2">
+                  Inventory Management
+                </div>
+              </div>
+            )}
 
-        {inventoryNavigation.map((item) => {
-          const Icon = item.icon;
-          
-          return (
-            <Link key={item.id} to={item.path!}>
-              <Button
-                variant="ghost"
-                className={`w-full justify-start ${isCollapsed ? "px-3" : ""}`}
-              >
-                <Icon className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
-                {!isCollapsed && (
-                  <span className="flex-1 text-left">{item.label}</span>
-                )}
-              </Button>
-            </Link>
-          );
-        })}
+            {inventoryNavigation.map((item) => {
+              const Icon = item.icon;
+              const isActive = item.path ? 
+                location.pathname === item.path : 
+                (activeView === item.internalView && !isInventoryRoute);
+              
+              if (item.path) {
+                return (
+                  <Link key={item.id} to={item.path}>
+                    <Button
+                      variant={isActive ? "default" : "ghost"}
+                      className={`w-full justify-start ${isCollapsed ? "px-3" : ""}`}
+                    >
+                      <Icon className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
+                      {!isCollapsed && (
+                        <span className="flex-1 text-left">{item.label}</span>
+                      )}
+                    </Button>
+                  </Link>
+                );
+              } else {
+                return (
+                  <Button
+                    key={item.id}
+                    variant={isActive ? "default" : "ghost"}
+                    className={`w-full justify-start ${isCollapsed ? "px-3" : ""}`}
+                    onClick={() => onViewChange(item.internalView!)}
+                  >
+                    <Icon className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
+                    {!isCollapsed && (
+                      <span className="flex-1 text-left">{item.label}</span>
+                    )}
+                  </Button>
+                );
+              }
+            })}
+          </>
+        )}
       </nav>
 
       {/* Sign Out */}

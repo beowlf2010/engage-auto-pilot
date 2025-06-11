@@ -2,7 +2,8 @@
 import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, Database, FileSpreadsheet } from "lucide-react";
+import { Upload, FileText, Database, FileSpreadsheet, CheckCircle, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface UploadAreaProps {
   onFilesSelected: (files: FileList) => void;
@@ -11,6 +12,7 @@ interface UploadAreaProps {
 
 const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
   const [dragActive, setDragActive] = useState(false);
+  const [lastUploadedFile, setLastUploadedFile] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -29,9 +31,25 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
     setDragActive(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      setLastUploadedFile(file.name);
       onFilesSelected(e.dataTransfer.files);
     }
   };
+
+  const handleFileSelect = (files: FileList) => {
+    if (files && files[0]) {
+      setLastUploadedFile(files[0].name);
+      onFilesSelected(files);
+    }
+  };
+
+  const supportedFormats = [
+    { ext: "CSV", icon: FileText, description: "Comma-separated values" },
+    { ext: "XLSX", icon: FileSpreadsheet, description: "Excel workbook" },
+    { ext: "XLS", icon: FileSpreadsheet, description: "Legacy Excel format" },
+    { ext: "TXT", icon: FileText, description: "Plain text (tab or comma separated)" }
+  ];
 
   return (
     <Card>
@@ -43,10 +61,10 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
       </CardHeader>
       <CardContent>
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
             dragActive 
-              ? 'border-blue-500 bg-blue-50' 
-              : 'border-slate-300 hover:border-slate-400'
+              ? 'border-blue-500 bg-blue-50 scale-105' 
+              : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -62,13 +80,20 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
                   <Database className="w-4 h-4" />
                   <span>Validating duplicates and inserting to database</span>
                 </div>
+                {lastUploadedFile && (
+                  <div className="flex items-center justify-center space-x-2 text-xs text-slate-400">
+                    <FileSpreadsheet className="w-3 h-3" />
+                    <span>{lastUploadedFile}</span>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
                 <FileSpreadsheet className="w-8 h-8 text-blue-600" />
               </div>
+              
               <div>
                 <p className="text-lg font-medium text-slate-800 mb-2">
                   Drop your file here
@@ -86,23 +111,43 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
                   ref={fileInputRef}
                   type="file"
                   accept=".csv,.xlsx,.xls,.txt"
-                  onChange={(e) => e.target.files && onFilesSelected(e.target.files)}
+                  onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
                   className="hidden"
                 />
               </div>
-              <div className="space-y-2">
-                <p className="text-sm text-slate-500 font-medium">
-                  Supported formats:
+
+              {lastUploadedFile && (
+                <div className="flex items-center justify-center space-x-2 text-sm text-green-600 bg-green-50 rounded-lg p-2">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Last uploaded: {lastUploadedFile}</span>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-slate-600">
+                  Supported File Formats:
                 </p>
-                <div className="flex items-center justify-center space-x-4 text-xs text-slate-500">
-                  <span className="flex items-center space-x-1">
-                    <FileSpreadsheet className="w-3 h-3" />
-                    <span>Excel (.xlsx, .xls)</span>
-                  </span>
-                  <span className="flex items-center space-x-1">
-                    <FileText className="w-3 h-3" />
-                    <span>CSV, TXT</span>
-                  </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {supportedFormats.map((format) => {
+                    const Icon = format.icon;
+                    return (
+                      <div key={format.ext} className="flex items-center space-x-2 text-xs text-slate-500 bg-slate-50 rounded p-2">
+                        <Icon className="w-3 h-3" />
+                        <div>
+                          <div className="font-medium">{format.ext}</div>
+                          <div className="text-xs">{format.description}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="flex items-start space-x-2 text-xs text-amber-600 bg-amber-50 rounded p-2 mt-3">
+                  <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">File Requirements:</div>
+                    <div>Max size: 10MB • Headers in first row • UTF-8 encoding recommended</div>
+                  </div>
                 </div>
               </div>
             </div>

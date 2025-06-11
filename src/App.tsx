@@ -8,9 +8,7 @@ import { AuthProvider } from "./components/auth/AuthProvider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import InventoryDashboard from "./components/InventoryDashboard";
-import VehicleDetail from "./components/VehicleDetail";
-import RPOInsights from "./components/RPOInsights";
+import InventoryLayout from "./components/InventoryLayout";
 
 const queryClient = new QueryClient();
 
@@ -24,10 +22,10 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/inventory-dashboard" element={<InventoryDashboard />} />
-            <Route path="/vehicle-detail/:identifier" element={<VehicleDetail />} />
-            <Route path="/rpo-insights" element={<RPOInsights />} />
             <Route path="/upload-inventory-report" element={<Index />} />
+            <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />
+            <Route path="/vehicle-detail/:identifier" element={<InventoryLayout page="vehicle-detail" />} />
+            <Route path="/rpo-insights" element={<InventoryLayout page="rpo-insights" />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
