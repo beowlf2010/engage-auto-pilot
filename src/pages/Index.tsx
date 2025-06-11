@@ -57,7 +57,7 @@ const Index = () => {
   const renderContent = () => {
     switch (activeView) {
       case "dashboard":
-        return <Dashboard user={user} onViewChange={setActiveView} />;
+        return <Dashboard user={user} />;
       case "leads":
         return <LeadsList user={user} />;
       case "inbox":
@@ -67,7 +67,7 @@ const Index = () => {
       case "settings":
         return <Settings user={user} />;
       default:
-        return <Dashboard user={user} onViewChange={setActiveView} />;
+        return <Dashboard user={user} />;
     }
   };
 
