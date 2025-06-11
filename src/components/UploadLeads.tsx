@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import CSVFieldMapper from "./CSVFieldMapper";
@@ -7,7 +6,7 @@ import UploadResult from "./upload-leads/UploadResult";
 import CSVTemplateCard from "./upload-leads/CSVTemplateCard";
 import PhonePriorityCard from "./upload-leads/PhonePriorityCard";
 import ImportFeaturesCard from "./upload-leads/ImportFeaturesCard";
-import { parseInventoryFile } from "@/utils/fileParsingUtils";
+import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
 import { processLeads } from "./upload-leads/processLeads";
 import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
 import { 
@@ -59,7 +58,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
 
     try {
       console.log(`Processing ${file.name}...`);
-      const parsed = await parseInventoryFile(file);
+      const parsed = await parseEnhancedInventoryFile(file);
       setCsvData(parsed);
       setShowMapper(true);
       
