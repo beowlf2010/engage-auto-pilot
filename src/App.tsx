@@ -21,6 +21,11 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Index />} />
+            <Route path="/leads" element={<Index />} />
+            <Route path="/inbox" element={<Index />} />
+            <Route path="/upload-leads" element={<Index />} />
+            <Route path="/settings" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/upload-inventory-report" element={<Index />} />
             <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />

@@ -51,19 +51,21 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
     }
   };
 
-  const navigation = [
-    { id: "dashboard", label: "Dashboard", icon: Home },
-    { id: "leads", label: "Leads", icon: Users },
+  // Main navigation items - now using proper routing
+  const mainNavigation = [
+    { id: "dashboard", label: "Dashboard", icon: Home, path: "/" },
+    { id: "leads", label: "Leads", icon: Users, path: "/leads" },
     { 
       id: "inbox", 
       label: "Smart Inbox", 
       icon: MessageSquare,
+      path: "/inbox",
       badge: unreadCount > 0 ? unreadCount : undefined
     },
     ...(["manager", "admin"].includes(user.role) ? [
-      { id: "upload", label: "Upload Leads", icon: Upload }
+      { id: "upload", label: "Upload Leads", icon: Upload, path: "/upload-leads" }
     ] : []),
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "settings", label: "Settings", icon: Settings, path: "/settings" },
   ];
 
   // Inventory management section for managers/admins
@@ -133,29 +135,31 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">
-        {navigation.map((item) => {
+        {/* Main Navigation */}
+        {mainNavigation.map((item) => {
           const Icon = item.icon;
-          const isActive = activeView === item.id && !isInventoryRoute;
+          const isActive = location.pathname === item.path;
           
           return (
-            <Button
-              key={item.id}
-              variant={isActive ? "default" : "ghost"}
-              className={`w-full justify-start ${isCollapsed ? "px-3" : ""}`}
-              onClick={() => onViewChange(item.id)}
-            >
-              <Icon className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
-              {!isCollapsed && (
-                <>
-                  <span className="flex-1 text-left">{item.label}</span>
-                  {item.badge && (
-                    <Badge variant="destructive" className="ml-2">
-                      {item.badge}
-                    </Badge>
-                  )}
-                </>
-              )}
-            </Button>
+            <Link key={item.id} to={item.path}>
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                className={`w-full justify-start ${isCollapsed ? "px-3" : ""}`}
+                onClick={() => onViewChange(item.id)}
+              >
+                <Icon className={`w-4 h-4 ${isCollapsed ? "" : "mr-3"}`} />
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1 text-left">{item.label}</span>
+                    {item.badge && (
+                      <Badge variant="destructive" className="ml-2">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </Button>
+            </Link>
           );
         })}
 

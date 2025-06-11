@@ -73,19 +73,35 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       // Parse the file with enhanced parsing
       const parsed = await parseEnhancedInventoryFile(file, selectedSheet);
       console.log(`Parsed ${parsed.fileType} file with ${parsed.rows.length} rows, format: ${parsed.formatType}`);
+      console.log('Sample row keys:', Object.keys(parsed.sample));
+      console.log('Sample row data:', parsed.sample);
       
       let successCount = 0;
       let errorCount = 0;
       const errors: string[] = [];
 
-      for (const row of parsed.rows) {
+      for (let i = 0; i < parsed.rows.length; i++) {
+        const row = parsed.rows[i];
         try {
           // Use enhanced mapping function
           const inventoryItem = mapRowToInventoryItem(row, condition, uploadRecord.id);
+          console.log(`Row ${i + 1} mapped item:`, { vin: inventoryItem.vin, make: inventoryItem.make, model: inventoryItem.model });
 
-          // Validate required fields
-          if (!inventoryItem.vin || !inventoryItem.make || !inventoryItem.model) {
-            errors.push(`Row missing required fields: VIN="${inventoryItem.vin}", Make="${inventoryItem.make}", Model="${inventoryItem.model}"`);
+          // Validate required fields with more detailed error messages
+          if (!inventoryItem.vin || inventoryItem.vin.length < 10) {
+            errors.push(`Row ${i + 1}: Invalid or missing VIN "${inventoryItem.vin}" (VIN must be at least 10 characters)`);
+            errorCount++;
+            continue;
+          }
+
+          if (!inventoryItem.make || inventoryItem.make.length < 1) {
+            errors.push(`Row ${i + 1}: Missing Make field. Available fields in this row: ${Object.keys(row).join(', ')}`);
+            errorCount++;
+            continue;
+          }
+
+          if (!inventoryItem.model || inventoryItem.model.length < 1) {
+            errors.push(`Row ${i + 1}: Missing Model field. Available fields in this row: ${Object.keys(row).join(', ')}`);
             errorCount++;
             continue;
           }
@@ -98,13 +114,13 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
             });
 
           if (error) {
-            errors.push(`Error inserting ${inventoryItem.vin}: ${error.message}`);
+            errors.push(`Row ${i + 1}: Database error for VIN ${inventoryItem.vin}: ${error.message}`);
             errorCount++;
           } else {
             successCount++;
           }
         } catch (error) {
-          errors.push(`Error processing row: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          errors.push(`Row ${i + 1}: Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
           errorCount++;
         }
       }
@@ -115,7 +131,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         successful_imports: successCount,
         failed_imports: errorCount,
         processing_status: 'completed',
-        error_details: errors.length > 0 ? errors.slice(0, 10).join('\n') : undefined
+        error_details: errors.length > 0 ? errors.slice(0, 20).join('\n') : undefined
       });
 
       setUploadResult({
@@ -127,14 +143,28 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         fileName: file.name,
         condition: condition,
         formatType: parsed.formatType,
-        uploadId: uploadRecord.id
+        uploadId: uploadRecord.id,
+        status: errorCount === 0 ? 'success' : 'partial'
       });
 
-      toast({
-        title: "Upload completed",
-        description: `${successCount} ${condition} vehicles imported, ${errorCount} errors`,
-        variant: errorCount > 0 ? "default" : "default"
-      });
+      if (errorCount === 0) {
+        toast({
+          title: "Upload successful!",
+          description: `${successCount} ${condition} vehicles imported successfully`,
+        });
+      } else if (successCount > 0) {
+        toast({
+          title: "Upload completed with errors",
+          description: `${successCount} vehicles imported, ${errorCount} failed. Check details below.`,
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Upload failed",
+          description: `No vehicles could be imported. Please check your file format.`,
+          variant: "destructive"
+        });
+      }
 
     } catch (error) {
       console.error('Upload error:', error);

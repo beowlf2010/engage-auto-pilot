@@ -167,14 +167,45 @@ const parseCSVFileEnhanced = async (file: File): Promise<ParsedInventoryData> =>
 
 // Enhanced mapping function that handles GM/Vauto specific fields
 export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new' | 'used' | 'certified', uploadHistoryId: string) => {
+  console.log('Mapping row:', row);
+  console.log('Available keys:', Object.keys(row));
+  
+  // Enhanced field mapping with more flexible matching
+  const getFieldValue = (possibleFields: string[]): string => {
+    for (const field of possibleFields) {
+      // Try exact match first
+      if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
+        return String(row[field]).trim();
+      }
+      
+      // Try case-insensitive match
+      const lowerField = field.toLowerCase();
+      for (const key of Object.keys(row)) {
+        if (key.toLowerCase() === lowerField && row[key] !== undefined && row[key] !== null && row[key] !== '') {
+          return String(row[key]).trim();
+        }
+      }
+    }
+    return '';
+  };
+
+  // More comprehensive field mapping
+  const vin = getFieldValue(['VIN', 'vin', 'Vin', 'Vehicle_VIN', 'VehicleVIN']);
+  const make = getFieldValue(['Make', 'make', 'MAKE', 'Vehicle_Make', 'VehicleMake', 'Manufacturer']);
+  const model = getFieldValue(['Model', 'model', 'MODEL', 'Vehicle_Model', 'VehicleModel']);
+  const year = getFieldValue(['Year', 'year', 'YEAR', 'Model_Year', 'ModelYear', 'Vehicle_Year', 'VehicleYear']);
+  const stockNumber = getFieldValue(['Stock', 'stock', 'StockNumber', 'Stock_Number', 'VehicleStockNumber']);
+
+  console.log('Mapped values:', { vin, make, model, year, stockNumber });
+
   // Extract RPO codes from various possible fields
   const extractRPOCodes = (row: Record<string, any>): string[] => {
-    const rpoFields = ['rpo_codes', 'option_codes', 'options', 'rpo', 'accessories'];
+    const rpoFields = ['rpo_codes', 'option_codes', 'options', 'rpo', 'accessories', 'RPO_Codes', 'OptionCodes'];
     let rpoCodes: string[] = [];
     
     for (const field of rpoFields) {
-      const value = row[field];
-      if (value && typeof value === 'string') {
+      const value = getFieldValue([field]);
+      if (value) {
         // Split by common delimiters and clean up
         const codes = value.split(/[,;|\s]+/).filter(code => 
           code.trim().length > 0 && /^[A-Z0-9]{2,5}$/.test(code.trim())
@@ -189,25 +220,25 @@ export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new'
   const rpoCodes = extractRPOCodes(row);
 
   return {
-    vin: String(row.vin || row.VIN || '').trim(),
-    stock_number: String(row.stock_number || row.stock || row.stocknumber || '').trim() || undefined,
-    year: parseInt(String(row.year || row.model_year || '')) || undefined,
-    make: String(row.make || '').trim(),
-    model: String(row.model || '').trim(),
-    trim: String(row.trim || row.series || '').trim() || undefined,
-    body_style: String(row.body_style || row.body || '').trim() || undefined,
-    color_exterior: String(row.color_exterior || row.exterior_color || row.ext_color || '').trim() || undefined,
-    color_interior: String(row.color_interior || row.interior_color || row.int_color || '').trim() || undefined,
-    engine: String(row.engine || row.engine_description || '').trim() || undefined,
-    transmission: String(row.transmission || row.trans || '').trim() || undefined,
-    drivetrain: String(row.drivetrain || row.drive || '').trim() || undefined,
-    fuel_type: String(row.fuel_type || row.fuel || '').trim() || undefined,
-    mileage: parseInt(String(row.mileage || row.odometer || '')) || undefined,
-    price: parseFloat(String(row.price || row.selling_price || '')) || undefined,
-    msrp: parseFloat(String(row.msrp || row.retail_price || '')) || undefined,
-    invoice: parseFloat(String(row.invoice || row.invoice_price || '')) || undefined,
-    rebates: parseFloat(String(row.rebates || row.incentives || '')) || undefined,
-    pack: parseFloat(String(row.pack || row.dealer_pack || '')) || undefined,
+    vin: vin || '',
+    stock_number: stockNumber || undefined,
+    year: year ? parseInt(year) : undefined,
+    make: make || '',
+    model: model || '',
+    trim: getFieldValue(['Trim', 'trim', 'TRIM', 'Series', 'series']) || undefined,
+    body_style: getFieldValue(['BodyStyle', 'Body_Style', 'body_style', 'Body', 'body']) || undefined,
+    color_exterior: getFieldValue(['ExteriorColor', 'Exterior_Color', 'color_exterior', 'ExtColor', 'ext_color']) || undefined,
+    color_interior: getFieldValue(['InteriorColor', 'Interior_Color', 'color_interior', 'IntColor', 'int_color']) || undefined,
+    engine: getFieldValue(['Engine', 'engine', 'ENGINE', 'Engine_Description']) || undefined,
+    transmission: getFieldValue(['Transmission', 'transmission', 'TRANSMISSION', 'Trans', 'trans']) || undefined,
+    drivetrain: getFieldValue(['Drivetrain', 'drivetrain', 'DRIVETRAIN', 'Drive', 'drive']) || undefined,
+    fuel_type: getFieldValue(['FuelType', 'Fuel_Type', 'fuel_type', 'Fuel', 'fuel']) || undefined,
+    mileage: parseInt(getFieldValue(['Mileage', 'mileage', 'MILEAGE', 'Odometer', 'odometer'])) || undefined,
+    price: parseFloat(getFieldValue(['Price', 'price', 'PRICE', 'SellingPrice', 'Selling_Price'])) || undefined,
+    msrp: parseFloat(getFieldValue(['MSRP', 'msrp', 'RetailPrice', 'Retail_Price'])) || undefined,
+    invoice: parseFloat(getFieldValue(['Invoice', 'invoice', 'INVOICE', 'InvoicePrice', 'Invoice_Price'])) || undefined,
+    rebates: parseFloat(getFieldValue(['Rebates', 'rebates', 'REBATES', 'Incentives', 'incentives'])) || undefined,
+    pack: parseFloat(getFieldValue(['Pack', 'pack', 'PACK', 'DealerPack', 'Dealer_Pack'])) || undefined,
     condition,
     status: 'available',
     rpo_codes: rpoCodes.length > 0 ? rpoCodes : undefined,
