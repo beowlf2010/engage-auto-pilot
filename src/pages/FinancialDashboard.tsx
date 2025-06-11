@@ -1,15 +1,32 @@
-
 import { useAuth } from "@/components/auth/AuthProvider";
 import FinancialUpload from "@/components/financial/FinancialUpload";
 import FinancialMetrics from "@/components/financial/FinancialMetrics";
 import DealManagement from "@/components/financial/DealManagement";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const FinancialDashboard = () => {
   const { profile, loading } = useAuth();
-  const [packAdjustment, setPackAdjustment] = useState(0);
-  const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(false);
+  
+  // Load pack adjustment from localStorage
+  const [packAdjustment, setPackAdjustment] = useState(() => {
+    const saved = localStorage.getItem('packAdjustment');
+    return saved ? Number(saved) : 0;
+  });
+  
+  const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(() => {
+    const saved = localStorage.getItem('packAdjustmentEnabled');
+    return saved === 'true';
+  });
+
+  // Save pack adjustment to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('packAdjustment', packAdjustment.toString());
+  }, [packAdjustment]);
+
+  useEffect(() => {
+    localStorage.setItem('packAdjustmentEnabled', packAdjustmentEnabled.toString());
+  }, [packAdjustmentEnabled]);
 
   if (loading || !profile) {
     return (
@@ -26,6 +43,8 @@ const FinancialDashboard = () => {
     id: profile.id,
     role: profile.role
   };
+
+  const effectivePackAdjustment = packAdjustmentEnabled ? packAdjustment : 0;
 
   return (
     <div className="space-y-6">
@@ -53,7 +72,7 @@ const FinancialDashboard = () => {
           </label>
           {packAdjustmentEnabled && (
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-slate-600">$</span>
+              <span className="text-sm text-slate-600">+$</span>
               <input
                 type="number"
                 value={packAdjustment}
@@ -77,14 +96,14 @@ const FinancialDashboard = () => {
 
         <TabsContent value="overview" className="space-y-6">
           <FinancialMetrics 
-            packAdjustment={packAdjustmentEnabled ? packAdjustment : 0} 
+            packAdjustment={effectivePackAdjustment} 
           />
         </TabsContent>
 
         <TabsContent value="deals" className="space-y-6">
           <DealManagement 
             user={user} 
-            packAdjustment={packAdjustmentEnabled ? packAdjustment : 0}
+            packAdjustment={effectivePackAdjustment}
           />
         </TabsContent>
 

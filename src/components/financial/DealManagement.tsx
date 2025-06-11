@@ -42,6 +42,8 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
   const [showProfitChanges, setShowProfitChanges] = useState(false);
   const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
   const [bulkDealType, setBulkDealType] = useState<string>("");
+  
+  // Use pack adjustment from props consistently
   const [localPackAdjustment, setLocalPackAdjustment] = useState(packAdjustment);
   const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(packAdjustment > 0);
   const { toast } = useToast();
@@ -173,11 +175,10 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
   const getAdjustedGrossProfit = (deal: Deal) => {
     const baseGross = deal.gross_profit || 0;
     const isUsedCar = deal.stock_number && (deal.stock_number.toUpperCase().startsWith('B') || deal.stock_number.toUpperCase().startsWith('X'));
-    const adjustmentToApply = packAdjustmentEnabled ? localPackAdjustment : 0;
-    return isUsedCar ? baseGross + adjustmentToApply : baseGross;
+    // Use the pack adjustment from props (already calculated as effective value)
+    return isUsedCar ? baseGross + packAdjustment : baseGross;
   };
 
-  // Define filteredDeals first
   const filteredDeals = deals.filter(deal => {
     const matchesSearch = !searchTerm || 
       deal.stock_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -190,7 +191,6 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     return matchesSearch && matchesFilter && matchesProfitFilter;
   });
 
-  // Calculate summary totals directly from filtered deals
   const calculateSummaryTotals = () => {
     const totals = {
       newRetail: { units: 0, gross: 0, fi: 0, total: 0 },

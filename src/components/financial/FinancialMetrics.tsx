@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, DollarSign, Car, Banknote } from "lucide-react";
@@ -62,6 +61,7 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
     }).format(value);
   };
 
+  // F&I profit calculation using the already-adjusted metrics
   const fiProfit = (metrics?.total_profit_mtd || 0) - (metrics?.new_gross_mtd || 0) - (metrics?.used_gross_mtd || 0);
 
   return (
@@ -127,16 +127,16 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center justify-between">
-            Retail Units – MTD
+            Total Profit – MTD
             <Car className="h-4 w-4 text-indigo-600" />
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-indigo-600">
-            {metrics?.total_units_mtd || 0}
+            {formatCurrency(metrics?.total_profit_mtd || 0)}
           </div>
           <CardDescription>
-            Total profit: {formatCurrency(metrics?.total_profit_mtd || 0)}
+            {metrics?.total_units_mtd || 0} total units sold
           </CardDescription>
         </CardContent>
       </Card>

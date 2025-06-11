@@ -139,9 +139,10 @@ export const getMonthlyRetailSummary = async (packAdjustment: number = 0) => {
       total_profit_mtd: 0
     };
 
-    // Apply pack adjustment to used gross
-    const adjustedUsedGross = (baseData.used_gross_mtd || 0) - (packAdjustment * (baseData.used_units_mtd || 0));
-    const adjustedTotalProfit = (baseData.total_profit_mtd || 0) - (packAdjustment * (baseData.used_units_mtd || 0));
+    // Apply pack adjustment to used gross (ADDING, not subtracting)
+    const packAdjustmentTotal = packAdjustment * (baseData.used_units_mtd || 0);
+    const adjustedUsedGross = (baseData.used_gross_mtd || 0) + packAdjustmentTotal;
+    const adjustedTotalProfit = (baseData.total_profit_mtd || 0) + packAdjustmentTotal;
 
     return {
       ...baseData,
