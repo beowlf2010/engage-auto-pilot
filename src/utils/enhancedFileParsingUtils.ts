@@ -377,7 +377,7 @@ export const mapRowToInventoryItem = (
   }
 
   // Map condition to database-compatible condition - handle gm_global properly
-  const dbCondition = (condition === 'new' || condition === 'gm_global') ? 'new' : 'used';
+  const dbCondition: 'new' | 'used' = condition === 'used' ? 'used' : 'new';
 
   return {
     vin: vin || '',
