@@ -59,7 +59,7 @@ const Index = () => {
       case "dashboard":
         return <Dashboard user={user} />;
       case "leads":
-        return <LeadsList user={user} />;
+        return <LeadsList />;
       case "inbox":
         return <SmartInbox user={user} />;
       case "upload":
