@@ -13,14 +13,18 @@ interface MetricsData {
   total_profit_mtd: number;
 }
 
-const FinancialMetrics = () => {
+interface FinancialMetricsProps {
+  packAdjustment?: number;
+}
+
+const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const data = await getMonthlyRetailSummary();
+        const data = await getMonthlyRetailSummary(packAdjustment);
         setMetrics(data);
       } catch (error) {
         console.error('Error fetching financial metrics:', error);
@@ -30,7 +34,7 @@ const FinancialMetrics = () => {
     };
 
     fetchMetrics();
-  }, []);
+  }, [packAdjustment]);
 
   if (loading) {
     return (
@@ -77,7 +81,14 @@ const FinancialMetrics = () => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Used Gross – MTD</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            Used Gross – MTD
+            {packAdjustment > 0 && (
+              <span className="text-xs text-orange-600 ml-1">
+                (Adj: ${packAdjustment})
+              </span>
+            )}
+          </CardTitle>
           <TrendingUp className="h-4 w-4 text-blue-600" />
         </CardHeader>
         <CardContent>

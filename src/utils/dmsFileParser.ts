@@ -1,4 +1,3 @@
-
 import * as XLSX from 'xlsx';
 
 export interface DealRecord {
@@ -28,6 +27,12 @@ export interface FinancialSummary {
   newGross: number;
   usedUnits: number;
   usedGross: number;
+  retailUnits: number;
+  retailGross: number;
+  dealerTradeUnits: number;
+  dealerTradeGross: number;
+  wholesaleUnits: number;
+  wholesaleGross: number;
 }
 
 interface DmsColumns {
@@ -275,8 +280,8 @@ const extractDealFromRow = (row: any[], columnIndices: Record<string, number>): 
       deal.totalProfit = (deal.grossProfit || 0) + (deal.fiProfit || 0);
     }
     
-    // Determine deal type based on age or year
-    deal.dealType = determineDealType(deal);
+    // Determine deal type based on stock number prefix
+    deal.dealType = determineDealTypeByStock(deal.stockNumber);
     
     return deal;
   } catch (error) {
@@ -297,25 +302,21 @@ const parseNumeric = (value: any): number | undefined => {
   return isNaN(numericValue) ? undefined : numericValue;
 };
 
-const determineDealType = (deal: DealRecord): 'new' | 'used' => {
-  // Default to used
-  let dealType: 'new' | 'used' = 'used';
-  
-  // Check age (less than 365 days typically means new)
-  if (deal.age !== undefined && deal.age <= 365) {
-    dealType = 'new';
+const determineDealTypeByStock = (stockNumber?: string): 'new' | 'used' => {
+  if (!stockNumber || stockNumber.trim().length === 0) {
+    return 'used';
   }
   
-  // Check year model (current year or previous year typically means new)
-  if (deal.yearModel) {
-    const currentYear = new Date().getFullYear();
-    const modelYear = parseInt(String(deal.yearModel));
-    if (!isNaN(modelYear) && modelYear >= currentYear - 1) {
-      dealType = 'new';
-    }
-  }
+  const firstChar = stockNumber.trim().toUpperCase().charAt(0);
   
-  return dealType;
+  if (firstChar === 'C') {
+    return 'new';
+  } else if (firstChar === 'B' || firstChar === 'X') {
+    return 'used';
+  } else {
+    // Default to used for unknown patterns
+    return 'used';
+  }
 };
 
 const isValidDeal = (deal: DealRecord): boolean => {
@@ -333,7 +334,13 @@ const calculateSummaryFromDeals = (deals: DealRecord[]): FinancialSummary => {
     newUnits: 0,
     newGross: 0,
     usedUnits: 0,
-    usedGross: 0
+    usedGross: 0,
+    retailUnits: deals.length, // Default all to retail initially
+    retailGross: 0,
+    dealerTradeUnits: 0,
+    dealerTradeGross: 0,
+    wholesaleUnits: 0,
+    wholesaleGross: 0
   };
 
   for (const deal of deals) {
@@ -341,6 +348,7 @@ const calculateSummaryFromDeals = (deals: DealRecord[]): FinancialSummary => {
     summary.totalGross += deal.grossProfit || 0;
     summary.totalFiProfit += deal.fiProfit || 0;
     summary.totalProfit += deal.totalProfit || 0;
+    summary.retailGross += deal.grossProfit || 0; // Default all to retail
 
     if (deal.dealType === 'new') {
       summary.newUnits++;

@@ -834,9 +834,14 @@ export type Database = {
       profit_snapshots: {
         Row: {
           created_at: string
+          dealer_trade_gross: number | null
+          dealer_trade_units: number | null
           id: string
           new_gross: number
           new_units: number
+          pack_adjustment_used: number | null
+          retail_gross: number | null
+          retail_units: number | null
           snapshot_date: string
           total_fi_profit: number
           total_gross: number
@@ -847,12 +852,19 @@ export type Database = {
           upload_history_id: string | null
           used_gross: number
           used_units: number
+          wholesale_gross: number | null
+          wholesale_units: number | null
         }
         Insert: {
           created_at?: string
+          dealer_trade_gross?: number | null
+          dealer_trade_units?: number | null
           id?: string
           new_gross?: number
           new_units?: number
+          pack_adjustment_used?: number | null
+          retail_gross?: number | null
+          retail_units?: number | null
           snapshot_date: string
           total_fi_profit?: number
           total_gross?: number
@@ -863,12 +875,19 @@ export type Database = {
           upload_history_id?: string | null
           used_gross?: number
           used_units?: number
+          wholesale_gross?: number | null
+          wholesale_units?: number | null
         }
         Update: {
           created_at?: string
+          dealer_trade_gross?: number | null
+          dealer_trade_units?: number | null
           id?: string
           new_gross?: number
           new_units?: number
+          pack_adjustment_used?: number | null
+          retail_gross?: number | null
+          retail_units?: number | null
           snapshot_date?: string
           total_fi_profit?: number
           total_gross?: number
@@ -879,6 +898,8 @@ export type Database = {
           upload_history_id?: string | null
           used_gross?: number
           used_units?: number
+          wholesale_gross?: number | null
+          wholesale_units?: number | null
         }
         Relationships: []
       }
@@ -959,6 +980,10 @@ export type Database = {
         Args: { p_vin: string; p_stock_number: string }
         Returns: number
       }
+      classify_deal_by_stock: {
+        Args: { stock_number: string }
+        Returns: string
+      }
       find_matching_inventory: {
         Args: { p_lead_id: string }
         Returns: {
@@ -1004,6 +1029,29 @@ export type Database = {
       update_inventory_leads_count: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      upsert_expanded_profit_snapshot: {
+        Args: {
+          p_date: string
+          p_retail_units: number
+          p_retail_gross: number
+          p_dealer_trade_units: number
+          p_dealer_trade_gross: number
+          p_wholesale_units: number
+          p_wholesale_gross: number
+          p_new_units: number
+          p_new_gross: number
+          p_used_units: number
+          p_used_gross: number
+          p_total_units: number
+          p_total_sales: number
+          p_total_gross: number
+          p_total_fi_profit: number
+          p_total_profit: number
+          p_upload_history_id: string
+          p_pack_adjustment_used?: number
+        }
+        Returns: string
       }
       upsert_profit_snapshot: {
         Args: {
