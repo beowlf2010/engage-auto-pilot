@@ -57,7 +57,7 @@ export const getInventory = async (filters?: {
   make?: string;
   model?: string;
   status?: string;
-  sourceReport?: string;
+  sourceReport?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
   rpoCode?: string;
   priceMin?: number;
   priceMax?: number;

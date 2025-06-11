@@ -14,7 +14,7 @@ interface InventoryFilters {
   make?: string;
   model?: string;
   status?: string;
-  sourceReport?: string;
+  sourceReport?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
   rpoCode?: string;
   yearMin?: number;
   yearMax?: number;
@@ -207,7 +207,7 @@ const InventoryDashboard = () => {
             </SelectContent>
           </Select>
 
-          <Select value={filters.sourceReport} onValueChange={(value) => setFilters({...filters, sourceReport: value})}>
+          <Select value={filters.sourceReport} onValueChange={(value: 'new_car_main_view' | 'merch_inv_view' | 'orders_all') => setFilters({...filters, sourceReport: value})}>
             <SelectTrigger>
               <SelectValue placeholder="Source Report" />
             </SelectTrigger>
