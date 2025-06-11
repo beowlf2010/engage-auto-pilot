@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { getLeadMemory } from './aiMemoryService';
 import { findMatchingInventory } from './inventoryService';
@@ -30,6 +31,13 @@ export interface ResponsePattern {
   total_responses: number;
   preferred_content_types: string[];
   inventory_responsiveness: any;
+}
+
+export interface InventoryData {
+  isInventoryRelated: boolean;
+  mentionsFinancing?: boolean;
+  mentionsTradeIn?: boolean;
+  mentionsLease?: boolean;
 }
 
 // Get all active schedule configurations
@@ -315,7 +323,7 @@ export const generateAdvancedAIMessage = async (leadId: string): Promise<{ messa
     let inventoryMessage = "We have several vehicles that might interest you.";
     let availabilityMessage = "Let me know what you're looking for!";
     let pricingMessage = "";
-    let inventoryData = { isInventoryRelated: false };
+    let inventoryData: InventoryData = { isInventoryRelated: false };
 
     if (matchingInventory.length > 0) {
       const topMatch = matchingInventory[0];
