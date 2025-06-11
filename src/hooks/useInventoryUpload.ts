@@ -1,59 +1,61 @@
 
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { parseEnhancedInventoryFile, mapRowToInventoryItem, getSheetInfo, type SheetInfo } from "@/utils/enhancedFileParsingUtils";
+import { parseEnhancedInventoryFile, mapRowToInventoryItem } from "@/utils/enhancedFileParsingUtils";
 import { storeUploadedFile, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
+import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
+import { handleFileSelection } from "@/utils/fileUploadHandlers";
+import { useUploadState, type UploadResult } from "@/hooks/useUploadState";
 
 interface UseInventoryUploadProps {
   userId: string;
 }
 
 export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
-  const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<any>(null);
-  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | 'gm_global'>('used');
-  const [showHistory, setShowHistory] = useState(false);
-  const [showSheetSelector, setShowSheetSelector] = useState(false);
-  const [sheetsInfo, setSheetsInfo] = useState<SheetInfo[]>([]);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const {
+    uploading,
+    setUploading,
+    uploadResult,
+    setUploadResult,
+    selectedCondition,
+    setSelectedCondition,
+    showHistory,
+    setShowHistory,
+    showSheetSelector,
+    setShowSheetSelector,
+    sheetsInfo,
+    setSheetsInfo,
+    pendingFile,
+    setPendingFile
+  } = useUploadState();
+
   const { toast } = useToast();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, condition: 'new' | 'used' | 'gm_global') => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const validExtensions = ['.csv', '.xlsx', '.xls'];
-    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    
-    if (!validExtensions.includes(fileExtension)) {
+    try {
+      const result = await handleFileSelection(file);
+      
+      setSelectedCondition(condition);
+      setPendingFile(file);
+
+      if (result.shouldShowSheetSelector && result.sheets) {
+        setSheetsInfo(result.sheets);
+        setShowSheetSelector(true);
+        return;
+      }
+
+      if (result.shouldProcess) {
+        await processFile(file, condition);
+      }
+    } catch (error) {
       toast({
         title: "Invalid file format",
-        description: "Please upload a CSV or Excel file (.csv, .xlsx, .xls)",
+        description: error instanceof Error ? error.message : "Error processing file",
         variant: "destructive"
       });
-      return;
     }
-
-    setSelectedCondition(condition);
-    setPendingFile(file);
-
-    // Check if it's an Excel file with multiple sheets
-    if (fileExtension === '.xlsx' || fileExtension === '.xls') {
-      try {
-        const sheets = await getSheetInfo(file);
-        if (sheets.length > 1) {
-          setSheetsInfo(sheets);
-          setShowSheetSelector(true);
-          return;
-        }
-      } catch (error) {
-        console.error('Error getting sheet info:', error);
-      }
-    }
-
-    // Process single sheet or CSV file
-    await processFile(file, condition);
     
     // Reset the input
     event.target.value = '';
@@ -78,131 +80,46 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       console.log('Sample row keys:', Object.keys(parsed.sample));
       console.log('Sample row data:', parsed.sample);
       
-      let successCount = 0;
-      let errorCount = 0;
-      const errors: string[] = [];
-
-      for (let i = 0; i < parsed.rows.length; i++) {
-        const row = parsed.rows[i];
-        try {
-          console.log(`\n=== Processing Row ${i + 1} ===`);
-          
-          // Use enhanced mapping function with gm_global condition
-          const inventoryItem = mapRowToInventoryItem(row, condition, uploadRecord.id);
-          console.log(`Row ${i + 1} mapped result:`, { 
-            vin: inventoryItem.vin, 
-            make: inventoryItem.make, 
-            model: inventoryItem.model,
-            year: inventoryItem.year,
-            stock_number: inventoryItem.stock_number
-          });
-
-          // Enhanced validation with special handling for GM Global orders
-          const isGmGlobal = condition === 'gm_global';
-          const hasValidVin = inventoryItem.vin && inventoryItem.vin.length >= 10;
-          const hasValidStockNumber = inventoryItem.stock_number && inventoryItem.stock_number.length > 0;
-
-          // For GM Global, allow records without VIN if they have a stock/order number
-          if (!hasValidVin && (!isGmGlobal || !hasValidStockNumber)) {
-            const availableFields = Object.keys(row).filter(key => {
-              const value = row[key];
-              return value && String(value).trim().length >= 10 && /[A-Z0-9]/.test(String(value));
-            });
-            
-            if (isGmGlobal) {
-              errors.push(`Row ${i + 1}: GM Global order missing both VIN and Order Number. Need at least one identifier. Available potential fields: ${availableFields.join(', ') || 'none'}`);
-            } else {
-              errors.push(`Row ${i + 1}: Invalid or missing VIN "${inventoryItem.vin}" (VIN must be at least 10 characters). Potential VIN fields found: ${availableFields.join(', ') || 'none'}`);
-            }
-            errorCount++;
-            continue;
-          }
-
-          if (!inventoryItem.make || inventoryItem.make.length < 1) {
-            const makeHints = Object.keys(row).filter(key => 
-              key.toLowerCase().includes('make') || 
-              key.toLowerCase().includes('brand') || 
-              key.toLowerCase().includes('manufacturer') ||
-              key.toLowerCase().includes('division')
-            );
-            errors.push(`Row ${i + 1}: Missing Make field. Potential make fields: ${makeHints.join(', ') || 'none found'}. All available fields: ${Object.keys(row).slice(0, 10).join(', ')}${Object.keys(row).length > 10 ? '...' : ''}`);
-            errorCount++;
-            continue;
-          }
-
-          if (!inventoryItem.model || inventoryItem.model.length < 1) {
-            const modelHints = Object.keys(row).filter(key => 
-              key.toLowerCase().includes('model') || 
-              key.toLowerCase().includes('product') ||
-              key.toLowerCase().includes('series')
-            );
-            errors.push(`Row ${i + 1}: Missing Model field. Potential model fields: ${modelHints.join(', ') || 'none found'}. All available fields: ${Object.keys(row).slice(0, 10).join(', ')}${Object.keys(row).length > 10 ? '...' : ''}`);
-            errorCount++;
-            continue;
-          }
-
-          // For GM Global orders without VIN, use stock_number as unique identifier
-          let upsertConfig;
-          if (isGmGlobal && !hasValidVin && hasValidStockNumber) {
-            // Use stock_number for conflict resolution
-            upsertConfig = { onConflict: 'stock_number' };
-            console.log(`Row ${i + 1}: Using stock_number "${inventoryItem.stock_number}" as identifier for GM Global order without VIN`);
-          } else {
-            // Standard VIN-based upsert
-            upsertConfig = { onConflict: 'vin' };
-          }
-
-          // Upsert inventory item
-          const { error } = await supabase
-            .from('inventory')
-            .upsert(inventoryItem, upsertConfig);
-
-          if (error) {
-            errors.push(`Row ${i + 1}: Database error for ${hasValidVin ? `VIN ${inventoryItem.vin}` : `Order ${inventoryItem.stock_number}`}: ${error.message}`);
-            errorCount++;
-          } else {
-            successCount++;
-            console.log(`✓ Row ${i + 1} successfully imported: ${inventoryItem.make} ${inventoryItem.model} ${hasValidVin ? `(VIN: ${inventoryItem.vin})` : `(Order: ${inventoryItem.stock_number})`}`);
-          }
-        } catch (error) {
-          console.error(`Error processing row ${i + 1}:`, error);
-          errors.push(`Row ${i + 1}: Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          errorCount++;
-        }
-      }
+      // Validate and process all rows
+      const validationResult = await validateAndProcessInventoryRows(
+        parsed.rows,
+        condition,
+        uploadRecord.id,
+        mapRowToInventoryItem
+      );
 
       // Update upload history with results
       await updateUploadHistory(uploadRecord.id, {
         total_rows: parsed.rows.length,
-        successful_imports: successCount,
-        failed_imports: errorCount,
+        successful_imports: validationResult.successCount,
+        failed_imports: validationResult.errorCount,
         processing_status: 'completed',
-        error_details: errors.length > 0 ? errors.slice(0, 20).join('\n') : undefined
+        error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
       });
 
       setUploadResult({
         total: parsed.rows.length,
-        success: successCount,
-        errors: errorCount,
-        errorDetails: errors.slice(0, 10),
+        success: validationResult.successCount,
+        errors: validationResult.errorCount,
+        errorDetails: validationResult.errors.slice(0, 10),
         fileType: parsed.fileType,
         fileName: file.name,
         condition: condition,
         formatType: parsed.formatType,
         uploadId: uploadRecord.id,
-        status: errorCount === 0 ? 'success' : 'partial'
+        status: validationResult.errorCount === 0 ? 'success' : 'partial'
       });
 
       const conditionLabel = condition === 'gm_global' ? 'GM Global' : condition;
-      if (errorCount === 0) {
+      if (validationResult.errorCount === 0) {
         toast({
           title: "Upload successful!",
-          description: `${successCount} ${conditionLabel} vehicles imported successfully`,
+          description: `${validationResult.successCount} ${conditionLabel} vehicles imported successfully`,
         });
-      } else if (successCount > 0) {
+      } else if (validationResult.successCount > 0) {
         toast({
           title: "Upload completed with errors",
-          description: `${successCount} vehicles imported, ${errorCount} failed. Check details below.`,
+          description: `${validationResult.successCount} vehicles imported, ${validationResult.errorCount} failed. Check details below.`,
           variant: "default"
         });
       } else {
