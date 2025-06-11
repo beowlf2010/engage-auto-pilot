@@ -179,7 +179,11 @@ const parseCSVFileEnhanced = async (file: File): Promise<ParsedInventoryData> =>
 };
 
 // Enhanced mapping function that handles GM Global specific fields
-export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new' | 'used' | 'gm_global', uploadHistoryId: string) => {
+export const mapRowToInventoryItem = (
+  row: Record<string, any>, 
+  condition: 'new' | 'used' | 'gm_global', 
+  uploadHistoryId: string
+) => {
   console.log('=== FIELD MAPPING DEBUG ===');
   console.log('Row data received:', row);
   console.log('Available column names:', Object.keys(row));
