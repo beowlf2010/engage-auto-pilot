@@ -1,14 +1,15 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Download, TrendingUp, TrendingDown, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateDealType } from "@/utils/financialDataOperations";
 import { supabase } from "@/integrations/supabase/client";
+import PackAdjustmentControls from "./deal-management/PackAdjustmentControls";
+import DealSummaryCards from "./deal-management/DealSummaryCards";
+import DealFilters from "./deal-management/DealFilters";
+import BulkActions from "./deal-management/BulkActions";
+import DealsTable from "./deal-management/DealsTable";
 
 interface Deal {
   id: string;
@@ -171,11 +172,6 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
             deal.fi_profit !== deal.original_fi_profit);
   };
 
-  const getProfitChange = (current?: number, original?: number) => {
-    if (current === undefined || original === undefined) return 0;
-    return current - original;
-  };
-
   const getAdjustedGrossProfit = (deal: Deal) => {
     const baseGross = deal.gross_profit || 0;
     const isUsedCar = deal.stock_number && (deal.stock_number.toUpperCase().startsWith('B') || deal.stock_number.toUpperCase().startsWith('X'));
@@ -257,43 +253,6 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     }).format(value);
   };
 
-  const getDealTypeBadgeColor = (dealType?: string) => {
-    switch (dealType) {
-      case 'retail': return 'bg-green-100 text-green-800';
-      case 'dealer_trade': return 'bg-blue-100 text-blue-800';
-      case 'wholesale': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getVehicleTypeBadge = (stockNumber?: string) => {
-    const vehicleType = getVehicleType(stockNumber);
-    return vehicleType === 'new' ? 
-      <Badge className="bg-blue-100 text-blue-800 text-xs">New</Badge> :
-      <Badge className="bg-gray-100 text-gray-800 text-xs">Used</Badge>;
-  };
-
-  const renderProfitChangeIndicator = (deal: Deal) => {
-    if (!hasProfitChanges(deal)) return null;
-    
-    const grossChange = getProfitChange(deal.gross_profit, deal.original_gross_profit);
-    const fiChange = getProfitChange(deal.fi_profit, deal.original_fi_profit);
-    const totalChange = grossChange + fiChange;
-    
-    return (
-      <div className="flex items-center space-x-1">
-        {totalChange > 0 ? (
-          <TrendingUp className="w-4 h-4 text-green-600" />
-        ) : (
-          <TrendingDown className="w-4 h-4 text-red-600" />
-        )}
-        <span className={`text-xs ${totalChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
-          {totalChange > 0 ? '+' : ''}{formatCurrency(totalChange)}
-        </span>
-      </div>
-    );
-  };
-
   const handleSelectDeal = (dealId: string) => {
     setSelectedDeals(prev => 
       prev.includes(dealId) 
@@ -323,146 +282,19 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Pack Adjustment Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Settings className="w-5 h-5" />
-            <span>Pack Adjustment Settings</span>
-          </CardTitle>
-          <CardDescription>
-            Configure pack adjustment to be deducted from used vehicle gross profit
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={packAdjustmentEnabled}
-                onChange={(e) => setPackAdjustmentEnabled(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <span className="text-sm font-medium text-slate-700">Enable Used Car Pack Adjustment</span>
-            </label>
-            {packAdjustmentEnabled && (
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-slate-600">$</span>
-                <input
-                  type="number"
-                  value={localPackAdjustment}
-                  onChange={(e) => setLocalPackAdjustment(Number(e.target.value))}
-                  className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                  placeholder="0"
-                />
-                <span className="text-xs text-slate-500">per used vehicle</span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <PackAdjustmentControls
+        packAdjustmentEnabled={packAdjustmentEnabled}
+        setPackAdjustmentEnabled={setPackAdjustmentEnabled}
+        localPackAdjustment={localPackAdjustment}
+        setLocalPackAdjustment={setLocalPackAdjustment}
+      />
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">New Retail</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-blue-600">
-              {summaryTotals.newRetail.units} units
-            </div>
-            <div className="text-sm text-gray-600">
-              Sales: {formatCurrency(summaryTotals.newRetail.sales)}
-            </div>
-            <div className="text-sm text-gray-600">
-              Gross: {formatCurrency(summaryTotals.newRetail.gross)}
-            </div>
-            <div className="text-sm text-gray-600">
-              F&I: {formatCurrency(summaryTotals.newRetail.fi)}
-            </div>
-            <div className="text-sm font-medium">
-              Total: {formatCurrency(summaryTotals.newRetail.total)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">
-              Used Retail
-              {packAdjustmentEnabled && localPackAdjustment > 0 && (
-                <span className="text-xs text-orange-600 ml-1">
-                  (Pack: ${localPackAdjustment})
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-green-600">
-              {summaryTotals.usedRetail.units} units
-            </div>
-            <div className="text-sm text-gray-600">
-              Sales: {formatCurrency(summaryTotals.usedRetail.sales)}
-            </div>
-            <div className="text-sm text-gray-600">
-              Gross: {formatCurrency(summaryTotals.usedRetail.gross)}
-            </div>
-            <div className="text-sm text-gray-600">
-              F&I: {formatCurrency(summaryTotals.usedRetail.fi)}
-            </div>
-            <div className="text-sm font-medium">
-              Total: {formatCurrency(summaryTotals.usedRetail.total)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Dealer Trade</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-purple-600">
-              {summaryTotals.dealerTrade.units} units
-            </div>
-            <div className="text-sm text-gray-600">
-              Sales: {formatCurrency(summaryTotals.dealerTrade.sales)}
-            </div>
-            <div className="text-sm text-gray-600">
-              Gross: {formatCurrency(summaryTotals.dealerTrade.gross)}
-            </div>
-            <div className="text-sm text-gray-600">
-              F&I: {formatCurrency(summaryTotals.dealerTrade.fi)}
-            </div>
-            <div className="text-sm font-medium">
-              Total: {formatCurrency(summaryTotals.dealerTrade.total)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Wholesale</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-orange-600">
-              {summaryTotals.wholesale.units} units
-            </div>
-            <div className="text-sm text-gray-600">
-              Sales: {formatCurrency(summaryTotals.wholesale.sales)}
-            </div>
-            <div className="text-sm text-gray-600">
-              Gross: {formatCurrency(summaryTotals.wholesale.gross)}
-            </div>
-            <div className="text-sm text-gray-600">
-              F&I: {formatCurrency(summaryTotals.wholesale.fi)}
-            </div>
-            <div className="text-sm font-medium">
-              Total: {formatCurrency(summaryTotals.wholesale.total)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <DealSummaryCards
+        summaryTotals={summaryTotals}
+        packAdjustmentEnabled={packAdjustmentEnabled}
+        localPackAdjustment={localPackAdjustment}
+        formatCurrency={formatCurrency}
+      />
 
       <Card>
         <CardHeader>
@@ -475,185 +307,33 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Filters and Bulk Actions */}
-          <div className="flex flex-wrap gap-4 mb-6">
-            <div className="flex items-center space-x-2">
-              <Search className="w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Search by stock number, customer, or vehicle..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-400" />
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Filter by type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="retail">Retail</SelectItem>
-                  <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
-                  <SelectItem value="wholesale">Wholesale</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="profit-changes"
-                checked={showProfitChanges}
-                onChange={(e) => setShowProfitChanges(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor="profit-changes" className="text-sm font-medium">
-                Show Profit Changes Only
-              </label>
-            </div>
-          </div>
+          <DealFilters
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            filterType={filterType}
+            setFilterType={setFilterType}
+            showProfitChanges={showProfitChanges}
+            setShowProfitChanges={setShowProfitChanges}
+          />
 
-          {/* Bulk Actions */}
-          {selectedDeals.length > 0 && (
-            <div className="bg-blue-50 p-4 rounded-lg mb-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
-                  {selectedDeals.length} deals selected
-                </span>
-                <div className="flex items-center space-x-2">
-                  <Select value={bulkDealType} onValueChange={setBulkDealType}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Set type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
-                      <SelectItem value="wholesale">Wholesale</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleBulkDealTypeUpdate} size="sm">
-                    Update Selected
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          <BulkActions
+            selectedDeals={selectedDeals}
+            bulkDealType={bulkDealType}
+            setBulkDealType={setBulkDealType}
+            onBulkUpdate={handleBulkDealTypeUpdate}
+          />
 
-          {/* Deals Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left p-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedDeals.length === filteredDeals.length && filteredDeals.length > 0}
-                      onChange={handleSelectAll}
-                      className="rounded border-gray-300"
-                    />
-                  </th>
-                  <th className="text-left p-3 font-medium text-gray-600">Date</th>
-                  <th className="text-left p-3 font-medium text-gray-600">Stock #</th>
-                  <th className="text-left p-3 font-medium text-gray-600">Type</th>
-                  <th className="text-left p-3 font-medium text-gray-600">Vehicle</th>
-                  <th className="text-left p-3 font-medium text-gray-600">Customer</th>
-                  <th className="text-right p-3 font-medium text-gray-600">Sale Amount</th>
-                  <th className="text-right p-3 font-medium text-gray-600">Gross Profit</th>
-                  <th className="text-right p-3 font-medium text-gray-600">F&I Profit</th>
-                  <th className="text-right p-3 font-medium text-gray-600">Total Profit</th>
-                  <th className="text-center p-3 font-medium text-gray-600">Changes</th>
-                  <th className="text-center p-3 font-medium text-gray-600">Deal Type</th>
-                  <th className="text-center p-3 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDeals.map((deal) => (
-                  <tr key={deal.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="p-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedDeals.includes(deal.id)}
-                        onChange={() => handleSelectDeal(deal.id)}
-                        className="rounded border-gray-300"
-                      />
-                    </td>
-                    <td className="p-3 text-sm">
-                      {new Date(deal.upload_date).toLocaleDateString()}
-                    </td>
-                    <td className="p-3 text-sm font-medium">
-                      {deal.stock_number || '-'}
-                    </td>
-                    <td className="p-3 text-sm">
-                      {getVehicleTypeBadge(deal.stock_number)}
-                    </td>
-                    <td className="p-3 text-sm">
-                      {deal.year_model || '-'}
-                    </td>
-                    <td className="p-3 text-sm">
-                      {deal.buyer_name || '-'}
-                    </td>
-                    <td className="p-3 text-sm text-right">
-                      {formatCurrency(deal.sale_amount)}
-                    </td>
-                    <td className="p-3 text-sm text-right">
-                      <div>
-                        {formatCurrency(getAdjustedGrossProfit(deal))}
-                        {packAdjustmentEnabled && localPackAdjustment > 0 && deal.stock_number?.toUpperCase().match(/^[BX]/) && (
-                          <div className="text-xs text-orange-600">
-                            (Adj: -${localPackAdjustment})
-                          </div>
-                        )}
-                        {deal.original_gross_profit && deal.gross_profit !== deal.original_gross_profit && (
-                          <div className="text-xs text-gray-500">
-                            Was: {formatCurrency(deal.original_gross_profit)}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm text-right">
-                      <div>
-                        {formatCurrency(deal.fi_profit)}
-                        {deal.original_fi_profit && deal.fi_profit !== deal.original_fi_profit && (
-                          <div className="text-xs text-gray-500">
-                            Was: {formatCurrency(deal.original_fi_profit)}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm text-right">
-                      {formatCurrency((getAdjustedGrossProfit(deal) + (deal.fi_profit || 0)))}
-                    </td>
-                    <td className="p-3 text-center">
-                      {renderProfitChangeIndicator(deal)}
-                    </td>
-                    <td className="p-3 text-center">
-                      <Badge className={getDealTypeBadgeColor(deal.deal_type)}>
-                        {deal.deal_type?.replace('_', ' ') || 'retail'}
-                      </Badge>
-                    </td>
-                    <td className="p-3 text-center">
-                      <Select
-                        value={deal.deal_type || 'retail'}
-                        onValueChange={(value: 'retail' | 'dealer_trade' | 'wholesale') => 
-                          handleDealTypeUpdate(deal.id, value)
-                        }
-                      >
-                        <SelectTrigger className="w-32 h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="retail">Retail</SelectItem>
-                          <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
-                          <SelectItem value="wholesale">Wholesale</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DealsTable
+            deals={filteredDeals}
+            selectedDeals={selectedDeals}
+            onSelectDeal={handleSelectDeal}
+            onSelectAll={handleSelectAll}
+            onDealTypeUpdate={handleDealTypeUpdate}
+            getAdjustedGrossProfit={getAdjustedGrossProfit}
+            formatCurrency={formatCurrency}
+            packAdjustmentEnabled={packAdjustmentEnabled}
+            localPackAdjustment={localPackAdjustment}
+          />
 
           {filteredDeals.length === 0 && (
             <div className="text-center py-8 text-gray-500">
