@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,6 +105,12 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     }
   };
 
+  const getVehicleType = (stockNumber?: string): 'new' | 'used' => {
+    if (!stockNumber) return 'used';
+    const firstChar = stockNumber.trim().toUpperCase().charAt(0);
+    return firstChar === 'C' ? 'new' : 'used';
+  };
+
   const hasProfitChanges = (deal: Deal) => {
     return deal.original_gross_profit !== undefined && 
            (deal.gross_profit !== deal.original_gross_profit || 
@@ -116,6 +121,52 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     if (current === undefined || original === undefined) return 0;
     return current - original;
   };
+
+  // Calculate summary totals by category
+  const calculateSummaryTotals = () => {
+    const totals = {
+      newRetail: { units: 0, gross: 0, fi: 0, total: 0 },
+      usedRetail: { units: 0, gross: 0, fi: 0, total: 0 },
+      dealerTrade: { units: 0, gross: 0, fi: 0, total: 0 },
+      wholesale: { units: 0, gross: 0, fi: 0, total: 0 }
+    };
+
+    filteredDeals.forEach(deal => {
+      const vehicleType = getVehicleType(deal.stock_number);
+      const dealType = deal.deal_type || 'retail';
+      const adjustedGross = getAdjustedGrossProfit(deal);
+      const fiProfit = deal.fi_profit || 0;
+      const totalProfit = adjustedGross + fiProfit;
+
+      if (dealType === 'retail') {
+        if (vehicleType === 'new') {
+          totals.newRetail.units++;
+          totals.newRetail.gross += adjustedGross;
+          totals.newRetail.fi += fiProfit;
+          totals.newRetail.total += totalProfit;
+        } else {
+          totals.usedRetail.units++;
+          totals.usedRetail.gross += adjustedGross;
+          totals.usedRetail.fi += fiProfit;
+          totals.usedRetail.total += totalProfit;
+        }
+      } else if (dealType === 'dealer_trade') {
+        totals.dealerTrade.units++;
+        totals.dealerTrade.gross += adjustedGross;
+        totals.dealerTrade.fi += fiProfit;
+        totals.dealerTrade.total += totalProfit;
+      } else if (dealType === 'wholesale') {
+        totals.wholesale.units++;
+        totals.wholesale.gross += adjustedGross;
+        totals.wholesale.fi += fiProfit;
+        totals.wholesale.total += totalProfit;
+      }
+    });
+
+    return totals;
+  };
+
+  const summaryTotals = calculateSummaryTotals();
 
   const filteredDeals = deals.filter(deal => {
     const matchesSearch = !searchTerm || 
@@ -154,6 +205,13 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     }
   };
 
+  const getVehicleTypeBadge = (stockNumber?: string) => {
+    const vehicleType = getVehicleType(stockNumber);
+    return vehicleType === 'new' ? 
+      <Badge className="bg-blue-100 text-blue-800 text-xs">New</Badge> :
+      <Badge className="bg-gray-100 text-gray-800 text-xs">Used</Badge>;
+  };
+
   const renderProfitChangeIndicator = (deal: Deal) => {
     if (!hasProfitChanges(deal)) return null;
     
@@ -188,6 +246,96 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">New Retail</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold text-blue-600">
+              {summaryTotals.newRetail.units} units
+            </div>
+            <div className="text-sm text-gray-600">
+              Gross: {formatCurrency(summaryTotals.newRetail.gross)}
+            </div>
+            <div className="text-sm text-gray-600">
+              F&I: {formatCurrency(summaryTotals.newRetail.fi)}
+            </div>
+            <div className="text-sm font-medium">
+              Total: {formatCurrency(summaryTotals.newRetail.total)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">
+              Used Retail
+              {packAdjustment > 0 && (
+                <span className="text-xs text-orange-600 ml-1">
+                  (Pack: ${packAdjustment})
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold text-green-600">
+              {summaryTotals.usedRetail.units} units
+            </div>
+            <div className="text-sm text-gray-600">
+              Gross: {formatCurrency(summaryTotals.usedRetail.gross)}
+            </div>
+            <div className="text-sm text-gray-600">
+              F&I: {formatCurrency(summaryTotals.usedRetail.fi)}
+            </div>
+            <div className="text-sm font-medium">
+              Total: {formatCurrency(summaryTotals.usedRetail.total)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Dealer Trade</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold text-purple-600">
+              {summaryTotals.dealerTrade.units} units
+            </div>
+            <div className="text-sm text-gray-600">
+              Gross: {formatCurrency(summaryTotals.dealerTrade.gross)}
+            </div>
+            <div className="text-sm text-gray-600">
+              F&I: {formatCurrency(summaryTotals.dealerTrade.fi)}
+            </div>
+            <div className="text-sm font-medium">
+              Total: {formatCurrency(summaryTotals.dealerTrade.total)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Wholesale</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold text-orange-600">
+              {summaryTotals.wholesale.units} units
+            </div>
+            <div className="text-sm text-gray-600">
+              Gross: {formatCurrency(summaryTotals.wholesale.gross)}
+            </div>
+            <div className="text-sm text-gray-600">
+              F&I: {formatCurrency(summaryTotals.wholesale.fi)}
+            </div>
+            <div className="text-sm font-medium">
+              Total: {formatCurrency(summaryTotals.wholesale.total)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -249,6 +397,7 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
                 <tr className="border-b border-gray-200">
                   <th className="text-left p-3 font-medium text-gray-600">Date</th>
                   <th className="text-left p-3 font-medium text-gray-600">Stock #</th>
+                  <th className="text-left p-3 font-medium text-gray-600">Type</th>
                   <th className="text-left p-3 font-medium text-gray-600">Vehicle</th>
                   <th className="text-left p-3 font-medium text-gray-600">Customer</th>
                   <th className="text-right p-3 font-medium text-gray-600">Sale Amount</th>
@@ -268,6 +417,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
                     </td>
                     <td className="p-3 text-sm font-medium">
                       {deal.stock_number || '-'}
+                    </td>
+                    <td className="p-3 text-sm">
+                      {getVehicleTypeBadge(deal.stock_number)}
                     </td>
                     <td className="p-3 text-sm">
                       {deal.year_model || '-'}
@@ -304,7 +456,7 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
                       </div>
                     </td>
                     <td className="p-3 text-sm text-right">
-                      {formatCurrency(deal.total_profit)}
+                      {formatCurrency((getAdjustedGrossProfit(deal) + (deal.fi_profit || 0)))}
                     </td>
                     <td className="p-3 text-center">
                       {renderProfitChangeIndicator(deal)}
