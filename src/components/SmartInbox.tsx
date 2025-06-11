@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import ConversationsList from "./inbox/ConversationsList";
 import ChatView from "./inbox/ChatView";
 import ConversationMemory from "./ConversationMemory";
-import { useConversations } from "@/hooks/useConversations";
+import { useRealtimeInbox } from "@/hooks/useRealtimeInbox";
 import { markMessagesAsRead } from "@/services/conversationsService";
 
 interface SmartInboxProps {
@@ -17,7 +17,7 @@ interface SmartInboxProps {
 const SmartInbox = ({ user }: SmartInboxProps) => {
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [showMemory, setShowMemory] = useState(false);
-  const { conversations, messages, loading, fetchMessages, sendMessage } = useConversations();
+  const { conversations, messages, loading, fetchMessages, sendMessage } = useRealtimeInbox();
 
   // Filter conversations based on user role
   const filteredConversations = conversations.filter(conv => 

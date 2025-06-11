@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useConversations } from "@/hooks/useConversations";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import Sidebar from "@/components/Sidebar";
 import InventoryDashboard from "@/components/InventoryDashboard";
@@ -18,8 +17,7 @@ interface InventoryLayoutProps {
 const InventoryLayout = ({ page }: InventoryLayoutProps) => {
   const [activeView, setActiveView] = useState("inventory-dashboard");
   const { profile, loading } = useAuth();
-  const { conversations } = useConversations();
-  const unreadCount = useUnreadCount(conversations);
+  const unreadCount = useUnreadCount([]);
   const { identifier } = useParams();
 
   if (loading || !profile) {
