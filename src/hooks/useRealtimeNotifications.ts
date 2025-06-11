@@ -16,6 +16,7 @@ export const useRealtimeNotifications = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const notificationPermission = useRef<NotificationPermission>('default');
+  const channelRef = useRef<any>(null);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -33,8 +34,18 @@ export const useRealtimeNotifications = () => {
   useEffect(() => {
     if (!profile) return;
 
+    // Cleanup existing channel
+    if (channelRef.current) {
+      try {
+        supabase.removeChannel(channelRef.current);
+      } catch (error) {
+        console.error('Error removing existing notification channel:', error);
+      }
+    }
+
+    // Create new channel with unique name
     const channel = supabase
-      .channel('incoming-messages')
+      .channel(`incoming-messages-${profile.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -45,7 +56,7 @@ export const useRealtimeNotifications = () => {
         },
         async (payload) => {
           const newMessage = payload.new as IncomingMessage;
-          console.log('New incoming message:', newMessage);
+          console.log('New incoming message notification:', newMessage);
 
           // Get lead information for the notification
           const { data: leadData } = await supabase
@@ -82,7 +93,6 @@ export const useRealtimeNotifications = () => {
                 // Handle notification click
                 notification.onclick = () => {
                   window.focus();
-                  // Could navigate to the specific conversation here
                   notification.close();
                 };
 
@@ -95,8 +105,16 @@ export const useRealtimeNotifications = () => {
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        try {
+          supabase.removeChannel(channelRef.current);
+        } catch (error) {
+          console.error('Error removing notification channel:', error);
+        }
+      }
     };
   }, [profile, toast]);
 

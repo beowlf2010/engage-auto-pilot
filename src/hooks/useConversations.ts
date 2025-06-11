@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { fetchConversations } from '@/services/conversationsService';
 import { fetchMessages, sendMessage as sendMessageService } from '@/services/messagesService';
@@ -11,6 +11,7 @@ export const useConversations = () => {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
+  const channelsRef = useRef<any[]>([]);
 
   const loadConversations = async () => {
     if (!profile) return;
@@ -46,13 +47,28 @@ export const useConversations = () => {
     }
   };
 
-  // Set up real-time listeners for conversation updates
+  // Cleanup function to remove all channels
+  const cleanupChannels = () => {
+    channelsRef.current.forEach(channel => {
+      try {
+        supabase.removeChannel(channel);
+      } catch (error) {
+        console.error('Error removing channel:', error);
+      }
+    });
+    channelsRef.current = [];
+  };
+
+  // Single effect to handle all real-time subscriptions
   useEffect(() => {
     if (!profile) return;
 
-    // Listen for new messages to refresh conversations list
+    // Cleanup any existing channels first
+    cleanupChannels();
+
+    // Create a single channel for conversation updates
     const conversationChannel = supabase
-      .channel('conversation-updates')
+      .channel(`conversation-updates-${profile.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -61,7 +77,7 @@ export const useConversations = () => {
           table: 'conversations'
         },
         () => {
-          // Refresh conversations when new messages arrive
+          console.log('New conversation inserted, refreshing...');
           loadConversations();
         }
       )
@@ -73,26 +89,28 @@ export const useConversations = () => {
           table: 'conversations'
         },
         () => {
-          // Refresh conversations when messages are updated
+          console.log('Conversation updated, refreshing...');
           loadConversations();
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(conversationChannel);
-    };
+    // Store channel reference
+    channelsRef.current.push(conversationChannel);
+
+    return cleanupChannels;
   }, [profile]);
 
-  // Set up real-time listener for current conversation messages
+  // Separate effect for current conversation messages
   useEffect(() => {
     if (!messages.length) return;
 
     const currentLeadId = messages[0]?.leadId;
     if (!currentLeadId) return;
 
+    // Create unique channel name with timestamp to avoid conflicts
     const messageChannel = supabase
-      .channel(`messages-${currentLeadId}`)
+      .channel(`messages-${currentLeadId}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -102,7 +120,7 @@ export const useConversations = () => {
           filter: `lead_id=eq.${currentLeadId}`
         },
         () => {
-          // Refresh messages for current conversation
+          console.log(`New message for lead ${currentLeadId}, refreshing...`);
           loadMessages(currentLeadId);
         }
       )
@@ -115,14 +133,23 @@ export const useConversations = () => {
           filter: `lead_id=eq.${currentLeadId}`
         },
         () => {
-          // Refresh messages when status updates
+          console.log(`Message updated for lead ${currentLeadId}, refreshing...`);
           loadMessages(currentLeadId);
         }
       )
       .subscribe();
 
+    // Store channel reference
+    channelsRef.current.push(messageChannel);
+
     return () => {
-      supabase.removeChannel(messageChannel);
+      try {
+        supabase.removeChannel(messageChannel);
+        // Remove from ref array
+        channelsRef.current = channelsRef.current.filter(ch => ch !== messageChannel);
+      } catch (error) {
+        console.error('Error removing message channel:', error);
+      }
     };
   }, [messages]);
 
