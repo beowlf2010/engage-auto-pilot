@@ -24,10 +24,100 @@ interface DashboardProps {
   user: {
     role: string;
     firstName: string;
+    id: string;
   };
 }
 
 const Dashboard = ({ user }: DashboardProps) => {
+  // Fetch real dashboard stats
+  const { data: dashboardStats } = useQuery({
+    queryKey: ['dashboard-stats', user.id, user.role],
+    queryFn: async () => {
+      // Get leads count based on user role
+      let leadsQuery = supabase.from('leads').select('*', { count: 'exact', head: true });
+      
+      if (user.role === 'sales') {
+        leadsQuery = leadsQuery.eq('salesperson_id', user.id);
+      }
+      
+      const { count: totalLeads } = await leadsQuery;
+
+      // Get conversations count
+      let conversationsQuery = supabase
+        .from('conversations')
+        .select('lead_id, direction', { count: 'exact' })
+        .eq('direction', 'in');
+
+      if (user.role === 'sales') {
+        const { data: userLeads } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('salesperson_id', user.id);
+        
+        const leadIds = userLeads?.map(lead => lead.id) || [];
+        if (leadIds.length > 0) {
+          conversationsQuery = conversationsQuery.in('lead_id', leadIds);
+        } else {
+          conversationsQuery = conversationsQuery.eq('lead_id', '00000000-0000-0000-0000-000000000000'); // No results
+        }
+      }
+
+      const { count: activeConversations } = await conversationsQuery;
+
+      // Get unread messages count
+      let unreadQuery = supabase
+        .from('conversations')
+        .select('lead_id', { count: 'exact', head: true })
+        .eq('direction', 'in')
+        .is('read_at', null);
+
+      if (user.role === 'sales') {
+        const { data: userLeads } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('salesperson_id', user.id);
+        
+        const leadIds = userLeads?.map(lead => lead.id) || [];
+        if (leadIds.length > 0) {
+          unreadQuery = unreadQuery.in('lead_id', leadIds);
+        } else {
+          unreadQuery = unreadQuery.eq('lead_id', '00000000-0000-0000-0000-000000000000'); // No results
+        }
+      }
+
+      const { count: unreadMessages } = await unreadQuery;
+
+      // Get AI opt-in count
+      let aiOptInQuery = supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('ai_opt_in', true);
+
+      if (user.role === 'sales') {
+        aiOptInQuery = aiOptInQuery.eq('salesperson_id', user.id);
+      }
+
+      const { count: aiOptInCount } = await aiOptInQuery;
+
+      // Calculate AI response rate
+      const aiResponseRate = totalLeads && totalLeads > 0 
+        ? Math.round((aiOptInCount || 0) / totalLeads * 100) 
+        : 0;
+
+      return {
+        totalLeads: totalLeads || 0,
+        activeConversations: activeConversations || 0,
+        unreadMessages: unreadMessages || 0,
+        aiOptInCount: aiOptInCount || 0,
+        aiResponseRate,
+        conversionRate: 23.5, // Keep mock for now - would need sales data to calculate
+        monthlyRevenue: user.role === "sales" ? 87500 : 324000, // Keep mock for now
+        avgResponseTime: "2.4 min" // Keep mock for now
+      };
+    },
+    enabled: !!user.id
+  });
+
   // Fetch inventory stats for managers/admins
   const { data: inventoryStats } = useQuery({
     queryKey: ['dashboard-inventory-stats'],
@@ -57,14 +147,16 @@ const Dashboard = ({ user }: DashboardProps) => {
     enabled: ["manager", "admin"].includes(user.role)
   });
 
-  // Mock data - in real app this would come from API
-  const stats = {
-    totalLeads: user.role === "sales" ? 45 : 187,
-    activeConversations: user.role === "sales" ? 12 : 43,
-    conversionRate: 23.5,
-    monthlyRevenue: user.role === "sales" ? 87500 : 324000,
-    aiResponseRate: 89,
-    avgResponseTime: "2.4 min"
+  // Use real stats or fallback to 0
+  const stats = dashboardStats || {
+    totalLeads: 0,
+    activeConversations: 0,
+    unreadMessages: 0,
+    aiOptInCount: 0,
+    aiResponseRate: 0,
+    conversionRate: 0,
+    monthlyRevenue: 0,
+    avgResponseTime: "0 min"
   };
 
   const recentActivity = [
@@ -121,9 +213,9 @@ const Dashboard = ({ user }: DashboardProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-slate-800">{stats.totalLeads}</div>
-            <p className="text-xs text-green-600 flex items-center">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              +12% from last month
+            <p className="text-xs text-blue-600 flex items-center">
+              <MessageSquare className="w-3 h-3 mr-1" />
+              {stats.unreadMessages} unread messages
             </p>
           </CardContent>
         </Card>
@@ -147,13 +239,14 @@ const Dashboard = ({ user }: DashboardProps) => {
         <Card className="hover:shadow-lg transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">
-              Conversion Rate
+              AI Opt-in Rate
             </CardTitle>
             <Target className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-800">{stats.conversionRate}%</div>
-            <Progress value={stats.conversionRate} className="mt-2" />
+            <div className="text-2xl font-bold text-slate-800">{stats.aiResponseRate}%</div>
+            <Progress value={stats.aiResponseRate} className="mt-2" />
+            <p className="text-xs text-slate-500 mt-1">{stats.aiOptInCount} leads opted in</p>
           </CardContent>
         </Card>
 
@@ -286,7 +379,7 @@ const Dashboard = ({ user }: DashboardProps) => {
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-slate-600">Response Rate</span>
+                <span className="text-slate-600">Opt-in Rate</span>
                 <span className="font-medium">{stats.aiResponseRate}%</span>
               </div>
               <Progress value={stats.aiResponseRate} className="h-2" />
@@ -294,13 +387,13 @@ const Dashboard = ({ user }: DashboardProps) => {
             <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <Phone className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-                <div className="text-sm font-medium text-slate-800">127</div>
-                <div className="text-xs text-slate-500">SMS Sent Today</div>
+                <div className="text-sm font-medium text-slate-800">{stats.aiOptInCount}</div>
+                <div className="text-xs text-slate-500">AI Enabled</div>
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <Mail className="w-5 h-5 text-green-600 mx-auto mb-1" />
-                <div className="text-sm font-medium text-slate-800">89</div>
-                <div className="text-xs text-slate-500">Replies Received</div>
+                <div className="text-sm font-medium text-slate-800">{stats.activeConversations}</div>
+                <div className="text-xs text-slate-500">Active Chats</div>
               </div>
             </div>
           </CardContent>
