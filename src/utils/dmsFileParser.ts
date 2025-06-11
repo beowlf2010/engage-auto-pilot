@@ -1,3 +1,4 @@
+
 import * as XLSX from 'xlsx';
 
 export interface DealRecord {
@@ -57,6 +58,7 @@ export const parseDmsFile = async (file: File) => {
   try {
     const data = await parseExcelFile(file);
     console.log('Raw data rows:', data.length);
+    console.log('First few rows:', data.slice(0, 5));
     
     // Detect column mapping
     const columnMapping = detectDmsColumns(data);
@@ -73,6 +75,9 @@ export const parseDmsFile = async (file: File) => {
     if (deals.length === 0) {
       throw new Error('No valid deals found in the file. Please check that the report contains transaction data with the expected columns.');
     }
+    
+    // Log sample deal for debugging
+    console.log('Sample deal:', deals[0]);
     
     // Calculate summary
     const summary = calculateSummaryFromDeals(deals);
@@ -256,7 +261,9 @@ const extractDealFromRow = (row: any[], columnIndices: Record<string, number>): 
     }
     
     if (columnIndices.slp !== undefined) {
-      deal.saleAmount = parseNumeric(row[columnIndices.slp]);
+      const slpValue = row[columnIndices.slp];
+      deal.saleAmount = parseNumeric(slpValue);
+      console.log('SLP value for deal:', slpValue, '-> parsed as:', deal.saleAmount);
     }
     
     if (columnIndices.customer !== undefined) {
@@ -298,8 +305,22 @@ const parseString = (value: any): string | undefined => {
 const parseNumeric = (value: any): number | undefined => {
   if (value === null || value === undefined || value === '') return undefined;
   
-  const numericValue = typeof value === 'number' ? value : parseFloat(String(value).replace(/[,$]/g, ''));
-  return isNaN(numericValue) ? undefined : numericValue;
+  // Handle different number formats
+  let stringValue = String(value);
+  
+  // Remove common currency symbols and formatting
+  stringValue = stringValue.replace(/[$,\s]/g, '');
+  
+  // Handle parentheses for negative numbers (accounting format)
+  if (stringValue.startsWith('(') && stringValue.endsWith(')')) {
+    stringValue = '-' + stringValue.slice(1, -1);
+  }
+  
+  const numericValue = typeof value === 'number' ? value : parseFloat(stringValue);
+  const result = isNaN(numericValue) ? undefined : numericValue;
+  
+  console.log('Parsing numeric:', value, '-> cleaned:', stringValue, '-> result:', result);
+  return result;
 };
 
 const determineDealTypeByStock = (stockNumber?: string): 'new' | 'used' => {
@@ -359,5 +380,6 @@ const calculateSummaryFromDeals = (deals: DealRecord[]): FinancialSummary => {
     }
   }
 
+  console.log('Calculated summary totals:', summary);
   return summary;
 };

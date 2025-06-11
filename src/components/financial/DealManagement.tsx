@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Download, TrendingUp, TrendingDown } from "lucide-react";
+import { Search, Filter, Download, TrendingUp, TrendingDown, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateDealType } from "@/utils/financialDataOperations";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +41,10 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [showProfitChanges, setShowProfitChanges] = useState(false);
+  const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
+  const [bulkDealType, setBulkDealType] = useState<string>("");
+  const [localPackAdjustment, setLocalPackAdjustment] = useState(packAdjustment);
+  const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(packAdjustment > 0);
   const { toast } = useToast();
 
   // Check permissions
@@ -59,6 +63,11 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     fetchDeals();
   }, []);
 
+  useEffect(() => {
+    setLocalPackAdjustment(packAdjustment);
+    setPackAdjustmentEnabled(packAdjustment > 0);
+  }, [packAdjustment]);
+
   const fetchDeals = async () => {
     try {
       setLoading(true);
@@ -69,6 +78,10 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
         .limit(500);
 
       if (error) throw error;
+      
+      console.log('Fetched deals:', data?.length);
+      console.log('Sample deal:', data?.[0]);
+      
       setDeals(data || []);
     } catch (error) {
       console.error('Error fetching deals:', error);
@@ -106,6 +119,46 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     }
   };
 
+  const handleBulkDealTypeUpdate = async () => {
+    if (selectedDeals.length === 0 || !bulkDealType) {
+      toast({
+        title: "Error",
+        description: "Please select deals and a deal type",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const promises = selectedDeals.map(dealId => 
+        updateDealType(dealId, bulkDealType as 'retail' | 'dealer_trade' | 'wholesale')
+      );
+      
+      await Promise.all(promises);
+      
+      setDeals(prevDeals => 
+        prevDeals.map(deal => 
+          selectedDeals.includes(deal.id) ? { ...deal, deal_type: bulkDealType } : deal
+        )
+      );
+      
+      setSelectedDeals([]);
+      setBulkDealType("");
+      
+      toast({
+        title: "Success",
+        description: `Updated ${selectedDeals.length} deals`
+      });
+    } catch (error) {
+      console.error('Error bulk updating deal types:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update deal types",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getVehicleType = (stockNumber?: string): 'new' | 'used' => {
     if (!stockNumber) return 'used';
     const firstChar = stockNumber.trim().toUpperCase().charAt(0);
@@ -126,7 +179,8 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
   const getAdjustedGrossProfit = (deal: Deal) => {
     const baseGross = deal.gross_profit || 0;
     const isUsedCar = deal.stock_number && (deal.stock_number.toUpperCase().startsWith('B') || deal.stock_number.toUpperCase().startsWith('X'));
-    return isUsedCar ? baseGross - packAdjustment : baseGross;
+    const adjustmentToApply = packAdjustmentEnabled ? localPackAdjustment : 0;
+    return isUsedCar ? baseGross - adjustmentToApply : baseGross;
   };
 
   // Define filteredDeals first
@@ -142,13 +196,13 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     return matchesSearch && matchesFilter && matchesProfitFilter;
   });
 
-  // Calculate summary totals by category - now filteredDeals is available
+  // Calculate summary totals directly from filtered deals
   const calculateSummaryTotals = () => {
     const totals = {
-      newRetail: { units: 0, gross: 0, fi: 0, total: 0 },
-      usedRetail: { units: 0, gross: 0, fi: 0, total: 0 },
-      dealerTrade: { units: 0, gross: 0, fi: 0, total: 0 },
-      wholesale: { units: 0, gross: 0, fi: 0, total: 0 }
+      newRetail: { units: 0, gross: 0, fi: 0, total: 0, sales: 0 },
+      usedRetail: { units: 0, gross: 0, fi: 0, total: 0, sales: 0 },
+      dealerTrade: { units: 0, gross: 0, fi: 0, total: 0, sales: 0 },
+      wholesale: { units: 0, gross: 0, fi: 0, total: 0, sales: 0 }
     };
 
     filteredDeals.forEach(deal => {
@@ -157,6 +211,7 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
       const adjustedGross = getAdjustedGrossProfit(deal);
       const fiProfit = deal.fi_profit || 0;
       const totalProfit = adjustedGross + fiProfit;
+      const saleAmount = deal.sale_amount || 0;
 
       if (dealType === 'retail') {
         if (vehicleType === 'new') {
@@ -164,22 +219,26 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
           totals.newRetail.gross += adjustedGross;
           totals.newRetail.fi += fiProfit;
           totals.newRetail.total += totalProfit;
+          totals.newRetail.sales += saleAmount;
         } else {
           totals.usedRetail.units++;
           totals.usedRetail.gross += adjustedGross;
           totals.usedRetail.fi += fiProfit;
           totals.usedRetail.total += totalProfit;
+          totals.usedRetail.sales += saleAmount;
         }
       } else if (dealType === 'dealer_trade') {
         totals.dealerTrade.units++;
         totals.dealerTrade.gross += adjustedGross;
         totals.dealerTrade.fi += fiProfit;
         totals.dealerTrade.total += totalProfit;
+        totals.dealerTrade.sales += saleAmount;
       } else if (dealType === 'wholesale') {
         totals.wholesale.units++;
         totals.wholesale.gross += adjustedGross;
         totals.wholesale.fi += fiProfit;
         totals.wholesale.total += totalProfit;
+        totals.wholesale.sales += saleAmount;
       }
     });
 
@@ -235,6 +294,22 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     );
   };
 
+  const handleSelectDeal = (dealId: string) => {
+    setSelectedDeals(prev => 
+      prev.includes(dealId) 
+        ? prev.filter(id => id !== dealId)
+        : [...prev, dealId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedDeals.length === filteredDeals.length) {
+      setSelectedDeals([]);
+    } else {
+      setSelectedDeals(filteredDeals.map(deal => deal.id));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -248,6 +323,45 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Pack Adjustment Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Settings className="w-5 h-5" />
+            <span>Pack Adjustment Settings</span>
+          </CardTitle>
+          <CardDescription>
+            Configure pack adjustment to be deducted from used vehicle gross profit
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={packAdjustmentEnabled}
+                onChange={(e) => setPackAdjustmentEnabled(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm font-medium text-slate-700">Enable Used Car Pack Adjustment</span>
+            </label>
+            {packAdjustmentEnabled && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-slate-600">$</span>
+                <input
+                  type="number"
+                  value={localPackAdjustment}
+                  onChange={(e) => setLocalPackAdjustment(Number(e.target.value))}
+                  className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                  placeholder="0"
+                />
+                <span className="text-xs text-slate-500">per used vehicle</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -257,6 +371,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
           <CardContent>
             <div className="text-lg font-bold text-blue-600">
               {summaryTotals.newRetail.units} units
+            </div>
+            <div className="text-sm text-gray-600">
+              Sales: {formatCurrency(summaryTotals.newRetail.sales)}
             </div>
             <div className="text-sm text-gray-600">
               Gross: {formatCurrency(summaryTotals.newRetail.gross)}
@@ -274,9 +391,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">
               Used Retail
-              {packAdjustment > 0 && (
+              {packAdjustmentEnabled && localPackAdjustment > 0 && (
                 <span className="text-xs text-orange-600 ml-1">
-                  (Pack: ${packAdjustment})
+                  (Pack: ${localPackAdjustment})
                 </span>
               )}
             </CardTitle>
@@ -284,6 +401,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
           <CardContent>
             <div className="text-lg font-bold text-green-600">
               {summaryTotals.usedRetail.units} units
+            </div>
+            <div className="text-sm text-gray-600">
+              Sales: {formatCurrency(summaryTotals.usedRetail.sales)}
             </div>
             <div className="text-sm text-gray-600">
               Gross: {formatCurrency(summaryTotals.usedRetail.gross)}
@@ -306,6 +426,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
               {summaryTotals.dealerTrade.units} units
             </div>
             <div className="text-sm text-gray-600">
+              Sales: {formatCurrency(summaryTotals.dealerTrade.sales)}
+            </div>
+            <div className="text-sm text-gray-600">
               Gross: {formatCurrency(summaryTotals.dealerTrade.gross)}
             </div>
             <div className="text-sm text-gray-600">
@@ -324,6 +447,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
           <CardContent>
             <div className="text-lg font-bold text-orange-600">
               {summaryTotals.wholesale.units} units
+            </div>
+            <div className="text-sm text-gray-600">
+              Sales: {formatCurrency(summaryTotals.wholesale.sales)}
             </div>
             <div className="text-sm text-gray-600">
               Gross: {formatCurrency(summaryTotals.wholesale.gross)}
@@ -349,7 +475,7 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Filters */}
+          {/* Filters and Bulk Actions */}
           <div className="flex flex-wrap gap-4 mb-6">
             <div className="flex items-center space-x-2">
               <Search className="w-4 h-4 text-gray-400" />
@@ -386,17 +512,47 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
                 Show Profit Changes Only
               </label>
             </div>
-            <Button variant="outline" size="sm" className="flex items-center space-x-2">
-              <Download className="w-4 h-4" />
-              <span>Export</span>
-            </Button>
           </div>
+
+          {/* Bulk Actions */}
+          {selectedDeals.length > 0 && (
+            <div className="bg-blue-50 p-4 rounded-lg mb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {selectedDeals.length} deals selected
+                </span>
+                <div className="flex items-center space-x-2">
+                  <Select value={bulkDealType} onValueChange={setBulkDealType}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Set type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
+                      <SelectItem value="wholesale">Wholesale</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleBulkDealTypeUpdate} size="sm">
+                    Update Selected
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Deals Table */}
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-gray-200">
+                  <th className="text-left p-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedDeals.length === filteredDeals.length && filteredDeals.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300"
+                    />
+                  </th>
                   <th className="text-left p-3 font-medium text-gray-600">Date</th>
                   <th className="text-left p-3 font-medium text-gray-600">Stock #</th>
                   <th className="text-left p-3 font-medium text-gray-600">Type</th>
@@ -414,6 +570,14 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
               <tbody>
                 {filteredDeals.map((deal) => (
                   <tr key={deal.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedDeals.includes(deal.id)}
+                        onChange={() => handleSelectDeal(deal.id)}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
                     <td className="p-3 text-sm">
                       {new Date(deal.upload_date).toLocaleDateString()}
                     </td>
@@ -435,9 +599,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
                     <td className="p-3 text-sm text-right">
                       <div>
                         {formatCurrency(getAdjustedGrossProfit(deal))}
-                        {packAdjustment > 0 && deal.stock_number?.toUpperCase().match(/^[BX]/) && (
+                        {packAdjustmentEnabled && localPackAdjustment > 0 && deal.stock_number?.toUpperCase().match(/^[BX]/) && (
                           <div className="text-xs text-orange-600">
-                            (Adj: -${packAdjustment})
+                            (Adj: -${localPackAdjustment})
                           </div>
                         )}
                         {deal.original_gross_profit && deal.gross_profit !== deal.original_gross_profit && (
