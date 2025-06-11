@@ -1,5 +1,4 @@
-
-import { getFieldValue, extractRPOCodes, findVINInRow, findMakeInRow, findModelInRow, findYearInRow, extractGMGlobalStatus, extractOptionDescriptions } from './fieldExtractor';
+import { getFieldValue, extractRPOCodes, findVINInRow, findMakeInRow, findModelInRow, findYearInRow, extractGMGlobalStatus, extractOptionDescriptions } from './field-extraction';
 
 // Enhanced mapping function that handles GM Global specific fields with smart detection
 export const mapRowToInventoryItem = (
