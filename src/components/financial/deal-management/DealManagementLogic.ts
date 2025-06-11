@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { updateDealType } from "@/utils/financialDataOperations";
 import { useToast } from "@/hooks/use-toast";
-import { Deal, SummaryTotals } from "./DealManagementTypes";
+import { Deal } from "./DealManagementTypes";
 
-export const useDealManagement = (packAdjustment: number = 0) => {
+export const useDealManagement = () => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -14,18 +14,11 @@ export const useDealManagement = (packAdjustment: number = 0) => {
   const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
   const [bulkDealType, setBulkDealType] = useState<string>("");
   
-  const [localPackAdjustment, setLocalPackAdjustment] = useState(packAdjustment);
-  const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(packAdjustment > 0);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchDeals();
   }, []);
-
-  useEffect(() => {
-    setLocalPackAdjustment(packAdjustment);
-    setPackAdjustmentEnabled(packAdjustment > 0);
-  }, [packAdjustment]);
 
   const fetchDeals = async () => {
     try {
@@ -147,10 +140,6 @@ export const useDealManagement = (packAdjustment: number = 0) => {
     setSelectedDeals,
     bulkDealType,
     setBulkDealType,
-    localPackAdjustment,
-    setLocalPackAdjustment,
-    packAdjustmentEnabled,
-    setPackAdjustmentEnabled,
     handleDealTypeUpdate,
     handleBulkDealTypeUpdate,
     handleSelectDeal,

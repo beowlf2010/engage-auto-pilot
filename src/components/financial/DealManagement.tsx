@@ -10,7 +10,14 @@ import { useDealManagement } from "./deal-management/DealManagementLogic";
 import { DealManagementProps } from "./deal-management/DealManagementTypes";
 import { filterDeals, calculateSummaryTotals, formatCurrency, getAdjustedGrossProfit } from "./deal-management/DealManagementUtils";
 
-const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
+const DealManagement = ({ 
+  user, 
+  packAdjustment = 0,
+  packAdjustmentEnabled = false,
+  setPackAdjustmentEnabled,
+  localPackAdjustment = 0,
+  setLocalPackAdjustment
+}: DealManagementProps) => {
   const {
     deals,
     loading,
@@ -23,15 +30,11 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     selectedDeals,
     bulkDealType,
     setBulkDealType,
-    localPackAdjustment,
-    setLocalPackAdjustment,
-    packAdjustmentEnabled,
-    setPackAdjustmentEnabled,
     handleDealTypeUpdate,
     handleBulkDealTypeUpdate,
     handleSelectDeal,
     handleSelectAll
-  } = useDealManagement(packAdjustment);
+  } = useDealManagement();
 
   // Check permissions
   if (!["manager", "admin"].includes(user.role)) {
@@ -61,12 +64,14 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
 
   return (
     <div className="space-y-6">
-      <PackAdjustmentControls
-        packAdjustmentEnabled={packAdjustmentEnabled}
-        setPackAdjustmentEnabled={setPackAdjustmentEnabled}
-        localPackAdjustment={localPackAdjustment}
-        setLocalPackAdjustment={setLocalPackAdjustment}
-      />
+      {setPackAdjustmentEnabled && setLocalPackAdjustment && (
+        <PackAdjustmentControls
+          packAdjustmentEnabled={packAdjustmentEnabled}
+          setPackAdjustmentEnabled={setPackAdjustmentEnabled}
+          localPackAdjustment={localPackAdjustment}
+          setLocalPackAdjustment={setLocalPackAdjustment}
+        />
+      )}
 
       <DealSummaryCards
         summaryTotals={summaryTotals}

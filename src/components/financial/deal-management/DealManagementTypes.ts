@@ -21,6 +21,10 @@ export interface DealManagementProps {
     role: string;
   };
   packAdjustment?: number;
+  packAdjustmentEnabled?: boolean;
+  setPackAdjustmentEnabled?: (enabled: boolean) => void;
+  localPackAdjustment?: number;
+  setLocalPackAdjustment?: (value: number) => void;
 }
 
 export interface SummaryTotals {

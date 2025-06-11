@@ -50,34 +50,6 @@ const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
         </div>
       </div>
 
-      {/* Pack Adjustment Controls */}
-      <div className="bg-white p-4 rounded-lg border border-slate-200">
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={packAdjustmentEnabled}
-              onChange={(e) => setPackAdjustmentEnabled(e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            <span className="text-sm font-medium text-slate-700">Used Car Pack Adjustment</span>
-          </label>
-          {packAdjustmentEnabled && (
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-slate-600">+$</span>
-              <input
-                type="number"
-                value={packAdjustment}
-                onChange={(e) => setPackAdjustment(Number(e.target.value))}
-                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                placeholder="1500"
-              />
-              <span className="text-xs text-slate-500">per used vehicle</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Main Content Tabs */}
       <Tabs defaultValue="deals" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
@@ -89,6 +61,10 @@ const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
           <DealManagement 
             user={{ id: user.id, role: user.role }} 
             packAdjustment={effectivePackAdjustment}
+            packAdjustmentEnabled={packAdjustmentEnabled}
+            setPackAdjustmentEnabled={setPackAdjustmentEnabled}
+            localPackAdjustment={packAdjustment}
+            setLocalPackAdjustment={setPackAdjustment}
           />
         </TabsContent>
 
