@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   generateAdvancedAIMessage, 
@@ -13,28 +12,21 @@ export const generateEnhancedAIMessage = async (leadId: string): Promise<string 
     const result = await generateAdvancedAIMessage(leadId);
     if (!result) return null;
 
-    // Update message count and last stage using a raw SQL increment
-    const { error } = await supabase.rpc('increment_ai_messages_sent', { 
-      lead_id: leadId 
-    });
+    // Update message count - get current count and increment by 1
+    const { data: currentLead } = await supabase
+      .from('leads')
+      .select('ai_messages_sent')
+      .eq('id', leadId)
+      .single();
 
-    // If the RPC doesn't exist, fall back to a regular update with current count + 1
-    if (error) {
-      const { data: currentLead } = await supabase
-        .from('leads')
-        .select('ai_messages_sent')
-        .eq('id', leadId)
-        .single();
-
-      const currentCount = currentLead?.ai_messages_sent || 0;
-      
-      await supabase
-        .from('leads')
-        .update({
-          ai_messages_sent: currentCount + 1
-        })
-        .eq('id', leadId);
-    }
+    const currentCount = currentLead?.ai_messages_sent || 0;
+    
+    await supabase
+      .from('leads')
+      .update({
+        ai_messages_sent: currentCount + 1
+      })
+      .eq('id', leadId);
 
     return result.message;
   } catch (error) {
