@@ -174,9 +174,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
 
   const getAdjustedGrossProfit = (deal: Deal) => {
     const baseGross = deal.gross_profit || 0;
-    const isUsedCar = deal.stock_number && (deal.stock_number.toUpperCase().startsWith('B') || deal.stock_number.toUpperCase().startsWith('X'));
-    // Use the pack adjustment from props (already calculated as effective value)
-    return isUsedCar ? baseGross + packAdjustment : baseGross;
+    const vehicleType = getVehicleType(deal.stock_number);
+    // Apply pack adjustment to ALL used vehicles when enabled
+    return vehicleType === 'used' ? baseGross + packAdjustment : baseGross;
   };
 
   const filteredDeals = deals.filter(deal => {
@@ -195,6 +195,7 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     const totals = {
       newRetail: { units: 0, gross: 0, fi: 0, total: 0 },
       usedRetail: { units: 0, gross: 0, fi: 0, total: 0 },
+      totalRetail: { units: 0, gross: 0, fi: 0, total: 0 },
       dealerTrade: { units: 0, gross: 0, fi: 0, total: 0 },
       wholesale: { units: 0, gross: 0, fi: 0, total: 0 }
     };
@@ -230,6 +231,12 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
         totals.wholesale.total += totalProfit;
       }
     });
+
+    // Calculate total retail (new + used retail combined)
+    totals.totalRetail.units = totals.newRetail.units + totals.usedRetail.units;
+    totals.totalRetail.gross = totals.newRetail.gross + totals.usedRetail.gross;
+    totals.totalRetail.fi = totals.newRetail.fi + totals.usedRetail.fi;
+    totals.totalRetail.total = totals.newRetail.total + totals.usedRetail.total;
 
     return totals;
   };

@@ -16,10 +16,10 @@ interface FinancialDashboardProps {
 }
 
 const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
-  // Load pack adjustment from localStorage
+  // Load pack adjustment from localStorage with default of 1500
   const [packAdjustment, setPackAdjustment] = useState(() => {
     const saved = localStorage.getItem('packAdjustment');
-    return saved ? Number(saved) : 0;
+    return saved ? Number(saved) : 1500;
   });
   
   const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(() => {
@@ -70,7 +70,7 @@ const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
                 value={packAdjustment}
                 onChange={(e) => setPackAdjustment(Number(e.target.value))}
                 className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                placeholder="0"
+                placeholder="1500"
               />
               <span className="text-xs text-slate-500">per used vehicle</span>
             </div>
