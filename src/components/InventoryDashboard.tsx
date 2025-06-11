@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar } from "lucide-react";
+import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface InventoryFilters {
@@ -99,10 +99,26 @@ const InventoryDashboard = () => {
         .from('inventory')
         .select('*', { count: 'exact', head: true });
 
-      const { count: availableVehicles } = await supabase
+      // For regular inventory (non-GM Global), count vehicles with status 'available'
+      const { count: regularAvailable } = await supabase
         .from('inventory')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'available');
+        .eq('status', 'available')
+        .neq('source_report', 'orders_all');
+
+      // For GM Global orders, only count vehicles with status '5000' as available
+      const { count: gmGlobalAvailable } = await supabase
+        .from('inventory')
+        .select('*', { count: 'exact', head: true })
+        .eq('source_report', 'orders_all')
+        .eq('status', '5000');
+
+      // Count GM Global orders that are in production/transit (not 5000)
+      const { count: inProductionTransit } = await supabase
+        .from('inventory')
+        .select('*', { count: 'exact', head: true })
+        .eq('source_report', 'orders_all')
+        .neq('status', '5000');
 
       const { count: soldVehicles } = await supabase
         .from('inventory')
@@ -111,7 +127,8 @@ const InventoryDashboard = () => {
 
       return {
         totalVehicles: totalVehicles || 0,
-        availableVehicles: availableVehicles || 0,
+        availableVehicles: (regularAvailable || 0) + (gmGlobalAvailable || 0),
+        inProductionTransit: inProductionTransit || 0,
         soldVehicles: soldVehicles || 0,
         rpoAnalytics: data || []
       };
@@ -296,9 +313,9 @@ const InventoryDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Enhanced Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -311,12 +328,23 @@ const InventoryDashboard = () => {
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600">Available</p>
+                <p className="text-sm font-medium text-slate-600">Available for Sale</p>
                 <p className="text-2xl font-bold text-green-600">{stats.availableVehicles}</p>
+                <p className="text-xs text-slate-500">Ready on lot</p>
               </div>
               <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
               </div>
+            </div>
+          </Card>
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600">In Production/Transit</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.inProductionTransit}</p>
+                <p className="text-xs text-slate-500">GM Global orders</p>
+              </div>
+              <Clock className="w-8 h-8 text-orange-500" />
             </div>
           </Card>
           <Card className="p-6">
