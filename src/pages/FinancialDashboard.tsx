@@ -1,6 +1,6 @@
+
 import { useAuth } from "@/components/auth/AuthProvider";
 import FinancialUpload from "@/components/financial/FinancialUpload";
-import FinancialMetrics from "@/components/financial/FinancialMetrics";
 import DealManagement from "@/components/financial/DealManagement";
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -87,18 +87,11 @@ const FinancialDashboard = () => {
       </div>
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+      <Tabs defaultValue="deals" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="deals">Deal Management</TabsTrigger>
           <TabsTrigger value="upload">Upload Data</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <FinancialMetrics 
-            packAdjustment={effectivePackAdjustment} 
-          />
-        </TabsContent>
 
         <TabsContent value="deals" className="space-y-6">
           <DealManagement 
