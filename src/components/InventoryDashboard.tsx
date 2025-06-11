@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -250,7 +249,7 @@ const InventoryDashboard = () => {
                   </h4>
                   <p className="text-sm text-slate-600">
                     {vehicle.stock_number && `Stock: ${vehicle.stock_number} • `}
-                    VIN: {vehicle.vin.slice(-8)}
+                    {vehicle.vin ? `VIN: ${vehicle.vin.slice(-8)}` : 'No VIN (GM Global Order)'}
                   </p>
                 </div>
                 <Badge className={getStatusColor(vehicle.status)}>
@@ -288,7 +287,7 @@ const InventoryDashboard = () => {
                     <span className="ml-3">{vehicle.leads_count} leads</span>
                   )}
                 </div>
-                <Link to={`/vehicle-detail/${vehicle.stock_number || vehicle.vin}`}>
+                <Link to={`/vehicle-detail/${vehicle.stock_number || vehicle.vin || vehicle.id}`}>
                   <Button variant="outline" size="sm" className="flex items-center space-x-1">
                     <Eye className="w-4 h-4" />
                     <span>View</span>
