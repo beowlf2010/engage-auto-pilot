@@ -5,24 +5,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Filter, Car, Eye, BarChart3 } from "lucide-react";
+import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface InventoryFilters {
   make?: string;
   model?: string;
-  status?: string;
+  inventoryType?: 'new' | 'used' | 'all';
   sourceReport?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
   rpoCode?: string;
   yearMin?: number;
   yearMax?: number;
   priceMin?: number;
   priceMax?: number;
+  sortBy?: 'age' | 'price' | 'year' | 'make' | 'model';
+  sortOrder?: 'asc' | 'desc';
 }
 
 const InventoryDashboard = () => {
-  const [filters, setFilters] = useState<InventoryFilters>({});
+  const [filters, setFilters] = useState<InventoryFilters>({
+    sortBy: 'age',
+    sortOrder: 'desc'
+  });
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: inventory, isLoading } = useQuery({
@@ -30,8 +36,7 @@ const InventoryDashboard = () => {
     queryFn: async () => {
       let query = supabase
         .from('inventory')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
 
       if (filters.make) {
         query = query.ilike('make', `%${filters.make}%`);
@@ -39,8 +44,8 @@ const InventoryDashboard = () => {
       if (filters.model) {
         query = query.ilike('model', `%${filters.model}%`);
       }
-      if (filters.status) {
-        query = query.eq('status', filters.status);
+      if (filters.inventoryType && filters.inventoryType !== 'all') {
+        query = query.eq('condition', filters.inventoryType);
       }
       if (filters.sourceReport) {
         query = query.eq('source_report', filters.sourceReport);
@@ -62,6 +67,19 @@ const InventoryDashboard = () => {
       }
       if (searchTerm) {
         query = query.or(`vin.ilike.%${searchTerm}%,stock_number.ilike.%${searchTerm}%,make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+      }
+
+      // Apply sorting
+      if (filters.sortBy === 'age') {
+        query = query.order('days_in_inventory', { ascending: filters.sortOrder === 'asc' });
+      } else if (filters.sortBy === 'price') {
+        query = query.order('price', { ascending: filters.sortOrder === 'asc' });
+      } else if (filters.sortBy === 'year') {
+        query = query.order('year', { ascending: filters.sortOrder === 'asc' });
+      } else if (filters.sortBy === 'make') {
+        query = query.order('make', { ascending: filters.sortOrder === 'asc' });
+      } else if (filters.sortBy === 'model') {
+        query = query.order('model', { ascending: filters.sortOrder === 'asc' });
       }
 
       const { data, error } = await query;
@@ -108,12 +126,46 @@ const InventoryDashboard = () => {
     }
   };
 
+  const getGMGlobalStatus = (status: string) => {
+    if (status === '5000') {
+      return { label: 'Available', color: 'bg-green-100 text-green-800' };
+    } else if (status === '1000' || status === '2000') {
+      return { label: 'Being Built', color: 'bg-yellow-100 text-yellow-800' };
+    } else {
+      return { label: 'In Transit', color: 'bg-blue-100 text-blue-800' };
+    }
+  };
+
+  const formatVehicleTitle = (vehicle: any) => {
+    const parts = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean);
+    return parts.join(' ');
+  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0
     }).format(price);
+  };
+
+  const isGMGlobalOrder = (vehicle: any) => {
+    return vehicle.source_report === 'orders_all';
+  };
+
+  const toggleSort = (sortBy: string) => {
+    if (filters.sortBy === sortBy) {
+      setFilters({
+        ...filters,
+        sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc'
+      });
+    } else {
+      setFilters({
+        ...filters,
+        sortBy: sortBy as any,
+        sortOrder: 'asc'
+      });
+    }
   };
 
   return (
@@ -177,14 +229,14 @@ const InventoryDashboard = () => {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Enhanced Filters */}
       <Card className="p-6">
         <div className="flex items-center space-x-2 mb-4">
           <Filter className="w-5 h-5 text-slate-600" />
-          <h3 className="font-medium text-slate-800">Filters</h3>
+          <h3 className="font-medium text-slate-800">Filters & Sorting</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
@@ -195,25 +247,38 @@ const InventoryDashboard = () => {
             />
           </div>
           
-          <Select value={filters.status} onValueChange={(value) => setFilters({...filters, status: value})}>
+          <Select value={filters.inventoryType} onValueChange={(value: 'new' | 'used' | 'all') => setFilters({...filters, inventoryType: value})}>
             <SelectTrigger>
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder="New/Used" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="available">Available</SelectItem>
-              <SelectItem value="sold">Sold</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="all">All Inventory</SelectItem>
+              <SelectItem value="new">New Only</SelectItem>
+              <SelectItem value="used">Used Only</SelectItem>
             </SelectContent>
           </Select>
 
           <Select value={filters.sourceReport} onValueChange={(value: 'new_car_main_view' | 'merch_inv_view' | 'orders_all') => setFilters({...filters, sourceReport: value})}>
             <SelectTrigger>
-              <SelectValue placeholder="Source Report" />
+              <SelectValue placeholder="Inventory Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="new_car_main_view">New Car Main View</SelectItem>
-              <SelectItem value="merch_inv_view">Merch Inv View</SelectItem>
-              <SelectItem value="orders_all">Orders All</SelectItem>
+              <SelectItem value="new_car_main_view">New Car Inventory</SelectItem>
+              <SelectItem value="merch_inv_view">Used Inventory</SelectItem>
+              <SelectItem value="orders_all">GM Global Orders</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.sortBy} onValueChange={(value: 'age' | 'price' | 'year' | 'make' | 'model') => setFilters({...filters, sortBy: value})}>
+            <SelectTrigger>
+              <SelectValue placeholder="Sort By" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="age">Age (Days in Stock)</SelectItem>
+              <SelectItem value="price">Price</SelectItem>
+              <SelectItem value="year">Year</SelectItem>
+              <SelectItem value="make">Make</SelectItem>
+              <SelectItem value="model">Model</SelectItem>
             </SelectContent>
           </Select>
 
@@ -225,86 +290,152 @@ const InventoryDashboard = () => {
         </div>
       </Card>
 
-      {/* Inventory Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {isLoading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="p-6 animate-pulse">
-              <div className="h-4 bg-slate-200 rounded mb-3"></div>
-              <div className="h-6 bg-slate-200 rounded mb-2"></div>
-              <div className="h-4 bg-slate-200 rounded mb-4"></div>
-              <div className="flex space-x-2">
-                <div className="h-6 bg-slate-200 rounded w-16"></div>
-                <div className="h-6 bg-slate-200 rounded w-20"></div>
-              </div>
-            </Card>
-          ))
-        ) : (
-          inventory?.map((vehicle) => (
-            <Card key={vehicle.id} className="p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h4 className="font-medium text-slate-800">
-                    {vehicle.year} {vehicle.make} {vehicle.model}
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    {vehicle.stock_number && `Stock: ${vehicle.stock_number} • `}
-                    {vehicle.vin ? `VIN: ${vehicle.vin.slice(-8)}` : 'No VIN (GM Global Order)'}
-                  </p>
-                </div>
-                <Badge className={getStatusColor(vehicle.status)}>
-                  {vehicle.status}
-                </Badge>
-              </div>
+      {/* vAuto-Style Inventory Table */}
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50">
+              <TableHead className="font-semibold">
+                <Button variant="ghost" size="sm" onClick={() => toggleSort('make')} className="p-0 h-auto font-semibold">
+                  Vehicle <ArrowUpDown className="w-3 h-3 ml-1" />
+                </Button>
+              </TableHead>
+              <TableHead className="font-semibold">Stock #</TableHead>
+              <TableHead className="font-semibold">
+                <Button variant="ghost" size="sm" onClick={() => toggleSort('price')} className="p-0 h-auto font-semibold">
+                  Price <ArrowUpDown className="w-3 h-3 ml-1" />
+                </Button>
+              </TableHead>
+              <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold">
+                <Button variant="ghost" size="sm" onClick={() => toggleSort('age')} className="p-0 h-auto font-semibold">
+                  Age <ArrowUpDown className="w-3 h-3 ml-1" />
+                </Button>
+              </TableHead>
+              <TableHead className="font-semibold">Features</TableHead>
+              <TableHead className="font-semibold">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 10 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                </TableRow>
+              ))
+            ) : (
+              inventory?.map((vehicle) => (
+                <TableRow key={vehicle.id} className="hover:bg-slate-50">
+                  <TableCell>
+                    <div>
+                      <div className="font-medium text-slate-800">
+                        {formatVehicleTitle(vehicle)}
+                      </div>
+                      {vehicle.color_exterior && (
+                        <div className="text-sm text-slate-600">{vehicle.color_exterior}</div>
+                      )}
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell>
+                    <div className="font-medium">
+                      {vehicle.stock_number || 'N/A'}
+                    </div>
+                    {isGMGlobalOrder(vehicle) && !vehicle.vin && (
+                      <div className="text-xs text-slate-500">GM Global Order</div>
+                    )}
+                  </TableCell>
+                  
+                  <TableCell>
+                    {vehicle.price && (
+                      <div className="font-semibold text-slate-800">
+                        {formatPrice(vehicle.price)}
+                      </div>
+                    )}
+                    {vehicle.msrp && vehicle.msrp !== vehicle.price && (
+                      <div className="text-sm text-slate-500 line-through">
+                        MSRP: {formatPrice(vehicle.msrp)}
+                      </div>
+                    )}
+                  </TableCell>
+                  
+                  <TableCell>
+                    {isGMGlobalOrder(vehicle) && vehicle.status ? (
+                      <Badge className={getGMGlobalStatus(vehicle.status).color}>
+                        {getGMGlobalStatus(vehicle.status).label}
+                      </Badge>
+                    ) : vehicle.condition === 'new' && vehicle.status ? (
+                      <Badge className="bg-green-100 text-green-800">
+                        {vehicle.status}
+                      </Badge>
+                    ) : (
+                      <span className="text-slate-500">-</span>
+                    )}
+                    {vehicle.expected_sale_date && (
+                      <div className="text-xs text-slate-500 mt-1 flex items-center">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        ETA: {new Date(vehicle.expected_sale_date).toLocaleDateString()}
+                      </div>
+                    )}
+                  </TableCell>
+                  
+                  <TableCell>
+                    <div className="text-sm">
+                      {vehicle.days_in_inventory !== null ? (
+                        <div>{vehicle.days_in_inventory} days</div>
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
+                      {vehicle.leads_count > 0 && (
+                        <div className="text-blue-600">{vehicle.leads_count} leads</div>
+                      )}
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell>
+                    {vehicle.rpo_codes && vehicle.rpo_codes.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {vehicle.rpo_codes.slice(0, 3).map((code) => (
+                          <Badge key={code} variant="outline" className="text-xs">
+                            {code}
+                          </Badge>
+                        ))}
+                        {vehicle.rpo_codes.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{vehicle.rpo_codes.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
+                  
+                  <TableCell>
+                    <Link to={`/vehicle-detail/${vehicle.stock_number || vehicle.vin || vehicle.id}`}>
+                      <Button variant="outline" size="sm" className="flex items-center space-x-1">
+                        <Eye className="w-4 h-4" />
+                        <span>View</span>
+                      </Button>
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
 
-              {vehicle.price && (
-                <p className="text-lg font-semibold text-slate-800 mb-2">
-                  {formatPrice(vehicle.price)}
-                </p>
-              )}
-
-              {vehicle.rpo_codes && vehicle.rpo_codes.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {vehicle.rpo_codes.slice(0, 5).map((code) => (
-                    <Badge key={code} variant="outline" className="text-xs">
-                      {code}
-                    </Badge>
-                  ))}
-                  {vehicle.rpo_codes.length > 5 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{vehicle.rpo_codes.length - 5} more
-                    </Badge>
-                  )}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">
-                  {vehicle.days_in_inventory !== null && (
-                    <span>{vehicle.days_in_inventory} days in inventory</span>
-                  )}
-                  {vehicle.leads_count > 0 && (
-                    <span className="ml-3">{vehicle.leads_count} leads</span>
-                  )}
-                </div>
-                <Link to={`/vehicle-detail/${vehicle.stock_number || vehicle.vin || vehicle.id}`}>
-                  <Button variant="outline" size="sm" className="flex items-center space-x-1">
-                    <Eye className="w-4 h-4" />
-                    <span>View</span>
-                  </Button>
-                </Link>
-              </div>
-            </Card>
-          ))
+        {inventory && inventory.length === 0 && (
+          <div className="p-8 text-center">
+            <Car className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+            <p className="text-slate-600">No vehicles found matching your criteria</p>
+          </div>
         )}
-      </div>
-
-      {inventory && inventory.length === 0 && (
-        <Card className="p-8 text-center">
-          <Car className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-          <p className="text-slate-600">No vehicles found matching your criteria</p>
-        </Card>
-      )}
+      </Card>
     </div>
   );
 };
