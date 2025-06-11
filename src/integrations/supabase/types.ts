@@ -168,7 +168,7 @@ export type Database = {
           updated_at: string
           upload_history_id: string | null
           vehicle_history_report: string | null
-          vin: string
+          vin: string | null
           warranty_miles: number | null
           warranty_months: number | null
           warranty_type: string | null
@@ -246,7 +246,7 @@ export type Database = {
           updated_at?: string
           upload_history_id?: string | null
           vehicle_history_report?: string | null
-          vin: string
+          vin?: string | null
           warranty_miles?: number | null
           warranty_months?: number | null
           warranty_type?: string | null
@@ -324,7 +324,7 @@ export type Database = {
           updated_at?: string
           upload_history_id?: string | null
           vehicle_history_report?: string | null
-          vin?: string
+          vin?: string | null
           warranty_miles?: number | null
           warranty_months?: number | null
           warranty_type?: string | null
