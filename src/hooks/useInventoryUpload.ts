@@ -97,13 +97,23 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
             stock_number: inventoryItem.stock_number
           });
 
-          // Enhanced validation with detailed error messages
-          if (!inventoryItem.vin || inventoryItem.vin.length < 10) {
+          // Enhanced validation with special handling for GM Global orders
+          const isGmGlobal = condition === 'gm_global';
+          const hasValidVin = inventoryItem.vin && inventoryItem.vin.length >= 10;
+          const hasValidStockNumber = inventoryItem.stock_number && inventoryItem.stock_number.length > 0;
+
+          // For GM Global, allow records without VIN if they have a stock/order number
+          if (!hasValidVin && (!isGmGlobal || !hasValidStockNumber)) {
             const availableFields = Object.keys(row).filter(key => {
               const value = row[key];
               return value && String(value).trim().length >= 10 && /[A-Z0-9]/.test(String(value));
             });
-            errors.push(`Row ${i + 1}: Invalid or missing VIN "${inventoryItem.vin}" (VIN must be at least 10 characters). Potential VIN fields found: ${availableFields.join(', ') || 'none'}`);
+            
+            if (isGmGlobal) {
+              errors.push(`Row ${i + 1}: GM Global order missing both VIN and Order Number. Need at least one identifier. Available potential fields: ${availableFields.join(', ') || 'none'}`);
+            } else {
+              errors.push(`Row ${i + 1}: Invalid or missing VIN "${inventoryItem.vin}" (VIN must be at least 10 characters). Potential VIN fields found: ${availableFields.join(', ') || 'none'}`);
+            }
             errorCount++;
             continue;
           }
@@ -131,19 +141,28 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
             continue;
           }
 
+          // For GM Global orders without VIN, use stock_number as unique identifier
+          let upsertConfig;
+          if (isGmGlobal && !hasValidVin && hasValidStockNumber) {
+            // Use stock_number for conflict resolution
+            upsertConfig = { onConflict: 'stock_number' };
+            console.log(`Row ${i + 1}: Using stock_number "${inventoryItem.stock_number}" as identifier for GM Global order without VIN`);
+          } else {
+            // Standard VIN-based upsert
+            upsertConfig = { onConflict: 'vin' };
+          }
+
           // Upsert inventory item
           const { error } = await supabase
             .from('inventory')
-            .upsert(inventoryItem, {
-              onConflict: 'vin'
-            });
+            .upsert(inventoryItem, upsertConfig);
 
           if (error) {
-            errors.push(`Row ${i + 1}: Database error for VIN ${inventoryItem.vin}: ${error.message}`);
+            errors.push(`Row ${i + 1}: Database error for ${hasValidVin ? `VIN ${inventoryItem.vin}` : `Order ${inventoryItem.stock_number}`}: ${error.message}`);
             errorCount++;
           } else {
             successCount++;
-            console.log(`✓ Row ${i + 1} successfully imported: ${inventoryItem.make} ${inventoryItem.model}`);
+            console.log(`✓ Row ${i + 1} successfully imported: ${inventoryItem.make} ${inventoryItem.model} ${hasValidVin ? `(VIN: ${inventoryItem.vin})` : `(Order: ${inventoryItem.stock_number})`}`);
           }
         } catch (error) {
           console.error(`Error processing row ${i + 1}:`, error);
