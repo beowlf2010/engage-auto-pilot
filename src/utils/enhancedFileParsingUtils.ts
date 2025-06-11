@@ -6,7 +6,7 @@ export interface ParsedInventoryData {
   rows: any[];
   sample: Record<string, string>;
   fileType: 'csv' | 'excel';
-  formatType?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'unknown';
+  formatType?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'gm_global' | 'unknown';
 }
 
 export interface SheetInfo {
@@ -62,10 +62,18 @@ const getFileType = (file: File): 'csv' | 'excel' => {
   return 'csv';
 };
 
-const detectFormatType = (headers: string[]): 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'unknown' => {
+const detectFormatType = (headers: string[]): 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'gm_global' | 'unknown' => {
   const headerStr = headers.join('|').toLowerCase();
   
-  // Check for GM orders format
+  // Check for GM Global format (comprehensive GM identifiers)
+  if (headerStr.includes('gm config id') || 
+      headerStr.includes('order #') && headerStr.includes('division') ||
+      headerStr.includes('current event') && headerStr.includes('gm') ||
+      headerStr.includes('dealer code') && headerStr.includes('order status')) {
+    return 'gm_global';
+  }
+  
+  // Check for GM orders format (legacy detection)
   if (headerStr.includes('order #') && headerStr.includes('gm config id') && headerStr.includes('current event')) {
     return 'gm_orders';
   }
@@ -170,12 +178,13 @@ const parseCSVFileEnhanced = async (file: File): Promise<ParsedInventoryData> =>
   };
 };
 
-// Enhanced mapping function that handles GM/Vauto specific fields with comprehensive field matching
-export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new' | 'used' | 'certified', uploadHistoryId: string) => {
+// Enhanced mapping function that handles GM Global specific fields
+export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new' | 'used' | 'gm_global', uploadHistoryId: string) => {
   console.log('=== FIELD MAPPING DEBUG ===');
   console.log('Row data received:', row);
   console.log('Available column names:', Object.keys(row));
   console.log('Number of columns:', Object.keys(row).length);
+  console.log('Condition:', condition);
   
   // Enhanced field mapping with exact matches and comprehensive alternatives
   const getFieldValue = (possibleFields: string[]): string => {
@@ -209,7 +218,78 @@ export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new'
     return '';
   };
 
-  // Updated field mapping with your specific column names and common alternatives
+  // GM Global specific field mapping
+  if (condition === 'gm_global') {
+    const vinFields = [
+      'VIN', 'vin', 'Vin', 'Vehicle VIN', 'Unit VIN',
+      'VIN Number', 'Vehicle Identification Number'
+    ];
+    
+    const makeFields = [
+      'Division', 'Make', 'Brand', 'Manufacturer',
+      'GM Division', 'Vehicle Make', 'Auto Make'
+    ];
+    
+    const modelFields = [
+      'Model', 'Vehicle Model', 'Product',
+      'Model Name', 'Series Model', 'Product Name'
+    ];
+    
+    const yearFields = [
+      'Year', 'Model Year', 'MY', 'Vehicle Year',
+      'Model_Year', 'Yr'
+    ];
+    
+    const stockFields = [
+      'Order #', 'Order Number', 'Stock Number', 'Stock',
+      'Dealer Stock', 'Unit Number', 'Order ID'
+    ];
+
+    const vin = getFieldValue(vinFields);
+    const make = getFieldValue(makeFields);
+    const model = getFieldValue(modelFields);
+    const year = getFieldValue(yearFields);
+    const stockNumber = getFieldValue(stockFields);
+
+    console.log('=== GM GLOBAL MAPPED VALUES ===');
+    console.log('VIN:', vin);
+    console.log('Make:', make);
+    console.log('Model:', model);
+    console.log('Year:', year);
+    console.log('Stock Number:', stockNumber);
+    console.log('================================');
+
+    return {
+      vin: vin || '',
+      stock_number: stockNumber || undefined,
+      year: year ? parseInt(year) : undefined,
+      make: make || '',
+      model: model || '',
+      trim: getFieldValue(['Trim', 'Series', 'Level', 'Grade']) || undefined,
+      body_style: getFieldValue(['Body Style', 'Body', 'Style', 'Body Type']) || undefined,
+      color_exterior: getFieldValue(['Exterior Color', 'ExtColor', 'Color', 'Paint Code']) || undefined,
+      color_interior: getFieldValue(['Interior Color', 'IntColor', 'Interior', 'Trim Color']) || undefined,
+      engine: getFieldValue(['Engine', 'Engine Description', 'Motor', 'Engine Code']) || undefined,
+      transmission: getFieldValue(['Transmission', 'Trans', 'Transmission Type']) || undefined,
+      drivetrain: getFieldValue(['Drivetrain', 'Drive', 'DriveTrain', 'Drive Type']) || undefined,
+      fuel_type: getFieldValue(['Fuel Type', 'Fuel', 'Fuel System']) || undefined,
+      mileage: parseInt(getFieldValue(['Mileage', 'Odometer', 'Miles', 'Current Mileage'])) || undefined,
+      price: parseFloat(getFieldValue(['Price', 'MSRP', 'Selling Price', 'Retail Price'])) || undefined,
+      msrp: parseFloat(getFieldValue(['MSRP', 'Retail Price', 'List Price', 'Suggested Retail'])) || undefined,
+      invoice: parseFloat(getFieldValue(['Invoice', 'Invoice Price', 'Dealer Cost'])) || undefined,
+      condition: 'new', // GM Global orders are typically new vehicles
+      status: 'available',
+      source_report: 'gm_orders' as any,
+      full_option_blob: row,
+      first_seen_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+      upload_history_id: uploadHistoryId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  // Standard field mapping for regular uploads (existing logic)
   const vinFields = [
     'VIN', 'vin', 'Vin', 
     'Vehicle_VIN', 'VehicleVIN', 'Vehicle VIN',
@@ -292,6 +372,9 @@ export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new'
     console.log('Defaulting to GM for GM orders');
   }
 
+  // Map gm_global condition to database-compatible condition
+  const dbCondition = condition === 'gm_global' ? 'new' : condition;
+
   return {
     vin: vin || '',
     stock_number: stockNumber || undefined,
@@ -312,7 +395,7 @@ export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new'
     invoice: parseFloat(getFieldValue(['Invoice', 'invoice', 'INVOICE', 'InvoicePrice', 'Invoice_Price'])) || undefined,
     rebates: parseFloat(getFieldValue(['Rebates', 'rebates', 'REBATES', 'Incentives', 'incentives'])) || undefined,
     pack: parseFloat(getFieldValue(['Pack', 'pack', 'PACK', 'DealerPack', 'Dealer_Pack'])) || undefined,
-    condition,
+    condition: dbCondition,
     status: 'available',
     rpo_codes: rpoCodes.length > 0 ? rpoCodes : undefined,
     rpo_descriptions: undefined, // Will be populated later if available

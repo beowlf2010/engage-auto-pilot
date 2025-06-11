@@ -12,14 +12,14 @@ interface UseInventoryUploadProps {
 export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
-  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | 'certified'>('used');
+  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | 'gm_global'>('used');
   const [showHistory, setShowHistory] = useState(false);
   const [showSheetSelector, setShowSheetSelector] = useState(false);
   const [sheetsInfo, setSheetsInfo] = useState<SheetInfo[]>([]);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const { toast } = useToast();
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, condition: 'new' | 'used' | 'certified') => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, condition: 'new' | 'used' | 'gm_global') => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -59,15 +59,16 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     event.target.value = '';
   };
 
-  const processFile = async (file: File, condition: 'new' | 'used' | 'certified', selectedSheet?: string) => {
+  const processFile = async (file: File, condition: 'new' | 'used' | 'gm_global', selectedSheet?: string) => {
     setUploading(true);
     let uploadRecord: UploadHistoryRecord | null = null;
     
     try {
       console.log(`Processing ${file.name} as ${condition} inventory...`);
       
-      // Store the original file first
-      uploadRecord = await storeUploadedFile(file, userId, 'inventory', condition);
+      // Store the original file first - map gm_global to inventory type
+      const inventoryCondition = condition === 'gm_global' ? 'new' : condition;
+      uploadRecord = await storeUploadedFile(file, userId, 'inventory', inventoryCondition);
       console.log('File stored with ID:', uploadRecord.id);
       
       // Parse the file with enhanced parsing
@@ -86,7 +87,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         try {
           console.log(`\n=== Processing Row ${i + 1} ===`);
           
-          // Use enhanced mapping function
+          // Use enhanced mapping function with gm_global condition
           const inventoryItem = mapRowToInventoryItem(row, condition, uploadRecord.id);
           console.log(`Row ${i + 1} mapped result:`, { 
             vin: inventoryItem.vin, 
@@ -173,10 +174,11 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         status: errorCount === 0 ? 'success' : 'partial'
       });
 
+      const conditionLabel = condition === 'gm_global' ? 'GM Global' : condition;
       if (errorCount === 0) {
         toast({
           title: "Upload successful!",
-          description: `${successCount} ${condition} vehicles imported successfully`,
+          description: `${successCount} ${conditionLabel} vehicles imported successfully`,
         });
       } else if (successCount > 0) {
         toast({

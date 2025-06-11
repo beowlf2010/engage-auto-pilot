@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react";
 
 interface UploadButtonsProps {
-  onFileUpload: (event: React.ChangeEvent<HTMLInputElement>, condition: 'new' | 'used' | 'certified') => void;
+  onFileUpload: (event: React.ChangeEvent<HTMLInputElement>, condition: 'new' | 'used' | 'gm_global') => void;
   uploading: boolean;
-  selectedCondition: 'new' | 'used' | 'certified';
+  selectedCondition: 'new' | 'used' | 'gm_global';
 }
 
 const UploadButtons = ({ onFileUpload, uploading, selectedCondition }: UploadButtonsProps) => {
@@ -26,11 +26,11 @@ const UploadButtons = ({ onFileUpload, uploading, selectedCondition }: UploadBut
       color: 'bg-blue-500 hover:bg-blue-600'
     },
     {
-      condition: 'certified' as const,
-      label: 'Upload Certified Pre-Owned',
-      description: 'Manufacturer certified vehicles',
-      icon: '✅',
-      color: 'bg-purple-500 hover:bg-purple-600'
+      condition: 'gm_global' as const,
+      label: 'Upload GM Global Orders',
+      description: 'GM orders and configuration data',
+      icon: '🔧',
+      color: 'bg-orange-500 hover:bg-orange-600'
     }
   ];
 
