@@ -11,7 +11,8 @@ export const useConversations = () => {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
-  const channelsRef = useRef<any[]>([]);
+  const channelsRef = useRef<Set<string>>(new Set());
+  const currentLeadIdRef = useRef<string | null>(null);
 
   const loadConversations = async () => {
     if (!profile) return;
@@ -30,6 +31,7 @@ export const useConversations = () => {
     try {
       const messagesData = await fetchMessages(leadId);
       setMessages(messagesData);
+      currentLeadIdRef.current = leadId;
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -49,14 +51,18 @@ export const useConversations = () => {
 
   // Cleanup function to remove all channels
   const cleanupChannels = () => {
-    channelsRef.current.forEach(channel => {
+    console.log('Cleaning up channels:', Array.from(channelsRef.current));
+    channelsRef.current.forEach(channelName => {
       try {
-        supabase.removeChannel(channel);
+        const channel = supabase.getChannel(channelName);
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
       } catch (error) {
         console.error('Error removing channel:', error);
       }
     });
-    channelsRef.current = [];
+    channelsRef.current.clear();
   };
 
   // Single effect to handle all real-time subscriptions
@@ -66,9 +72,15 @@ export const useConversations = () => {
     // Cleanup any existing channels first
     cleanupChannels();
 
-    // Create a single channel for conversation updates
+    // Create unique channel names
+    const conversationChannelName = `conversation-updates-${profile.id}-${Date.now()}`;
+    const messageChannelName = currentLeadIdRef.current 
+      ? `messages-${currentLeadIdRef.current}-${Date.now()}`
+      : null;
+
+    // Create conversation updates channel
     const conversationChannel = supabase
-      .channel(`conversation-updates-${profile.id}-${Date.now()}`)
+      .channel(conversationChannelName)
       .on(
         'postgres_changes',
         {
@@ -92,66 +104,62 @@ export const useConversations = () => {
           console.log('Conversation updated, refreshing...');
           loadConversations();
         }
-      )
-      .subscribe();
+      );
 
-    // Store channel reference
-    channelsRef.current.push(conversationChannel);
+    // Subscribe to conversation channel
+    conversationChannel.subscribe((status) => {
+      console.log('Conversation channel status:', status);
+      if (status === 'SUBSCRIBED') {
+        channelsRef.current.add(conversationChannelName);
+      }
+    });
+
+    // Create message channel if we have a current lead
+    if (messageChannelName && currentLeadIdRef.current) {
+      const messageChannel = supabase
+        .channel(messageChannelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'conversations',
+            filter: `lead_id=eq.${currentLeadIdRef.current}`
+          },
+          () => {
+            console.log(`New message for lead ${currentLeadIdRef.current}, refreshing...`);
+            if (currentLeadIdRef.current) {
+              loadMessages(currentLeadIdRef.current);
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'conversations',
+            filter: `lead_id=eq.${currentLeadIdRef.current}`
+          },
+          () => {
+            console.log(`Message updated for lead ${currentLeadIdRef.current}, refreshing...`);
+            if (currentLeadIdRef.current) {
+              loadMessages(currentLeadIdRef.current);
+            }
+          }
+        );
+
+      // Subscribe to message channel
+      messageChannel.subscribe((status) => {
+        console.log('Message channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          channelsRef.current.add(messageChannelName);
+        }
+      });
+    }
 
     return cleanupChannels;
-  }, [profile]);
-
-  // Separate effect for current conversation messages
-  useEffect(() => {
-    if (!messages.length) return;
-
-    const currentLeadId = messages[0]?.leadId;
-    if (!currentLeadId) return;
-
-    // Create unique channel name with timestamp to avoid conflicts
-    const messageChannel = supabase
-      .channel(`messages-${currentLeadId}-${Date.now()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'conversations',
-          filter: `lead_id=eq.${currentLeadId}`
-        },
-        () => {
-          console.log(`New message for lead ${currentLeadId}, refreshing...`);
-          loadMessages(currentLeadId);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations',
-          filter: `lead_id=eq.${currentLeadId}`
-        },
-        () => {
-          console.log(`Message updated for lead ${currentLeadId}, refreshing...`);
-          loadMessages(currentLeadId);
-        }
-      )
-      .subscribe();
-
-    // Store channel reference
-    channelsRef.current.push(messageChannel);
-
-    return () => {
-      try {
-        supabase.removeChannel(messageChannel);
-        // Remove from ref array
-        channelsRef.current = channelsRef.current.filter(ch => ch !== messageChannel);
-      } catch (error) {
-        console.error('Error removing message channel:', error);
-      }
-    };
-  }, [messages]);
+  }, [profile, currentLeadIdRef.current]);
 
   useEffect(() => {
     if (profile) {

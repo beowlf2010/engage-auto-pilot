@@ -17,6 +17,7 @@ export const useRealtimeNotifications = () => {
   const { toast } = useToast();
   const notificationPermission = useRef<NotificationPermission>('default');
   const channelRef = useRef<any>(null);
+  const channelNameRef = useRef<string | null>(null);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -35,8 +36,9 @@ export const useRealtimeNotifications = () => {
     if (!profile) return;
 
     // Cleanup existing channel
-    if (channelRef.current) {
+    if (channelRef.current && channelNameRef.current) {
       try {
+        console.log('Removing existing notification channel:', channelNameRef.current);
         supabase.removeChannel(channelRef.current);
       } catch (error) {
         console.error('Error removing existing notification channel:', error);
@@ -44,8 +46,11 @@ export const useRealtimeNotifications = () => {
     }
 
     // Create new channel with unique name
+    const channelName = `incoming-messages-notifications-${profile.id}-${Date.now()}`;
+    channelNameRef.current = channelName;
+
     const channel = supabase
-      .channel(`incoming-messages-${profile.id}-${Date.now()}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -102,14 +107,20 @@ export const useRealtimeNotifications = () => {
             }
           }
         }
-      )
-      .subscribe();
+      );
 
-    channelRef.current = channel;
+    // Subscribe with status callback
+    channel.subscribe((status) => {
+      console.log('Notification channel status:', status, channelName);
+      if (status === 'SUBSCRIBED') {
+        channelRef.current = channel;
+      }
+    });
 
     return () => {
-      if (channelRef.current) {
+      if (channelRef.current && channelNameRef.current) {
         try {
+          console.log('Cleaning up notification channel:', channelNameRef.current);
           supabase.removeChannel(channelRef.current);
         } catch (error) {
           console.error('Error removing notification channel:', error);
