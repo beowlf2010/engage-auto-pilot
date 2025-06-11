@@ -62,12 +62,16 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
     }).format(value);
   };
 
+  const fiProfit = (metrics?.total_profit_mtd || 0) - (metrics?.new_gross_mtd || 0) - (metrics?.used_gross_mtd || 0);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">New Gross – MTD</CardTitle>
-          <DollarSign className="h-4 w-4 text-green-600" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center justify-between">
+            New Gross – MTD
+            <DollarSign className="h-4 w-4 text-green-600" />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-green-600">
@@ -80,16 +84,18 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">
-            Used Gross – MTD
-            {packAdjustment > 0 && (
-              <span className="text-xs text-orange-600 ml-1">
-                (Adj: ${packAdjustment})
-              </span>
-            )}
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center justify-between">
+            <div>
+              Used Gross – MTD
+              {packAdjustment > 0 && (
+                <div className="text-xs text-green-600 font-normal">
+                  (Pack Adj: +${packAdjustment}/unit)
+                </div>
+              )}
+            </div>
+            <TrendingUp className="h-4 w-4 text-blue-600" />
           </CardTitle>
-          <TrendingUp className="h-4 w-4 text-blue-600" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-blue-600">
@@ -102,13 +108,15 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">F&I Profit – MTD</CardTitle>
-          <Banknote className="h-4 w-4 text-purple-600" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center justify-between">
+            F&I Profit – MTD
+            <Banknote className="h-4 w-4 text-purple-600" />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-purple-600">
-            {formatCurrency((metrics?.total_profit_mtd || 0) - (metrics?.new_gross_mtd || 0) - (metrics?.used_gross_mtd || 0))}
+            {formatCurrency(fiProfit)}
           </div>
           <CardDescription>
             Finance & Insurance profits
@@ -117,9 +125,11 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Retail Units – MTD</CardTitle>
-          <Car className="h-4 w-4 text-indigo-600" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center justify-between">
+            Retail Units – MTD
+            <Car className="h-4 w-4 text-indigo-600" />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-indigo-600">
