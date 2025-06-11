@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Download } from "lucide-react";
+import { Search, Filter, Download, TrendingUp, TrendingDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getDeals, updateDealType } from "@/utils/financialDataOperations";
+import { updateDealType } from "@/utils/financialDataOperations";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Deal {
   id: string;
@@ -20,6 +21,10 @@ interface Deal {
   fi_profit?: number;
   total_profit?: number;
   deal_type?: string;
+  original_gross_profit?: number;
+  original_fi_profit?: number;
+  original_total_profit?: number;
+  first_reported_date?: string;
 }
 
 interface DealManagementProps {
@@ -35,6 +40,7 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const [showProfitChanges, setShowProfitChanges] = useState(false);
   const { toast } = useToast();
 
   // Check permissions
@@ -56,8 +62,14 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
   const fetchDeals = async () => {
     try {
       setLoading(true);
-      const data = await getDeals(500); // Get more deals for management
-      setDeals(data);
+      const { data, error } = await supabase
+        .from('deals')
+        .select('*')
+        .order('upload_date', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+      setDeals(data || []);
     } catch (error) {
       console.error('Error fetching deals:', error);
       toast({
@@ -74,7 +86,6 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     try {
       await updateDealType(dealId, newType);
       
-      // Update local state
       setDeals(prevDeals => 
         prevDeals.map(deal => 
           deal.id === dealId ? { ...deal, deal_type: newType } : deal
@@ -95,6 +106,17 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
     }
   };
 
+  const hasProfit Changes = (deal: Deal) => {
+    return deal.original_gross_profit !== undefined && 
+           (deal.gross_profit !== deal.original_gross_profit || 
+            deal.fi_profit !== deal.original_fi_profit);
+  };
+
+  const getProfitChange = (current?: number, original?: number) => {
+    if (current === undefined || original === undefined) return 0;
+    return current - original;
+  };
+
   const filteredDeals = deals.filter(deal => {
     const matchesSearch = !searchTerm || 
       deal.stock_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -102,8 +124,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
       deal.year_model?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filterType === "all" || deal.deal_type === filterType;
+    const matchesProfitFilter = !showProfitChanges || hasProfitChanges(deal);
     
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesFilter && matchesProfitFilter;
   });
 
   const formatCurrency = (value?: number) => {
@@ -118,7 +141,6 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
 
   const getAdjustedGrossProfit = (deal: Deal) => {
     const baseGross = deal.gross_profit || 0;
-    // Apply pack adjustment to used cars (stock numbers starting with B or X)
     const isUsedCar = deal.stock_number && (deal.stock_number.toUpperCase().startsWith('B') || deal.stock_number.toUpperCase().startsWith('X'));
     return isUsedCar ? baseGross - packAdjustment : baseGross;
   };
@@ -130,6 +152,27 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
       case 'wholesale': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const renderProfitChangeIndicator = (deal: Deal) => {
+    if (!hasProfitChanges(deal)) return null;
+    
+    const grossChange = getProfitChange(deal.gross_profit, deal.original_gross_profit);
+    const fiChange = getProfitChange(deal.fi_profit, deal.original_fi_profit);
+    const totalChange = grossChange + fiChange;
+    
+    return (
+      <div className="flex items-center space-x-1">
+        {totalChange > 0 ? (
+          <TrendingUp className="w-4 h-4 text-green-600" />
+        ) : (
+          <TrendingDown className="w-4 h-4 text-red-600" />
+        )}
+        <span className={`text-xs ${totalChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
+          {totalChange > 0 ? '+' : ''}{formatCurrency(totalChange)}
+        </span>
+      </div>
+    );
   };
 
   if (loading) {
@@ -181,6 +224,18 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="profit-changes"
+                checked={showProfitChanges}
+                onChange={(e) => setShowProfitChanges(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="profit-changes" className="text-sm font-medium">
+                Show Profit Changes Only
+              </label>
+            </div>
             <Button variant="outline" size="sm" className="flex items-center space-x-2">
               <Download className="w-4 h-4" />
               <span>Export</span>
@@ -198,7 +253,9 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
                   <th className="text-left p-3 font-medium text-gray-600">Customer</th>
                   <th className="text-right p-3 font-medium text-gray-600">Sale Amount</th>
                   <th className="text-right p-3 font-medium text-gray-600">Gross Profit</th>
-                  <th className="text-right p-3 font-medium text-gray-600">F&I</th>
+                  <th className="text-right p-3 font-medium text-gray-600">F&I Profit</th>
+                  <th className="text-right p-3 font-medium text-gray-600">Total Profit</th>
+                  <th className="text-center p-3 font-medium text-gray-600">Changes</th>
                   <th className="text-center p-3 font-medium text-gray-600">Deal Type</th>
                   <th className="text-center p-3 font-medium text-gray-600">Actions</th>
                 </tr>
@@ -229,10 +286,28 @@ const DealManagement = ({ user, packAdjustment = 0 }: DealManagementProps) => {
                             (Adj: -${packAdjustment})
                           </div>
                         )}
+                        {deal.original_gross_profit && deal.gross_profit !== deal.original_gross_profit && (
+                          <div className="text-xs text-gray-500">
+                            Was: {formatCurrency(deal.original_gross_profit)}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-3 text-sm text-right">
-                      {formatCurrency(deal.fi_profit)}
+                      <div>
+                        {formatCurrency(deal.fi_profit)}
+                        {deal.original_fi_profit && deal.fi_profit !== deal.original_fi_profit && (
+                          <div className="text-xs text-gray-500">
+                            Was: {formatCurrency(deal.original_fi_profit)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 text-sm text-right">
+                      {formatCurrency(deal.total_profit)}
+                    </td>
+                    <td className="p-3 text-center">
+                      {renderProfitChangeIndicator(deal)}
                     </td>
                     <td className="p-3 text-center">
                       <Badge className={getDealTypeBadgeColor(deal.deal_type)}>

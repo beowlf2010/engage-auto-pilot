@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, DollarSign, Car } from "lucide-react";
+import { TrendingUp, DollarSign, Car, Banknote } from "lucide-react";
 import { getMonthlyRetailSummary } from "@/utils/financialDataOperations";
 
 interface MetricsData {
@@ -38,8 +38,8 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[1, 2, 3].map((i) => (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
           <Card key={i}>
             <CardContent className="p-6">
               <div className="animate-pulse">
@@ -63,7 +63,7 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">New Gross – MTD</CardTitle>
@@ -103,11 +103,26 @@ const FinancialMetrics = ({ packAdjustment = 0 }: FinancialMetricsProps) => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Retail Units – MTD</CardTitle>
-          <Car className="h-4 w-4 text-purple-600" />
+          <CardTitle className="text-sm font-medium">F&I Profit – MTD</CardTitle>
+          <Banknote className="h-4 w-4 text-purple-600" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-purple-600">
+            {formatCurrency((metrics?.total_profit_mtd || 0) - (metrics?.new_gross_mtd || 0) - (metrics?.used_gross_mtd || 0))}
+          </div>
+          <CardDescription>
+            Finance & Insurance profits
+          </CardDescription>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Retail Units – MTD</CardTitle>
+          <Car className="h-4 w-4 text-indigo-600" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-indigo-600">
             {metrics?.total_units_mtd || 0}
           </div>
           <CardDescription>

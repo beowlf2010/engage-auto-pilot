@@ -10,8 +10,11 @@ interface UploadResult {
     totalUnits: number;
     totalGross: number;
     totalFiProfit: number;
+    totalProfit: number;
     newUnits: number;
     usedUnits: number;
+    newGross: number;
+    usedGross: number;
   };
 }
 
@@ -20,6 +23,16 @@ interface UploadResultProps {
 }
 
 const UploadResultComponent = ({ uploadResult }: UploadResultProps) => {
+  const formatCurrency = (value?: number) => {
+    if (!value) return "$0";
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
   return (
     <Card className={uploadResult.status === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
       <CardContent className="pt-6">
@@ -34,11 +47,19 @@ const UploadResultComponent = ({ uploadResult }: UploadResultProps) => {
               {uploadResult.message}
             </p>
             {uploadResult.summary && (
-              <div className="mt-2 text-sm text-green-700">
-                <p>Total Units: {uploadResult.summary.totalUnits}</p>
-                <p>Total Gross: ${uploadResult.summary.totalGross?.toLocaleString()}</p>
-                <p>F&I Profit: ${uploadResult.summary.totalFiProfit?.toLocaleString()}</p>
-                <p>New/Used: {uploadResult.summary.newUnits}/{uploadResult.summary.usedUnits}</p>
+              <div className="mt-3 grid grid-cols-2 gap-4 text-sm text-green-700">
+                <div>
+                  <p className="font-medium">Unit Summary:</p>
+                  <p>Total Units: {uploadResult.summary.totalUnits}</p>
+                  <p>New Units: {uploadResult.summary.newUnits}</p>
+                  <p>Used Units: {uploadResult.summary.usedUnits}</p>
+                </div>
+                <div>
+                  <p className="font-medium">Profit Summary:</p>
+                  <p>Total Gross: {formatCurrency(uploadResult.summary.totalGross)}</p>
+                  <p>F&I Profit: {formatCurrency(uploadResult.summary.totalFiProfit)}</p>
+                  <p>Total Profit: {formatCurrency(uploadResult.summary.totalProfit)}</p>
+                </div>
               </div>
             )}
           </div>

@@ -230,8 +230,12 @@ export type Database = {
           created_at: string
           deal_type: string | null
           fi_profit: number | null
+          first_reported_date: string | null
           gross_profit: number | null
           id: string
+          original_fi_profit: number | null
+          original_gross_profit: number | null
+          original_total_profit: number | null
           sale_amount: number | null
           stock_number: string | null
           total_profit: number | null
@@ -247,8 +251,12 @@ export type Database = {
           created_at?: string
           deal_type?: string | null
           fi_profit?: number | null
+          first_reported_date?: string | null
           gross_profit?: number | null
           id?: string
+          original_fi_profit?: number | null
+          original_gross_profit?: number | null
+          original_total_profit?: number | null
           sale_amount?: number | null
           stock_number?: string | null
           total_profit?: number | null
@@ -264,8 +272,12 @@ export type Database = {
           created_at?: string
           deal_type?: string | null
           fi_profit?: number | null
+          first_reported_date?: string | null
           gross_profit?: number | null
           id?: string
+          original_fi_profit?: number | null
+          original_gross_profit?: number | null
+          original_total_profit?: number | null
           sale_amount?: number | null
           stock_number?: string | null
           total_profit?: number | null

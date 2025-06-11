@@ -11,25 +11,61 @@ export const insertFinancialData = async (
   console.log('=== INSERTING FINANCIAL DATA ===');
   
   try {
-    // Insert individual deals with 'retail' as default deal type
-    const dealsToInsert = deals.map(deal => ({
-      upload_date: uploadDate,
-      stock_number: deal.stockNumber,
-      age: deal.age,
-      year_model: deal.yearModel,
-      buyer_name: deal.buyerName,
-      sale_amount: deal.saleAmount,
-      cost_amount: deal.costAmount,
-      gross_profit: deal.grossProfit,
-      fi_profit: deal.fiProfit,
-      total_profit: deal.totalProfit,
-      deal_type: 'retail', // Default all uploads to retail
-      upload_history_id: uploadHistoryId
-    }));
+    // First, check for existing deals this month to handle profit change tracking
+    const existingDealsMap = new Map();
+    if (deals.length > 0) {
+      const stockNumbers = deals.map(deal => deal.stockNumber).filter(Boolean);
+      if (stockNumbers.length > 0) {
+        const { data: existingDeals } = await supabase
+          .from('deals')
+          .select('stock_number, original_gross_profit, original_fi_profit, original_total_profit, first_reported_date')
+          .in('stock_number', stockNumbers)
+          .gte('upload_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+        
+        if (existingDeals) {
+          existingDeals.forEach(deal => {
+            existingDealsMap.set(deal.stock_number, deal);
+          });
+        }
+      }
+    }
+
+    // Prepare deals for insertion with proper deal classification and profit tracking
+    const dealsToInsert = deals.map(deal => {
+      const existingDeal = existingDealsMap.get(deal.stockNumber);
+      const isNewDeal = !existingDeal;
+      
+      // Map the parsed deal type (new/used from DMS) to database deal_type (retail as default)
+      // All deals default to 'retail' unless manually changed later
+      const dealType = 'retail';
+      
+      return {
+        upload_date: uploadDate,
+        stock_number: deal.stockNumber,
+        age: deal.age,
+        year_model: deal.yearModel,
+        buyer_name: deal.buyerName,
+        sale_amount: deal.saleAmount,
+        cost_amount: deal.costAmount,
+        gross_profit: deal.grossProfit,
+        fi_profit: deal.fiProfit,
+        total_profit: deal.totalProfit,
+        deal_type: dealType,
+        upload_history_id: uploadHistoryId,
+        // Profit change tracking: set original values only for new deals
+        original_gross_profit: isNewDeal ? deal.grossProfit : existingDeal.original_gross_profit,
+        original_fi_profit: isNewDeal ? deal.fiProfit : existingDeal.original_fi_profit,
+        original_total_profit: isNewDeal ? deal.totalProfit : existingDeal.original_total_profit,
+        first_reported_date: isNewDeal ? uploadDate : existingDeal.first_reported_date
+      };
+    });
 
     const { data: insertedDeals, error: dealsError } = await supabase
       .from('deals')
-      .insert(dealsToInsert)
+      .upsert(dealsToInsert, { 
+        onConflict: 'stock_number,upload_date',
+        ignoreDuplicates: false 
+      })
       .select();
 
     if (dealsError) {
@@ -37,9 +73,9 @@ export const insertFinancialData = async (
       throw dealsError;
     }
 
-    console.log(`Inserted ${insertedDeals?.length} deals`);
+    console.log(`Processed ${insertedDeals?.length} deals`);
 
-    // Upsert profit snapshot using the new expanded function
+    // Upsert profit snapshot using the expanded function
     const { data: snapshotId, error: snapshotError } = await supabase
       .rpc('upsert_expanded_profit_snapshot', {
         p_date: uploadDate,
