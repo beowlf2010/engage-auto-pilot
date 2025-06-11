@@ -9,6 +9,9 @@ export interface ConversationData {
   lastMessageTime: string;
   status: string;
   salespersonId: string;
+  salespersonName?: string;
+  aiOptIn?: boolean;
+  lastMessageDate?: Date;
 }
 
 export interface MessageData {

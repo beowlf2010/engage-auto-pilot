@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Car, Plus } from "lucide-react";
+import { MessageSquare, Car, Plus, Brain, User } from "lucide-react";
 
 interface Conversation {
   leadId: string;
@@ -13,6 +13,8 @@ interface Conversation {
   lastMessageTime: string;
   status: string;
   salespersonId: string;
+  salespersonName?: string;
+  aiOptIn?: boolean;
 }
 
 interface ConversationsListProps {
@@ -39,7 +41,7 @@ const ConversationsList = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="space-y-1">
+          <div className="space-y-1 max-h-[calc(100vh-12rem)] overflow-y-auto">
             {conversations.map((conv) => (
               <div
                 key={conv.leadId}
@@ -50,30 +52,47 @@ const ConversationsList = ({
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 mb-1">
                       <h4 className="font-medium text-slate-800">{conv.leadName}</h4>
                       {conv.unreadCount > 0 && (
                         <Badge variant="destructive" className="text-xs">
                           {conv.unreadCount}
                         </Badge>
                       )}
+                      {conv.aiOptIn && (
+                        <Badge variant="outline" className="text-xs flex items-center space-x-1 bg-purple-50 text-purple-700">
+                          <Brain className="w-3 h-3" />
+                          <span>Finn</span>
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center space-x-1 text-xs text-slate-500 mb-1">
+                      <Car className="w-3 h-3" />
+                      <span>{conv.vehicleInterest}</span>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2 mb-2">
+                      {!conv.salespersonId ? (
+                        <Badge variant="outline" className="text-xs flex items-center space-x-1">
+                          <Plus className="w-3 h-3" />
+                          <span>Unassigned</span>
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs flex items-center space-x-1">
+                          <User className="w-3 h-3" />
+                          <span>{conv.salespersonName || 'Assigned'}</span>
+                        </Badge>
+                      )}
+                      
                       {!canReply(conv) && (
                         <Badge variant="secondary" className="text-xs">
                           View-only
                         </Badge>
                       )}
-                      {!conv.salespersonId && (
-                        <Badge variant="outline" className="text-xs flex items-center space-x-1">
-                          <Plus className="w-3 h-3" />
-                          <span>Unassigned</span>
-                        </Badge>
-                      )}
                     </div>
-                    <div className="flex items-center space-x-1 text-xs text-slate-500 mt-1">
-                      <Car className="w-3 h-3" />
-                      <span>{conv.vehicleInterest}</span>
-                    </div>
-                    <p className="text-sm text-slate-600 mt-2 truncate">
+                    
+                    <p className="text-sm text-slate-600 truncate">
                       {conv.lastMessage}
                     </p>
                   </div>

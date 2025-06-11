@@ -6,7 +6,7 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
   if (!profile) return [];
 
   try {
-    // Get all leads with their basic info and phone numbers
+    // Get all leads with their basic info, phone numbers, and AI opt-in status
     const { data: leadsData, error: leadsError } = await supabase
       .from('leads')
       .select(`
@@ -16,9 +16,14 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
         vehicle_interest,
         status,
         salesperson_id,
+        ai_opt_in,
         phone_numbers (
           number,
           is_primary
+        ),
+        profiles (
+          first_name,
+          last_name
         )
       `)
       .order('created_at', { ascending: false });
@@ -36,9 +41,11 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
     // Group conversations by lead and calculate unread counts
     const conversationMap = new Map();
     const unreadCountMap = new Map();
+    const leadIdsWithMessages = new Set();
 
     conversationsData?.forEach(conv => {
       const leadId = conv.lead_id;
+      leadIdsWithMessages.add(leadId);
       
       // Track latest conversation
       if (!conversationMap.has(leadId) || 
@@ -53,8 +60,13 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
       }
     });
 
+    // Filter leads to only include those with actual conversations
+    const leadsWithConversations = leadsData?.filter(lead => 
+      leadIdsWithMessages.has(lead.id)
+    ) || [];
+
     // Transform leads data to include conversation info
-    const transformedConversations = leadsData?.map(lead => {
+    const transformedConversations = leadsWithConversations.map(lead => {
       const latestConv = conversationMap.get(lead.id);
       const unreadCount = unreadCountMap.get(lead.id) || 0;
       
@@ -68,9 +80,22 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
         lastMessage: latestConv?.body || 'No messages yet',
         lastMessageTime: latestConv ? new Date(latestConv.sent_at).toLocaleTimeString() : '',
         status: lead.status,
-        salespersonId: lead.salesperson_id
+        salespersonId: lead.salesperson_id,
+        salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : null,
+        aiOptIn: lead.ai_opt_in || false,
+        lastMessageDate: latestConv ? new Date(latestConv.sent_at) : new Date(0)
       };
-    }) || [];
+    });
+
+    // Sort conversations: unread first, then by last message time
+    transformedConversations.sort((a, b) => {
+      // Prioritize unread messages
+      if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+      if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+      
+      // Then sort by last message time (newest first)
+      return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
+    });
 
     return transformedConversations;
   } catch (error) {

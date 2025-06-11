@@ -16,6 +16,7 @@ interface Conversation {
   vehicleInterest: string;
   status: string;
   salespersonId: string;
+  salespersonName?: string;
   aiOptIn?: boolean;
 }
 
@@ -48,6 +49,12 @@ const ChatView = ({
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [togglingAI, setTogglingAI] = useState(false);
+  const [localAiOptIn, setLocalAiOptIn] = useState(selectedConversation?.aiOptIn || false);
+
+  // Update local state when conversation changes
+  useState(() => {
+    setLocalAiOptIn(selectedConversation?.aiOptIn || false);
+  }, [selectedConversation?.aiOptIn]);
 
   const handleSendMessage = async () => {
     if (newMessage.trim() && selectedConversation && canReply(selectedConversation)) {
@@ -66,13 +73,10 @@ const ChatView = ({
     
     setTogglingAI(true);
     
-    const result = await toggleFinnAI(selectedConversation.leadId, selectedConversation.aiOptIn || false);
+    const result = await toggleFinnAI(selectedConversation.leadId, localAiOptIn);
     
     if (result.success) {
-      // Update the conversation object locally
-      if (selectedConversation) {
-        selectedConversation.aiOptIn = result.newState;
-      }
+      setLocalAiOptIn(result.newState);
     }
     
     setTogglingAI(false);
@@ -118,6 +122,11 @@ const ChatView = ({
                   <span>{selectedConversation.vehicleInterest}</span>
                 </span>
               </div>
+              {selectedConversation.salespersonName && (
+                <div className="text-xs text-slate-500 mt-1">
+                  Assigned to: {selectedConversation.salespersonName}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -139,7 +148,7 @@ const ChatView = ({
               Finn's Memory
             </Button>
             <Button 
-              variant={selectedConversation.aiOptIn ? "destructive" : "outline"} 
+              variant={localAiOptIn ? "destructive" : "outline"} 
               size="sm"
               onClick={handleFinnAIToggle}
               disabled={!userCanReply || togglingAI}
@@ -149,7 +158,7 @@ const ChatView = ({
               ) : (
                 <>
                   <Brain className="w-4 h-4 mr-1" />
-                  {selectedConversation.aiOptIn ? "Disable" : "Enable"} Finn
+                  {localAiOptIn ? "Disable" : "Enable"} Finn
                 </>
               )}
             </Button>
@@ -216,7 +225,7 @@ const ChatView = ({
           <div className="text-center py-4 text-slate-500">
             <User className="w-6 h-6 mx-auto mb-2" />
             <p>You can only view this conversation</p>
-            <p className="text-sm mt-1">This lead is assigned to another salesperson</p>
+            <p className="text-sm mt-1">This lead is assigned to {selectedConversation.salespersonName || 'another salesperson'}</p>
           </div>
         )}
       </div>
