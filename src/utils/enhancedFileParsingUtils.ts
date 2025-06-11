@@ -376,8 +376,8 @@ export const mapRowToInventoryItem = (
     console.log('Defaulting to GM for GM orders');
   }
 
-  // Map condition to database-compatible condition (remove gm_global comparison)
-  const dbCondition = condition === 'new' ? 'new' : 'used';
+  // Map condition to database-compatible condition - handle gm_global properly
+  const dbCondition = (condition === 'new' || condition === 'gm_global') ? 'new' : 'used';
 
   return {
     vin: vin || '',
