@@ -67,7 +67,7 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
       const { deals, summary, fileName } = await parseFinancialFile(file);
 
       if (deals.length === 0) {
-        throw new Error('No valid deals found in the file. Please check that you uploaded a DMS Sales Analysis Detail report.');
+        throw new Error('No valid deals found in the file. Please check that you uploaded a DMS Sales Analysis Detail report with the correct format (Date, Age, Stock, Vin6, Vehicle, Trade, SLP, Customer, Gross, FI, Total).');
       }
 
       console.log(`Parsed ${deals.length} deals successfully`);
@@ -207,21 +207,24 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
           <CardContent>
             <div className="space-y-3 text-sm text-slate-600">
               <div>
-                <p className="font-medium text-slate-700 mb-1">Required Columns:</p>
+                <p className="font-medium text-slate-700 mb-1">Required Columns (in this exact order):</p>
                 <ul className="space-y-1 ml-4">
-                  <li>• Age (days in inventory)</li>
-                  <li>• Stock # (stock number)</li>
-                  <li>• Yr Model (year/model)</li>
-                  <li>• Buyer (customer name)</li>
-                  <li>• Sale (sale amount)</li>
-                  <li>• Cost (cost amount)</li>
-                  <li>• Gross (gross profit)</li>
-                  <li>• F&I (finance profit)</li>
+                  <li>• <strong>Date</strong> - Transaction date</li>
+                  <li>• <strong>Age</strong> - Days in inventory</li>
+                  <li>• <strong>Stock</strong> - Stock number</li>
+                  <li>• <strong>Vin6</strong> - Last 6 digits of VIN</li>
+                  <li>• <strong>Vehicle</strong> - Year/make/model</li>
+                  <li>• <strong>Trade</strong> - Trade-in value</li>
+                  <li>• <strong>SLP</strong> - Sale price</li>
+                  <li>• <strong>Customer</strong> - Buyer name</li>
+                  <li>• <strong>Gross</strong> - Gross profit</li>
+                  <li>• <strong>FI</strong> - Finance profit</li>
+                  <li>• <strong>Total</strong> - Total profit</li>
                 </ul>
               </div>
               <div className="pt-2 border-t">
                 <p className="text-xs text-slate-500">
-                  Upload your DMS Sales Analysis Detail report exactly as exported from your DMS system.
+                  Upload your DMS Sales Analysis Detail report exactly as exported from your DMS system with these column headers.
                 </p>
               </div>
             </div>

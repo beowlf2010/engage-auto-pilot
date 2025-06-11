@@ -12,6 +12,10 @@ export interface DealRecord {
   fiProfit?: number;
   totalProfit?: number;
   dealType?: 'new' | 'used';
+  vin?: string;
+  vehicle?: string;
+  tradeValue?: number;
+  saleDate?: string;
 }
 
 export interface FinancialSummary {
@@ -27,15 +31,17 @@ export interface FinancialSummary {
 }
 
 interface DmsColumns {
+  date?: string;
   age?: string;
   stockNumber?: string;
-  yearModel?: string;
-  buyerName?: string;
-  saleAmount?: string;
-  costAmount?: string;
-  grossProfit?: string;
-  fiProfit?: string;
-  totalProfit?: string;
+  vin6?: string;
+  vehicle?: string;
+  trade?: string;
+  slp?: string; // SLP instead of Sale
+  customer?: string;
+  gross?: string;
+  fi?: string;
+  total?: string;
 }
 
 export const parseDmsFile = async (file: File) => {
@@ -52,7 +58,7 @@ export const parseDmsFile = async (file: File) => {
     console.log('Column mapping:', columnMapping);
     
     if (!columnMapping) {
-      throw new Error('Could not detect DMS Sales Analysis Detail format. Please ensure you are uploading the correct DMS report.');
+      throw new Error('Could not detect DMS Sales Analysis Detail format. Please ensure you are uploading the correct DMS report with columns: Date, Age, Stock, Vin6, Vehicle, Trade, SLP, Customer, Gross, FI, Total');
     }
     
     // Extract deal records
@@ -60,7 +66,7 @@ export const parseDmsFile = async (file: File) => {
     console.log(`Extracted ${deals.length} deals`);
     
     if (deals.length === 0) {
-      throw new Error('No valid deals found in the file. Please check that the report contains transaction data.');
+      throw new Error('No valid deals found in the file. Please check that the report contains transaction data with the expected columns.');
     }
     
     // Calculate summary
@@ -104,44 +110,47 @@ const parseExcelFile = async (file: File): Promise<any[]> => {
 };
 
 const detectDmsColumns = (data: any[]): DmsColumns | null => {
-  // Look for header row with DMS column names
+  // Look for header row with your specific DMS column names
   for (let i = 0; i < Math.min(10, data.length); i++) {
     const row = data[i];
     if (!Array.isArray(row)) continue;
     
     const columns: DmsColumns = {};
-    const rowStr = row.map(cell => String(cell || '').toLowerCase().trim());
     
-    // Look for common DMS column patterns
-    for (let j = 0; j < rowStr.length; j++) {
-      const cell = rowStr[j];
+    // Look for exact matches with your column headers
+    for (let j = 0; j < row.length; j++) {
+      const cell = String(row[j] || '').trim();
       
-      if (cell.includes('age') || cell.includes('days')) {
-        columns.age = String(row[j]);
-      } else if (cell.includes('stock') && (cell.includes('#') || cell.includes('number'))) {
-        columns.stockNumber = String(row[j]);
-      } else if (cell.includes('yr') && cell.includes('model') || cell.includes('year')) {
-        columns.yearModel = String(row[j]);
-      } else if (cell.includes('buyer') || cell.includes('customer')) {
-        columns.buyerName = String(row[j]);
-      } else if (cell.includes('sale') && !cell.includes('person')) {
-        columns.saleAmount = String(row[j]);
-      } else if (cell.includes('cost') || cell.includes('invoice')) {
-        columns.costAmount = String(row[j]);
-      } else if (cell.includes('gross') && !cell.includes('total')) {
-        columns.grossProfit = String(row[j]);
-      } else if (cell.includes('f&i') || cell.includes('fi') || cell.includes('finance')) {
-        columns.fiProfit = String(row[j]);
-      } else if (cell.includes('total') && (cell.includes('profit') || cell.includes('gross'))) {
-        columns.totalProfit = String(row[j]);
+      if (cell === 'Date') {
+        columns.date = cell;
+      } else if (cell === 'Age') {
+        columns.age = cell;
+      } else if (cell === 'Stock') {
+        columns.stockNumber = cell;
+      } else if (cell === 'Vin6') {
+        columns.vin6 = cell;
+      } else if (cell === 'Vehicle') {
+        columns.vehicle = cell;
+      } else if (cell === 'Trade') {
+        columns.trade = cell;
+      } else if (cell === 'SLP') {
+        columns.slp = cell;
+      } else if (cell === 'Customer') {
+        columns.customer = cell;
+      } else if (cell === 'Gross') {
+        columns.gross = cell;
+      } else if (cell === 'FI') {
+        columns.fi = cell;
+      } else if (cell === 'Total') {
+        columns.total = cell;
       }
     }
     
-    // Check if we found enough columns to proceed
+    // Check if we found the core required columns
     const foundColumns = Object.keys(columns).length;
     console.log(`Row ${i}: Found ${foundColumns} DMS columns`);
     
-    if (foundColumns >= 4) { // Need at least 4 key columns
+    if (foundColumns >= 6) { // Need at least 6 core columns
       console.log('DMS format detected at row', i);
       return columns;
     }
@@ -152,13 +161,36 @@ const detectDmsColumns = (data: any[]): DmsColumns | null => {
 
 const extractDealsFromData = (data: any[], columnMapping: DmsColumns): DealRecord[] => {
   const deals: DealRecord[] = [];
-  const headers = data[0];
+  
+  // Find the header row index
+  let headerRowIndex = -1;
+  for (let i = 0; i < Math.min(10, data.length); i++) {
+    const row = data[i];
+    if (Array.isArray(row)) {
+      const hasDate = row.some(cell => String(cell || '') === 'Date');
+      const hasAge = row.some(cell => String(cell || '') === 'Age');
+      const hasStock = row.some(cell => String(cell || '') === 'Stock');
+      
+      if (hasDate && hasAge && hasStock) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+  }
+  
+  if (headerRowIndex === -1) {
+    console.error('Could not find header row');
+    return deals;
+  }
+  
+  const headers = data[headerRowIndex];
+  console.log('Headers found at row', headerRowIndex, ':', headers);
   
   // Find the column indices
   const columnIndices: Record<string, number> = {};
   for (const [key, columnName] of Object.entries(columnMapping)) {
     if (columnName) {
-      const index = headers.findIndex((h: any) => String(h || '') === columnName);
+      const index = headers.findIndex((h: any) => String(h || '').trim() === columnName);
       if (index !== -1) {
         columnIndices[key] = index;
       }
@@ -167,14 +199,14 @@ const extractDealsFromData = (data: any[], columnMapping: DmsColumns): DealRecor
   
   console.log('Column indices:', columnIndices);
   
-  // Process data rows (skip header rows)
-  for (let i = 1; i < data.length; i++) {
+  // Process data rows (skip header row and any rows before it)
+  for (let i = headerRowIndex + 1; i < data.length; i++) {
     const row = data[i];
     if (!Array.isArray(row) || row.length === 0) continue;
     
     // Skip summary/total rows
-    const firstCell = String(row[0] || '').toLowerCase();
-    if (firstCell.includes('total') || firstCell.includes('summary') || firstCell.includes('grand')) {
+    const firstCell = String(row[0] || '').toLowerCase().trim();
+    if (firstCell.includes('total') || firstCell.includes('summary') || firstCell.includes('grand') || firstCell === '') {
       continue;
     }
     
@@ -192,6 +224,10 @@ const extractDealFromRow = (row: any[], columnIndices: Record<string, number>): 
     const deal: DealRecord = {};
     
     // Extract values using column indices
+    if (columnIndices.date !== undefined) {
+      deal.saleDate = parseString(row[columnIndices.date]);
+    }
+    
     if (columnIndices.age !== undefined) {
       deal.age = parseNumeric(row[columnIndices.age]);
     }
@@ -200,32 +236,38 @@ const extractDealFromRow = (row: any[], columnIndices: Record<string, number>): 
       deal.stockNumber = parseString(row[columnIndices.stockNumber]);
     }
     
-    if (columnIndices.yearModel !== undefined) {
-      deal.yearModel = parseString(row[columnIndices.yearModel]);
+    if (columnIndices.vin6 !== undefined) {
+      deal.vin = parseString(row[columnIndices.vin6]);
     }
     
-    if (columnIndices.buyerName !== undefined) {
-      deal.buyerName = parseString(row[columnIndices.buyerName]);
+    if (columnIndices.vehicle !== undefined) {
+      deal.vehicle = parseString(row[columnIndices.vehicle]);
+      // Extract year/model from vehicle field if available
+      deal.yearModel = deal.vehicle;
     }
     
-    if (columnIndices.saleAmount !== undefined) {
-      deal.saleAmount = parseNumeric(row[columnIndices.saleAmount]);
+    if (columnIndices.trade !== undefined) {
+      deal.tradeValue = parseNumeric(row[columnIndices.trade]);
     }
     
-    if (columnIndices.costAmount !== undefined) {
-      deal.costAmount = parseNumeric(row[columnIndices.costAmount]);
+    if (columnIndices.slp !== undefined) {
+      deal.saleAmount = parseNumeric(row[columnIndices.slp]);
     }
     
-    if (columnIndices.grossProfit !== undefined) {
-      deal.grossProfit = parseNumeric(row[columnIndices.grossProfit]);
+    if (columnIndices.customer !== undefined) {
+      deal.buyerName = parseString(row[columnIndices.customer]);
     }
     
-    if (columnIndices.fiProfit !== undefined) {
-      deal.fiProfit = parseNumeric(row[columnIndices.fiProfit]);
+    if (columnIndices.gross !== undefined) {
+      deal.grossProfit = parseNumeric(row[columnIndices.gross]);
     }
     
-    if (columnIndices.totalProfit !== undefined) {
-      deal.totalProfit = parseNumeric(row[columnIndices.totalProfit]);
+    if (columnIndices.fi !== undefined) {
+      deal.fiProfit = parseNumeric(row[columnIndices.fi]);
+    }
+    
+    if (columnIndices.total !== undefined) {
+      deal.totalProfit = parseNumeric(row[columnIndices.total]);
     }
     
     // Calculate total profit if not provided
