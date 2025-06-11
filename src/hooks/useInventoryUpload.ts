@@ -73,6 +73,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       // Parse the file with enhanced parsing
       const parsed = await parseEnhancedInventoryFile(file, selectedSheet);
       console.log(`Parsed ${parsed.fileType} file with ${parsed.rows.length} rows, format: ${parsed.formatType}`);
+      console.log('Headers found:', parsed.headers);
       console.log('Sample row keys:', Object.keys(parsed.sample));
       console.log('Sample row data:', parsed.sample);
       
@@ -83,25 +84,48 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       for (let i = 0; i < parsed.rows.length; i++) {
         const row = parsed.rows[i];
         try {
+          console.log(`\n=== Processing Row ${i + 1} ===`);
+          
           // Use enhanced mapping function
           const inventoryItem = mapRowToInventoryItem(row, condition, uploadRecord.id);
-          console.log(`Row ${i + 1} mapped item:`, { vin: inventoryItem.vin, make: inventoryItem.make, model: inventoryItem.model });
+          console.log(`Row ${i + 1} mapped result:`, { 
+            vin: inventoryItem.vin, 
+            make: inventoryItem.make, 
+            model: inventoryItem.model,
+            year: inventoryItem.year,
+            stock_number: inventoryItem.stock_number
+          });
 
-          // Validate required fields with more detailed error messages
+          // Enhanced validation with detailed error messages
           if (!inventoryItem.vin || inventoryItem.vin.length < 10) {
-            errors.push(`Row ${i + 1}: Invalid or missing VIN "${inventoryItem.vin}" (VIN must be at least 10 characters)`);
+            const availableFields = Object.keys(row).filter(key => {
+              const value = row[key];
+              return value && String(value).trim().length >= 10 && /[A-Z0-9]/.test(String(value));
+            });
+            errors.push(`Row ${i + 1}: Invalid or missing VIN "${inventoryItem.vin}" (VIN must be at least 10 characters). Potential VIN fields found: ${availableFields.join(', ') || 'none'}`);
             errorCount++;
             continue;
           }
 
           if (!inventoryItem.make || inventoryItem.make.length < 1) {
-            errors.push(`Row ${i + 1}: Missing Make field. Available fields in this row: ${Object.keys(row).join(', ')}`);
+            const makeHints = Object.keys(row).filter(key => 
+              key.toLowerCase().includes('make') || 
+              key.toLowerCase().includes('brand') || 
+              key.toLowerCase().includes('manufacturer') ||
+              key.toLowerCase().includes('division')
+            );
+            errors.push(`Row ${i + 1}: Missing Make field. Potential make fields: ${makeHints.join(', ') || 'none found'}. All available fields: ${Object.keys(row).slice(0, 10).join(', ')}${Object.keys(row).length > 10 ? '...' : ''}`);
             errorCount++;
             continue;
           }
 
           if (!inventoryItem.model || inventoryItem.model.length < 1) {
-            errors.push(`Row ${i + 1}: Missing Model field. Available fields in this row: ${Object.keys(row).join(', ')}`);
+            const modelHints = Object.keys(row).filter(key => 
+              key.toLowerCase().includes('model') || 
+              key.toLowerCase().includes('product') ||
+              key.toLowerCase().includes('series')
+            );
+            errors.push(`Row ${i + 1}: Missing Model field. Potential model fields: ${modelHints.join(', ') || 'none found'}. All available fields: ${Object.keys(row).slice(0, 10).join(', ')}${Object.keys(row).length > 10 ? '...' : ''}`);
             errorCount++;
             continue;
           }
@@ -118,8 +142,10 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
             errorCount++;
           } else {
             successCount++;
+            console.log(`✓ Row ${i + 1} successfully imported: ${inventoryItem.make} ${inventoryItem.model}`);
           }
         } catch (error) {
+          console.error(`Error processing row ${i + 1}:`, error);
           errors.push(`Row ${i + 1}: Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
           errorCount++;
         }
@@ -161,7 +187,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       } else {
         toast({
           title: "Upload failed",
-          description: `No vehicles could be imported. Please check your file format.`,
+          description: `No vehicles could be imported. Check the console for detailed field mapping information.`,
           variant: "destructive"
         });
       }

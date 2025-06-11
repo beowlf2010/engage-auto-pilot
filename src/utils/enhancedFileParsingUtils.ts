@@ -6,7 +6,7 @@ export interface ParsedInventoryData {
   rows: any[];
   sample: Record<string, string>;
   fileType: 'csv' | 'excel';
-  formatType?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'unknown';
+  formatType?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'unknown';
 }
 
 export interface SheetInfo {
@@ -62,8 +62,13 @@ const getFileType = (file: File): 'csv' | 'excel' => {
   return 'csv';
 };
 
-const detectFormatType = (headers: string[]): 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'unknown' => {
+const detectFormatType = (headers: string[]): 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'unknown' => {
   const headerStr = headers.join('|').toLowerCase();
+  
+  // Check for GM orders format
+  if (headerStr.includes('order #') && headerStr.includes('gm config id') && headerStr.includes('current event')) {
+    return 'gm_orders';
+  }
   
   // Check for specific patterns that indicate each format
   if (headerStr.includes('new') && headerStr.includes('main')) {
@@ -165,42 +170,98 @@ const parseCSVFileEnhanced = async (file: File): Promise<ParsedInventoryData> =>
   };
 };
 
-// Enhanced mapping function that handles GM/Vauto specific fields
+// Enhanced mapping function that handles GM/Vauto specific fields with comprehensive field matching
 export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new' | 'used' | 'certified', uploadHistoryId: string) => {
-  console.log('Mapping row:', row);
-  console.log('Available keys:', Object.keys(row));
+  console.log('=== FIELD MAPPING DEBUG ===');
+  console.log('Row data received:', row);
+  console.log('Available column names:', Object.keys(row));
+  console.log('Number of columns:', Object.keys(row).length);
   
-  // Enhanced field mapping with more flexible matching
+  // Enhanced field mapping with exact matches and comprehensive alternatives
   const getFieldValue = (possibleFields: string[]): string => {
+    console.log(`Looking for field from options: [${possibleFields.join(', ')}]`);
+    
     for (const field of possibleFields) {
       // Try exact match first
       if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
-        return String(row[field]).trim();
+        const value = String(row[field]).trim();
+        console.log(`✓ Found exact match for "${field}": "${value}"`);
+        return value;
       }
-      
-      // Try case-insensitive match
+    }
+    
+    // Try case-insensitive and partial matches
+    for (const field of possibleFields) {
       const lowerField = field.toLowerCase();
       for (const key of Object.keys(row)) {
-        if (key.toLowerCase() === lowerField && row[key] !== undefined && row[key] !== null && row[key] !== '') {
-          return String(row[key]).trim();
+        const lowerKey = key.toLowerCase();
+        if (lowerKey === lowerField || lowerKey.includes(lowerField) || lowerField.includes(lowerKey)) {
+          if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+            const value = String(row[key]).trim();
+            console.log(`✓ Found fuzzy match "${key}" for "${field}": "${value}"`);
+            return value;
+          }
         }
       }
     }
+    
+    console.log(`✗ No match found for any of: [${possibleFields.join(', ')}]`);
     return '';
   };
 
-  // More comprehensive field mapping
-  const vin = getFieldValue(['VIN', 'vin', 'Vin', 'Vehicle_VIN', 'VehicleVIN']);
-  const make = getFieldValue(['Make', 'make', 'MAKE', 'Vehicle_Make', 'VehicleMake', 'Manufacturer']);
-  const model = getFieldValue(['Model', 'model', 'MODEL', 'Vehicle_Model', 'VehicleModel']);
-  const year = getFieldValue(['Year', 'year', 'YEAR', 'Model_Year', 'ModelYear', 'Vehicle_Year', 'VehicleYear']);
-  const stockNumber = getFieldValue(['Stock', 'stock', 'StockNumber', 'Stock_Number', 'VehicleStockNumber']);
+  // Updated field mapping with your specific column names and common alternatives
+  const vinFields = [
+    'VIN', 'vin', 'Vin', 
+    'Vehicle_VIN', 'VehicleVIN', 'Vehicle VIN',
+    'Stock VIN', 'Unit VIN'
+  ];
+  
+  const makeFields = [
+    'Make', 'make', 'MAKE', 
+    'Vehicle_Make', 'VehicleMake', 'Vehicle Make',
+    'Manufacturer', 'Brand', 'Division',
+    'GM Division', 'Auto Make'
+  ];
+  
+  const modelFields = [
+    'Model', 'model', 'MODEL', 
+    'Vehicle_Model', 'VehicleModel', 'Vehicle Model',
+    'Model Name', 'Product', 'Series Model'
+  ];
+  
+  const yearFields = [
+    'Year', 'year', 'YEAR', 
+    'Model_Year', 'ModelYear', 'Model Year',
+    'Vehicle_Year', 'VehicleYear', 'Vehicle Year',
+    'MY', 'Yr'
+  ];
+  
+  const stockFields = [
+    'Stock', 'stock', 'StockNumber', 'Stock_Number', 'Stock Number', 'Stock No.',
+    'VehicleStockNumber', 'Dealer Stock', 'Unit Number',
+    'Inventory Number', 'Stock #'
+  ];
 
-  console.log('Mapped values:', { vin, make, model, year, stockNumber });
+  const vin = getFieldValue(vinFields);
+  const make = getFieldValue(makeFields);
+  const model = getFieldValue(modelFields);
+  const year = getFieldValue(yearFields);
+  const stockNumber = getFieldValue(stockFields);
+
+  console.log('=== FINAL MAPPED VALUES ===');
+  console.log('VIN:', vin);
+  console.log('Make:', make);
+  console.log('Model:', model);
+  console.log('Year:', year);
+  console.log('Stock Number:', stockNumber);
+  console.log('===============================');
 
   // Extract RPO codes from various possible fields
   const extractRPOCodes = (row: Record<string, any>): string[] => {
-    const rpoFields = ['rpo_codes', 'option_codes', 'options', 'rpo', 'accessories', 'RPO_Codes', 'OptionCodes'];
+    const rpoFields = [
+      'rpo_codes', 'option_codes', 'options', 'rpo', 'accessories', 'RPO_Codes', 'OptionCodes',
+      'Ordered Options', 'Options', 'Equipment', 'Features'
+    ];
     let rpoCodes: string[] = [];
     
     for (const field of rpoFields) {
@@ -219,23 +280,35 @@ export const mapRowToInventoryItem = (row: Record<string, any>, condition: 'new'
 
   const rpoCodes = extractRPOCodes(row);
 
+  // For GM orders, try to extract make from other fields if not found directly
+  let finalMake = make;
+  if (!finalMake && row['Division']) {
+    finalMake = String(row['Division']).trim();
+    console.log('Using Division as Make:', finalMake);
+  }
+  if (!finalMake && row['GM Config ID']) {
+    // Could potentially derive make from GM Config ID patterns
+    finalMake = 'GM'; // Default for GM orders
+    console.log('Defaulting to GM for GM orders');
+  }
+
   return {
     vin: vin || '',
     stock_number: stockNumber || undefined,
     year: year ? parseInt(year) : undefined,
-    make: make || '',
+    make: finalMake || '',
     model: model || '',
-    trim: getFieldValue(['Trim', 'trim', 'TRIM', 'Series', 'series']) || undefined,
-    body_style: getFieldValue(['BodyStyle', 'Body_Style', 'body_style', 'Body', 'body']) || undefined,
-    color_exterior: getFieldValue(['ExteriorColor', 'Exterior_Color', 'color_exterior', 'ExtColor', 'ext_color']) || undefined,
-    color_interior: getFieldValue(['InteriorColor', 'Interior_Color', 'color_interior', 'IntColor', 'int_color']) || undefined,
-    engine: getFieldValue(['Engine', 'engine', 'ENGINE', 'Engine_Description']) || undefined,
+    trim: getFieldValue(['Trim', 'trim', 'TRIM', 'Series', 'series', 'Level']) || undefined,
+    body_style: getFieldValue(['BodyStyle', 'Body_Style', 'body_style', 'Body', 'body', 'Style']) || undefined,
+    color_exterior: getFieldValue(['ExteriorColor', 'Exterior_Color', 'color_exterior', 'ExtColor', 'ext_color', 'Color', 'Exterior']) || undefined,
+    color_interior: getFieldValue(['InteriorColor', 'Interior_Color', 'color_interior', 'IntColor', 'int_color', 'Interior']) || undefined,
+    engine: getFieldValue(['Engine', 'engine', 'ENGINE', 'Engine_Description', 'Motor']) || undefined,
     transmission: getFieldValue(['Transmission', 'transmission', 'TRANSMISSION', 'Trans', 'trans']) || undefined,
-    drivetrain: getFieldValue(['Drivetrain', 'drivetrain', 'DRIVETRAIN', 'Drive', 'drive']) || undefined,
+    drivetrain: getFieldValue(['Drivetrain', 'drivetrain', 'DRIVETRAIN', 'Drive', 'drive', 'DriveTrain']) || undefined,
     fuel_type: getFieldValue(['FuelType', 'Fuel_Type', 'fuel_type', 'Fuel', 'fuel']) || undefined,
-    mileage: parseInt(getFieldValue(['Mileage', 'mileage', 'MILEAGE', 'Odometer', 'odometer'])) || undefined,
-    price: parseFloat(getFieldValue(['Price', 'price', 'PRICE', 'SellingPrice', 'Selling_Price'])) || undefined,
-    msrp: parseFloat(getFieldValue(['MSRP', 'msrp', 'RetailPrice', 'Retail_Price'])) || undefined,
+    mileage: parseInt(getFieldValue(['Mileage', 'mileage', 'MILEAGE', 'Odometer', 'odometer', 'Miles'])) || undefined,
+    price: parseFloat(getFieldValue(['Price', 'price', 'PRICE', 'SellingPrice', 'Selling_Price', 'MSRP'])) || undefined,
+    msrp: parseFloat(getFieldValue(['MSRP', 'msrp', 'MSRP w/DFC†', 'RetailPrice', 'Retail_Price', 'Retail'])) || undefined,
     invoice: parseFloat(getFieldValue(['Invoice', 'invoice', 'INVOICE', 'InvoicePrice', 'Invoice_Price'])) || undefined,
     rebates: parseFloat(getFieldValue(['Rebates', 'rebates', 'REBATES', 'Incentives', 'incentives'])) || undefined,
     pack: parseFloat(getFieldValue(['Pack', 'pack', 'PACK', 'DealerPack', 'Dealer_Pack'])) || undefined,
