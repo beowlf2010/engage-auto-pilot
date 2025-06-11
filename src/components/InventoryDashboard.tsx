@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -136,22 +137,55 @@ const InventoryDashboard = () => {
     }
   };
 
-  // Enhanced vehicle title formatting that prevents duplication
+  // Enhanced vehicle title formatting that prevents duplication and handles vAuto data properly
   const formatVehicleTitle = (vehicle: any) => {
+    console.log('=== VEHICLE TITLE FORMATTING ===');
+    console.log('Vehicle data:', { year: vehicle.year, make: vehicle.make, model: vehicle.model, trim: vehicle.trim });
+    
+    // Handle vAuto data where vehicle info might be in full_option_blob
+    if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
+      const blob = vehicle.full_option_blob;
+      console.log('Checking vAuto blob for vehicle info...');
+      
+      // Look for vAuto Vehicle field
+      const vehicleField = blob.Vehicle || blob.vehicle || blob['Vehicle:'];
+      if (vehicleField && typeof vehicleField === 'string') {
+        console.log('Found vAuto vehicle field:', vehicleField);
+        
+        // Parse vAuto format: "2022 Chevrolet Silverado 1500 LT"
+        const parts = vehicleField.trim().split(/\s+/);
+        if (parts.length >= 3) {
+          const yearPart = parts.find(p => /^\d{4}$/.test(p));
+          const yearIndex = yearPart ? parts.indexOf(yearPart) : -1;
+          
+          if (yearIndex !== -1 && yearIndex < parts.length - 2) {
+            const extractedYear = parts[yearIndex];
+            const extractedMake = parts[yearIndex + 1];
+            const extractedModel = parts.slice(yearIndex + 2).join(' ');
+            
+            console.log('Extracted from vAuto:', { year: extractedYear, make: extractedMake, model: extractedModel });
+            return `${extractedYear} ${extractedMake} ${extractedModel}`;
+          }
+        }
+      }
+    }
+    
+    // Fallback to database fields
     const year = vehicle.year ? String(vehicle.year) : '';
     const make = vehicle.make || '';
     const model = vehicle.model || '';
     const trim = vehicle.trim || '';
 
-    // Check if make or model already contains the year to prevent duplication
-    const makeContainsYear = make.includes(year);
-    const modelContainsYear = model.includes(year);
-    
-    // Check if make and model are duplicates or if model contains make
+    // Prevent duplication issues
+    const makeContainsYear = year && make.includes(year);
+    const modelContainsYear = year && model.includes(year);
     const makeAndModelSame = make.toLowerCase() === model.toLowerCase();
     const modelContainsMake = model.toLowerCase().includes(make.toLowerCase()) && make.length > 2;
 
-    console.log('Vehicle title debug:', { year, make, model, trim, makeContainsYear, modelContainsYear, makeAndModelSame, modelContainsMake });
+    console.log('Database field analysis:', { 
+      year, make, model, trim, 
+      makeContainsYear, modelContainsYear, makeAndModelSame, modelContainsMake 
+    });
 
     let parts: string[] = [];
 
@@ -160,15 +194,12 @@ const InventoryDashboard = () => {
       parts.push(year);
     }
 
-    // Handle make
-    if (make && !makeAndModelSame) {
-      // If model contains make, skip adding make separately
-      if (!modelContainsMake) {
-        parts.push(make);
-      }
+    // Handle make - avoid duplication
+    if (make && !makeAndModelSame && !modelContainsMake) {
+      parts.push(make);
     }
 
-    // Handle model
+    // Handle model - avoid duplication
     if (model && !makeAndModelSame) {
       parts.push(model);
     } else if (!model && make) {
@@ -182,7 +213,7 @@ const InventoryDashboard = () => {
     }
 
     const result = parts.filter(Boolean).join(' ');
-    console.log('Final vehicle title:', result);
+    console.log('Final formatted title:', result);
     
     return result || 'Unknown Vehicle';
   };
@@ -190,11 +221,25 @@ const InventoryDashboard = () => {
   // Enhanced description extraction from vAuto data
   const getVehicleDescription = (vehicle: any) => {
     if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
-      // Look for vAuto description fields
       const blob = vehicle.full_option_blob;
+      
+      // Look for vAuto-specific rich data
+      const overallScore = blob.Overall || blob.overall;
+      const priceRank = blob['Price Rank'] || blob.priceRank;
+      const daysOnMarket = blob['Days on Market'] || blob.daysOnMarket;
+      
+      if (overallScore || priceRank || daysOnMarket) {
+        const metrics = [];
+        if (overallScore) metrics.push(`Overall: ${overallScore}`);
+        if (priceRank) metrics.push(`Price Rank: ${priceRank}`);
+        if (daysOnMarket) metrics.push(`${daysOnMarket} days on market`);
+        return metrics.join(' • ');
+      }
+      
+      // Fallback to description fields
       const description = blob.Description || blob.description || blob.Details || blob.details;
       if (description && typeof description === 'string' && description.length > 10) {
-        return description.substring(0, 100) + '...';
+        return description.substring(0, 80) + '...';
       }
     }
     return null;
@@ -507,5 +552,3 @@ const InventoryDashboard = () => {
 };
 
 export default InventoryDashboard;
-
-</edits_to_apply>
