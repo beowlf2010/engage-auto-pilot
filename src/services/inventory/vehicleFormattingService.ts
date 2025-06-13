@@ -147,17 +147,20 @@ export const getDataCompletenessScore = (vehicle: any): number => {
 
 export const getVehicleStatusDisplay = (vehicle: any) => {
   if (vehicle.source_report === 'orders_all') {
-    switch (vehicle.status) {
-      case '5000':
-        return { label: 'Available', color: 'bg-green-100 text-green-800' };
-      case '1000':
-      case '2000':
-        return { label: 'Being Built', color: 'bg-yellow-100 text-yellow-800' };
-      case '3000':
-      case '4000':
-        return { label: 'In Transit', color: 'bg-blue-100 text-blue-800' };
-      default:
-        return { label: vehicle.status || 'Unknown', color: 'bg-gray-100 text-gray-800' };
+    const statusNum = parseInt(vehicle.status);
+    
+    if (statusNum === 6000) {
+      return { label: 'CTP', color: 'bg-green-100 text-green-800' };
+    } else if (statusNum >= 5000 && statusNum <= 5999) {
+      return { label: 'Available', color: 'bg-green-100 text-green-800' };
+    } else if (statusNum >= 3800 && statusNum <= 4999) {
+      return { label: 'In Transit', color: 'bg-blue-100 text-blue-800' };
+    } else if (statusNum >= 2500 && statusNum <= 3799) {
+      return { label: 'In Production', color: 'bg-yellow-100 text-yellow-800' };
+    } else if (statusNum >= 2000 && statusNum <= 2499) {
+      return { label: 'Placed/Waiting', color: 'bg-orange-100 text-orange-800' };
+    } else {
+      return { label: vehicle.status || 'Unknown', color: 'bg-gray-100 text-gray-800' };
     }
   }
   
