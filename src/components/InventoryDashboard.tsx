@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar, Clock, Doll
 import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 import EnhancedInventoryMetrics from "@/components/inventory/EnhancedInventoryMetrics";
+import InventoryCleanupButton from "@/components/inventory/InventoryCleanupButton";
 import { formatVehicleTitle, getVehicleDescription, formatPrice, getDataCompletenessScore, getVehicleStatusDisplay } from "@/services/inventory/vehicleFormattingService";
 
 interface InventoryFilters {
