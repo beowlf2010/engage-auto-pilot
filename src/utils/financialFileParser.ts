@@ -8,11 +8,11 @@ export const parseFinancialFile = async (file: File) => {
   console.log('=== FINANCIAL FILE PARSING ===');
   
   // Validate file type
-  const validExtensions = ['.xlsx', '.xls'];
+  const validExtensions = ['.xlsx', '.xls', '.csv'];
   const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
   
   if (!validExtensions.includes(fileExtension)) {
-    throw new Error('Invalid file format. Please upload an Excel file (.xlsx or .xls)');
+    throw new Error('Invalid file format. Please upload an Excel file (.xlsx or .xls) or CSV file (.csv)');
   }
   
   try {

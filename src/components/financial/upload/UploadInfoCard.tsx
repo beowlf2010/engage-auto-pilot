@@ -31,7 +31,7 @@ const UploadInfoCard = () => {
           </div>
           <div className="pt-2 border-t">
             <p className="text-xs text-slate-500">
-              Upload your DMS Sales Analysis Detail report exactly as exported from your DMS system with these column headers.
+              Upload your DMS Sales Analysis Detail report as Excel (.xlsx, .xls) or CSV (.csv) format with these column headers.
             </p>
           </div>
         </div>

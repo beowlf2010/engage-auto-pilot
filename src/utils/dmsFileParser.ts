@@ -1,4 +1,3 @@
-
 import * as XLSX from 'xlsx';
 
 export interface DealRecord {
@@ -56,7 +55,15 @@ export const parseDmsFile = async (file: File) => {
   console.log('File size:', file.size);
   
   try {
-    const data = await parseExcelFile(file);
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    let data: any[];
+    
+    if (fileExtension === '.csv') {
+      data = await parseCSVFile(file);
+    } else {
+      data = await parseExcelFile(file);
+    }
+    
     console.log('Raw data rows:', data.length);
     console.log('First few rows:', data.slice(0, 5));
     
@@ -93,6 +100,57 @@ export const parseDmsFile = async (file: File) => {
     console.error('DMS parsing error:', error);
     throw error;
   }
+};
+
+const parseCSVFile = async (file: File): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        // Parse CSV lines into arrays
+        const data = lines.map(line => {
+          // Simple CSV parsing - handles basic cases
+          const values = [];
+          let current = '';
+          let inQuotes = false;
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === '\t' && !inQuotes) {
+              // Tab-separated values
+              values.push(current.trim());
+              current = '';
+            } else if (char === ',' && !inQuotes) {
+              // Comma-separated values
+              values.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          
+          // Add the last value
+          values.push(current.trim());
+          return values;
+        });
+        
+        console.log('CSV parsed, rows:', data.length);
+        resolve(data);
+      } catch (error) {
+        reject(new Error(`Error parsing CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Error reading CSV file'));
+    reader.readAsText(file);
+  });
 };
 
 const parseExcelFile = async (file: File): Promise<any[]> => {

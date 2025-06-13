@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,7 +59,7 @@ const EnhancedUploadArea = ({
   };
 
   const handleFiles = (files: FileList) => {
-    const validExtensions = ['.xlsx', '.xls'];
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
     const newQueuedFiles: QueuedFile[] = [];
 
     Array.from(files).forEach(file => {
@@ -116,7 +115,7 @@ const EnhancedUploadArea = ({
           <span>Upload DMS Reports</span>
         </CardTitle>
         <CardDescription>
-          Drag and drop multiple Excel files or click to browse
+          Drag and drop multiple Excel or CSV files or click to browse
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -148,7 +147,7 @@ const EnhancedUploadArea = ({
                 {dragActive ? 'Drop files here' : 'Drop DMS reports here'}
               </p>
               <p className="text-slate-600 mb-4">
-                or click to browse for Excel files (.xlsx, .xls)
+                or click to browse for Excel or CSV files (.xlsx, .xls, .csv)
               </p>
               <Button 
                 onClick={() => fileInputRef.current?.click()}
@@ -160,7 +159,7 @@ const EnhancedUploadArea = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 multiple
                 onChange={handleFileSelect}
                 className="hidden"
