@@ -4,58 +4,33 @@ import { toast } from '@/hooks/use-toast';
 
 export interface CleanupSummary {
   totalProcessed: number;
-  gmGlobalMarkedSold: number;
-  regularInventoryMarkedSold: number;
   latestUploads: {
     mostRecentUploads: string[];
-    gmGlobalUpload: string | null;
   };
 }
 
 export const getLatestUploads = async (): Promise<CleanupSummary['latestUploads']> => {
-  // Get the 3 most recent upload_history_id values from inventory
-  // This handles mixed uploads better than filtering by condition
+  console.log('Getting latest upload batches...');
+  
+  // Get the most recent upload_history_id values (regardless of source_report)
   const { data: recentUploads } = await supabase
     .from('inventory')
     .select('upload_history_id')
     .not('upload_history_id', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(1000); // Get enough to find recent unique uploads
+    .limit(500); // Get enough to find recent unique uploads
 
   if (!recentUploads) {
-    return { mostRecentUploads: [], gmGlobalUpload: null };
+    console.warn('No upload history found');
+    return { mostRecentUploads: [] };
   }
 
-  // Get unique upload_history_ids and take the most recent ones
+  // Get unique upload_history_ids and take the 2 most recent ones
   const uniqueUploads = [...new Set(recentUploads.map(r => r.upload_history_id))];
-  const mostRecentUploads = uniqueUploads.slice(0, 3); // Keep vehicles from 3 most recent uploads
+  const mostRecentUploads = uniqueUploads.slice(0, 2); // Keep vehicles from 2 most recent upload batches
 
-  // Find the most recent GM Global upload specifically
-  const { data: gmGlobalUpload } = await supabase
-    .from('inventory')
-    .select('upload_history_id')
-    .eq('source_report', 'orders_all')
-    .not('upload_history_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  return {
-    mostRecentUploads,
-    gmGlobalUpload: gmGlobalUpload?.upload_history_id || null,
-  };
-};
-
-const buildNotInQuery = (query: any, fieldName: string, excludeValues: string[]) => {
-  // Since Supabase doesn't support .not('field', 'in', array), 
-  // we'll chain multiple .neq() conditions for each value to exclude
-  let modifiedQuery = query;
-  
-  for (const value of excludeValues) {
-    modifiedQuery = modifiedQuery.neq(fieldName, value);
-  }
-  
-  return modifiedQuery;
+  console.log('Most recent upload batches:', mostRecentUploads);
+  return { mostRecentUploads };
 };
 
 export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
@@ -65,72 +40,56 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
     const latestUploads = await getLatestUploads();
     console.log('Latest uploads identified:', latestUploads);
 
-    let totalProcessed = 0;
-    let gmGlobalMarkedSold = 0;
-    let regularInventoryMarkedSold = 0;
-
-    // Validate we have upload IDs before proceeding
     if (latestUploads.mostRecentUploads.length === 0) {
       console.warn('No recent uploads found to base cleanup on');
       throw new Error('No recent upload history found to determine which vehicles to keep');
     }
 
-    // Mark old GM Global orders as sold (not from latest GM Global upload)
-    if (latestUploads.gmGlobalUpload) {
-      const { data: oldGMGlobal, error: gmError } = await supabase
-        .from('inventory')
-        .update({
-          status: 'sold',
-          sold_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('source_report', 'orders_all')
-        .neq('upload_history_id', latestUploads.gmGlobalUpload)
-        .neq('status', 'sold')
-        .select('id');
+    // Get all vehicles that should be marked as sold (not from recent uploads)
+    const { data: vehiclesToUpdate, error: fetchError } = await supabase
+      .from('inventory')
+      .select('id, upload_history_id, status')
+      .neq('status', 'sold')
+      .not('upload_history_id', 'in', `(${latestUploads.mostRecentUploads.map(id => `"${id}"`).join(',')})`);
 
-      if (gmError) {
-        console.error('Error marking old GM Global as sold:', gmError);
-        throw gmError;
-      }
-
-      gmGlobalMarkedSold = oldGMGlobal?.length || 0;
-      totalProcessed += gmGlobalMarkedSold;
-      console.log(`Marked ${gmGlobalMarkedSold} old GM Global orders as sold`);
+    if (fetchError) {
+      console.error('Error fetching vehicles to update:', fetchError);
+      throw fetchError;
     }
 
-    // Mark regular inventory (non-GM Global) as sold if not from recent uploads
-    // Build query with multiple .neq() conditions instead of unsupported .not('in')
-    let regularQuery = supabase
+    console.log(`Found ${vehiclesToUpdate?.length || 0} vehicles to mark as sold`);
+
+    if (!vehiclesToUpdate || vehiclesToUpdate.length === 0) {
+      console.log('No vehicles need to be marked as sold');
+      return {
+        totalProcessed: 0,
+        latestUploads,
+      };
+    }
+
+    // Mark old vehicles as sold using ID list
+    const vehicleIds = vehiclesToUpdate.map(v => v.id);
+    
+    const { data: updatedVehicles, error: updateError } = await supabase
       .from('inventory')
       .update({
         status: 'sold',
         sold_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .not('source_report', 'eq', 'orders_all')
-      .neq('status', 'sold');
+      .in('id', vehicleIds)
+      .select('id');
 
-    // Chain multiple .neq() conditions for each upload_history_id to exclude
-    regularQuery = buildNotInQuery(regularQuery, 'upload_history_id', latestUploads.mostRecentUploads);
-
-    const { data: oldRegular, error: regularError } = await regularQuery.select('id');
-
-    if (regularError) {
-      console.error('Error marking old regular inventory as sold:', regularError);
-      throw regularError;
+    if (updateError) {
+      console.error('Error marking vehicles as sold:', updateError);
+      throw updateError;
     }
 
-    regularInventoryMarkedSold = oldRegular?.length || 0;
-    totalProcessed += regularInventoryMarkedSold;
-    console.log(`Marked ${regularInventoryMarkedSold} old regular inventory vehicles as sold`);
-
+    const totalProcessed = updatedVehicles?.length || 0;
     console.log(`Cleanup completed. Total processed: ${totalProcessed}`);
 
     return {
       totalProcessed,
-      gmGlobalMarkedSold,
-      regularInventoryMarkedSold,
       latestUploads,
     };
   } catch (error) {
@@ -150,7 +109,7 @@ export const performInventoryCleanup = async (): Promise<void> => {
 
     toast({
       title: "Cleanup Completed",
-      description: `Processed ${summary.totalProcessed} vehicles: ${summary.gmGlobalMarkedSold} GM Global, ${summary.regularInventoryMarkedSold} Regular inventory marked as sold`,
+      description: `Processed ${summary.totalProcessed} vehicles and marked them as sold`,
     });
 
     // Refresh the page to show updated counts
