@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { DealRecord, FinancialSummary } from "./dms/types";
 
@@ -10,12 +9,10 @@ export const insertFinancialData = async (
 ) => {
   console.log('=== FINANCIAL DATA INSERTION ===');
   console.log(`Inserting ${deals.length} deals`);
-  
-  // Use individual deal dates instead of a single report date
-  console.log('Using individual deal dates from each transaction');
+  console.log('Sample deal dates:', deals.slice(0, 3).map(d => ({ stock: d.stockNumber, date: d.saleDate })));
   
   try {
-    // Map deals to database format and use upsert with the unique constraint
+    // Map deals to database format - use individual deal dates
     const dealRecords = deals.map(deal => ({
       upload_date: deal.saleDate || new Date().toISOString().split('T')[0], // Use individual deal date
       stock_number: deal.stockNumber || null,
@@ -32,7 +29,7 @@ export const insertFinancialData = async (
       original_gross_profit: deal.grossProfit || null,
       original_fi_profit: deal.fiProfit || null,
       original_total_profit: deal.totalProfit || null,
-      first_reported_date: deal.saleDate || new Date().toISOString().split('T')[0]
+      first_reported_date: deal.saleDate || new Date().toISOString().split('T')[0] // Store original deal date
     }));
 
     console.log('Sample deal record to insert:', dealRecords[0]);
@@ -53,16 +50,19 @@ export const insertFinancialData = async (
 
     console.log(`Successfully upserted ${insertedDeals?.length || 0} deals`);
 
-    // Calculate summary totals for profit snapshot - use the most common date or today
+    // Calculate summary totals for profit snapshot - use the most common date from the deals
     const dateGroups = deals.reduce((acc, deal) => {
       const date = deal.saleDate || new Date().toISOString().split('T')[0];
       acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     
+    // Use the most frequent date from the actual deals
     const snapshotDate = Object.keys(dateGroups).reduce((a, b) => 
       dateGroups[a] > dateGroups[b] ? a : b
     ) || new Date().toISOString().split('T')[0];
+
+    console.log(`Using snapshot date: ${snapshotDate} (from ${Object.keys(dateGroups).length} unique deal dates)`);
 
     const retailDeals = deals.filter(d => d.dealType !== 'new');
     const newDeals = deals.filter(d => d.dealType === 'new');

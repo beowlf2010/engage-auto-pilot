@@ -44,6 +44,7 @@ export const extractDealsFromData = (data: any[], columnMapping: DmsColumns): De
     try {
       const deal = extractDealFromRow(row, headerRow, columnMapping);
       if (deal) {
+        console.log(`Row ${i}: Extracted deal with date ${deal.saleDate}, stock ${deal.stockNumber}`);
         deals.push(deal);
       }
     } catch (error) {
@@ -98,8 +99,15 @@ const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColu
   // Determine deal type based on stock number
   const dealType = classifyDealByStock(stockNumber);
   
-  // Extract individual deal date
-  const dealDate = extractDealDate(getValue(columnMapping.date));
+  // Extract individual deal date with better parsing
+  const dateValue = getValue(columnMapping.date);
+  const dealDate = extractDealDate(dateValue);
+  
+  console.log(`Deal extraction - Stock: ${stockNumber}, Raw date: "${dateValue}", Parsed date: ${dealDate}`);
+  
+  if (!dealDate) {
+    console.warn(`Failed to parse date "${dateValue}" for stock ${stockNumber}`);
+  }
   
   const deal: DealRecord = {
     stockNumber: stockNumber || undefined,
@@ -124,29 +132,53 @@ const extractDealDate = (dateValue: string): string | null => {
   if (!dateValue) return null;
   
   const dateStr = dateValue.trim();
+  console.log(`Parsing date: "${dateStr}"`);
   
-  // Try different date formats
+  // Try different date formats more aggressively
   const formats = [
     /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // MM/DD/YYYY or M/D/YYYY
+    /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/, // MM/DD/YY or M/D/YY
     /^(\d{4})-(\d{1,2})-(\d{1,2})$/, // YYYY-MM-DD
     /^(\d{1,2})-(\d{1,2})-(\d{4})$/, // MM-DD-YYYY
+    /^(\d{1,2})-(\d{1,2})-(\d{2})$/, // MM-DD-YY
   ];
   
-  for (const format of formats) {
+  for (let i = 0; i < formats.length; i++) {
+    const format = formats[i];
     const match = dateStr.match(format);
     if (match) {
-      if (format === formats[0]) { // MM/DD/YYYY
+      console.log(`Matched format ${i}:`, match);
+      
+      if (i === 0) { // MM/DD/YYYY
         const [, month, day, year] = match;
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      } else if (format === formats[1]) { // YYYY-MM-DD
+      } else if (i === 1) { // MM/DD/YY
+        const [, month, day, year] = match;
+        const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      } else if (i === 2) { // YYYY-MM-DD
         return match[0];
-      } else if (format === formats[2]) { // MM-DD-YYYY
+      } else if (i === 3) { // MM-DD-YYYY
         const [, month, day, year] = match;
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      } else if (i === 4) { // MM-DD-YY
+        const [, month, day, year] = match;
+        const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
     }
   }
   
+  // Try to parse as a number (Excel serial date)
+  const numericDate = parseFloat(dateStr);
+  if (!isNaN(numericDate) && numericDate > 40000 && numericDate < 50000) {
+    // Excel date serial number (days since 1900-01-01)
+    const excelEpoch = new Date(1900, 0, 1);
+    const date = new Date(excelEpoch.getTime() + (numericDate - 2) * 24 * 60 * 60 * 1000);
+    return date.toISOString().split('T')[0];
+  }
+  
+  console.warn(`Could not parse date: "${dateStr}"`);
   return null;
 };
 

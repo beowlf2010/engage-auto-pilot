@@ -51,7 +51,7 @@ const DealsTable = ({
   const isUsedVehicle = (stockNumber?: string): boolean => {
     if (!stockNumber) return true;
     const firstChar = stockNumber.trim().toUpperCase().charAt(0);
-    return ['B', 'X'].includes(firstChar) || (firstChar !== 'C');
+    return firstChar !== 'C'; // Everything that's not C (new) is considered used
   };
 
   const getPackAdjustment = (deal: Deal): number => {
@@ -114,6 +114,12 @@ const DealsTable = ({
     );
   };
 
+  const getDealDate = (deal: Deal): string => {
+    // Use first_reported_date if available, otherwise fall back to upload_date
+    const dateToUse = deal.first_reported_date || deal.upload_date;
+    return new Date(dateToUse).toLocaleDateString();
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
@@ -154,7 +160,7 @@ const DealsTable = ({
                   />
                 </td>
                 <td className="p-3 text-sm">
-                  {new Date(deal.upload_date).toLocaleDateString()}
+                  {getDealDate(deal)}
                 </td>
                 <td className="p-3 text-sm font-medium">
                   {deal.stock_number || '-'}
