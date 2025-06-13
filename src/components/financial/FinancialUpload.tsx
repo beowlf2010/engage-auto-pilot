@@ -1,9 +1,11 @@
 
 import AccessDenied from "./upload/AccessDenied";
-import UploadArea from "./upload/UploadArea";
 import UploadInfoCard from "./upload/UploadInfoCard";
-import UploadResultComponent from "./upload/UploadResult";
-import { useFinancialUpload } from "@/hooks/useFinancialUpload";
+import EnhancedUploadArea from "./upload/EnhancedUploadArea";
+import BatchUploadResult from "./upload/BatchUploadResult";
+import { useEnhancedFinancialUpload } from "@/hooks/useEnhancedFinancialUpload";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 interface FinancialUploadProps {
   user: {
@@ -13,7 +15,15 @@ interface FinancialUploadProps {
 }
 
 const FinancialUpload = ({ user }: FinancialUploadProps) => {
-  const { uploading, uploadResult, handleFileUpload } = useFinancialUpload(user.id);
+  const { 
+    queuedFiles, 
+    uploading, 
+    batchResult, 
+    addFiles, 
+    removeFile, 
+    processBatch, 
+    clearResults 
+  } = useEnhancedFinancialUpload(user.id);
 
   // Check permissions
   if (!["manager", "admin"].includes(user.role)) {
@@ -22,20 +32,34 @@ const FinancialUpload = ({ user }: FinancialUploadProps) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">Upload Financial Data</h2>
-        <p className="text-slate-600 mt-1">
-          Import daily DMS Sales Analysis Detail reports to track profit and performance
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Upload Financial Data</h2>
+          <p className="text-slate-600 mt-1">
+            Import multiple DMS Sales Analysis Detail reports with drag & drop functionality
+          </p>
+        </div>
+        {batchResult && (
+          <Button onClick={clearResults} variant="outline" className="flex items-center space-x-2">
+            <Trash2 className="w-4 h-4" />
+            <span>Clear Results</span>
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UploadArea onFileUpload={handleFileUpload} uploading={uploading} />
+        <EnhancedUploadArea
+          onFilesSelected={addFiles}
+          onFileRemove={removeFile}
+          onProcessFiles={processBatch}
+          queuedFiles={queuedFiles}
+          uploading={uploading}
+        />
         <UploadInfoCard />
       </div>
 
-      {uploadResult && (
-        <UploadResultComponent uploadResult={uploadResult} />
+      {batchResult && (
+        <BatchUploadResult result={batchResult} />
       )}
     </div>
   );
