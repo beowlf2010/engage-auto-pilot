@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface InventoryStats {
@@ -43,13 +42,85 @@ export interface InventoryStats {
 
 export const getInventoryStats = async (): Promise<InventoryStats> => {
   try {
-    console.log('=== ENHANCED INVENTORY STATS CALCULATION ===');
+    console.log('=== DETAILED INVENTORY DEBUGGING ===');
+    
+    // Get ALL inventory records with detailed breakdown
+    const { data: allInventory, error: allError } = await supabase
+      .from('inventory')
+      .select('id, condition, status, source_report, make, model, year, vin, stock_number');
+    
+    if (allError) {
+      console.error('Error fetching all inventory:', allError);
+      throw allError;
+    }
+    
+    console.log('=== RAW INVENTORY BREAKDOWN ===');
+    console.log('Total records in database:', allInventory?.length || 0);
+    
+    // Detailed breakdown by condition
+    const newRecords = allInventory?.filter(v => v.condition === 'new') || [];
+    const usedRecords = allInventory?.filter(v => v.condition === 'used') || [];
+    const otherConditions = allInventory?.filter(v => v.condition !== 'new' && v.condition !== 'used') || [];
+    
+    console.log('By condition:');
+    console.log('- NEW condition:', newRecords.length);
+    console.log('- USED condition:', usedRecords.length);
+    console.log('- OTHER conditions:', otherConditions.length, otherConditions.map(v => v.condition));
+    
+    // Breakdown of NEW vehicles by source
+    const gmGlobalRecords = newRecords.filter(v => v.source_report === 'orders_all');
+    const regularNewRecords = newRecords.filter(v => v.source_report !== 'orders_all');
+    
+    console.log('NEW vehicles breakdown:');
+    console.log('- GM Global (orders_all):', gmGlobalRecords.length);
+    console.log('- Regular New (not orders_all):', regularNewRecords.length);
+    
+    // Detailed GM Global status breakdown
+    console.log('GM Global status breakdown:');
+    const gmStatusBreakdown: Record<string, number> = {};
+    gmGlobalRecords.forEach(vehicle => {
+      const status = vehicle.status || 'unknown';
+      gmStatusBreakdown[status] = (gmStatusBreakdown[status] || 0) + 1;
+    });
+    
+    Object.entries(gmStatusBreakdown).forEach(([status, count]) => {
+      console.log(`- Status "${status}": ${count} vehicles`);
+    });
+    
+    // Regular new status breakdown
+    console.log('Regular NEW status breakdown:');
+    const regularNewStatusBreakdown: Record<string, number> = {};
+    regularNewRecords.forEach(vehicle => {
+      const status = vehicle.status || 'unknown';
+      regularNewStatusBreakdown[status] = (regularNewStatusBreakdown[status] || 0) + 1;
+    });
+    
+    Object.entries(regularNewStatusBreakdown).forEach(([status, count]) => {
+      console.log(`- Status "${status}": ${count} vehicles`);
+    });
+    
+    // Used vehicles status breakdown
+    console.log('USED vehicles status breakdown:');
+    const usedStatusBreakdown: Record<string, number> = {};
+    usedRecords.forEach(vehicle => {
+      const status = vehicle.status || 'unknown';
+      usedStatusBreakdown[status] = (usedStatusBreakdown[status] || 0) + 1;
+    });
+    
+    Object.entries(usedStatusBreakdown).forEach(([status, count]) => {
+      console.log(`- Status "${status}": ${count} vehicles`);
+    });
+    
+    // Now get the actual counts using the original queries for comparison
+    console.log('=== ORIGINAL QUERY RESULTS COMPARISON ===');
     
     // Get total count
     const { count: totalVehicles } = await supabase
       .from('inventory')
       .select('*', { count: 'exact', head: true });
-    console.log('Total vehicles in database:', totalVehicles);
+    console.log('Total vehicles (count query):', totalVehicles);
+    console.log('Total vehicles (actual data):', allInventory?.length);
+    console.log('COUNT vs DATA MATCH:', totalVehicles === allInventory?.length);
 
     // Get regular new vehicles (not GM Global orders)
     const { count: regularNewTotal } = await supabase
@@ -65,7 +136,8 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
       .eq('status', 'available')
       .or('source_report.is.null,source_report.neq.orders_all');
 
-    console.log('Regular new vehicles - Total:', regularNewTotal, 'Available:', regularNewAvailable);
+    console.log('Regular new vehicles - Query Total:', regularNewTotal, 'vs Data:', regularNewRecords.length);
+    console.log('Regular new available - Query:', regularNewAvailable);
 
     // Get used vehicles
     const { count: usedTotal } = await supabase
@@ -85,13 +157,17 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
       .eq('condition', 'used')
       .eq('status', 'sold');
 
-    console.log('Used vehicles - Total:', usedTotal, 'Available:', usedAvailable, 'Sold:', usedSold);
+    console.log('Used vehicles - Query Total:', usedTotal, 'vs Data:', usedRecords.length);
+    console.log('Used available - Query:', usedAvailable);
+    console.log('Used sold - Query:', usedSold);
 
     // Get GM Global orders and categorize by Current Event ranges
     const { data: gmGlobalData } = await supabase
       .from('inventory')
       .select('status')
       .eq('source_report', 'orders_all');
+    
+    console.log('GM Global query count:', gmGlobalData?.length, 'vs Data:', gmGlobalRecords.length);
     
     let gmGlobalAvailable = 0;
     let gmGlobalInProduction = 0;
@@ -119,16 +195,18 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
           gmGlobalPlaced++;
           console.log(`Status ${vehicle.status}: Placed/waiting`);
         } else {
-          console.log(`Status ${vehicle.status}: Unknown range`);
+          console.log(`Status ${vehicle.status}: Unknown range - NOT COUNTED IN ANY CATEGORY`);
         }
       });
     }
     
+    console.log('=== FINAL COUNT CALCULATIONS ===');
     console.log('GM Global categorization:');
     console.log('- Available (6000 + 5000-5999):', gmGlobalAvailable);
     console.log('- In transit (3800-4999):', gmGlobalInTransit);
     console.log('- In production (2500-3799):', gmGlobalInProduction);
     console.log('- Placed/waiting (2000-2499):', gmGlobalPlaced);
+    console.log('- GM Global TOTAL:', gmGlobalAvailable + gmGlobalInTransit + gmGlobalInProduction + gmGlobalPlaced);
 
     // Get sold vehicles
     const { count: soldVehicles } = await supabase
@@ -186,12 +264,17 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
       ? allValidDays.reduce((sum, item) => sum + (item.days_in_inventory || 0), 0) / allValidDays.length 
       : 0;
     
-    console.log('FINAL ENHANCED COUNTS:');
-    console.log('- New vehicles total:', totalNewVehicles);
-    console.log('- New vehicles available:', totalNewAvailable);
+    console.log('FINAL ENHANCED COUNTS VERIFICATION:');
+    console.log('- New vehicles total (calculated):', totalNewVehicles);
+    console.log('  - Regular new total:', regularNewTotal);
+    console.log('  - GM Global total:', gmGlobalData?.length || 0);
+    console.log('- New vehicles available (calculated):', totalNewAvailable);
+    console.log('  - Regular new available:', regularNewAvailable);
+    console.log('  - GM Global available:', gmGlobalAvailable);
     console.log('- Used vehicles total:', usedTotal || 0);
     console.log('- Used vehicles available:', usedAvailable || 0);
-    console.log('- Total available:', totalAvailable);
+    console.log('- GRAND TOTAL (calculated):', totalNewVehicles + (usedTotal || 0));
+    console.log('- GRAND TOTAL (query):', totalVehicles);
 
     return {
       totalVehicles: totalVehicles || 0,
