@@ -96,8 +96,8 @@ const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColu
   // Calculate total profit (gross + FI)
   const totalProfit = (grossProfit || 0) + fiProfit;
   
-  // Determine deal type - all deals are retail by default (can be changed in UI)
-  const dealType = 'retail';
+  // All deals start as retail by default (can be changed in UI)
+  const dealType: 'retail' | 'dealer_trade' | 'wholesale' = 'retail';
   
   // Extract individual deal date with enhanced parsing
   const dateValue = getValue(columnMapping.date);

@@ -9,7 +9,7 @@ export interface DealRecord {
   grossProfit?: number;
   fiProfit?: number;
   totalProfit?: number;
-  dealType?: 'new' | 'used';
+  dealType?: 'retail' | 'dealer_trade' | 'wholesale';
   vin?: string;
   vehicle?: string;
   tradeValue?: number;
