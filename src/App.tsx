@@ -40,7 +40,7 @@ const AppContent = () => {
         <Route path="/dash/manager" element={<ManagerDashboardPage />} />
         <Route path="/dash/admin" element={<AdminDashboardPage />} />
         <Route path="/ai-monitor" element={<AIMonitorPage />} />
-        <Route path="/inbox" element={<Index />} />
+        <Route path="/inbox" element={<SmartInboxPage />} />
         <Route path="/upload-leads" element={<Index />} />
         <Route path="/settings" element={<Index />} />
         <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />

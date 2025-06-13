@@ -1,7 +1,9 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import ConversationsList from "./inbox/ConversationsList";
 import ChatView from "./inbox/ChatView";
 import ConversationMemory from "./ConversationMemory";
@@ -22,6 +24,9 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const [searchParams] = useSearchParams();
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [showMemory, setShowMemory] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  
   const { conversations, messages, loading, fetchMessages, sendMessage, refetch } = useRealtimeInbox();
   const { processing: aiProcessing } = useEnhancedAIScheduler();
 
@@ -40,52 +45,70 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     return conv.salespersonId === user.id || !conv.salespersonId;
   };
 
+  const handleRetry = async () => {
+    setError(null);
+    setRetryCount(prev => prev + 1);
+    try {
+      await refetch();
+    } catch (err) {
+      setError("Failed to load conversations. Please check your connection and try again.");
+    }
+  };
+
   const handleSendMessage = async (message: string) => {
     if (selectedLead && selectedConversation) {
-      // Auto-assign lead if it's unassigned and user can reply
-      if (!selectedConversation.salespersonId && canReply(selectedConversation)) {
-        console.log(`Auto-assigning lead ${selectedLead} to user ${user.id}`);
-        
-        const assigned = await assignCurrentUserToLead(selectedLead, user.id);
-        if (assigned) {
-          toast({
-            title: "Lead Assigned",
-            description: "This lead has been assigned to you",
-          });
+      try {
+        // Auto-assign lead if it's unassigned and user can reply
+        if (!selectedConversation.salespersonId && canReply(selectedConversation)) {
+          console.log(`Auto-assigning lead ${selectedLead} to user ${user.id}`);
           
-          // Update the conversation object locally
-          selectedConversation.salespersonId = user.id;
+          const assigned = await assignCurrentUserToLead(selectedLead, user.id);
+          if (assigned) {
+            toast({
+              title: "Lead Assigned",
+              description: "This lead has been assigned to you",
+            });
+            
+            // Update the conversation object locally
+            selectedConversation.salespersonId = user.id;
+          }
         }
+        
+        await sendMessage(selectedLead, message);
+        
+        // Refresh conversations to show updated assignment
+        setTimeout(() => {
+          refetch();
+        }, 1000);
+      } catch (err) {
+        setError("Failed to send message. Please try again.");
       }
-      
-      await sendMessage(selectedLead, message);
-      
-      // Refresh conversations to show updated assignment
-      setTimeout(() => {
-        refetch();
-      }, 1000);
     }
   };
 
   const handleSelectConversation = async (leadId: string) => {
-    setSelectedLead(leadId);
-    await fetchMessages(leadId);
-    
-    // Check if this lead has incoming messages to track as responses
-    const incomingMessages = messages.filter(msg => msg.direction === 'in');
-    if (incomingMessages.length > 0) {
-      // Track the most recent incoming message as a response
-      const latestIncoming = incomingMessages[incomingMessages.length - 1];
-      await trackLeadResponse(leadId, new Date(latestIncoming.sentAt));
+    try {
+      setSelectedLead(leadId);
+      await fetchMessages(leadId);
+      
+      // Check if this lead has incoming messages to track as responses
+      const incomingMessages = messages.filter(msg => msg.direction === 'in');
+      if (incomingMessages.length > 0) {
+        // Track the most recent incoming message as a response
+        const latestIncoming = incomingMessages[incomingMessages.length - 1];
+        await trackLeadResponse(leadId, new Date(latestIncoming.sentAt));
+      }
+      
+      // Mark messages as read when viewing the conversation
+      await markMessagesAsRead(leadId);
+      
+      // Refresh conversations to update unread counts
+      setTimeout(() => {
+        refetch();
+      }, 500);
+    } catch (err) {
+      setError("Failed to load messages for this conversation.");
     }
-    
-    // Mark messages as read when viewing the conversation
-    await markMessagesAsRead(leadId);
-    
-    // Refresh conversations to update unread counts
-    setTimeout(() => {
-      refetch();
-    }, 500);
   };
 
   const handleToggleMemory = () => {
@@ -111,10 +134,46 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     }
   }, [filteredConversations, selectedLead, searchParams]);
 
+  // Show error state
+  if (error) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center">
+        <Alert className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="mb-4">
+            {error}
+          </AlertDescription>
+          <Button onClick={handleRetry} className="w-full">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </Button>
+        </Alert>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p className="text-slate-600">Loading conversations...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state if no conversations
+  if (filteredConversations.length === 0) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-slate-600 mb-4">No conversations found</p>
+          <Button onClick={handleRetry} variant="outline">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
     );
   }

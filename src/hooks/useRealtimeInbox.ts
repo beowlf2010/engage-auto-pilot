@@ -19,11 +19,13 @@ export const useRealtimeInbox = () => {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { profile } = useAuth();
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
   const currentLeadIdRef = useRef<string | null>(null);
   const notificationPermission = useRef<NotificationPermission>('default');
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -36,31 +38,63 @@ export const useRealtimeInbox = () => {
     requestPermission();
   }, []);
 
-  const loadConversations = async () => {
+  const loadConversations = async (retryCount = 0) => {
     if (!profile) return;
 
     try {
+      setError(null);
       const conversationsData = await fetchConversations(profile);
       setConversations(conversationsData);
+      setLoading(false);
     } catch (error) {
       console.error('Error loading conversations:', error);
-    } finally {
+      
+      // If it's a network error and we haven't retried too many times
+      if (retryCount < 3 && error instanceof TypeError && error.message.includes('fetch')) {
+        console.log(`Retrying conversation fetch (attempt ${retryCount + 1})`);
+        
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, retryCount) * 1000;
+        retryTimeoutRef.current = setTimeout(() => {
+          loadConversations(retryCount + 1);
+        }, delay);
+        
+        return;
+      }
+      
+      setError('Unable to load conversations. Please check your connection.');
       setLoading(false);
     }
   };
 
-  const loadMessages = async (leadId: string) => {
+  const loadMessages = async (leadId: string, retryCount = 0) => {
     try {
+      setError(null);
       const messagesData = await fetchMessages(leadId);
       setMessages(messagesData);
       currentLeadIdRef.current = leadId;
     } catch (error) {
       console.error('Error loading messages:', error);
+      
+      // Retry logic for message loading
+      if (retryCount < 2 && error instanceof TypeError && error.message.includes('fetch')) {
+        console.log(`Retrying message fetch (attempt ${retryCount + 1})`);
+        
+        const delay = Math.pow(2, retryCount) * 1000;
+        setTimeout(() => {
+          loadMessages(leadId, retryCount + 1);
+        }, delay);
+        
+        return;
+      }
+      
+      setError('Unable to load messages for this conversation.');
     }
   };
 
   const sendMessage = async (leadId: string, body: string, aiGenerated = false) => {
     try {
+      setError(null);
       await sendMessageService(leadId, body, profile, aiGenerated);
       
       // Refresh messages and conversations to show updated status
@@ -68,6 +102,8 @@ export const useRealtimeInbox = () => {
       await loadConversations();
     } catch (error) {
       console.error('Error in sendMessage:', error);
+      setError('Failed to send message. Please try again.');
+      throw error;
     }
   };
 
@@ -75,60 +111,70 @@ export const useRealtimeInbox = () => {
     const newMessage = payload.new as IncomingMessage;
     console.log('New incoming message:', newMessage);
 
-    // Refresh conversations list
-    await loadConversations();
+    try {
+      // Refresh conversations list
+      await loadConversations();
 
-    // If viewing this lead's messages, refresh them
-    if (currentLeadIdRef.current === newMessage.lead_id) {
-      await loadMessages(newMessage.lead_id);
-    }
+      // If viewing this lead's messages, refresh them
+      if (currentLeadIdRef.current === newMessage.lead_id) {
+        await loadMessages(newMessage.lead_id);
+      }
 
-    // Get lead information for notifications
-    const { data: leadData } = await supabase
-      .from('leads')
-      .select('first_name, last_name, salesperson_id')
-      .eq('id', newMessage.lead_id)
-      .single();
+      // Get lead information for notifications
+      const { data: leadData } = await supabase
+        .from('leads')
+        .select('first_name, last_name, salesperson_id')
+        .eq('id', newMessage.lead_id)
+        .single();
 
-    if (leadData && newMessage.direction === 'in') {
-      const leadName = `${leadData.first_name} ${leadData.last_name}`;
-      
-      // Check if this message is for the current user
-      const isForCurrentUser = leadData.salesperson_id === profile?.id || 
-                             !leadData.salesperson_id ||
-                             profile?.role === 'manager' || 
-                             profile?.role === 'admin';
+      if (leadData && newMessage.direction === 'in') {
+        const leadName = `${leadData.first_name} ${leadData.last_name}`;
+        
+        // Check if this message is for the current user
+        const isForCurrentUser = leadData.salesperson_id === profile?.id || 
+                               !leadData.salesperson_id ||
+                               profile?.role === 'manager' || 
+                               profile?.role === 'admin';
 
-      if (isForCurrentUser) {
-        // Show toast notification
-        toast({
-          title: `New message from ${leadName}`,
-          description: newMessage.body.substring(0, 100) + (newMessage.body.length > 100 ? '...' : ''),
-          duration: 5000,
-        });
-
-        // Show browser notification if permission granted
-        if (notificationPermission.current === 'granted') {
-          const notification = new Notification(`New message from ${leadName}`, {
-            body: newMessage.body.substring(0, 200) + (newMessage.body.length > 200 ? '...' : ''),
-            icon: '/favicon.ico',
-            tag: `message-${newMessage.id}`,
+        if (isForCurrentUser) {
+          // Show toast notification
+          toast({
+            title: `New message from ${leadName}`,
+            description: newMessage.body.substring(0, 100) + (newMessage.body.length > 100 ? '...' : ''),
+            duration: 5000,
           });
 
-          notification.onclick = () => {
-            window.focus();
-            notification.close();
-          };
+          // Show browser notification if permission granted
+          if (notificationPermission.current === 'granted') {
+            const notification = new Notification(`New message from ${leadName}`, {
+              body: newMessage.body.substring(0, 200) + (newMessage.body.length > 200 ? '...' : ''),
+              icon: '/favicon.ico',
+              tag: `message-${newMessage.id}`,
+            });
 
-          setTimeout(() => notification.close(), 5000);
+            notification.onclick = () => {
+              window.focus();
+              notification.close();
+            };
+
+            setTimeout(() => notification.close(), 5000);
+          }
         }
       }
+    } catch (error) {
+      console.error('Error handling incoming message:', error);
     }
   };
 
   // Setup unified realtime channel
   useEffect(() => {
     if (!profile) return;
+
+    // Clear any existing retry timeout
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
 
     // Cleanup existing channel
     if (channelRef.current) {
@@ -190,16 +236,21 @@ export const useRealtimeInbox = () => {
           console.error('Error removing unified inbox channel:', error);
         }
       }
+      
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
     };
-  }, [profile?.id]); // Only depend on profile.id
+  }, [profile?.id]);
 
   return { 
     conversations, 
     messages, 
     loading, 
+    error,
     fetchMessages: loadMessages, 
     sendMessage,
-    refetch: loadConversations,
+    refetch: () => loadConversations(0),
     notificationPermission: notificationPermission.current
   };
 };
