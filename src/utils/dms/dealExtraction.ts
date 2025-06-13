@@ -44,7 +44,7 @@ export const extractDealsFromData = (data: any[], columnMapping: DmsColumns): De
     try {
       const deal = extractDealFromRow(row, headerRow, columnMapping);
       if (deal) {
-        console.log(`Row ${i}: Extracted deal with date ${deal.saleDate}, stock ${deal.stockNumber}`);
+        console.log(`Row ${i}: Extracted deal with date ${deal.saleDate}, stock ${deal.stockNumber}, type ${deal.dealType}`);
         deals.push(deal);
       }
     } catch (error) {
@@ -96,14 +96,14 @@ const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColu
   // Calculate total profit (gross + FI)
   const totalProfit = (grossProfit || 0) + fiProfit;
   
-  // Determine deal type based on stock number
-  const dealType = classifyDealByStock(stockNumber);
+  // Determine deal type - all deals are retail by default (can be changed in UI)
+  const dealType = 'retail';
   
   // Extract individual deal date with enhanced parsing
   const dateValue = getValue(columnMapping.date);
   const dealDate = extractDealDate(dateValue);
   
-  console.log(`Deal extraction - Stock: ${stockNumber}, Raw date: "${dateValue}", Parsed date: ${dealDate}`);
+  console.log(`Deal extraction - Stock: ${stockNumber}, Raw date: "${dateValue}", Parsed date: ${dealDate}, Deal type: ${dealType}`);
   
   if (!dealDate) {
     console.warn(`Failed to parse date "${dateValue}" for stock ${stockNumber}`);
@@ -145,7 +145,10 @@ const extractDealDate = (dateValue: string): string | null => {
     return result;
   }
   
-  // Try different common date formats
+  // Try different common date formats with proper 2-digit year handling
+  const currentYear = new Date().getFullYear();
+  const currentCentury = Math.floor(currentYear / 100) * 100;
+  
   const formats = [
     /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // MM/DD/YYYY or M/D/YYYY
     /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/, // MM/DD/YY or M/D/YY
@@ -168,19 +171,35 @@ const extractDealDate = (dateValue: string): string | null => {
         [, month, day, year] = match;
       } else if (i === 1) { // MM/DD/YY
         [, month, day, year] = match;
-        year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+        // Improved 2-digit year logic: 00-30 = 2000s, 31-99 = 1900s
+        const twoDigitYear = parseInt(year);
+        if (twoDigitYear <= 30) {
+          year = String(currentCentury + twoDigitYear);
+        } else {
+          year = String(currentCentury - 100 + twoDigitYear);
+        }
       } else if (i === 2) { // YYYY-MM-DD
         return match[0]; // Already in correct format
       } else if (i === 3) { // MM-DD-YYYY
         [, month, day, year] = match;
       } else if (i === 4) { // MM-DD-YY
         [, month, day, year] = match;
-        year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+        const twoDigitYear = parseInt(year);
+        if (twoDigitYear <= 30) {
+          year = String(currentCentury + twoDigitYear);
+        } else {
+          year = String(currentCentury - 100 + twoDigitYear);
+        }
       } else if (i === 5) { // MMDDYYYY
         [, month, day, year] = match;
       } else if (i === 6) { // MMDDYY
         [, month, day, year] = match;
-        year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+        const twoDigitYear = parseInt(year);
+        if (twoDigitYear <= 30) {
+          year = String(currentCentury + twoDigitYear);
+        } else {
+          year = String(currentCentury - 100 + twoDigitYear);
+        }
       }
       
       if (month && day && year) {
@@ -205,10 +224,4 @@ const extractDealDate = (dateValue: string): string | null => {
   
   console.warn(`Could not parse date: "${dateStr}"`);
   return null;
-};
-
-const classifyDealByStock = (stockNumber?: string): 'new' | 'used' => {
-  if (!stockNumber) return 'used';
-  const firstChar = stockNumber.trim().toUpperCase().charAt(0);
-  return firstChar === 'C' ? 'new' : 'used';
 };

@@ -10,7 +10,8 @@ export const getVehicleType = (stockNumber?: string): 'new' | 'used' => {
 export const isUsedVehicle = (stockNumber?: string): boolean => {
   if (!stockNumber) return true;
   const firstChar = stockNumber.trim().toUpperCase().charAt(0);
-  // Used vehicles include anything that's not C (new)
+  // Used vehicles: B prefix (used) and X prefix (trade-ins) get pack adjustment
+  // New vehicles: C prefix (new) do not get pack adjustment
   return firstChar !== 'C';
 };
 
@@ -22,7 +23,7 @@ export const hasProfitChanges = (deal: Deal) => {
 
 export const getAdjustedGrossProfit = (deal: Deal, packAdjustment: number) => {
   const baseGross = deal.gross_profit || 0;
-  // Only apply pack adjustment to used vehicles
+  // Only apply pack adjustment to used vehicles (B and X prefixes)
   return isUsedVehicle(deal.stock_number) ? baseGross + packAdjustment : baseGross;
 };
 

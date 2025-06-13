@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { DealRecord, FinancialSummary } from "./dms/types";
 
@@ -12,10 +13,10 @@ export const insertFinancialData = async (
   console.log('Sample deal dates:', deals.slice(0, 5).map(d => ({ stock: d.stockNumber, date: d.saleDate })));
   
   try {
-    // Map deals to database format - use individual deal dates
+    // Map deals to database format - use individual deal dates and ensure correct deal_type
     const dealRecords = deals.map(deal => {
       const dealDate = deal.saleDate || new Date().toISOString().split('T')[0];
-      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, using=${dealDate}`);
+      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, using=${dealDate}, dealType=${deal.dealType}`);
       
       return {
         upload_date: dealDate, // Use individual deal date as upload_date for database storage
@@ -28,7 +29,7 @@ export const insertFinancialData = async (
         gross_profit: deal.grossProfit || null,
         fi_profit: deal.fiProfit || null,
         total_profit: deal.totalProfit || null,
-        deal_type: deal.dealType === 'new' ? 'new' : 'retail',
+        deal_type: deal.dealType || 'retail', // Ensure valid deal_type
         upload_history_id: uploadHistoryId,
         original_gross_profit: deal.grossProfit || null,
         original_fi_profit: deal.fiProfit || null,
@@ -70,8 +71,20 @@ export const insertFinancialData = async (
     console.log(`Using snapshot date: ${snapshotDate} (from ${Object.keys(dateGroups).length} unique deal dates)`);
     console.log('Date distribution:', dateGroups);
 
-    const retailDeals = deals.filter(d => d.dealType !== 'new');
-    const newDeals = deals.filter(d => d.dealType === 'new');
+    // Categorize deals for profit snapshot
+    const retailDeals = deals.filter(d => (d.dealType || 'retail') === 'retail');
+    const dealerTradeDeals = deals.filter(d => d.dealType === 'dealer_trade');
+    const wholesaleDeals = deals.filter(d => d.dealType === 'wholesale');
+    
+    // Separate new vs used based on stock number classification
+    const getVehicleType = (stockNumber?: string): 'new' | 'used' => {
+      if (!stockNumber) return 'used';
+      const firstChar = stockNumber.trim().toUpperCase().charAt(0);
+      return firstChar === 'C' ? 'new' : 'used';
+    };
+    
+    const newDeals = retailDeals.filter(d => getVehicleType(d.stockNumber) === 'new');
+    const usedDeals = retailDeals.filter(d => getVehicleType(d.stockNumber) === 'used');
 
     const summaryData = {
       snapshot_date: snapshotDate,
@@ -82,14 +95,14 @@ export const insertFinancialData = async (
       total_profit: summary.totalProfit,
       new_units: newDeals.length,
       new_gross: newDeals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
-      used_units: retailDeals.length,
-      used_gross: retailDeals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
-      retail_units: summary.retailUnits,
-      retail_gross: summary.retailGross,
-      dealer_trade_units: summary.dealerTradeUnits,
-      dealer_trade_gross: summary.dealerTradeGross,
-      wholesale_units: summary.wholesaleUnits,
-      wholesale_gross: summary.wholesaleGross,
+      used_units: usedDeals.length,
+      used_gross: usedDeals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
+      retail_units: retailDeals.length,
+      retail_gross: retailDeals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
+      dealer_trade_units: dealerTradeDeals.length,
+      dealer_trade_gross: dealerTradeDeals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
+      wholesale_units: wholesaleDeals.length,
+      wholesale_gross: wholesaleDeals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
       upload_history_id: uploadHistoryId
     };
 
