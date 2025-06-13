@@ -1,4 +1,5 @@
 
+
 export interface DealRecord {
   age?: number;
   stockNumber?: string;
@@ -13,7 +14,7 @@ export interface DealRecord {
   vin?: string;
   vehicle?: string;
   tradeValue?: number;
-  saleDate?: string;
+  saleDate?: string | null; // Allow null to track parsing failures
 }
 
 export interface FinancialSummary {
@@ -47,3 +48,4 @@ export interface DmsColumns {
   fi?: string;
   total?: string;
 }
+

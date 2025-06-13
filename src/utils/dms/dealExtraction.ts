@@ -1,4 +1,5 @@
 
+
 import { DealRecord, DmsColumns } from './types';
 
 export const extractDealsFromData = (data: any[], columnMapping: DmsColumns): DealRecord[] => {
@@ -106,7 +107,7 @@ const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColu
   console.log(`Deal extraction - Stock: ${stockNumber}, Raw date: "${dateValue}", Parsed date: ${dealDate}, Deal type: ${dealType}`);
   
   if (!dealDate) {
-    console.warn(`Failed to parse date "${dateValue}" for stock ${stockNumber}`);
+    console.warn(`Failed to parse date "${dateValue}" for stock ${stockNumber} - NO FALLBACK APPLIED`);
   }
   
   const deal: DealRecord = {
@@ -122,7 +123,7 @@ const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColu
     vin: getValue(columnMapping.vin6) || undefined,
     vehicle: getValue(columnMapping.vehicle) || undefined,
     tradeValue: getNumberValue(columnMapping.trade),
-    saleDate: dealDate || new Date().toISOString().split('T')[0] // fallback to today if no date found
+    saleDate: dealDate // NO FALLBACK - null if parsing fails
   };
   
   return deal;
@@ -132,7 +133,7 @@ const extractDealDate = (dateValue: string): string | null => {
   if (!dateValue) return null;
   
   const dateStr = dateValue.trim();
-  console.log(`Parsing date: "${dateStr}"`);
+  console.log(`=== DATE PARSING === Input: "${dateStr}"`);
   
   // First, try to parse as Excel serial number (most common in DMS exports)
   const numericDate = parseFloat(dateStr);
@@ -145,9 +146,8 @@ const extractDealDate = (dateValue: string): string | null => {
     return result;
   }
   
-  // Try different common date formats with proper 2-digit year handling
+  // Try different common date formats with FIXED 2-digit year handling
   const currentYear = new Date().getFullYear();
-  const currentCentury = Math.floor(currentYear / 100) * 100;
   
   const formats = [
     /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // MM/DD/YYYY or M/D/YYYY
@@ -171,40 +171,47 @@ const extractDealDate = (dateValue: string): string | null => {
         [, month, day, year] = match;
       } else if (i === 1) { // MM/DD/YY
         [, month, day, year] = match;
-        // Improved 2-digit year logic: 00-30 = 2000s, 31-99 = 1900s
+        // FIXED 2-digit year logic: 00-50 = 2000s, 51-99 = 1900s
         const twoDigitYear = parseInt(year);
-        if (twoDigitYear <= 30) {
-          year = String(currentCentury + twoDigitYear);
+        if (twoDigitYear <= 50) {
+          year = String(2000 + twoDigitYear);
+          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (2000s)`);
         } else {
-          year = String(currentCentury - 100 + twoDigitYear);
+          year = String(1900 + twoDigitYear);
+          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (1900s)`);
         }
       } else if (i === 2) { // YYYY-MM-DD
-        return match[0]; // Already in correct format
+        console.log(`Already in ISO format: ${match[0]}`);
+        return match[0];
       } else if (i === 3) { // MM-DD-YYYY
         [, month, day, year] = match;
       } else if (i === 4) { // MM-DD-YY
         [, month, day, year] = match;
         const twoDigitYear = parseInt(year);
-        if (twoDigitYear <= 30) {
-          year = String(currentCentury + twoDigitYear);
+        if (twoDigitYear <= 50) {
+          year = String(2000 + twoDigitYear);
+          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (2000s)`);
         } else {
-          year = String(currentCentury - 100 + twoDigitYear);
+          year = String(1900 + twoDigitYear);
+          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (1900s)`);
         }
       } else if (i === 5) { // MMDDYYYY
         [, month, day, year] = match;
       } else if (i === 6) { // MMDDYY
         [, month, day, year] = match;
         const twoDigitYear = parseInt(year);
-        if (twoDigitYear <= 30) {
-          year = String(currentCentury + twoDigitYear);
+        if (twoDigitYear <= 50) {
+          year = String(2000 + twoDigitYear);
+          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (2000s)`);
         } else {
-          year = String(currentCentury - 100 + twoDigitYear);
+          year = String(1900 + twoDigitYear);
+          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (1900s)`);
         }
       }
       
       if (month && day && year) {
         const result = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        console.log(`Formatted date: ${result}`);
+        console.log(`Final parsed date: ${result}`);
         return result;
       }
     }
@@ -222,6 +229,7 @@ const extractDealDate = (dateValue: string): string | null => {
     // Ignore parsing errors
   }
   
-  console.warn(`Could not parse date: "${dateStr}"`);
+  console.error(`FAILED TO PARSE DATE: "${dateStr}" - returning null`);
   return null;
 };
+

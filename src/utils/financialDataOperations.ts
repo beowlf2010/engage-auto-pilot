@@ -8,14 +8,32 @@ export const insertFinancialData = async (
   reportDate?: string
 ) => {
   console.log('=== FINANCIAL DATA INSERTION ===');
-  console.log(`Inserting ${deals.length} deals`);
-  console.log('Sample deal dates:', deals.slice(0, 5).map(d => ({ stock: d.stockNumber, date: d.saleDate })));
+  console.log(`Starting with ${deals.length} extracted deals`);
+  
+  // Filter out deals with invalid data BEFORE processing
+  const validDeals = deals.filter(deal => {
+    if (!deal.saleDate) {
+      console.warn(`Skipping deal ${deal.stockNumber}: No valid sale date`);
+      return false;
+    }
+    if (!deal.stockNumber && (deal.grossProfit === undefined || deal.grossProfit === null)) {
+      console.warn(`Skipping deal: No stock number and no gross profit`);
+      return false;
+    }
+    return true;
+  });
+  
+  console.log(`After filtering: ${validDeals.length} valid deals (${deals.length - validDeals.length} skipped due to missing data)`);
+  
+  if (validDeals.length === 0) {
+    throw new Error('No valid deals found after filtering. Check date parsing and required fields.');
+  }
   
   try {
     // Map deals to database format - use individual deal dates and ensure correct deal_type
-    const dealRecords = deals.map(deal => {
-      const dealDate = deal.saleDate || new Date().toISOString().split('T')[0];
-      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, using=${dealDate}, dealType=${deal.dealType}`);
+    const dealRecords = validDeals.map(deal => {
+      const dealDate = deal.saleDate!; // We know it's valid from filtering above
+      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, dealType=${deal.dealType}`);
       
       return {
         upload_date: dealDate, // Use individual deal date as upload_date for database storage
@@ -37,6 +55,7 @@ export const insertFinancialData = async (
       };
     });
 
+    console.log(`Prepared ${dealRecords.length} deal records for insertion`);
     console.log('Sample deal record to insert:', dealRecords[0]);
 
     // Use upsert with the unique constraint on (stock_number, upload_date)
@@ -53,11 +72,16 @@ export const insertFinancialData = async (
       throw new Error(`Failed to insert deals: ${insertError.message}`);
     }
 
-    console.log(`Successfully upserted ${insertedDeals?.length || 0} deals`);
+    const insertedCount = insertedDeals?.length || 0;
+    console.log(`Successfully upserted ${insertedCount} deals`);
+    
+    if (insertedCount !== dealRecords.length) {
+      console.warn(`Warning: Tried to insert ${dealRecords.length} deals but only ${insertedCount} were successful`);
+    }
 
-    // For profit snapshot, use the most common deal date from the actual deals
-    const dateGroups = deals.reduce((acc, deal) => {
-      const date = deal.saleDate || new Date().toISOString().split('T')[0];
+    // For profit snapshot, use the most common deal date from the actual valid deals
+    const dateGroups = validDeals.reduce((acc, deal) => {
+      const date = deal.saleDate!; // We know it's valid
       acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -70,10 +94,10 @@ export const insertFinancialData = async (
     console.log(`Using snapshot date: ${snapshotDate} (from ${Object.keys(dateGroups).length} unique deal dates)`);
     console.log('Date distribution:', dateGroups);
 
-    // Categorize deals for profit snapshot
-    const retailDeals = deals.filter(d => (d.dealType || 'retail') === 'retail');
-    const dealerTradeDeals = deals.filter(d => d.dealType === 'dealer_trade');
-    const wholesaleDeals = deals.filter(d => d.dealType === 'wholesale');
+    // Categorize deals for profit snapshot using validDeals (not all deals)
+    const retailDeals = validDeals.filter(d => (d.dealType || 'retail') === 'retail');
+    const dealerTradeDeals = validDeals.filter(d => d.dealType === 'dealer_trade');
+    const wholesaleDeals = validDeals.filter(d => d.dealType === 'wholesale');
     
     // Separate new vs used based on stock number classification
     const getVehicleType = (stockNumber?: string): 'new' | 'used' => {
@@ -87,11 +111,11 @@ export const insertFinancialData = async (
 
     const summaryData = {
       snapshot_date: snapshotDate,
-      total_units: deals.length, // Use actual deal count, not summary.totalUnits
-      total_sales: summary.totalSales,
-      total_gross: summary.totalGross,
-      total_fi_profit: summary.totalFiProfit,
-      total_profit: summary.totalProfit,
+      total_units: validDeals.length, // Use valid deal count, not original summary
+      total_sales: validDeals.reduce((sum, deal) => sum + (deal.saleAmount || 0), 0),
+      total_gross: validDeals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
+      total_fi_profit: validDeals.reduce((sum, deal) => sum + (deal.fiProfit || 0), 0),
+      total_profit: validDeals.reduce((sum, deal) => sum + (deal.totalProfit || 0), 0),
       new_units: newDeals.length,
       new_gross: newDeals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
       used_units: usedDeals.length,
@@ -105,7 +129,7 @@ export const insertFinancialData = async (
       upload_history_id: uploadHistoryId
     };
 
-    console.log('Summary data for snapshot:', summaryData);
+    console.log('Summary data for snapshot (calculated from valid deals):', summaryData);
 
     // Use the expanded profit snapshot function
     const { data: snapshotResult, error: snapshotError } = await supabase
@@ -137,9 +161,12 @@ export const insertFinancialData = async (
     console.log('Profit snapshot upserted with ID:', snapshotResult);
 
     return {
-      insertedDeals: insertedDeals?.length || 0,
+      insertedDeals: insertedCount,
       summary: summaryData,
-      reportDate: snapshotDate
+      reportDate: snapshotDate,
+      totalExtracted: deals.length,
+      validDeals: validDeals.length,
+      skippedDeals: deals.length - validDeals.length
     };
 
   } catch (error) {
