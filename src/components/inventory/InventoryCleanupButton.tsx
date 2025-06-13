@@ -37,18 +37,20 @@ const InventoryCleanupButton = () => {
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-3">
             <p>
-              This will identify the latest upload for each inventory type (GM Global, New, Used) 
-              and mark older vehicles as "sold" to fix the inventory count.
+              This will identify the most recent upload batches and mark older vehicles as "sold" 
+              to fix the inventory count and remove duplicates.
             </p>
             <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
               <p className="text-sm text-yellow-800">
                 <strong>What this does:</strong>
               </p>
               <ul className="text-sm text-yellow-700 mt-1 space-y-1">
-                <li>• Keeps only vehicles from the most recent upload of each type</li>
+                <li>• Identifies the 3 most recent upload batches</li>
+                <li>• Keeps only vehicles from these recent uploads</li>
+                <li>• Handles GM Global orders separately</li>
                 <li>• Marks older duplicate vehicles as "sold"</li>
                 <li>• Preserves all data - no vehicles are deleted</li>
-                <li>• Updates the dashboard counts to show accurate numbers</li>
+                <li>• Updates dashboard counts to show accurate numbers</li>
               </ul>
             </div>
             <p className="text-sm text-slate-600">

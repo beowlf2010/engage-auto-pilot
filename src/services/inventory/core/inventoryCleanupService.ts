@@ -5,50 +5,44 @@ import { toast } from '@/hooks/use-toast';
 export interface CleanupSummary {
   totalProcessed: number;
   gmGlobalMarkedSold: number;
-  newMarkedSold: number;
-  usedMarkedSold: number;
+  regularInventoryMarkedSold: number;
   latestUploads: {
-    gmGlobal: string | null;
-    new: string | null;
-    used: string | null;
+    mostRecentUploads: string[];
+    gmGlobalUpload: string | null;
   };
 }
 
 export const getLatestUploads = async (): Promise<CleanupSummary['latestUploads']> => {
-  // Get latest GM Global upload
-  const { data: latestGMGlobal } = await supabase
-    .from('upload_history')
-    .select('id')
-    .eq('upload_type', 'inventory')
-    .eq('inventory_condition', 'new')
+  // Get the 3 most recent upload_history_id values from inventory
+  // This handles mixed uploads better than filtering by condition
+  const { data: recentUploads } = await supabase
+    .from('inventory')
+    .select('upload_history_id')
+    .not('upload_history_id', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1000); // Get enough to find recent unique uploads
 
-  // Get latest Used upload
-  const { data: latestUsed } = await supabase
-    .from('upload_history')
-    .select('id')
-    .eq('upload_type', 'inventory')
-    .eq('inventory_condition', 'used')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  if (!recentUploads) {
+    return { mostRecentUploads: [], gmGlobalUpload: null };
+  }
 
-  // Get latest New upload (non-GM Global)
-  const { data: latestNew } = await supabase
-    .from('upload_history')
-    .select('id')
-    .eq('upload_type', 'inventory')
-    .eq('inventory_condition', 'new')
+  // Get unique upload_history_ids and take the most recent ones
+  const uniqueUploads = [...new Set(recentUploads.map(r => r.upload_history_id))];
+  const mostRecentUploads = uniqueUploads.slice(0, 3); // Keep vehicles from 3 most recent uploads
+
+  // Find the most recent GM Global upload specifically
+  const { data: gmGlobalUpload } = await supabase
+    .from('inventory')
+    .select('upload_history_id')
+    .eq('source_report', 'orders_all')
+    .not('upload_history_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
 
   return {
-    gmGlobal: latestGMGlobal?.id || null,
-    new: latestNew?.id || null,
-    used: latestUsed?.id || null,
+    mostRecentUploads,
+    gmGlobalUpload: gmGlobalUpload?.upload_history_id || null,
   };
 };
 
@@ -61,11 +55,10 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
 
     let totalProcessed = 0;
     let gmGlobalMarkedSold = 0;
-    let newMarkedSold = 0;
-    let usedMarkedSold = 0;
+    let regularInventoryMarkedSold = 0;
 
-    // Mark old GM Global orders as sold (not from latest upload)
-    if (latestUploads.gmGlobal) {
+    // Mark old GM Global orders as sold (not from latest GM Global upload)
+    if (latestUploads.gmGlobalUpload) {
       const { data: oldGMGlobal, error: gmError } = await supabase
         .from('inventory')
         .update({
@@ -74,55 +67,42 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
           updated_at: new Date().toISOString()
         })
         .eq('source_report', 'orders_all')
-        .neq('upload_history_id', latestUploads.gmGlobal)
+        .neq('upload_history_id', latestUploads.gmGlobalUpload)
         .neq('status', 'sold')
         .select('id');
 
-      if (gmError) throw gmError;
+      if (gmError) {
+        console.error('Error marking old GM Global as sold:', gmError);
+        throw gmError;
+      }
+
       gmGlobalMarkedSold = oldGMGlobal?.length || 0;
       totalProcessed += gmGlobalMarkedSold;
       console.log(`Marked ${gmGlobalMarkedSold} old GM Global orders as sold`);
     }
 
-    // Mark old New vehicles as sold (not from latest upload, excluding GM Global)
-    if (latestUploads.new) {
-      const { data: oldNew, error: newError } = await supabase
+    // Mark regular inventory (non-GM Global) as sold if not from recent uploads
+    if (latestUploads.mostRecentUploads.length > 0) {
+      const { data: oldRegular, error: regularError } = await supabase
         .from('inventory')
         .update({
           status: 'sold',
           sold_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('condition', 'new')
-        .or('source_report.is.null,source_report.neq.orders_all')
-        .neq('upload_history_id', latestUploads.new)
+        .not('source_report', 'eq', 'orders_all')
+        .not('upload_history_id', 'in', `(${latestUploads.mostRecentUploads.map(id => `'${id}'`).join(',')})`)
         .neq('status', 'sold')
         .select('id');
 
-      if (newError) throw newError;
-      newMarkedSold = oldNew?.length || 0;
-      totalProcessed += newMarkedSold;
-      console.log(`Marked ${newMarkedSold} old New vehicles as sold`);
-    }
+      if (regularError) {
+        console.error('Error marking old regular inventory as sold:', regularError);
+        throw regularError;
+      }
 
-    // Mark old Used vehicles as sold (not from latest upload)
-    if (latestUploads.used) {
-      const { data: oldUsed, error: usedError } = await supabase
-        .from('inventory')
-        .update({
-          status: 'sold',
-          sold_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('condition', 'used')
-        .neq('upload_history_id', latestUploads.used)
-        .neq('status', 'sold')
-        .select('id');
-
-      if (usedError) throw usedError;
-      usedMarkedSold = oldUsed?.length || 0;
-      totalProcessed += usedMarkedSold;
-      console.log(`Marked ${usedMarkedSold} old Used vehicles as sold`);
+      regularInventoryMarkedSold = oldRegular?.length || 0;
+      totalProcessed += regularInventoryMarkedSold;
+      console.log(`Marked ${regularInventoryMarkedSold} old regular inventory vehicles as sold`);
     }
 
     console.log(`Cleanup completed. Total processed: ${totalProcessed}`);
@@ -130,8 +110,7 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
     return {
       totalProcessed,
       gmGlobalMarkedSold,
-      newMarkedSold,
-      usedMarkedSold,
+      regularInventoryMarkedSold,
       latestUploads,
     };
   } catch (error) {
@@ -151,7 +130,7 @@ export const performInventoryCleanup = async (): Promise<void> => {
 
     toast({
       title: "Cleanup Completed",
-      description: `Processed ${summary.totalProcessed} vehicles: ${summary.gmGlobalMarkedSold} GM Global, ${summary.newMarkedSold} New, ${summary.usedMarkedSold} Used marked as sold`,
+      description: `Processed ${summary.totalProcessed} vehicles: ${summary.gmGlobalMarkedSold} GM Global, ${summary.regularInventoryMarkedSold} Regular inventory marked as sold`,
     });
 
     // Refresh the page to show updated counts
