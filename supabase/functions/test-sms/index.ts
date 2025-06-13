@@ -63,13 +63,13 @@ serve(async (req) => {
       )
     }
 
-    // Get Twilio credentials from environment
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
-    const fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
+    // Get Twilio credentials from environment first
+    let accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
+    let authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
+    let fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
 
+    // If not in environment, get from database
     if (!accountSid || !authToken || !fromNumber) {
-      // Try to get from database fallback
       const { data: settings } = await supabase
         .from('settings')
         .select('key, value')
@@ -80,78 +80,26 @@ serve(async (req) => {
         settingsMap[setting.key] = setting.value
       })
 
-      const fallbackSid = settingsMap['TWILIO_ACCOUNT_SID']
-      const fallbackToken = settingsMap['TWILIO_AUTH_TOKEN']
-      const fallbackPhone = settingsMap['TWILIO_PHONE_NUMBER']
+      accountSid = accountSid || settingsMap['TWILIO_ACCOUNT_SID']
+      authToken = authToken || settingsMap['TWILIO_AUTH_TOKEN']
+      fromNumber = fromNumber || settingsMap['TWILIO_PHONE_NUMBER']
+    }
 
-      if (!fallbackSid || !fallbackToken || !fallbackPhone) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Missing Twilio credentials. Please configure your Twilio settings first.',
-            details: {
-              hasSid: !!(accountSid || fallbackSid),
-              hasToken: !!(authToken || fallbackToken),
-              hasPhone: !!(fromNumber || fallbackPhone)
-            }
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      // Use fallback credentials
-      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${fallbackSid}/Messages.json`
-      const auth = btoa(`${fallbackSid}:${fallbackToken}`)
-
-      const formData = new URLSearchParams()
-      formData.append('To', testPhoneNumber)
-      formData.append('From', fallbackPhone)
-      formData.append('Body', `Test message from your CRM system at ${new Date().toLocaleString()}. Your Twilio integration is working correctly!`)
-
-      const response = await fetch(twilioUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData,
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        console.error('Twilio API error:', result)
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: result.message || 'Failed to send test SMS',
-            details: result
-          }),
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      }
-
-      console.log('Test SMS sent successfully:', result.sid)
-      
+    if (!accountSid || !authToken || !fromNumber) {
       return new Response(
         JSON.stringify({ 
-          success: true,
-          message: 'Test SMS sent successfully!',
-          twilioMessageId: result.sid,
-          status: result.status,
-          to: testPhoneNumber,
-          from: fallbackPhone
+          error: 'Missing Twilio credentials. Please configure your Twilio settings first.',
+          details: {
+            hasSid: !!accountSid,
+            hasToken: !!authToken,
+            hasPhone: !!fromNumber
+          }
         }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Use environment credentials
+    // Send test SMS using Twilio API
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
     const auth = btoa(`${accountSid}:${authToken}`)
 
