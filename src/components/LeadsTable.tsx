@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -110,6 +109,10 @@ const LeadsTable = ({ leads, onAiOptInChange, canEdit, loading, searchTerm }: Le
 
   const handleMessageClick = (lead: Lead) => {
     navigate(`/inbox?leadId=${lead.id}`);
+  };
+
+  const handleLeadClick = (leadId: number) => {
+    navigate(`/lead/${leadId}`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -225,7 +228,10 @@ const LeadsTable = ({ leads, onAiOptInChange, canEdit, loading, searchTerm }: Le
                   />
                 </TableCell>
                 <TableCell className="font-medium">
-                  <div>
+                  <div
+                    className="cursor-pointer hover:text-blue-600 transition-colors"
+                    onClick={() => handleLeadClick(lead.id)}
+                  >
                     <div className="font-medium">{lead.firstName} {lead.lastName}</div>
                     {lead.middleName && (
                       <div className="text-xs text-muted-foreground">{lead.middleName}</div>

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +17,7 @@ import {
   AIMonitorPage 
 } from "./pages/StreamlinedPages";
 import StreamlinedNavigation from "./components/StreamlinedNavigation";
+import LeadDetailPage from "./pages/LeadDetailPage";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +35,7 @@ const App = () => (
               <Route path="/dashboard" element={<Index />} />
               <Route path="/smartinbox" element={<SmartInboxPage />} />
               <Route path="/leads" element={<StreamlinedLeadsPage />} />
+              <Route path="/lead/:leadId" element={<LeadDetailPage />} />
               <Route path="/dash/sales" element={<SalesDashboardPage />} />
               <Route path="/dash/manager" element={<ManagerDashboardPage />} />
               <Route path="/dash/admin" element={<AdminDashboardPage />} />
