@@ -13,44 +13,64 @@ export interface InventoryStats {
 
 export const getInventoryStats = async (): Promise<InventoryStats> => {
   try {
+    console.log('=== INVENTORY STATS CALCULATION ===');
+    
     // Get total count
     const { count: totalVehicles } = await supabase
       .from('inventory')
       .select('*', { count: 'exact', head: true });
+    console.log('Total vehicles in database:', totalVehicles);
 
-    // Get available vehicles - regular inventory
+    // Get available vehicles - regular inventory (not GM Global orders)
     const { count: regularAvailable } = await supabase
       .from('inventory')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'available')
       .or('source_report.is.null,source_report.neq.orders_all');
+    console.log('Regular available vehicles:', regularAvailable);
 
-    // Get available GM Global orders (status 5000 or available)
-    const { count: gmGlobalAvailable } = await supabase
+    // Get GM Global available orders (status 5000-5999 range)
+    const { data: gmGlobalData } = await supabase
       .from('inventory')
-      .select('*', { count: 'exact', head: true })
-      .eq('source_report', 'orders_all')
-      .in('status', ['5000', 'available']);
-
-    // Get GM Global in production/transit
-    const { count: inProductionTransit } = await supabase
-      .from('inventory')
-      .select('*', { count: 'exact', head: true })
-      .eq('source_report', 'orders_all')
-      .not('status', 'in', '(5000,available,sold)');
+      .select('status')
+      .eq('source_report', 'orders_all');
+    
+    let gmGlobalAvailable = 0;
+    let gmGlobalInProduction = 0;
+    
+    if (gmGlobalData) {
+      console.log('GM Global vehicles by status:');
+      gmGlobalData.forEach(vehicle => {
+        const statusNum = parseInt(vehicle.status);
+        if (statusNum >= 5000 && statusNum <= 5999) {
+          gmGlobalAvailable++;
+        } else if (statusNum >= 2500 && statusNum <= 4999) {
+          gmGlobalInProduction++;
+        }
+        // Log status distribution for debugging
+        const statusRange = Math.floor(statusNum / 1000) * 1000;
+        console.log(`Status ${vehicle.status} (${statusRange}s range)`);
+      });
+    }
+    
+    console.log('GM Global available (5000-5999):', gmGlobalAvailable);
+    console.log('GM Global in production/transit (2500-4999):', gmGlobalInProduction);
 
     // Get sold vehicles
     const { count: soldVehicles } = await supabase
       .from('inventory')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'sold');
+    console.log('Sold vehicles:', soldVehicles);
 
-    // Get pricing data for available vehicles
+    // Get pricing data for truly available vehicles only
     const { data: pricingData } = await supabase
       .from('inventory')
-      .select('price, days_in_inventory')
-      .or('status.eq.available,and(source_report.eq.orders_all,status.in.(5000,available))')
+      .select('price, days_in_inventory, status, source_report')
+      .or('and(status.eq.available,or(source_report.is.null,source_report.neq.orders_all)),and(source_report.eq.orders_all,status.gte.5000,status.lte.5999)')
       .not('price', 'is', null);
+
+    console.log('Pricing data count:', pricingData?.length || 0);
 
     const validPrices = pricingData?.filter(item => item.price && item.price > 0) || [];
     const totalValue = validPrices.reduce((sum, item) => sum + item.price, 0);
@@ -61,10 +81,17 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
       ? validDays.reduce((sum, item) => sum + (item.days_in_inventory || 0), 0) / validDays.length 
       : 0;
 
+    const totalAvailable = (regularAvailable || 0) + gmGlobalAvailable;
+    console.log('FINAL COUNTS:');
+    console.log('- Regular available:', regularAvailable || 0);
+    console.log('- GM Global available:', gmGlobalAvailable);
+    console.log('- Total available:', totalAvailable);
+    console.log('- In production/transit:', gmGlobalInProduction);
+
     return {
       totalVehicles: totalVehicles || 0,
-      availableVehicles: (regularAvailable || 0) + (gmGlobalAvailable || 0),
-      inProductionTransit: inProductionTransit || 0,
+      availableVehicles: totalAvailable,
+      inProductionTransit: gmGlobalInProduction,
       soldVehicles: soldVehicles || 0,
       averagePrice,
       totalValue,
@@ -86,7 +113,8 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
 
 export const isVehicleAvailable = (vehicle: any): boolean => {
   if (vehicle.source_report === 'orders_all') {
-    return ['5000', 'available'].includes(vehicle.status);
+    const statusNum = parseInt(vehicle.status);
+    return statusNum >= 5000 && statusNum <= 5999;
   }
   return vehicle.status === 'available';
 };
