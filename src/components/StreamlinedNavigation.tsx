@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
@@ -69,6 +68,15 @@ const StreamlinedNavigation = () => {
           hoverActions: [
             { label: 'View Performance', icon: BarChart3, action: () => navigate('/dash/sales') }
           ]
+        },
+        { 
+          path: '/settings', 
+          label: 'Settings', 
+          icon: Settings,
+          color: 'gray',
+          hoverActions: [
+            { label: 'Configure Settings', icon: Settings, action: () => navigate('/settings') }
+          ]
         }
       ];
     }
@@ -104,6 +112,15 @@ const StreamlinedNavigation = () => {
           color: 'red',
           hoverActions: [
             { label: 'Monitor AI Activity', icon: Eye, action: () => navigate('/ai-monitor') }
+          ]
+        },
+        { 
+          path: '/settings', 
+          label: 'Settings', 
+          icon: Settings,
+          color: 'gray',
+          hoverActions: [
+            { label: 'Configure Settings', icon: Settings, action: () => navigate('/settings') }
           ]
         }
       ];
@@ -144,12 +161,12 @@ const StreamlinedNavigation = () => {
           ]
         },
         { 
-          path: '/users', 
-          label: 'Users', 
+          path: '/settings', 
+          label: 'Settings', 
           icon: Settings,
           color: 'gray',
           hoverActions: [
-            { label: 'Manage Users', icon: Settings, action: () => navigate('/users') }
+            { label: 'Configure Settings', icon: Settings, action: () => navigate('/settings') }
           ]
         }
       ];
