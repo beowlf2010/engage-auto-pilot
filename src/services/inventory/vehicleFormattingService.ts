@@ -144,3 +144,31 @@ export const getDataCompletenessScore = (vehicle: any): number => {
   
   return Math.round((score / fields.length) * 100);
 };
+
+export const getVehicleStatusDisplay = (vehicle: any) => {
+  if (vehicle.source_report === 'orders_all') {
+    switch (vehicle.status) {
+      case '5000':
+        return { label: 'Available', color: 'bg-green-100 text-green-800' };
+      case '1000':
+      case '2000':
+        return { label: 'Being Built', color: 'bg-yellow-100 text-yellow-800' };
+      case '3000':
+      case '4000':
+        return { label: 'In Transit', color: 'bg-blue-100 text-blue-800' };
+      default:
+        return { label: vehicle.status || 'Unknown', color: 'bg-gray-100 text-gray-800' };
+    }
+  }
+  
+  switch (vehicle.status) {
+    case 'available':
+      return { label: 'Available', color: 'bg-green-100 text-green-800' };
+    case 'sold':
+      return { label: 'Sold', color: 'bg-blue-100 text-blue-800' };
+    case 'pending':
+      return { label: 'Pending', color: 'bg-yellow-100 text-yellow-800' };
+    default:
+      return { label: vehicle.status || 'Unknown', color: 'bg-gray-100 text-gray-800' };
+  }
+};
