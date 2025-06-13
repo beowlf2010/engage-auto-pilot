@@ -89,7 +89,19 @@ const StreamlinedInbox = () => {
 
     const { data, error } = await supabase
       .from('leads')
-      .select('*')
+      .select(`
+        id,
+        first_name,
+        last_name,
+        ai_stage,
+        next_ai_send_at,
+        last_reply_at,
+        ai_opt_in,
+        phone_numbers (
+          number,
+          is_primary
+        )
+      `)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -97,7 +109,20 @@ const StreamlinedInbox = () => {
       return;
     }
 
-    setLeads(data || []);
+    // Transform the data to match our Lead interface
+    const transformedLeads: Lead[] = (data || []).map(lead => ({
+      id: lead.id,
+      first_name: lead.first_name,
+      last_name: lead.last_name,
+      phone: lead.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+             lead.phone_numbers?.[0]?.number || '',
+      ai_stage: lead.ai_stage || 'new',
+      next_ai_send_at: lead.next_ai_send_at,
+      last_reply_at: lead.last_reply_at,
+      ai_opt_in: lead.ai_opt_in || false
+    }));
+
+    setLeads(transformedLeads);
   };
 
   const fetchMessages = async (leadId: string) => {

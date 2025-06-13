@@ -3,7 +3,7 @@ import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import StreamlinedInbox from '@/components/StreamlinedInbox';
 import { SalesDashboard, ManagerDashboard } from '@/components/StreamlinedDashboards';
-import { LeadsList } from '@/components/LeadsList';
+import LeadsList from '@/components/LeadsList';
 
 export const SmartInboxPage = () => {
   const { profile } = useAuth();
