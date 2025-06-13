@@ -36,6 +36,12 @@ const Settings = ({ user }: SettingsProps) => {
   const [activeTab, setActiveTab] = useState("cadence");
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [loadingStates, setLoadingStates] = useState({
+    openai: false,
+    twilioSid: false,
+    twilioToken: false,
+    twilioPhone: false
+  });
   const [apiKeys, setApiKeys] = useState({
     openaiKey: "sk-1234567890abcdef...",
     twilioSid: "AC1234567890abcdef...",
@@ -60,8 +66,8 @@ const Settings = ({ user }: SettingsProps) => {
     });
   };
 
-  const handleApiKeyUpdate = async (settingType: string, value: string) => {
-    setIsLoading(true);
+  const handleApiKeyUpdate = async (settingType: string, value: string, keyType: keyof typeof loadingStates) => {
+    setLoadingStates(prev => ({ ...prev, [keyType]: true }));
     try {
       if (settingType === 'TWILIO_PHONE_NUMBER') {
         const formattedPhone = formatPhoneNumber(value);
@@ -85,7 +91,7 @@ const Settings = ({ user }: SettingsProps) => {
 
       toast({
         title: "Settings Updated",
-        description: result.message,
+        description: result.message || "Settings updated successfully",
       });
     } catch (error) {
       toast({
@@ -94,7 +100,7 @@ const Settings = ({ user }: SettingsProps) => {
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setLoadingStates(prev => ({ ...prev, [keyType]: false }));
     }
   };
 
@@ -304,21 +310,36 @@ const Settings = ({ user }: SettingsProps) => {
                     onChange={(e) => setApiKeys(prev => ({ ...prev, openaiKey: e.target.value }))}
                     className="flex-1"
                   />
-                  <Button variant="outline" disabled>Test</Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => handleApiKeyUpdate('OPENAI_API_KEY', apiKeys.openaiKey, 'openai')}
+                    disabled={loadingStates.openai}
+                  >
+                    {loadingStates.openai ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                  </Button>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">Used for AI message generation</p>
               </div>
               
               <div>
                 <Label htmlFor="twilio_sid">Twilio Account SID</Label>
-                <Input 
-                  id="twilio_sid"
-                  type="password" 
-                  placeholder="AC..." 
-                  value={apiKeys.twilioSid}
-                  onChange={(e) => setApiKeys(prev => ({ ...prev, twilioSid: e.target.value }))}
-                  className="mt-1"
-                />
+                <div className="flex space-x-2 mt-1">
+                  <Input 
+                    id="twilio_sid"
+                    type="password" 
+                    placeholder="AC..." 
+                    value={apiKeys.twilioSid}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, twilioSid: e.target.value }))}
+                    className="flex-1"
+                  />
+                  <Button 
+                    variant="outline"
+                    onClick={() => handleApiKeyUpdate('TWILIO_ACCOUNT_SID', apiKeys.twilioSid, 'twilioSid')}
+                    disabled={loadingStates.twilioSid}
+                  >
+                    {loadingStates.twilioSid ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                  </Button>
+                </div>
               </div>
               
               <div>
@@ -332,13 +353,22 @@ const Settings = ({ user }: SettingsProps) => {
                     onChange={(e) => setApiKeys(prev => ({ ...prev, twilioToken: e.target.value }))}
                     className="flex-1"
                   />
-                  <Button 
-                    variant="outline" 
-                    onClick={handleTestConnection}
-                    disabled={isTesting}
-                  >
-                    {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Test"}
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleApiKeyUpdate('TWILIO_AUTH_TOKEN', apiKeys.twilioToken, 'twilioToken')}
+                      disabled={loadingStates.twilioToken}
+                    >
+                      {loadingStates.twilioToken ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleTestConnection}
+                      disabled={isTesting}
+                    >
+                      {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Test"}
+                    </Button>
+                  </div>
                 </div>
               </div>
               
@@ -354,10 +384,10 @@ const Settings = ({ user }: SettingsProps) => {
                   />
                   <Button 
                     variant="outline"
-                    onClick={() => handleApiKeyUpdate('TWILIO_PHONE_NUMBER', apiKeys.twilioPhone)}
-                    disabled={isLoading}
+                    onClick={() => handleApiKeyUpdate('TWILIO_PHONE_NUMBER', apiKeys.twilioPhone, 'twilioPhone')}
+                    disabled={loadingStates.twilioPhone}
                   >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                    {loadingStates.twilioPhone ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
                   </Button>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">

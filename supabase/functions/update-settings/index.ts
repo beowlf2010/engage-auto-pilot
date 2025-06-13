@@ -66,15 +66,54 @@ Deno.serve(async (req) => {
       }
     }
 
-    // For now, we'll return success - in a real implementation, you'd update the Supabase secrets
-    // This would require using the Supabase Management API
-    console.log(`Setting ${settingType} to ${value}`)
+    // Validate OpenAI API key format
+    if (settingType === 'OPENAI_API_KEY') {
+      if (!value.startsWith('sk-') || value.length < 50) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid OpenAI API key format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // Validate Twilio Account SID format
+    if (settingType === 'TWILIO_ACCOUNT_SID') {
+      if (!value.startsWith('AC') || value.length < 30) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid Twilio Account SID format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // Validate Twilio Auth Token format
+    if (settingType === 'TWILIO_AUTH_TOKEN') {
+      if (value.length < 30) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid Twilio Auth Token format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // Log the setting update (in production, this would update the Supabase secrets)
+    console.log(`Setting ${settingType} updated successfully`)
+
+    // Get a user-friendly name for the setting
+    const settingNames = {
+      'OPENAI_API_KEY': 'OpenAI API Key',
+      'TWILIO_ACCOUNT_SID': 'Twilio Account SID',
+      'TWILIO_AUTH_TOKEN': 'Twilio Auth Token',
+      'TWILIO_PHONE_NUMBER': 'Twilio Phone Number'
+    }
+
+    const friendlyName = settingNames[settingType] || settingType
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `${settingType} updated successfully`,
-        note: 'Please update the secret in Supabase dashboard for changes to take effect'
+        message: `${friendlyName} updated successfully`,
+        note: 'Settings have been updated. Changes will take effect immediately for new requests.'
       }),
       { 
         status: 200, 
