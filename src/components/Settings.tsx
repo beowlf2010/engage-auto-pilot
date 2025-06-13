@@ -7,12 +7,14 @@ import {
   Key, 
   Users, 
   Bot,
-  Save
+  Save,
+  Brain
 } from "lucide-react";
 import UserManagementTable from "./user-management/UserManagementTable";
 import CadenceSettings from "./settings/CadenceSettings";
 import BusinessHoursSettings from "./settings/BusinessHoursSettings";
 import ApiKeysSettings from "./settings/ApiKeysSettings";
+import EnhancedAISettings from "./settings/EnhancedAISettings";
 
 interface SettingsProps {
   user: {
@@ -26,6 +28,7 @@ const Settings = ({ user }: SettingsProps) => {
 
   const tabs = [
     { id: "cadence", label: "AI Cadence", icon: Bot, roles: ["sales", "manager", "admin"] },
+    { id: "enhanced", label: "Enhanced AI", icon: Brain, roles: ["manager", "admin"] },
     { id: "business", label: "Business Hours", icon: Clock, roles: ["sales", "manager", "admin"] },
     { id: "api", label: "API Keys", icon: Key, roles: ["admin"] },
     { id: "users", label: "User Management", icon: Users, roles: ["manager", "admin"] }
@@ -44,6 +47,8 @@ const Settings = ({ user }: SettingsProps) => {
     switch (activeTab) {
       case "cadence": 
         return <CadenceSettings userRole={user.role} />;
+      case "enhanced": 
+        return <EnhancedAISettings userRole={user.role} />;
       case "business": 
         return <BusinessHoursSettings userRole={user.role} />;
       case "api": 
@@ -63,7 +68,7 @@ const Settings = ({ user }: SettingsProps) => {
           <h1 className="text-3xl font-bold text-slate-800">Settings</h1>
           <p className="text-slate-600 mt-1">Configure your CRM system preferences</p>
         </div>
-        {user.role !== "sales" && activeTab !== "users" && activeTab !== "api" && (
+        {user.role !== "sales" && activeTab !== "users" && activeTab !== "api" && activeTab !== "enhanced" && (
           <Button onClick={handleSave} className="mt-4 md:mt-0">
             <Save className="w-4 h-4 mr-2" />
             Save Changes
