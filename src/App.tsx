@@ -14,7 +14,8 @@ import {
   SalesDashboardPage, 
   ManagerDashboardPage, 
   AdminDashboardPage,
-  StreamlinedLeadsPage 
+  StreamlinedLeadsPage,
+  AIMonitorPage 
 } from "./pages/StreamlinedPages";
 import StreamlinedNavigation from "./components/StreamlinedNavigation";
 
@@ -37,6 +38,7 @@ const App = () => (
               <Route path="/dash/sales" element={<SalesDashboardPage />} />
               <Route path="/dash/manager" element={<ManagerDashboardPage />} />
               <Route path="/dash/admin" element={<AdminDashboardPage />} />
+              <Route path="/ai-monitor" element={<AIMonitorPage />} />
               <Route path="/inbox" element={<Index />} />
               <Route path="/upload-leads" element={<Index />} />
               <Route path="/settings" element={<Index />} />

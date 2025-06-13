@@ -28,7 +28,8 @@ const StreamlinedNavigation = () => {
     if (profile.role === 'manager') {
       return [
         ...baseItems,
-        { path: '/dash/manager', label: 'Manager Dashboard', icon: BarChart3 }
+        { path: '/dash/manager', label: 'Manager Dashboard', icon: BarChart3 },
+        { path: '/ai-monitor', label: 'AI Monitor', icon: Settings }
       ];
     }
 
@@ -36,6 +37,7 @@ const StreamlinedNavigation = () => {
       return [
         ...baseItems,
         { path: '/dash/admin', label: 'Admin Dashboard', icon: BarChart3 },
+        { path: '/ai-monitor', label: 'AI Monitor', icon: Settings },
         { path: '/users', label: 'Users', icon: Settings }
       ];
     }
