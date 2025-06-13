@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -45,12 +44,35 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
       throw new Error('No recent upload history found to determine which vehicles to keep');
     }
 
-    // Get all vehicles that should be marked as sold (not from recent uploads)
+    // Step 1: Get all vehicle IDs that should be KEPT (from recent uploads)
+    const { data: vehiclesToKeep, error: keepError } = await supabase
+      .from('inventory')
+      .select('id')
+      .in('upload_history_id', latestUploads.mostRecentUploads);
+
+    if (keepError) {
+      console.error('Error fetching vehicles to keep:', keepError);
+      throw keepError;
+    }
+
+    console.log(`Found ${vehiclesToKeep?.length || 0} vehicles to keep from recent uploads`);
+
+    if (!vehiclesToKeep || vehiclesToKeep.length === 0) {
+      console.log('No vehicles found in recent uploads');
+      return {
+        totalProcessed: 0,
+        latestUploads,
+      };
+    }
+
+    // Step 2: Get all vehicles that should be marked as sold (NOT in the keep list and not already sold)
+    const keepIds = vehiclesToKeep.map(v => v.id);
+    
     const { data: vehiclesToUpdate, error: fetchError } = await supabase
       .from('inventory')
       .select('id, upload_history_id, status')
       .neq('status', 'sold')
-      .not('upload_history_id', 'in', `(${latestUploads.mostRecentUploads.map(id => `"${id}"`).join(',')})`);
+      .not('id', 'in', keepIds);
 
     if (fetchError) {
       console.error('Error fetching vehicles to update:', fetchError);
@@ -67,7 +89,7 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
       };
     }
 
-    // Mark old vehicles as sold using ID list
+    // Step 3: Mark old vehicles as sold using their IDs
     const vehicleIds = vehiclesToUpdate.map(v => v.id);
     
     const { data: updatedVehicles, error: updateError } = await supabase
