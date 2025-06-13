@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import StreamlinedInbox from '@/components/StreamlinedInbox';
+import StreamlinedInbox from '@/components/inbox/StreamlinedInbox';
 import { SalesDashboard, ManagerDashboard } from '@/components/StreamlinedDashboards';
 import LeadsList from '@/components/LeadsList';
 import AIMessageMonitor from '@/components/AIMessageMonitor';
