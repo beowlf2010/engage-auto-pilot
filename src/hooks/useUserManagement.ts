@@ -30,7 +30,14 @@ export const useUserManagement = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setUsers(data || []);
+      
+      // Ensure role is properly typed
+      const typedUsers = (data || []).map(user => ({
+        ...user,
+        role: user.role as 'sales' | 'manager' | 'admin'
+      }));
+      
+      setUsers(typedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
