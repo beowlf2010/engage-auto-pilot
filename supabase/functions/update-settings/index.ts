@@ -96,8 +96,74 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Log the setting update (in production, this would update the Supabase secrets)
-    console.log(`Setting ${settingType} updated successfully`)
+    // Actually update the environment variable/secret in Supabase
+    try {
+      // Update the secret using the Supabase Management API
+      const projectRef = Deno.env.get('SUPABASE_URL')?.split('//')[1]?.split('.')[0]
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+      
+      if (!projectRef || !serviceRoleKey) {
+        throw new Error('Missing project configuration')
+      }
+
+      const managementUrl = `https://api.supabase.com/v1/projects/${projectRef}/secrets`
+      
+      const secretUpdateResponse = await fetch(managementUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify([{
+          name: settingType,
+          value: value
+        }])
+      })
+
+      if (!secretUpdateResponse.ok) {
+        const errorText = await secretUpdateResponse.text()
+        console.error('Failed to update secret:', errorText)
+        
+        // Fallback: Store in a settings table if secret update fails
+        const { error: dbError } = await supabase
+          .from('settings')
+          .upsert({
+            key: settingType,
+            value: value,
+            updated_at: new Date().toISOString(),
+            updated_by: user.id
+          })
+
+        if (dbError) {
+          console.error('Database fallback also failed:', dbError)
+          throw new Error('Failed to save setting')
+        }
+
+        console.log(`Setting ${settingType} saved to database as fallback`)
+      } else {
+        console.log(`Secret ${settingType} updated successfully via Management API`)
+      }
+
+    } catch (secretError) {
+      console.error('Error updating secret:', secretError)
+      
+      // Always try database fallback
+      const { error: dbError } = await supabase
+        .from('settings')
+        .upsert({
+          key: settingType,
+          value: value,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id
+        })
+
+      if (dbError) {
+        console.error('Database fallback failed:', dbError)
+        throw new Error('Failed to save setting to both secrets and database')
+      }
+
+      console.log(`Setting ${settingType} saved to database as fallback`)
+    }
 
     // Get a user-friendly name for the setting
     const settingNames = {

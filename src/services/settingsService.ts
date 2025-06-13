@@ -46,6 +46,23 @@ export const testTwilioConnection = async (accountSid: string, authToken: string
   }
 };
 
+export const sendTestSMS = async (testPhoneNumber: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('test-sms', {
+      body: { testPhoneNumber }
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error sending test SMS:', error);
+    throw error;
+  }
+};
+
 export const validatePhoneNumber = (phone: string): boolean => {
   const phoneRegex = /^\+1[0-9]{10}$/;
   return phoneRegex.test(phone);

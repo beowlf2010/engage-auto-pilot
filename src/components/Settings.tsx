@@ -11,7 +11,8 @@ import {
   updateTwilioSettings, 
   testTwilioConnection, 
   validatePhoneNumber, 
-  formatPhoneNumber 
+  formatPhoneNumber,
+  sendTestSMS
 } from "@/services/settingsService";
 import { 
   Settings as SettingsIcon, 
@@ -23,7 +24,8 @@ import {
   Save,
   Plus,
   Trash2,
-  Loader2
+  Loader2,
+  Send
 } from "lucide-react";
 
 interface SettingsProps {
@@ -36,6 +38,8 @@ const Settings = ({ user }: SettingsProps) => {
   const [activeTab, setActiveTab] = useState("cadence");
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingSMS, setIsTestingSMS] = useState(false);
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
   const [loadingStates, setLoadingStates] = useState({
     openai: false,
     twilioSid: false,
@@ -120,6 +124,45 @@ const Settings = ({ user }: SettingsProps) => {
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleTestSMS = async () => {
+    if (!testPhoneNumber) {
+      toast({
+        title: "Phone Number Required",
+        description: "Please enter a phone number to send the test SMS to",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const formattedPhone = formatPhoneNumber(testPhoneNumber);
+    if (!validatePhoneNumber(formattedPhone)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid US phone number (e.g., +1234567890 or 234-567-8900)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsTestingSMS(true);
+    try {
+      const result = await sendTestSMS(formattedPhone);
+      toast({
+        title: "Test SMS Sent!",
+        description: `Test message sent successfully to ${formattedPhone}`,
+      });
+      setTestPhoneNumber("");
+    } catch (error) {
+      toast({
+        title: "Test SMS Failed",
+        description: error instanceof Error ? error.message : "Failed to send test SMS",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTestingSMS(false);
     }
   };
 
@@ -392,6 +435,38 @@ const Settings = ({ user }: SettingsProps) => {
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
                   Phone number for outbound SMS (toll-free numbers supported: +1800xxxxxxx)
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Test SMS Configuration</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="test_phone">Test Phone Number</Label>
+                <div className="flex space-x-2 mt-1">
+                  <Input 
+                    id="test_phone"
+                    placeholder="+1234567890" 
+                    value={testPhoneNumber}
+                    onChange={(e) => setTestPhoneNumber(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button 
+                    onClick={handleTestSMS}
+                    disabled={isTestingSMS}
+                  >
+                    {isTestingSMS ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                    Send Test SMS
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Enter your phone number to test if your Twilio configuration is working
                 </p>
               </div>
             </div>
