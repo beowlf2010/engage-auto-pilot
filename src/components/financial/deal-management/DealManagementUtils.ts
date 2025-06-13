@@ -10,8 +10,8 @@ export const getVehicleType = (stockNumber?: string): 'new' | 'used' => {
 export const isUsedVehicle = (stockNumber?: string): boolean => {
   if (!stockNumber) return true;
   const firstChar = stockNumber.trim().toUpperCase().charAt(0);
-  // Used vehicles include B, X prefixes and anything that's not C (new)
-  return ['B', 'X'].includes(firstChar) || (firstChar !== 'C');
+  // Used vehicles include anything that's not C (new)
+  return firstChar !== 'C';
 };
 
 export const hasProfitChanges = (deal: Deal) => {
@@ -46,6 +46,8 @@ export const filterDeals = (
 };
 
 export const calculateSummaryTotals = (filteredDeals: Deal[], packAdjustment: number): SummaryTotals => {
+  console.log(`Calculating summary for ${filteredDeals.length} filtered deals with pack adjustment: ${packAdjustment}`);
+  
   const totals = {
     newRetail: { units: 0, gross: 0, fi: 0, total: 0 },
     usedRetail: { units: 0, gross: 0, fi: 0, total: 0 },
@@ -62,6 +64,8 @@ export const calculateSummaryTotals = (filteredDeals: Deal[], packAdjustment: nu
     const adjustedGross = baseGross + packAdj;
     const fiProfit = deal.fi_profit || 0;
     const totalProfit = adjustedGross + fiProfit;
+
+    console.log(`Deal ${deal.stock_number}: type=${dealType}, vehicle=${vehicleType}, gross=${baseGross}, pack=${packAdj}, fi=${fiProfit}, total=${totalProfit}`);
 
     if (dealType === 'retail') {
       if (vehicleType === 'new') {
@@ -94,6 +98,7 @@ export const calculateSummaryTotals = (filteredDeals: Deal[], packAdjustment: nu
   totals.totalRetail.fi = totals.newRetail.fi + totals.usedRetail.fi;
   totals.totalRetail.total = totals.newRetail.total + totals.usedRetail.total;
 
+  console.log('Summary totals calculated:', totals);
   return totals;
 };
 

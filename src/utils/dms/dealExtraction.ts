@@ -99,7 +99,7 @@ const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColu
   // Determine deal type based on stock number
   const dealType = classifyDealByStock(stockNumber);
   
-  // Extract individual deal date with better parsing
+  // Extract individual deal date with enhanced parsing
   const dateValue = getValue(columnMapping.date);
   const dealDate = extractDealDate(dateValue);
   
@@ -134,13 +134,26 @@ const extractDealDate = (dateValue: string): string | null => {
   const dateStr = dateValue.trim();
   console.log(`Parsing date: "${dateStr}"`);
   
-  // Try different date formats more aggressively
+  // First, try to parse as Excel serial number (most common in DMS exports)
+  const numericDate = parseFloat(dateStr);
+  if (!isNaN(numericDate) && numericDate > 25000 && numericDate < 60000) {
+    // Excel date serial number (days since 1900-01-01, accounting for Excel's leap year bug)
+    const excelEpoch = new Date(1900, 0, 1);
+    const date = new Date(excelEpoch.getTime() + (numericDate - 2) * 24 * 60 * 60 * 1000);
+    const result = date.toISOString().split('T')[0];
+    console.log(`Excel serial ${numericDate} -> ${result}`);
+    return result;
+  }
+  
+  // Try different common date formats
   const formats = [
     /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // MM/DD/YYYY or M/D/YYYY
     /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/, // MM/DD/YY or M/D/YY
     /^(\d{4})-(\d{1,2})-(\d{1,2})$/, // YYYY-MM-DD
     /^(\d{1,2})-(\d{1,2})-(\d{4})$/, // MM-DD-YYYY
     /^(\d{1,2})-(\d{1,2})-(\d{2})$/, // MM-DD-YY
+    /^(\d{2})(\d{2})(\d{4})$/, // MMDDYYYY
+    /^(\d{2})(\d{2})(\d{2})$/, // MMDDYY
   ];
   
   for (let i = 0; i < formats.length; i++) {
@@ -149,33 +162,45 @@ const extractDealDate = (dateValue: string): string | null => {
     if (match) {
       console.log(`Matched format ${i}:`, match);
       
+      let month, day, year;
+      
       if (i === 0) { // MM/DD/YYYY
-        const [, month, day, year] = match;
-        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        [, month, day, year] = match;
       } else if (i === 1) { // MM/DD/YY
-        const [, month, day, year] = match;
-        const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`;
-        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        [, month, day, year] = match;
+        year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
       } else if (i === 2) { // YYYY-MM-DD
-        return match[0];
+        return match[0]; // Already in correct format
       } else if (i === 3) { // MM-DD-YYYY
-        const [, month, day, year] = match;
-        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        [, month, day, year] = match;
       } else if (i === 4) { // MM-DD-YY
-        const [, month, day, year] = match;
-        const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`;
-        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        [, month, day, year] = match;
+        year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+      } else if (i === 5) { // MMDDYYYY
+        [, month, day, year] = match;
+      } else if (i === 6) { // MMDDYY
+        [, month, day, year] = match;
+        year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+      }
+      
+      if (month && day && year) {
+        const result = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        console.log(`Formatted date: ${result}`);
+        return result;
       }
     }
   }
   
-  // Try to parse as a number (Excel serial date)
-  const numericDate = parseFloat(dateStr);
-  if (!isNaN(numericDate) && numericDate > 40000 && numericDate < 50000) {
-    // Excel date serial number (days since 1900-01-01)
-    const excelEpoch = new Date(1900, 0, 1);
-    const date = new Date(excelEpoch.getTime() + (numericDate - 2) * 24 * 60 * 60 * 1000);
-    return date.toISOString().split('T')[0];
+  // Try parsing as a standard JavaScript date
+  try {
+    const jsDate = new Date(dateStr);
+    if (!isNaN(jsDate.getTime())) {
+      const result = jsDate.toISOString().split('T')[0];
+      console.log(`JS Date parse: ${result}`);
+      return result;
+    }
+  } catch (e) {
+    // Ignore parsing errors
   }
   
   console.warn(`Could not parse date: "${dateStr}"`);

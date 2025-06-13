@@ -9,28 +9,33 @@ export const insertFinancialData = async (
 ) => {
   console.log('=== FINANCIAL DATA INSERTION ===');
   console.log(`Inserting ${deals.length} deals`);
-  console.log('Sample deal dates:', deals.slice(0, 3).map(d => ({ stock: d.stockNumber, date: d.saleDate })));
+  console.log('Sample deal dates:', deals.slice(0, 5).map(d => ({ stock: d.stockNumber, date: d.saleDate })));
   
   try {
     // Map deals to database format - use individual deal dates
-    const dealRecords = deals.map(deal => ({
-      upload_date: deal.saleDate || new Date().toISOString().split('T')[0], // Use individual deal date
-      stock_number: deal.stockNumber || null,
-      age: deal.age || null,
-      year_model: deal.yearModel || null,
-      buyer_name: deal.buyerName || null,
-      sale_amount: deal.saleAmount || null,
-      cost_amount: deal.costAmount || null,
-      gross_profit: deal.grossProfit || null,
-      fi_profit: deal.fiProfit || null,
-      total_profit: deal.totalProfit || null,
-      deal_type: deal.dealType === 'new' ? 'new' : 'retail',
-      upload_history_id: uploadHistoryId,
-      original_gross_profit: deal.grossProfit || null,
-      original_fi_profit: deal.fiProfit || null,
-      original_total_profit: deal.totalProfit || null,
-      first_reported_date: deal.saleDate || new Date().toISOString().split('T')[0] // Store original deal date
-    }));
+    const dealRecords = deals.map(deal => {
+      const dealDate = deal.saleDate || new Date().toISOString().split('T')[0];
+      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, using=${dealDate}`);
+      
+      return {
+        upload_date: dealDate, // Use individual deal date as upload_date for database storage
+        stock_number: deal.stockNumber || null,
+        age: deal.age || null,
+        year_model: deal.yearModel || null,
+        buyer_name: deal.buyerName || null,
+        sale_amount: deal.saleAmount || null,
+        cost_amount: deal.costAmount || null,
+        gross_profit: deal.grossProfit || null,
+        fi_profit: deal.fiProfit || null,
+        total_profit: deal.totalProfit || null,
+        deal_type: deal.dealType === 'new' ? 'new' : 'retail',
+        upload_history_id: uploadHistoryId,
+        original_gross_profit: deal.grossProfit || null,
+        original_fi_profit: deal.fiProfit || null,
+        original_total_profit: deal.totalProfit || null,
+        first_reported_date: dealDate // Store the individual deal date here too
+      };
+    });
 
     console.log('Sample deal record to insert:', dealRecords[0]);
 
@@ -50,26 +55,27 @@ export const insertFinancialData = async (
 
     console.log(`Successfully upserted ${insertedDeals?.length || 0} deals`);
 
-    // Calculate summary totals for profit snapshot - use the most common date from the deals
+    // For profit snapshot, use the most common deal date from the actual deals
     const dateGroups = deals.reduce((acc, deal) => {
       const date = deal.saleDate || new Date().toISOString().split('T')[0];
       acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     
-    // Use the most frequent date from the actual deals
-    const snapshotDate = Object.keys(dateGroups).reduce((a, b) => 
-      dateGroups[a] > dateGroups[b] ? a : b
-    ) || new Date().toISOString().split('T')[0];
+    // Use the most frequent date from the actual deals, or fall back to report date
+    const snapshotDate = Object.keys(dateGroups).length > 0 
+      ? Object.keys(dateGroups).reduce((a, b) => dateGroups[a] > dateGroups[b] ? a : b)
+      : reportDate || new Date().toISOString().split('T')[0];
 
     console.log(`Using snapshot date: ${snapshotDate} (from ${Object.keys(dateGroups).length} unique deal dates)`);
+    console.log('Date distribution:', dateGroups);
 
     const retailDeals = deals.filter(d => d.dealType !== 'new');
     const newDeals = deals.filter(d => d.dealType === 'new');
 
     const summaryData = {
       snapshot_date: snapshotDate,
-      total_units: summary.totalUnits,
+      total_units: deals.length, // Use actual deal count, not summary.totalUnits
       total_sales: summary.totalSales,
       total_gross: summary.totalGross,
       total_fi_profit: summary.totalFiProfit,
@@ -86,6 +92,8 @@ export const insertFinancialData = async (
       wholesale_gross: summary.wholesaleGross,
       upload_history_id: uploadHistoryId
     };
+
+    console.log('Summary data for snapshot:', summaryData);
 
     // Use the expanded profit snapshot function
     const { data: snapshotResult, error: snapshotError } = await supabase

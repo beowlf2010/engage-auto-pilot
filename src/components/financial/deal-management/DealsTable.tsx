@@ -115,128 +115,141 @@ const DealsTable = ({
   };
 
   const getDealDate = (deal: Deal): string => {
-    // Use first_reported_date if available, otherwise fall back to upload_date
+    // Use first_reported_date (individual deal date) if available, otherwise fall back to upload_date
     const dateToUse = deal.first_reported_date || deal.upload_date;
-    return new Date(dateToUse).toLocaleDateString();
+    try {
+      return new Date(dateToUse).toLocaleDateString();
+    } catch (error) {
+      console.warn('Error formatting date:', dateToUse, error);
+      return dateToUse || 'Unknown';
+    }
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left p-3">
-              <input
-                type="checkbox"
-                checked={selectedDeals.length === deals.length && deals.length > 0}
-                onChange={onSelectAll}
-                className="rounded border-gray-300"
-              />
-            </th>
-            <th className="text-left p-3 font-medium text-gray-600">Date</th>
-            <th className="text-left p-3 font-medium text-gray-600">Stock #</th>
-            <th className="text-left p-3 font-medium text-gray-600">Type</th>
-            <th className="text-left p-3 font-medium text-gray-600">Vehicle</th>
-            <th className="text-left p-3 font-medium text-gray-600">Customer</th>
-            <th className="text-right p-3 font-medium text-gray-600">Gross Profit</th>
-            <th className="text-right p-3 font-medium text-gray-600">F&I Profit</th>
-            <th className="text-right p-3 font-medium text-gray-600">Total Profit</th>
-            <th className="text-center p-3 font-medium text-gray-600">Changes</th>
-            <th className="text-center p-3 font-medium text-gray-600">Deal Type</th>
-            <th className="text-center p-3 font-medium text-gray-600">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {deals.map((deal) => {
-            const packAdjustment = getPackAdjustment(deal);
-            return (
-              <tr key={deal.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="p-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedDeals.includes(deal.id)}
-                    onChange={() => onSelectDeal(deal.id)}
-                    className="rounded border-gray-300"
-                  />
-                </td>
-                <td className="p-3 text-sm">
-                  {getDealDate(deal)}
-                </td>
-                <td className="p-3 text-sm font-medium">
-                  {deal.stock_number || '-'}
-                </td>
-                <td className="p-3 text-sm">
-                  {getVehicleTypeBadge(deal.stock_number)}
-                </td>
-                <td className="p-3 text-sm">
-                  {deal.year_model || '-'}
-                </td>
-                <td className="p-3 text-sm">
-                  {deal.buyer_name || '-'}
-                </td>
-                <td className="p-3 text-sm text-right">
-                  <div>
-                    {formatCurrency(deal.gross_profit)}
-                    {packAdjustment > 0 && (
-                      <div className="text-xs text-green-600">
-                        +{formatCurrency(packAdjustment)} pack
-                      </div>
-                    )}
-                    {deal.original_gross_profit && deal.gross_profit !== deal.original_gross_profit && (
-                      <div className="text-xs text-gray-500">
-                        Was: {formatCurrency(deal.original_gross_profit)}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="p-3 text-sm text-right">
-                  <div>
-                    {formatCurrency(deal.fi_profit)}
-                    {deal.original_fi_profit && deal.fi_profit !== deal.original_fi_profit && (
-                      <div className="text-xs text-gray-500">
-                        Was: {formatCurrency(deal.original_fi_profit)}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="p-3 text-sm text-right font-medium">
-                  {formatCurrency(getTotalProfitWithPack(deal))}
-                  {packAdjustment > 0 && (
-                    <div className="text-xs text-gray-500">
-                      (incl. {formatCurrency(packAdjustment)} pack)
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-500">
+          Showing {deals.length} deal{deals.length !== 1 ? 's' : ''}
+        </div>
+      </div>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left p-3">
+                <input
+                  type="checkbox"
+                  checked={selectedDeals.length === deals.length && deals.length > 0}
+                  onChange={onSelectAll}
+                  className="rounded border-gray-300"
+                />
+              </th>
+              <th className="text-left p-3 font-medium text-gray-600">Date</th>
+              <th className="text-left p-3 font-medium text-gray-600">Stock #</th>
+              <th className="text-left p-3 font-medium text-gray-600">Type</th>
+              <th className="text-left p-3 font-medium text-gray-600">Vehicle</th>
+              <th className="text-left p-3 font-medium text-gray-600">Customer</th>
+              <th className="text-right p-3 font-medium text-gray-600">Gross Profit</th>
+              <th className="text-right p-3 font-medium text-gray-600">F&I Profit</th>
+              <th className="text-right p-3 font-medium text-gray-600">Total Profit</th>
+              <th className="text-center p-3 font-medium text-gray-600">Changes</th>
+              <th className="text-center p-3 font-medium text-gray-600">Deal Type</th>
+              <th className="text-center p-3 font-medium text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deals.map((deal) => {
+              const packAdjustment = getPackAdjustment(deal);
+              return (
+                <tr key={deal.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="p-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedDeals.includes(deal.id)}
+                      onChange={() => onSelectDeal(deal.id)}
+                      className="rounded border-gray-300"
+                    />
+                  </td>
+                  <td className="p-3 text-sm">
+                    {getDealDate(deal)}
+                  </td>
+                  <td className="p-3 text-sm font-medium">
+                    {deal.stock_number || '-'}
+                  </td>
+                  <td className="p-3 text-sm">
+                    {getVehicleTypeBadge(deal.stock_number)}
+                  </td>
+                  <td className="p-3 text-sm">
+                    {deal.year_model || '-'}
+                  </td>
+                  <td className="p-3 text-sm">
+                    {deal.buyer_name || '-'}
+                  </td>
+                  <td className="p-3 text-sm text-right">
+                    <div>
+                      {formatCurrency(deal.gross_profit)}
+                      {packAdjustment > 0 && (
+                        <div className="text-xs text-green-600">
+                          +{formatCurrency(packAdjustment)} pack
+                        </div>
+                      )}
+                      {deal.original_gross_profit && deal.gross_profit !== deal.original_gross_profit && (
+                        <div className="text-xs text-gray-500">
+                          Was: {formatCurrency(deal.original_gross_profit)}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </td>
-                <td className="p-3 text-center">
-                  {renderProfitChangeIndicator(deal)}
-                </td>
-                <td className="p-3 text-center">
-                  <Badge className={getDealTypeBadgeColor(deal.deal_type)}>
-                    {deal.deal_type?.replace('_', ' ') || 'retail'}
-                  </Badge>
-                </td>
-                <td className="p-3 text-center">
-                  <Select
-                    value={deal.deal_type || 'retail'}
-                    onValueChange={(value: 'retail' | 'dealer_trade' | 'wholesale') => 
-                      onDealTypeUpdate(deal.id, value)
-                    }
-                  >
-                    <SelectTrigger className="w-32 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
-                      <SelectItem value="wholesale">Wholesale</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  </td>
+                  <td className="p-3 text-sm text-right">
+                    <div>
+                      {formatCurrency(deal.fi_profit)}
+                      {deal.original_fi_profit && deal.fi_profit !== deal.original_fi_profit && (
+                        <div className="text-xs text-gray-500">
+                          Was: {formatCurrency(deal.original_fi_profit)}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-3 text-sm text-right font-medium">
+                    {formatCurrency(getTotalProfitWithPack(deal))}
+                    {packAdjustment > 0 && (
+                      <div className="text-xs text-gray-500">
+                        (incl. {formatCurrency(packAdjustment)} pack)
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-3 text-center">
+                    {renderProfitChangeIndicator(deal)}
+                  </td>
+                  <td className="p-3 text-center">
+                    <Badge className={getDealTypeBadgeColor(deal.deal_type)}>
+                      {deal.deal_type?.replace('_', ' ') || 'retail'}
+                    </Badge>
+                  </td>
+                  <td className="p-3 text-center">
+                    <Select
+                      value={deal.deal_type || 'retail'}
+                      onValueChange={(value: 'retail' | 'dealer_trade' | 'wholesale') => 
+                        onDealTypeUpdate(deal.id, value)
+                      }
+                    >
+                      <SelectTrigger className="w-32 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="retail">Retail</SelectItem>
+                        <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
+                        <SelectItem value="wholesale">Wholesale</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
