@@ -4,7 +4,6 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useConversations } from "@/hooks/useConversations";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
-import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
 import LeadsList from "@/components/LeadsList";
 import SmartInbox from "@/components/SmartInbox";
@@ -77,15 +76,9 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
-      <Sidebar 
-        user={user} 
-        activeView={activeView} 
-        onViewChange={setActiveView}
-        unreadCount={unreadCount}
-      />
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <main className="flex-1">
+        <div className="p-6">
           {renderContent()}
         </div>
       </main>
