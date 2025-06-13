@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { 
+  updateTwilioSettings, 
+  testTwilioConnection, 
+  validatePhoneNumber, 
+  formatPhoneNumber 
+} from "@/services/settingsService";
+import { 
   Settings as SettingsIcon, 
   Clock, 
   Key, 
@@ -17,7 +22,8 @@ import {
   MessageSquare,
   Save,
   Plus,
-  Trash2
+  Trash2,
+  Loader2
 } from "lucide-react";
 
 interface SettingsProps {
@@ -28,6 +34,14 @@ interface SettingsProps {
 
 const Settings = ({ user }: SettingsProps) => {
   const [activeTab, setActiveTab] = useState("cadence");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [apiKeys, setApiKeys] = useState({
+    openaiKey: "sk-1234567890abcdef...",
+    twilioSid: "AC1234567890abcdef...",
+    twilioToken: "1234567890abcdef...",
+    twilioPhone: "+15551234567"
+  });
   const { toast } = useToast();
 
   const tabs = [
@@ -44,6 +58,63 @@ const Settings = ({ user }: SettingsProps) => {
       title: "Settings saved",
       description: "Your changes have been saved successfully"
     });
+  };
+
+  const handleApiKeyUpdate = async (settingType: string, value: string) => {
+    setIsLoading(true);
+    try {
+      if (settingType === 'TWILIO_PHONE_NUMBER') {
+        const formattedPhone = formatPhoneNumber(value);
+        if (!validatePhoneNumber(formattedPhone)) {
+          toast({
+            title: "Invalid Phone Number",
+            description: "Please enter a valid US phone number (e.g., +1234567890 or 234-567-8900)",
+            variant: "destructive"
+          });
+          return;
+        }
+        value = formattedPhone;
+      }
+
+      const result = await updateTwilioSettings(settingType, value);
+      
+      // Update local state
+      if (settingType === 'TWILIO_PHONE_NUMBER') {
+        setApiKeys(prev => ({ ...prev, twilioPhone: value }));
+      }
+
+      toast({
+        title: "Settings Updated",
+        description: result.message,
+      });
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: error instanceof Error ? error.message : "Failed to update settings",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    try {
+      const result = await testTwilioConnection(apiKeys.twilioSid, apiKeys.twilioToken);
+      toast({
+        title: "Connection Test",
+        description: result.message,
+      });
+    } catch (error) {
+      toast({
+        title: "Connection Test Failed",
+        description: error instanceof Error ? error.message : "Failed to test connection",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const renderCadenceSettings = () => (
@@ -229,10 +300,11 @@ const Settings = ({ user }: SettingsProps) => {
                     id="openai_key"
                     type="password" 
                     placeholder="sk-..." 
-                    defaultValue="sk-1234567890abcdef..."
+                    value={apiKeys.openaiKey}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, openaiKey: e.target.value }))}
                     className="flex-1"
                   />
-                  <Button variant="outline">Test</Button>
+                  <Button variant="outline" disabled>Test</Button>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">Used for AI message generation</p>
               </div>
@@ -243,7 +315,8 @@ const Settings = ({ user }: SettingsProps) => {
                   id="twilio_sid"
                   type="password" 
                   placeholder="AC..." 
-                  defaultValue="AC1234567890abcdef..."
+                  value={apiKeys.twilioSid}
+                  onChange={(e) => setApiKeys(prev => ({ ...prev, twilioSid: e.target.value }))}
                   className="mt-1"
                 />
               </div>
@@ -255,22 +328,41 @@ const Settings = ({ user }: SettingsProps) => {
                     id="twilio_token"
                     type="password" 
                     placeholder="..." 
-                    defaultValue="1234567890abcdef..."
+                    value={apiKeys.twilioToken}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, twilioToken: e.target.value }))}
                     className="flex-1"
                   />
-                  <Button variant="outline">Test</Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleTestConnection}
+                    disabled={isTesting}
+                  >
+                    {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Test"}
+                  </Button>
                 </div>
               </div>
               
               <div>
                 <Label htmlFor="twilio_phone">Twilio Phone Number</Label>
-                <Input 
-                  id="twilio_phone"
-                  placeholder="+1234567890" 
-                  defaultValue="+15551234567"
-                  className="mt-1"
-                />
-                <p className="text-xs text-slate-500 mt-1">Phone number for outbound SMS</p>
+                <div className="flex space-x-2 mt-1">
+                  <Input 
+                    id="twilio_phone"
+                    placeholder="+1234567890" 
+                    value={apiKeys.twilioPhone}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, twilioPhone: e.target.value }))}
+                    className="flex-1"
+                  />
+                  <Button 
+                    variant="outline"
+                    onClick={() => handleApiKeyUpdate('TWILIO_PHONE_NUMBER', apiKeys.twilioPhone)}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Phone number for outbound SMS (toll-free numbers supported: +1800xxxxxxx)
+                </p>
               </div>
             </div>
           </CardContent>
@@ -364,7 +456,7 @@ const Settings = ({ user }: SettingsProps) => {
           <h1 className="text-3xl font-bold text-slate-800">Settings</h1>
           <p className="text-slate-600 mt-1">Configure your CRM system preferences</p>
         </div>
-        {user.role !== "sales" && activeTab !== "users" && (
+        {user.role !== "sales" && activeTab !== "users" && activeTab !== "api" && (
           <Button onClick={handleSave} className="mt-4 md:mt-0">
             <Save className="w-4 h-4 mr-2" />
             Save Changes
