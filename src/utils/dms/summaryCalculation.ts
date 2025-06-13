@@ -1,6 +1,13 @@
 
 import { DealRecord, FinancialSummary } from './types';
 
+// Helper function to determine if a vehicle is new based on stock number
+const isNewVehicle = (stockNumber?: string): boolean => {
+  if (!stockNumber) return false;
+  const firstChar = stockNumber.trim().toUpperCase().charAt(0);
+  return firstChar === 'C'; // C prefix indicates new vehicles
+};
+
 export const calculateSummaryFromDeals = (deals: DealRecord[]): FinancialSummary => {
   const summary: FinancialSummary = {
     totalUnits: deals.length,
@@ -27,7 +34,8 @@ export const calculateSummaryFromDeals = (deals: DealRecord[]): FinancialSummary
     summary.totalProfit += deal.totalProfit || 0;
     summary.retailGross += deal.grossProfit || 0; // Default all to retail
 
-    if (deal.dealType === 'new') {
+    // Classify by vehicle type based on stock number
+    if (isNewVehicle(deal.stockNumber)) {
       summary.newUnits++;
       summary.newGross += deal.grossProfit || 0;
     } else {
