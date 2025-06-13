@@ -19,14 +19,14 @@ const BreadcrumbNav = () => {
     
     if (path === '/inventory-dashboard') {
       return [
-        { label: 'Dashboard', path: '/', icon: Home },
+        { label: 'Dashboard', path: '/dashboard', icon: Home },
         { label: 'Inventory Dashboard', current: true, icon: Package }
       ];
     }
     
     if (path === '/inventory-upload') {
       return [
-        { label: 'Dashboard', path: '/', icon: Home },
+        { label: 'Dashboard', path: '/dashboard', icon: Home },
         { label: 'Inventory', path: '/inventory-dashboard', icon: Package },
         { label: 'Upload Inventory', current: true, icon: Upload }
       ];
@@ -34,7 +34,7 @@ const BreadcrumbNav = () => {
     
     if (path === '/rpo-insights') {
       return [
-        { label: 'Dashboard', path: '/', icon: Home },
+        { label: 'Dashboard', path: '/dashboard', icon: Home },
         { label: 'Inventory', path: '/inventory-dashboard', icon: Package },
         { label: 'RPO Insights', current: true, icon: BarChart3 }
       ];
@@ -43,14 +43,14 @@ const BreadcrumbNav = () => {
     if (path.startsWith('/vehicle-detail/')) {
       const identifier = path.split('/').pop();
       return [
-        { label: 'Dashboard', path: '/', icon: Home },
+        { label: 'Dashboard', path: '/dashboard', icon: Home },
         { label: 'Inventory', path: '/inventory-dashboard', icon: Package },
         { label: `Vehicle ${identifier}`, current: true, icon: Car }
       ];
     }
     
     return [
-      { label: 'Dashboard', path: '/', icon: Home, current: true }
+      { label: 'Dashboard', path: '/dashboard', icon: Home, current: true }
     ];
   };
 

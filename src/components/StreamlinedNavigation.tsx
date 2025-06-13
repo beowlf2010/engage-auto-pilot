@@ -3,7 +3,7 @@ import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, Users, BarChart3, Settings } from 'lucide-react';
+import { MessageSquare, Users, BarChart3, Settings, Package } from 'lucide-react';
 
 const StreamlinedNavigation = () => {
   const { profile } = useAuth();
@@ -29,6 +29,7 @@ const StreamlinedNavigation = () => {
       return [
         ...baseItems,
         { path: '/dash/manager', label: 'Manager Dashboard', icon: BarChart3 },
+        { path: '/inventory-dashboard', label: 'Inventory', icon: Package },
         { path: '/ai-monitor', label: 'AI Monitor', icon: Settings }
       ];
     }
@@ -37,6 +38,7 @@ const StreamlinedNavigation = () => {
       return [
         ...baseItems,
         { path: '/dash/admin', label: 'Admin Dashboard', icon: BarChart3 },
+        { path: '/inventory-dashboard', label: 'Inventory', icon: Package },
         { path: '/ai-monitor', label: 'AI Monitor', icon: Settings },
         { path: '/users', label: 'Users', icon: Settings }
       ];
@@ -56,7 +58,8 @@ const StreamlinedNavigation = () => {
         
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.path;
+          const isActive = location.pathname === item.path || 
+            (item.path === '/inventory-dashboard' && location.pathname.startsWith('/inventory'));
           
           return (
             <Button

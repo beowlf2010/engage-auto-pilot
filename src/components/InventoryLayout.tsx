@@ -2,8 +2,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useUnreadCount } from "@/hooks/useUnreadCount";
-import Sidebar from "@/components/Sidebar";
 import InventoryDashboard from "@/components/InventoryDashboard";
 import InventoryUpload from "@/components/InventoryUpload";
 import VehicleDetail from "@/components/VehicleDetail";
@@ -15,9 +13,7 @@ interface InventoryLayoutProps {
 }
 
 const InventoryLayout = ({ page }: InventoryLayoutProps) => {
-  const [activeView, setActiveView] = useState("inventory-dashboard");
   const { profile, loading } = useAuth();
-  const unreadCount = useUnreadCount([]);
   const { identifier } = useParams();
 
   if (loading || !profile) {
@@ -56,19 +52,9 @@ const InventoryLayout = ({ page }: InventoryLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
-      <Sidebar 
-        user={user} 
-        activeView={activeView} 
-        onViewChange={setActiveView}
-        unreadCount={unreadCount}
-      />
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full p-6">
-          <BreadcrumbNav />
-          {renderContent()}
-        </div>
-      </main>
+    <div className="container mx-auto py-6">
+      <BreadcrumbNav />
+      {renderContent()}
     </div>
   );
 };
