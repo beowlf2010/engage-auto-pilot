@@ -39,8 +39,7 @@ const InventoryDashboard = () => {
         .from('inventory')
         .select(`
           *,
-          deal_count:deals!stock_number(count),
-          latest_deal:deals!stock_number(
+          deals!stock_number(
             id,
             upload_date,
             sale_amount,
@@ -99,8 +98,10 @@ const InventoryDashboard = () => {
       // Process the data to include deal information
       const processedData = data?.map(vehicle => ({
         ...vehicle,
-        deal_count: vehicle.deal_count?.[0]?.count || 0,
-        latest_deal: vehicle.latest_deal?.[0] || null
+        deal_count: Array.isArray(vehicle.deals) ? vehicle.deals.length : 0,
+        latest_deal: Array.isArray(vehicle.deals) && vehicle.deals.length > 0 
+          ? vehicle.deals.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0]
+          : null
       }));
       
       return processedData;

@@ -9,9 +9,20 @@ export interface VehicleWithDeals {
   make: string;
   model: string;
   trim?: string;
+  body_style?: string;
   price?: number;
   status: string;
   condition: string;
+  mileage?: number;
+  color_exterior?: string;
+  color_interior?: string;
+  engine?: string;
+  transmission?: string;
+  first_seen_at?: string;
+  last_seen_at?: string;
+  sold_at?: string;
+  days_in_inventory?: number;
+  source_report?: string;
   deals: Array<{
     id: string;
     upload_date: string;
@@ -73,9 +84,20 @@ export const getVehicleWithDeals = async (identifier: string): Promise<VehicleWi
     make: vehicle.make,
     model: vehicle.model,
     trim: vehicle.trim,
+    body_style: vehicle.body_style,
     price: vehicle.price,
     status: vehicle.status,
     condition: vehicle.condition,
+    mileage: vehicle.mileage,
+    color_exterior: vehicle.color_exterior,
+    color_interior: vehicle.color_interior,
+    engine: vehicle.engine,
+    transmission: vehicle.transmission,
+    first_seen_at: vehicle.first_seen_at,
+    last_seen_at: vehicle.last_seen_at,
+    sold_at: vehicle.sold_at,
+    days_in_inventory: vehicle.days_in_inventory,
+    source_report: vehicle.source_report,
     deals: deals || [],
     leads_count: vehicle.leads_count || 0
   };
