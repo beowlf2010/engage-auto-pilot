@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { DealRecord, FinancialSummary } from "./dms/types";
 
@@ -58,11 +59,11 @@ export const insertFinancialData = async (
     console.log(`Prepared ${dealRecords.length} deal records for insertion`);
     console.log('Sample deal record to insert:', dealRecords[0]);
 
-    // Use upsert with the unique constraint on (stock_number, upload_date)
+    // Use upsert with the unique constraint on stock_number only
     const { data: insertedDeals, error: insertError } = await supabase
       .from('deals')
       .upsert(dealRecords, {
-        onConflict: 'stock_number,upload_date',
+        onConflict: 'stock_number',
         ignoreDuplicates: false
       })
       .select();
