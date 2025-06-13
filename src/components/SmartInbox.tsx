@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,10 +24,9 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const [searchParams] = useSearchParams();
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [showMemory, setShowMemory] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   
-  const { conversations, messages, loading, fetchMessages, sendMessage, refetch } = useRealtimeInbox();
+  const { conversations, messages, loading, fetchMessages, sendMessage, refetch, error } = useRealtimeInbox();
   const { processing: aiProcessing } = useEnhancedAIScheduler();
 
   // Filter conversations based on user role
@@ -37,25 +36,46 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   const selectedConversation = filteredConversations.find(conv => conv.leadId === selectedLead);
 
-  const canReply = (conv: any) => {
+  const canReply = useCallback((conv: any) => {
     // Managers and admins can reply to any conversation
     if (user.role === "manager" || user.role === "admin") return true;
     
     // Sales users can reply to their own leads or unassigned leads
     return conv.salespersonId === user.id || !conv.salespersonId;
-  };
+  }, [user.role, user.id]);
 
-  const handleRetry = async () => {
-    setError(null);
-    setRetryCount(prev => prev + 1);
+  const handleSelectConversation = useCallback(async (leadId: string) => {
     try {
-      await refetch();
+      console.log('Selecting conversation for lead:', leadId);
+      setSelectedLead(leadId);
+      await fetchMessages(leadId);
+      
+      // Check if this lead has incoming messages to track as responses
+      const incomingMessages = messages.filter(msg => msg.direction === 'in');
+      if (incomingMessages.length > 0) {
+        // Track the most recent incoming message as a response
+        const latestIncoming = incomingMessages[incomingMessages.length - 1];
+        await trackLeadResponse(leadId, new Date(latestIncoming.sentAt));
+      }
+      
+      // Mark messages as read when viewing the conversation
+      await markMessagesAsRead(leadId);
+      
+      // Refresh conversations to update unread counts
+      setTimeout(() => {
+        refetch();
+      }, 500);
     } catch (err) {
-      setError("Failed to load conversations. Please check your connection and try again.");
+      console.error('Error selecting conversation:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load messages for this conversation.",
+        variant: "destructive"
+      });
     }
-  };
+  }, [fetchMessages, messages, refetch]);
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = useCallback(async (message: string) => {
     if (selectedLead && selectedConversation) {
       try {
         // Auto-assign lead if it's unassigned and user can reply
@@ -81,58 +101,50 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           refetch();
         }, 1000);
       } catch (err) {
-        setError("Failed to send message. Please try again.");
+        console.error('Error sending message:', err);
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive"
+        });
       }
     }
-  };
+  }, [selectedLead, selectedConversation, canReply, sendMessage, user.id, refetch]);
 
-  const handleSelectConversation = async (leadId: string) => {
-    try {
-      setSelectedLead(leadId);
-      await fetchMessages(leadId);
-      
-      // Check if this lead has incoming messages to track as responses
-      const incomingMessages = messages.filter(msg => msg.direction === 'in');
-      if (incomingMessages.length > 0) {
-        // Track the most recent incoming message as a response
-        const latestIncoming = incomingMessages[incomingMessages.length - 1];
-        await trackLeadResponse(leadId, new Date(latestIncoming.sentAt));
-      }
-      
-      // Mark messages as read when viewing the conversation
-      await markMessagesAsRead(leadId);
-      
-      // Refresh conversations to update unread counts
-      setTimeout(() => {
-        refetch();
-      }, 500);
-    } catch (err) {
-      setError("Failed to load messages for this conversation.");
-    }
-  };
+  const handleToggleMemory = useCallback(() => {
+    setShowMemory(prev => !prev);
+  }, []);
 
-  const handleToggleMemory = () => {
-    setShowMemory(!showMemory);
-  };
-
-  // Handle pre-selection from URL parameter
+  // Handle pre-selection from URL parameter - only run once after conversations load
   useEffect(() => {
+    if (loading || isInitialized || filteredConversations.length === 0) return;
+
     const leadIdFromUrl = searchParams.get('leadId');
-    if (leadIdFromUrl && filteredConversations.length > 0) {
+    console.log('URL leadId:', leadIdFromUrl);
+    console.log('Available conversations:', filteredConversations.length);
+
+    if (leadIdFromUrl) {
       // Check if the lead exists in conversations
       const conversation = filteredConversations.find(conv => conv.leadId === leadIdFromUrl);
       if (conversation) {
+        console.log('Found conversation for URL leadId, selecting...');
         handleSelectConversation(leadIdFromUrl);
+        setIsInitialized(true);
         return;
+      } else {
+        console.log('Lead from URL not found in conversations');
       }
     }
 
     // Default selection if no URL parameter or conversation not found
     if (filteredConversations.length > 0 && !selectedLead) {
       const firstConv = filteredConversations[0];
+      console.log('Selecting first conversation:', firstConv.leadId);
       handleSelectConversation(firstConv.leadId);
     }
-  }, [filteredConversations, selectedLead, searchParams]);
+    
+    setIsInitialized(true);
+  }, [loading, isInitialized, filteredConversations, searchParams, selectedLead, handleSelectConversation]);
 
   // Show error state
   if (error) {
@@ -143,7 +155,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           <AlertDescription className="mb-4">
             {error}
           </AlertDescription>
-          <Button onClick={handleRetry} className="w-full">
+          <Button onClick={refetch} className="w-full">
             <RefreshCw className="w-4 h-4 mr-2" />
             Retry
           </Button>
@@ -169,7 +181,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
       <div className="h-[calc(100vh-8rem)] flex items-center justify-center">
         <div className="text-center">
           <p className="text-slate-600 mb-4">No conversations found</p>
-          <Button onClick={handleRetry} variant="outline">
+          <Button onClick={refetch} variant="outline">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>

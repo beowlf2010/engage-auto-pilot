@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { fetchConversations } from '@/services/conversationsService';
 import { fetchMessages, sendMessage as sendMessageService } from '@/services/messagesService';
@@ -26,6 +26,8 @@ export const useRealtimeInbox = () => {
   const currentLeadIdRef = useRef<string | null>(null);
   const notificationPermission = useRef<NotificationPermission>('default');
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const failureCountRef = useRef(0);
+  const maxRetries = 3;
 
   // Request notification permission on mount
   useEffect(() => {
@@ -38,23 +40,37 @@ export const useRealtimeInbox = () => {
     requestPermission();
   }, []);
 
-  const loadConversations = async (retryCount = 0) => {
+  const loadConversations = useCallback(async (retryCount = 0) => {
     if (!profile) return;
 
     try {
+      console.log('Loading conversations, attempt:', retryCount + 1);
       setError(null);
       const conversationsData = await fetchConversations(profile);
       setConversations(conversationsData);
       setLoading(false);
+      failureCountRef.current = 0; // Reset failure count on success
     } catch (error) {
       console.error('Error loading conversations:', error);
+      failureCountRef.current += 1;
       
-      // If it's a network error and we haven't retried too many times
-      if (retryCount < 3 && error instanceof TypeError && error.message.includes('fetch')) {
-        console.log(`Retrying conversation fetch (attempt ${retryCount + 1})`);
+      // Circuit breaker - stop retrying after max attempts
+      if (retryCount >= maxRetries) {
+        console.log('Max retries reached, stopping attempts');
+        setError('Unable to load conversations. Please refresh the page.');
+        setLoading(false);
+        return;
+      }
+      
+      // Only retry on network errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.log(`Retrying conversation fetch (attempt ${retryCount + 1}/${maxRetries})`);
         
-        // Exponential backoff: 1s, 2s, 4s
-        const delay = Math.pow(2, retryCount) * 1000;
+        // Exponential backoff with jitter
+        const baseDelay = Math.pow(2, retryCount) * 1000;
+        const jitter = Math.random() * 1000;
+        const delay = baseDelay + jitter;
+        
         retryTimeoutRef.current = setTimeout(() => {
           loadConversations(retryCount + 1);
         }, delay);
@@ -65,10 +81,11 @@ export const useRealtimeInbox = () => {
       setError('Unable to load conversations. Please check your connection.');
       setLoading(false);
     }
-  };
+  }, [profile]);
 
-  const loadMessages = async (leadId: string, retryCount = 0) => {
+  const loadMessages = useCallback(async (leadId: string, retryCount = 0) => {
     try {
+      console.log('Loading messages for lead:', leadId);
       setError(null);
       const messagesData = await fetchMessages(leadId);
       setMessages(messagesData);
@@ -76,7 +93,7 @@ export const useRealtimeInbox = () => {
     } catch (error) {
       console.error('Error loading messages:', error);
       
-      // Retry logic for message loading
+      // Limited retry for message loading
       if (retryCount < 2 && error instanceof TypeError && error.message.includes('fetch')) {
         console.log(`Retrying message fetch (attempt ${retryCount + 1})`);
         
@@ -90,7 +107,7 @@ export const useRealtimeInbox = () => {
       
       setError('Unable to load messages for this conversation.');
     }
-  };
+  }, []);
 
   const sendMessage = async (leadId: string, body: string, aiGenerated = false) => {
     try {
@@ -137,14 +154,12 @@ export const useRealtimeInbox = () => {
                                profile?.role === 'admin';
 
         if (isForCurrentUser) {
-          // Show toast notification
           toast({
             title: `New message from ${leadName}`,
             description: newMessage.body.substring(0, 100) + (newMessage.body.length > 100 ? '...' : ''),
             duration: 5000,
           });
 
-          // Show browser notification if permission granted
           if (notificationPermission.current === 'granted') {
             const notification = new Notification(`New message from ${leadName}`, {
               body: newMessage.body.substring(0, 200) + (newMessage.body.length > 200 ? '...' : ''),
@@ -241,7 +256,14 @@ export const useRealtimeInbox = () => {
         clearTimeout(retryTimeoutRef.current);
       }
     };
-  }, [profile?.id]);
+  }, [profile?.id, loadConversations]);
+
+  const manualRefresh = useCallback(() => {
+    failureCountRef.current = 0; // Reset failure count
+    setError(null);
+    setLoading(true);
+    loadConversations(0);
+  }, [loadConversations]);
 
   return { 
     conversations, 
@@ -250,7 +272,7 @@ export const useRealtimeInbox = () => {
     error,
     fetchMessages: loadMessages, 
     sendMessage,
-    refetch: () => loadConversations(0),
+    refetch: manualRefresh,
     notificationPermission: notificationPermission.current
   };
 };
