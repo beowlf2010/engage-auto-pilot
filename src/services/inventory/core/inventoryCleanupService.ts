@@ -46,6 +46,18 @@ export const getLatestUploads = async (): Promise<CleanupSummary['latestUploads'
   };
 };
 
+const buildNotInQuery = (query: any, fieldName: string, excludeValues: string[]) => {
+  // Since Supabase doesn't support .not('field', 'in', array), 
+  // we'll chain multiple .neq() conditions for each value to exclude
+  let modifiedQuery = query;
+  
+  for (const value of excludeValues) {
+    modifiedQuery = modifiedQuery.neq(fieldName, value);
+  }
+  
+  return modifiedQuery;
+};
+
 export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
   try {
     console.log('Starting inventory cleanup process...');
@@ -88,8 +100,8 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
     }
 
     // Mark regular inventory (non-GM Global) as sold if not from recent uploads
-    // Use proper array syntax instead of manual SQL string construction
-    const { data: oldRegular, error: regularError } = await supabase
+    // Build query with multiple .neq() conditions instead of unsupported .not('in')
+    let regularQuery = supabase
       .from('inventory')
       .update({
         status: 'sold',
@@ -97,9 +109,12 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
         updated_at: new Date().toISOString()
       })
       .not('source_report', 'eq', 'orders_all')
-      .not('upload_history_id', 'in', latestUploads.mostRecentUploads)
-      .neq('status', 'sold')
-      .select('id');
+      .neq('status', 'sold');
+
+    // Chain multiple .neq() conditions for each upload_history_id to exclude
+    regularQuery = buildNotInQuery(regularQuery, 'upload_history_id', latestUploads.mostRecentUploads);
+
+    const { data: oldRegular, error: regularError } = await regularQuery.select('id');
 
     if (regularError) {
       console.error('Error marking old regular inventory as sold:', regularError);
