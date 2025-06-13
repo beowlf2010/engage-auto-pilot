@@ -84,7 +84,7 @@ export const getPendingTriggers = async (): Promise<BehavioralTrigger[]> => {
       .from('lead_behavior_triggers')
       .select(`
         *,
-        leads(first_name, last_name, phone, ai_opt_in, ai_sequence_paused)
+        leads(first_name, last_name, ai_opt_in, ai_sequence_paused)
       `)
       .eq('is_processed', false)
       .lte('trigger_time', new Date().toISOString())
@@ -94,7 +94,17 @@ export const getPendingTriggers = async (): Promise<BehavioralTrigger[]> => {
       console.error('Error fetching pending triggers:', error);
       return [];
     }
-    return data || [];
+
+    // Transform the data to match our interface
+    return (data || []).map(item => ({
+      id: item.id,
+      lead_id: item.lead_id,
+      trigger_type: item.trigger_type as BehavioralTrigger['trigger_type'],
+      trigger_data: item.trigger_data,
+      trigger_time: item.trigger_time,
+      is_processed: item.is_processed,
+      message_sent: item.message_sent || false
+    }));
   } catch (error) {
     console.error('Error fetching pending triggers:', error);
     return [];
