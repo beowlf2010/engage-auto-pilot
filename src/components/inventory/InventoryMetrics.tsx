@@ -24,12 +24,10 @@ const InventoryMetrics = () => {
       try {
         console.log('Fetching inventory stats...');
         
-        // Fetch inventory stats using the new service
         const stats = await getInventoryStats();
         console.log('Inventory stats:', stats);
         setInventoryStats(stats);
 
-        // Fetch financial stats
         console.log('Fetching financial stats...');
         const financialData = await getMonthlyRetailSummary();
         console.log('Financial stats:', financialData);
@@ -81,7 +79,7 @@ const InventoryMetrics = () => {
         <CardContent>
           <div className="text-2xl font-bold">{inventoryStats?.totalVehicles || 0}</div>
           <CardDescription>
-            {inventoryStats?.availableVehicles || 0} available for sale
+            {inventoryStats?.newVehicles.available || 0} new + {inventoryStats?.usedVehicles.available || 0} used available
           </CardDescription>
         </CardContent>
       </Card>

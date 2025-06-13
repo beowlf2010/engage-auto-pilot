@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -11,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar, Clock, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
-import { getInventoryStats } from "@/services/inventory/inventoryStatsService";
+import EnhancedInventoryMetrics from "@/components/inventory/EnhancedInventoryMetrics";
 import { formatVehicleTitle, getVehicleDescription, formatPrice, getDataCompletenessScore, getVehicleStatusDisplay } from "@/services/inventory/vehicleFormattingService";
 
 interface InventoryFilters {
@@ -150,11 +149,6 @@ const InventoryDashboard = () => {
     }
   });
 
-  const { data: stats } = useQuery({
-    queryKey: ['inventory-stats-enhanced'],
-    queryFn: getInventoryStats
-  });
-
   const toggleSort = (sortBy: string) => {
     if (filters.sortBy === sortBy) {
       setFilters({
@@ -176,7 +170,7 @@ const InventoryDashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Inventory Dashboard</h1>
-          <p className="text-slate-600 mt-1">Manage and analyze your vehicle inventory</p>
+          <p className="text-slate-600 mt-1">Manage and analyze your vehicle inventory with enhanced new/used breakdown</p>
         </div>
         <div className="flex items-center space-x-3">
           <Link to="/rpo-insights">
@@ -194,52 +188,8 @@ const InventoryDashboard = () => {
         </div>
       </div>
 
-      {/* Enhanced Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">Total Vehicles</p>
-                <p className="text-2xl font-bold text-slate-800">{stats.totalVehicles}</p>
-              </div>
-              <Car className="w-8 h-8 text-blue-500" />
-            </div>
-          </Card>
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">Available for Sale</p>
-                <p className="text-2xl font-bold text-green-600">{stats.availableVehicles}</p>
-                <p className="text-xs text-slate-500">Ready on lot</p>
-              </div>
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">In Production/Transit</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.inProductionTransit}</p>
-                <p className="text-xs text-slate-500">GM Global orders</p>
-              </div>
-              <Clock className="w-8 h-8 text-orange-500" />
-            </div>
-          </Card>
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">Average Price</p>
-                <p className="text-2xl font-bold text-blue-600">{formatPrice(stats.averagePrice)}</p>
-                <p className="text-xs text-slate-500">{stats.averageDaysInStock} days avg age</p>
-              </div>
-              <DollarSign className="w-8 h-8 text-blue-500" />
-            </div>
-          </Card>
-        </div>
-      )}
+      {/* Enhanced Stats with New/Used Breakdown */}
+      <EnhancedInventoryMetrics />
 
       {/* Enhanced Filters */}
       <Card className="p-6">
