@@ -2,13 +2,15 @@
 import { Button } from "@/components/ui/button";
 import { History, Package, BarChart3 } from "lucide-react";
 import { useInventoryUpload } from "@/hooks/useInventoryUpload";
+import { useMultiFileUpload } from "@/hooks/useMultiFileUpload";
 import { Link } from "react-router-dom";
 import AccessDenied from "./inventory-upload/AccessDenied";
-import UploadButtons from "./inventory-upload/UploadButtons";
 import UploadInfoCards from "./inventory-upload/UploadInfoCards";
-import UploadResult from "./inventory-upload/UploadResult";
 import UploadHistoryViewer from "./inventory-upload/UploadHistoryViewer";
 import SheetSelector from "./inventory-upload/SheetSelector";
+import DragDropFileQueue from "./inventory-upload/DragDropFileQueue";
+import BatchUploadResult from "./inventory-upload/BatchUploadResult";
+import type { QueuedFile } from "./inventory-upload/DragDropFileQueue";
 
 interface InventoryUploadProps {
   user: {
@@ -19,18 +21,22 @@ interface InventoryUploadProps {
 
 const InventoryUpload = ({ user }: InventoryUploadProps) => {
   const {
-    uploading,
-    uploadResult,
-    selectedCondition,
     showHistory,
     setShowHistory,
     showSheetSelector,
     setShowSheetSelector,
     sheetsInfo,
     pendingFile,
-    handleFileUpload,
     handleSheetSelected
   } = useInventoryUpload({ userId: user.id });
+
+  const {
+    processing,
+    batchResult,
+    setBatchResult,
+    processFile,
+    processBatch
+  } = useMultiFileUpload({ userId: user.id });
 
   // Check permissions
   if (!["manager", "admin"].includes(user.role)) {
@@ -83,13 +89,24 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
     );
   }
 
+  const handleFilesProcessed = async (files: QueuedFile[]) => {
+    const pendingFiles = files.filter(f => f.status === 'pending');
+    if (pendingFiles.length > 0) {
+      await processBatch(pendingFiles);
+    }
+  };
+
+  const handleSingleFileProcess = async (file: QueuedFile) => {
+    await processFile(file);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Upload Inventory</h2>
           <p className="text-slate-600 mt-1">
-            Import your vehicle inventory from CSV or Excel files with permanent storage
+            Import multiple vehicle inventory files with drag & drop functionality
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -112,40 +129,21 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UploadButtons 
-          onFileUpload={handleFileUpload}
-          uploading={uploading}
-          selectedCondition={selectedCondition}
-        />
-        <UploadInfoCards />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <DragDropFileQueue 
+            onFilesProcessed={handleFilesProcessed}
+            onFileProcess={handleSingleFileProcess}
+            processing={processing}
+          />
+        </div>
+        <div>
+          <UploadInfoCards />
+        </div>
       </div>
 
-      {uploadResult && (
-        <div className="space-y-4">
-          <UploadResult uploadResult={uploadResult} />
-          
-          {/* Success Actions */}
-          {uploadResult.status === 'success' && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="font-medium text-green-800 mb-2">Upload Complete! What's Next?</h3>
-              <div className="flex flex-wrap gap-3">
-                <Link to="/inventory-dashboard">
-                  <Button size="sm" className="flex items-center space-x-2">
-                    <Package className="w-4 h-4" />
-                    <span>View Inventory Dashboard</span>
-                  </Button>
-                </Link>
-                <Link to="/rpo-insights">
-                  <Button variant="outline" size="sm" className="flex items-center space-x-2">
-                    <BarChart3 className="w-4 h-4" />
-                    <span>Analyze RPO Performance</span>
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+      {batchResult && (
+        <BatchUploadResult result={batchResult} />
       )}
     </div>
   );
