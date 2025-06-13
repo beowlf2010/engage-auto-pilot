@@ -8,7 +8,9 @@ import {
   Plus,
   Send,
   Eye,
-  UserPlus
+  UserPlus,
+  DollarSign,
+  Upload
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -85,6 +87,16 @@ export const getNavigationItems = (role: string, navigate: (path: string) => voi
         ]
       },
       { 
+        path: '/financial-dashboard', 
+        label: 'Financial', 
+        icon: DollarSign,
+        color: 'emerald',
+        hoverActions: [
+          { label: 'Upload Data', icon: Upload, action: () => navigate('/financial-dashboard') },
+          { label: 'View Deals', icon: Eye, action: () => navigate('/financial-dashboard') }
+        ]
+      },
+      { 
         path: '/inventory-dashboard', 
         label: 'Inventory', 
         icon: Package,
@@ -128,6 +140,16 @@ export const getNavigationItems = (role: string, navigate: (path: string) => voi
           { label: 'Sales Dashboard', icon: BarChart3, action: () => navigate('/dash/sales') },
           { label: 'Manager Dashboard', icon: BarChart3, action: () => navigate('/dash/manager') },
           { label: 'Admin Dashboard', icon: BarChart3, action: () => navigate('/dash/admin') }
+        ]
+      },
+      { 
+        path: '/financial-dashboard', 
+        label: 'Financial', 
+        icon: DollarSign,
+        color: 'emerald',
+        hoverActions: [
+          { label: 'Upload Data', icon: Upload, action: () => navigate('/financial-dashboard') },
+          { label: 'View Deals', icon: Eye, action: () => navigate('/financial-dashboard') }
         ]
       },
       { 

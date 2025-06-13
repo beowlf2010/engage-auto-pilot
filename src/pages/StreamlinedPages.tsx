@@ -5,6 +5,7 @@ import StreamlinedInbox from '@/components/inbox/StreamlinedInbox';
 import { SalesDashboard, ManagerDashboard } from '@/components/StreamlinedDashboards';
 import LeadsList from '@/components/LeadsList';
 import AIMessageMonitor from '@/components/AIMessageMonitor';
+import FinancialDashboard from '@/components/financial/FinancialDashboard';
 
 export const SmartInboxPage = () => {
   const { profile } = useAuth();
@@ -70,6 +71,36 @@ export const AdminDashboardPage = () => {
         <p className="text-slate-600">Complete system overview</p>
       </div>
       <ManagerDashboard />
+    </div>
+  );
+};
+
+export const FinancialDashboardPage = () => {
+  const { profile } = useAuth();
+  
+  if (!profile || !['manager', 'admin'].includes(profile.role)) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-slate-800 mb-4">Access Denied</h1>
+          <p className="text-slate-600">Manager or Admin role required to access financial data.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-6">
+      <FinancialDashboard 
+        user={{
+          id: profile.id,
+          email: profile.email || '',
+          role: profile.role,
+          firstName: profile.first_name || '',
+          lastName: profile.last_name || '',
+          phone: profile.phone || undefined
+        }}
+      />
     </div>
   );
 };

@@ -15,7 +15,8 @@ import {
   ManagerDashboardPage, 
   AdminDashboardPage,
   StreamlinedLeadsPage,
-  AIMonitorPage 
+  AIMonitorPage,
+  FinancialDashboardPage
 } from "./pages/StreamlinedPages";
 import StreamlinedNavigation from "./components/StreamlinedNavigation";
 import LeadDetailPage from "./pages/LeadDetailPage";
@@ -42,7 +43,7 @@ const AppContent = () => {
         <Route path="/inbox" element={<Index />} />
         <Route path="/upload-leads" element={<Index />} />
         <Route path="/settings" element={<Index />} />
-        <Route path="/financial-dashboard" element={<Index />} />
+        <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/upload-inventory-report" element={<Index />} />
         <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />
