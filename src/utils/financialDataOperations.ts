@@ -6,10 +6,14 @@ export const insertFinancialData = async (
   deals: DealRecord[],
   summary: FinancialSummary,
   uploadHistoryId: string,
-  uploadDate: string
+  reportDate?: string // Make this optional, extract from deals if not provided
 ) => {
   console.log('=== FINANCIAL DATA INSERTION ===');
-  console.log(`Inserting ${deals.length} deals for date: ${uploadDate}`);
+  console.log(`Inserting ${deals.length} deals`);
+  
+  // Use the date from the first deal if reportDate not provided
+  const uploadDate = reportDate || deals[0]?.saleDate || new Date().toISOString().split('T')[0];
+  console.log('Using upload date:', uploadDate);
   
   try {
     // Map deals to database format and use upsert with the unique constraint
@@ -106,7 +110,8 @@ export const insertFinancialData = async (
 
     return {
       insertedDeals: insertedDeals?.length || 0,
-      summary: summaryData
+      summary: summaryData,
+      reportDate: uploadDate
     };
 
   } catch (error) {

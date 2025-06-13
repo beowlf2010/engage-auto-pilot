@@ -10,6 +10,7 @@ interface UploadResult {
   message: string;
   dealsProcessed?: number;
   summary?: any;
+  reportDate?: string;
 }
 
 export const useFinancialUpload = (userId: string) => {
@@ -70,9 +71,8 @@ export const useFinancialUpload = (userId: string) => {
         throw uploadError;
       }
 
-      // Insert financial data
-      const uploadDate = new Date().toISOString().split('T')[0];
-      const result = await insertFinancialData(deals, summary, uploadHistory.id, uploadDate);
+      // Insert financial data - let it extract the date from the deals
+      const result = await insertFinancialData(deals, summary, uploadHistory.id);
 
       // Update upload history
       await supabase
@@ -86,14 +86,15 @@ export const useFinancialUpload = (userId: string) => {
 
       setUploadResult({
         status: 'success',
-        message: `Successfully processed ${result.insertedDeals} deals`,
+        message: `Successfully processed ${result.insertedDeals} deals for ${result.reportDate}`,
         dealsProcessed: result.insertedDeals,
-        summary: result.summary
+        summary: result.summary,
+        reportDate: result.reportDate
       });
 
       toast({
         title: "Upload successful!",
-        description: `Processed ${result.insertedDeals} deals from ${fileName}`,
+        description: `Processed ${result.insertedDeals} deals from ${fileName} for ${result.reportDate}`,
       });
 
     } catch (error) {
