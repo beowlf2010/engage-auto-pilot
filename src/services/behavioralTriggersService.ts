@@ -11,30 +11,26 @@ export interface BehavioralTrigger {
   message_sent?: boolean;
 }
 
-// Create a behavioral trigger using raw SQL since table might not be in types yet
+// Create a behavioral trigger
 export const createBehavioralTrigger = async (
   leadId: string, 
   triggerType: string, 
   triggerData: any
 ): Promise<void> => {
   try {
-    const { error } = await supabase.rpc('exec_sql', {
-      query: `
-        INSERT INTO lead_behavior_triggers (lead_id, trigger_type, trigger_data, trigger_time, is_processed)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      params: [leadId, triggerType, JSON.stringify(triggerData), new Date().toISOString(), false]
-    });
-
-    if (error) {
-      // Fallback to direct insert if rpc fails
-      await supabase.from('lead_behavior_triggers' as any).insert({
+    const { error } = await supabase
+      .from('lead_behavior_triggers')
+      .insert({
         lead_id: leadId,
         trigger_type: triggerType,
         trigger_data: triggerData,
         trigger_time: new Date().toISOString(),
         is_processed: false
       });
+
+    if (error) {
+      console.error('Error creating behavioral trigger:', error);
+      throw error;
     }
 
     console.log(`Created behavioral trigger: ${triggerType} for lead ${leadId}`);
@@ -81,12 +77,15 @@ export const trackAbandonedQuote = async (leadId: string, quoteData: any): Promi
   });
 };
 
-// Get pending triggers for processing using raw query
+// Get pending triggers for processing
 export const getPendingTriggers = async (): Promise<BehavioralTrigger[]> => {
   try {
     const { data, error } = await supabase
-      .from('lead_behavior_triggers' as any)
-      .select('*, leads(first_name, last_name, phone, ai_opt_in, ai_sequence_paused)')
+      .from('lead_behavior_triggers')
+      .select(`
+        *,
+        leads(first_name, last_name, phone, ai_opt_in, ai_sequence_paused)
+      `)
       .eq('is_processed', false)
       .lte('trigger_time', new Date().toISOString())
       .order('trigger_time', { ascending: true });
@@ -106,7 +105,7 @@ export const getPendingTriggers = async (): Promise<BehavioralTrigger[]> => {
 export const updateResponsePatterns = async (leadId: string, behaviorData: any): Promise<void> => {
   try {
     const { data: existing } = await supabase
-      .from('lead_response_patterns' as any)
+      .from('lead_response_patterns')
       .select('*')
       .eq('lead_id', leadId)
       .single();
@@ -114,13 +113,13 @@ export const updateResponsePatterns = async (leadId: string, behaviorData: any):
     const responseHour = new Date().getHours();
     const responseDay = new Date().getDay();
 
-    if (existing) {
+    if (existing && !('error' in existing)) {
       // Update existing patterns
       const updatedHours = [...(existing.best_response_hours || []), responseHour].slice(-10);
       const updatedDays = [...(existing.best_response_days || []), responseDay].slice(-10);
       
       await supabase
-        .from('lead_response_patterns' as any)
+        .from('lead_response_patterns')
         .update({
           best_response_hours: updatedHours,
           best_response_days: updatedDays,
@@ -131,7 +130,7 @@ export const updateResponsePatterns = async (leadId: string, behaviorData: any):
     } else {
       // Create new pattern
       await supabase
-        .from('lead_response_patterns' as any)
+        .from('lead_response_patterns')
         .insert({
           lead_id: leadId,
           best_response_hours: [responseHour],
@@ -150,14 +149,14 @@ export const updateResponsePatterns = async (leadId: string, behaviorData: any):
 export const getLeadBehavioralInsights = async (leadId: string) => {
   try {
     const { data: triggers } = await supabase
-      .from('lead_behavior_triggers' as any)
+      .from('lead_behavior_triggers')
       .select('*')
       .eq('lead_id', leadId)
       .order('trigger_time', { ascending: false })
       .limit(20);
 
     const { data: patterns } = await supabase
-      .from('lead_response_patterns' as any)
+      .from('lead_response_patterns')
       .select('*')
       .eq('lead_id', leadId)
       .single();
@@ -171,9 +170,9 @@ export const getLeadBehavioralInsights = async (leadId: string) => {
 
     return {
       recentTriggers: triggers || [],
-      responsePatterns: patterns,
+      responsePatterns: patterns && !('error' in patterns) ? patterns : null,
       conversationMemory: memory || [],
-      behaviorScore: calculateBehaviorScore(triggers || [], patterns)
+      behaviorScore: calculateBehaviorScore(triggers || [], patterns && !('error' in patterns) ? patterns : null)
     };
   } catch (error) {
     console.error('Error getting behavioral insights:', error);
@@ -208,7 +207,7 @@ const calculateBehaviorScore = (triggers: any[], patterns: any): number => {
 export const getOptimalMessageTime = async (leadId: string): Promise<Date> => {
   try {
     const { data: patterns } = await supabase
-      .from('lead_response_patterns' as any)
+      .from('lead_response_patterns')
       .select('best_response_hours, best_response_days')
       .eq('lead_id', leadId)
       .single();
@@ -216,8 +215,8 @@ export const getOptimalMessageTime = async (leadId: string): Promise<Date> => {
     const now = new Date();
     const currentHour = now.getHours();
 
-    // Use patterns if available
-    if (patterns?.best_response_hours?.length > 0) {
+    // Use patterns if available and valid
+    if (patterns && !('error' in patterns) && patterns.best_response_hours?.length > 0) {
       const preferredHours = patterns.best_response_hours;
       const nextPreferredHour = preferredHours.find(h => h > currentHour) || preferredHours[0];
       
