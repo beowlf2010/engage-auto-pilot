@@ -533,6 +533,39 @@ export type Database = {
           },
         ]
       }
+      kpis: {
+        Row: {
+          cars_sold: number | null
+          created_at: string | null
+          date: string
+          gross_profit: number | null
+          leads_created: number | null
+          messages_sent: number | null
+          replies_in: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cars_sold?: number | null
+          created_at?: string | null
+          date: string
+          gross_profit?: number | null
+          leads_created?: number | null
+          messages_sent?: number | null
+          replies_in?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cars_sold?: number | null
+          created_at?: string | null
+          date?: string
+          gross_profit?: number | null
+          leads_created?: number | null
+          messages_sent?: number | null
+          replies_in?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lead_inventory_interests: {
         Row: {
           created_at: string
@@ -626,6 +659,7 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          last_reply_at: string | null
           middle_name: string | null
           next_ai_send_at: string | null
           postal_code: string | null
@@ -666,6 +700,7 @@ export type Database = {
           first_name: string
           id?: string
           last_name: string
+          last_reply_at?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
           postal_code?: string | null
@@ -706,6 +741,7 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          last_reply_at?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
           postal_code?: string | null
@@ -1030,8 +1066,16 @@ export type Database = {
         Args: { phone_input: string }
         Returns: string
       }
+      schedule_next_touch: {
+        Args: { lead_uuid: string }
+        Returns: undefined
+      }
       set_primary_phone: {
         Args: { p_lead_id: string; p_phone_id: string }
+        Returns: undefined
+      }
+      update_daily_kpis: {
+        Args: { target_date?: string }
         Returns: undefined
       }
       update_inventory_days: {

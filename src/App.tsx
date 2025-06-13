@@ -9,6 +9,14 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import InventoryLayout from "./components/InventoryLayout";
+import { 
+  SmartInboxPage, 
+  SalesDashboardPage, 
+  ManagerDashboardPage, 
+  AdminDashboardPage,
+  StreamlinedLeadsPage 
+} from "./pages/StreamlinedPages";
+import StreamlinedNavigation from "./components/StreamlinedNavigation";
 
 const queryClient = new QueryClient();
 
@@ -19,22 +27,29 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/dashboard" element={<Index />} />
-            <Route path="/leads" element={<Index />} />
-            <Route path="/inbox" element={<Index />} />
-            <Route path="/upload-leads" element={<Index />} />
-            <Route path="/settings" element={<Index />} />
-            <Route path="/financial-dashboard" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/upload-inventory-report" element={<Index />} />
-            <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />
-            <Route path="/inventory-upload" element={<InventoryLayout page="inventory-upload" />} />
-            <Route path="/vehicle-detail/:identifier" element={<InventoryLayout page="vehicle-detail" />} />
-            <Route path="/rpo-insights" element={<InventoryLayout page="rpo-insights" />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <div className="min-h-screen bg-slate-50">
+            <StreamlinedNavigation />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Index />} />
+              <Route path="/smartinbox" element={<SmartInboxPage />} />
+              <Route path="/leads" element={<StreamlinedLeadsPage />} />
+              <Route path="/dash/sales" element={<SalesDashboardPage />} />
+              <Route path="/dash/manager" element={<ManagerDashboardPage />} />
+              <Route path="/dash/admin" element={<AdminDashboardPage />} />
+              <Route path="/inbox" element={<Index />} />
+              <Route path="/upload-leads" element={<Index />} />
+              <Route path="/settings" element={<Index />} />
+              <Route path="/financial-dashboard" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/upload-inventory-report" element={<Index />} />
+              <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />
+              <Route path="/inventory-upload" element={<InventoryLayout page="inventory-upload" />} />
+              <Route path="/vehicle-detail/:identifier" element={<InventoryLayout page="vehicle-detail" />} />
+              <Route path="/rpo-insights" element={<InventoryLayout page="rpo-insights" />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
