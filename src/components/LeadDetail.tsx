@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,11 +18,13 @@ import {
   Bot,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  PhoneCall
 } from "lucide-react";
 import { fetchLeadDetail, LeadDetailData } from '@/services/leadDetailService';
 import { formatPhoneForDisplay } from '@/utils/phoneUtils';
 import { Skeleton } from "@/components/ui/skeleton";
+import PhoneNumberDisplay from '@/components/PhoneNumberDisplay';
 
 const LeadDetail = () => {
   const { leadId } = useParams<{ leadId: string }>();
@@ -72,6 +73,11 @@ const LeadDetail = () => {
     }
   };
 
+  const handlePhoneSelect = (phoneNumber: string) => {
+    // This could trigger SMS composition or phone dialing
+    console.log('Selected phone:', phoneNumber);
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-6 space-y-6">
@@ -107,6 +113,16 @@ const LeadDetail = () => {
       </div>
     );
   }
+
+  // Convert lead phone numbers to PhoneNumber format for the component
+  const phoneNumbers = lead.phoneNumbers.map(phone => ({
+    number: phone.number,
+    type: phone.type as 'cell' | 'day' | 'eve',
+    priority: 1, // Default priority, could be enhanced later
+    status: phone.status as 'active' | 'failed' | 'opted_out'
+  }));
+
+  const primaryPhone = phoneNumbers.find(p => p.status === 'active')?.number || '';
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -165,34 +181,15 @@ const LeadDetail = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Phone Numbers */}
+                  {/* Phone Numbers - Using PhoneNumberDisplay component */}
                   <div>
-                    <h4 className="font-semibold text-sm text-gray-700 mb-2">Phone Numbers</h4>
-                    <div className="space-y-2">
-                      {lead.phoneNumbers.map((phone) => (
-                        <div key={phone.id} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Phone className="w-4 h-4 text-gray-500" />
-                            <span>{formatPhoneForDisplay(phone.number)}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {phone.type}
-                            </Badge>
-                            {phone.isPrimary && (
-                              <Badge variant="secondary" className="text-xs">
-                                Primary
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center">
-                            {phone.status === 'active' ? (
-                              <CheckCircle className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <XCircle className="w-4 h-4 text-red-500" />
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <h4 className="font-semibold text-sm text-gray-700 mb-3">Phone Numbers</h4>
+                    <PhoneNumberDisplay
+                      phoneNumbers={phoneNumbers}
+                      primaryPhone={primaryPhone}
+                      onPhoneSelect={handlePhoneSelect}
+                      compact={false}
+                    />
                   </div>
 
                   <Separator />
@@ -380,6 +377,25 @@ const LeadDetail = () => {
                 <span className="text-sm font-medium text-gray-700">Messages:</span>
                 <p className="text-sm">{lead.conversations.length} total</p>
               </div>
+              <div>
+                <span className="text-sm font-medium text-gray-700">Phone Numbers:</span>
+                <p className="text-sm">{lead.phoneNumbers.length} numbers</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Contact */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Contact</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <PhoneNumberDisplay
+                phoneNumbers={phoneNumbers}
+                primaryPhone={primaryPhone}
+                onPhoneSelect={handlePhoneSelect}
+                compact={true}
+              />
             </CardContent>
           </Card>
 
