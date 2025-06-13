@@ -7,6 +7,13 @@ export const getVehicleType = (stockNumber?: string): 'new' | 'used' => {
   return firstChar === 'C' ? 'new' : 'used';
 };
 
+export const isUsedVehicle = (stockNumber?: string): boolean => {
+  if (!stockNumber) return true;
+  const firstChar = stockNumber.trim().toUpperCase().charAt(0);
+  // Used vehicles include B, X prefixes and anything that's not C (new)
+  return ['B', 'X'].includes(firstChar) || (firstChar !== 'C');
+};
+
 export const hasProfitChanges = (deal: Deal) => {
   return deal.original_gross_profit !== undefined && 
          (deal.gross_profit !== deal.original_gross_profit || 
@@ -15,9 +22,8 @@ export const hasProfitChanges = (deal: Deal) => {
 
 export const getAdjustedGrossProfit = (deal: Deal, packAdjustment: number) => {
   const baseGross = deal.gross_profit || 0;
-  const vehicleType = getVehicleType(deal.stock_number);
-  // Apply pack adjustment to ALL used vehicles when enabled
-  return vehicleType === 'used' ? baseGross + packAdjustment : baseGross;
+  // Only apply pack adjustment to used vehicles
+  return isUsedVehicle(deal.stock_number) ? baseGross + packAdjustment : baseGross;
 };
 
 export const filterDeals = (
@@ -51,7 +57,9 @@ export const calculateSummaryTotals = (filteredDeals: Deal[], packAdjustment: nu
   filteredDeals.forEach(deal => {
     const vehicleType = getVehicleType(deal.stock_number);
     const dealType = deal.deal_type || 'retail';
-    const adjustedGross = getAdjustedGrossProfit(deal, packAdjustment);
+    const baseGross = deal.gross_profit || 0;
+    const packAdj = isUsedVehicle(deal.stock_number) ? packAdjustment : 0;
+    const adjustedGross = baseGross + packAdj;
     const fiProfit = deal.fi_profit || 0;
     const totalProfit = adjustedGross + fiProfit;
 
@@ -90,7 +98,7 @@ export const calculateSummaryTotals = (filteredDeals: Deal[], packAdjustment: nu
 };
 
 export const formatCurrency = (value?: number) => {
-  if (!value) return "$0";
+  if (!value && value !== 0) return "$0";
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',

@@ -6,7 +6,6 @@ export const extractDealsFromData = (data: any[], columnMapping: DmsColumns): De
   console.log('Column mapping:', columnMapping);
   
   const deals: DealRecord[] = [];
-  let reportDate: string | null = null;
   
   // Find the header row index
   let headerRowIndex = -1;
@@ -26,58 +25,6 @@ export const extractDealsFromData = (data: any[], columnMapping: DmsColumns): De
   
   console.log('Header row found at index:', headerRowIndex);
   
-  // Extract report date from the data (look for date patterns in early rows)
-  for (let i = 0; i < Math.min(headerRowIndex + 1, data.length); i++) {
-    const row = data[i];
-    if (Array.isArray(row)) {
-      for (const cell of row) {
-        const cellStr = String(cell || '').trim();
-        // Look for date patterns like "01/01/2024", "2024-01-01", etc.
-        const dateMatch = cellStr.match(/(\d{1,2}\/\d{1,2}\/\d{4})|(\d{4}-\d{1,2}-\d{1,2})/);
-        if (dateMatch) {
-          const foundDate = dateMatch[0];
-          // Convert to standard format
-          if (foundDate.includes('/')) {
-            const [month, day, year] = foundDate.split('/');
-            reportDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          } else {
-            reportDate = foundDate;
-          }
-          console.log('Found report date:', reportDate);
-          break;
-        }
-      }
-      if (reportDate) break;
-    }
-  }
-  
-  // If no date found in header, use the first date from data rows
-  if (!reportDate && headerRowIndex !== -1) {
-    for (let i = headerRowIndex + 1; i < data.length; i++) {
-      const row = data[i];
-      if (Array.isArray(row)) {
-        const dateIndex = getColumnIndex(data[headerRowIndex], columnMapping.date);
-        if (dateIndex !== -1) {
-          const dateValue = row[dateIndex];
-          if (dateValue) {
-            const parsedDate = parseDate(dateValue);
-            if (parsedDate) {
-              reportDate = parsedDate;
-              console.log('Using first transaction date as report date:', reportDate);
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  // Fallback to today's date if no date found
-  if (!reportDate) {
-    reportDate = new Date().toISOString().split('T')[0];
-    console.log('No date found in report, using today:', reportDate);
-  }
-  
   // Process data rows starting after header
   if (headerRowIndex === -1) {
     console.log('No header row found, cannot process deals');
@@ -95,7 +42,7 @@ export const extractDealsFromData = (data: any[], columnMapping: DmsColumns): De
     if (row.every(cell => !cell || String(cell).trim() === '')) continue;
     
     try {
-      const deal = extractDealFromRow(row, headerRow, columnMapping, reportDate);
+      const deal = extractDealFromRow(row, headerRow, columnMapping);
       if (deal) {
         deals.push(deal);
       }
@@ -104,7 +51,7 @@ export const extractDealsFromData = (data: any[], columnMapping: DmsColumns): De
     }
   }
   
-  console.log(`Extracted ${deals.length} deals with report date: ${reportDate}`);
+  console.log(`Extracted ${deals.length} deals`);
   return deals;
 };
 
@@ -119,7 +66,7 @@ const getColumnIndex = (headerRow: any[], columnName?: string): number => {
   return -1;
 };
 
-const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColumns, reportDate: string): DealRecord | null => {
+const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColumns): DealRecord | null => {
   const getValue = (columnName?: string): string => {
     const index = getColumnIndex(headerRow, columnName);
     return index !== -1 ? String(row[index] || '').trim() : '';
@@ -151,6 +98,9 @@ const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColu
   // Determine deal type based on stock number
   const dealType = classifyDealByStock(stockNumber);
   
+  // Extract individual deal date
+  const dealDate = extractDealDate(getValue(columnMapping.date));
+  
   const deal: DealRecord = {
     stockNumber: stockNumber || undefined,
     grossProfit,
@@ -164,22 +114,16 @@ const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: DmsColu
     vin: getValue(columnMapping.vin6) || undefined,
     vehicle: getValue(columnMapping.vehicle) || undefined,
     tradeValue: getNumberValue(columnMapping.trade),
-    saleDate: reportDate
+    saleDate: dealDate || new Date().toISOString().split('T')[0] // fallback to today if no date found
   };
   
   return deal;
 };
 
-const classifyDealByStock = (stockNumber?: string): 'new' | 'used' => {
-  if (!stockNumber) return 'used';
-  const firstChar = stockNumber.trim().toUpperCase().charAt(0);
-  return firstChar === 'C' ? 'new' : 'used';
-};
-
-const parseDate = (dateValue: any): string | null => {
+const extractDealDate = (dateValue: string): string | null => {
   if (!dateValue) return null;
   
-  const dateStr = String(dateValue).trim();
+  const dateStr = dateValue.trim();
   
   // Try different date formats
   const formats = [
@@ -204,4 +148,10 @@ const parseDate = (dateValue: any): string | null => {
   }
   
   return null;
+};
+
+const classifyDealByStock = (stockNumber?: string): 'new' | 'used' => {
+  if (!stockNumber) return 'used';
+  const firstChar = stockNumber.trim().toUpperCase().charAt(0);
+  return firstChar === 'C' ? 'new' : 'used';
 };

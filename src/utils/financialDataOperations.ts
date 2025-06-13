@@ -6,19 +6,18 @@ export const insertFinancialData = async (
   deals: DealRecord[],
   summary: FinancialSummary,
   uploadHistoryId: string,
-  reportDate?: string // Make this optional, extract from deals if not provided
+  reportDate?: string
 ) => {
   console.log('=== FINANCIAL DATA INSERTION ===');
   console.log(`Inserting ${deals.length} deals`);
   
-  // Use the date from the first deal if reportDate not provided
-  const uploadDate = reportDate || deals[0]?.saleDate || new Date().toISOString().split('T')[0];
-  console.log('Using upload date:', uploadDate);
+  // Use individual deal dates instead of a single report date
+  console.log('Using individual deal dates from each transaction');
   
   try {
     // Map deals to database format and use upsert with the unique constraint
     const dealRecords = deals.map(deal => ({
-      upload_date: uploadDate,
+      upload_date: deal.saleDate || new Date().toISOString().split('T')[0], // Use individual deal date
       stock_number: deal.stockNumber || null,
       age: deal.age || null,
       year_model: deal.yearModel || null,
@@ -28,13 +27,12 @@ export const insertFinancialData = async (
       gross_profit: deal.grossProfit || null,
       fi_profit: deal.fiProfit || null,
       total_profit: deal.totalProfit || null,
-      deal_type: deal.dealType === 'new' ? 'new' : 'retail', // Map deal types
+      deal_type: deal.dealType === 'new' ? 'new' : 'retail',
       upload_history_id: uploadHistoryId,
-      // Store original values for pack adjustment calculations
       original_gross_profit: deal.grossProfit || null,
       original_fi_profit: deal.fiProfit || null,
       original_total_profit: deal.totalProfit || null,
-      first_reported_date: uploadDate
+      first_reported_date: deal.saleDate || new Date().toISOString().split('T')[0]
     }));
 
     console.log('Sample deal record to insert:', dealRecords[0]);
@@ -44,7 +42,7 @@ export const insertFinancialData = async (
       .from('deals')
       .upsert(dealRecords, {
         onConflict: 'stock_number,upload_date',
-        ignoreDuplicates: false // This ensures we update existing records
+        ignoreDuplicates: false
       })
       .select();
 
@@ -55,12 +53,22 @@ export const insertFinancialData = async (
 
     console.log(`Successfully upserted ${insertedDeals?.length || 0} deals`);
 
-    // Calculate summary totals for profit snapshot
+    // Calculate summary totals for profit snapshot - use the most common date or today
+    const dateGroups = deals.reduce((acc, deal) => {
+      const date = deal.saleDate || new Date().toISOString().split('T')[0];
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const snapshotDate = Object.keys(dateGroups).reduce((a, b) => 
+      dateGroups[a] > dateGroups[b] ? a : b
+    ) || new Date().toISOString().split('T')[0];
+
     const retailDeals = deals.filter(d => d.dealType !== 'new');
     const newDeals = deals.filter(d => d.dealType === 'new');
 
     const summaryData = {
-      snapshot_date: uploadDate,
+      snapshot_date: snapshotDate,
       total_units: summary.totalUnits,
       total_sales: summary.totalSales,
       total_gross: summary.totalGross,
@@ -82,7 +90,7 @@ export const insertFinancialData = async (
     // Use the expanded profit snapshot function
     const { data: snapshotResult, error: snapshotError } = await supabase
       .rpc('upsert_expanded_profit_snapshot', {
-        p_date: uploadDate,
+        p_date: snapshotDate,
         p_retail_units: summaryData.retail_units,
         p_retail_gross: summaryData.retail_gross,
         p_dealer_trade_units: summaryData.dealer_trade_units,
@@ -111,7 +119,7 @@ export const insertFinancialData = async (
     return {
       insertedDeals: insertedDeals?.length || 0,
       summary: summaryData,
-      reportDate: uploadDate
+      reportDate: snapshotDate
     };
 
   } catch (error) {

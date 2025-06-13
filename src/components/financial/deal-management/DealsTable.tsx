@@ -48,6 +48,24 @@ const DealsTable = ({
     return firstChar === 'C' ? 'new' : 'used';
   };
 
+  const isUsedVehicle = (stockNumber?: string): boolean => {
+    if (!stockNumber) return true;
+    const firstChar = stockNumber.trim().toUpperCase().charAt(0);
+    return ['B', 'X'].includes(firstChar) || (firstChar !== 'C');
+  };
+
+  const getPackAdjustment = (deal: Deal): number => {
+    if (!packAdjustmentEnabled || !isUsedVehicle(deal.stock_number)) return 0;
+    return localPackAdjustment;
+  };
+
+  const getTotalProfitWithPack = (deal: Deal): number => {
+    const grossProfit = deal.gross_profit || 0;
+    const fiProfit = deal.fi_profit || 0;
+    const packAdjustment = getPackAdjustment(deal);
+    return grossProfit + fiProfit + packAdjustment;
+  };
+
   const hasProfitChanges = (deal: Deal) => {
     return deal.original_gross_profit !== undefined && 
            (deal.gross_profit !== deal.original_gross_profit || 
@@ -123,86 +141,94 @@ const DealsTable = ({
           </tr>
         </thead>
         <tbody>
-          {deals.map((deal) => (
-            <tr key={deal.id} className="border-b border-gray-100 hover:bg-gray-50">
-              <td className="p-3">
-                <input
-                  type="checkbox"
-                  checked={selectedDeals.includes(deal.id)}
-                  onChange={() => onSelectDeal(deal.id)}
-                  className="rounded border-gray-300"
-                />
-              </td>
-              <td className="p-3 text-sm">
-                {new Date(deal.upload_date).toLocaleDateString()}
-              </td>
-              <td className="p-3 text-sm font-medium">
-                {deal.stock_number || '-'}
-              </td>
-              <td className="p-3 text-sm">
-                {getVehicleTypeBadge(deal.stock_number)}
-              </td>
-              <td className="p-3 text-sm">
-                {deal.year_model || '-'}
-              </td>
-              <td className="p-3 text-sm">
-                {deal.buyer_name || '-'}
-              </td>
-              <td className="p-3 text-sm text-right">
-                <div>
-                  {formatCurrency(getAdjustedGrossProfit(deal))}
-                  {packAdjustmentEnabled && localPackAdjustment > 0 && deal.stock_number?.toUpperCase().match(/^[BX]/) && (
-                    <div className="text-xs text-green-600">
-                      (+${localPackAdjustment})
-                    </div>
-                  )}
-                  {deal.original_gross_profit && deal.gross_profit !== deal.original_gross_profit && (
+          {deals.map((deal) => {
+            const packAdjustment = getPackAdjustment(deal);
+            return (
+              <tr key={deal.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="p-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedDeals.includes(deal.id)}
+                    onChange={() => onSelectDeal(deal.id)}
+                    className="rounded border-gray-300"
+                  />
+                </td>
+                <td className="p-3 text-sm">
+                  {new Date(deal.upload_date).toLocaleDateString()}
+                </td>
+                <td className="p-3 text-sm font-medium">
+                  {deal.stock_number || '-'}
+                </td>
+                <td className="p-3 text-sm">
+                  {getVehicleTypeBadge(deal.stock_number)}
+                </td>
+                <td className="p-3 text-sm">
+                  {deal.year_model || '-'}
+                </td>
+                <td className="p-3 text-sm">
+                  {deal.buyer_name || '-'}
+                </td>
+                <td className="p-3 text-sm text-right">
+                  <div>
+                    {formatCurrency(deal.gross_profit)}
+                    {packAdjustment > 0 && (
+                      <div className="text-xs text-green-600">
+                        +{formatCurrency(packAdjustment)} pack
+                      </div>
+                    )}
+                    {deal.original_gross_profit && deal.gross_profit !== deal.original_gross_profit && (
+                      <div className="text-xs text-gray-500">
+                        Was: {formatCurrency(deal.original_gross_profit)}
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="p-3 text-sm text-right">
+                  <div>
+                    {formatCurrency(deal.fi_profit)}
+                    {deal.original_fi_profit && deal.fi_profit !== deal.original_fi_profit && (
+                      <div className="text-xs text-gray-500">
+                        Was: {formatCurrency(deal.original_fi_profit)}
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="p-3 text-sm text-right font-medium">
+                  {formatCurrency(getTotalProfitWithPack(deal))}
+                  {packAdjustment > 0 && (
                     <div className="text-xs text-gray-500">
-                      Was: {formatCurrency(deal.original_gross_profit)}
+                      (incl. {formatCurrency(packAdjustment)} pack)
                     </div>
                   )}
-                </div>
-              </td>
-              <td className="p-3 text-sm text-right">
-                <div>
-                  {formatCurrency(deal.fi_profit)}
-                  {deal.original_fi_profit && deal.fi_profit !== deal.original_fi_profit && (
-                    <div className="text-xs text-gray-500">
-                      Was: {formatCurrency(deal.original_fi_profit)}
-                    </div>
-                  )}
-                </div>
-              </td>
-              <td className="p-3 text-sm text-right">
-                {formatCurrency((getAdjustedGrossProfit(deal) + (deal.fi_profit || 0)))}
-              </td>
-              <td className="p-3 text-center">
-                {renderProfitChangeIndicator(deal)}
-              </td>
-              <td className="p-3 text-center">
-                <Badge className={getDealTypeBadgeColor(deal.deal_type)}>
-                  {deal.deal_type?.replace('_', ' ') || 'retail'}
-                </Badge>
-              </td>
-              <td className="p-3 text-center">
-                <Select
-                  value={deal.deal_type || 'retail'}
-                  onValueChange={(value: 'retail' | 'dealer_trade' | 'wholesale') => 
-                    onDealTypeUpdate(deal.id, value)
-                  }
-                >
-                  <SelectTrigger className="w-32 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="retail">Retail</SelectItem>
-                    <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
-                    <SelectItem value="wholesale">Wholesale</SelectItem>
-                  </SelectContent>
-                </Select>
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td className="p-3 text-center">
+                  {renderProfitChangeIndicator(deal)}
+                </td>
+                <td className="p-3 text-center">
+                  <Badge className={getDealTypeBadgeColor(deal.deal_type)}>
+                    {deal.deal_type?.replace('_', ' ') || 'retail'}
+                  </Badge>
+                </td>
+                <td className="p-3 text-center">
+                  <Select
+                    value={deal.deal_type || 'retail'}
+                    onValueChange={(value: 'retail' | 'dealer_trade' | 'wholesale') => 
+                      onDealTypeUpdate(deal.id, value)
+                    }
+                  >
+                    <SelectTrigger className="w-32 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
+                      <SelectItem value="wholesale">Wholesale</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
