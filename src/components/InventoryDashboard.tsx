@@ -173,6 +173,7 @@ const InventoryDashboard = () => {
           <p className="text-slate-600 mt-1">Manage and analyze your vehicle inventory with enhanced new/used breakdown</p>
         </div>
         <div className="flex items-center space-x-3">
+          <InventoryCleanupButton />
           <Link to="/rpo-insights">
             <Button variant="outline" className="flex items-center space-x-2">
               <BarChart3 className="w-4 h-4" />

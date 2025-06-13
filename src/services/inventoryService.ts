@@ -29,3 +29,10 @@ export {
   isVehicleAvailable,
   getVehicleStatusDisplay
 } from './inventory/inventoryStatsService';
+
+// Export cleanup functionality
+export { 
+  performInventoryCleanup,
+  cleanupInventoryData,
+  getLatestUploads
+} from './inventory/core/inventoryCleanupService';
