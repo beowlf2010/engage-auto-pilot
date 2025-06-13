@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -8,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar, Clock } from "lucide-react";
+import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar, Clock, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
+import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 
 interface InventoryFilters {
   make?: string;
@@ -33,11 +33,21 @@ const InventoryDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: inventory, isLoading } = useQuery({
-    queryKey: ['inventory', filters, searchTerm],
+    queryKey: ['inventory-with-deals', filters, searchTerm],
     queryFn: async () => {
       let query = supabase
         .from('inventory')
-        .select('*');
+        .select(`
+          *,
+          deal_count:deals!stock_number(count),
+          latest_deal:deals!stock_number(
+            id,
+            upload_date,
+            sale_amount,
+            total_profit,
+            deal_type
+          )
+        `);
 
       if (filters.make) {
         query = query.ilike('make', `%${filters.make}%`);
@@ -85,7 +95,15 @@ const InventoryDashboard = () => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      
+      // Process the data to include deal information
+      const processedData = data?.map(vehicle => ({
+        ...vehicle,
+        deal_count: vehicle.deal_count?.[0]?.count || 0,
+        latest_deal: vehicle.latest_deal?.[0] || null
+      }));
+      
+      return processedData;
     }
   });
 
@@ -445,6 +463,7 @@ const InventoryDashboard = () => {
                 </Button>
               </TableHead>
               <TableHead className="font-semibold">Features</TableHead>
+              <TableHead className="font-semibold">Deal History</TableHead>
               <TableHead className="font-semibold">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -482,11 +501,14 @@ const InventoryDashboard = () => {
                     </TableCell>
                     
                     <TableCell>
-                      <div className="font-medium">
-                        {vehicle.stock_number || 'N/A'}
-                      </div>
+                      <VehicleIdentifier 
+                        stockNumber={vehicle.stock_number}
+                        vin={vehicle.vin}
+                        variant="badge"
+                        showIcon={true}
+                      />
                       {isGMGlobalOrder(vehicle) && !vehicle.vin && (
-                        <div className="text-xs text-slate-500">GM Global Order</div>
+                        <div className="text-xs text-slate-500 mt-1">GM Global Order</div>
                       )}
                     </TableCell>
                     
@@ -551,6 +573,36 @@ const InventoryDashboard = () => {
                           )}
                         </div>
                       )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      <div className="text-sm">
+                        {vehicle.deal_count > 0 ? (
+                          <div className="space-y-1">
+                            <Badge variant="outline" className="text-xs">
+                              {vehicle.deal_count} deal{vehicle.deal_count > 1 ? 's' : ''}
+                            </Badge>
+                            {vehicle.latest_deal && (
+                              <div className="text-xs text-slate-600">
+                                <div className="flex items-center space-x-1">
+                                  <DollarSign className="w-3 h-3" />
+                                  <span>
+                                    {vehicle.latest_deal.sale_amount 
+                                      ? formatPrice(vehicle.latest_deal.sale_amount)
+                                      : 'No sale price'
+                                    }
+                                  </span>
+                                </div>
+                                <div className="text-slate-500">
+                                  {new Date(vehicle.latest_deal.upload_date).toLocaleDateString()}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 text-xs">No deals</span>
+                        )}
+                      </div>
                     </TableCell>
                     
                     <TableCell>
