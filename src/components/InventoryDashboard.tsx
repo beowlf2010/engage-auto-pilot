@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -10,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar, Clock, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
+import { getInventoryStats } from "@/services/inventory/inventoryStatsService";
+import { formatVehicleTitle, getVehicleDescription, formatPrice, getDataCompletenessScore, getVehicleStatusDisplay } from "@/services/inventory/vehicleFormattingService";
 
 interface InventoryFilters {
   make?: string;
@@ -21,19 +24,21 @@ interface InventoryFilters {
   yearMax?: number;
   priceMin?: number;
   priceMax?: number;
-  sortBy?: 'age' | 'price' | 'year' | 'make' | 'model';
+  sortBy?: 'age' | 'price' | 'year' | 'make' | 'model' | 'completeness';
   sortOrder?: 'asc' | 'desc';
+  dataQuality?: 'all' | 'complete' | 'incomplete';
 }
 
 const InventoryDashboard = () => {
   const [filters, setFilters] = useState<InventoryFilters>({
     sortBy: 'age',
-    sortOrder: 'desc'
+    sortOrder: 'desc',
+    dataQuality: 'all'
   });
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: inventory, isLoading } = useQuery({
-    queryKey: ['inventory-with-deals', filters, searchTerm],
+    queryKey: ['inventory-enhanced', filters, searchTerm],
     queryFn: async () => {
       let query = supabase
         .from('inventory')
@@ -79,219 +84,76 @@ const InventoryDashboard = () => {
         query = query.or(`vin.ilike.%${searchTerm}%,stock_number.ilike.%${searchTerm}%,make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
       }
 
-      // Apply sorting
-      if (filters.sortBy === 'age') {
-        query = query.order('days_in_inventory', { ascending: filters.sortOrder === 'asc' });
-      } else if (filters.sortBy === 'price') {
-        query = query.order('price', { ascending: filters.sortOrder === 'asc' });
-      } else if (filters.sortBy === 'year') {
-        query = query.order('year', { ascending: filters.sortOrder === 'asc' });
-      } else if (filters.sortBy === 'make') {
-        query = query.order('make', { ascending: filters.sortOrder === 'asc' });
-      } else if (filters.sortBy === 'model') {
-        query = query.order('model', { ascending: filters.sortOrder === 'asc' });
-      }
-
       const { data, error } = await query;
       if (error) throw error;
       
-      // Process the data to include deal information
-      const processedData = data?.map(vehicle => ({
+      // Process the data to include deal information and data quality
+      let processedData = data?.map(vehicle => ({
         ...vehicle,
         deal_count: Array.isArray(vehicle.deals) ? vehicle.deals.length : 0,
         latest_deal: Array.isArray(vehicle.deals) && vehicle.deals.length > 0 
           ? vehicle.deals.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0]
-          : null
-      }));
+          : null,
+        data_completeness: getDataCompletenessScore(vehicle)
+      })) || [];
+
+      // Apply data quality filter
+      if (filters.dataQuality === 'complete') {
+        processedData = processedData.filter(v => v.data_completeness >= 80);
+      } else if (filters.dataQuality === 'incomplete') {
+        processedData = processedData.filter(v => v.data_completeness < 80);
+      }
+
+      // Apply sorting
+      processedData.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch (filters.sortBy) {
+          case 'age':
+            aVal = a.days_in_inventory || 0;
+            bVal = b.days_in_inventory || 0;
+            break;
+          case 'price':
+            aVal = a.price || 0;
+            bVal = b.price || 0;
+            break;
+          case 'year':
+            aVal = a.year || 0;
+            bVal = b.year || 0;
+            break;
+          case 'make':
+            aVal = a.make || '';
+            bVal = b.make || '';
+            break;
+          case 'model':
+            aVal = a.model || '';
+            bVal = b.model || '';
+            break;
+          case 'completeness':
+            aVal = a.data_completeness;
+            bVal = b.data_completeness;
+            break;
+          default:
+            return 0;
+        }
+        
+        if (typeof aVal === 'string') {
+          return filters.sortOrder === 'asc' 
+            ? aVal.localeCompare(bVal) 
+            : bVal.localeCompare(aVal);
+        }
+        
+        return filters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+      });
       
       return processedData;
     }
   });
 
   const { data: stats } = useQuery({
-    queryKey: ['inventory-stats'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_rpo_analytics');
-      if (error) throw error;
-
-      const { count: totalVehicles } = await supabase
-        .from('inventory')
-        .select('*', { count: 'exact', head: true });
-
-      // For regular inventory (non-GM Global), count vehicles with status 'available'
-      const { count: regularAvailable } = await supabase
-        .from('inventory')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'available')
-        .neq('source_report', 'orders_all');
-
-      // For GM Global orders, only count vehicles with status '5000' as available
-      const { count: gmGlobalAvailable } = await supabase
-        .from('inventory')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_report', 'orders_all')
-        .eq('status', '5000');
-
-      // Count GM Global orders that are in production/transit (not 5000)
-      const { count: inProductionTransit } = await supabase
-        .from('inventory')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_report', 'orders_all')
-        .neq('status', '5000');
-
-      const { count: soldVehicles } = await supabase
-        .from('inventory')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'sold');
-
-      return {
-        totalVehicles: totalVehicles || 0,
-        availableVehicles: (regularAvailable || 0) + (gmGlobalAvailable || 0),
-        inProductionTransit: inProductionTransit || 0,
-        soldVehicles: soldVehicles || 0,
-        rpoAnalytics: data || []
-      };
-    }
+    queryKey: ['inventory-stats-enhanced'],
+    queryFn: getInventoryStats
   });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'available': return 'bg-green-100 text-green-800';
-      case 'sold': return 'bg-blue-100 text-blue-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getGMGlobalStatus = (status: string) => {
-    if (status === '5000') {
-      return { label: 'Available', color: 'bg-green-100 text-green-800' };
-    } else if (status === '1000' || status === '2000') {
-      return { label: 'Being Built', color: 'bg-yellow-100 text-yellow-800' };
-    } else {
-      return { label: 'In Transit', color: 'bg-blue-100 text-blue-800' };
-    }
-  };
-
-  // Enhanced vehicle title formatting that prevents duplication and handles vAuto data properly
-  const formatVehicleTitle = (vehicle: any) => {
-    console.log('=== VEHICLE TITLE FORMATTING ===');
-    console.log('Vehicle data:', { year: vehicle.year, make: vehicle.make, model: vehicle.model, trim: vehicle.trim });
-    
-    // Handle vAuto data where vehicle info might be in full_option_blob
-    if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
-      const blob = vehicle.full_option_blob;
-      console.log('Checking vAuto blob for vehicle info...');
-      
-      // Look for vAuto Vehicle field
-      const vehicleField = blob.Vehicle || blob.vehicle || blob['Vehicle:'];
-      if (vehicleField && typeof vehicleField === 'string') {
-        console.log('Found vAuto vehicle field:', vehicleField);
-        
-        // Parse vAuto format: "2022 Chevrolet Silverado 1500 LT"
-        const parts = vehicleField.trim().split(/\s+/);
-        if (parts.length >= 3) {
-          const yearPart = parts.find(p => /^\d{4}$/.test(p));
-          const yearIndex = yearPart ? parts.indexOf(yearPart) : -1;
-          
-          if (yearIndex !== -1 && yearIndex < parts.length - 2) {
-            const extractedYear = parts[yearIndex];
-            const extractedMake = parts[yearIndex + 1];
-            const extractedModel = parts.slice(yearIndex + 2).join(' ');
-            
-            console.log('Extracted from vAuto:', { year: extractedYear, make: extractedMake, model: extractedModel });
-            return `${extractedYear} ${extractedMake} ${extractedModel}`;
-          }
-        }
-      }
-    }
-    
-    // Fallback to database fields
-    const year = vehicle.year ? String(vehicle.year) : '';
-    const make = vehicle.make || '';
-    const model = vehicle.model || '';
-    const trim = vehicle.trim || '';
-
-    // Prevent duplication issues
-    const makeContainsYear = year && make.includes(year);
-    const modelContainsYear = year && model.includes(year);
-    const makeAndModelSame = make.toLowerCase() === model.toLowerCase();
-    const modelContainsMake = model.toLowerCase().includes(make.toLowerCase()) && make.length > 2;
-
-    console.log('Database field analysis:', { 
-      year, make, model, trim, 
-      makeContainsYear, modelContainsYear, makeAndModelSame, modelContainsMake 
-    });
-
-    let parts: string[] = [];
-
-    // Add year only if it's not already in make or model
-    if (year && !makeContainsYear && !modelContainsYear) {
-      parts.push(year);
-    }
-
-    // Handle make - avoid duplication
-    if (make && !makeAndModelSame && !modelContainsMake) {
-      parts.push(make);
-    }
-
-    // Handle model - avoid duplication
-    if (model && !makeAndModelSame) {
-      parts.push(model);
-    } else if (!model && make) {
-      // If no model but we have make, use make
-      parts.push(make);
-    }
-
-    // Add trim if available and not already included
-    if (trim && !parts.some(part => part.toLowerCase().includes(trim.toLowerCase()))) {
-      parts.push(trim);
-    }
-
-    const result = parts.filter(Boolean).join(' ');
-    console.log('Final formatted title:', result);
-    
-    return result || 'Unknown Vehicle';
-  };
-
-  // Enhanced description extraction from vAuto data
-  const getVehicleDescription = (vehicle: any) => {
-    if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
-      const blob = vehicle.full_option_blob;
-      
-      // Look for vAuto-specific rich data
-      const overallScore = blob.Overall || blob.overall;
-      const priceRank = blob['Price Rank'] || blob.priceRank;
-      const daysOnMarket = blob['Days on Market'] || blob.daysOnMarket;
-      
-      if (overallScore || priceRank || daysOnMarket) {
-        const metrics = [];
-        if (overallScore) metrics.push(`Overall: ${overallScore}`);
-        if (priceRank) metrics.push(`Price Rank: ${priceRank}`);
-        if (daysOnMarket) metrics.push(`${daysOnMarket} days on market`);
-        return metrics.join(' • ');
-      }
-      
-      // Fallback to description fields
-      const description = blob.Description || blob.description || blob.Details || blob.details;
-      if (description && typeof description === 'string' && description.length > 10) {
-        return description.substring(0, 80) + '...';
-      }
-    }
-    return null;
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    }).format(price);
-  };
-
-  const isGMGlobalOrder = (vehicle: any) => {
-    return vehicle.source_report === 'orders_all';
-  };
 
   const toggleSort = (sortBy: string) => {
     if (filters.sortBy === sortBy) {
@@ -369,12 +231,11 @@ const InventoryDashboard = () => {
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600">Sold</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.soldVehicles}</p>
+                <p className="text-sm font-medium text-slate-600">Average Price</p>
+                <p className="text-2xl font-bold text-blue-600">{formatPrice(stats.averagePrice)}</p>
+                <p className="text-xs text-slate-500">{stats.averageDaysInStock} days avg age</p>
               </div>
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              </div>
+              <DollarSign className="w-8 h-8 text-blue-500" />
             </div>
           </Card>
         </div>
@@ -387,7 +248,7 @@ const InventoryDashboard = () => {
           <h3 className="font-medium text-slate-800">Filters & Sorting</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
@@ -411,7 +272,7 @@ const InventoryDashboard = () => {
 
           <Select value={filters.sourceReport} onValueChange={(value: 'new_car_main_view' | 'merch_inv_view' | 'orders_all') => setFilters({...filters, sourceReport: value})}>
             <SelectTrigger>
-              <SelectValue placeholder="Inventory Type" />
+              <SelectValue placeholder="Source Type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="new_car_main_view">New Car Inventory</SelectItem>
@@ -420,7 +281,18 @@ const InventoryDashboard = () => {
             </SelectContent>
           </Select>
 
-          <Select value={filters.sortBy} onValueChange={(value: 'age' | 'price' | 'year' | 'make' | 'model') => setFilters({...filters, sortBy: value})}>
+          <Select value={filters.dataQuality} onValueChange={(value: 'all' | 'complete' | 'incomplete') => setFilters({...filters, dataQuality: value})}>
+            <SelectTrigger>
+              <SelectValue placeholder="Data Quality" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Records</SelectItem>
+              <SelectItem value="complete">Complete Data (80%+)</SelectItem>
+              <SelectItem value="incomplete">Incomplete Data (&lt;80%)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.sortBy} onValueChange={(value: 'age' | 'price' | 'year' | 'make' | 'model' | 'completeness') => setFilters({...filters, sortBy: value})}>
             <SelectTrigger>
               <SelectValue placeholder="Sort By" />
             </SelectTrigger>
@@ -430,6 +302,7 @@ const InventoryDashboard = () => {
               <SelectItem value="year">Year</SelectItem>
               <SelectItem value="make">Make</SelectItem>
               <SelectItem value="model">Model</SelectItem>
+              <SelectItem value="completeness">Data Completeness</SelectItem>
             </SelectContent>
           </Select>
 
@@ -465,6 +338,11 @@ const InventoryDashboard = () => {
               </TableHead>
               <TableHead className="font-semibold">Features</TableHead>
               <TableHead className="font-semibold">Deal History</TableHead>
+              <TableHead className="font-semibold">
+                <Button variant="ghost" size="sm" onClick={() => toggleSort('completeness')} className="p-0 h-auto font-semibold">
+                  Data Quality <ArrowUpDown className="w-3 h-3 ml-1" />
+                </Button>
+              </TableHead>
               <TableHead className="font-semibold">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -472,18 +350,15 @@ const InventoryDashboard = () => {
             {isLoading ? (
               Array.from({ length: 10 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
-                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
-                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
-                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
-                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
-                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
-                  <TableCell><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                  {Array.from({ length: 9 }).map((_, j) => (
+                    <TableCell key={j}><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
+                  ))}
                 </TableRow>
               ))
             ) : (
               inventory?.map((vehicle) => {
                 const vehicleDescription = getVehicleDescription(vehicle);
+                const statusDisplay = getVehicleStatusDisplay(vehicle);
                 
                 return (
                   <TableRow key={vehicle.id} className="hover:bg-slate-50">
@@ -508,17 +383,15 @@ const InventoryDashboard = () => {
                         variant="badge"
                         showIcon={true}
                       />
-                      {isGMGlobalOrder(vehicle) && !vehicle.vin && (
+                      {vehicle.source_report === 'orders_all' && !vehicle.vin && (
                         <div className="text-xs text-slate-500 mt-1">GM Global Order</div>
                       )}
                     </TableCell>
                     
                     <TableCell>
-                      {vehicle.price && (
-                        <div className="font-semibold text-slate-800">
-                          {formatPrice(vehicle.price)}
-                        </div>
-                      )}
+                      <div className="font-semibold text-slate-800">
+                        {formatPrice(vehicle.price)}
+                      </div>
                       {vehicle.msrp && vehicle.msrp !== vehicle.price && (
                         <div className="text-sm text-slate-500 line-through">
                           MSRP: {formatPrice(vehicle.msrp)}
@@ -527,17 +400,9 @@ const InventoryDashboard = () => {
                     </TableCell>
                     
                     <TableCell>
-                      {isGMGlobalOrder(vehicle) && vehicle.status ? (
-                        <Badge className={getGMGlobalStatus(vehicle.status).color}>
-                          {getGMGlobalStatus(vehicle.status).label}
-                        </Badge>
-                      ) : vehicle.condition === 'new' && vehicle.status ? (
-                        <Badge className="bg-green-100 text-green-800">
-                          {vehicle.status}
-                        </Badge>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
+                      <Badge className={statusDisplay.color}>
+                        {statusDisplay.label}
+                      </Badge>
                       {vehicle.expected_sale_date && (
                         <div className="text-xs text-slate-500 mt-1 flex items-center">
                           <Calendar className="w-3 h-3 mr-1" />
@@ -603,6 +468,23 @@ const InventoryDashboard = () => {
                         ) : (
                           <span className="text-slate-500 text-xs">No deals</span>
                         )}
+                      </div>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            vehicle.data_completeness >= 80 
+                              ? 'bg-green-50 text-green-700 border-green-200' 
+                              : vehicle.data_completeness >= 60
+                                ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                : 'bg-red-50 text-red-700 border-red-200'
+                          }`}
+                        >
+                          {vehicle.data_completeness}%
+                        </Badge>
                       </div>
                     </TableCell>
                     

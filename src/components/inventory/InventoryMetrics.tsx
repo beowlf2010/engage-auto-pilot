@@ -1,15 +1,9 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Car, DollarSign, Clock, TrendingUp } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { getInventoryStats, type InventoryStats } from "@/services/inventory/inventoryStatsService";
 import { getMonthlyRetailSummary } from "@/utils/financialDataOperations";
-
-interface InventoryStats {
-  totalVehicles: number;
-  averagePrice: number;
-  averageDays: number;
-  totalValue: number;
-}
 
 interface FinancialStats {
   new_units_mtd: number;
@@ -28,31 +22,17 @@ const InventoryMetrics = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch inventory stats
-        const { data: inventoryData, error: inventoryError } = await supabase
-          .from('inventory')
-          .select('price, days_in_inventory')
-          .eq('status', 'available');
-
-        if (inventoryError) throw inventoryError;
-
-        // Calculate inventory metrics
-        const totalVehicles = inventoryData?.length || 0;
-        const totalValue = inventoryData?.reduce((sum, item) => sum + (item.price || 0), 0) || 0;
-        const averagePrice = totalVehicles > 0 ? totalValue / totalVehicles : 0;
-        const averageDays = totalVehicles > 0 
-          ? (inventoryData?.reduce((sum, item) => sum + (item.days_in_inventory || 0), 0) || 0) / totalVehicles 
-          : 0;
-
-        setInventoryStats({
-          totalVehicles,
-          averagePrice,
-          averageDays,
-          totalValue
-        });
+        console.log('Fetching inventory stats...');
+        
+        // Fetch inventory stats using the new service
+        const stats = await getInventoryStats();
+        console.log('Inventory stats:', stats);
+        setInventoryStats(stats);
 
         // Fetch financial stats
+        console.log('Fetching financial stats...');
         const financialData = await getMonthlyRetailSummary();
+        console.log('Financial stats:', financialData);
         setFinancialStats(financialData);
 
       } catch (error) {
@@ -101,7 +81,7 @@ const InventoryMetrics = () => {
         <CardContent>
           <div className="text-2xl font-bold">{inventoryStats?.totalVehicles || 0}</div>
           <CardDescription>
-            Currently in inventory
+            {inventoryStats?.availableVehicles || 0} available for sale
           </CardDescription>
         </CardContent>
       </Card>
@@ -116,7 +96,7 @@ const InventoryMetrics = () => {
             {formatCurrency(inventoryStats?.averagePrice || 0)}
           </div>
           <CardDescription>
-            Across all vehicles
+            {formatCurrency(inventoryStats?.totalValue || 0)} total value
           </CardDescription>
         </CardContent>
       </Card>
@@ -128,10 +108,10 @@ const InventoryMetrics = () => {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {Math.round(inventoryStats?.averageDays || 0)}
+            {inventoryStats?.averageDaysInStock || 0}
           </div>
           <CardDescription>
-            Days on lot
+            {inventoryStats?.inProductionTransit || 0} in production/transit
           </CardDescription>
         </CardContent>
       </Card>
@@ -146,7 +126,7 @@ const InventoryMetrics = () => {
             {financialStats?.total_units_mtd || 0}
           </div>
           <CardDescription>
-            {formatCurrency(financialStats?.total_profit_mtd || 0)} profit
+            {formatCurrency(financialStats?.total_profit_mtd || 0)} profit MTD
           </CardDescription>
         </CardContent>
       </Card>
