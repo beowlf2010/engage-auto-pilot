@@ -57,6 +57,12 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
     let gmGlobalMarkedSold = 0;
     let regularInventoryMarkedSold = 0;
 
+    // Validate we have upload IDs before proceeding
+    if (latestUploads.mostRecentUploads.length === 0) {
+      console.warn('No recent uploads found to base cleanup on');
+      throw new Error('No recent upload history found to determine which vehicles to keep');
+    }
+
     // Mark old GM Global orders as sold (not from latest GM Global upload)
     if (latestUploads.gmGlobalUpload) {
       const { data: oldGMGlobal, error: gmError } = await supabase
@@ -82,28 +88,27 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
     }
 
     // Mark regular inventory (non-GM Global) as sold if not from recent uploads
-    if (latestUploads.mostRecentUploads.length > 0) {
-      const { data: oldRegular, error: regularError } = await supabase
-        .from('inventory')
-        .update({
-          status: 'sold',
-          sold_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .not('source_report', 'eq', 'orders_all')
-        .not('upload_history_id', 'in', `(${latestUploads.mostRecentUploads.map(id => `'${id}'`).join(',')})`)
-        .neq('status', 'sold')
-        .select('id');
+    // Use proper array syntax instead of manual SQL string construction
+    const { data: oldRegular, error: regularError } = await supabase
+      .from('inventory')
+      .update({
+        status: 'sold',
+        sold_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .not('source_report', 'eq', 'orders_all')
+      .not('upload_history_id', 'in', latestUploads.mostRecentUploads)
+      .neq('status', 'sold')
+      .select('id');
 
-      if (regularError) {
-        console.error('Error marking old regular inventory as sold:', regularError);
-        throw regularError;
-      }
-
-      regularInventoryMarkedSold = oldRegular?.length || 0;
-      totalProcessed += regularInventoryMarkedSold;
-      console.log(`Marked ${regularInventoryMarkedSold} old regular inventory vehicles as sold`);
+    if (regularError) {
+      console.error('Error marking old regular inventory as sold:', regularError);
+      throw regularError;
     }
+
+    regularInventoryMarkedSold = oldRegular?.length || 0;
+    totalProcessed += regularInventoryMarkedSold;
+    console.log(`Marked ${regularInventoryMarkedSold} old regular inventory vehicles as sold`);
 
     console.log(`Cleanup completed. Total processed: ${totalProcessed}`);
 
@@ -139,7 +144,7 @@ export const performInventoryCleanup = async (): Promise<void> => {
     console.error('Cleanup failed:', error);
     toast({
       title: "Cleanup Failed",
-      description: "Failed to clean up inventory data. Please try again.",
+      description: error instanceof Error ? error.message : "Failed to clean up inventory data. Please try again.",
       variant: "destructive"
     });
   }
