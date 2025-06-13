@@ -87,17 +87,26 @@ const InventoryLayout = ({ page }: InventoryLayoutProps) => {
       
       {showTabs ? (
         <Tabs value={getActiveTab()} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="dashboard" className="flex items-center space-x-2">
-              <Package className="w-4 h-4" />
+          <TabsList className="grid w-full grid-cols-3 bg-transparent gap-3 h-auto p-0">
+            <TabsTrigger 
+              value="dashboard" 
+              className="flex items-center space-x-2 bg-blue-50 text-blue-700 border-2 border-blue-200 hover:bg-blue-100 hover:border-blue-300 data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:border-blue-500 data-[state=active]:shadow-lg transition-all duration-200 rounded-lg py-3 px-4 font-semibold"
+            >
+              <Package className="w-5 h-5" />
               <span>Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="upload" className="flex items-center space-x-2">
-              <Upload className="w-4 h-4" />
+            <TabsTrigger 
+              value="upload" 
+              className="flex items-center space-x-2 bg-green-50 text-green-700 border-2 border-green-200 hover:bg-green-100 hover:border-green-300 data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:border-green-500 data-[state=active]:shadow-lg transition-all duration-200 rounded-lg py-3 px-4 font-semibold"
+            >
+              <Upload className="w-5 h-5" />
               <span>Upload</span>
             </TabsTrigger>
-            <TabsTrigger value="insights" className="flex items-center space-x-2">
-              <BarChart3 className="w-4 h-4" />
+            <TabsTrigger 
+              value="insights" 
+              className="flex items-center space-x-2 bg-orange-50 text-orange-700 border-2 border-orange-200 hover:bg-orange-100 hover:border-orange-300 data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:border-orange-500 data-[state=active]:shadow-lg transition-all duration-200 rounded-lg py-3 px-4 font-semibold"
+            >
+              <BarChart3 className="w-5 h-5" />
               <span>RPO Insights</span>
             </TabsTrigger>
           </TabsList>
