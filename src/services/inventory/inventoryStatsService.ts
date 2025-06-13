@@ -42,85 +42,100 @@ export interface InventoryStats {
 
 export const getInventoryStats = async (): Promise<InventoryStats> => {
   try {
-    console.log('=== DETAILED INVENTORY DEBUGGING ===');
+    console.log('=== INVENTORY DEBUGGING - DETAILED VEHICLE LIST ===');
     
-    // Get ALL inventory records with detailed breakdown
+    // Get ALL inventory records with key identifying information
     const { data: allInventory, error: allError } = await supabase
       .from('inventory')
-      .select('id, condition, status, source_report, make, model, year, vin, stock_number');
+      .select('id, condition, status, source_report, make, model, year, vin, stock_number, created_at, upload_history_id')
+      .order('created_at', { ascending: false });
     
     if (allError) {
       console.error('Error fetching all inventory:', allError);
       throw allError;
     }
     
-    console.log('=== RAW INVENTORY BREAKDOWN ===');
-    console.log('Total records in database:', allInventory?.length || 0);
+    console.log('=== COMPLETE VEHICLE INVENTORY LIST ===');
+    console.log('Total records found:', allInventory?.length || 0);
     
-    // Detailed breakdown by condition
-    const newRecords = allInventory?.filter(v => v.condition === 'new') || [];
-    const usedRecords = allInventory?.filter(v => v.condition === 'used') || [];
-    const otherConditions = allInventory?.filter(v => v.condition !== 'new' && v.condition !== 'used') || [];
+    // Group by upload_history_id to see different uploads
+    const uploadGroups: Record<string, any[]> = {};
+    const noUploadId: any[] = [];
     
-    console.log('By condition:');
-    console.log('- NEW condition:', newRecords.length);
-    console.log('- USED condition:', usedRecords.length);
-    console.log('- OTHER conditions:', otherConditions.length, otherConditions.map(v => v.condition));
-    
-    // Breakdown of NEW vehicles by source
-    const gmGlobalRecords = newRecords.filter(v => v.source_report === 'orders_all');
-    const regularNewRecords = newRecords.filter(v => v.source_report !== 'orders_all');
-    
-    console.log('NEW vehicles breakdown:');
-    console.log('- GM Global (orders_all):', gmGlobalRecords.length);
-    console.log('- Regular New (not orders_all):', regularNewRecords.length);
-    
-    // Detailed GM Global status breakdown
-    console.log('GM Global status breakdown:');
-    const gmStatusBreakdown: Record<string, number> = {};
-    gmGlobalRecords.forEach(vehicle => {
-      const status = vehicle.status || 'unknown';
-      gmStatusBreakdown[status] = (gmStatusBreakdown[status] || 0) + 1;
+    allInventory?.forEach(vehicle => {
+      if (vehicle.upload_history_id) {
+        const uploadId = vehicle.upload_history_id;
+        if (!uploadGroups[uploadId]) {
+          uploadGroups[uploadId] = [];
+        }
+        uploadGroups[uploadId].push(vehicle);
+      } else {
+        noUploadId.push(vehicle);
+      }
     });
     
-    Object.entries(gmStatusBreakdown).forEach(([status, count]) => {
-      console.log(`- Status "${status}": ${count} vehicles`);
+    console.log('=== VEHICLES BY UPLOAD BATCH ===');
+    Object.entries(uploadGroups).forEach(([uploadId, vehicles]) => {
+      console.log(`Upload ID ${uploadId.substring(0, 8)}... : ${vehicles.length} vehicles`);
+      console.log('Sample vehicles from this upload:');
+      vehicles.slice(0, 3).forEach(v => {
+        console.log(`  - ${v.year} ${v.make} ${v.model} | Stock: ${v.stock_number} | VIN: ${v.vin?.substring(0, 8)}... | Status: ${v.status} | Condition: ${v.condition}`);
+      });
     });
     
-    // Regular new status breakdown
-    console.log('Regular NEW status breakdown:');
-    const regularNewStatusBreakdown: Record<string, number> = {};
-    regularNewRecords.forEach(vehicle => {
-      const status = vehicle.status || 'unknown';
-      regularNewStatusBreakdown[status] = (regularNewStatusBreakdown[status] || 0) + 1;
+    if (noUploadId.length > 0) {
+      console.log(`Vehicles with NO upload_history_id: ${noUploadId.length}`);
+      noUploadId.slice(0, 5).forEach(v => {
+        console.log(`  - ${v.year} ${v.make} ${v.model} | Stock: ${v.stock_number} | Created: ${v.created_at}`);
+      });
+    }
+    
+    // Check for potential duplicates by VIN or Stock Number
+    console.log('=== POTENTIAL DUPLICATE CHECK ===');
+    const vinCounts: Record<string, number> = {};
+    const stockCounts: Record<string, number> = {};
+    
+    allInventory?.forEach(vehicle => {
+      if (vehicle.vin) {
+        vinCounts[vehicle.vin] = (vinCounts[vehicle.vin] || 0) + 1;
+      }
+      if (vehicle.stock_number) {
+        stockCounts[vehicle.stock_number] = (stockCounts[vehicle.stock_number] || 0) + 1;
+      }
     });
     
-    Object.entries(regularNewStatusBreakdown).forEach(([status, count]) => {
-      console.log(`- Status "${status}": ${count} vehicles`);
-    });
+    const duplicateVins = Object.entries(vinCounts).filter(([_, count]) => count > 1);
+    const duplicateStocks = Object.entries(stockCounts).filter(([_, count]) => count > 1);
     
-    // Used vehicles status breakdown
-    console.log('USED vehicles status breakdown:');
-    const usedStatusBreakdown: Record<string, number> = {};
-    usedRecords.forEach(vehicle => {
-      const status = vehicle.status || 'unknown';
-      usedStatusBreakdown[status] = (usedStatusBreakdown[status] || 0) + 1;
-    });
+    if (duplicateVins.length > 0) {
+      console.log('DUPLICATE VINs found:');
+      duplicateVins.forEach(([vin, count]) => {
+        console.log(`  VIN ${vin} appears ${count} times`);
+        const duplicates = allInventory?.filter(v => v.vin === vin) || [];
+        duplicates.forEach(d => {
+          console.log(`    - ID: ${d.id} | Stock: ${d.stock_number} | Status: ${d.status} | Upload: ${d.upload_history_id?.substring(0, 8)}...`);
+        });
+      });
+    }
     
-    Object.entries(usedStatusBreakdown).forEach(([status, count]) => {
-      console.log(`- Status "${status}": ${count} vehicles`);
-    });
-    
-    // Now get the actual counts using the original queries for comparison
-    console.log('=== ORIGINAL QUERY RESULTS COMPARISON ===');
+    if (duplicateStocks.length > 0) {
+      console.log('DUPLICATE Stock Numbers found:');
+      duplicateStocks.forEach(([stock, count]) => {
+        console.log(`  Stock ${stock} appears ${count} times`);
+        const duplicates = allInventory?.filter(v => v.stock_number === stock) || [];
+        duplicates.forEach(d => {
+          console.log(`    - ID: ${d.id} | VIN: ${d.vin} | Status: ${d.status} | Upload: ${d.upload_history_id?.substring(0, 8)}...`);
+        });
+      });
+    }
+
+    // Continue with the existing stats calculation but log key findings
+    console.log('=== CONTINUING WITH STATS CALCULATION ===');
     
     // Get total count
     const { count: totalVehicles } = await supabase
       .from('inventory')
       .select('*', { count: 'exact', head: true });
-    console.log('Total vehicles (count query):', totalVehicles);
-    console.log('Total vehicles (actual data):', allInventory?.length);
-    console.log('COUNT vs DATA MATCH:', totalVehicles === allInventory?.length);
 
     // Get regular new vehicles (not GM Global orders)
     const { count: regularNewTotal } = await supabase
@@ -135,9 +150,6 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
       .eq('condition', 'new')
       .eq('status', 'available')
       .or('source_report.is.null,source_report.neq.orders_all');
-
-    console.log('Regular new vehicles - Query Total:', regularNewTotal, 'vs Data:', regularNewRecords.length);
-    console.log('Regular new available - Query:', regularNewAvailable);
 
     // Get used vehicles
     const { count: usedTotal } = await supabase
@@ -157,17 +169,11 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
       .eq('condition', 'used')
       .eq('status', 'sold');
 
-    console.log('Used vehicles - Query Total:', usedTotal, 'vs Data:', usedRecords.length);
-    console.log('Used available - Query:', usedAvailable);
-    console.log('Used sold - Query:', usedSold);
-
     // Get GM Global orders and categorize by Current Event ranges
     const { data: gmGlobalData } = await supabase
       .from('inventory')
       .select('status')
       .eq('source_report', 'orders_all');
-    
-    console.log('GM Global query count:', gmGlobalData?.length, 'vs Data:', gmGlobalRecords.length);
     
     let gmGlobalAvailable = 0;
     let gmGlobalInProduction = 0;
@@ -175,38 +181,22 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
     let gmGlobalPlaced = 0;
     
     if (gmGlobalData) {
-      console.log('GM Global vehicles by Current Event status:');
       gmGlobalData.forEach(vehicle => {
         const statusNum = parseInt(vehicle.status);
         
         if (statusNum === 6000) {
           gmGlobalAvailable++;
-          console.log(`Status ${vehicle.status}: CTP/Available`);
         } else if (statusNum >= 5000 && statusNum <= 5999) {
           gmGlobalAvailable++;
-          console.log(`Status ${vehicle.status}: Available for delivery`);
         } else if (statusNum >= 3800 && statusNum <= 4999) {
           gmGlobalInTransit++;
-          console.log(`Status ${vehicle.status}: In transit`);
         } else if (statusNum >= 2500 && statusNum <= 3799) {
           gmGlobalInProduction++;
-          console.log(`Status ${vehicle.status}: In production`);
         } else if (statusNum >= 2000 && statusNum <= 2499) {
           gmGlobalPlaced++;
-          console.log(`Status ${vehicle.status}: Placed/waiting`);
-        } else {
-          console.log(`Status ${vehicle.status}: Unknown range - NOT COUNTED IN ANY CATEGORY`);
         }
       });
     }
-    
-    console.log('=== FINAL COUNT CALCULATIONS ===');
-    console.log('GM Global categorization:');
-    console.log('- Available (6000 + 5000-5999):', gmGlobalAvailable);
-    console.log('- In transit (3800-4999):', gmGlobalInTransit);
-    console.log('- In production (2500-3799):', gmGlobalInProduction);
-    console.log('- Placed/waiting (2000-2499):', gmGlobalPlaced);
-    console.log('- GM Global TOTAL:', gmGlobalAvailable + gmGlobalInTransit + gmGlobalInProduction + gmGlobalPlaced);
 
     // Get sold vehicles
     const { count: soldVehicles } = await supabase
@@ -264,17 +254,11 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
       ? allValidDays.reduce((sum, item) => sum + (item.days_in_inventory || 0), 0) / allValidDays.length 
       : 0;
     
-    console.log('FINAL ENHANCED COUNTS VERIFICATION:');
-    console.log('- New vehicles total (calculated):', totalNewVehicles);
-    console.log('  - Regular new total:', regularNewTotal);
-    console.log('  - GM Global total:', gmGlobalData?.length || 0);
-    console.log('- New vehicles available (calculated):', totalNewAvailable);
-    console.log('  - Regular new available:', regularNewAvailable);
-    console.log('  - GM Global available:', gmGlobalAvailable);
-    console.log('- Used vehicles total:', usedTotal || 0);
-    console.log('- Used vehicles available:', usedAvailable || 0);
-    console.log('- GRAND TOTAL (calculated):', totalNewVehicles + (usedTotal || 0));
-    console.log('- GRAND TOTAL (query):', totalVehicles);
+    console.log('=== FINAL SUMMARY ===');
+    console.log(`Total vehicles in database: ${totalVehicles}`);
+    console.log(`Duplicates found: ${duplicateVins.length} VINs, ${duplicateStocks.length} Stock Numbers`);
+    console.log(`Upload batches: ${Object.keys(uploadGroups).length}`);
+    console.log('Check the detailed logs above to identify which vehicles should be removed.');
 
     return {
       totalVehicles: totalVehicles || 0,
