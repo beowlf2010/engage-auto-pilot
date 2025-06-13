@@ -13,7 +13,7 @@ export const useEnhancedAIScheduler = () => {
     if (!profile || processing) return;
 
     setProcessing(true);
-    console.log('Processing enhanced AI scheduled messages...');
+    console.log('Processing intelligent AI scheduled messages...');
 
     try {
       // First, resume any paused sequences that should resume
@@ -22,57 +22,58 @@ export const useEnhancedAIScheduler = () => {
       // Get all leads with AI enabled and messages due
       const { data: leads, error } = await supabase
         .from('leads')
-        .select('id, first_name, last_name, vehicle_interest, ai_stage, ai_messages_sent')
+        .select('id, first_name, last_name, vehicle_interest, ai_messages_sent')
         .eq('ai_opt_in', true)
         .eq('ai_sequence_paused', false)
         .not('next_ai_send_at', 'is', null)
         .lte('next_ai_send_at', new Date().toISOString())
-        .limit(10); // Process in batches to avoid overwhelming the system
+        .limit(10); // Process in batches
 
       if (error) throw error;
 
-      console.log(`Found ${leads?.length || 0} leads with enhanced messages due`);
+      console.log(`Found ${leads?.length || 0} leads with intelligent messages due`);
 
       for (const lead of leads || []) {
         try {
+          // Generate truly unique AI message
           const message = await generateEnhancedAIMessage(lead.id);
           
           if (message) {
             // Send the AI-generated message
             await sendMessage(lead.id, message, profile, true);
             
-            // Schedule the next message using the enhanced system
+            // Schedule the next message using intelligent scheduling
             const { scheduleEnhancedAIMessages } = await import('@/services/enhancedAIMessageService');
             await scheduleEnhancedAIMessages(lead.id);
             
-            console.log(`Sent enhanced AI message ${lead.ai_messages_sent + 1} to ${lead.first_name} ${lead.last_name} (Stage: ${lead.ai_stage})`);
+            console.log(`Sent intelligent AI message to ${lead.first_name} ${lead.last_name}: "${message.substring(0, 50)}..."`);
           } else {
-            // No more messages to send, clear the schedule
+            // Clear the schedule if no message was generated (quality controls)
             await supabase
               .from('leads')
               .update({ 
                 next_ai_send_at: null,
                 ai_sequence_paused: true,
-                ai_pause_reason: 'sequence_completed'
+                ai_pause_reason: 'quality_control_block'
               })
               .eq('id', lead.id);
             
-            console.log(`Completed AI sequence for ${lead.first_name} ${lead.last_name}`);
+            console.log(`No message generated for ${lead.first_name} ${lead.last_name} (quality controls)`);
           }
         } catch (error) {
-          console.error(`Error processing enhanced message for lead ${lead.id}:`, error);
+          console.error(`Error processing intelligent message for lead ${lead.id}:`, error);
         }
       }
     } catch (error) {
-      console.error('Error processing enhanced scheduled messages:', error);
+      console.error('Error processing intelligent scheduled messages:', error);
     } finally {
       setProcessing(false);
     }
   };
 
-  // Check for scheduled messages every 30 seconds (more frequent for aggressive scheduling)
+  // Check for scheduled messages every 60 seconds for intelligent processing
   useEffect(() => {
-    const interval = setInterval(processScheduledMessages, 30000);
+    const interval = setInterval(processScheduledMessages, 60000);
     
     // Run immediately on mount
     processScheduledMessages();

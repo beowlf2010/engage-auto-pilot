@@ -9,6 +9,53 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_conversation_context: {
+        Row: {
+          context_score: number | null
+          conversation_summary: string | null
+          created_at: string
+          id: string
+          key_topics: string[] | null
+          last_interaction_type: string | null
+          lead_id: string
+          lead_preferences: Json | null
+          response_style: string | null
+          updated_at: string
+        }
+        Insert: {
+          context_score?: number | null
+          conversation_summary?: string | null
+          created_at?: string
+          id?: string
+          key_topics?: string[] | null
+          last_interaction_type?: string | null
+          lead_id: string
+          lead_preferences?: Json | null
+          response_style?: string | null
+          updated_at?: string
+        }
+        Update: {
+          context_score?: number | null
+          conversation_summary?: string | null
+          created_at?: string
+          id?: string
+          key_topics?: string[] | null
+          last_interaction_type?: string | null
+          lead_id?: string
+          lead_preferences?: Json | null
+          response_style?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversation_context_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_message_analytics: {
         Row: {
           created_at: string
@@ -58,6 +105,44 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "ai_message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_message_history: {
+        Row: {
+          context_data: Json | null
+          created_at: string
+          id: string
+          lead_id: string
+          message_content: string
+          message_hash: string
+          sent_at: string
+        }
+        Insert: {
+          context_data?: Json | null
+          created_at?: string
+          id?: string
+          lead_id: string
+          message_content: string
+          message_hash: string
+          sent_at?: string
+        }
+        Update: {
+          context_data?: Json | null
+          created_at?: string
+          id?: string
+          lead_id?: string
+          message_content?: string
+          message_hash?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_message_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
