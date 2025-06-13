@@ -3,7 +3,10 @@ export const extractDealDate = (dateValue: string): string | null => {
   if (!dateValue) return null;
   
   const dateStr = dateValue.trim();
-  console.log(`=== DATE PARSING === Input: "${dateStr}"`);
+  console.log(`=== SIMPLIFIED DATE PARSING === Input: "${dateStr}"`);
+  
+  // Get current year as default
+  const currentYear = new Date().getFullYear();
   
   // First, try to parse as Excel serial number (most common in DMS exports)
   const numericDate = parseFloat(dateStr);
@@ -16,15 +19,16 @@ export const extractDealDate = (dateValue: string): string | null => {
     return result;
   }
   
-  // Try different common date formats with FIXED 2-digit year handling
+  // Try different common date formats - focus on month/day, assume current year
   const formats = [
-    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // MM/DD/YYYY or M/D/YYYY
-    /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/, // MM/DD/YY or M/D/YY
-    /^(\d{4})-(\d{1,2})-(\d{1,2})$/, // YYYY-MM-DD
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // MM/DD/YYYY - keep full year
+    /^(\d{1,2})\/(\d{1,2})$/, // MM/DD - assume current year
+    /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/, // MM/DD/YY - convert to current century
+    /^(\d{4})-(\d{1,2})-(\d{1,2})$/, // YYYY-MM-DD - keep as is
+    /^(\d{1,2})-(\d{1,2})$/, // MM-DD - assume current year
     /^(\d{1,2})-(\d{1,2})-(\d{4})$/, // MM-DD-YYYY
     /^(\d{1,2})-(\d{1,2})-(\d{2})$/, // MM-DD-YY
-    /^(\d{2})(\d{2})(\d{4})$/, // MMDDYYYY
-    /^(\d{2})(\d{2})(\d{2})$/, // MMDDYY
+    /^(\d{2})(\d{2})$/, // MMDD - assume current year
   ];
   
   for (let i = 0; i < formats.length; i++) {
@@ -33,51 +37,50 @@ export const extractDealDate = (dateValue: string): string | null => {
     if (match) {
       console.log(`Matched format ${i}:`, match);
       
-      let month, day, year;
+      let month, day, year = currentYear;
       
       if (i === 0) { // MM/DD/YYYY
         [, month, day, year] = match;
-      } else if (i === 1) { // MM/DD/YY
+      } else if (i === 1) { // MM/DD - use current year
+        [, month, day] = match;
+        console.log(`Month/Day format, using current year: ${year}`);
+      } else if (i === 2) { // MM/DD/YY
         [, month, day, year] = match;
-        // FIXED 2-digit year logic: 00-50 = 2000s, 51-99 = 1900s
-        const twoDigitYear = parseInt(year);
-        if (twoDigitYear <= 50) {
-          year = String(2000 + twoDigitYear);
-          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (2000s)`);
-        } else {
-          year = String(1900 + twoDigitYear);
-          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (1900s)`);
-        }
-      } else if (i === 2) { // YYYY-MM-DD
+        // Simple 2-digit year: assume 2000s
+        year = String(2000 + parseInt(year));
+        console.log(`2-digit year converted to: ${year}`);
+      } else if (i === 3) { // YYYY-MM-DD
         console.log(`Already in ISO format: ${match[0]}`);
         return match[0];
-      } else if (i === 3) { // MM-DD-YYYY
+      } else if (i === 4) { // MM-DD - use current year
+        [, month, day] = match;
+        console.log(`Month-Day format, using current year: ${year}`);
+      } else if (i === 5) { // MM-DD-YYYY
         [, month, day, year] = match;
-      } else if (i === 4) { // MM-DD-YY
+      } else if (i === 6) { // MM-DD-YY
         [, month, day, year] = match;
-        const twoDigitYear = parseInt(year);
-        if (twoDigitYear <= 50) {
-          year = String(2000 + twoDigitYear);
-          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (2000s)`);
-        } else {
-          year = String(1900 + twoDigitYear);
-          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (1900s)`);
-        }
-      } else if (i === 5) { // MMDDYYYY
-        [, month, day, year] = match;
-      } else if (i === 6) { // MMDDYY
-        [, month, day, year] = match;
-        const twoDigitYear = parseInt(year);
-        if (twoDigitYear <= 50) {
-          year = String(2000 + twoDigitYear);
-          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (2000s)`);
-        } else {
-          year = String(1900 + twoDigitYear);
-          console.log(`2-digit year ${twoDigitYear} interpreted as ${year} (1900s)`);
-        }
+        year = String(2000 + parseInt(year));
+        console.log(`2-digit year converted to: ${year}`);
+      } else if (i === 7) { // MMDD - use current year
+        [, month, day] = [match[0], match[0].substring(0, 2), match[0].substring(2, 4)];
+        console.log(`MMDD format, using current year: ${year}`);
       }
       
-      if (month && day && year) {
+      if (month && day) {
+        // Validate month and day ranges
+        const monthNum = parseInt(month);
+        const dayNum = parseInt(day);
+        
+        if (monthNum < 1 || monthNum > 12) {
+          console.warn(`Invalid month: ${monthNum}`);
+          continue;
+        }
+        
+        if (dayNum < 1 || dayNum > 31) {
+          console.warn(`Invalid day: ${dayNum}`);
+          continue;
+        }
+        
         const result = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         console.log(`Final parsed date: ${result}`);
         return result;
@@ -85,7 +88,7 @@ export const extractDealDate = (dateValue: string): string | null => {
     }
   }
   
-  // Try parsing as a standard JavaScript date
+  // Try parsing as a standard JavaScript date as last resort
   try {
     const jsDate = new Date(dateStr);
     if (!isNaN(jsDate.getTime())) {
