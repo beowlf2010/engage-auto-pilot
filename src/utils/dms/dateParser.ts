@@ -37,39 +37,42 @@ export const extractDealDate = (dateValue: string): string | null => {
     if (match) {
       console.log(`Matched format ${i}:`, match);
       
-      let month, day, year = currentYear;
+      let monthStr: string, dayStr: string, yearNum: number = currentYear;
       
       if (i === 0) { // MM/DD/YYYY
-        [, month, day, year] = match;
+        [, monthStr, dayStr] = match;
+        yearNum = parseInt(match[3]);
       } else if (i === 1) { // MM/DD - use current year
-        [, month, day] = match;
-        console.log(`Month/Day format, using current year: ${year}`);
+        [, monthStr, dayStr] = match;
+        console.log(`Month/Day format, using current year: ${yearNum}`);
       } else if (i === 2) { // MM/DD/YY
-        [, month, day, year] = match;
+        [, monthStr, dayStr] = match;
         // Simple 2-digit year: assume 2000s
-        year = String(2000 + parseInt(year));
-        console.log(`2-digit year converted to: ${year}`);
+        yearNum = 2000 + parseInt(match[3]);
+        console.log(`2-digit year converted to: ${yearNum}`);
       } else if (i === 3) { // YYYY-MM-DD
         console.log(`Already in ISO format: ${match[0]}`);
         return match[0];
       } else if (i === 4) { // MM-DD - use current year
-        [, month, day] = match;
-        console.log(`Month-Day format, using current year: ${year}`);
+        [, monthStr, dayStr] = match;
+        console.log(`Month-Day format, using current year: ${yearNum}`);
       } else if (i === 5) { // MM-DD-YYYY
-        [, month, day, year] = match;
+        [, monthStr, dayStr] = match;
+        yearNum = parseInt(match[3]);
       } else if (i === 6) { // MM-DD-YY
-        [, month, day, year] = match;
-        year = String(2000 + parseInt(year));
-        console.log(`2-digit year converted to: ${year}`);
+        [, monthStr, dayStr] = match;
+        yearNum = 2000 + parseInt(match[3]);
+        console.log(`2-digit year converted to: ${yearNum}`);
       } else if (i === 7) { // MMDD - use current year
-        [, month, day] = [match[0], match[0].substring(0, 2), match[0].substring(2, 4)];
-        console.log(`MMDD format, using current year: ${year}`);
+        monthStr = match[0].substring(0, 2);
+        dayStr = match[0].substring(2, 4);
+        console.log(`MMDD format, using current year: ${yearNum}`);
       }
       
-      if (month && day) {
+      if (monthStr && dayStr) {
         // Validate month and day ranges
-        const monthNum = parseInt(month);
-        const dayNum = parseInt(day);
+        const monthNum = parseInt(monthStr);
+        const dayNum = parseInt(dayStr);
         
         if (monthNum < 1 || monthNum > 12) {
           console.warn(`Invalid month: ${monthNum}`);
@@ -81,7 +84,7 @@ export const extractDealDate = (dateValue: string): string | null => {
           continue;
         }
         
-        const result = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        const result = `${yearNum}-${monthStr.padStart(2, '0')}-${dayStr.padStart(2, '0')}`;
         console.log(`Final parsed date: ${result}`);
         return result;
       }
