@@ -215,8 +215,10 @@ export const generateUrgencyMessage = async (leadId: string): Promise<string | n
       return `${highUrgencyInsight.message} - ${highUrgencyInsight.context}`;
     }
 
-    // Check for inventory-specific urgency
-    const matchingVehicles = await supabase.rpc('find_matching_inventory', { p_lead_id: leadId });
+    // Check for inventory-specific urgency using function call
+    const { data: matchingVehicles } = await supabase.rpc('find_matching_inventory', { 
+      p_lead_id: leadId 
+    });
     
     if (matchingVehicles && matchingVehicles.length > 0) {
       const topMatch = matchingVehicles[0];

@@ -566,6 +566,47 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_behavior_triggers: {
+        Row: {
+          created_at: string
+          id: string
+          is_processed: boolean
+          lead_id: string
+          message_sent: boolean | null
+          trigger_data: Json | null
+          trigger_time: string
+          trigger_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_processed?: boolean
+          lead_id: string
+          message_sent?: boolean | null
+          trigger_data?: Json | null
+          trigger_time?: string
+          trigger_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_processed?: boolean
+          lead_id?: string
+          message_sent?: boolean | null
+          trigger_data?: Json | null
+          trigger_time?: string
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_behavior_triggers_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_inventory_interests: {
         Row: {
           created_at: string
