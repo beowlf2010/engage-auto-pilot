@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useEmailConversations } from '@/hooks/useEmailConversations';
 import { formatDistanceToNow } from 'date-fns';
-import { Mail, MailOpen, MailX, Clock, CheckCircle } from 'lucide-react';
+import { Mail, MailOpen, MailX, Clock, CheckCircle, Bot, User } from 'lucide-react';
 import { EmailConversation } from '@/types/email';
 
 interface EmailConversationsListProps {
@@ -46,6 +46,19 @@ const EmailConversationsList = ({ leadId }: EmailConversationsListProps) => {
     }
   };
 
+  const getDirectionIcon = (direction: 'in' | 'out') => {
+    return direction === 'in' ? (
+      <User className="w-4 h-4 text-blue-600" />
+    ) : (
+      <Bot className="w-4 h-4 text-green-600" />
+    );
+  };
+
+  const getDirectionLabel = (direction: 'in' | 'out', subject: string) => {
+    if (direction === 'in') return 'Received';
+    return subject.startsWith('Re:') ? 'Auto-reply' : 'Sent';
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -70,11 +83,19 @@ const EmailConversationsList = ({ leadId }: EmailConversationsListProps) => {
   return (
     <div className="space-y-3">
       {emails.map((email) => (
-        <Card key={email.id} className="hover:shadow-md transition-shadow">
+        <Card key={email.id} className={`hover:shadow-md transition-shadow ${
+          email.direction === 'in' ? 'border-l-4 border-l-blue-500' : 'border-l-4 border-l-green-500'
+        }`}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">{email.subject}</CardTitle>
               <div className="flex items-center space-x-2">
+                {getDirectionIcon(email.direction)}
+                <CardTitle className="text-sm font-medium">{email.subject}</CardTitle>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline" className="text-xs">
+                  {getDirectionLabel(email.direction, email.subject)}
+                </Badge>
                 <Badge className={getStatusColor(email.email_status)}>
                   {getStatusIcon(email.email_status)}
                   <span className="ml-1 capitalize">{email.email_status}</span>

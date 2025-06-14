@@ -17,6 +17,41 @@ interface InboundEmailPayload {
   date: string;
 }
 
+// Extract clean email from "Name <email@domain.com>" format
+function extractEmail(emailString: string): string {
+  const emailRegex = /<([^>]+)>/;
+  const match = emailString.match(emailRegex);
+  return match ? match[1] : emailString.trim();
+}
+
+// Extract name from "Name <email@domain.com>" format
+function extractName(emailString: string): { firstName: string; lastName: string } {
+  const nameMatch = emailString.match(/^([^<]+)</);
+  if (nameMatch) {
+    const fullName = nameMatch[1].trim().replace(/"/g, '');
+    const nameParts = fullName.split(' ');
+    return {
+      firstName: nameParts[0] || 'Unknown',
+      lastName: nameParts.slice(1).join(' ') || 'Customer'
+    };
+  }
+  return { firstName: 'Unknown', lastName: 'Customer' };
+}
+
+// Generate auto-reply content
+function generateAutoReply(leadName: string): string {
+  return `
+    <p>Dear ${leadName},</p>
+    
+    <p>Thank you for your email! We have received your message and will get back to you shortly.</p>
+    
+    <p>If you have any urgent questions about our vehicles or would like to schedule a test drive, please don't hesitate to call us.</p>
+    
+    <p>Best regards,<br>
+    Your Sales Team</p>
+  `;
+}
+
 serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -31,9 +66,12 @@ serve(async (req: Request) => {
     const payload: InboundEmailPayload = await req.json();
     console.log('Received inbound email:', payload);
 
-    // Extract sender email
-    const senderEmail = payload.from;
+    // Extract clean sender email and name
+    const senderEmail = extractEmail(payload.from);
+    const senderName = extractName(payload.from);
     
+    console.log('Parsed sender:', { email: senderEmail, name: senderName });
+
     // Try to find a lead by email
     const { data: leads, error: leadError } = await supabase
       .from('leads')
@@ -50,40 +88,106 @@ serve(async (req: Request) => {
     }
 
     let leadId = null;
+    let leadFirstName = '';
+    let isNewLead = false;
+
     if (leads && leads.length > 0) {
       leadId = leads[0].id;
-      console.log(`Found lead: ${leads[0].first_name} ${leads[0].last_name} (${leadId})`);
+      leadFirstName = leads[0].first_name;
+      console.log(`Found existing lead: ${leads[0].first_name} ${leads[0].last_name} (${leadId})`);
     } else {
-      console.log(`No lead found for email: ${senderEmail}`);
-      // You could create a new lead here if desired
-    }
-
-    // Store the inbound email conversation
-    if (leadId) {
-      const { error: conversationError } = await supabase
-        .from('email_conversations')
+      // Create new lead for unknown email address
+      console.log(`Creating new lead for email: ${senderEmail}`);
+      
+      const { data: newLead, error: createError } = await supabase
+        .from('leads')
         .insert({
-          lead_id: leadId,
-          direction: 'in',
-          subject: payload.subject || 'No Subject',
-          body: payload.html || payload.text || '',
-          sent_at: new Date(payload.date || new Date()).toISOString(),
-          email_status: 'delivered',
-          resend_message_id: payload.message_id
-        });
+          first_name: senderName.firstName,
+          last_name: senderName.lastName,
+          email: senderEmail,
+          vehicle_interest: 'General Inquiry',
+          source: 'Inbound Email',
+          status: 'new'
+        })
+        .select('id, first_name')
+        .single();
 
-      if (conversationError) {
-        console.error('Error storing email conversation:', conversationError);
-        return new Response(JSON.stringify({ error: 'Failed to store email' }), {
+      if (createError) {
+        console.error('Error creating new lead:', createError);
+        return new Response(JSON.stringify({ error: 'Failed to create lead' }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
 
-      console.log('Email conversation stored successfully');
+      leadId = newLead.id;
+      leadFirstName = newLead.first_name;
+      isNewLead = true;
+      console.log(`Created new lead: ${newLead.first_name} (${leadId})`);
     }
 
-    return new Response(JSON.stringify({ success: true, leadFound: !!leadId }), {
+    // Clean and parse email content
+    let emailBody = payload.html || payload.text || '';
+    
+    // Remove quoted text and signatures for cleaner storage
+    emailBody = emailBody
+      .split(/On .* wrote:|-----Original Message-----|From:.*To:/)[0]
+      .trim();
+
+    // Store the inbound email conversation
+    const { error: conversationError } = await supabase
+      .from('email_conversations')
+      .insert({
+        lead_id: leadId,
+        direction: 'in',
+        subject: payload.subject || 'No Subject',
+        body: emailBody,
+        sent_at: new Date(payload.date || new Date()).toISOString(),
+        email_status: 'delivered',
+        resend_message_id: payload.message_id
+      });
+
+    if (conversationError) {
+      console.error('Error storing email conversation:', conversationError);
+      return new Response(JSON.stringify({ error: 'Failed to store email' }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log('Email conversation stored successfully');
+
+    // Send auto-reply (in background)
+    const autoReplySubject = `Re: ${payload.subject || 'Your inquiry'}`;
+    const autoReplyContent = generateAutoReply(leadFirstName);
+
+    // Schedule auto-reply as background task
+    EdgeRuntime.waitUntil(
+      supabase.functions.invoke('send-email', {
+        body: {
+          to: senderEmail,
+          subject: autoReplySubject,
+          html: autoReplyContent,
+          leadId: leadId
+        }
+      }).then((response) => {
+        if (response.error) {
+          console.error('Auto-reply failed:', response.error);
+        } else {
+          console.log('Auto-reply sent successfully');
+        }
+      }).catch((error) => {
+        console.error('Auto-reply error:', error);
+      })
+    );
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      leadFound: !isNewLead,
+      leadCreated: isNewLead,
+      leadId: leadId,
+      autoReplySent: true
+    }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });

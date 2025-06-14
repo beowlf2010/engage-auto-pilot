@@ -1,10 +1,10 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { fetchConversations } from '@/services/conversationsService';
 import { fetchMessages, sendMessage as sendMessageService } from '@/services/messagesService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useInboxNotifications } from './useInboxNotifications';
 import type { ConversationData, MessageData } from '@/types/conversation';
 
 interface IncomingMessage {
@@ -24,10 +24,12 @@ export const useRealtimeInbox = () => {
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
   const currentLeadIdRef = useRef<string | null>(null);
-  const notificationPermission = useRef<NotificationPermission>('default');
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const failureCountRef = useRef(0);
   const maxRetries = 3;
+
+  // Use the new email notifications hook
+  useInboxNotifications();
 
   // Request notification permission on mount
   useEffect(() => {
@@ -49,12 +51,11 @@ export const useRealtimeInbox = () => {
       const conversationsData = await fetchConversations(profile);
       setConversations(conversationsData);
       setLoading(false);
-      failureCountRef.current = 0; // Reset failure count on success
+      failureCountRef.current = 0;
     } catch (error) {
       console.error('Error loading conversations:', error);
       failureCountRef.current += 1;
       
-      // Circuit breaker - stop retrying after max attempts
       if (retryCount >= maxRetries) {
         console.log('Max retries reached, stopping attempts');
         setError('Unable to load conversations. Please refresh the page.');
@@ -62,11 +63,9 @@ export const useRealtimeInbox = () => {
         return;
       }
       
-      // Only retry on network errors
       if (error instanceof TypeError && error.message.includes('fetch')) {
         console.log(`Retrying conversation fetch (attempt ${retryCount + 1}/${maxRetries})`);
         
-        // Exponential backoff with jitter
         const baseDelay = Math.pow(2, retryCount) * 1000;
         const jitter = Math.random() * 1000;
         const delay = baseDelay + jitter;
@@ -93,7 +92,6 @@ export const useRealtimeInbox = () => {
     } catch (error) {
       console.error('Error loading messages:', error);
       
-      // Limited retry for message loading
       if (retryCount < 2 && error instanceof TypeError && error.message.includes('fetch')) {
         console.log(`Retrying message fetch (attempt ${retryCount + 1})`);
         
@@ -114,7 +112,6 @@ export const useRealtimeInbox = () => {
       setError(null);
       await sendMessageService(leadId, body, profile, aiGenerated);
       
-      // Refresh messages and conversations to show updated status
       await loadMessages(leadId);
       await loadConversations();
     } catch (error) {
@@ -129,15 +126,12 @@ export const useRealtimeInbox = () => {
     console.log('New incoming message:', newMessage);
 
     try {
-      // Refresh conversations list
       await loadConversations();
 
-      // If viewing this lead's messages, refresh them
       if (currentLeadIdRef.current === newMessage.lead_id) {
         await loadMessages(newMessage.lead_id);
       }
 
-      // Get lead information for notifications
       const { data: leadData } = await supabase
         .from('leads')
         .select('first_name, last_name, salesperson_id')
@@ -147,7 +141,6 @@ export const useRealtimeInbox = () => {
       if (leadData && newMessage.direction === 'in') {
         const leadName = `${leadData.first_name} ${leadData.last_name}`;
         
-        // Check if this message is for the current user
         const isForCurrentUser = leadData.salesperson_id === profile?.id || 
                                !leadData.salesperson_id ||
                                profile?.role === 'manager' || 
@@ -155,25 +148,10 @@ export const useRealtimeInbox = () => {
 
         if (isForCurrentUser) {
           toast({
-            title: `New message from ${leadName}`,
+            title: `📱 New message from ${leadName}`,
             description: newMessage.body.substring(0, 100) + (newMessage.body.length > 100 ? '...' : ''),
             duration: 5000,
           });
-
-          if (notificationPermission.current === 'granted') {
-            const notification = new Notification(`New message from ${leadName}`, {
-              body: newMessage.body.substring(0, 200) + (newMessage.body.length > 200 ? '...' : ''),
-              icon: '/favicon.ico',
-              tag: `message-${newMessage.id}`,
-            });
-
-            notification.onclick = () => {
-              window.focus();
-              notification.close();
-            };
-
-            setTimeout(() => notification.close(), 5000);
-          }
         }
       }
     } catch (error) {
@@ -181,17 +159,15 @@ export const useRealtimeInbox = () => {
     }
   };
 
-  // Setup unified realtime channel
+  // Setup unified realtime channel for SMS messages
   useEffect(() => {
     if (!profile) return;
 
-    // Clear any existing retry timeout
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
     }
 
-    // Cleanup existing channel
     if (channelRef.current) {
       try {
         console.log('Removing existing unified channel');
@@ -239,7 +215,6 @@ export const useRealtimeInbox = () => {
       }
     });
 
-    // Load initial conversations
     loadConversations();
 
     return () => {
@@ -259,7 +234,7 @@ export const useRealtimeInbox = () => {
   }, [profile?.id, loadConversations]);
 
   const manualRefresh = useCallback(() => {
-    failureCountRef.current = 0; // Reset failure count
+    failureCountRef.current = 0;
     setError(null);
     setLoading(true);
     loadConversations(0);
@@ -272,7 +247,6 @@ export const useRealtimeInbox = () => {
     error,
     fetchMessages: loadMessages, 
     sendMessage,
-    refetch: manualRefresh,
-    notificationPermission: notificationPermission.current
+    refetch: manualRefresh
   };
 };
