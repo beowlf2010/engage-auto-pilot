@@ -57,11 +57,23 @@ export const useApiKeysActions = ({
   const { toast } = useToast();
 
   const handleApiKeyUpdate = async (settingType: string, value: string, keyType: keyof typeof apiKeys) => {
+    if (!value.trim()) {
+      toast({
+        title: "Invalid Input",
+        description: "Please enter a valid API key or profile ID",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const loadingKey = keyType === 'openaiKey' ? 'openai' : keyType === 'telnyxApiKey' ? 'telnyxKey' : 'telnyxProfile';
     setLoadingStates((prev: any) => ({ ...prev, [loadingKey]: true }));
     
     try {
+      console.log(`Updating ${settingType} with value:`, value.substring(0, 10) + '...');
       const result = await updateTelnyxSettings(settingType, value);
+      console.log('Update result:', result);
+      
       if (result && result.success) {
         toast({
           title: "Settings Updated",
@@ -70,7 +82,7 @@ export const useApiKeysActions = ({
       } else {
         toast({
           title: "Update Failed",
-          description: result.error || "An unexpected error occurred while updating settings.",
+          description: result?.error || "An unexpected error occurred while updating settings.",
           variant: "destructive"
         });
       }
@@ -88,14 +100,25 @@ export const useApiKeysActions = ({
   };
 
   const handleTestConnection = async () => {
+    if (!apiKeys.telnyxApiKey || !apiKeys.telnyxProfileId) {
+      toast({
+        title: "Missing Credentials",
+        description: "Please enter both Telnyx API Key and Messaging Profile ID before testing",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsTesting(true);
     try {
+      console.log('Testing Telnyx connection...');
       const result = await testTelnyxConnection(apiKeys.telnyxApiKey, apiKeys.telnyxProfileId);
       toast({
         title: "Connection Test",
         description: result.message,
       });
     } catch (error) {
+      console.error('Connection test error:', error);
       toast({
         title: "Connection Test Failed",
         description: error instanceof Error ? error.message : "Failed to test connection",
@@ -117,10 +140,12 @@ export const useApiKeysActions = ({
     }
 
     const formattedPhone = formatPhoneNumber(testPhoneNumber);
+    console.log('Original phone:', testPhoneNumber, 'Formatted:', formattedPhone);
+    
     if (!validatePhoneNumber(formattedPhone)) {
       toast({
         title: "Invalid Phone Number",
-        description: "Please enter a valid US phone number (e.g., +1234567890 or 234-567-8900)",
+        description: "Please enter a valid phone number (e.g., +1234567890, 234-567-8900, or 2345678900)",
         variant: "destructive"
       });
       return;
@@ -128,7 +153,10 @@ export const useApiKeysActions = ({
 
     setIsTestingSMS(true);
     try {
+      console.log('Sending test SMS to:', formattedPhone);
       const result = await sendTestSMS(formattedPhone);
+      console.log('Test SMS result:', result);
+      
       if (result && result.success) {
         toast({
           title: "Test SMS Sent!",
@@ -136,9 +164,10 @@ export const useApiKeysActions = ({
         });
         setTestPhoneNumber("");
       } else {
+        const errorMsg = result?.error || result?.telnyxError?.errors?.[0]?.detail || "SMS sending failed";
         toast({
           title: "Test SMS Failed",
-          description: result.error || "An unexpected error occurred in the SMS function.",
+          description: errorMsg,
           variant: "destructive"
         });
       }

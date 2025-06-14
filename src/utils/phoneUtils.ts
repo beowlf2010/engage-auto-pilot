@@ -1,7 +1,6 @@
-
 import { PhoneNumber } from '@/types/lead';
 
-// Format phone number for Twilio E.164 compatibility
+// Format phone number for Telnyx E.164 compatibility
 export const formatPhoneForTwilio = (phone: string): string => {
   // Remove all non-digits
   const digits = phone.replace(/\D/g, '');
@@ -14,6 +13,11 @@ export const formatPhoneForTwilio = (phone: string): string => {
   // Handle 11-digit numbers starting with 1
   if (digits.length === 11 && digits.startsWith('1')) {
     return `+${digits}`;
+  }
+  
+  // If already has + at the beginning, keep it
+  if (phone.startsWith('+')) {
+    return phone;
   }
   
   return phone; // Return original if can't format
@@ -38,19 +42,20 @@ export const formatPhoneForDisplay = (phone: string): string => {
   return phone; // Return original if can't format
 };
 
-// Legacy function - now uses Twilio format internally
+// Legacy function - now uses Telnyx format internally
 export const formatPhoneNumber = (phone: string): string => {
   return formatPhoneForTwilio(phone);
 };
 
 export const isValidPhoneNumber = (phone: string): boolean => {
   const digits = phone.replace(/\D/g, '');
-  return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
+  // More flexible - accept 10, 11, or already formatted numbers
+  return digits.length >= 10 && digits.length <= 15;
 };
 
-// Validate E.164 format specifically for Twilio
+// Validate E.164 format specifically for Telnyx (more flexible)
 export const isValidE164Format = (phone: string): boolean => {
-  const e164Regex = /^\+1[0-9]{10}$/;
+  const e164Regex = /^\+[1-9]\d{1,14}$/;
   return e164Regex.test(phone);
 };
 

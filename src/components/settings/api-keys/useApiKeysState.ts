@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export const useApiKeysState = () => {
   const [isTesting, setIsTesting] = useState(false);
@@ -11,9 +11,9 @@ export const useApiKeysState = () => {
     telnyxProfile: false
   });
   const [apiKeys, setApiKeys] = useState({
-    openaiKey: "sk-1234567890abcdef...",
-    telnyxApiKey: "KEY0123456789ABCDEF...",
-    telnyxProfileId: "12345678-1234-1234-1234-123456789012"
+    openaiKey: "",
+    telnyxApiKey: "",
+    telnyxProfileId: ""
   });
 
   return {

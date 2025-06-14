@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -71,8 +70,9 @@ export const sendTestSMS = async (testPhoneNumber: string) => {
 };
 
 export const validatePhoneNumber = (phone: string): boolean => {
-  const phoneRegex = /^\+1[0-9]{10}$/;
-  return phoneRegex.test(phone);
+  // More flexible validation
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 15;
 };
 
 export const formatPhoneNumber = (phone: string): string => {
@@ -87,6 +87,11 @@ export const formatPhoneNumber = (phone: string): string => {
   // Handle 11-digit numbers starting with 1
   if (digits.length === 11 && digits.startsWith('1')) {
     return `+${digits}`;
+  }
+  
+  // If already formatted with +, keep it
+  if (phone.startsWith('+')) {
+    return phone;
   }
   
   return phone;
