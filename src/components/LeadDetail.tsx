@@ -59,6 +59,19 @@ const LeadDetail = () => {
     );
   }
 
+  // Transform phone numbers to match PhoneNumber interface
+  const phoneNumbers = lead.phone_numbers?.map((phone: any) => ({
+    number: phone.number,
+    type: phone.type as 'cell' | 'day' | 'eve',
+    priority: phone.priority || 1,
+    status: phone.status as 'active' | 'failed' | 'opted_out',
+    lastAttempt: phone.last_attempt
+  })) || [];
+
+  // Get primary phone number
+  const primaryPhone = lead.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+                     lead.phone_numbers?.[0]?.number || '';
+
   // Transform the database lead object to match component expectations
   const transformedLead = {
     id: lead.id,
@@ -86,26 +99,13 @@ const LeadDetail = () => {
     doNotCall: lead.do_not_call,
     doNotEmail: lead.do_not_email,
     doNotMail: lead.do_not_mail,
-    phoneNumbers: lead.phone_numbers?.map((phone: any) => ({
-      id: phone.id,
-      number: phone.number,
-      type: phone.type,
-      isPrimary: phone.is_primary,
-      status: phone.status,
-      priority: phone.priority || 1,
-      lastAttempt: phone.last_attempt
-    })) || [],
+    phoneNumbers: phoneNumbers,
     conversations: [],
     activityTimeline: []
   };
 
-  // Get primary phone number
-  const primaryPhone = transformedLead.phoneNumbers.find(p => p.isPrimary)?.number || 
-                     transformedLead.phoneNumbers[0]?.number || '';
-
   // Phone selection handler
   const handlePhoneSelect = (phoneNumber: string) => {
-    // Handle phone selection logic - could trigger call or set as primary
     console.log('Selected phone:', phoneNumber);
   };
 
@@ -133,13 +133,13 @@ const LeadDetail = () => {
         <div className="lg:col-span-1 space-y-6">
           <ContactInfoCard 
             lead={transformedLead}
-            phoneNumbers={transformedLead.phoneNumbers}
+            phoneNumbers={phoneNumbers}
             primaryPhone={primaryPhone}
             onPhoneSelect={handlePhoneSelect}
           />
           <VehicleInfoCard lead={transformedLead} />
           <QuickContactCard 
-            phoneNumbers={transformedLead.phoneNumbers}
+            phoneNumbers={phoneNumbers}
             primaryPhone={primaryPhone}
             onPhoneSelect={handlePhoneSelect}
           />
