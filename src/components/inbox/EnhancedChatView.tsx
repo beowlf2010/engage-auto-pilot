@@ -46,6 +46,7 @@ const EnhancedChatView = ({
   const [newMessage, setNewMessage] = useState('');
   const [showLeadContext, setShowLeadContext] = useState(true);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -56,10 +57,18 @@ const EnhancedChatView = ({
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
-    if (newMessage.trim()) {
-      onSendMessage(newMessage.trim());
-      setNewMessage('');
+  const handleSend = async () => {
+    if (newMessage.trim() && !isSending) {
+      setIsSending(true);
+      try {
+        console.log('Sending message from chat view:', newMessage.trim());
+        await onSendMessage(newMessage.trim());
+        setNewMessage('');
+      } catch (error) {
+        console.error('Error sending message:', error);
+      } finally {
+        setIsSending(false);
+      }
     }
   };
 
@@ -70,9 +79,16 @@ const EnhancedChatView = ({
     }
   };
 
-  const handleAIGeneratedMessage = (message: string) => {
-    onSendMessage(message, false);
-    setShowAIGenerator(false);
+  const handleAIGeneratedMessage = async (message: string) => {
+    setIsSending(true);
+    try {
+      await onSendMessage(message, false);
+      setShowAIGenerator(false);
+    } catch (error) {
+      console.error('Error sending AI message:', error);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const canReply = selectedConversation && (
@@ -177,6 +193,7 @@ const EnhancedChatView = ({
                       onKeyPress={handleKeyPress}
                       className="min-h-[60px] resize-none"
                       maxLength={160}
+                      disabled={isSending}
                     />
                     <div className="flex items-center justify-between mt-2">
                       <div className="text-xs text-slate-500">
@@ -188,6 +205,7 @@ const EnhancedChatView = ({
                           size="sm"
                           onClick={() => setShowAIGenerator(!showAIGenerator)}
                           className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                          disabled={isSending}
                         >
                           <Sparkles className="h-4 w-4 mr-1" />
                           AI Generate
@@ -196,16 +214,17 @@ const EnhancedChatView = ({
                           variant="outline"
                           size="sm"
                           onClick={onToggleTemplates}
+                          disabled={isSending}
                         >
                           Templates
                         </Button>
                         <Button
                           onClick={handleSend}
-                          disabled={!newMessage.trim()}
+                          disabled={!newMessage.trim() || isSending}
                           size="sm"
                         >
                           <Send className="h-4 w-4 mr-1" />
-                          Send
+                          {isSending ? 'Sending...' : 'Send'}
                         </Button>
                       </div>
                     </div>

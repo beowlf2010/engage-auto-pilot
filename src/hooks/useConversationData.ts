@@ -12,11 +12,16 @@ export const useConversationData = () => {
   const { profile } = useAuth();
 
   const loadConversations = async () => {
-    if (!profile) return;
+    if (!profile) {
+      console.log('No profile available for loading conversations');
+      return;
+    }
 
     try {
+      console.log('Loading conversations for profile:', profile.id);
       const conversationsData = await fetchConversations(profile);
       setConversations(conversationsData);
+      console.log('Loaded conversations:', conversationsData.length);
     } catch (error) {
       console.error('Error loading conversations:', error);
     } finally {
@@ -26,8 +31,10 @@ export const useConversationData = () => {
 
   const loadMessages = async (leadId: string) => {
     try {
+      console.log('Loading messages for lead:', leadId);
       const messagesData = await fetchMessages(leadId);
       setMessages(messagesData);
+      console.log('Loaded messages:', messagesData.length);
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -35,13 +42,23 @@ export const useConversationData = () => {
 
   const sendMessage = async (leadId: string, body: string, aiGenerated = false) => {
     try {
-      await sendMessageService(leadId, body, profile, aiGenerated);
+      console.log('Sending message:', { leadId, body, aiGenerated, profile: !!profile });
+      
+      if (!profile) {
+        throw new Error('No profile available');
+      }
+
+      const result = await sendMessageService(leadId, body, profile, aiGenerated);
+      console.log('Message sent result:', result);
       
       // Refresh messages and conversations to show updated status
       await loadMessages(leadId);
       await loadConversations();
+      
+      return result;
     } catch (error) {
       console.error('Error in sendMessage:', error);
+      throw error;
     }
   };
 

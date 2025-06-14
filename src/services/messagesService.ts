@@ -7,13 +7,17 @@ import type { MessageData } from '@/types/conversation';
 
 export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
   try {
+    console.log('Fetching messages for lead:', leadId);
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
       .eq('lead_id', leadId)
       .order('sent_at', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching messages:', error);
+      throw error;
+    }
 
     return data?.map(msg => ({
       id: msg.id,
@@ -39,6 +43,12 @@ export const sendMessage = async (
 ) => {
   try {
     console.log('Starting to send message for lead:', leadId);
+    console.log('Message content:', message);
+    console.log('Profile:', profile);
+    
+    if (!leadId || !message || !profile) {
+      throw new Error('Missing required parameters: leadId, message, or profile');
+    }
     
     // Validate compliance for pricing content
     const compliance = validateMessageForCompliance(message);
@@ -64,6 +74,7 @@ export const sendMessage = async (
     }
 
     // Get lead's primary phone number
+    console.log('Looking up phone number for lead:', leadId);
     const { data: phoneData, error: phoneError } = await supabase
       .from('phone_numbers')
       .select('number')
@@ -72,6 +83,7 @@ export const sendMessage = async (
       .single();
 
     if (phoneError || !phoneData) {
+      console.error('Phone lookup error:', phoneError);
       throw new Error('No primary phone number found for this lead');
     }
 
@@ -99,6 +111,7 @@ export const sendMessage = async (
     console.log('Created conversation record:', conversation.id);
 
     // Send SMS via Telnyx (using the send-sms function)
+    console.log('Calling send-sms function...');
     const { data, error } = await supabase.functions.invoke('send-sms', {
       body: {
         to: phoneData.number,
@@ -151,6 +164,8 @@ export const sendMessage = async (
         description: "Your message has been delivered",
       });
     }
+
+    return { success: true };
 
   } catch (error) {
     console.error('Error sending message:', error);
