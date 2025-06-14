@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useEmailTemplates, useCreateEmailTemplate, useUpdateEmailTemplate, useDeleteEmailTemplate } from '@/hooks/useEmailTemplates';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Template, Save } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, Save } from 'lucide-react';
 import { EmailTemplate } from '@/types/email';
 
 const EmailTemplateManager = () => {
@@ -142,7 +142,7 @@ const EmailTemplateManager = () => {
                   className="min-h-[200px]"
                 />
                 <p className="text-xs text-gray-500">
-                  Available variables: {{lead_first_name}}, {{lead_last_name}}, {{vehicle_interest}}, {{salesperson_name}}
+                  Available variables: &#123;&#123;lead_first_name&#125;&#125;, &#123;&#123;lead_last_name&#125;&#125;, &#123;&#123;vehicle_interest&#125;&#125;, &#123;&#123;salesperson_name&#125;&#125;
                 </p>
               </div>
 
@@ -166,7 +166,7 @@ const EmailTemplateManager = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center">
-                  <Template className="w-5 h-5 mr-2" />
+                  <FileText className="w-5 h-5 mr-2" />
                   {template.name}
                 </CardTitle>
                 <Badge variant="secondary">

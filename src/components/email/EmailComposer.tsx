@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useEmailTemplates } from '@/hooks/useEmailTemplates';
 import { useSendEmail } from '@/hooks/useEmailConversations';
 import { emailService } from '@/services/emailService';
-import { Loader2, Send, Template } from 'lucide-react';
+import { Loader2, Send, FileText } from 'lucide-react';
 
 interface EmailComposerProps {
   open: boolean;
@@ -100,7 +100,7 @@ const EmailComposer = ({
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     <div className="flex items-center space-x-2">
-                      <Template className="w-4 h-4" />
+                      <FileText className="w-4 h-4" />
                       <span>{template.name}</span>
                     </div>
                   </SelectItem>

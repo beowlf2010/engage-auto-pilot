@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { emailService } from '@/services/emailService';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Save, Settings, Template } from 'lucide-react';
+import { Mail, Save, Settings, FileText } from 'lucide-react';
 import EmailTemplateManager from '../email/EmailTemplateManager';
 
 interface EmailSettingsProps {
@@ -74,7 +74,7 @@ const EmailSettings = ({ userRole }: EmailSettingsProps) => {
             <span>Email Settings</span>
           </TabsTrigger>
           <TabsTrigger value="templates" className="flex items-center space-x-2">
-            <Template className="w-4 h-4" />
+            <FileText className="w-4 h-4" />
             <span>Templates</span>
           </TabsTrigger>
         </TabsList>

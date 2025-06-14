@@ -55,10 +55,10 @@ const BulkEmailAction = ({ selectedLeads, onComplete }: BulkEmailActionProps) =>
       for (const lead of leadsWithEmail) {
         try {
           const variables = {
-            lead_first_name: lead.first_name,
-            lead_last_name: lead.last_name,
-            vehicle_interest: lead.vehicle_interest || '',
-            salesperson_name: 'Your Sales Representative'
+            'lead_first_name': lead.first_name,
+            'lead_last_name': lead.last_name,
+            'vehicle_interest': lead.vehicle_interest || '',
+            'salesperson_name': 'Your Sales Representative'
           };
 
           const personalizedSubject = emailService.replaceTemplateVariables(subject, variables);
@@ -167,7 +167,7 @@ const BulkEmailAction = ({ selectedLeads, onComplete }: BulkEmailActionProps) =>
               className="min-h-[150px]"
             />
             <p className="text-xs text-gray-500">
-              Available variables: {{lead_first_name}}, {{lead_last_name}}, {{vehicle_interest}}, {{salesperson_name}}
+              Available variables: &#123;&#123;lead_first_name&#125;&#125;, &#123;&#123;lead_last_name&#125;&#125;, &#123;&#123;vehicle_interest&#125;&#125;, &#123;&#123;salesperson_name&#125;&#125;
             </p>
           </div>
 

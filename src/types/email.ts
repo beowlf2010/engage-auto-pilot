@@ -5,7 +5,7 @@ export interface EmailTemplate {
   subject: string;
   content: string;
   category: string;
-  variables: string[];
+  variables: any; // Changed from string[] to any to match Json type from database
   is_active: boolean;
   created_by?: string;
   created_at: string;
