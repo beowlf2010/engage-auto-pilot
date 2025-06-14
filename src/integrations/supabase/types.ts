@@ -898,6 +898,53 @@ export type Database = {
           },
         ]
       }
+      message_templates: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_shared: boolean
+          title: string
+          updated_at: string
+          usage_count: number | null
+          variables: Json | null
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_shared?: boolean
+          title: string
+          updated_at?: string
+          usage_count?: number | null
+          variables?: Json | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_shared?: boolean
+          title?: string
+          updated_at?: string
+          usage_count?: number | null
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phone_numbers: {
         Row: {
           created_at: string
@@ -1210,6 +1257,10 @@ export type Database = {
           avg_days_to_sell: number
           total_sales_value: number
         }[]
+      }
+      increment_template_usage: {
+        Args: { template_id: string }
+        Returns: undefined
       }
       mark_missing_vehicles_sold: {
         Args: { p_upload_id: string }
