@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 
@@ -43,12 +42,13 @@ serve(async (req) => {
   }
 
   try {
+    console.log('test-sms function invoked.');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Auth check (same as before)
+    console.log('Performing auth check...');
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -62,13 +62,15 @@ serve(async (req) => {
     )
 
     if (authError || !user) {
+      console.error('Auth check failed:', authError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    console.log('Auth check passed for user:', user.id);
 
-    // Check admin
+    console.log('Performing admin check...');
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -76,13 +78,16 @@ serve(async (req) => {
       .single()
 
     if (!profile || profile.role !== 'admin') {
+      console.error('Admin check failed for user:', user.id);
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    console.log('Admin check passed.');
 
     const { testPhoneNumber } = await req.json()
+    console.log('Received test phone number:', testPhoneNumber);
     if (!testPhoneNumber) {
       return new Response(
         JSON.stringify({ error: 'Test phone number is required' }),
@@ -90,9 +95,10 @@ serve(async (req) => {
       )
     }
 
-    // Get Telnyx credentials
+    console.log('Fetching Telnyx secrets...');
     const { apiKey, messagingProfileId } = await getTelnyxSecrets()
     if (!apiKey || !messagingProfileId) {
+      console.error('Missing Telnyx credentials.', { hasApiKey: !!apiKey, hasProfile: !!messagingProfileId });
       return new Response(
         JSON.stringify({ 
           error: 'Missing Telnyx credentials. Please configure your Telnyx settings first.',
@@ -104,6 +110,7 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    console.log('Telnyx secrets fetched successfully.');
 
     // Send test SMS
     const telnyxUrl = "https://api.telnyx.com/v2/messages"
@@ -113,6 +120,7 @@ serve(async (req) => {
       text: `Test message from your CRM (Telnyx integration) at ${new Date().toLocaleString()}.`,
       messaging_profile_id: messagingProfileId
     }
+    console.log('Sending test SMS with payload:', JSON.stringify(payload));
 
     const response = await fetch(telnyxUrl, {
       method: 'POST',
@@ -122,8 +130,10 @@ serve(async (req) => {
       },
       body: JSON.stringify(payload)
     })
+    console.log('Telnyx API response status:', response.status);
 
     const result = await response.json()
+    console.log('Telnyx API response body:', JSON.stringify(result));
 
     if (!response.ok) {
       console.error('Telnyx API error:', result)
@@ -157,7 +167,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error in test-sms function:', error)
+    console.error('Critical error in test-sms function:', error.message, error.stack);
     return new Response(
       JSON.stringify({ 
         success: false, 

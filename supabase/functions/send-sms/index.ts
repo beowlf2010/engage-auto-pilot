@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 
@@ -13,7 +12,6 @@ async function getTelnyxSecrets() {
   const messagingProfileId = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID')
 
   if (!apiKey || !messagingProfileId) {
-    // Get from settings table as a fallback
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -45,14 +43,19 @@ serve(async (req) => {
   }
 
   try {
+    console.log('send-sms function invoked.');
     const { to, body, conversationId } = await req.json()
+    console.log(`Received request to send to ${to} for conversation ${conversationId}`);
 
     // Get Telnyx credentials
+    console.log('Fetching Telnyx secrets...');
     const { apiKey, messagingProfileId } = await getTelnyxSecrets()
 
     if (!apiKey || !messagingProfileId) {
+      console.error('Missing Telnyx API credentials.', { hasApiKey: !!apiKey, hasProfile: !!messagingProfileId });
       throw new Error('Missing Telnyx API credentials')
     }
+    console.log('Telnyx secrets fetched successfully.');
 
     // Compose the Telnyx API request - don't include 'from' field if we want to use profile default
     const payload = {
@@ -72,9 +75,10 @@ serve(async (req) => {
       },
       body: JSON.stringify(payload)
     })
+    console.log('Telnyx API response status:', response.status);
 
     const result = await response.json()
-    console.log('Telnyx API response:', JSON.stringify(result))
+    console.log('Telnyx API response body:', JSON.stringify(result));
     
     if (!response.ok) {
       console.error('Telnyx API error:', result)
@@ -108,7 +112,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error in send-sms function:', error)
+    console.error('Critical error in send-sms function:', error.message, error.stack);
     return new Response(
       JSON.stringify({ 
         success: false, 
