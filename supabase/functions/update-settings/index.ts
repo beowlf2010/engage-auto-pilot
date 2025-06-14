@@ -55,17 +55,6 @@ Deno.serve(async (req) => {
 
     const { settingType, value } = await req.json()
 
-    // Validate phone number format for Twilio settings
-    if (settingType === 'TWILIO_PHONE_NUMBER') {
-      const phoneRegex = /^\+1[0-9]{10}$/
-      if (!phoneRegex.test(value)) {
-        return new Response(
-          JSON.stringify({ error: 'Phone number must be in E.164 format (+1XXXXXXXXXX)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-    }
-
     // Validate OpenAI API key format
     if (settingType === 'OPENAI_API_KEY') {
       if (!value.startsWith('sk-') || value.length < 50) {
@@ -76,21 +65,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Validate Twilio Account SID format
-    if (settingType === 'TWILIO_ACCOUNT_SID') {
-      if (!value.startsWith('AC') || value.length < 30) {
+    // Validate Telnyx API key format
+    if (settingType === 'TELNYX_API_KEY') {
+      if (!value.startsWith('KEY') || value.length < 30) {
         return new Response(
-          JSON.stringify({ error: 'Invalid Twilio Account SID format' }),
+          JSON.stringify({ error: 'Invalid Telnyx API key format' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
     }
 
-    // Validate Twilio Auth Token format
-    if (settingType === 'TWILIO_AUTH_TOKEN') {
-      if (value.length < 30) {
+    // Validate Telnyx Messaging Profile ID format (UUID)
+    if (settingType === 'TELNYX_MESSAGING_PROFILE_ID') {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(value)) {
         return new Response(
-          JSON.stringify({ error: 'Invalid Twilio Auth Token format' }),
+          JSON.stringify({ error: 'Invalid Telnyx Messaging Profile ID format (must be a UUID)' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -116,9 +106,8 @@ Deno.serve(async (req) => {
     // Get a user-friendly name for the setting
     const settingNames = {
       'OPENAI_API_KEY': 'OpenAI API Key',
-      'TWILIO_ACCOUNT_SID': 'Twilio Account SID',
-      'TWILIO_AUTH_TOKEN': 'Twilio Auth Token',
-      'TWILIO_PHONE_NUMBER': 'Twilio Phone Number'
+      'TELNYX_API_KEY': 'Telnyx API Key',
+      'TELNYX_MESSAGING_PROFILE_ID': 'Telnyx Messaging Profile ID'
     }
 
     const friendlyName = settingNames[settingType] || settingType
