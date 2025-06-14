@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useEmailTemplates } from '@/hooks/useEmailTemplates';
 import { useSendEmail } from '@/hooks/useEmailConversations';
 import { emailService } from '@/services/emailService';
-import { Loader2, Send, FileText } from 'lucide-react';
+import { Loader2, Send, FileText, Bot } from 'lucide-react';
+import AIEmailGenerator from './AIEmailGenerator';
 
 interface EmailComposerProps {
   open: boolean;
@@ -34,6 +35,7 @@ const EmailComposer = ({
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('none');
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   const { data: templates = [] } = useEmailTemplates();
   const sendEmailMutation = useSendEmail();
@@ -61,6 +63,13 @@ const EmailComposer = ({
     }
   };
 
+  const handleAIEmailGenerated = (aiSubject: string, aiContent: string) => {
+    setSubject(aiSubject);
+    setContent(aiContent);
+    setSelectedTemplate('none'); // Clear template selection when using AI
+    setShowAIGenerator(false);
+  };
+
   const handleSend = async () => {
     if (!to || !subject || !content) return;
 
@@ -78,6 +87,7 @@ const EmailComposer = ({
       setSubject('');
       setContent('');
       setSelectedTemplate('none');
+      setShowAIGenerator(false);
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to send email:', error);
@@ -95,25 +105,51 @@ const EmailComposer = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Template Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="template">Email Template</Label>
-            <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a template (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No template</SelectItem>
-                {templates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    <div className="flex items-center space-x-2">
-                      <FileText className="w-4 h-4" />
-                      <span>{template.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* AI Email Generator */}
+          {showAIGenerator && (
+            <AIEmailGenerator
+              leadId={leadId}
+              leadFirstName={leadFirstName}
+              leadLastName={leadLastName}
+              vehicleInterest={vehicleInterest}
+              onEmailGenerated={handleAIEmailGenerated}
+              onClose={() => setShowAIGenerator(false)}
+            />
+          )}
+
+          {/* Template Selection and AI Button */}
+          <div className="flex gap-4">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="template">Email Template</Label>
+              <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a template (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No template</SelectItem>
+                  {templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-4 h-4" />
+                        <span>{template.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowAIGenerator(true)}
+                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+              >
+                <Bot className="w-4 h-4 mr-2" />
+                Generate with AI
+              </Button>
+            </div>
           </div>
 
           {/* Email Fields */}
