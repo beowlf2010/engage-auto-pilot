@@ -16,10 +16,12 @@ import {
   Star,
   MapPin,
   Mail,
-  Calendar
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import LeadContextPanel from './LeadContextPanel';
+import AIMessageGenerator from './AIMessageGenerator';
 
 interface EnhancedChatViewProps {
   selectedConversation: any;
@@ -43,6 +45,7 @@ const EnhancedChatView = ({
 }: EnhancedChatViewProps) => {
   const [newMessage, setNewMessage] = useState('');
   const [showLeadContext, setShowLeadContext] = useState(true);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -67,6 +70,11 @@ const EnhancedChatView = ({
     }
   };
 
+  const handleAIGeneratedMessage = (message: string) => {
+    onSendMessage(message, false);
+    setShowAIGenerator(false);
+  };
+
   const canReply = selectedConversation && (
     user.role === "manager" || 
     user.role === "admin" || 
@@ -89,7 +97,16 @@ const EnhancedChatView = ({
   return (
     <div className="grid grid-cols-12 gap-4 h-full">
       {/* Main Chat Area */}
-      <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col`}>
+      <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col space-y-4`}>
+        {/* AI Message Generator */}
+        {showAIGenerator && canReply && (
+          <AIMessageGenerator
+            leadId={selectedConversation.leadId}
+            onSendMessage={handleAIGeneratedMessage}
+            onClose={() => setShowAIGenerator(false)}
+          />
+        )}
+
         <Card className="flex-1 flex flex-col">
           {/* Chat Header */}
           <CardHeader className="pb-3 border-b">
@@ -166,6 +183,15 @@ const EnhancedChatView = ({
                         {newMessage.length}/160 characters
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAIGenerator(!showAIGenerator)}
+                          className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                        >
+                          <Sparkles className="h-4 w-4 mr-1" />
+                          AI Generate
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
