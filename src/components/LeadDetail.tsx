@@ -1,44 +1,21 @@
 
-import React, { useState } from "react";
-import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, User, Calendar, Activity, Mail } from "lucide-react";
-import LeadDetailHeader from "./leads/detail/LeadDetailHeader";
-import ContactInfoCard from "./leads/detail/ContactInfoCard";
-import VehicleInfoCard from "./leads/detail/VehicleInfoCard";
-import QuickContactCard from "./leads/detail/QuickContactCard";
-import LeadSummaryCard from "./leads/detail/LeadSummaryCard";
-import AIAutomationCard from "./leads/detail/AIAutomationCard";
-import CommunicationPrefsCard from "./leads/detail/CommunicationPrefsCard";
-import ActivityTimeline from "./leads/detail/ActivityTimeline";
-import MessageThread from "./inbox/MessageThread";
-import EmailTab from "./leads/detail/EmailTab";
+import React from "react";
+import { useLeadDetail } from "@/hooks/useLeadDetail";
+import LeadDetailLayout from "./leads/detail/LeadDetailLayout";
 
 const LeadDetail = () => {
-  const { id } = useParams<{ id: string }>();
-  const [showMessageComposer, setShowMessageComposer] = useState(false);
-
-  const { data: lead, isLoading, error } = useQuery({
-    queryKey: ["lead", id],
-    queryFn: async () => {
-      if (!id) throw new Error("No lead ID provided");
-      
-      const { data, error } = await supabase
-        .from("leads")
-        .select(`
-          *,
-          phone_numbers (*)
-        `)
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!id,
-  });
+  const {
+    lead,
+    transformedLead,
+    messageThreadLead,
+    phoneNumbers,
+    primaryPhone,
+    isLoading,
+    error,
+    showMessageComposer,
+    setShowMessageComposer,
+    handlePhoneSelect
+  } = useLeadDetail();
 
   if (isLoading) {
     return (
@@ -48,7 +25,7 @@ const LeadDetail = () => {
     );
   }
 
-  if (error || !lead) {
+  if (error || !lead || !transformedLead || !messageThreadLead) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -59,174 +36,17 @@ const LeadDetail = () => {
     );
   }
 
-  // Transform phone numbers for PhoneNumberDisplay component (PhoneNumber interface)
-  const phoneNumbers = lead.phone_numbers?.map((phone: any) => ({
-    number: phone.number,
-    type: phone.type as 'cell' | 'day' | 'eve',
-    priority: phone.priority || 1,
-    status: phone.status as 'active' | 'failed' | 'opted_out',
-    lastAttempt: phone.last_attempt
-  })) || [];
-
-  // Transform phone numbers for LeadDetailData interface
-  const leadDetailPhoneNumbers = lead.phone_numbers?.map((phone: any) => ({
-    id: phone.id,
-    number: phone.number,
-    type: phone.type,
-    isPrimary: phone.is_primary,
-    status: phone.status
-  })) || [];
-
-  // Get primary phone number
-  const primaryPhone = lead.phone_numbers?.find((p: any) => p.is_primary)?.number || 
-                     lead.phone_numbers?.[0]?.number || '';
-
-  // Transform the database lead object to match component expectations
-  const transformedLead = {
-    id: lead.id,
-    firstName: lead.first_name,
-    lastName: lead.last_name,
-    middleName: lead.middle_name,
-    email: lead.email,
-    emailAlt: lead.email_alt,
-    address: lead.address,
-    city: lead.city,
-    state: lead.state,
-    postalCode: lead.postal_code,
-    vehicleInterest: lead.vehicle_interest,
-    vehicleYear: lead.vehicle_year,
-    vehicleMake: lead.vehicle_make,
-    vehicleModel: lead.vehicle_model,
-    vehicleVIN: lead.vehicle_vin,
-    status: lead.status,
-    source: lead.source,
-    aiOptIn: lead.ai_opt_in || false,
-    aiStage: lead.ai_stage,
-    nextAiSendAt: lead.next_ai_send_at,
-    createdAt: lead.created_at,
-    salespersonId: lead.salesperson_id,
-    doNotCall: lead.do_not_call,
-    doNotEmail: lead.do_not_email,
-    doNotMail: lead.do_not_mail,
-    phoneNumbers: leadDetailPhoneNumbers,
-    conversations: [],
-    activityTimeline: []
-  };
-
-  // Phone selection handler
-  const handlePhoneSelect = (phoneNumber: string) => {
-    console.log('Selected phone:', phoneNumber);
-  };
-
-  // Transform for MessageThread component
-  const messageThreadLead = {
-    id: lead.id.toString(),
-    first_name: lead.first_name,
-    last_name: lead.last_name,
-    phone: primaryPhone,
-    ai_stage: lead.ai_stage || '',
-    next_ai_send_at: lead.next_ai_send_at,
-    last_reply_at: lead.last_reply_at,
-    ai_opt_in: lead.ai_opt_in || false
-  };
-
   return (
-    <div className="space-y-6">
-      <LeadDetailHeader 
-        lead={lead}
-        onSendMessage={() => setShowMessageComposer(true)}
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Lead Info Cards */}
-        <div className="lg:col-span-1 space-y-6">
-          <ContactInfoCard 
-            lead={transformedLead}
-            phoneNumbers={phoneNumbers}
-            primaryPhone={primaryPhone}
-            onPhoneSelect={handlePhoneSelect}
-          />
-          <VehicleInfoCard lead={transformedLead} />
-          <QuickContactCard 
-            phoneNumbers={phoneNumbers}
-            primaryPhone={primaryPhone}
-            onPhoneSelect={handlePhoneSelect}
-          />
-          <LeadSummaryCard lead={transformedLead} />
-          <AIAutomationCard lead={transformedLead} />
-          <CommunicationPrefsCard lead={transformedLead} />
-        </div>
-
-        {/* Right Column - Messages and Activity */}
-        <div className="lg:col-span-2">
-          <Tabs defaultValue="messages" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="messages" className="flex items-center space-x-2">
-                <MessageSquare className="w-4 h-4" />
-                <span>Messages</span>
-              </TabsTrigger>
-              <TabsTrigger value="emails" className="flex items-center space-x-2">
-                <Mail className="w-4 h-4" />
-                <span>Emails</span>
-              </TabsTrigger>
-              <TabsTrigger value="activity" className="flex items-center space-x-2">
-                <Activity className="w-4 h-4" />
-                <span>Activity</span>
-              </TabsTrigger>
-              <TabsTrigger value="profile" className="flex items-center space-x-2">
-                <User className="w-4 h-4" />
-                <span>Profile</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="messages" className="space-y-6">
-              <MessageThread 
-                lead={messageThreadLead}
-                messages={[]}
-                onClose={() => setShowMessageComposer(false)}
-                onSendMessage={(message: string) => {
-                  console.log('Sending message:', message);
-                }}
-                onApproveAI={() => {
-                  console.log('Approving AI');
-                }}
-                onToggleAI={() => {
-                  console.log('Toggling AI');
-                }}
-              />
-            </TabsContent>
-
-            <TabsContent value="emails" className="space-y-6">
-              <EmailTab leadId={lead.id} />
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-6">
-              <ActivityTimeline activityTimeline={transformedLead.activityTimeline} />
-            </TabsContent>
-
-            <TabsContent value="profile" className="space-y-6">
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h3 className="text-lg font-semibold mb-4">Lead Profile Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium text-gray-700">Contact Information</h4>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Complete contact details and communication preferences
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-700">Vehicle Preferences</h4>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Interested vehicles and budget information
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    </div>
+    <LeadDetailLayout
+      lead={lead}
+      transformedLead={transformedLead}
+      messageThreadLead={messageThreadLead}
+      phoneNumbers={phoneNumbers}
+      primaryPhone={primaryPhone}
+      showMessageComposer={showMessageComposer}
+      setShowMessageComposer={setShowMessageComposer}
+      onPhoneSelect={handlePhoneSelect}
+    />
   );
 };
 
