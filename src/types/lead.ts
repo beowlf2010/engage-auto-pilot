@@ -40,6 +40,10 @@ export interface Lead {
   vehicleModel?: string;
   vehicleVIN?: string;
   contactStatus: 'no_contact' | 'contact_attempted' | 'response_received';
+  // Message count properties calculated in useLeads hook
+  incomingCount: number;
+  outgoingCount: number;
+  messageCount?: number;
   // New enhanced AI tracking fields
   aiMessagesSent?: number;
   aiLastMessageStage?: string;
