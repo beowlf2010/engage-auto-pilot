@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { fetchConversations } from '@/services/conversationsService';
 import { fetchMessages, sendMessage as sendMessageService } from '@/services/messagesService';
@@ -11,7 +11,7 @@ export const useConversationData = () => {
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
 
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     if (!profile) {
       console.log('No profile available for loading conversations');
       return;
@@ -27,9 +27,9 @@ export const useConversationData = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile]);
 
-  const loadMessages = async (leadId: string) => {
+  const loadMessages = useCallback(async (leadId: string) => {
     try {
       console.log('Loading messages for lead:', leadId);
       const messagesData = await fetchMessages(leadId);
@@ -38,9 +38,9 @@ export const useConversationData = () => {
     } catch (error) {
       console.error('Error loading messages:', error);
     }
-  };
+  }, []);
 
-  const sendMessage = async (leadId: string, body: string, aiGenerated = false) => {
+  const sendMessage = useCallback(async (leadId: string, body: string, aiGenerated = false) => {
     try {
       console.log('Sending message:', { leadId, body, aiGenerated, profile: !!profile });
       
@@ -60,7 +60,7 @@ export const useConversationData = () => {
       console.error('Error in sendMessage:', error);
       throw error;
     }
-  };
+  }, [profile, loadMessages, loadConversations]);
 
   return {
     conversations,
