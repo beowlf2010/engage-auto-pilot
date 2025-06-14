@@ -137,7 +137,7 @@ const LeadAssignmentControls = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleAutoAss ign}
+            onClick={handleAutoAssign}
             disabled={isAssigning}
           >
             {isAssigning ? (
