@@ -33,12 +33,19 @@ const EmailComposer = ({
   const [to, setTo] = useState(leadEmail || '');
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState('none');
 
   const { data: templates = [] } = useEmailTemplates();
   const sendEmailMutation = useSendEmail();
 
   const handleTemplateSelect = (templateId: string) => {
+    if (templateId === 'none') {
+      setSubject('');
+      setContent('');
+      setSelectedTemplate('none');
+      return;
+    }
+
     const template = templates.find(t => t.id === templateId);
     if (template) {
       const variables = {
@@ -63,14 +70,14 @@ const EmailComposer = ({
         subject,
         html: content,
         leadId,
-        templateId: selectedTemplate || undefined,
+        templateId: selectedTemplate === 'none' ? undefined : selectedTemplate,
       });
       
       // Reset form
       setTo('');
       setSubject('');
       setContent('');
-      setSelectedTemplate('');
+      setSelectedTemplate('none');
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to send email:', error);
@@ -96,7 +103,7 @@ const EmailComposer = ({
                 <SelectValue placeholder="Choose a template (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No template</SelectItem>
+                <SelectItem value="none">No template</SelectItem>
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     <div className="flex items-center space-x-2">
