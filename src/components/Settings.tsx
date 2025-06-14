@@ -8,13 +8,15 @@ import {
   Users, 
   Bot,
   Save,
-  Brain
+  Brain,
+  Mail
 } from "lucide-react";
 import UserManagementTable from "./user-management/UserManagementTable";
 import CadenceSettings from "./settings/CadenceSettings";
 import BusinessHoursSettings from "./settings/BusinessHoursSettings";
 import ApiKeysSettings from "./settings/ApiKeysSettings";
 import EnhancedAISettings from "./settings/EnhancedAISettings";
+import EmailSettings from "./settings/EmailSettings";
 
 interface SettingsProps {
   user: {
@@ -30,6 +32,7 @@ const Settings = ({ user }: SettingsProps) => {
     { id: "cadence", label: "AI Cadence", icon: Bot, roles: ["sales", "manager", "admin"] },
     { id: "enhanced", label: "Enhanced AI", icon: Brain, roles: ["manager", "admin"] },
     { id: "business", label: "Business Hours", icon: Clock, roles: ["sales", "manager", "admin"] },
+    { id: "email", label: "Email Settings", icon: Mail, roles: ["sales", "manager", "admin"] },
     { id: "api", label: "API Keys", icon: Key, roles: ["admin"] },
     { id: "users", label: "User Management", icon: Users, roles: ["manager", "admin"] }
   ];
@@ -51,6 +54,8 @@ const Settings = ({ user }: SettingsProps) => {
         return <EnhancedAISettings userRole={user.role} />;
       case "business": 
         return <BusinessHoursSettings userRole={user.role} />;
+      case "email": 
+        return <EmailSettings userRole={user.role} />;
       case "api": 
         return <ApiKeysSettings userRole={user.role} />;
       case "users": 
@@ -68,7 +73,7 @@ const Settings = ({ user }: SettingsProps) => {
           <h1 className="text-3xl font-bold text-slate-800">Settings</h1>
           <p className="text-slate-600 mt-1">Configure your CRM system preferences</p>
         </div>
-        {user.role !== "sales" && activeTab !== "users" && activeTab !== "api" && activeTab !== "enhanced" && (
+        {user.role !== "sales" && activeTab !== "users" && activeTab !== "api" && activeTab !== "enhanced" && activeTab !== "email" && (
           <Button onClick={handleSave} className="mt-4 md:mt-0">
             <Save className="w-4 h-4 mr-2" />
             Save Changes

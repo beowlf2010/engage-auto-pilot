@@ -1,180 +1,140 @@
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, AlertCircle } from "lucide-react";
-import { fetchLeadDetail, LeadDetailData } from '@/services/leadDetailService';
-import { Skeleton } from "@/components/ui/skeleton";
-import LeadMessaging from './leads/LeadMessaging';
-import { Button } from '@/components/ui/button';
-import { PhoneNumber } from '@/types/lead';
-import LeadDetailHeader from './leads/detail/LeadDetailHeader';
-import ContactInfoCard from './leads/detail/ContactInfoCard';
-import VehicleInfoCard from './leads/detail/VehicleInfoCard';
-import ActivityTimeline from './leads/detail/ActivityTimeline';
-import LeadSummaryCard from './leads/detail/LeadSummaryCard';
-import QuickContactCard from './leads/detail/QuickContactCard';
-import AIAutomationCard from './leads/detail/AIAutomationCard';
-import CommunicationPrefsCard from './leads/detail/CommunicationPrefsCard';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { MessageSquare, User, Calendar, Activity, Mail } from "lucide-react";
+import LeadDetailHeader from "./leads/detail/LeadDetailHeader";
+import ContactInfoCard from "./leads/detail/ContactInfoCard";
+import VehicleInfoCard from "./leads/detail/VehicleInfoCard";
+import QuickContactCard from "./leads/detail/QuickContactCard";
+import LeadSummaryCard from "./leads/detail/LeadSummaryCard";
+import AIAutomationCard from "./leads/detail/AIAutomationCard";
+import CommunicationPrefsCard from "./leads/detail/CommunicationPrefsCard";
+import ActivityTimeline from "./leads/detail/ActivityTimeline";
+import MessageThread from "./inbox/MessageThread";
+import EmailTab from "./leads/detail/EmailTab";
 
 const LeadDetail = () => {
-  const { leadId } = useParams<{ leadId: string }>();
-  const navigate = useNavigate();
-  const [lead, setLead] = useState<LeadDetailData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const { id } = useParams<{ id: string }>();
+  const [showMessageComposer, setShowMessageComposer] = useState(false);
 
-  useEffect(() => {
-    const loadLeadDetail = async () => {
-      if (!leadId) {
-        setLoading(false);
-        setError("No lead ID provided.");
-        return;
-      }
+  const { data: lead, isLoading, error } = useQuery({
+    queryKey: ["lead", id],
+    queryFn: async () => {
+      if (!id) throw new Error("No lead ID provided");
       
-      setLoading(true);
-      setError(null);
-      
-      try {
-        console.log('Loading lead detail for ID:', leadId);
-        const leadData = await fetchLeadDetail(leadId);
-        
-        if (!leadData) {
-          setError("Lead not found or failed to load.");
-          return;
-        }
-        
-        console.log('Lead data loaded successfully:', leadData);
-        setLead(leadData);
-      } catch (err) {
-        console.error("Failed to load lead details:", err);
-        setError("An unexpected error occurred while fetching lead details.");
-      } finally {
-        setLoading(false);
-      }
-    };
+      const { data, error } = await supabase
+        .from("leads")
+        .select(`
+          *,
+          phone_numbers (*)
+        `)
+        .eq("id", id)
+        .single();
 
-    loadLeadDetail();
-  }, [leadId]);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
 
-  const handlePhoneSelect = (phoneNumber: string) => {
-    console.log('Selected phone:', phoneNumber);
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex items-center space-x-4">
-          <Skeleton className="h-10 w-24" />
-          <Skeleton className="h-8 w-48" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-          <div className="space-y-6">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !lead) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="text-center p-8 bg-red-50 border border-red-200 rounded-lg">
-          <AlertCircle className="w-12 h-12 mx-auto text-destructive mb-4" />
-          <h1 className="text-2xl font-bold text-destructive mb-2">Error Loading Lead</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={() => navigate('/leads')}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Leads
-          </Button>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Lead Not Found</h2>
+          <p className="text-gray-600">The lead you're looking for doesn't exist or you don't have permission to view it.</p>
         </div>
       </div>
     );
   }
-
-  if (!lead) {
-    return (
-      <div className="container mx-auto py-6">
-        <div className="text-center p-8 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <AlertCircle className="w-12 h-12 mx-auto text-yellow-600 mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Lead Not Found</h1>
-          <p className="text-gray-600 mb-4">The requested lead could not be found.</p>
-          <Button onClick={() => navigate('/leads')}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Leads
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const phoneNumbers: PhoneNumber[] = lead.phoneNumbers.map(phone => ({
-    number: phone.number,
-    type: phone.type as 'cell' | 'day' | 'eve',
-    priority: 1,
-    status: phone.status as 'active' | 'failed' | 'opted_out'
-  }));
-
-  const primaryPhone = phoneNumbers.find(p => p.status === 'active')?.number || 
-                      phoneNumbers[0]?.number || '';
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <LeadDetailHeader lead={lead} onSendMessageClick={() => setActiveTab("conversations")} />
+    <div className="space-y-6">
+      <LeadDetailHeader 
+        lead={lead} 
+        onSendMessage={() => setShowMessageComposer(true)}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="conversations">Messages</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-6">
-              <ContactInfoCard 
-                lead={lead} 
-                phoneNumbers={phoneNumbers} 
-                primaryPhone={primaryPhone}
-                onPhoneSelect={handlePhoneSelect}
-              />
-              <VehicleInfoCard lead={lead} />
-            </TabsContent>
-
-            <TabsContent value="conversations">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Message History</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {leadId && <LeadMessaging leadId={leadId} />}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-4">
-              <ActivityTimeline activityTimeline={lead.activityTimeline} />
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <div className="space-y-6">
+        {/* Left Column - Lead Info Cards */}
+        <div className="lg:col-span-1 space-y-6">
+          <ContactInfoCard lead={lead} />
+          <VehicleInfoCard lead={lead} />
+          <QuickContactCard lead={lead} />
           <LeadSummaryCard lead={lead} />
-          <QuickContactCard 
-            phoneNumbers={phoneNumbers}
-            primaryPhone={primaryPhone}
-            onPhoneSelect={handlePhoneSelect}
-          />
           <AIAutomationCard lead={lead} />
           <CommunicationPrefsCard lead={lead} />
+        </div>
+
+        {/* Right Column - Messages and Activity */}
+        <div className="lg:col-span-2">
+          <Tabs defaultValue="messages" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="messages" className="flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4" />
+                <span>Messages</span>
+              </TabsTrigger>
+              <TabsTrigger value="emails" className="flex items-center space-x-2">
+                <Mail className="w-4 h-4" />
+                <span>Emails</span>
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="flex items-center space-x-2">
+                <Activity className="w-4 h-4" />
+                <span>Activity</span>
+              </TabsTrigger>
+              <TabsTrigger value="profile" className="flex items-center space-x-2">
+                <User className="w-4 h-4" />
+                <span>Profile</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="messages" className="space-y-6">
+              <MessageThread 
+                leadId={lead.id}
+                showComposer={showMessageComposer}
+                onComposerClose={() => setShowMessageComposer(false)}
+              />
+            </TabsContent>
+
+            <TabsContent value="emails" className="space-y-6">
+              <EmailTab leadId={lead.id} />
+            </TabsContent>
+
+            <TabsContent value="activity" className="space-y-6">
+              <ActivityTimeline leadId={lead.id} />
+            </TabsContent>
+
+            <TabsContent value="profile" className="space-y-6">
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold mb-4">Lead Profile Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium text-gray-700">Contact Information</h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Complete contact details and communication preferences
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-700">Vehicle Preferences</h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Interested vehicles and budget information
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

@@ -1,194 +1,106 @@
 
-import React, { useState } from 'react';
+import React from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Users, 
   MessageSquare, 
-  Bot, 
   UserCheck, 
-  Download,
+  UserX, 
+  Trash2, 
   X,
-  Send
+  Mail
 } from "lucide-react";
+import BulkEmailAction from "./BulkEmailAction";
+
+interface Lead {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  status: string;
+  vehicle_interest?: string;
+}
 
 interface BulkActionsPanelProps {
-  selectedCount: number;
-  onClose: () => void;
+  selectedLeads: Lead[];
+  onClearSelection: () => void;
   onBulkStatusUpdate: (status: string) => void;
-  onBulkAiToggle: (enabled: boolean) => void;
-  onBulkMessage: (message: string) => void;
-  onBulkAssign: (salespersonId: string) => void;
-  onBulkExport: () => void;
-  salespeople: Array<{ id: string; name: string }>;
+  onBulkDelete: () => void;
+  onBulkMessage: () => void;
 }
 
 const BulkActionsPanel = ({
-  selectedCount,
-  onClose,
+  selectedLeads,
+  onClearSelection,
   onBulkStatusUpdate,
-  onBulkAiToggle,
+  onBulkDelete,
   onBulkMessage,
-  onBulkAssign,
-  onBulkExport,
-  salespeople
 }: BulkActionsPanelProps) => {
-  const [bulkMessage, setBulkMessage] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [selectedSalesperson, setSelectedSalesperson] = useState('');
-
-  const handleBulkMessage = () => {
-    if (bulkMessage.trim()) {
-      onBulkMessage(bulkMessage.trim());
-      setBulkMessage('');
-    }
-  };
-
-  const handleStatusUpdate = () => {
-    if (selectedStatus) {
-      onBulkStatusUpdate(selectedStatus);
-      setSelectedStatus('');
-    }
-  };
-
-  const handleAssignment = () => {
-    if (selectedSalesperson) {
-      onBulkAssign(selectedSalesperson);
-      setSelectedSalesperson('');
-    }
-  };
+  if (selectedLeads.length === 0) return null;
 
   return (
-    <Card className="mb-6 border-blue-200 bg-blue-50">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-blue-800">
-            <Users className="h-5 w-5" />
-            Bulk Actions
-            <Badge variant="secondary">{selectedCount} selected</Badge>
-          </CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Quick Actions Row */}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onBulkAiToggle(true)}
-          >
-            <Bot className="h-3 w-3 mr-1" />
-            Enable AI
-          </Button>
+    <div className="bg-white border rounded-lg p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Badge variant="secondary">
+              {selectedLeads.length} selected
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearSelection}
+              className="h-6 w-6 p-0"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onBulkAiToggle(false)}
-          >
-            <Bot className="h-3 w-3 mr-1" />
-            Disable AI
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onBulkExport}
-          >
-            <Download className="h-3 w-3 mr-1" />
-            Export Selected
-          </Button>
-        </div>
-
-        {/* Status Update */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Update Status</label>
-            <div className="flex gap-2">
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="new">New</SelectItem>
-                  <SelectItem value="engaged">Engaged</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                  <SelectItem value="lost">Lost</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                onClick={handleStatusUpdate}
-                disabled={!selectedStatus}
-              >
-                Apply
-              </Button>
-            </div>
-          </div>
-
-          {/* Assign Salesperson */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Assign To</label>
-            <div className="flex gap-2">
-              <Select value={selectedSalesperson} onValueChange={setSelectedSalesperson}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select salesperson" />
-                </SelectTrigger>
-                <SelectContent>
-                  {salespeople.map(person => (
-                    <SelectItem key={person.id} value={person.id}>
-                      {person.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                onClick={handleAssignment}
-                disabled={!selectedSalesperson}
-              >
-                <UserCheck className="h-3 w-3 mr-1" />
-                Assign
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Bulk Message */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Send Bulk Message</label>
-          <div className="flex gap-2">
-            <Textarea
-              placeholder="Type your message here... (will be sent to all selected leads)"
-              value={bulkMessage}
-              onChange={(e) => setBulkMessage(e.target.value)}
-              className="flex-1 min-h-[80px]"
-              maxLength={160}
+          <Separator orientation="vertical" className="h-6" />
+          
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={onBulkMessage}>
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Send SMS
+            </Button>
+            
+            <BulkEmailAction
+              selectedLeads={selectedLeads}
+              onComplete={onClearSelection}
             />
-            <div className="flex flex-col gap-2">
-              <Button
-                onClick={handleBulkMessage}
-                disabled={!bulkMessage.trim()}
-              >
-                <Send className="h-3 w-3 mr-1" />
-                Send
-              </Button>
-              <div className="text-xs text-muted-foreground">
-                {bulkMessage.length}/160
-              </div>
-            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => onBulkStatusUpdate("qualified")}
+            >
+              <UserCheck className="w-4 h-4 mr-2" />
+              Mark Qualified
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => onBulkStatusUpdate("unqualified")}
+            >
+              <UserX className="w-4 h-4 mr-2" />
+              Mark Unqualified
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={onBulkDelete}
+              className="text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

@@ -1,67 +1,119 @@
 
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, MessageSquare, Edit } from "lucide-react";
-import { LeadDetailData } from '@/services/leadDetailService';
+import { Phone, MessageSquare, Mail, User, Calendar, MapPin, Car } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import EmailComposer from "../../email/EmailComposer";
 
-interface LeadDetailHeaderProps {
-  lead: LeadDetailData;
-  onSendMessageClick: () => void;
+interface Lead {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  status: string;
+  vehicle_interest?: string;
+  city?: string;
+  state?: string;
+  created_at: string;
 }
 
-const LeadDetailHeader = ({ lead, onSendMessageClick }: LeadDetailHeaderProps) => {
-  const navigate = useNavigate();
+interface LeadDetailHeaderProps {
+  lead: Lead;
+  onSendMessage?: () => void;
+}
 
-  const getStatusBadge = (status: string) => {
-    const statusColors = {
-      'new': 'bg-blue-100 text-blue-800',
-      'engaged': 'bg-green-100 text-green-800',
-      'paused': 'bg-yellow-100 text-yellow-800',
-      'closed': 'bg-gray-100 text-gray-800',
-      'lost': 'bg-red-100 text-red-800'
-    };
-    return statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800';
-  };
+const LeadDetailHeader = ({ lead, onSendMessage }: LeadDetailHeaderProps) => {
+  const [showEmailComposer, setShowEmailComposer] = useState(false);
 
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "new":
+        return "bg-blue-100 text-blue-800";
+      case "contacted":
+        return "bg-yellow-100 text-yellow-800";
+      case "qualified":
+        return "bg-green-100 text-green-800";
+      case "closed":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
   };
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-4">
-        <Button variant="outline" onClick={() => navigate('/leads')}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Leads
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">
-            {lead.firstName} {lead.lastName}
-            {lead.middleName && ` ${lead.middleName}`}
-          </h1>
-          <div className="flex items-center space-x-2 mt-1">
-            <Badge className={getStatusBadge(lead.status)}>
-              {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
+    <>
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+          <div className="flex items-start space-x-4">
+            <div className="bg-blue-100 p-3 rounded-full">
+              <User className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {lead.first_name} {lead.last_name}
+              </h1>
+              <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
+                <div className="flex items-center space-x-1">
+                  <Calendar className="w-4 h-4" />
+                  <span>Added {formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })}</span>
+                </div>
+                {lead.city && lead.state && (
+                  <div className="flex items-center space-x-1">
+                    <MapPin className="w-4 h-4" />
+                    <span>{lead.city}, {lead.state}</span>
+                  </div>
+                )}
+                {lead.vehicle_interest && (
+                  <div className="flex items-center space-x-1">
+                    <Car className="w-4 h-4" />
+                    <span>{lead.vehicle_interest}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
+            <Badge className={getStatusColor(lead.status)}>
+              {lead.status}
             </Badge>
-            <span className="text-sm text-gray-500">
-              Created {formatTimestamp(lead.createdAt)}
-            </span>
+            
+            <div className="flex space-x-2">
+              <Button size="sm" variant="outline">
+                <Phone className="w-4 h-4 mr-2" />
+                Call
+              </Button>
+              
+              <Button size="sm" variant="outline" onClick={onSendMessage}>
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Text
+              </Button>
+
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => setShowEmailComposer(true)}
+                disabled={!lead.email}
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                Email
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-      <div className="flex space-x-2">
-        <Button onClick={onSendMessageClick}>
-          <MessageSquare className="w-4 h-4 mr-2" />
-          Send Message
-        </Button>
-        <Button variant="outline">
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Lead
-        </Button>
-      </div>
-    </div>
+
+      <EmailComposer
+        open={showEmailComposer}
+        onOpenChange={setShowEmailComposer}
+        leadId={lead.id}
+        leadEmail={lead.email}
+        leadFirstName={lead.first_name}
+        leadLastName={lead.last_name}
+        vehicleInterest={lead.vehicle_interest}
+      />
+    </>
   );
 };
 
