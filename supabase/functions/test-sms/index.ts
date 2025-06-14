@@ -7,8 +7,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Utility to get Telnyx API credentials
+async function getTelnyxSecrets() {
+  const apiKey = Deno.env.get('TELNYX_API_KEY')
+  const messagingProfileId = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID')
+
+  if (!apiKey || !messagingProfileId) {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const { data: settings } = await supabase
+      .from('settings')
+      .select('key, value')
+      .in('key', ['TELNYX_API_KEY', 'TELNYX_MESSAGING_PROFILE_ID'])
+
+    const settingsMap = {}
+    settings?.forEach(setting => {
+      settingsMap[setting.key] = setting.value
+    })
+
+    return {
+      apiKey: apiKey || settingsMap['TELNYX_API_KEY'],
+      messagingProfileId: messagingProfileId || settingsMap['TELNYX_MESSAGING_PROFILE_ID']
+    }
+  }
+
+  return { apiKey, messagingProfileId }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -19,7 +48,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get the user from the request
+    // Auth check (same as before)
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -28,7 +57,6 @@ serve(async (req) => {
       )
     }
 
-    // Verify the user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', '')
     )
@@ -40,7 +68,7 @@ serve(async (req) => {
       )
     }
 
-    // Check if user is admin
+    // Check admin
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -55,7 +83,6 @@ serve(async (req) => {
     }
 
     const { testPhoneNumber } = await req.json()
-
     if (!testPhoneNumber) {
       return new Response(
         JSON.stringify({ error: 'Test phone number is required' }),
@@ -63,68 +90,47 @@ serve(async (req) => {
       )
     }
 
-    // Get Twilio credentials from environment first
-    let accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
-    let authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
-    let fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
-
-    // If not in environment, get from database
-    if (!accountSid || !authToken || !fromNumber) {
-      const { data: settings } = await supabase
-        .from('settings')
-        .select('key, value')
-        .in('key', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER'])
-
-      const settingsMap = {}
-      settings?.forEach(setting => {
-        settingsMap[setting.key] = setting.value
-      })
-
-      accountSid = accountSid || settingsMap['TWILIO_ACCOUNT_SID']
-      authToken = authToken || settingsMap['TWILIO_AUTH_TOKEN']
-      fromNumber = fromNumber || settingsMap['TWILIO_PHONE_NUMBER']
-    }
-
-    if (!accountSid || !authToken || !fromNumber) {
+    // Get Telnyx credentials
+    const { apiKey, messagingProfileId } = await getTelnyxSecrets()
+    if (!apiKey || !messagingProfileId) {
       return new Response(
         JSON.stringify({ 
-          error: 'Missing Twilio credentials. Please configure your Twilio settings first.',
+          error: 'Missing Telnyx credentials. Please configure your Telnyx settings first.',
           details: {
-            hasSid: !!accountSid,
-            hasToken: !!authToken,
-            hasPhone: !!fromNumber
+            hasApiKey: !!apiKey,
+            hasProfile: !!messagingProfileId
           }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Send test SMS using Twilio API
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
-    const auth = btoa(`${accountSid}:${authToken}`)
+    // Send test SMS
+    const telnyxUrl = "https://api.telnyx.com/v2/messages"
+    const payload = {
+      to: testPhoneNumber,
+      from: null, // Allow profile default
+      text: `Test message from your CRM (Telnyx integration) at ${new Date().toLocaleString()}.`,
+      messaging_profile_id: messagingProfileId
+    }
 
-    const formData = new URLSearchParams()
-    formData.append('To', testPhoneNumber)
-    formData.append('From', fromNumber)
-    formData.append('Body', `Test message from your CRM system at ${new Date().toLocaleString()}. Your Twilio integration is working correctly!`)
-
-    const response = await fetch(twilioUrl, {
+    const response = await fetch(telnyxUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
       },
-      body: formData,
+      body: JSON.stringify(payload)
     })
 
     const result = await response.json()
 
     if (!response.ok) {
-      console.error('Twilio API error:', result)
+      console.error('Telnyx API error:', result)
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: result.message || 'Failed to send test SMS',
+          error: result.errors ? result.errors[0]?.detail : result.message || 'Failed to send test SMS',
           details: result
         }),
         { 
@@ -134,16 +140,15 @@ serve(async (req) => {
       )
     }
 
-    console.log('Test SMS sent successfully:', result.sid)
-    
+    console.log('Telnyx test SMS sent successfully:', result.data?.id)
+
     return new Response(
       JSON.stringify({ 
         success: true,
         message: 'Test SMS sent successfully!',
-        twilioMessageId: result.sid,
-        status: result.status,
-        to: testPhoneNumber,
-        from: fromNumber
+        telnyxMessageId: result.data?.id,
+        status: result.data?.record_type || 'submitted',
+        to: testPhoneNumber
       }),
       { 
         status: 200, 
