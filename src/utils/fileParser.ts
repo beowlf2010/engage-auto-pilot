@@ -1,6 +1,6 @@
-
 import * as XLSX from 'xlsx';
 import { detectFormatType } from './fileDetection';
+import { parseCSVText } from './csvParser';
 
 export interface SheetInfo {
   name: string;
@@ -74,7 +74,15 @@ export const parseExcelFileEnhanced = async (file: File, selectedSheet?: string)
           const rowObj: Record<string, any> = {};
           headers.forEach((header, index) => {
             const cellValue = (row as any[])[index];
-            rowObj[header] = cellValue !== null && cellValue !== undefined ? cellValue : '';
+            // Clean the cell value similar to CSV cleaning
+            let cleanValue = cellValue !== null && cellValue !== undefined ? String(cellValue).trim() : '';
+            
+            // Remove surrounding quotes if they exist (can happen with Excel CSV imports)
+            if (cleanValue.length >= 2 && cleanValue.startsWith('"') && cleanValue.endsWith('"')) {
+              cleanValue = cleanValue.slice(1, -1);
+            }
+            
+            rowObj[header] = cleanValue;
           });
           return rowObj;
         });
@@ -99,33 +107,18 @@ export const parseExcelFileEnhanced = async (file: File, selectedSheet?: string)
 };
 
 export const parseCSVFileEnhanced = async (file: File): Promise<ParsedInventoryData> => {
-  const text = await file.text();
-  const lines = text.split('\n').filter(line => line.trim());
-  
-  if (lines.length < 2) {
-    throw new Error('CSV must have at least a header and one data row');
+  try {
+    const parsed = await parseCSVText(await file.text());
+    const formatType = detectFormatType(parsed.headers);
+    
+    return {
+      headers: parsed.headers,
+      rows: parsed.rows,
+      sample: parsed.sample,
+      fileType: 'csv',
+      formatType
+    };
+  } catch (error) {
+    throw new Error(`Error parsing CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-  
-  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-  const formatType = detectFormatType(headers);
-  
-  const rows = lines.slice(1).map(line => {
-    const values = line.split(',');
-    const row: Record<string, any> = {};
-    headers.forEach((header, index) => {
-      const value = values[index]?.trim().replace(/"/g, '') || '';
-      row[header] = value;
-    });
-    return row;
-  });
-
-  const sample = rows[0] || {};
-  
-  return {
-    headers,
-    rows,
-    sample,
-    fileType: 'csv',
-    formatType
-  };
 };

@@ -1,55 +1,21 @@
 
 import * as XLSX from 'xlsx';
+import { parseCSVFile as parseCSVWithUnifiedParser } from '@/utils/csvParser';
 
 export const parseCSVFile = async (file: File): Promise<any[]> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+  try {
+    const parsed = await parseCSVWithUnifiedParser(file);
+    console.log('CSV parsed with unified parser, rows:', parsed.rows.length);
     
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim());
-        
-        // Parse CSV lines into arrays
-        const data = lines.map(line => {
-          // Simple CSV parsing - handles basic cases
-          const values = [];
-          let current = '';
-          let inQuotes = false;
-          
-          for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            
-            if (char === '"') {
-              inQuotes = !inQuotes;
-            } else if (char === '\t' && !inQuotes) {
-              // Tab-separated values
-              values.push(current.trim());
-              current = '';
-            } else if (char === ',' && !inQuotes) {
-              // Comma-separated values
-              values.push(current.trim());
-              current = '';
-            } else {
-              current += char;
-            }
-          }
-          
-          // Add the last value
-          values.push(current.trim());
-          return values;
-        });
-        
-        console.log('CSV parsed, rows:', data.length);
-        resolve(data);
-      } catch (error) {
-        reject(new Error(`Error parsing CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`));
-      }
-    };
+    // Convert to array format for backward compatibility
+    const result = [parsed.headers, ...parsed.rows.map(row => 
+      parsed.headers.map(header => row[header] || '')
+    )];
     
-    reader.onerror = () => reject(new Error('Error reading CSV file'));
-    reader.readAsText(file);
-  });
+    return result;
+  } catch (error) {
+    throw new Error(`Error parsing CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };
 
 export const parseExcelFile = async (file: File): Promise<any[]> => {

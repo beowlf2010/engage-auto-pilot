@@ -64,8 +64,13 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
   const duplicates: ProcessingResult['duplicates'] = [];
   const errors: ProcessingResult['errors'] = [];
 
+  console.log('Processing leads with cleaned CSV data. Sample row:', csvData.sample);
+
   csvData.rows.forEach((row: any, index: number) => {
     try {
+      // Data is already cleaned by the unified CSV parser
+      // No need for additional quote removal since cleanFieldValue handles it
+      
       // Create phone numbers with priority
       const phoneNumbers = createPhoneNumbers(
         row[mapping.cellphone] || '',
@@ -84,7 +89,7 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
         return;
       }
 
-      // Combine vehicle information
+      // Combine vehicle information - data is already clean
       const vehicleParts = [
         row[mapping.vehicleYear] || '',
         row[mapping.vehicleMake] || '',

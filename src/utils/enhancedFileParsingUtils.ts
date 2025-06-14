@@ -7,9 +7,11 @@ import { mapRowToInventoryItem } from './inventoryMapper';
 export type { ParsedInventoryData, SheetInfo };
 export { getSheetInfo, mapRowToInventoryItem };
 
-// Enhanced parsing that detects GM/Vauto specific formats
+// Enhanced parsing that detects GM/Vauto specific formats and uses unified CSV parsing
 export const parseEnhancedInventoryFile = async (file: File, selectedSheet?: string): Promise<ParsedInventoryData> => {
   const fileType = getFileType(file);
+  
+  console.log(`Parsing ${fileType} file: ${file.name}`);
   
   if (fileType === 'excel') {
     return parseExcelFileEnhanced(file, selectedSheet);
