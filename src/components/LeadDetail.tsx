@@ -97,6 +97,28 @@ const LeadDetail = () => {
     activityTimeline: []
   };
 
+  // Get primary phone number
+  const primaryPhone = transformedLead.phoneNumbers.find(p => p.isPrimary)?.number || 
+                     transformedLead.phoneNumbers[0]?.number || '';
+
+  // Phone selection handler
+  const handlePhoneSelect = (phoneNumber: string) => {
+    // Handle phone selection logic - could trigger call or set as primary
+    console.log('Selected phone:', phoneNumber);
+  };
+
+  // Transform for MessageThread component
+  const messageThreadLead = {
+    id: lead.id.toString(),
+    first_name: lead.first_name,
+    last_name: lead.last_name,
+    phone: primaryPhone,
+    ai_stage: lead.ai_stage || '',
+    next_ai_send_at: lead.next_ai_send_at,
+    last_reply_at: lead.last_reply_at,
+    ai_opt_in: lead.ai_opt_in || false
+  };
+
   return (
     <div className="space-y-6">
       <LeadDetailHeader 
@@ -107,9 +129,18 @@ const LeadDetail = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Lead Info Cards */}
         <div className="lg:col-span-1 space-y-6">
-          <ContactInfoCard lead={transformedLead} />
+          <ContactInfoCard 
+            lead={transformedLead}
+            phoneNumbers={transformedLead.phoneNumbers}
+            primaryPhone={primaryPhone}
+            onPhoneSelect={handlePhoneSelect}
+          />
           <VehicleInfoCard lead={transformedLead} />
-          <QuickContactCard />
+          <QuickContactCard 
+            phoneNumbers={transformedLead.phoneNumbers}
+            primaryPhone={primaryPhone}
+            onPhoneSelect={handlePhoneSelect}
+          />
           <LeadSummaryCard lead={transformedLead} />
           <AIAutomationCard lead={transformedLead} />
           <CommunicationPrefsCard lead={transformedLead} />
@@ -139,9 +170,18 @@ const LeadDetail = () => {
 
             <TabsContent value="messages" className="space-y-6">
               <MessageThread 
-                lead={transformedLead}
-                showComposer={showMessageComposer}
-                onComposerClose={() => setShowMessageComposer(false)}
+                lead={messageThreadLead}
+                messages={[]}
+                onClose={() => setShowMessageComposer(false)}
+                onSendMessage={(message: string) => {
+                  console.log('Sending message:', message);
+                }}
+                onApproveAI={() => {
+                  console.log('Approving AI');
+                }}
+                onToggleAI={() => {
+                  console.log('Toggling AI');
+                }}
               />
             </TabsContent>
 
@@ -150,7 +190,7 @@ const LeadDetail = () => {
             </TabsContent>
 
             <TabsContent value="activity" className="space-y-6">
-              <ActivityTimeline lead={transformedLead} />
+              <ActivityTimeline activityTimeline={transformedLead.activityTimeline} />
             </TabsContent>
 
             <TabsContent value="profile" className="space-y-6">

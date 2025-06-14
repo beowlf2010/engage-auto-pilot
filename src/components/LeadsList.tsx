@@ -95,6 +95,18 @@ const LeadsList = () => {
     { id: '3', name: 'Mike Johnson' }
   ];
 
+  // Transform selected leads for BulkActionsPanel
+  const selectedLeadObjects = leads.filter(lead => 
+    selectedLeads.includes(lead.id.toString())
+  ).map(lead => ({
+    id: lead.id.toString(),
+    first_name: lead.firstName,
+    last_name: lead.lastName,
+    email: lead.email,
+    status: lead.status,
+    vehicle_interest: lead.vehicleInterest
+  }));
+
   // Bulk action handlers
   const handleBulkStatusUpdate = async (status: string) => {
     try {
@@ -212,6 +224,32 @@ const LeadsList = () => {
       title: "Export successful",
       description: `Exported ${selectedLeads.length} leads`,
     });
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .in('id', selectedLeads);
+
+      if (error) throw error;
+
+      toast({
+        title: "Bulk delete successful",
+        description: `Deleted ${selectedLeads.length} leads`,
+      });
+
+      refetch();
+      clearSelection();
+    } catch (error) {
+      console.error('Error deleting leads:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete leads",
+        variant: "destructive",
+      });
+    }
   };
 
   // Quick view handlers
@@ -337,14 +375,11 @@ const LeadsList = () => {
       {/* Bulk Actions Panel */}
       {selectedLeads.length > 0 && (
         <BulkActionsPanel
-          selectedCount={selectedLeads.length}
-          onClose={clearSelection}
+          selectedLeads={selectedLeadObjects}
+          onClearSelection={clearSelection}
           onBulkStatusUpdate={handleBulkStatusUpdate}
-          onBulkAiToggle={handleBulkAiToggle}
+          onBulkDelete={handleBulkDelete}
           onBulkMessage={handleBulkMessage}
-          onBulkAssign={handleBulkAssign}
-          onBulkExport={handleBulkExport}
-          salespeople={salespeople}
         />
       )}
 
