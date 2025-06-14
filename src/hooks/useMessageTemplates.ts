@@ -17,6 +17,20 @@ export interface MessageTemplate {
   usage_count: number;
 }
 
+// Helper function to transform database row to MessageTemplate
+const transformTemplate = (row: any): MessageTemplate => ({
+  id: row.id,
+  title: row.title,
+  content: row.content,
+  category: row.category,
+  variables: Array.isArray(row.variables) ? row.variables : [],
+  is_shared: row.is_shared,
+  created_by: row.created_by,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+  usage_count: row.usage_count
+});
+
 export const useMessageTemplates = () => {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +50,8 @@ export const useMessageTemplates = () => {
 
       if (error) throw error;
       
-      setTemplates(data || []);
+      const transformedTemplates = (data || []).map(transformTemplate);
+      setTemplates(transformedTemplates);
     } catch (err) {
       console.error('Error fetching templates:', err);
       setError('Failed to load templates');
@@ -55,7 +70,11 @@ export const useMessageTemplates = () => {
       const { data, error } = await supabase
         .from('message_templates')
         .insert({
-          ...template,
+          title: template.title,
+          content: template.content,
+          category: template.category,
+          variables: template.variables,
+          is_shared: template.is_shared,
           created_by: profile?.id
         })
         .select()
@@ -63,13 +82,14 @@ export const useMessageTemplates = () => {
 
       if (error) throw error;
 
-      setTemplates(prev => [data, ...prev]);
+      const transformedTemplate = transformTemplate(data);
+      setTemplates(prev => [transformedTemplate, ...prev]);
       toast({
         title: "Success",
         description: "Template created successfully"
       });
       
-      return data;
+      return transformedTemplate;
     } catch (err) {
       console.error('Error creating template:', err);
       toast({
@@ -85,20 +105,27 @@ export const useMessageTemplates = () => {
     try {
       const { data, error } = await supabase
         .from('message_templates')
-        .update(updates)
+        .update({
+          title: updates.title,
+          content: updates.content,
+          category: updates.category,
+          variables: updates.variables,
+          is_shared: updates.is_shared
+        })
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
 
-      setTemplates(prev => prev.map(t => t.id === id ? data : t));
+      const transformedTemplate = transformTemplate(data);
+      setTemplates(prev => prev.map(t => t.id === id ? transformedTemplate : t));
       toast({
         title: "Success",
         description: "Template updated successfully"
       });
       
-      return data;
+      return transformedTemplate;
     } catch (err) {
       console.error('Error updating template:', err);
       toast({

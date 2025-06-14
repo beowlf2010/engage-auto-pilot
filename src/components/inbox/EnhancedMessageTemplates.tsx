@@ -60,6 +60,7 @@ const EnhancedMessageTemplates = ({ onSelectTemplate, onClose, leadContext }: En
     title: '',
     content: '',
     category: 'general',
+    variables: [] as string[],
     is_shared: false
   });
 
@@ -88,7 +89,7 @@ const EnhancedMessageTemplates = ({ onSelectTemplate, onClose, leadContext }: En
   const handleCreateTemplate = async () => {
     try {
       await createTemplate(newTemplate);
-      setNewTemplate({ title: '', content: '', category: 'general', is_shared: false });
+      setNewTemplate({ title: '', content: '', category: 'general', variables: [], is_shared: false });
       setShowCreateDialog(false);
     } catch (error) {
       // Error handling is done in the hook
