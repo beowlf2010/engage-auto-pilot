@@ -59,22 +59,60 @@ const LeadDetail = () => {
     );
   }
 
+  // Transform the database lead object to match component expectations
+  const transformedLead = {
+    id: lead.id,
+    firstName: lead.first_name,
+    lastName: lead.last_name,
+    middleName: lead.middle_name,
+    email: lead.email,
+    emailAlt: lead.email_alt,
+    address: lead.address,
+    city: lead.city,
+    state: lead.state,
+    postalCode: lead.postal_code,
+    vehicleInterest: lead.vehicle_interest,
+    vehicleYear: lead.vehicle_year,
+    vehicleMake: lead.vehicle_make,
+    vehicleModel: lead.vehicle_model,
+    vehicleVIN: lead.vehicle_vin,
+    status: lead.status,
+    source: lead.source,
+    aiOptIn: lead.ai_opt_in || false,
+    aiStage: lead.ai_stage,
+    nextAiSendAt: lead.next_ai_send_at,
+    createdAt: lead.created_at,
+    salespersonId: lead.salesperson_id,
+    doNotCall: lead.do_not_call,
+    doNotEmail: lead.do_not_email,
+    doNotMail: lead.do_not_mail,
+    phoneNumbers: lead.phone_numbers?.map((phone: any) => ({
+      id: phone.id,
+      number: phone.number,
+      type: phone.type,
+      isPrimary: phone.is_primary,
+      status: phone.status
+    })) || [],
+    conversations: [],
+    activityTimeline: []
+  };
+
   return (
     <div className="space-y-6">
       <LeadDetailHeader 
-        lead={lead} 
+        lead={lead}
         onSendMessage={() => setShowMessageComposer(true)}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Lead Info Cards */}
         <div className="lg:col-span-1 space-y-6">
-          <ContactInfoCard lead={lead} />
-          <VehicleInfoCard lead={lead} />
-          <QuickContactCard lead={lead} />
-          <LeadSummaryCard lead={lead} />
-          <AIAutomationCard lead={lead} />
-          <CommunicationPrefsCard lead={lead} />
+          <ContactInfoCard lead={transformedLead} />
+          <VehicleInfoCard lead={transformedLead} />
+          <QuickContactCard />
+          <LeadSummaryCard lead={transformedLead} />
+          <AIAutomationCard lead={transformedLead} />
+          <CommunicationPrefsCard lead={transformedLead} />
         </div>
 
         {/* Right Column - Messages and Activity */}
@@ -101,7 +139,7 @@ const LeadDetail = () => {
 
             <TabsContent value="messages" className="space-y-6">
               <MessageThread 
-                leadId={lead.id}
+                lead={transformedLead}
                 showComposer={showMessageComposer}
                 onComposerClose={() => setShowMessageComposer(false)}
               />
@@ -112,7 +150,7 @@ const LeadDetail = () => {
             </TabsContent>
 
             <TabsContent value="activity" className="space-y-6">
-              <ActivityTimeline leadId={lead.id} />
+              <ActivityTimeline lead={transformedLead} />
             </TabsContent>
 
             <TabsContent value="profile" className="space-y-6">

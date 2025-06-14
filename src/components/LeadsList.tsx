@@ -148,7 +148,7 @@ const LeadsList = () => {
     }
   };
 
-  const handleBulkMessage = async (message: string) => {
+  const handleBulkMessage = async () => {
     // This would integrate with your messaging system
     toast({
       title: "Bulk message queued",

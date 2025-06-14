@@ -12,7 +12,7 @@ export const emailService = {
       .order('name');
     
     if (error) throw error;
-    return data || [];
+    return (data || []) as EmailTemplate[];
   },
 
   async createEmailTemplate(template: Omit<EmailTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<EmailTemplate> {
@@ -23,7 +23,7 @@ export const emailService = {
       .single();
     
     if (error) throw error;
-    return data;
+    return data as EmailTemplate;
   },
 
   async updateEmailTemplate(id: string, updates: Partial<EmailTemplate>): Promise<EmailTemplate> {
@@ -35,7 +35,7 @@ export const emailService = {
       .single();
     
     if (error) throw error;
-    return data;
+    return data as EmailTemplate;
   },
 
   async deleteEmailTemplate(id: string): Promise<void> {
@@ -55,7 +55,7 @@ export const emailService = {
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data || [];
+    return (data || []) as EmailCampaign[];
   },
 
   async createEmailCampaign(campaign: Omit<EmailCampaign, 'id' | 'created_at' | 'updated_at' | 'total_recipients' | 'total_sent' | 'total_delivered' | 'total_opened' | 'total_clicked' | 'total_bounced'>): Promise<EmailCampaign> {
@@ -66,7 +66,7 @@ export const emailService = {
       .single();
     
     if (error) throw error;
-    return data;
+    return data as EmailCampaign;
   },
 
   // Email Conversations
@@ -78,7 +78,7 @@ export const emailService = {
       .order('sent_at', { ascending: false });
     
     if (error) throw error;
-    return data || [];
+    return (data || []) as EmailConversation[];
   },
 
   async createEmailConversation(conversation: Omit<EmailConversation, 'id' | 'created_at'>): Promise<EmailConversation> {
@@ -89,7 +89,7 @@ export const emailService = {
       .single();
     
     if (error) throw error;
-    return data;
+    return data as EmailConversation;
   },
 
   // Email Settings
@@ -100,7 +100,7 @@ export const emailService = {
       .single();
     
     if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    return data as EmailSettings | null;
   },
 
   async upsertEmailSettings(settings: Omit<EmailSettings, 'id' | 'created_at' | 'updated_at'>): Promise<EmailSettings> {
@@ -111,7 +111,7 @@ export const emailService = {
       .single();
     
     if (error) throw error;
-    return data;
+    return data as EmailSettings;
   },
 
   // Send Email
