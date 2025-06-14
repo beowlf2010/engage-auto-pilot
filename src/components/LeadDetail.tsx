@@ -91,7 +91,9 @@ const LeadDetail = () => {
       number: phone.number,
       type: phone.type,
       isPrimary: phone.is_primary,
-      status: phone.status
+      status: phone.status,
+      priority: phone.priority || 1,
+      lastAttempt: phone.last_attempt
     })) || [],
     conversations: [],
     activityTimeline: []
