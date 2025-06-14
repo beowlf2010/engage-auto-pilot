@@ -81,9 +81,7 @@ export const useAdvancedLeads = () => {
     // Vehicle interest filter
     if (filters.vehicleInterest) {
       filtered = filtered.filter(lead => 
-        lead.vehicleInter
-        
-        est?.toLowerCase().includes(filters.vehicleInterest.toLowerCase())
+        lead.vehicleInterest?.toLowerCase().includes(filters.vehicleInterest.toLowerCase())
       );
     }
 
