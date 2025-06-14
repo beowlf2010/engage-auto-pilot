@@ -6,13 +6,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { PhoneNumber } from '@/types/lead';
 
 export const useLeadDetail = () => {
-  const { id } = useParams<{ id: string }>();
+  const { leadId } = useParams<{ leadId: string }>();
   const [showMessageComposer, setShowMessageComposer] = useState(false);
 
+  console.log('Lead ID from params:', leadId);
+
   const { data: lead, isLoading, error } = useQuery({
-    queryKey: ["lead", id],
+    queryKey: ["lead", leadId],
     queryFn: async () => {
-      if (!id) throw new Error("No lead ID provided");
+      if (!leadId) {
+        console.error('No lead ID provided');
+        throw new Error("No lead ID provided");
+      }
+      
+      console.log('Fetching lead with ID:', leadId);
       
       const { data, error } = await supabase
         .from("leads")
@@ -20,13 +27,18 @@ export const useLeadDetail = () => {
           *,
           phone_numbers (*)
         `)
-        .eq("id", id)
+        .eq("id", leadId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Fetched lead data:', data);
       return data;
     },
-    enabled: !!id,
+    enabled: !!leadId,
   });
 
   // Transform phone numbers for PhoneNumberDisplay component (PhoneNumber interface)
@@ -38,7 +50,6 @@ export const useLeadDetail = () => {
     lastAttempt: phone.last_attempt
   })) || [];
 
-  // Transform phone numbers for LeadDetailData interface
   const leadDetailPhoneNumbers = lead?.phone_numbers?.map((phone: any) => ({
     id: phone.id,
     number: phone.number,
@@ -47,11 +58,9 @@ export const useLeadDetail = () => {
     status: phone.status
   })) || [];
 
-  // Get primary phone number
   const primaryPhone = lead?.phone_numbers?.find((p: any) => p.is_primary)?.number || 
                      lead?.phone_numbers?.[0]?.number || '';
 
-  // Transform the database lead object to match component expectations
   const transformedLead = lead ? {
     id: lead.id,
     firstName: lead.first_name,
@@ -83,7 +92,6 @@ export const useLeadDetail = () => {
     activityTimeline: []
   } : null;
 
-  // Transform for MessageThread component
   const messageThreadLead = lead ? {
     id: lead.id.toString(),
     first_name: lead.first_name,
@@ -95,7 +103,6 @@ export const useLeadDetail = () => {
     ai_opt_in: lead.ai_opt_in || false
   } : null;
 
-  // Phone selection handler
   const handlePhoneSelect = (phoneNumber: string) => {
     console.log('Selected phone:', phoneNumber);
   };
