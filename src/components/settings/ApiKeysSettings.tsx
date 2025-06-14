@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  updateTwilioSettings, 
-  testTwilioConnection, 
+  updateTelnyxSettings, 
+  testTelnyxConnection, 
   validatePhoneNumber, 
   formatPhoneNumber,
   sendTestSMS
@@ -24,39 +24,20 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
   const [testPhoneNumber, setTestPhoneNumber] = useState("");
   const [loadingStates, setLoadingStates] = useState({
     openai: false,
-    twilioSid: false,
-    twilioToken: false,
-    twilioPhone: false
+    telnyxKey: false,
+    telnyxProfile: false
   });
   const [apiKeys, setApiKeys] = useState({
     openaiKey: "sk-1234567890abcdef...",
-    twilioSid: "AC1234567890abcdef...",
-    twilioToken: "1234567890abcdef...",
-    twilioPhone: "+15551234567"
+    telnyxApiKey: "KEY0123456789ABCDEF...",
+    telnyxProfileId: "12345678-1234-1234-1234-123456789012"
   });
   const { toast } = useToast();
 
   const handleApiKeyUpdate = async (settingType: string, value: string, keyType: keyof typeof loadingStates) => {
     setLoadingStates(prev => ({ ...prev, [keyType]: true }));
     try {
-      if (settingType === 'TWILIO_PHONE_NUMBER') {
-        const formattedPhone = formatPhoneNumber(value);
-        if (!validatePhoneNumber(formattedPhone)) {
-          toast({
-            title: "Invalid Phone Number",
-            description: "Please enter a valid US phone number (e.g., +1234567890 or 234-567-8900)",
-            variant: "destructive"
-          });
-          return;
-        }
-        value = formattedPhone;
-      }
-
-      const result = await updateTwilioSettings(settingType, value);
-      
-      if (settingType === 'TWILIO_PHONE_NUMBER') {
-        setApiKeys(prev => ({ ...prev, twilioPhone: value }));
-      }
+      const result = await updateTelnyxSettings(settingType, value);
 
       toast({
         title: "Settings Updated",
@@ -76,7 +57,7 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
   const handleTestConnection = async () => {
     setIsTesting(true);
     try {
-      const result = await testTwilioConnection(apiKeys.twilioSid, apiKeys.twilioToken);
+      const result = await testTelnyxConnection(apiKeys.telnyxApiKey, apiKeys.telnyxProfileId);
       toast({
         title: "Connection Test",
         description: result.message,
@@ -172,44 +153,44 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
             </div>
             
             <div>
-              <Label htmlFor="twilio_sid">Twilio Account SID</Label>
+              <Label htmlFor="telnyx_key">Telnyx API Key</Label>
               <div className="flex space-x-2 mt-1">
                 <Input 
-                  id="twilio_sid"
+                  id="telnyx_key"
                   type="password" 
-                  placeholder="AC..." 
-                  value={apiKeys.twilioSid}
-                  onChange={(e) => setApiKeys(prev => ({ ...prev, twilioSid: e.target.value }))}
+                  placeholder="KEY..." 
+                  value={apiKeys.telnyxApiKey}
+                  onChange={(e) => setApiKeys(prev => ({ ...prev, telnyxApiKey: e.target.value }))}
                   className="flex-1"
                 />
                 <Button 
                   variant="outline"
-                  onClick={() => handleApiKeyUpdate('TWILIO_ACCOUNT_SID', apiKeys.twilioSid, 'twilioSid')}
-                  disabled={loadingStates.twilioSid}
+                  onClick={() => handleApiKeyUpdate('TELNYX_API_KEY', apiKeys.telnyxApiKey, 'telnyxKey')}
+                  disabled={loadingStates.telnyxKey}
                 >
-                  {loadingStates.twilioSid ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                  {loadingStates.telnyxKey ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
                 </Button>
               </div>
+              <p className="text-xs text-slate-500 mt-1">Your Telnyx API v2 key for SMS services</p>
             </div>
             
             <div>
-              <Label htmlFor="twilio_token">Twilio Auth Token</Label>
+              <Label htmlFor="telnyx_profile">Telnyx Messaging Profile ID</Label>
               <div className="flex space-x-2 mt-1">
                 <Input 
-                  id="twilio_token"
-                  type="password" 
-                  placeholder="..." 
-                  value={apiKeys.twilioToken}
-                  onChange={(e) => setApiKeys(prev => ({ ...prev, twilioToken: e.target.value }))}
+                  id="telnyx_profile"
+                  placeholder="12345678-1234-1234-1234-123456789012" 
+                  value={apiKeys.telnyxProfileId}
+                  onChange={(e) => setApiKeys(prev => ({ ...prev, telnyxProfileId: e.target.value }))}
                   className="flex-1"
                 />
                 <div className="flex space-x-2">
                   <Button 
                     variant="outline"
-                    onClick={() => handleApiKeyUpdate('TWILIO_AUTH_TOKEN', apiKeys.twilioToken, 'twilioToken')}
-                    disabled={loadingStates.twilioToken}
+                    onClick={() => handleApiKeyUpdate('TELNYX_MESSAGING_PROFILE_ID', apiKeys.telnyxProfileId, 'telnyxProfile')}
+                    disabled={loadingStates.telnyxProfile}
                   >
-                    {loadingStates.twilioToken ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+                    {loadingStates.telnyxProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
                   </Button>
                   <Button 
                     variant="outline" 
@@ -220,29 +201,7 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
                   </Button>
                 </div>
               </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="twilio_phone">Twilio Phone Number</Label>
-              <div className="flex space-x-2 mt-1">
-                <Input 
-                  id="twilio_phone"
-                  placeholder="+1234567890" 
-                  value={apiKeys.twilioPhone}
-                  onChange={(e) => setApiKeys(prev => ({ ...prev, twilioPhone: e.target.value }))}
-                  className="flex-1"
-                />
-                <Button 
-                  variant="outline"
-                  onClick={() => handleApiKeyUpdate('TWILIO_PHONE_NUMBER', apiKeys.twilioPhone, 'twilioPhone')}
-                  disabled={loadingStates.twilioPhone}
-                >
-                  {loadingStates.twilioPhone ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
-                </Button>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Phone number for outbound SMS (toll-free numbers supported: +1800xxxxxxx)
-              </p>
+              <p className="text-xs text-slate-500 mt-1">Messaging profile ID from your Telnyx account</p>
             </div>
           </div>
         </CardContent>
@@ -273,7 +232,7 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
                 </Button>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Enter your phone number to test if your Twilio configuration is working
+                Enter your phone number to test if your Telnyx configuration is working
               </p>
             </div>
           </div>

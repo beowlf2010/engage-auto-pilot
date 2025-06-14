@@ -7,7 +7,7 @@ export interface SettingsUpdateRequest {
   value: string;
 }
 
-export const updateTwilioSettings = async (settingType: string, value: string) => {
+export const updateTelnyxSettings = async (settingType: string, value: string) => {
   try {
     const { data, error } = await supabase.functions.invoke('update-settings', {
       body: { settingType, value }
@@ -24,24 +24,31 @@ export const updateTwilioSettings = async (settingType: string, value: string) =
   }
 };
 
-export const testTwilioConnection = async (accountSid: string, authToken: string) => {
+export const testTelnyxConnection = async (apiKey: string, messagingProfileId: string) => {
   try {
-    // In a real implementation, this would test the Twilio connection
-    // For now, we'll simulate a test
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Simple validation
-    if (!accountSid.startsWith('AC') || accountSid.length < 30) {
-      throw new Error('Invalid Account SID format');
-    }
-    
-    if (authToken.length < 30) {
-      throw new Error('Invalid Auth Token format');
+    // Test the Telnyx connection by making a simple API call
+    const response = await fetch('https://api.telnyx.com/v2/messaging_profiles', {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.errors?.[0]?.detail || 'Invalid Telnyx credentials');
     }
 
-    return { success: true, message: 'Connection test successful' };
+    const data = await response.json();
+    const profileExists = data.data?.some((profile: any) => profile.id === messagingProfileId);
+    
+    if (!profileExists) {
+      throw new Error('Messaging Profile ID not found in your Telnyx account');
+    }
+
+    return { success: true, message: 'Telnyx connection test successful' };
   } catch (error) {
-    console.error('Error testing Twilio connection:', error);
+    console.error('Error testing Telnyx connection:', error);
     throw error;
   }
 };
