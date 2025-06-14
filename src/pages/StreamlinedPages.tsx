@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import StreamlinedInbox from '@/components/inbox/StreamlinedInbox';
+import UnifiedSmartInbox from '@/components/inbox/UnifiedSmartInbox';
 import { SalesDashboard, ManagerDashboard } from '@/components/StreamlinedDashboards';
 import LeadsList from '@/components/LeadsList';
 import AIMessageMonitor from '@/components/AIMessageMonitor';
@@ -15,9 +14,12 @@ export const SmartInboxPage = () => {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <StreamlinedInbox />
-    </div>
+    <UnifiedSmartInbox 
+      user={{
+        id: profile.id,
+        role: profile.role
+      }}
+    />
   );
 };
 
