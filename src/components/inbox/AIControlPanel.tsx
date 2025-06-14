@@ -96,7 +96,6 @@ const AIControlPanel = ({ selectedLead, conversation }: AIControlPanelProps) => 
             <Switch
               checked={aiEnabled}
               onCheckedChange={handleAiToggle}
-              size="sm"
             />
           </div>
 
@@ -145,15 +144,15 @@ const AIControlPanel = ({ selectedLead, conversation }: AIControlPanelProps) => 
                 <div className="space-y-2 p-2 bg-slate-50 rounded border text-xs">
                   <div className="flex items-center justify-between">
                     <span>Aggressive Mode</span>
-                    <Switch defaultChecked={false} size="sm" />
+                    <Switch defaultChecked={false} />
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Auto-Pause on Reply</span>
-                    <Switch defaultChecked={true} size="sm" />
+                    <Switch defaultChecked={true} />
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Weekend Messages</span>
-                    <Switch defaultChecked={false} size="sm" />
+                    <Switch defaultChecked={false} />
                   </div>
                 </div>
               )}
