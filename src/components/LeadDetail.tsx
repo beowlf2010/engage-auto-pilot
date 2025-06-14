@@ -25,12 +25,14 @@ import { fetchLeadDetail, LeadDetailData } from '@/services/leadDetailService';
 import { formatPhoneForDisplay } from '@/utils/phoneUtils';
 import { Skeleton } from "@/components/ui/skeleton";
 import PhoneNumberDisplay from '@/components/PhoneNumberDisplay';
+import LeadMessaging from './leads/LeadMessaging';
 
 const LeadDetail = () => {
   const { leadId } = useParams<{ leadId: string }>();
   const navigate = useNavigate();
   const [lead, setLead] = useState<LeadDetailData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     const loadLeadDetail = async () => {
@@ -149,7 +151,7 @@ const LeadDetail = () => {
           </div>
         </div>
         <div className="flex space-x-2">
-          <Button>
+          <Button onClick={() => setActiveTab("conversations")}>
             <MessageSquare className="w-4 h-4 mr-2" />
             Send Message
           </Button>
@@ -164,7 +166,7 @@ const LeadDetail = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Main Information */}
         <div className="lg:col-span-2 space-y-6">
-          <Tabs defaultValue="overview" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="conversations">Messages</TabsTrigger>
@@ -283,42 +285,13 @@ const LeadDetail = () => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="conversations" className="space-y-4">
+            <TabsContent value="conversations">
               <Card>
                 <CardHeader>
                   <CardTitle>Message History</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  {lead.conversations.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">No messages yet</p>
-                  ) : (
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {lead.conversations.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                              message.direction === 'out'
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-100 text-gray-900'
-                            }`}
-                          >
-                            <p className="text-sm">{message.body}</p>
-                            <div className="flex items-center justify-between mt-1">
-                              <span className="text-xs opacity-75">
-                                {formatTimestamp(message.sentAt)}
-                              </span>
-                              {message.aiGenerated && (
-                                <Bot className="w-3 h-3 opacity-75" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <CardContent className="p-0">
+                  {leadId && <LeadMessaging leadId={leadId} />}
                 </CardContent>
               </Card>
             </TabsContent>
