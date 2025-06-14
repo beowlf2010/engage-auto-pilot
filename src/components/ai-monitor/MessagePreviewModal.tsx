@@ -65,7 +65,7 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
         .single();
 
       // Get conversation history
-      const { data: conversations } = await supabase
+      const { data: conversationsData } = await supabase
         .from('conversations')
         .select('body, direction, sent_at, ai_generated')
         .eq('lead_id', leadId)
@@ -73,7 +73,15 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
         .limit(5);
 
       if (lead) {
-        const lastIncoming = conversations?.find(c => c.direction === 'in');
+        const lastIncoming = conversationsData?.find(c => c.direction === 'in');
+        
+        // Transform the conversation data to match the expected interface
+        const conversationHistory = conversationsData?.map(conv => ({
+          body: conv.body,
+          direction: conv.direction as 'in' | 'out',
+          sentAt: conv.sent_at,
+          aiGenerated: conv.ai_generated
+        })) || [];
         
         setLeadContext({
           firstName: lead.first_name,
@@ -84,7 +92,7 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
           messagesSent: lead.ai_messages_sent || 0,
           lastResponse: lastIncoming?.body,
           lastResponseTime: lastIncoming?.sent_at,
-          conversationHistory: conversations || []
+          conversationHistory
         });
       }
     } catch (error) {
