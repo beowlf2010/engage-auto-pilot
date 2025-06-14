@@ -6,6 +6,8 @@ import ApiKeyField from "./api-keys/ApiKeyField";
 import TelnyxProfileField from "./api-keys/TelnyxProfileField";
 import TestSMSCard from "./api-keys/TestSMSCard";
 import AccessDeniedView from "./api-keys/AccessDeniedView";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 interface ApiKeysSettingsProps {
   userRole: string;
@@ -83,6 +85,19 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
           </div>
         </CardContent>
       </Card>
+
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Having trouble connecting Telnyx?</AlertTitle>
+        <AlertDescription>
+          <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
+            <li>Ensure your <strong>Telnyx API Key</strong> starts with <code>KEY...</code> and is from a V2 API credential.</li>
+            <li>Your <strong>Telnyx Messaging Profile ID</strong> is a UUID (e.g., <code>123e4567-e89b-12d3-a456-426614174000</code>) found under "Messaging" in your Telnyx dashboard.</li>
+            <li>Use the "Test" button next to the Profile ID to verify your credentials. If it fails, the error message will provide details.</li>
+            <li>Make sure the phone number you are testing with is in E.164 format (e.g., <code>+15551234567</code>).</li>
+          </ul>
+        </AlertDescription>
+      </Alert>
 
       <TestSMSCard
         testPhoneNumber={testPhoneNumber}

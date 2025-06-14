@@ -21,6 +21,31 @@ interface UseApiKeysActionsProps {
   setIsTestingSMS: (value: boolean) => void;
 }
 
+const getErrorMessage = (error: any): string => {
+  if (!error) return "An unknown error occurred.";
+  
+  // For Supabase FunctionsHttpError which has a context object
+  if (error.context && typeof error.context.error === 'string') {
+    return error.context.error;
+  }
+  
+  // For other errors that have a message property
+  if (error.message) {
+    // Sometimes the message is a stringified JSON from the edge function
+    try {
+      const parsed = JSON.parse(error.message);
+      if (parsed.error) return parsed.error;
+      if (parsed.message) return parsed.message;
+      return error.message;
+    } catch (e) {
+      // Not JSON, return as is
+      return error.message;
+    }
+  }
+  
+  return "An unknown error occurred. Please check the browser console for details.";
+};
+
 export const useApiKeysActions = ({
   apiKeys,
   testPhoneNumber,
@@ -37,14 +62,24 @@ export const useApiKeysActions = ({
     
     try {
       const result = await updateTelnyxSettings(settingType, value);
-      toast({
-        title: "Settings Updated",
-        description: result.message || "Settings updated successfully",
-      });
+      if (result && result.success) {
+        toast({
+          title: "Settings Updated",
+          description: result.message || "Settings updated successfully",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: result.error || "An unexpected error occurred while updating settings.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
+      console.error('Error updating API key:', error);
+      const description = getErrorMessage(error);
       toast({
         title: "Update Failed",
-        description: error instanceof Error ? error.message : "Failed to update settings",
+        description: description,
         variant: "destructive"
       });
     } finally {
@@ -94,15 +129,25 @@ export const useApiKeysActions = ({
     setIsTestingSMS(true);
     try {
       const result = await sendTestSMS(formattedPhone);
-      toast({
-        title: "Test SMS Sent!",
-        description: `Test message sent successfully to ${formattedPhone}`,
-      });
-      setTestPhoneNumber("");
+      if (result && result.success) {
+        toast({
+          title: "Test SMS Sent!",
+          description: `Test message sent successfully to ${formattedPhone}`,
+        });
+        setTestPhoneNumber("");
+      } else {
+        toast({
+          title: "Test SMS Failed",
+          description: result.error || "An unexpected error occurred in the SMS function.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
+      console.error('Error sending test SMS:', error);
+      const description = getErrorMessage(error);
       toast({
         title: "Test SMS Failed",
-        description: error instanceof Error ? error.message : "Failed to send test SMS",
+        description: description,
         variant: "destructive"
       });
     } finally {
