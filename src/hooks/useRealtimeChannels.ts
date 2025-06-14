@@ -22,87 +22,121 @@ export const useRealtimeChannels = () => {
   const setupConversationChannel = useCallback((profileId: string, onUpdate: () => void) => {
     cleanupChannel(conversationChannelRef, 'conversation');
 
-    const channelName = `conversation-updates-${profileId}-${Date.now()}`;
-    
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'conversations'
-        },
-        () => {
-          console.log('New conversation inserted, refreshing...');
-          onUpdate();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations'
-        },
-        () => {
-          console.log('Conversation updated, refreshing...');
-          onUpdate();
-        }
-      );
+    try {
+      const channelName = `conversation-updates-${profileId}-${Date.now()}`;
+      
+      const channel = supabase
+        .channel(channelName, {
+          config: {
+            broadcast: { self: false },
+            presence: { key: profileId }
+          }
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'conversations'
+          },
+          (payload) => {
+            console.log('New conversation inserted:', payload);
+            onUpdate();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'conversations'
+          },
+          (payload) => {
+            console.log('Conversation updated:', payload);
+            onUpdate();
+          }
+        );
 
-    channel.subscribe((status) => {
-      console.log('Conversation channel status:', status);
-      if (status === 'SUBSCRIBED') {
-        conversationChannelRef.current = channel;
-      }
-    });
+      channel.subscribe((status, err) => {
+        console.log('Conversation channel status:', status);
+        if (err) {
+          console.error('Conversation channel error:', err);
+        }
+        if (status === 'SUBSCRIBED') {
+          conversationChannelRef.current = channel;
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.log('Conversation channel failed, will retry...');
+          setTimeout(() => {
+            setupConversationChannel(profileId, onUpdate);
+          }, 5000);
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up conversation channel:', error);
+    }
   }, [cleanupChannel]);
 
   const setupMessageChannel = useCallback((leadId: string, onUpdate: (leadId: string) => void) => {
     cleanupChannel(messageChannelRef, 'message');
 
-    const channelName = `messages-${leadId}-${Date.now()}`;
-    
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'conversations',
-          filter: `lead_id=eq.${leadId}`
-        },
-        () => {
-          console.log(`New message for lead ${leadId}, refreshing...`);
-          if (currentLeadIdRef.current === leadId) {
-            onUpdate(leadId);
+    try {
+      const channelName = `messages-${leadId}-${Date.now()}`;
+      
+      const channel = supabase
+        .channel(channelName, {
+          config: {
+            broadcast: { self: false },
+            presence: { key: leadId }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations',
-          filter: `lead_id=eq.${leadId}`
-        },
-        () => {
-          console.log(`Message updated for lead ${leadId}, refreshing...`);
-          if (currentLeadIdRef.current === leadId) {
-            onUpdate(leadId);
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'conversations',
+            filter: `lead_id=eq.${leadId}`
+          },
+          (payload) => {
+            console.log(`New message for lead ${leadId}:`, payload);
+            if (currentLeadIdRef.current === leadId) {
+              onUpdate(leadId);
+            }
           }
-        }
-      );
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'conversations',
+            filter: `lead_id=eq.${leadId}`
+          },
+          (payload) => {
+            console.log(`Message updated for lead ${leadId}:`, payload);
+            if (currentLeadIdRef.current === leadId) {
+              onUpdate(leadId);
+            }
+          }
+        );
 
-    channel.subscribe((status) => {
-      console.log('Message channel status:', status);
-      if (status === 'SUBSCRIBED') {
-        messageChannelRef.current = channel;
-      }
-    });
+      channel.subscribe((status, err) => {
+        console.log('Message channel status:', status);
+        if (err) {
+          console.error('Message channel error:', err);
+        }
+        if (status === 'SUBSCRIBED') {
+          messageChannelRef.current = channel;
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.log('Message channel failed, will retry...');
+          setTimeout(() => {
+            setupMessageChannel(leadId, onUpdate);
+          }, 3000);
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up message channel:', error);
+    }
   }, [cleanupChannel]);
 
   const setCurrentLeadId = useCallback((leadId: string | null) => {

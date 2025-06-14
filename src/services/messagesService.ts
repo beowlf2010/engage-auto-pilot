@@ -38,6 +38,8 @@ export const sendMessage = async (
   isAI: boolean = false
 ) => {
   try {
+    console.log('Starting to send message for lead:', leadId);
+    
     // Validate compliance for pricing content
     const compliance = validateMessageForCompliance(message);
     
@@ -73,6 +75,8 @@ export const sendMessage = async (
       throw new Error('No primary phone number found for this lead');
     }
 
+    console.log('Found phone number:', phoneData.number);
+
     // Store the conversation record first
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
@@ -88,19 +92,25 @@ export const sendMessage = async (
       .single();
 
     if (conversationError) {
+      console.error('Error creating conversation record:', conversationError);
       throw conversationError;
     }
 
-    // Send SMS via Supabase Edge Function
+    console.log('Created conversation record:', conversation.id);
+
+    // Send SMS via Telnyx (using the send-sms function)
     const { data, error } = await supabase.functions.invoke('send-sms', {
       body: {
         to: phoneData.number,
-        message: finalMessage,
+        body: finalMessage,
         conversationId: conversation.id
       }
     });
 
+    console.log('SMS function response:', data, error);
+
     if (error) {
+      console.error('SMS sending error:', error);
       // Update conversation with error status
       await supabase
         .from('conversations')
@@ -113,14 +123,16 @@ export const sendMessage = async (
       throw error;
     }
 
-    // Update conversation with success status and Twilio message ID
+    // Update conversation with success status and message ID
     await supabase
       .from('conversations')
       .update({
         sms_status: 'sent',
-        twilio_message_id: data?.messageSid
+        twilio_message_id: data?.telnyxMessageId || data?.messageSid
       })
       .eq('id', conversation.id);
+
+    console.log('Updated conversation with success status');
 
     // Store memory from outgoing message
     await extractAndStoreMemory(leadId, finalMessage, 'out');
