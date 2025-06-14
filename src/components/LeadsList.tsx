@@ -1,20 +1,42 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Users, MessageSquare, UserCheck, UserX, Plus } from "lucide-react";
-import { useLeads } from '@/hooks/useLeads';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Skeleton } from "@/components/ui/skeleton";
 import LeadsTable from './LeadsTable';
+import LeadQuickView from './leads/LeadQuickView';
+import AdvancedFilters from './leads/AdvancedFilters';
+import BulkActionsPanel from './leads/BulkActionsPanel';
+import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
+import { Lead } from '@/types/lead';
 
 const LeadsList = () => {
-  const { leads, loading, refetch } = useLeads();
+  const {
+    leads,
+    loading,
+    selectedLeads,
+    quickViewLead,
+    savedPresets,
+    filters,
+    setFilters,
+    savePreset,
+    loadPreset,
+    clearFilters,
+    selectAllFiltered,
+    clearSelection,
+    toggleLeadSelection,
+    showQuickView,
+    hideQuickView,
+    refetch,
+    getEngagementScore
+  } = useAdvancedLeads();
+
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -46,29 +68,170 @@ const LeadsList = () => {
     }
   };
 
-  const filteredLeads = useMemo(() => {
-    return leads.filter(lead => {
-      const matchesSearch = searchTerm === '' || 
-        `${lead.firstName} ${lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.primaryPhone?.includes(searchTerm) ||
-        lead.vehicleInterest?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = searchTerm === '' || 
+      `${lead.firstName} ${lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.primaryPhone?.includes(searchTerm) ||
+      lead.vehicleInterest?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  const stats = {
+    total: leads.length,
+    noContact: leads.filter(l => l.contactStatus === 'no_contact').length,
+    contacted: leads.filter(l => l.contactStatus === 'contact_attempted').length,
+    responded: leads.filter(l => l.contactStatus === 'response_received').length,
+    aiEnabled: leads.filter(l => l.aiOptIn).length
+  };
+
+  // Mock salespeople data - in real app, fetch from API
+  const salespeople = [
+    { id: '1', name: 'John Smith' },
+    { id: '2', name: 'Jane Doe' },
+    { id: '3', name: 'Mike Johnson' }
+  ];
+
+  // Bulk action handlers
+  const handleBulkStatusUpdate = async (status: string) => {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ status })
+        .in('id', selectedLeads);
+
+      if (error) throw error;
+
+      toast({
+        title: "Bulk update successful",
+        description: `Updated ${selectedLeads.length} leads to ${status} status`,
+      });
+
+      refetch();
+      clearSelection();
+    } catch (error) {
+      console.error('Error updating leads:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update leads",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkAiToggle = async (enabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ ai_opt_in: enabled })
+        .in('id', selectedLeads);
+
+      if (error) throw error;
+
+      toast({
+        title: "Bulk update successful",
+        description: `${enabled ? 'Enabled' : 'Disabled'} AI for ${selectedLeads.length} leads`,
+      });
+
+      refetch();
+      clearSelection();
+    } catch (error) {
+      console.error('Error updating leads:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update leads",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkMessage = async (message: string) => {
+    // This would integrate with your messaging system
+    toast({
+      title: "Bulk message queued",
+      description: `Message queued for ${selectedLeads.length} leads`,
     });
-  }, [leads, searchTerm, statusFilter]);
+    clearSelection();
+  };
 
-  const stats = useMemo(() => {
-    const total = leads.length;
-    const noContact = leads.filter(l => l.contactStatus === 'no_contact').length;
-    const contacted = leads.filter(l => l.contactStatus === 'contact_attempted').length;
-    const responded = leads.filter(l => l.contactStatus === 'response_received').length;
-    const aiEnabled = leads.filter(l => l.aiOptIn).length;
+  const handleBulkAssign = async (salespersonId: string) => {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ salesperson_id: salespersonId })
+        .in('id', selectedLeads);
 
-    return { total, noContact, contacted, responded, aiEnabled };
-  }, [leads]);
+      if (error) throw error;
+
+      toast({
+        title: "Bulk assignment successful",
+        description: `Assigned ${selectedLeads.length} leads`,
+      });
+
+      refetch();
+      clearSelection();
+    } catch (error) {
+      console.error('Error assigning leads:', error);
+      toast({
+        title: "Error",
+        description: "Failed to assign leads",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkExport = () => {
+    const selectedLeadData = leads.filter(lead => 
+      selectedLeads.includes(lead.id.toString())
+    );
+    
+    const csv = [
+      ['Name', 'Email', 'Phone', 'Status', 'Vehicle Interest', 'Created At'].join(','),
+      ...selectedLeadData.map(lead => [
+        `"${lead.firstName} ${lead.lastName}"`,
+        `"${lead.email || ''}"`,
+        `"${lead.primaryPhone || ''}"`,
+        `"${lead.status}"`,
+        `"${lead.vehicleInterest}"`,
+        `"${lead.createdAt}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `leads-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export successful",
+      description: `Exported ${selectedLeads.length} leads`,
+    });
+  };
+
+  // Quick view handlers
+  const handleMessage = (lead: Lead) => {
+    // Navigate to inbox with lead selected
+    window.location.href = `/inbox?leadId=${lead.id}`;
+  };
+
+  const handleCall = (phoneNumber: string) => {
+    // Trigger phone call - could integrate with softphone
+    window.open(`tel:${phoneNumber}`);
+  };
+
+  const handleSchedule = (lead: Lead) => {
+    // Open scheduling modal or navigate to calendar
+    toast({
+      title: "Schedule appointment",
+      description: `Opening calendar for ${lead.firstName} ${lead.lastName}`,
+    });
+  };
 
   if (loading) {
     return (
@@ -161,6 +324,30 @@ const LeadsList = () => {
         </Card>
       </div>
 
+      {/* Advanced Filters */}
+      <AdvancedFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        onSavePreset={savePreset}
+        savedPresets={savedPresets}
+        onLoadPreset={loadPreset}
+        onClearFilters={clearFilters}
+      />
+
+      {/* Bulk Actions Panel */}
+      {selectedLeads.length > 0 && (
+        <BulkActionsPanel
+          selectedCount={selectedLeads.length}
+          onClose={clearSelection}
+          onBulkStatusUpdate={handleBulkStatusUpdate}
+          onBulkAiToggle={handleBulkAiToggle}
+          onBulkMessage={handleBulkMessage}
+          onBulkAssign={handleBulkAssign}
+          onBulkExport={handleBulkExport}
+          salespeople={salespeople}
+        />
+      )}
+
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -172,6 +359,15 @@ const LeadsList = () => {
             className="pl-10"
           />
         </div>
+        {filteredLeads.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={selectAllFiltered}
+            disabled={selectedLeads.length === filteredLeads.length}
+          >
+            Select All ({filteredLeads.length})
+          </Button>
+        )}
       </div>
 
       {/* Status Filter Tabs */}
@@ -205,9 +401,24 @@ const LeadsList = () => {
             canEdit={canEdit}
             loading={loading}
             searchTerm={searchTerm}
+            selectedLeads={selectedLeads}
+            onLeadSelect={toggleLeadSelection}
+            onQuickView={showQuickView}
+            getEngagementScore={getEngagementScore}
           />
         </TabsContent>
       </Tabs>
+
+      {/* Quick View Modal */}
+      {quickViewLead && (
+        <LeadQuickView
+          lead={quickViewLead}
+          onClose={hideQuickView}
+          onMessage={handleMessage}
+          onCall={handleCall}
+          onSchedule={handleSchedule}
+        />
+      )}
     </div>
   );
 };
