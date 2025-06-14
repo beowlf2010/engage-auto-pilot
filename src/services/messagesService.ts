@@ -54,7 +54,6 @@ export const sendMessage = async (
     const compliance = validateMessageForCompliance(message);
     
     if (!compliance.isCompliant && !isAI) {
-      // For manual messages, warn but don't block
       toast({
         title: "Pricing Compliance Warning",
         description: "This message contains pricing but may be missing disclaimers. Please review.",
@@ -66,7 +65,7 @@ export const sendMessage = async (
     let finalMessage = message;
     if (isAI && compliance.hasPrice && !compliance.hasDisclaimer) {
       finalMessage = await addDisclaimersToMessage(message, {
-        isInventoryRelated: true, // Assume AI messages are often inventory-related
+        isInventoryRelated: true,
         mentionsFinancing: message.toLowerCase().includes('financ'),
         mentionsTradeIn: message.toLowerCase().includes('trade'),
         mentionsLease: message.toLowerCase().includes('lease')
@@ -110,49 +109,85 @@ export const sendMessage = async (
 
     console.log('Created conversation record:', conversation.id);
 
-    // Send SMS via Telnyx (using the send-sms function)
+    // Try to send SMS via Telnyx
     console.log('Calling send-sms function...');
-    const { data, error } = await supabase.functions.invoke('send-sms', {
-      body: {
-        to: phoneData.number,
-        body: finalMessage,
-        conversationId: conversation.id
+    try {
+      const { data, error } = await supabase.functions.invoke('send-sms', {
+        body: {
+          to: phoneData.number,
+          body: finalMessage,
+          conversationId: conversation.id
+        }
+      });
+
+      console.log('SMS function response:', data, error);
+
+      if (error) {
+        console.error('SMS sending error:', error);
+        
+        // Update conversation with error status
+        await supabase
+          .from('conversations')
+          .update({
+            sms_status: 'failed',
+            sms_error: `SMS service error: ${error.message || 'Unknown error'}`
+          })
+          .eq('id', conversation.id);
+        
+        // Show warning but don't throw - message is saved locally
+        toast({
+          title: "Message Saved Locally",
+          description: "SMS sending failed but your message has been saved. Please check your SMS configuration.",
+          variant: "default"
+        });
+        
+        return { success: true, warning: 'SMS sending failed but message saved' };
       }
-    });
 
-    console.log('SMS function response:', data, error);
+      // Update conversation with success status
+      await supabase
+        .from('conversations')
+        .update({
+          sms_status: 'sent',
+          twilio_message_id: data?.telnyxMessageId || data?.messageSid
+        })
+        .eq('id', conversation.id);
 
-    if (error) {
-      console.error('SMS sending error:', error);
+      console.log('Updated conversation with success status');
+
+    } catch (smsError) {
+      console.error('SMS function error:', smsError);
+      
       // Update conversation with error status
       await supabase
         .from('conversations')
         .update({
           sms_status: 'failed',
-          sms_error: error.message
+          sms_error: `SMS function error: ${smsError.message || 'Function call failed'}`
         })
         .eq('id', conversation.id);
       
-      throw error;
+      // Show warning but don't throw - message is saved locally
+      toast({
+        title: "Message Saved Locally",
+        description: "SMS sending failed but your message has been saved. Please check your Telnyx configuration in settings.",
+        variant: "default"
+      });
+      
+      return { success: true, warning: 'SMS sending failed but message saved' };
     }
 
-    // Update conversation with success status and message ID
-    await supabase
-      .from('conversations')
-      .update({
-        sms_status: 'sent',
-        twilio_message_id: data?.telnyxMessageId || data?.messageSid
-      })
-      .eq('id', conversation.id);
-
-    console.log('Updated conversation with success status');
-
     // Store memory from outgoing message
-    await extractAndStoreMemory(leadId, finalMessage, 'out');
+    try {
+      await extractAndStoreMemory(leadId, finalMessage, 'out');
+    } catch (memoryError) {
+      console.error('Memory extraction error:', memoryError);
+      // Don't fail the message for memory errors
+    }
 
     console.log(`Message sent successfully to lead ${leadId}`);
     
-    // Show compliance info if disclaimers were added
+    // Show success message
     if (finalMessage !== message) {
       toast({
         title: "Message Sent with Disclaimers",

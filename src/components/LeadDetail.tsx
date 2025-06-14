@@ -36,8 +36,17 @@ const LeadDetail = () => {
       
       setLoading(true);
       setError(null);
+      
       try {
+        console.log('Loading lead detail for ID:', leadId);
         const leadData = await fetchLeadDetail(leadId);
+        
+        if (!leadData) {
+          setError("Lead not found or failed to load.");
+          return;
+        }
+        
+        console.log('Lead data loaded successfully:', leadData);
         setLead(leadData);
       } catch (err) {
         console.error("Failed to load lead details:", err);
@@ -94,8 +103,9 @@ const LeadDetail = () => {
   if (!lead) {
     return (
       <div className="container mx-auto py-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Lead Not Found</h1>
+        <div className="text-center p-8 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <AlertCircle className="w-12 h-12 mx-auto text-yellow-600 mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Lead Not Found</h1>
           <p className="text-gray-600 mb-4">The requested lead could not be found.</p>
           <Button onClick={() => navigate('/leads')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -109,11 +119,12 @@ const LeadDetail = () => {
   const phoneNumbers: PhoneNumber[] = lead.phoneNumbers.map(phone => ({
     number: phone.number,
     type: phone.type as 'cell' | 'day' | 'eve',
-    priority: 1, // Default priority, could be enhanced later
+    priority: 1,
     status: phone.status as 'active' | 'failed' | 'opted_out'
   }));
 
-  const primaryPhone = phoneNumbers.find(p => p.status === 'active')?.number || '';
+  const primaryPhone = phoneNumbers.find(p => p.status === 'active')?.number || 
+                      phoneNumbers[0]?.number || '';
 
   return (
     <div className="container mx-auto py-6 space-y-6">
