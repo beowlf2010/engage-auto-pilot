@@ -7,6 +7,8 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  console.log('=== UPDATE SETTINGS FUNCTION START ===');
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,28 +20,33 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    console.log('Getting auth header...');
     // Get the user from the request
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.log('❌ No authorization header');
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('Verifying user authentication...');
     // Verify the user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', '')
     )
 
     if (authError || !user) {
-      console.error('Auth error:', authError)
+      console.error('❌ Auth error:', authError)
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    console.log('✓ User authenticated:', user.id);
 
+    console.log('Checking admin role...');
     // Check if user is admin
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -48,7 +55,7 @@ Deno.serve(async (req) => {
       .single()
 
     if (profileError) {
-      console.error('Profile lookup error:', profileError)
+      console.error('❌ Profile lookup error:', profileError)
       return new Response(
         JSON.stringify({ error: 'Failed to verify user role' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -56,14 +63,17 @@ Deno.serve(async (req) => {
     }
 
     if (!profile || profile.role !== 'admin') {
+      console.log('❌ User is not admin. Role:', profile?.role);
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    console.log('✓ Admin check passed.');
 
     const requestBody = await req.json()
     const { settingType, value } = requestBody
+    console.log('📝 Updating setting:', settingType, 'Value length:', value?.length);
 
     if (!settingType || !value) {
       return new Response(
@@ -71,8 +81,6 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log('Updating setting:', settingType, 'for user:', user.id)
 
     // Validate OpenAI API key format
     if (settingType === 'OPENAI_API_KEY') {
@@ -105,25 +113,50 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Store the setting in the database
-    const { error: dbError } = await supabase
+    console.log('🔄 Attempting to update/insert setting...');
+    
+    // First try to update existing record
+    const { data: updateData, error: updateError } = await supabase
       .from('settings')
-      .upsert({
-        key: settingType,
+      .update({
         value: value,
         updated_at: new Date().toISOString(),
         updated_by: user.id
       })
+      .eq('key', settingType)
+      .select()
 
-    if (dbError) {
-      console.error('Database error:', dbError)
+    if (updateError) {
+      console.error('❌ Update error:', updateError);
       return new Response(
-        JSON.stringify({ error: 'Failed to save setting to database' }),
+        JSON.stringify({ error: 'Failed to update setting in database', details: updateError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`Setting ${settingType} saved successfully to database`)
+    // If no rows were updated (setting doesn't exist), insert it
+    if (!updateData || updateData.length === 0) {
+      console.log('📝 Setting does not exist, inserting new record...');
+      const { error: insertError } = await supabase
+        .from('settings')
+        .insert({
+          key: settingType,
+          value: value,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id
+        })
+
+      if (insertError) {
+        console.error('❌ Insert error:', insertError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to insert setting in database', details: insertError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      console.log('✅ Setting inserted successfully');
+    } else {
+      console.log('✅ Setting updated successfully');
+    }
 
     // Get a user-friendly name for the setting
     const settingNames = {
@@ -133,6 +166,8 @@ Deno.serve(async (req) => {
     }
 
     const friendlyName = settingNames[settingType] || settingType
+
+    console.log('✅ SUCCESS! Setting saved:', friendlyName);
 
     return new Response(
       JSON.stringify({ 
@@ -147,11 +182,17 @@ Deno.serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error updating settings:', error)
+    console.error('💥 CRITICAL ERROR in update-settings function:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
     return new Response(
       JSON.stringify({ 
-        error: 'Internal server error',
-        details: error.message 
+        success: false,
+        error: `Server error: ${error.message}`,
+        type: 'server_error'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
