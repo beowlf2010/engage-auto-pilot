@@ -27,11 +27,13 @@ export const useLeadDetail = () => {
 
   // Transform phone numbers for PhoneNumberDisplay component (PhoneNumber interface)
   const phoneNumbers: PhoneNumber[] = lead?.phoneNumbers?.map((phone: any) => ({
+    id: phone.id,
     number: phone.number,
     type: phone.type as 'cell' | 'day' | 'eve',
-    priority: 1,
+    priority: phone.priority || 1,
     status: phone.status as 'active' | 'failed' | 'opted_out',
-    lastAttempt: undefined
+    isPrimary: phone.isPrimary,
+    lastAttempt: phone.lastAttempt
   })) || [];
 
   const primaryPhone = lead?.phoneNumbers?.find((p: any) => p.isPrimary)?.number || 

@@ -1,14 +1,16 @@
 
 export interface PhoneNumber {
+  id: string;
   number: string;
   type: 'cell' | 'day' | 'eve';
   priority: number;
   status: 'active' | 'failed' | 'opted_out';
+  isPrimary: boolean;
   lastAttempt?: string;
 }
 
 export interface Lead {
-  id: number;
+  id: string; // Changed from number to string to match UUID
   firstName: string;
   lastName: string;
   middleName?: string;
@@ -50,4 +52,8 @@ export interface Lead {
   aiSequencePaused?: boolean;
   aiPauseReason?: string;
   aiResumeAt?: string;
+  // Additional required Lead properties
+  first_name: string;
+  last_name: string;
+  created_at: string;
 }

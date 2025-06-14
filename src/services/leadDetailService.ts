@@ -34,6 +34,8 @@ export interface LeadDetailData {
     type: string;
     isPrimary: boolean;
     status: string;
+    priority: number;
+    lastAttempt?: string;
   }>;
   conversations: Array<{
     id: string;
@@ -157,7 +159,9 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
         number: phone.number,
         type: phone.type,
         isPrimary: phone.is_primary,
-        status: phone.status
+        status: phone.status,
+        priority: phone.priority,
+        lastAttempt: phone.last_attempt
       })) || [],
       conversations: conversations?.map(conv => ({
         id: conv.id,
