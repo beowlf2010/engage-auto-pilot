@@ -114,8 +114,8 @@ class EmailService {
     return data as EmailSettings;
   }
 
-  // Send Email
-  async sendEmail(emailData: SendEmailRequest): Promise<{ success: boolean; messageId?: string }> {
+  // Send Email - using arrow function to preserve 'this' context
+  sendEmail = async (emailData: SendEmailRequest): Promise<{ success: boolean; messageId?: string }> => {
     try {
       // Clean the email address - remove quotes if present
       const cleanEmail = emailData.to.replace(/^"|"$/g, '');
