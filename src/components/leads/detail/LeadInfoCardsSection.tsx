@@ -1,44 +1,46 @@
 
-import React from 'react';
-import ContactInfoCard from './ContactInfoCard';
-import VehicleInfoCard from './VehicleInfoCard';
-import QuickContactCard from './QuickContactCard';
-import LeadSummaryCard from './LeadSummaryCard';
-import AIAutomationCard from './AIAutomationCard';
-import CommunicationPrefsCard from './CommunicationPrefsCard';
-import { LeadDetailData } from '@/services/leadDetailService';
-import { PhoneNumber } from '@/types/lead';
+import React from "react";
+import LeadSummaryCard from "./LeadSummaryCard";
+import ContactInfoCard from "./ContactInfoCard";
+import VehicleInfoCard from "./VehicleInfoCard";
+import EnhancedPhoneManager from "./EnhancedPhoneManager";
+import EnhancedAIControls from "./EnhancedAIControls";
+import CommunicationPrefsCard from "./CommunicationPrefsCard";
+import type { LeadDetailData } from "@/services/leadDetailService";
 
 interface LeadInfoCardsSectionProps {
-  transformedLead: LeadDetailData;
-  phoneNumbers: PhoneNumber[];
-  primaryPhone: string;
-  onPhoneSelect: (phoneNumber: string) => void;
+  lead: LeadDetailData;
+  phoneNumbers: any[];
+  onPhoneSelect: (phone: any) => void;
 }
 
-const LeadInfoCardsSection = ({ 
-  transformedLead, 
-  phoneNumbers, 
-  primaryPhone, 
-  onPhoneSelect 
-}: LeadInfoCardsSectionProps) => {
+const LeadInfoCardsSection: React.FC<LeadInfoCardsSectionProps> = ({
+  lead,
+  phoneNumbers,
+  onPhoneSelect
+}) => {
+  const handleAIOptInChange = async (enabled: boolean): Promise<void> => {
+    console.log("AI opt-in changed:", enabled);
+    // Implementation would update the lead's AI opt-in status
+  };
+
   return (
-    <div className="lg:col-span-1 space-y-6">
-      <ContactInfoCard 
-        lead={transformedLead}
+    <div className="space-y-6">
+      <LeadSummaryCard lead={lead} />
+      <ContactInfoCard lead={lead} />
+      <EnhancedPhoneManager 
         phoneNumbers={phoneNumbers}
-        primaryPhone={primaryPhone}
         onPhoneSelect={onPhoneSelect}
       />
-      <VehicleInfoCard lead={transformedLead} />
-      <QuickContactCard 
-        phoneNumbers={phoneNumbers}
-        primaryPhone={primaryPhone}
-        onPhoneSelect={onPhoneSelect}
+      <VehicleInfoCard lead={lead} />
+      <EnhancedAIControls
+        leadId={lead.id}
+        aiOptIn={lead.aiOptIn}
+        aiStage={lead.aiStage}
+        nextAiSendAt={lead.nextAiSendAt}
+        onAIOptInChange={handleAIOptInChange}
       />
-      <LeadSummaryCard lead={transformedLead} />
-      <AIAutomationCard lead={transformedLead} />
-      <CommunicationPrefsCard lead={transformedLead} />
+      <CommunicationPrefsCard lead={lead} />
     </div>
   );
 };

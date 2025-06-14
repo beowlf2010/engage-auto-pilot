@@ -11,8 +11,8 @@ import { toast } from '@/hooks/use-toast';
 import { Skeleton } from "@/components/ui/skeleton";
 import LeadsTable from './LeadsTable';
 import LeadQuickView from './leads/LeadQuickView';
-import AdvancedFilters from './leads/AdvancedFilters';
 import BulkActionsPanel from './leads/BulkActionsPanel';
+import EnhancedLeadSearch from './leads/EnhancedLeadSearch';
 import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
 import { Lead } from '@/types/lead';
 
@@ -38,7 +38,6 @@ const LeadsList = () => {
   } = useAdvancedLeads();
 
   const { profile } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
   const canEdit = profile?.role === 'manager' || profile?.role === 'admin';
@@ -68,16 +67,9 @@ const LeadsList = () => {
     }
   };
 
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = searchTerm === '' || 
-      `${lead.firstName} ${lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.primaryPhone?.includes(searchTerm) ||
-      lead.vehicleInterest?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+  // Apply status filter to the filtered leads from search
+  const finalFilteredLeads = leads.filter(lead => {
+    return statusFilter === 'all' || lead.status === statusFilter;
   });
 
   const stats = {
@@ -87,13 +79,6 @@ const LeadsList = () => {
     responded: leads.filter(l => l.contactStatus === 'response_received').length,
     aiEnabled: leads.filter(l => l.aiOptIn).length
   };
-
-  // Mock salespeople data - in real app, fetch from API
-  const salespeople = [
-    { id: '1', name: 'John Smith' },
-    { id: '2', name: 'Jane Doe' },
-    { id: '3', name: 'Mike Johnson' }
-  ];
 
   // Transform selected leads for BulkActionsPanel
   const selectedLeadObjects = leads.filter(lead => 
@@ -161,7 +146,6 @@ const LeadsList = () => {
   };
 
   const handleBulkMessage = async () => {
-    // This would integrate with your messaging system
     toast({
       title: "Bulk message queued",
       description: `Message queued for ${selectedLeads.length} leads`,
@@ -252,19 +236,15 @@ const LeadsList = () => {
     }
   };
 
-  // Quick view handlers
   const handleMessage = (lead: Lead) => {
-    // Navigate to inbox with lead selected
     window.location.href = `/inbox?leadId=${lead.id}`;
   };
 
   const handleCall = (phoneNumber: string) => {
-    // Trigger phone call - could integrate with softphone
     window.open(`tel:${phoneNumber}`);
   };
 
   const handleSchedule = (lead: Lead) => {
-    // Open scheduling modal or navigate to calendar
     toast({
       title: "Schedule appointment",
       description: `Opening calendar for ${lead.firstName} ${lead.lastName}`,
@@ -362,14 +342,14 @@ const LeadsList = () => {
         </Card>
       </div>
 
-      {/* Advanced Filters */}
-      <AdvancedFilters
-        filters={filters}
+      {/* Enhanced Search & Filters */}
+      <EnhancedLeadSearch
         onFiltersChange={setFilters}
-        onSavePreset={savePreset}
         savedPresets={savedPresets}
+        onSavePreset={savePreset}
         onLoadPreset={loadPreset}
-        onClearFilters={clearFilters}
+        totalResults={finalFilteredLeads.length}
+        isLoading={loading}
       />
 
       {/* Bulk Actions Panel */}
@@ -382,28 +362,6 @@ const LeadsList = () => {
           onBulkMessage={handleBulkMessage}
         />
       )}
-
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search leads by name, email, phone, or vehicle interest..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        {filteredLeads.length > 0 && (
-          <Button
-            variant="outline"
-            onClick={selectAllFiltered}
-            disabled={selectedLeads.length === filteredLeads.length}
-          >
-            Select All ({filteredLeads.length})
-          </Button>
-        )}
-      </div>
 
       {/* Status Filter Tabs */}
       <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
@@ -420,22 +378,26 @@ const LeadsList = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <Badge variant="outline">
-                {filteredLeads.length} lead{filteredLeads.length !== 1 ? 's' : ''}
+                {finalFilteredLeads.length} lead{finalFilteredLeads.length !== 1 ? 's' : ''}
               </Badge>
-              {searchTerm && (
-                <Badge variant="secondary">
-                  Filtered by: "{searchTerm}"
-                </Badge>
-              )}
             </div>
+            {finalFilteredLeads.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={selectAllFiltered}
+                disabled={selectedLeads.length === finalFilteredLeads.length}
+              >
+                Select All ({finalFilteredLeads.length})
+              </Button>
+            )}
           </div>
 
           <LeadsTable
-            leads={filteredLeads}
+            leads={finalFilteredLeads}
             onAiOptInChange={handleAiOptInChange}
             canEdit={canEdit}
             loading={loading}
-            searchTerm={searchTerm}
+            searchTerm={filters.searchTerm}
             selectedLeads={selectedLeads}
             onLeadSelect={toggleLeadSelection}
             onQuickView={showQuickView}
