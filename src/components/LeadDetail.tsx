@@ -59,13 +59,22 @@ const LeadDetail = () => {
     );
   }
 
-  // Transform phone numbers to match PhoneNumber interface
+  // Transform phone numbers for PhoneNumberDisplay component (PhoneNumber interface)
   const phoneNumbers = lead.phone_numbers?.map((phone: any) => ({
     number: phone.number,
     type: phone.type as 'cell' | 'day' | 'eve',
     priority: phone.priority || 1,
     status: phone.status as 'active' | 'failed' | 'opted_out',
     lastAttempt: phone.last_attempt
+  })) || [];
+
+  // Transform phone numbers for LeadDetailData interface
+  const leadDetailPhoneNumbers = lead.phone_numbers?.map((phone: any) => ({
+    id: phone.id,
+    number: phone.number,
+    type: phone.type,
+    isPrimary: phone.is_primary,
+    status: phone.status
   })) || [];
 
   // Get primary phone number
@@ -99,7 +108,7 @@ const LeadDetail = () => {
     doNotCall: lead.do_not_call,
     doNotEmail: lead.do_not_email,
     doNotMail: lead.do_not_mail,
-    phoneNumbers: phoneNumbers,
+    phoneNumbers: leadDetailPhoneNumbers,
     conversations: [],
     activityTimeline: []
   };
