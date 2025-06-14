@@ -40,6 +40,19 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
     // Implementation will be handled by parent component
   };
 
+  // Transform lead for header component
+  const headerLead = {
+    id: lead.id,
+    first_name: lead.firstName,
+    last_name: lead.lastName,
+    email: lead.email,
+    status: lead.status,
+    vehicle_interest: lead.vehicleInterest,
+    city: lead.city,
+    state: lead.state,
+    created_at: lead.createdAt
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -74,10 +87,11 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
           {/* Left Column - Lead Info */}
           <div className="lg:col-span-1">
             <div className="space-y-6">
-              <LeadDetailHeader lead={lead} />
+              <LeadDetailHeader lead={headerLead} />
               <LeadInfoCardsSection 
                 lead={lead} 
                 phoneNumbers={phoneNumbers}
+                primaryPhone={primaryPhone}
                 onPhoneSelect={onPhoneSelect}
               />
             </div>
@@ -112,7 +126,7 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
 
               <TabsContent value="email" className="space-y-0">
                 <div className="h-[600px]">
-                  <EmailTab leadId={lead.id} leadName={`${lead.firstName} ${lead.lastName}`} />
+                  <EmailTab leadId={lead.id} />
                 </div>
               </TabsContent>
             </Tabs>

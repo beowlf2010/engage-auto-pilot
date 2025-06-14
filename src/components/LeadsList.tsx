@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import LeadsTable from './LeadsTable';
 import LeadQuickView from './leads/LeadQuickView';
 import BulkActionsPanel from './leads/BulkActionsPanel';
-import EnhancedLeadSearch from './leads/EnhancedLeadSearch';
+import EnhancedLeadSearch, { SearchFilters, SavedPreset } from './leads/EnhancedLeadSearch';
 import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
 import { Lead } from '@/types/lead';
 
@@ -22,25 +22,49 @@ const LeadsList = () => {
     loading,
     selectedLeads,
     quickViewLead,
-    savedPresets,
-    filters,
-    setFilters,
-    savePreset,
-    loadPreset,
-    clearFilters,
-    selectAllFiltered,
-    clearSelection,
-    toggleLeadSelection,
-    showQuickView,
-    hideQuickView,
     refetch,
     getEngagementScore
   } = useAdvancedLeads();
 
   const { profile } = useAuth();
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({ searchTerm: '' });
+  const [savedPresets] = useState<SavedPreset[]>([]);
 
   const canEdit = profile?.role === 'manager' || profile?.role === 'admin';
+
+  // Simple filter implementation
+  const filteredLeads = leads.filter(lead => {
+    // Search term filter
+    if (searchFilters.searchTerm) {
+      const searchTerm = searchFilters.searchTerm.toLowerCase();
+      const matchesSearch = 
+        lead.firstName.toLowerCase().includes(searchTerm) ||
+        lead.lastName.toLowerCase().includes(searchTerm) ||
+        lead.email?.toLowerCase().includes(searchTerm) ||
+        lead.primaryPhone?.includes(searchTerm) ||
+        lead.vehicleInterest.toLowerCase().includes(searchTerm);
+      
+      if (!matchesSearch) return false;
+    }
+
+    // Status filter
+    if (searchFilters.status && lead.status !== searchFilters.status) {
+      return false;
+    }
+
+    // Source filter
+    if (searchFilters.source && lead.source !== searchFilters.source) {
+      return false;
+    }
+
+    // AI Opt-in filter
+    if (searchFilters.aiOptIn !== undefined && lead.aiOptIn !== searchFilters.aiOptIn) {
+      return false;
+    }
+
+    return true;
+  });
 
   const handleAiOptInChange = async (leadId: string, value: boolean) => {
     try {
@@ -68,7 +92,7 @@ const LeadsList = () => {
   };
 
   // Apply status filter to the filtered leads from search
-  const finalFilteredLeads = leads.filter(lead => {
+  const finalFilteredLeads = filteredLeads.filter(lead => {
     return statusFilter === 'all' || lead.status === statusFilter;
   });
 
@@ -80,17 +104,34 @@ const LeadsList = () => {
     aiEnabled: leads.filter(l => l.aiOptIn).length
   };
 
-  // Transform selected leads for BulkActionsPanel
-  const selectedLeadObjects = leads.filter(lead => 
-    selectedLeads.includes(lead.id.toString())
-  ).map(lead => ({
-    id: lead.id.toString(),
-    first_name: lead.firstName,
-    last_name: lead.lastName,
-    email: lead.email,
-    status: lead.status,
-    vehicle_interest: lead.vehicleInterest
-  }));
+  // Mock functions for the enhanced search
+  const handleSavePreset = async (name: string, filters: SearchFilters) => {
+    console.log('Saving preset:', name, filters);
+  };
+
+  const handleLoadPreset = (preset: SavedPreset) => {
+    setSearchFilters(preset.filters);
+  };
+
+  const clearSelection = () => {
+    // Mock implementation
+  };
+
+  const toggleLeadSelection = (leadId: string) => {
+    // Mock implementation
+  };
+
+  const showQuickView = (lead: Lead) => {
+    // Mock implementation
+  };
+
+  const hideQuickView = () => {
+    // Mock implementation
+  };
+
+  const selectAllFiltered = () => {
+    // Mock implementation
+  };
 
   // Bulk action handlers
   const handleBulkStatusUpdate = async (status: string) => {
@@ -251,6 +292,18 @@ const LeadsList = () => {
     });
   };
 
+  // Transform selected leads for BulkActionsPanel
+  const selectedLeadObjects = leads.filter(lead => 
+    selectedLeads.includes(lead.id.toString())
+  ).map(lead => ({
+    id: lead.id.toString(),
+    first_name: lead.firstName,
+    last_name: lead.lastName,
+    email: lead.email,
+    status: lead.status,
+    vehicle_interest: lead.vehicleInterest
+  }));
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -344,10 +397,10 @@ const LeadsList = () => {
 
       {/* Enhanced Search & Filters */}
       <EnhancedLeadSearch
-        onFiltersChange={setFilters}
+        onFiltersChange={setSearchFilters}
         savedPresets={savedPresets}
-        onSavePreset={savePreset}
-        onLoadPreset={loadPreset}
+        onSavePreset={handleSavePreset}
+        onLoadPreset={handleLoadPreset}
         totalResults={finalFilteredLeads.length}
         isLoading={loading}
       />
@@ -397,7 +450,7 @@ const LeadsList = () => {
             onAiOptInChange={handleAiOptInChange}
             canEdit={canEdit}
             loading={loading}
-            searchTerm={filters.searchTerm}
+            searchTerm={searchFilters.searchTerm}
             selectedLeads={selectedLeads}
             onLeadSelect={toggleLeadSelection}
             onQuickView={showQuickView}

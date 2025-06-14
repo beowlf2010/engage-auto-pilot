@@ -42,12 +42,14 @@ export interface LeadDetailData {
     sentAt: string;
     aiGenerated: boolean;
     smsStatus?: string;
+    leadId: string; // Added missing leadId property
   }>;
   activityTimeline: Array<{
     id: string;
     type: string;
     description: string;
     timestamp: string;
+    metadata?: Record<string, any>;
   }>;
 }
 
@@ -163,7 +165,8 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
         direction: conv.direction as 'in' | 'out',
         sentAt: conv.sent_at,
         aiGenerated: conv.ai_generated || false,
-        smsStatus: conv.sms_status
+        smsStatus: conv.sms_status,
+        leadId: conv.lead_id // Added leadId to match MessageData interface
       })) || [],
       activityTimeline
     };

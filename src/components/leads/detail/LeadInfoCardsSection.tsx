@@ -7,16 +7,19 @@ import EnhancedPhoneManager from "./EnhancedPhoneManager";
 import EnhancedAIControls from "./EnhancedAIControls";
 import CommunicationPrefsCard from "./CommunicationPrefsCard";
 import type { LeadDetailData } from "@/services/leadDetailService";
+import type { PhoneNumber } from "@/types/lead";
 
 interface LeadInfoCardsSectionProps {
   lead: LeadDetailData;
-  phoneNumbers: any[];
+  phoneNumbers: PhoneNumber[];
+  primaryPhone: string;
   onPhoneSelect: (phone: any) => void;
 }
 
 const LeadInfoCardsSection: React.FC<LeadInfoCardsSectionProps> = ({
   lead,
   phoneNumbers,
+  primaryPhone,
   onPhoneSelect
 }) => {
   const handleAIOptInChange = async (enabled: boolean): Promise<void> => {
@@ -27,7 +30,12 @@ const LeadInfoCardsSection: React.FC<LeadInfoCardsSectionProps> = ({
   return (
     <div className="space-y-6">
       <LeadSummaryCard lead={lead} />
-      <ContactInfoCard lead={lead} />
+      <ContactInfoCard 
+        lead={lead}
+        phoneNumbers={phoneNumbers}
+        primaryPhone={primaryPhone}
+        onPhoneSelect={onPhoneSelect}
+      />
       <EnhancedPhoneManager 
         phoneNumbers={phoneNumbers}
         onPhoneSelect={onPhoneSelect}
