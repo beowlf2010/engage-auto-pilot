@@ -54,15 +54,16 @@ serve(async (req) => {
       throw new Error('Missing Telnyx API credentials')
     }
 
-    // Compose the Telnyx API request
-    const telnyxUrl = "https://api.telnyx.com/v2/messages"
+    // Compose the Telnyx API request - don't include 'from' field if we want to use profile default
     const payload = {
       to,
-      from: null, // Allow profile default
       text: body,
       messaging_profile_id: messagingProfileId
     }
 
+    console.log('Sending SMS with payload:', JSON.stringify(payload))
+
+    const telnyxUrl = "https://api.telnyx.com/v2/messages"
     const response = await fetch(telnyxUrl, {
       method: 'POST',
       headers: {
@@ -73,6 +74,8 @@ serve(async (req) => {
     })
 
     const result = await response.json()
+    console.log('Telnyx API response:', JSON.stringify(result))
+    
     if (!response.ok) {
       console.error('Telnyx API error:', result)
       return new Response(
