@@ -33,6 +33,7 @@ Deno.serve(async (req) => {
     )
 
     if (authError || !user) {
+      console.error('Auth error:', authError)
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -40,11 +41,19 @@ Deno.serve(async (req) => {
     }
 
     // Check if user is admin
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
+
+    if (profileError) {
+      console.error('Profile lookup error:', profileError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to verify user role' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     if (!profile || profile.role !== 'admin') {
       return new Response(
@@ -53,7 +62,17 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { settingType, value } = await req.json()
+    const requestBody = await req.json()
+    const { settingType, value } = requestBody
+
+    if (!settingType || !value) {
+      return new Response(
+        JSON.stringify({ error: 'Missing settingType or value' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('Updating setting:', settingType, 'for user:', user.id)
 
     // Validate OpenAI API key format
     if (settingType === 'OPENAI_API_KEY') {
@@ -98,7 +117,10 @@ Deno.serve(async (req) => {
 
     if (dbError) {
       console.error('Database error:', dbError)
-      throw new Error('Failed to save setting')
+      return new Response(
+        JSON.stringify({ error: 'Failed to save setting to database' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     console.log(`Setting ${settingType} saved successfully to database`)
@@ -127,7 +149,10 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error updating settings:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ 
+        error: 'Internal server error',
+        details: error.message 
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
