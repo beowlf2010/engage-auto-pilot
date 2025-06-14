@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { fetchConversations } from '@/services/conversationsService';
@@ -30,17 +31,6 @@ export const useRealtimeInbox = () => {
 
   // Use the new email notifications hook
   useInboxNotifications();
-
-  // Request notification permission on mount
-  useEffect(() => {
-    const requestPermission = async () => {
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        notificationPermission.current = permission;
-      }
-    };
-    requestPermission();
-  }, []);
 
   const loadConversations = useCallback(async (retryCount = 0) => {
     if (!profile) return;
