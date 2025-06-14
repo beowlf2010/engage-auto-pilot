@@ -22,6 +22,11 @@ interface EmailComposerProps {
   vehicleInterest?: string;
 }
 
+// Helper function to clean quotes from strings
+const cleanQuotes = (str: string = '') => {
+  return str.replace(/^["']|["']$/g, '');
+};
+
 const EmailComposer = ({ 
   open, 
   onOpenChange, 
@@ -31,7 +36,13 @@ const EmailComposer = ({
   leadLastName = '',
   vehicleInterest = ''
 }: EmailComposerProps) => {
-  const [to, setTo] = useState(leadEmail || '');
+  // Clean the props of any quotes
+  const cleanEmail = cleanQuotes(leadEmail || '');
+  const cleanFirstName = cleanQuotes(leadFirstName);
+  const cleanLastName = cleanQuotes(leadLastName);
+  const cleanVehicleInterest = cleanQuotes(vehicleInterest);
+
+  const [to, setTo] = useState(cleanEmail);
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('none');
@@ -51,9 +62,9 @@ const EmailComposer = ({
     const template = templates.find(t => t.id === templateId);
     if (template) {
       const variables = {
-        lead_first_name: leadFirstName,
-        lead_last_name: leadLastName,
-        vehicle_interest: vehicleInterest,
+        lead_first_name: cleanFirstName,
+        lead_last_name: cleanLastName,
+        vehicle_interest: cleanVehicleInterest,
         salesperson_name: 'Your Sales Representative'
       };
       
@@ -75,7 +86,7 @@ const EmailComposer = ({
 
     try {
       await sendEmailMutation.mutateAsync({
-        to,
+        to: cleanQuotes(to), // Clean quotes from the email address before sending
         subject,
         html: content,
         leadId,
@@ -109,9 +120,9 @@ const EmailComposer = ({
           {showAIGenerator && (
             <AIEmailGenerator
               leadId={leadId}
-              leadFirstName={leadFirstName}
-              leadLastName={leadLastName}
-              vehicleInterest={vehicleInterest}
+              leadFirstName={cleanFirstName}
+              leadLastName={cleanLastName}
+              vehicleInterest={cleanVehicleInterest}
               onEmailGenerated={handleAIEmailGenerated}
               onClose={() => setShowAIGenerator(false)}
             />
