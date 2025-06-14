@@ -19,7 +19,8 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  PhoneCall
+  PhoneCall,
+  AlertCircle
 } from "lucide-react";
 import { fetchLeadDetail, LeadDetailData } from '@/services/leadDetailService';
 import { formatPhoneForDisplay } from '@/utils/phoneUtils';
@@ -32,16 +33,28 @@ const LeadDetail = () => {
   const navigate = useNavigate();
   const [lead, setLead] = useState<LeadDetailData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     const loadLeadDetail = async () => {
-      if (!leadId) return;
+      if (!leadId) {
+        setLoading(false);
+        setError("No lead ID provided.");
+        return;
+      }
       
       setLoading(true);
-      const leadData = await fetchLeadDetail(leadId);
-      setLead(leadData);
-      setLoading(false);
+      setError(null);
+      try {
+        const leadData = await fetchLeadDetail(leadId);
+        setLead(leadData);
+      } catch (err) {
+        console.error("Failed to load lead details:", err);
+        setError("An unexpected error occurred while fetching lead details.");
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadLeadDetail();
@@ -96,6 +109,22 @@ const LeadDetail = () => {
             <Skeleton className="h-32 w-full" />
             <Skeleton className="h-48 w-full" />
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="text-center p-8 bg-red-50 border border-red-200 rounded-lg">
+          <AlertCircle className="w-12 h-12 mx-auto text-destructive mb-4" />
+          <h1 className="text-2xl font-bold text-destructive mb-2">Error Loading Lead</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => navigate('/leads')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Leads
+          </Button>
         </div>
       </div>
     );
