@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Loader2, MessageSquare } from 'lucide-react';
+import { Send, Loader2, MessageSquare, AlertTriangle } from 'lucide-react';
 import MessageBubble from '@/components/inbox/MessageBubble';
 import { useConversationData } from '@/hooks/useConversationData';
 
@@ -11,7 +10,7 @@ interface LeadMessagingProps {
 }
 
 const LeadMessaging = ({ leadId }: LeadMessagingProps) => {
-  const { messages, loading, loadMessages, sendMessage, setMessages } = useConversationData();
+  const { messages, messagesLoading, messagesError, loadMessages, sendMessage, setMessages } = useConversationData();
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -52,8 +51,19 @@ const LeadMessaging = ({ leadId }: LeadMessagingProps) => {
     }
   };
 
-  if (loading && messages.length === 0) {
+  if (messagesLoading) {
     return <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin text-slate-500" /></div>;
+  }
+
+  if (messagesError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48 text-center p-4">
+        <AlertTriangle className="h-8 w-8 mb-2 text-destructive" />
+        <p className="font-semibold text-destructive">Failed to load messages</p>
+        <p className="text-sm text-slate-500 mt-1">There was a problem retrieving the conversation history.</p>
+        <p className="text-xs text-slate-400 mt-2 break-all">Details: {messagesError}</p>
+      </div>
+    );
   }
 
   return (

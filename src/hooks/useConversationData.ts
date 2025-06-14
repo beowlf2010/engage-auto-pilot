@@ -9,6 +9,8 @@ export const useConversationData = () => {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const { profile } = useAuth();
 
   const loadConversations = useCallback(async () => {
@@ -30,6 +32,8 @@ export const useConversationData = () => {
   }, [profile]);
 
   const loadMessages = useCallback(async (leadId: string) => {
+    setMessagesLoading(true);
+    setMessagesError(null);
     try {
       console.log('Loading messages for lead:', leadId);
       const messagesData = await fetchMessages(leadId);
@@ -37,6 +41,9 @@ export const useConversationData = () => {
       console.log('Loaded messages:', messagesData.length);
     } catch (error) {
       console.error('Error loading messages:', error);
+      setMessagesError(error instanceof Error ? error.message : "An unexpected error occurred.");
+    } finally {
+      setMessagesLoading(false);
     }
   }, []);
 
@@ -66,6 +73,8 @@ export const useConversationData = () => {
     conversations,
     messages,
     loading,
+    messagesLoading,
+    messagesError,
     setMessages,
     loadConversations,
     loadMessages,
