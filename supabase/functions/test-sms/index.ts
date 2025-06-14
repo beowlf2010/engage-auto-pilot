@@ -9,32 +9,59 @@ const corsHeaders = {
 
 // Utility to get Telnyx API credentials
 async function getTelnyxSecrets() {
-  const apiKey = Deno.env.get('TELNYX_API_KEY')
-  const messagingProfileId = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID')
+  console.log('🔍 Checking environment variables first...');
+  const envApiKey = Deno.env.get('TELNYX_API_KEY')
+  const envProfileId = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID')
+  
+  console.log('🔍 Environment check:', {
+    hasEnvApiKey: !!envApiKey,
+    hasEnvProfileId: !!envProfileId,
+    envApiKeyStart: envApiKey ? envApiKey.substring(0, 6) + '...' : 'none',
+    envProfileId: envProfileId || 'none'
+  });
 
-  if (!apiKey || !messagingProfileId) {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    const { data: settings } = await supabase
-      .from('settings')
-      .select('key, value')
-      .in('key', ['TELNYX_API_KEY', 'TELNYX_MESSAGING_PROFILE_ID'])
-
-    const settingsMap = {}
-    settings?.forEach(setting => {
-      settingsMap[setting.key] = setting.value
-    })
-
-    return {
-      apiKey: apiKey || settingsMap['TELNYX_API_KEY'],
-      messagingProfileId: messagingProfileId || settingsMap['TELNYX_MESSAGING_PROFILE_ID']
-    }
+  if (envApiKey && envProfileId) {
+    console.log('✅ Using environment variables');
+    return { apiKey: envApiKey, messagingProfileId: envProfileId }
   }
 
-  return { apiKey, messagingProfileId }
+  console.log('📊 Environment variables not found, checking database...');
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
+
+  const { data: settings, error } = await supabase
+    .from('settings')
+    .select('key, value')
+    .in('key', ['TELNYX_API_KEY', 'TELNYX_MESSAGING_PROFILE_ID'])
+
+  if (error) {
+    console.error('❌ Database error:', error);
+    return { apiKey: null, messagingProfileId: null }
+  }
+
+  console.log('📊 Retrieved settings from database:', settings?.map(s => ({ key: s.key, hasValue: !!s.value })));
+
+  const settingsMap = {}
+  settings?.forEach(setting => {
+    settingsMap[setting.key] = setting.value
+  })
+
+  const dbApiKey = settingsMap['TELNYX_API_KEY']
+  const dbProfileId = settingsMap['TELNYX_MESSAGING_PROFILE_ID']
+
+  console.log('📊 Database settings parsed:', {
+    hasDbApiKey: !!dbApiKey,
+    hasDbProfileId: !!dbProfileId,
+    dbApiKeyStart: dbApiKey ? dbApiKey.substring(0, 6) + '...' : 'none',
+    dbProfileId: dbProfileId || 'none'
+  });
+
+  return {
+    apiKey: dbApiKey,
+    messagingProfileId: dbProfileId
+  }
 }
 
 serve(async (req) => {
@@ -49,10 +76,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('Performing auth check...');
+    console.log('🔐 Performing auth check...');
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      console.log('ERROR: No authorization header');
+      console.log('❌ No authorization header');
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -64,15 +91,15 @@ serve(async (req) => {
     )
 
     if (authError || !user) {
-      console.error('Auth check failed:', authError);
+      console.error('❌ Auth check failed:', authError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log('✓ Auth check passed for user:', user.id);
+    console.log('✅ Auth check passed for user:', user.id);
 
-    console.log('Performing admin check...');
+    console.log('👑 Performing admin check...');
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -80,13 +107,13 @@ serve(async (req) => {
       .single()
 
     if (!profile || profile.role !== 'admin') {
-      console.error('Admin check failed for user:', user.id, 'Role:', profile?.role);
+      console.error('❌ Admin check failed for user:', user.id, 'Role:', profile?.role);
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log('✓ Admin check passed.');
+    console.log('✅ Admin check passed');
 
     const { testPhoneNumber } = await req.json()
     console.log('📱 Test phone number received:', testPhoneNumber);
@@ -114,13 +141,14 @@ serve(async (req) => {
           error: 'Missing Telnyx credentials. Please configure your API key and messaging profile ID first.',
           details: {
             hasApiKey: !!apiKey,
-            hasProfile: !!messagingProfileId
+            hasProfile: !!messagingProfileId,
+            debugInfo: `API Key: ${apiKey ? 'present' : 'missing'}, Profile: ${messagingProfileId ? 'present' : 'missing'}`
           }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log('✓ Telnyx credentials found - API Key:', apiKey.substring(0, 6) + '...', 'Profile:', messagingProfileId);
+    console.log('✅ Telnyx credentials found - API Key:', apiKey.substring(0, 6) + '...', 'Profile:', messagingProfileId);
 
     // Send test SMS
     const telnyxUrl = "https://api.telnyx.com/v2/messages"
@@ -134,7 +162,8 @@ serve(async (req) => {
       url: telnyxUrl,
       to: testPhoneNumber,
       profileId: messagingProfileId,
-      messageLength: payload.text.length
+      messageLength: payload.text.length,
+      apiKeyStart: apiKey.substring(0, 6) + '...'
     });
 
     const response = await fetch(telnyxUrl, {
@@ -147,8 +176,6 @@ serve(async (req) => {
     })
 
     console.log('📡 Telnyx API response status:', response.status);
-    console.log('📡 Telnyx API response headers:', Object.fromEntries(response.headers.entries()));
-
     const result = await response.json()
     console.log('📡 Telnyx API full response:', JSON.stringify(result, null, 2));
 
@@ -156,12 +183,19 @@ serve(async (req) => {
       console.error('❌ Telnyx API error details:', {
         status: response.status,
         statusText: response.statusText,
-        result: result
+        result: result,
+        usedApiKey: apiKey.substring(0, 6) + '...',
+        usedProfileId: messagingProfileId
       });
       
       let errorMessage = 'Failed to send test SMS';
       if (result.errors && result.errors.length > 0) {
         errorMessage = result.errors[0].detail || result.errors[0].title || errorMessage;
+        
+        // Add specific help for common errors
+        if (result.errors[0].code === '10015') {
+          errorMessage += '. Please verify your Messaging Profile ID in your Telnyx dashboard under Messaging > Messaging Profiles.';
+        }
       } else if (result.message) {
         errorMessage = result.message;
       }
@@ -171,7 +205,8 @@ serve(async (req) => {
           success: false, 
           error: errorMessage,
           telnyxError: result,
-          statusCode: response.status
+          statusCode: response.status,
+          debugInfo: `Using Profile ID: ${messagingProfileId}`
         }),
         { 
           status: 400, 
