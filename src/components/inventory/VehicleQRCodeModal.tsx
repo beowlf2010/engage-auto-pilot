@@ -1,8 +1,7 @@
-
 import React, { useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { QRCode } from "qrcode.react";
+import QRCode from "qrcode.react";
 
 interface VehicleQRCodeModalProps {
   open: boolean;
