@@ -184,15 +184,15 @@ const Dashboard = ({ user }: DashboardProps) => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800">
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-1">
             Welcome back, {user.firstName}!
           </h1>
-          <p className="text-slate-600 mt-1">
-            Here's what's happening with your leads today
+          <p className="text-slate-600 text-lg">
+            Here&#39;s what&#39;s happening with your leads today
           </p>
         </div>
         <div className="flex items-center space-x-2 mt-4 md:mt-0">
@@ -204,64 +204,64 @@ const Dashboard = ({ user }: DashboardProps) => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover:shadow-lg transition-shadow duration-200">
+        <Card className="hover:shadow-2xl shadow-lg border-2 border-slate-100 transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-base font-semibold text-slate-700">
               Total Leads
             </CardTitle>
-            <Users className="h-4 w-4 text-blue-600" />
+            <Users className="h-5 w-5 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-800">{stats.totalLeads}</div>
-            <p className="text-xs text-blue-600 flex items-center">
+            <div className="text-3xl font-bold text-slate-900">{stats.totalLeads}</div>
+            <p className="text-xs text-blue-600 flex items-center mt-1">
               <MessageSquare className="w-3 h-3 mr-1" />
               {stats.unreadMessages} unread messages
             </p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow duration-200">
+        <Card className="hover:shadow-2xl shadow-lg border-2 border-slate-100 transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-base font-semibold text-slate-700">
               Active Conversations
             </CardTitle>
-            <MessageSquare className="h-4 w-4 text-green-600" />
+            <MessageSquare className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-800">{stats.activeConversations}</div>
-            <p className="text-xs text-blue-600 flex items-center">
+            <div className="text-3xl font-bold text-slate-900">{stats.activeConversations}</div>
+            <p className="text-xs text-blue-600 flex items-center mt-1">
               <Clock className="w-3 h-3 mr-1" />
               Avg response: {stats.avgResponseTime}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow duration-200">
+        <Card className="hover:shadow-2xl shadow-lg border-2 border-slate-100 transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-base font-semibold text-slate-700">
               AI Opt-in Rate
             </CardTitle>
-            <Target className="h-4 w-4 text-purple-600" />
+            <Target className="h-5 w-5 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-800">{stats.aiResponseRate}%</div>
+            <div className="text-3xl font-bold text-slate-900">{stats.aiResponseRate}%</div>
             <Progress value={stats.aiResponseRate} className="mt-2" />
             <p className="text-xs text-slate-500 mt-1">{stats.aiOptInCount} leads opted in</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow duration-200">
+        <Card className="hover:shadow-2xl shadow-lg border-2 border-slate-100 transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-base font-semibold text-slate-700">
               Monthly Revenue
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
+            <DollarSign className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-800">
+            <div className="text-3xl font-bold text-slate-900">
               ${stats.monthlyRevenue.toLocaleString()}
             </div>
-            <p className="text-xs text-green-600 flex items-center">
+            <p className="text-xs text-green-600 flex items-center mt-1">
               <TrendingUp className="w-3 h-3 mr-1" />
               +8.5% from last month
             </p>
@@ -271,11 +271,11 @@ const Dashboard = ({ user }: DashboardProps) => {
 
       {/* Inventory Management Section for Managers/Admins */}
       {["manager", "admin"].includes(user.role) && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-800">Inventory Management</h2>
+            <h2 className="text-2xl font-bold text-slate-900">Inventory Management</h2>
             <Link to="/inventory-dashboard">
-              <Button variant="outline" className="flex items-center space-x-2">
+              <Button variant="outline" className="flex items-center space-x-2 font-semibold px-4 py-2 rounded-lg shadow-sm">
                 <Eye className="w-4 h-4" />
                 <span>View Full Dashboard</span>
               </Button>
@@ -285,24 +285,24 @@ const Dashboard = ({ user }: DashboardProps) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {inventoryStats && (
               <>
-                <Card className="hover:shadow-lg transition-shadow duration-200">
+                <Card className="hover:shadow-xl shadow border-2 border-slate-100">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-600">
+                    <CardTitle className="text-base font-semibold text-slate-700">
                       Total Inventory
                     </CardTitle>
-                    <Package className="h-4 w-4 text-blue-600" />
+                    <Package className="h-5 w-5 text-blue-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-slate-800">{inventoryStats.totalVehicles}</div>
-                    <Link to="/inventory-dashboard" className="text-xs text-blue-600 hover:underline">
+                    <div className="text-2xl font-bold text-slate-900">{inventoryStats.totalVehicles}</div>
+                    <Link to="/inventory-dashboard" className="text-xs text-blue-600 hover:underline font-medium">
                       View details →
                     </Link>
                   </CardContent>
                 </Card>
 
-                <Card className="hover:shadow-lg transition-shadow duration-200">
+                <Card className="hover:shadow-xl shadow border-2 border-slate-100">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-600">
+                    <CardTitle className="text-base font-semibold text-slate-700">
                       Available
                     </CardTitle>
                     <div className="w-4 h-4 bg-green-500 rounded-full"></div>
@@ -313,16 +313,16 @@ const Dashboard = ({ user }: DashboardProps) => {
                   </CardContent>
                 </Card>
 
-                <Card className="hover:shadow-lg transition-shadow duration-200">
+                <Card className="hover:shadow-xl shadow border-2 border-slate-100">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-600">
+                    <CardTitle className="text-base font-semibold text-slate-700">
                       Sold This Month
                     </CardTitle>
-                    <TrendingUp className="h-4 w-4 text-blue-600" />
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-slate-800">{inventoryStats.soldVehicles}</div>
-                    <Link to="/rpo-insights" className="text-xs text-blue-600 hover:underline">
+                    <div className="text-2xl font-bold text-slate-900">{inventoryStats.soldVehicles}</div>
+                    <Link to="/rpo-insights" className="text-xs text-blue-600 hover:underline font-medium">
                       View analytics →
                     </Link>
                   </CardContent>
@@ -333,14 +333,14 @@ const Dashboard = ({ user }: DashboardProps) => {
 
           {/* Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="p-4">
+            <Card className="p-4 hover:shadow-lg border-2 border-slate-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-slate-800">Upload Inventory</h3>
+                  <h3 className="font-bold text-slate-800">Upload Inventory</h3>
                   <p className="text-sm text-slate-600">Import new vehicle data</p>
                 </div>
                 <Link to="/upload-inventory-report">
-                  <Button size="sm" className="flex items-center space-x-2">
+                  <Button size="sm" className="flex items-center space-x-2 font-semibold rounded-lg shadow-sm">
                     <Car className="w-4 h-4" />
                     <span>Upload</span>
                   </Button>
@@ -348,14 +348,14 @@ const Dashboard = ({ user }: DashboardProps) => {
               </div>
             </Card>
 
-            <Card className="p-4">
+            <Card className="p-4 hover:shadow-lg border-2 border-slate-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-slate-800">RPO Insights</h3>
+                  <h3 className="font-bold text-slate-800">RPO Insights</h3>
                   <p className="text-sm text-slate-600">Analyze options performance</p>
                 </div>
                 <Link to="/rpo-insights">
-                  <Button variant="outline" size="sm" className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" className="flex items-center space-x-2 font-semibold rounded-lg shadow-sm">
                     <BarChart3 className="w-4 h-4" />
                     <span>View</span>
                   </Button>
@@ -369,9 +369,9 @@ const Dashboard = ({ user }: DashboardProps) => {
       {/* AI Performance & Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* AI Performance */}
-        <Card>
+        <Card className="hover:shadow-lg border-2 border-slate-100">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center space-x-2 text-lg font-bold text-slate-900">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span>AI Performance</span>
             </CardTitle>
@@ -379,30 +379,30 @@ const Dashboard = ({ user }: DashboardProps) => {
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-slate-600">Opt-in Rate</span>
-                <span className="font-medium">{stats.aiResponseRate}%</span>
+                <span className="text-slate-700 font-medium">Opt-in Rate</span>
+                <span className="font-semibold text-slate-900">{stats.aiResponseRate}%</span>
               </div>
               <Progress value={stats.aiResponseRate} className="h-2" />
             </div>
             <div className="grid grid-cols-2 gap-4 pt-4">
-              <div className="text-center p-3 bg-blue-50 rounded-lg">
+              <div className="text-center p-3 bg-blue-50 rounded-lg shadow">
                 <Phone className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-                <div className="text-sm font-medium text-slate-800">{stats.aiOptInCount}</div>
-                <div className="text-xs text-slate-500">AI Enabled</div>
+                <div className="text-base font-semibold text-slate-900">{stats.aiOptInCount}</div>
+                <div className="text-xs text-slate-600">AI Enabled</div>
               </div>
-              <div className="text-center p-3 bg-green-50 rounded-lg">
+              <div className="text-center p-3 bg-green-50 rounded-lg shadow">
                 <Mail className="w-5 h-5 text-green-600 mx-auto mb-1" />
-                <div className="text-sm font-medium text-slate-800">{stats.activeConversations}</div>
-                <div className="text-xs text-slate-500">Active Chats</div>
+                <div className="text-base font-semibold text-slate-900">{stats.activeConversations}</div>
+                <div className="text-xs text-slate-600">Active Chats</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Recent Activity */}
-        <Card>
+        <Card className="hover:shadow-lg border-2 border-slate-100">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="text-lg font-bold text-slate-900">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

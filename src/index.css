@@ -94,10 +94,13 @@
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border antialiased;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    font-smooth: always;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
