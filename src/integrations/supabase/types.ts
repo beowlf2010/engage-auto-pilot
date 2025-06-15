@@ -219,6 +219,66 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_settings: {
+        Row: {
+          email_disclaimer: string | null
+          id: string
+          message_window_end: string
+          message_window_start: string
+          policy_links: Json | null
+          sms_disclaimer: string | null
+          updated_at: string
+        }
+        Insert: {
+          email_disclaimer?: string | null
+          id?: string
+          message_window_end?: string
+          message_window_start?: string
+          policy_links?: Json | null
+          sms_disclaimer?: string | null
+          updated_at?: string
+        }
+        Update: {
+          email_disclaimer?: string | null
+          id?: string
+          message_window_end?: string
+          message_window_start?: string
+          policy_links?: Json | null
+          sms_disclaimer?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      compliance_suppression_list: {
+        Row: {
+          contact: string
+          details: string | null
+          id: string
+          lead_id: string | null
+          reason: string | null
+          suppressed_at: string
+          type: string
+        }
+        Insert: {
+          contact: string
+          details?: string | null
+          id?: string
+          lead_id?: string | null
+          reason?: string | null
+          suppressed_at?: string
+          type: string
+        }
+        Update: {
+          contact?: string
+          details?: string | null
+          id?: string
+          lead_id?: string | null
+          reason?: string | null
+          suppressed_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
       conversation_memory: {
         Row: {
           confidence: number | null
@@ -945,6 +1005,78 @@ export type Database = {
           },
         ]
       }
+      lead_consent_audit: {
+        Row: {
+          channel: string
+          event_at: string
+          event_metadata: Json | null
+          event_type: string
+          id: string
+          lead_id: string
+          performed_by: string | null
+        }
+        Insert: {
+          channel: string
+          event_at?: string
+          event_metadata?: Json | null
+          event_type: string
+          id?: string
+          lead_id: string
+          performed_by?: string | null
+        }
+        Update: {
+          channel?: string
+          event_at?: string
+          event_metadata?: Json | null
+          event_type?: string
+          id?: string
+          lead_id?: string
+          performed_by?: string | null
+        }
+        Relationships: []
+      }
+      lead_consent_proof: {
+        Row: {
+          captured_at: string
+          captured_by: string | null
+          consent_channel: string
+          consent_given: boolean
+          consent_method: string
+          consent_text: string | null
+          id: string
+          ip_address: string | null
+          lead_id: string
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          captured_at?: string
+          captured_by?: string | null
+          consent_channel: string
+          consent_given?: boolean
+          consent_method: string
+          consent_text?: string | null
+          id?: string
+          ip_address?: string | null
+          lead_id: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          captured_at?: string
+          captured_by?: string | null
+          consent_channel?: string
+          consent_given?: boolean
+          consent_method?: string
+          consent_text?: string | null
+          id?: string
+          ip_address?: string | null
+          lead_id?: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       lead_inventory_interests: {
         Row: {
           created_at: string
@@ -1150,6 +1282,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      legal_disclosures: {
+        Row: {
+          created_at: string
+          disclosure_type: string
+          display_order: number
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          disclosure_type?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          disclosure_type?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
       }
       message_templates: {
         Row: {
