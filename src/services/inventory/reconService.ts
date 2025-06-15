@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export async function fetchReconServiceLines(inventoryId: string) {
@@ -33,6 +32,39 @@ export async function updateReconServiceLine(lineId: string, updates: Partial<{ 
     .from("recon_service_lines")
     .update(updates)
     .eq("id", lineId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchReconApprovals(serviceLineId: string) {
+  const { data, error } = await supabase
+    .from("recon_approvals")
+    .select("*, profiles: user_id (first_name, last_name)")
+    .eq("service_line_id", serviceLineId);
+  if (error) throw error;
+  return data;
+}
+
+export async function upsertReconApproval({ serviceLineId, userId, status, notes }: {
+  serviceLineId: string;
+  userId: string;
+  status: string;
+  notes?: string;
+}) {
+  // Upsert for unique (service_line_id, user_id)
+  const { data, error } = await supabase
+    .from("recon_approvals")
+    .upsert(
+      [{
+        service_line_id: serviceLineId,
+        user_id: userId,
+        approval_status: status,
+        notes: notes ?? null,
+      }],
+      { onConflict: "service_line_id, user_id" }
+    )
     .select()
     .single();
   if (error) throw error;
