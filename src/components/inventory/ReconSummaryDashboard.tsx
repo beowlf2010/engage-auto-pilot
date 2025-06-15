@@ -78,6 +78,14 @@ const ReconSummaryDashboard = () => {
     return user ? `${user.first_name} ${user.last_name}` : userId;
   };
 
+  // Clear all filters helper
+  const handleClearFilters = () => {
+    setStatusFilter("");
+    setAssignedUserFilter("");
+    setVehicleFilter("");
+    setSearchTerm("");
+  };
+
   // Filtering logic
   const filteredLines = (lines || []).filter((line: any) => {
     let pass = true;
@@ -154,6 +162,7 @@ const ReconSummaryDashboard = () => {
             setSearchTerm={setSearchTerm}
             users={users}
             statusOptions={statusOptions}
+            onClearFilters={handleClearFilters}
           />
         </CardContent>
       </Card>

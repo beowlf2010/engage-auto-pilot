@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -19,6 +18,7 @@ interface FilterPanelProps {
   setSearchTerm: (v: string) => void;
   users: User[] | undefined;
   statusOptions: Array<{ value: string; label: string }>;
+  onClearFilters?: () => void;
 }
 
 const statusColor = (status: string) => {
@@ -47,8 +47,9 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
   setSearchTerm,
   users,
   statusOptions,
+  onClearFilters,
 }) => (
-  <div className="flex gap-4 flex-wrap">
+  <div className="flex gap-4 flex-wrap items-end">
     <div>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -128,8 +129,19 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
         placeholder="Description or vehicle"
       />
     </div>
+    {onClearFilters && (
+      <div>
+        <button
+          className="border border-slate-300 rounded px-4 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium shadow-sm transition disabled:opacity-50"
+          style={{ minWidth: 100 }}
+          type="button"
+          onClick={onClearFilters}
+        >
+          Clear Filters
+        </button>
+      </div>
+    )}
   </div>
 );
 
 export default FiltersPanel;
-
