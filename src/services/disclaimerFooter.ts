@@ -1,8 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 // Retrieves active disclaimer by channel (sms or email)
-// @ts-expect-error table disclaimer_templates may not be present in generated types
 export async function fetchDisclaimerFooter(channel: "sms" | "email"): Promise<string> {
   try {
     // @ts-expect-error see above: disclaimer_templates is new

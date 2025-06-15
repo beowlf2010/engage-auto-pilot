@@ -1,8 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 // Returns {start, end, timezone}
-// @ts-expect-error types may be missing newly created DB tables
 export async function getBusinessHours() {
   // fallback default
   let result: any = { start: "08:00", end: "19:00", timezone: "America/New_York" };
