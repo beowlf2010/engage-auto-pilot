@@ -153,6 +153,21 @@ const InventoryDashboard = () => {
     }
   });
 
+  // Compute data quality stats (inside InventoryDashboard, before return)
+  const completenessStats = (() => {
+    if (!Array.isArray(inventory)) return { total: 0, complete: 0, incomplete: 0 };
+    let complete = 0, incomplete = 0;
+    inventory.forEach(v => {
+      if ((v.data_completeness ?? 0) >= 80) complete++;
+      else incomplete++;
+    });
+    return {
+      total: inventory.length,
+      complete,
+      incomplete,
+    };
+  })();
+
   const toggleSort = (sortBy: string) => {
     if (filters.sortBy === sortBy) {
       setFilters({
@@ -266,6 +281,52 @@ const InventoryDashboard = () => {
             value={filters.rpoCode || ''}
             onChange={(e) => setFilters({...filters, rpoCode: e.target.value})}
           />
+        </div>
+      </Card>
+
+      {/* Summary Stat Card with Quick Filters */}
+      <Card className="p-5 flex items-center justify-between mb-4 border-2 border-blue-100 bg-blue-50/70">
+        <div className="flex gap-6 items-center flex-wrap">
+          <div>
+            <span className="font-bold text-2xl text-blue-900">
+              {completenessStats.total}
+            </span>
+            <span className="ml-2 text-slate-700 font-medium">vehicles</span>
+          </div>
+          <div>
+            <span className="font-bold text-green-700 text-lg">{completenessStats.complete}</span>
+            <span className="ml-1 text-slate-600 text-sm">complete</span>
+          </div>
+          <div>
+            <span className="font-bold text-red-700 text-lg">{completenessStats.incomplete}</span>
+            <span className="ml-1 text-slate-600 text-sm">incomplete</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            className={`rounded-full ${filters.dataQuality === "all" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"}`}
+            variant="ghost"
+            onClick={() => setFilters({ ...filters, dataQuality: "all" })}
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            className={`rounded-full ${filters.dataQuality === "complete" ? "bg-green-600 text-white" : "bg-green-100 text-green-700"}`}
+            variant="ghost"
+            onClick={() => setFilters({ ...filters, dataQuality: "complete" })}
+          >
+            Complete
+          </Button>
+          <Button
+            size="sm"
+            className={`rounded-full ${filters.dataQuality === "incomplete" ? "bg-red-600 text-white" : "bg-red-100 text-red-700"}`}
+            variant="ghost"
+            onClick={() => setFilters({ ...filters, dataQuality: "incomplete" })}
+          >
+            Incomplete
+          </Button>
         </div>
       </Card>
 
