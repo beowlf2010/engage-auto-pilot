@@ -203,34 +203,30 @@ const InventoryDashboard = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-8">
-      {/* HERO Section */}
-      <section className="w-full flex flex-col items-center justify-center py-16">
-        <div className="max-w-3xl text-center mb-12">
-          <h1 className="font-display text-5xl sm:text-6xl mb-6 font-black leading-tight">
-            <span className="bg-gradient-to-r from-accent2 to-accent text-transparent bg-clip-text">
-              Unlock Your Dealership’s Full Potential
-            </span>
-          </h1>
-          <p className="text-xl text-white/80 mb-8 font-medium">
-            All your inventory, leads & financials, in one beautiful dashboard. Elevate your workflow with AI-powered insights & automation.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="cta-btn shadow-xl" onClick={() => alert('Add Vehicle Flow Coming Soon!')}>Add New Vehicle</button>
-            <button className="cta-btn-outline" onClick={() => alert('Schedule Demo Coming Soon!')}>Schedule Demo</button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">Inventory Dashboard</h1>
+          <p className="text-slate-600 mt-1">Manage and analyze your vehicle inventory with enhanced new/used breakdown</p>
         </div>
-      </section>
-      {/* Card for intro image/feature */}
-      <div className="glass-card mb-12 mx-auto max-w-lg text-center">
-        <h2 className="font-display text-2xl mb-2 font-bold text-white">Welcome to formaCRM Inventory</h2>
-        <p className="text-md text-white/80 mb-5">Experience modern auto management, complete with data quality stats, fast search, and a clean new interface.</p>
-        <img
-          src="https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=400&q=80"
-          alt="car"
-          className="rounded-xl shadow-xl mx-auto border-2 border-accent2 w-full max-w-xs"
-        />
+        <div className="flex items-center space-x-3">
+          <InventoryCleanupButton />
+          <Link to="/rpo-insights">
+            <Button variant="outline" className="flex items-center space-x-2">
+              <BarChart3 className="w-4 h-4" />
+              <span>RPO Insights</span>
+            </Button>
+          </Link>
+          <Link to="/upload-inventory-report">
+            <Button className="flex items-center space-x-2">
+              <Car className="w-4 h-4" />
+              <span>Upload Inventory</span>
+            </Button>
+          </Link>
+        </div>
       </div>
+
       {/* Enhanced Stats with New/Used Breakdown */}
       <EnhancedInventoryMetrics />
 
