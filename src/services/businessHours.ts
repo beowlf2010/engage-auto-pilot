@@ -2,11 +2,19 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // Returns {start, end, timezone}
+// @ts-expect-error types may be missing newly created DB tables
 export async function getBusinessHours() {
-  const { data, error } = await supabase.from("business_hours").select("*").limit(1);
-  if (error || !data?.[0]) return { start: "08:00", end: "19:00", timezone: "America/New_York" };
-  const row = data[0];
-  return { start: row.weekday_start, end: row.weekday_end, timezone: row.timezone };
+  // fallback default
+  let result: any = { start: "08:00", end: "19:00", timezone: "America/New_York" };
+  try {
+    // @ts-expect-error business_hours may not exist in TS types yet
+    const { data } = await (supabase.from("business_hours") as any).select("*").limit(1);
+    if (data && data.length > 0) {
+      const row = data[0];
+      result = { start: row.weekday_start, end: row.weekday_end, timezone: row.timezone };
+    }
+  } catch {}
+  return result;
 }
 
 // true if we're inside business hours window

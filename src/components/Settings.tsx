@@ -18,6 +18,7 @@ import ApiKeysSettings from "./settings/ApiKeysSettings";
 import EnhancedAISettings from "./settings/EnhancedAISettings";
 import EmailSettings from "./settings/EmailSettings";
 import { ComplianceAuditExport, ComplianceDisclaimers } from "./settings/ComplianceSettings";
+import CommsSettingsPanel from "./settings/CommsSettingsPanel";
 
 interface SettingsProps {
   user: {

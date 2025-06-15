@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+/**
+ * NOTE: disclaimer_templates table is new and types might not be available in supabase types yet.
+ * We cast supabase.from("disclaimer_templates") as any to avoid type errors until regenerated.
+ */
 export default function DisclaimerTemplatesAdmin() {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<any[]>([]);
@@ -14,8 +18,9 @@ export default function DisclaimerTemplatesAdmin() {
 
   useEffect(() => { fetchTemplates(); }, []);
   const fetchTemplates = async () => {
-    const { data } = await supabase.from("disclaimer_templates").select("*").order("channel");
-    setTemplates(data ?? []);
+    // @ts-expect-error workaround until disclaimer_templates is typed
+    const res = await (supabase.from("disclaimer_templates") as any).select("*").order("channel");
+    setTemplates(res.data ?? []);
   };
 
   const onEdit = (tpl: any) => setEditing({ ...tpl });
@@ -24,9 +29,11 @@ export default function DisclaimerTemplatesAdmin() {
   const save = async () => {
     let res;
     if (editing.id) {
-      res = await supabase.from("disclaimer_templates").update(editing).eq("id", editing.id);
+      // @ts-expect-error workaround
+      res = await (supabase.from("disclaimer_templates") as any).update(editing).eq("id", editing.id);
     } else {
-      res = await supabase.from("disclaimer_templates").insert(editing);
+      // @ts-expect-error workaround
+      res = await (supabase.from("disclaimer_templates") as any).insert(editing);
     }
     fetchTemplates();
     toast({ title: "Saved!" });

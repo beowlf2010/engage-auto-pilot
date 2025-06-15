@@ -87,7 +87,7 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-4">
-        <LeadFiltersBar filter={filter} setFilter={setFilter} />
+        <LeadFiltersBar filter={filter} setFilter={(v: string) => setFilter(v as any)} />
         {/* Main Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
