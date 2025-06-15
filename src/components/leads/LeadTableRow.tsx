@@ -1,4 +1,3 @@
-
 import React from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +21,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatPhoneForDisplay } from "@/utils/phoneUtils";
 import { Lead } from "@/types/lead";
+import LeadStatusBadge from "./LeadStatusBadge";
+import LeadContactStatusBadge from "./LeadContactStatusBadge";
+import LeadEngagementScore from "./LeadEngagementScore";
 
 interface LeadTableRowProps {
   lead: Lead;
@@ -124,15 +126,11 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
         <span className="text-sm">{lead.vehicleInterest || 'Not specified'}</span>
       </TableCell>
       <TableCell>
-        <Badge className={getStatusBadge(lead.status)}>
-          {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
-        </Badge>
+        <LeadStatusBadge status={lead.status} />
       </TableCell>
       <TableCell>
         <div className="flex flex-col space-y-1">
-          <Badge className={getContactStatusBadge(lead.contactStatus)}>
-            {formatContactStatus(lead.contactStatus)}
-          </Badge>
+          <LeadContactStatusBadge contactStatus={lead.contactStatus} />
           {lead.unreadCount > 0 && (
             <Badge variant="destructive" className="text-xs">
               {lead.unreadCount} unread
@@ -141,19 +139,7 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
         </div>
       </TableCell>
       <TableCell>
-        <div className="flex items-center gap-2">
-          <span className={`font-bold ${getScoreColor(engagementScore)}`}>
-            {engagementScore}
-          </span>
-          <div className="flex">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Star
-                key={star}
-                className={`h-3 w-3 ${engagementScore >= star * 20 ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-              />
-            ))}
-          </div>
-        </div>
+        <LeadEngagementScore score={engagementScore} />
       </TableCell>
       <TableCell>
         <Switch
