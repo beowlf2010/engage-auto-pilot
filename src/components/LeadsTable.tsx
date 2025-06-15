@@ -34,6 +34,7 @@ import {
 import { formatPhoneForDisplay } from "@/utils/phoneUtils";
 import { Lead } from "@/types/lead";
 import LeadTableRow from "./leads/LeadTableRow";
+import LeadsTableHeader from "./leads/LeadsTableHeader";
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -180,69 +181,15 @@ const LeadsTable = ({
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={selectedLeads.length === leads.length && leads.length > 0}
-                  onCheckedChange={handleSelectAll}
-                />
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort('name')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Name <SortIcon field="name" />
-                </Button>
-              </TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Vehicle Interest</TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort('status')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Status <SortIcon field="status" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort('contactStatus')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Contact <SortIcon field="contactStatus" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort('engagementScore')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Score <SortIcon field="engagementScore" />
-                </Button>
-              </TableHead>
-              <TableHead>Finn AI</TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort('lastMessage')}
-                  className="h-auto p-0 font-medium"
-                >
-                  Last Contact <SortIcon field="lastMessage" />
-                </Button>
-              </TableHead>
-              <TableHead className="w-24">Actions</TableHead>
-            </TableRow>
+            <LeadsTableHeader
+              leadsCount={leads.length}
+              selectedLeadsCount={selectedLeads.length}
+              searchTerm={searchTerm}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              onSelectAll={handleSelectAll}
+            />
           </TableHeader>
           <TableBody>
             {sortedLeads.map((lead) => (
