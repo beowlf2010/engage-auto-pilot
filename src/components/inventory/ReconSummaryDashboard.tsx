@@ -9,7 +9,9 @@ import FiltersPanel from "./ReconSummaryFiltersPanel";
 import ReconItemsTable from "./ReconItemsTable";
 
 // Use the correct Lucide icon import
+// Replace Search with a camera icon from your allowed list if desired (just FYI!)
 import { Search } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ReconLine {
   id: string;
@@ -114,13 +116,27 @@ const ReconSummaryDashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <span>Recon Summary</span>
-          {/* Use a valid icon, e.g. Search, or remove if you don't want an icon */}
-          <Search className="w-6 h-6 text-blue-600" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>Recon Summary</span>
+            </TooltipTrigger>
+            <TooltipContent>This page summarizes all recon service lines and their statuses.</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Search className="w-6 h-6 text-blue-600" />
+            </TooltipTrigger>
+            <TooltipContent>Search or filter recon lines below.</TooltipContent>
+          </Tooltip>
         </h1>
-        <Link to="/inventory-dashboard">
-          <Button variant="secondary">Back to Inventory</Button>
-        </Link>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link to="/inventory-dashboard">
+              <Button variant="secondary">Back to Inventory</Button>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>Go back to the main inventory dashboard.</TooltipContent>
+        </Tooltip>
       </div>
       <Card className="mb-4">
         <CardHeader>

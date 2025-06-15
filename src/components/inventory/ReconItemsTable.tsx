@@ -1,6 +1,6 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ReconLine {
   id: string;
@@ -25,14 +25,70 @@ const ReconItemsTable: React.FC<Props> = ({ lines, isLoading, getAssignedUserNam
     <table className="min-w-full text-sm text-left">
       <thead>
         <tr className="bg-slate-100">
-          <th className="p-2">Description</th>
-          <th className="p-2">Status</th>
-          <th className="p-2">Assigned To</th>
-          <th className="p-2">Cost</th>
-          <th className="p-2">Due Date</th>
-          <th className="p-2">Vehicle</th>
-          <th className="p-2">Approvals</th>
-          <th className="p-2">View</th>
+          <th className="p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>Description</span>
+              </TooltipTrigger>
+              <TooltipContent>Recon work or service to be performed.</TooltipContent>
+            </Tooltip>
+          </th>
+          <th className="p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>Status</span>
+              </TooltipTrigger>
+              <TooltipContent>Current status of this recon line.</TooltipContent>
+            </Tooltip>
+          </th>
+          <th className="p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>Assigned To</span>
+              </TooltipTrigger>
+              <TooltipContent>Who is responsible for this task.</TooltipContent>
+            </Tooltip>
+          </th>
+          <th className="p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>Cost</span>
+              </TooltipTrigger>
+              <TooltipContent>Estimated or actual cost for this service line.</TooltipContent>
+            </Tooltip>
+          </th>
+          <th className="p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>Due Date</span>
+              </TooltipTrigger>
+              <TooltipContent>Deadline for completing this item.</TooltipContent>
+            </Tooltip>
+          </th>
+          <th className="p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>Vehicle</span>
+              </TooltipTrigger>
+              <TooltipContent>Vehicle details relevant to this recon line.</TooltipContent>
+            </Tooltip>
+          </th>
+          <th className="p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>Approvals</span>
+              </TooltipTrigger>
+              <TooltipContent>Approval status and comments from team members.</TooltipContent>
+            </Tooltip>
+          </th>
+          <th className="p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>View</span>
+              </TooltipTrigger>
+              <TooltipContent>Open vehicle detail page.</TooltipContent>
+            </Tooltip>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -116,12 +172,20 @@ const ReconItemsTable: React.FC<Props> = ({ lines, isLoading, getAssignedUserNam
               </td>
               <td className="p-2">
                 {line.inventory && (
-                  <Link
-                    to={`/vehicle-detail/${line.inventory.id}`}
-                    className="text-blue-700 underline hover:text-blue-900"
-                  >
-                    View Vehicle
-                  </Link>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={`/vehicle-detail/${line.inventory.id}`}
+                        className="text-blue-700 underline hover:text-blue-900"
+                        tabIndex={0}
+                        aria-label="View Vehicle Details"
+                        target="_blank" rel="noopener noreferrer"
+                      >
+                        View Vehicle
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent>Go to detailed info for this vehicle.</TooltipContent>
+                  </Tooltip>
                 )}
               </td>
             </tr>

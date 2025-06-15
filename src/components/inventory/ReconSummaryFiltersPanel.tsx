@@ -1,5 +1,5 @@
-
 import React from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface User {
   id: string;
@@ -34,7 +34,12 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
 }) => (
   <div className="flex gap-4 flex-wrap">
     <div>
-      <label className="block text-xs text-slate-500 mb-1">Status</label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="block text-xs text-slate-500 mb-1">Status</label>
+        </TooltipTrigger>
+        <TooltipContent>Filter by the current status of the recon line.</TooltipContent>
+      </Tooltip>
       <select
         className="border rounded px-2 py-1"
         value={statusFilter}
@@ -47,7 +52,12 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
       </select>
     </div>
     <div>
-      <label className="block text-xs text-slate-500 mb-1">Assigned to</label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="block text-xs text-slate-500 mb-1">Assigned to</label>
+        </TooltipTrigger>
+        <TooltipContent>Show only recon lines assigned to a specific user.</TooltipContent>
+      </Tooltip>
       <select
         className="border rounded px-2 py-1"
         value={assignedUserFilter}
@@ -62,7 +72,12 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
       </select>
     </div>
     <div>
-      <label className="block text-xs text-slate-500 mb-1">Vehicle</label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="block text-xs text-slate-500 mb-1">Vehicle</label>
+        </TooltipTrigger>
+        <TooltipContent>Search by VIN, stock number, make, or model.</TooltipContent>
+      </Tooltip>
       <input
         type="text"
         className="border rounded px-2 py-1"
@@ -72,7 +87,12 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
       />
     </div>
     <div>
-      <label className="block text-xs text-slate-500 mb-1">Keyword</label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="block text-xs text-slate-500 mb-1">Keyword</label>
+        </TooltipTrigger>
+        <TooltipContent>Search for keywords in the description or vehicle info.</TooltipContent>
+      </Tooltip>
       <input
         type="text"
         className="border rounded px-2 py-1"
