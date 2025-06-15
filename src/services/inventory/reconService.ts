@@ -70,3 +70,25 @@ export async function upsertReconApproval({ serviceLineId, userId, status, notes
   if (error) throw error;
   return data;
 }
+
+export async function fetchReconAttachments(serviceLineId: string) {
+  const { data, error } = await supabase
+    .from("recon_attachments")
+    .select("*")
+    .eq("service_line_id", serviceLineId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function addReconAttachment(serviceLineId: string, url: string, uploadedBy?: string) {
+  const { data, error } = await supabase
+    .from("recon_attachments")
+    .insert([
+      { service_line_id: serviceLineId, url, uploaded_by: uploadedBy ?? null }
+    ])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}

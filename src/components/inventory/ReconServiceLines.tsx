@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import useReconApprovals from "@/hooks/useReconApprovals";
 import { addReconServiceLine, upsertReconApproval } from "@/services/inventory/reconService";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "@/hooks/use-toast";
+import ReconServiceLineAttachments from "./ReconServiceLineAttachments";
 
 interface ReconServiceLinesProps {
   inventoryId: string;
@@ -111,6 +111,10 @@ function ReconServiceLineItem({ line, currentUser, onApprove }: {
           <span className="ml-2 text-xs text-slate-600">${line.cost}</span>
         )}
       </div>
+      <ReconServiceLineAttachments
+        serviceLineId={line.id}
+        currentUser={currentUser}
+      />
       {/* Approvals */}
       <div className="flex flex-col gap-1 ml-4 mt-1">
         {approvals && approvals.length > 0 && (
