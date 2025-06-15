@@ -826,6 +826,51 @@ export type Database = {
           },
         ]
       }
+      key_moves: {
+        Row: {
+          action_type: string | null
+          created_at: string
+          id: string
+          inventory_id: string
+          location: string | null
+          moved_by: string | null
+          notes: string | null
+        }
+        Insert: {
+          action_type?: string | null
+          created_at?: string
+          id?: string
+          inventory_id: string
+          location?: string | null
+          moved_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          action_type?: string | null
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          location?: string | null
+          moved_by?: string | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "key_moves_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "key_moves_moved_by_fkey"
+            columns: ["moved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kpis: {
         Row: {
           cars_sold: number | null
@@ -1331,6 +1376,180 @@ export type Database = {
           wholesale_units?: number | null
         }
         Relationships: []
+      }
+      recon_approvals: {
+        Row: {
+          approval_status: string
+          created_at: string
+          id: string
+          notes: string | null
+          service_line_id: string
+          user_id: string
+        }
+        Insert: {
+          approval_status: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          service_line_id: string
+          user_id: string
+        }
+        Update: {
+          approval_status?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          service_line_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recon_approvals_service_line_id_fkey"
+            columns: ["service_line_id"]
+            isOneToOne: false
+            referencedRelation: "recon_service_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recon_approvals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recon_attachments: {
+        Row: {
+          created_at: string
+          id: string
+          service_line_id: string
+          uploaded_by: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          service_line_id: string
+          uploaded_by?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          service_line_id?: string
+          uploaded_by?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recon_attachments_service_line_id_fkey"
+            columns: ["service_line_id"]
+            isOneToOne: false
+            referencedRelation: "recon_service_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recon_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recon_logs: {
+        Row: {
+          action_detail: string | null
+          action_type: string
+          created_at: string
+          id: string
+          inventory_id: string
+          performed_by: string | null
+        }
+        Insert: {
+          action_detail?: string | null
+          action_type: string
+          created_at?: string
+          id?: string
+          inventory_id: string
+          performed_by?: string | null
+        }
+        Update: {
+          action_detail?: string | null
+          action_type?: string
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          performed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recon_logs_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recon_logs_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recon_service_lines: {
+        Row: {
+          assigned_to: string | null
+          cost: number | null
+          created_at: string
+          description: string
+          due_date: string | null
+          id: string
+          inventory_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          cost?: number | null
+          created_at?: string
+          description: string
+          due_date?: string | null
+          id?: string
+          inventory_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          cost?: number | null
+          created_at?: string
+          description?: string
+          due_date?: string | null
+          id?: string
+          inventory_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recon_service_lines_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recon_service_lines_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
