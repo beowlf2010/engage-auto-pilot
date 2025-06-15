@@ -95,40 +95,42 @@ const VehicleKeyMoveLogModal: React.FC<Props> = ({ open, onOpenChange, vehicle, 
           {step === "user" ? (
             <div>
               <div>Please scan your User QR code below:</div>
-              <QrReader
-                constraints={{ facingMode: "environment" }}
-                onResult={(result, error) => {
-                  if (userScanDone) return;
-                  if (result?.getText()) {
-                    setUserId(result.getText());
-                    setStep("vehicle");
-                    setUserScanDone(true);
-                  }
-                  if (error && error.name !== "NotFoundException") {
-                    toast({ title: "Camera error", description: error.message, variant: "destructive" });
-                  }
-                }}
-                style={{ width: "100%" }}
-              />
+              <div className="w-full">
+                <QrReader
+                  constraints={{ facingMode: "environment" }}
+                  onResult={(result, error) => {
+                    if (userScanDone) return;
+                    if (result?.getText()) {
+                      setUserId(result.getText());
+                      setStep("vehicle");
+                      setUserScanDone(true);
+                    }
+                    if (error && error.name !== "NotFoundException") {
+                      toast({ title: "Camera error", description: error.message, variant: "destructive" });
+                    }
+                  }}
+                />
+              </div>
               <Button className="w-full mt-2" variant="outline" onClick={desktopApprove}>Skip Scan (Use My Account)</Button>
             </div>
           ) : step === "vehicle" ? (
             <div>
               <div>Now scan the Vehicle QR code:</div>
-              <QrReader
-                constraints={{ facingMode: "environment" }}
-                onResult={(result, error) => {
-                  if (vehicleScanDone) return;
-                  if (result?.getText()) {
-                    setScannedVehicleId(result.getText());
-                    setVehicleScanDone(true);
-                  }
-                  if (error && error.name !== "NotFoundException") {
-                    toast({ title: "Camera error", description: error.message, variant: "destructive" });
-                  }
-                }}
-                style={{ width: "100%" }}
-              />
+              <div className="w-full">
+                <QrReader
+                  constraints={{ facingMode: "environment" }}
+                  onResult={(result, error) => {
+                    if (vehicleScanDone) return;
+                    if (result?.getText()) {
+                      setScannedVehicleId(result.getText());
+                      setVehicleScanDone(true);
+                    }
+                    if (error && error.name !== "NotFoundException") {
+                      toast({ title: "Camera error", description: error.message, variant: "destructive" });
+                    }
+                  }}
+                />
+              </div>
               <Button
                 disabled={!scannedVehicleId || loading}
                 className="w-full mt-2"
