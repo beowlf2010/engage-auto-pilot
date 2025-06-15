@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -8,19 +7,24 @@ import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 import { formatVehicleTitle, getVehicleDescription, formatPrice, getVehicleStatusDisplay } from "@/services/inventory/vehicleFormattingService";
 import DataCompletenessModal from "./DataCompletenessModal";
+import { QrCode } from "lucide-react";
 
 interface InventoryTableProps {
   inventory: any[] | undefined;
   isLoading: boolean;
   onSort: (sortBy: string) => void;
   openCompletenessModal: (vehicle: any) => void;
+  onQRCode: (vehicle: any) => void;
 }
 
-const InventoryTable: React.FC<InventoryTableProps> = ({
+const InventoryTable: React.FC<InventoryTableProps & {
+  onQRCode: (vehicle: any) => void;
+}> = ({
   inventory,
   isLoading,
   onSort,
   openCompletenessModal,
+  onQRCode,
 }) => {
   return (
     <Table>
@@ -201,6 +205,17 @@ const InventoryTable: React.FC<InventoryTableProps> = ({
                       <span>View</span>
                     </Button>
                   </Link>
+                </TableCell>
+                {/* Insert QR column just before Actions */}
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Print QR Code"
+                    onClick={() => onQRCode(vehicle)}
+                  >
+                    <QrCode className="w-5 h-5" />
+                  </Button>
                 </TableCell>
               </TableRow>
             );

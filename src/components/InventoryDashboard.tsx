@@ -16,6 +16,7 @@ import { formatVehicleTitle, getVehicleDescription, formatPrice, getDataComplete
 import DataCompletenessModal from "./inventory/DataCompletenessModal";
 import SummaryDataQualityCard from "./inventory/SummaryDataQualityCard";
 import InventoryTable from "./inventory/InventoryTable";
+import VehicleQRCodeModal from "./inventory/VehicleQRCodeModal";
 
 interface InventoryFilters {
   make?: string;
@@ -41,6 +42,8 @@ const InventoryDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [completenessModalOpen, setCompletenessModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
+  const [qrModalOpen, setQRModalOpen] = useState(false);
+  const [qrVehicle, setQRVehicle] = useState<any | null>(null);
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory-enhanced', filters, searchTerm],
@@ -179,6 +182,11 @@ const InventoryDashboard = () => {
     setCompletenessModalOpen(true);
   };
 
+  const handleOpenQRCodeModal = (vehicle: any) => {
+    setQRVehicle(vehicle);
+    setQRModalOpen(true);
+  };
+
   const toggleSort = (sortBy: string) => {
     if (filters.sortBy === sortBy) {
       setFilters({
@@ -309,6 +317,7 @@ const InventoryDashboard = () => {
           isLoading={isLoading}
           onSort={toggleSort}
           openCompletenessModal={handleOpenCompletenessModal}
+          onQRCode={handleOpenQRCodeModal}
         />
         {inventory && inventory.length === 0 && (
           <div className="p-8 text-center">
@@ -318,6 +327,12 @@ const InventoryDashboard = () => {
         )}
       </Card>
 
+      {/* Modal for QR Code print */}
+      <VehicleQRCodeModal
+        open={qrModalOpen}
+        onOpenChange={setQRModalOpen}
+        vehicle={qrVehicle}
+      />
       {/* Modal for data completeness */}
       <DataCompletenessModal
         open={completenessModalOpen}
