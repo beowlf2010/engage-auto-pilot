@@ -15,6 +15,8 @@ import BulkActionsPanel from './leads/BulkActionsPanel';
 import EnhancedLeadSearch, { SearchFilters, SavedPreset } from './leads/EnhancedLeadSearch';
 import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
 import { Lead } from '@/types/lead';
+import LeadsStatsCards from './leads/LeadsStatsCards';
+import LeadsStatusTabs from './leads/LeadsStatusTabs';
 
 const LeadsList = () => {
   const {
@@ -343,57 +345,7 @@ const LeadsList = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">No Contact</CardTitle>
-            <UserX className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.noContact}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Contacted</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.contacted}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Responded</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.responded}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Finn AI Enabled</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.aiEnabled}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <LeadsStatsCards stats={stats} />
 
       {/* Enhanced Search & Filters */}
       <EnhancedLeadSearch
@@ -417,47 +369,20 @@ const LeadsList = () => {
       )}
 
       {/* Status Filter Tabs */}
-      <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="new">New</TabsTrigger>
-          <TabsTrigger value="engaged">Engaged</TabsTrigger>
-          <TabsTrigger value="paused">Paused</TabsTrigger>
-          <TabsTrigger value="closed">Closed</TabsTrigger>
-          <TabsTrigger value="lost">Lost</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={statusFilter} className="mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <Badge variant="outline">
-                {finalFilteredLeads.length} lead{finalFilteredLeads.length !== 1 ? 's' : ''}
-              </Badge>
-            </div>
-            {finalFilteredLeads.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={selectAllFiltered}
-                disabled={selectedLeads.length === finalFilteredLeads.length}
-              >
-                Select All ({finalFilteredLeads.length})
-              </Button>
-            )}
-          </div>
-
-          <LeadsTable
-            leads={finalFilteredLeads}
-            onAiOptInChange={handleAiOptInChange}
-            canEdit={canEdit}
-            loading={loading}
-            searchTerm={searchFilters.searchTerm}
-            selectedLeads={selectedLeads}
-            onLeadSelect={toggleLeadSelection}
-            onQuickView={showQuickView}
-            getEngagementScore={getEngagementScore}
-          />
-        </TabsContent>
-      </Tabs>
+      <LeadsStatusTabs
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        finalFilteredLeads={finalFilteredLeads}
+        loading={loading}
+        selectedLeads={selectedLeads}
+        selectAllFiltered={selectAllFiltered}
+        toggleLeadSelection={toggleLeadSelection}
+        handleAiOptInChange={handleAiOptInChange}
+        canEdit={canEdit}
+        searchTerm={searchFilters.searchTerm}
+        onQuickView={showQuickView}
+        getEngagementScore={getEngagementScore}
+      />
 
       {/* Quick View Modal */}
       {quickViewLead && (
