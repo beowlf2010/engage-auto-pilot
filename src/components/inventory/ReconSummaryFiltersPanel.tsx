@@ -19,6 +19,10 @@ interface FilterPanelProps {
   users: User[] | undefined;
   statusOptions: Array<{ value: string; label: string }>;
   onClearFilters?: () => void;
+  dueDateFrom: string;
+  dueDateTo: string;
+  setDueDateFrom: (v: string) => void;
+  setDueDateTo: (v: string) => void;
 }
 
 const statusColor = (status: string) => {
@@ -48,6 +52,10 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
   users,
   statusOptions,
   onClearFilters,
+  dueDateFrom,
+  dueDateTo,
+  setDueDateFrom,
+  setDueDateTo,
 }) => (
   <div className="flex gap-4 flex-wrap items-end">
     <div>
@@ -58,18 +66,13 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
         <TooltipContent>Filter by the current status of the recon line.</TooltipContent>
       </Tooltip>
       <select
-        className="border rounded px-2 py-1 min-w-[120px]"
+        className="border rounded px-2 py-1 min-w-[120px] bg-white z-10"
         value={statusFilter}
         onChange={e => setStatusFilter(e.target.value)}
       >
         <option value="">All</option>
         {statusOptions.map(opt => (
           <option value={opt.value} key={opt.value}>
-            {/* 
-              HTML option element cannot render JSX directly. 
-              So prepend a color dot using unicode colored circles, 
-              or set the color via emoji for a simple, cross-browser effect.
-            */}
             {opt.value === "pending" && "🟡 "}
             {opt.value === "approved" && "🟢 "}
             {opt.value === "declined" && "🔴 "}
@@ -87,7 +90,7 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
         <TooltipContent>Show only recon lines assigned to a specific user.</TooltipContent>
       </Tooltip>
       <select
-        className="border rounded px-2 py-1"
+        className="border rounded px-2 py-1 bg-white z-10"
         value={assignedUserFilter}
         onChange={e => setAssignedUserFilter(e.target.value)}
       >
@@ -112,6 +115,35 @@ const FiltersPanel: React.FC<FilterPanelProps> = ({
         value={vehicleFilter}
         onChange={e => setVehicleFilter(e.target.value)}
         placeholder="VIN, stock number, make, model"
+      />
+    </div>
+    {/* Date Range Filters */}
+    <div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="block text-xs text-slate-500 mb-1">Due Date From</label>
+        </TooltipTrigger>
+        <TooltipContent>Filter by earliest due date.</TooltipContent>
+      </Tooltip>
+      <input
+        type="date"
+        className="border rounded px-2 py-1"
+        value={dueDateFrom}
+        onChange={e => setDueDateFrom(e.target.value)}
+      />
+    </div>
+    <div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="block text-xs text-slate-500 mb-1">Due Date To</label>
+        </TooltipTrigger>
+        <TooltipContent>Filter by latest due date.</TooltipContent>
+      </Tooltip>
+      <input
+        type="date"
+        className="border rounded px-2 py-1"
+        value={dueDateTo}
+        onChange={e => setDueDateTo(e.target.value)}
       />
     </div>
     <div>

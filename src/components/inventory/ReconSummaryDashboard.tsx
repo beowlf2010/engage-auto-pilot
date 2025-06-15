@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,9 +8,6 @@ import { toast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import FiltersPanel from "./ReconSummaryFiltersPanel";
 import ReconItemsTable from "./ReconItemsTable";
-
-// Use the correct Lucide icon import
-// Replace Search with a camera icon from your allowed list if desired (just FYI!)
 import { Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -37,6 +35,11 @@ const ReconSummaryDashboard = () => {
   const [assignedUserFilter, setAssignedUserFilter] = useState("");
   const [vehicleFilter, setVehicleFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  // New: due date range state
+  const [dueDateFrom, setDueDateFrom] = useState<string>("");
+  const [dueDateTo, setDueDateTo] = useState<string>("");
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{ sortBy: string; direction: "asc" | "desc" } | null>(null);
 
   const { data: lines, isLoading } = useQuery({
     queryKey: ["recon_summary_lines"],
@@ -84,6 +87,8 @@ const ReconSummaryDashboard = () => {
     setAssignedUserFilter("");
     setVehicleFilter("");
     setSearchTerm("");
+    setDueDateFrom("");
+    setDueDateTo("");
   };
 
   // Filtering logic
@@ -102,6 +107,17 @@ const ReconSummaryDashboard = () => {
     ) {
       pass = false;
     }
+    // Date range filter on due_date
+    if (dueDateFrom) {
+      if (!line.due_date || new Date(line.due_date) < new Date(dueDateFrom)) {
+        pass = false;
+      }
+    }
+    if (dueDateTo) {
+      if (!line.due_date || new Date(line.due_date) > new Date(dueDateTo)) {
+        pass = false;
+      }
+    }
     if (
       searchTerm &&
       !(
@@ -119,6 +135,35 @@ const ReconSummaryDashboard = () => {
     }
     return pass;
   });
+
+  // Sorting logic
+  const sortedLines = React.useMemo(() => {
+    if (!sortConfig) return filteredLines;
+    const { sortBy, direction } = sortConfig;
+    return [...filteredLines].sort((a, b) => {
+      let aValue: any, bValue: any;
+      switch (sortBy) {
+        case "status": aValue = a.status; bValue = b.status; break;
+        case "assigned_to": aValue = getAssignedUserName(a.assigned_to); bValue = getAssignedUserName(b.assigned_to); break;
+        case "cost": aValue = a.cost ?? 0; bValue = b.cost ?? 0; break;
+        case "due_date": aValue = a.due_date ? new Date(a.due_date).getTime() : 0; bValue = b.due_date ? new Date(b.due_date).getTime() : 0; break;
+        default: aValue = ""; bValue = "";
+      }
+      if (aValue < bValue) return direction === "asc" ? -1 : 1;
+      if (aValue > bValue) return direction === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filteredLines, sortConfig]);
+
+  const handleSort = (sortBy: string) => {
+    setSortConfig(prev => {
+      if (prev && prev.sortBy === sortBy) {
+        // toggle direction
+        return { sortBy, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { sortBy, direction: "asc" };
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -163,18 +208,25 @@ const ReconSummaryDashboard = () => {
             users={users}
             statusOptions={statusOptions}
             onClearFilters={handleClearFilters}
+            // New
+            dueDateFrom={dueDateFrom}
+            dueDateTo={dueDateTo}
+            setDueDateFrom={setDueDateFrom}
+            setDueDateTo={setDueDateTo}
           />
         </CardContent>
       </Card>
       <Card>
         <CardHeader className="flex items-center gap-2">
-          <CardTitle>Recon Items ({filteredLines.length})</CardTitle>
+          <CardTitle>Recon Items ({sortedLines.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <ReconItemsTable
-            lines={filteredLines}
+            lines={sortedLines}
             isLoading={isLoading}
             getAssignedUserName={getAssignedUserName}
+            sortConfig={sortConfig}
+            onSort={handleSort}
           />
         </CardContent>
       </Card>
@@ -184,4 +236,4 @@ const ReconSummaryDashboard = () => {
 
 export default ReconSummaryDashboard;
 
-// --- The file is getting long. Please consider refactoring into smaller components for maintainability!
+// --- This file is getting long. Please consider refactoring into smaller components for maintainability!

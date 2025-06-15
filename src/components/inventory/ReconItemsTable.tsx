@@ -1,6 +1,8 @@
+
 import React from "react";
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowUpDown } from "lucide-react";
 
 interface ReconLine {
   id: string;
@@ -18,9 +20,18 @@ interface Props {
   lines: ReconLine[];
   isLoading: boolean;
   getAssignedUserName: (userId: string | null) => string;
+  // Sorting
+  sortConfig?: { sortBy: string; direction: "asc" | "desc" } | null;
+  onSort?: (sortBy: string) => void;
 }
 
-const ReconItemsTable: React.FC<Props> = ({ lines, isLoading, getAssignedUserName }) => (
+const ReconItemsTable: React.FC<Props> = ({
+  lines,
+  isLoading,
+  getAssignedUserName,
+  sortConfig,
+  onSort,
+}) => (
   <div className="overflow-x-auto">
     <table className="min-w-full text-sm text-left">
       <thead>
@@ -33,36 +44,68 @@ const ReconItemsTable: React.FC<Props> = ({ lines, isLoading, getAssignedUserNam
               <TooltipContent>Recon work or service to be performed.</TooltipContent>
             </Tooltip>
           </th>
-          <th className="p-2">
+          <th className="p-2 cursor-pointer select-none" onClick={() => onSort && onSort("status")}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span>Status</span>
+                <span className="flex items-center gap-1">
+                  Status
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  {sortConfig?.sortBy === "status" && (
+                    <span className={"text-xs " + (sortConfig.direction === "asc" ? "text-green-600" : "text-red-600")}>
+                      {sortConfig.direction === "asc" ? "▲" : "▼"}
+                    </span>
+                  )}
+                </span>
               </TooltipTrigger>
-              <TooltipContent>Current status of this recon line.</TooltipContent>
+              <TooltipContent>Sort by status</TooltipContent>
             </Tooltip>
           </th>
-          <th className="p-2">
+          <th className="p-2 cursor-pointer select-none" onClick={() => onSort && onSort("assigned_to")}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span>Assigned To</span>
+                <span className="flex items-center gap-1">
+                  Assigned To
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  {sortConfig?.sortBy === "assigned_to" && (
+                    <span className={"text-xs " + (sortConfig.direction === "asc" ? "text-green-600" : "text-red-600")}>
+                      {sortConfig.direction === "asc" ? "▲" : "▼"}
+                    </span>
+                  )}
+                </span>
               </TooltipTrigger>
-              <TooltipContent>Who is responsible for this task.</TooltipContent>
+              <TooltipContent>Sort by assigned user</TooltipContent>
             </Tooltip>
           </th>
-          <th className="p-2">
+          <th className="p-2 cursor-pointer select-none" onClick={() => onSort && onSort("cost")}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span>Cost</span>
+                <span className="flex items-center gap-1">
+                  Cost
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  {sortConfig?.sortBy === "cost" && (
+                    <span className={"text-xs " + (sortConfig.direction === "asc" ? "text-green-600" : "text-red-600")}>
+                      {sortConfig.direction === "asc" ? "▲" : "▼"}
+                    </span>
+                  )}
+                </span>
               </TooltipTrigger>
-              <TooltipContent>Estimated or actual cost for this service line.</TooltipContent>
+              <TooltipContent>Sort by cost</TooltipContent>
             </Tooltip>
           </th>
-          <th className="p-2">
+          <th className="p-2 cursor-pointer select-none" onClick={() => onSort && onSort("due_date")}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span>Due Date</span>
+                <span className="flex items-center gap-1">
+                  Due Date
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  {sortConfig?.sortBy === "due_date" && (
+                    <span className={"text-xs " + (sortConfig.direction === "asc" ? "text-green-600" : "text-red-600")}>
+                      {sortConfig.direction === "asc" ? "▲" : "▼"}
+                    </span>
+                  )}
+                </span>
               </TooltipTrigger>
-              <TooltipContent>Deadline for completing this item.</TooltipContent>
+              <TooltipContent>Sort by due date</TooltipContent>
             </Tooltip>
           </th>
           <th className="p-2">
