@@ -4,7 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { logKeyMove } from "@/services/inventory/keyMoveService";
 import { toast } from "@/hooks/use-toast";
-import QrReader from "react-qr-reader";
+// FIX: Use named import per "react-qr-reader" v3+
+import { QrReader } from "react-qr-reader";
 
 interface Props {
   open: boolean;
