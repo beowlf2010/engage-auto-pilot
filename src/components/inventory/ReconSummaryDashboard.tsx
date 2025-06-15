@@ -7,8 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
-// For icon usage, pick from the limited set:
-import { report, search } from "lucide-react";
+// Use the correct Lucide icon import
+import { Search } from "lucide-react";
 
 interface ReconLine {
   id: string;
@@ -114,7 +114,8 @@ const ReconSummaryDashboard = () => {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <span>Recon Summary</span>
-          <report className="w-6 h-6 text-blue-600" />
+          {/* Use a valid icon, e.g. Search, or remove if you don't want an icon */}
+          <Search className="w-6 h-6 text-blue-600" />
         </h1>
         <Link to="/inventory-dashboard">
           <Button variant="secondary">Back to Inventory</Button>
@@ -298,3 +299,5 @@ const ReconSummaryDashboard = () => {
 };
 
 export default ReconSummaryDashboard;
+
+// --- The file is getting long. Please consider refactoring into smaller components for maintainability!
