@@ -44,7 +44,11 @@ const ReconServiceLines: React.FC<ReconServiceLinesProps> = ({ inventoryId }) =>
         status,
         notes: noteInput,
       });
-      toast({ title: `Marked as ${status}.` });
+      toast({
+        title: `Marked as ${status}.`,
+        description: `You ${status === "approved" ? "approved" : "declined"} this recon line.`,
+        variant: status === "approved" ? "default" : "destructive"
+      });
     } catch (err) {
       toast({ title: "Error saving decision.", variant: "destructive" });
     }
