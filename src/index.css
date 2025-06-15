@@ -5,32 +5,38 @@
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: #10141f;
-  }
-  body {
-    background: linear-gradient(120deg, #0e182d 0%, #132232 100%);
-    color: #e7f0fc;
-    min-height: 100vh;
-    font-family: 'Inter', system-ui, sans-serif;
-  }
-  h1, h2, h3, h4 {
-    font-family: 'Inter', system-ui, sans-serif;
-    font-weight: 900;
-    letter-spacing: -0.02em;
+    font-family: 'Inter', 'Montserrat', system-ui, sans-serif;
+    background: #0d0628;
     color: #fff;
   }
+  body {
+    font-family: 'Inter', 'Montserrat', system-ui, sans-serif;
+    background: linear-gradient(120deg, #4124aa 0%, #0d0628 70%);
+    color: #e7e9f5;
+    min-height: 100vh;
+  }
   .accent {
-    color: #12f2a3;
+    color: #2aeae0;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Montserrat', 'Inter', system-ui, sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    color: #fff;
   }
 }
 
 @layer components {
-  .card-neo {
-    @apply rounded-xl bg-surface-card shadow-neon p-8;
+  .glass-card {
+    @apply rounded-2xl bg-bg-glass shadow-glass p-10 border border-white/10 backdrop-blur-lg;
   }
-  .neon-btn {
-    @apply px-6 py-3 rounded-full font-bold text-black bg-accent-neon hover:bg-accent-blue transition;
-    box-shadow: 0 2px 24px 0 #12f2a3a0;
+  .cta-btn {
+    @apply px-8 py-3 rounded-full font-extrabold text-white bg-button-accent shadow-cta hover:bg-accent2 transition text-lg tracking-wide;
+  }
+  .cta-btn-outline {
+    @apply px-8 py-3 rounded-full font-extrabold text-accent bg-transparent border-2 border-accent hover:bg-accent hover:text-white transition text-lg tracking-wide;
+  }
+  .nav-link {
+    @apply font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition;
   }
 }
