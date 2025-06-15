@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { logKeyMove } from "@/services/inventory/keyMoveService";
 import { toast } from "@/hooks/use-toast";
-// FIX: Use named import per "react-qr-reader" v3+
+// Use named import per "react-qr-reader" v3+
 import { QrReader } from "react-qr-reader";
 
 interface Props {
@@ -21,18 +21,9 @@ const VehicleKeyMoveLogModal: React.FC<Props> = ({ open, onOpenChange, vehicle, 
   const [actionType, setActionType] = useState<"checked_out"|"returned">("checked_out");
   const [loading, setLoading] = useState(false);
 
-  const handleUserScan = (data: string|null) => {
-    if (data) {
-      setUserId(data);
-      setStep("vehicle");
-    }
-  };
-
-  const handleVehicleScan = (data: string|null) => {
-    if (data) {
-      setScannedVehicleId(data);
-    }
-  };
+  // Only set one scan result per modal opening
+  const [userScanDone, setUserScanDone] = useState(false);
+  const [vehicleScanDone, setVehicleScanDone] = useState(false);
 
   const handleLog = async () => {
     if (!userId || !vehicle?.id) return;
@@ -70,6 +61,18 @@ const VehicleKeyMoveLogModal: React.FC<Props> = ({ open, onOpenChange, vehicle, 
     onOpenChange(false);
   };
 
+  // Reset scan state when modal is opened/closed
+  React.useEffect(() => {
+    if (!open) {
+      setStep("user");
+      setUserId(undefined);
+      setScannedVehicleId(undefined);
+      setLoading(false);
+      setUserScanDone(false);
+      setVehicleScanDone(false);
+    }
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -93,9 +96,18 @@ const VehicleKeyMoveLogModal: React.FC<Props> = ({ open, onOpenChange, vehicle, 
             <div>
               <div>Please scan your User QR code below:</div>
               <QrReader
-                delay={300}
-                onError={() => toast({ title: "Camera error", variant: "destructive" })}
-                onScan={handleUserScan}
+                constraints={{ facingMode: "environment" }}
+                onResult={(result, error) => {
+                  if (userScanDone) return;
+                  if (result?.getText()) {
+                    setUserId(result.getText());
+                    setStep("vehicle");
+                    setUserScanDone(true);
+                  }
+                  if (error && error.name !== "NotFoundException") {
+                    toast({ title: "Camera error", description: error.message, variant: "destructive" });
+                  }
+                }}
                 style={{ width: "100%" }}
               />
               <Button className="w-full mt-2" variant="outline" onClick={desktopApprove}>Skip Scan (Use My Account)</Button>
@@ -104,9 +116,17 @@ const VehicleKeyMoveLogModal: React.FC<Props> = ({ open, onOpenChange, vehicle, 
             <div>
               <div>Now scan the Vehicle QR code:</div>
               <QrReader
-                delay={300}
-                onError={() => toast({ title: "Camera error", variant: "destructive" })}
-                onScan={handleVehicleScan}
+                constraints={{ facingMode: "environment" }}
+                onResult={(result, error) => {
+                  if (vehicleScanDone) return;
+                  if (result?.getText()) {
+                    setScannedVehicleId(result.getText());
+                    setVehicleScanDone(true);
+                  }
+                  if (error && error.name !== "NotFoundException") {
+                    toast({ title: "Camera error", description: error.message, variant: "destructive" });
+                  }
+                }}
                 style={{ width: "100%" }}
               />
               <Button
@@ -127,3 +147,4 @@ const VehicleKeyMoveLogModal: React.FC<Props> = ({ open, onOpenChange, vehicle, 
 };
 
 export default VehicleKeyMoveLogModal;
+
