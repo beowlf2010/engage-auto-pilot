@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -14,6 +13,7 @@ import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 import EnhancedInventoryMetrics from "@/components/inventory/EnhancedInventoryMetrics";
 import InventoryCleanupButton from "@/components/inventory/InventoryCleanupButton";
 import { formatVehicleTitle, getVehicleDescription, formatPrice, getDataCompletenessScore, getVehicleStatusDisplay } from "@/services/inventory/vehicleFormattingService";
+import DataCompletenessModal from "./inventory/DataCompletenessModal";
 
 interface InventoryFilters {
   make?: string;
@@ -37,6 +37,8 @@ const InventoryDashboard = () => {
     dataQuality: 'all'
   });
   const [searchTerm, setSearchTerm] = useState("");
+  const [completenessModalOpen, setCompletenessModalOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory-enhanced', filters, searchTerm],
@@ -426,18 +428,28 @@ const InventoryDashboard = () => {
                     
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs ${
-                            vehicle.data_completeness >= 80 
-                              ? 'bg-green-50 text-green-700 border-green-200' 
-                              : vehicle.data_completeness >= 60
-                                ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                : 'bg-red-50 text-red-700 border-red-200'
-                          }`}
+                        <button
+                          type="button"
+                          className="focus:outline-none"
+                          onClick={() => {
+                            setSelectedVehicle(vehicle);
+                            setCompletenessModalOpen(true);
+                          }}
+                          title="View completeness details"
                         >
-                          {vehicle.data_completeness}%
-                        </Badge>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs cursor-pointer hover:scale-105 transition ${
+                              vehicle.data_completeness >= 80 
+                                ? "bg-green-50 text-green-700 border-green-200" 
+                                : vehicle.data_completeness >= 60
+                                  ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                  : "bg-red-50 text-red-700 border-red-200"
+                            }`}
+                          >
+                            {vehicle.data_completeness}%
+                          </Badge>
+                        </button>
                       </div>
                     </TableCell>
                     
@@ -463,6 +475,13 @@ const InventoryDashboard = () => {
           </div>
         )}
       </Card>
+
+      {/* Modal for data completeness */}
+      <DataCompletenessModal
+        open={completenessModalOpen}
+        onOpenChange={(open) => setCompletenessModalOpen(open)}
+        vehicle={selectedVehicle}
+      />
     </div>
   );
 };
