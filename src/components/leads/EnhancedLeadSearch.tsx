@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter, Save, X, Calendar } from "lucide-react";
+import LeadFiltersBar from "./LeadFiltersBar";
+import { useLeadFilters } from "@/hooks/useLeadFilters";
 
 export interface SearchFilters {
   searchTerm: string;
@@ -50,6 +51,8 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
   const [savePresetName, setSavePresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
 
+  const { filter, setFilter, filterLeads } = useLeadFilters();
+
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
@@ -84,6 +87,7 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-4">
+        <LeadFiltersBar filter={filter} setFilter={setFilter} />
         {/* Main Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />

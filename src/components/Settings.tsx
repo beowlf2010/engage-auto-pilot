@@ -36,7 +36,8 @@ const Settings = ({ user }: SettingsProps) => {
     { id: "email", label: "Email Settings", icon: Mail, roles: ["sales", "manager", "admin"] },
     { id: "compliance", label: "Compliance", icon: ShieldCheck, roles: ["manager", "admin"] },
     { id: "api", label: "API Keys", icon: Key, roles: ["admin"] },
-    { id: "users", label: "User Management", icon: Users, roles: ["manager", "admin"] }
+    { id: "users", label: "User Management", icon: Users, roles: ["manager", "admin"] },
+    { id: "comms", label: "Comms Settings", icon: ShieldCheck, roles: ["admin"] }
   ];
 
   const filteredTabs = tabs.filter(tab => tab.roles.includes(user.role));
@@ -69,6 +70,8 @@ const Settings = ({ user }: SettingsProps) => {
         return <ApiKeysSettings userRole={user.role} />;
       case "users": 
         return <UserManagementTable currentUserRole={user.role} />;
+      case "comms":
+        return <CommsSettingsPanel />;
       default: 
         return <CadenceSettings userRole={user.role} />;
     }

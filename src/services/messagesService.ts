@@ -4,6 +4,8 @@ import { extractAndStoreMemory } from './aiMemoryService';
 import { addDisclaimersToMessage, validateMessageForCompliance } from './pricingDisclaimerService';
 import type { MessageData } from '@/types/conversation';
 import { useCompliance } from '@/hooks/useCompliance';
+import { getBusinessHours, isWithinBusinessHours } from "./businessHours";
+import { fetchDisclaimerFooter } from "./disclaimerFooter";
 
 const compliance = useCompliance();
 
@@ -44,6 +46,17 @@ export const sendMessage = async (
   isAI: boolean = false
 ) => {
   try {
+    // Business hours enforcement
+    const bh = await getBusinessHours();
+    if (!isWithinBusinessHours(new Date(), bh)) {
+      toast({
+        title: "Out of Business Hours",
+        description: `Messages can only be sent between ${bh.start} and ${bh.end} (${bh.timezone})`,
+        variant: "destructive"
+      });
+      throw new Error("Cannot send message outside allowed business hours.");
+    }
+
     // ENFORCE: Confirm suppression and consent before outbound message
     const { data: phoneData, error: phoneError } = await supabase
       .from('phone_numbers')
@@ -98,6 +111,12 @@ export const sendMessage = async (
         mentionsTradeIn: message.toLowerCase().includes('trade'),
         mentionsLease: message.toLowerCase().includes('lease')
       });
+    }
+
+    // Always append global disclaimer footer for outbound
+    const footer = await fetchDisclaimerFooter('sms');
+    if (footer && !finalMessage.includes(footer)) {
+      finalMessage = `${finalMessage}\n\n${footer}`;
     }
 
     console.log('Found phone number:', phoneData.number);
