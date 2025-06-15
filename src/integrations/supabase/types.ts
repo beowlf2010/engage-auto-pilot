@@ -1635,6 +1635,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_monthly_retail_summary: {
@@ -1684,6 +1705,13 @@ export type Database = {
           avg_days_to_sell: number
           total_sales_value: number
         }[]
+      }
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
       }
       increment_template_usage: {
         Args: { template_id: string }
@@ -1758,6 +1786,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "admin" | "manager" | "sales" | "user"
       source_report_type: "new_car_main_view" | "merch_inv_view" | "orders_all"
     }
     CompositeTypes: {
@@ -1874,6 +1903,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "manager", "sales", "user"],
       source_report_type: ["new_car_main_view", "merch_inv_view", "orders_all"],
     },
   },
