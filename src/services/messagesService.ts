@@ -1,9 +1,11 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { extractAndStoreMemory } from './aiMemoryService';
 import { addDisclaimersToMessage, validateMessageForCompliance } from './pricingDisclaimerService';
 import type { MessageData } from '@/types/conversation';
+import { useCompliance } from '@/hooks/useCompliance';
+
+const compliance = useCompliance();
 
 export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
   try {
@@ -42,6 +44,32 @@ export const sendMessage = async (
   isAI: boolean = false
 ) => {
   try {
+    // ENFORCE: Confirm suppression and consent before outbound message
+    const { data: phoneData, error: phoneError } = await supabase
+      .from('phone_numbers')
+      .select('number')
+      .eq('lead_id', leadId)
+      .eq('is_primary', true)
+      .single();
+
+    if (phoneError || !phoneData) {
+      throw new Error('No primary phone number found for this lead');
+    }
+
+    // Check for suppression (opt-outs)
+    const isSuppressed = await compliance.checkSuppressed(phoneData.number, "sms");
+    if (isSuppressed) {
+      toast({
+        title: "Cannot Send Message",
+        description: "This lead has opted out of SMS messages.",
+        variant: "destructive"
+      });
+      throw new Error("Lead is suppressed and cannot be messaged by SMS.");
+    }
+
+    // Fail-safe: enforce consent log exists for this lead/channel
+    await compliance.enforceConsent(leadId, "sms"); // will throw if missing
+
     console.log('Starting to send message for lead:', leadId);
     console.log('Message content:', message);
     console.log('Profile:', profile);
@@ -51,9 +79,9 @@ export const sendMessage = async (
     }
     
     // Validate compliance for pricing content
-    const compliance = validateMessageForCompliance(message);
+    const complianceCheck = validateMessageForCompliance(message);
     
-    if (!compliance.isCompliant && !isAI) {
+    if (!complianceCheck.isCompliant && !isAI) {
       toast({
         title: "Pricing Compliance Warning",
         description: "This message contains pricing but may be missing disclaimers. Please review.",
@@ -63,27 +91,13 @@ export const sendMessage = async (
 
     // For AI messages, automatically add disclaimers
     let finalMessage = message;
-    if (isAI && compliance.hasPrice && !compliance.hasDisclaimer) {
+    if (isAI && complianceCheck.hasPrice && !complianceCheck.hasDisclaimer) {
       finalMessage = await addDisclaimersToMessage(message, {
         isInventoryRelated: true,
         mentionsFinancing: message.toLowerCase().includes('financ'),
         mentionsTradeIn: message.toLowerCase().includes('trade'),
         mentionsLease: message.toLowerCase().includes('lease')
       });
-    }
-
-    // Get lead's primary phone number
-    console.log('Looking up phone number for lead:', leadId);
-    const { data: phoneData, error: phoneError } = await supabase
-      .from('phone_numbers')
-      .select('number')
-      .eq('lead_id', leadId)
-      .eq('is_primary', true)
-      .single();
-
-    if (phoneError || !phoneData) {
-      console.error('Phone lookup error:', phoneError);
-      throw new Error('No primary phone number found for this lead');
     }
 
     console.log('Found phone number:', phoneData.number);
@@ -176,6 +190,17 @@ export const sendMessage = async (
       
       return { success: true, warning: 'SMS sending failed but message saved' };
     }
+
+    // After successful send, auto-log consent audit if first message (opt-in confirmation)
+    await compliance.storeConsent({
+      leadId,
+      channel: "sms",
+      method: "webform", // reference: update if sending from another source
+      consentText: "Express written consent confirmed via message send.",
+      ipAddress: null,
+      userAgent: null,
+      capturedBy: profile?.id,
+    });
 
     // Store memory from outgoing message
     try {

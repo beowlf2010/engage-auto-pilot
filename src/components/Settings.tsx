@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -9,7 +8,8 @@ import {
   Bot,
   Save,
   Brain,
-  Mail
+  Mail,
+  ShieldCheck
 } from "lucide-react";
 import UserManagementTable from "./user-management/UserManagementTable";
 import CadenceSettings from "./settings/CadenceSettings";
@@ -17,6 +17,7 @@ import BusinessHoursSettings from "./settings/BusinessHoursSettings";
 import ApiKeysSettings from "./settings/ApiKeysSettings";
 import EnhancedAISettings from "./settings/EnhancedAISettings";
 import EmailSettings from "./settings/EmailSettings";
+import { ComplianceAuditExport, ComplianceDisclaimers } from "./settings/ComplianceSettings";
 
 interface SettingsProps {
   user: {
@@ -33,6 +34,7 @@ const Settings = ({ user }: SettingsProps) => {
     { id: "enhanced", label: "Enhanced AI", icon: Brain, roles: ["manager", "admin"] },
     { id: "business", label: "Business Hours", icon: Clock, roles: ["sales", "manager", "admin"] },
     { id: "email", label: "Email Settings", icon: Mail, roles: ["sales", "manager", "admin"] },
+    { id: "compliance", label: "Compliance", icon: ShieldCheck, roles: ["manager", "admin"] },
     { id: "api", label: "API Keys", icon: Key, roles: ["admin"] },
     { id: "users", label: "User Management", icon: Users, roles: ["manager", "admin"] }
   ];
@@ -56,6 +58,13 @@ const Settings = ({ user }: SettingsProps) => {
         return <BusinessHoursSettings userRole={user.role} />;
       case "email": 
         return <EmailSettings userRole={user.role} />;
+      case "compliance":
+        return (
+          <div className="space-y-6">
+            <ComplianceAuditExport />
+            <ComplianceDisclaimers />
+          </div>
+        );
       case "api": 
         return <ApiKeysSettings userRole={user.role} />;
       case "users": 
