@@ -39,11 +39,58 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
     const latestUploads = await getLatestUploads();
     console.log('Latest uploads identified:', latestUploads);
 
-    if (latestUploads.mostRecentUploads.length === 0) {
-      console.warn('No recent uploads found to base cleanup on');
-      throw new Error('No recent upload history found to determine which vehicles to keep');
+    // --- Duplicate VIN Cleanup ---
+    // Get all NON-sold inventory grouped by VIN
+    const { data: dupes, error: dupesError } = await supabase
+      .from('inventory')
+      .select('id, vin, created_at, updated_at, status')
+      .neq('status', 'sold')
+      .not('vin', 'is', null);
+
+    if (dupesError) {
+      console.error('Error fetching inventory for VIN deduplication:', dupesError);
+      throw dupesError;
     }
 
+    // Identify VINs with more than one non-sold record
+    const vinMap: Record<string, { id: string; created_at: string; updated_at: string; status: string }[]> = {};
+    dupes?.forEach((row) => {
+      if (!vinMap[row.vin]) vinMap[row.vin] = [];
+      vinMap[row.vin].push(row);
+    });
+
+    let toMarkSold: string[] = [];
+    Object.entries(vinMap).forEach(([vin, records]) => {
+      if (records.length > 1) {
+        // Sort so we keep the latest (by updated_at, then created_at)
+        const sorted = [...records].sort((a, b) =>
+          new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()
+        );
+        // Keep the most recent, mark others as sold
+        const markSold = sorted.slice(1).map((r) => r.id);
+        toMarkSold.push(...markSold);
+      }
+    });
+
+    if (toMarkSold.length > 0) {
+      console.log(`Marking ${toMarkSold.length} duplicate VIN records as sold`);
+      const { error: updateDupesError } = await supabase
+        .from('inventory')
+        .update({
+          status: 'sold',
+          sold_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', toMarkSold);
+      if (updateDupesError) {
+        console.error('Error marking duplicate VINs as sold:', updateDupesError);
+        throw updateDupesError;
+      }
+    } else {
+      console.log('No duplicate VIN groups needing cleanup.');
+    }
+
+    // --- Proceed with existing cleanup logic (keep only recent upload vehicles) ---
     // Step 1: Get all vehicle IDs that should be KEPT (from recent uploads)
     const { data: vehiclesToKeep, error: keepError } = await supabase
       .from('inventory')
@@ -60,7 +107,7 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
     if (!vehiclesToKeep || vehiclesToKeep.length === 0) {
       console.log('No vehicles found in recent uploads');
       return {
-        totalProcessed: 0,
+        totalProcessed: toMarkSold.length,
         latestUploads,
       };
     }
@@ -84,7 +131,7 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
     if (!vehiclesToUpdate || vehiclesToUpdate.length === 0) {
       console.log('No vehicles need to be marked as sold');
       return {
-        totalProcessed: 0,
+        totalProcessed: toMarkSold.length,
         latestUploads,
       };
     }
@@ -107,7 +154,7 @@ export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
       throw updateError;
     }
 
-    const totalProcessed = updatedVehicles?.length || 0;
+    const totalProcessed = (updatedVehicles?.length || 0) + toMarkSold.length;
     console.log(`Cleanup completed. Total processed: ${totalProcessed}`);
 
     return {
