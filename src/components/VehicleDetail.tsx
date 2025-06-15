@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import DealHistory from "./vehicle/DealHistory";
 import { getVehicleWithDeals } from "@/services/vehicleIntegrationService";
+import ReconServiceLines from "@/components/inventory/ReconServiceLines";
 
 const VehicleDetail = () => {
   const { identifier } = useParams();
@@ -190,6 +191,9 @@ const VehicleDetail = () => {
               </div>
             </Card>
           )}
+
+          {/* === Add Recon Service Lines === */}
+          <ReconServiceLines inventoryId={vehicleWithDeals.id} />
         </div>
 
         {/* Sidebar */}
