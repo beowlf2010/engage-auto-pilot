@@ -24,6 +24,7 @@ import { Lead } from "@/types/lead";
 import LeadStatusBadge from "./LeadStatusBadge";
 import LeadContactStatusBadge from "./LeadContactStatusBadge";
 import LeadEngagementScore from "./LeadEngagementScore";
+import LeadActionsDropdown from "./LeadActionsDropdown";
 
 interface LeadTableRowProps {
   lead: Lead;
@@ -154,30 +155,12 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
         </div>
       </TableCell>
       <TableCell>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onQuickView(lead)}>
-              <Eye className="w-4 h-4 mr-2" />
-              Quick View
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleMessageClick(lead)}
-              disabled={lead.doNotCall}
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Message
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!canEdit}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Lead
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <LeadActionsDropdown
+          lead={lead}
+          canEdit={canEdit}
+          onQuickView={onQuickView}
+          handleMessageClick={handleMessageClick}
+        />
       </TableCell>
     </TableRow>
   );
