@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { formatPhoneForDisplay } from "@/utils/phoneUtils";
 import { Lead } from "@/types/lead";
+import LeadTableRow from "./leads/LeadTableRow";
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -244,126 +245,20 @@ const LeadsTable = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedLeads.map((lead) => {
-              const engagementScore = getEngagementScore(lead);
-              return (
-                <TableRow key={lead.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedLeads.includes(lead.id.toString())}
-                      onCheckedChange={() => onLeadSelect(lead.id.toString())}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <div
-                      className="cursor-pointer hover:text-blue-600 transition-colors"
-                      onClick={() => handleLeadClick(lead.id)}
-                    >
-                      <div className="font-medium">{lead.firstName} {lead.lastName}</div>
-                      {lead.middleName && (
-                        <div className="text-xs text-muted-foreground">{lead.middleName}</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Phone className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        {lead.primaryPhone ? formatPhoneForDisplay(lead.primaryPhone) : 'No phone'}
-                      </span>
-                      {lead.phoneNumbers?.length > 1 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{lead.phoneNumbers.length - 1}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {lead.email ? (
-                      <div className="flex items-center space-x-2">
-                        <Mail className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm truncate max-w-[200px]">{lead.email}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">No email</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{lead.vehicleInterest || 'Not specified'}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusBadge(lead.status)}>
-                      {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col space-y-1">
-                      <Badge className={getContactStatusBadge(lead.contactStatus)}>
-                        {formatContactStatus(lead.contactStatus)}
-                      </Badge>
-                      {lead.unreadCount > 0 && (
-                        <Badge variant="destructive" className="text-xs">
-                          {lead.unreadCount} unread
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className={`font-bold ${getScoreColor(engagementScore)}`}>
-                        {engagementScore}
-                      </span>
-                      <div className="flex">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star 
-                            key={star} 
-                            className={`h-3 w-3 ${engagementScore >= star * 20 ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={lead.aiOptIn}
-                      onCheckedChange={(value) => onAiOptInChange(lead.id.toString(), value)}
-                      disabled={!canEdit || lead.doNotCall}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-xs text-muted-foreground">
-                      {lead.lastMessageTime || 'Never'}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onQuickView(lead)}>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Quick View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleMessageClick(lead)}
-                          disabled={lead.doNotCall}
-                        >
-                          <MessageSquare className="w-4 h-4 mr-2" />
-                          Message
-                        </DropdownMenuItem>
-                        <DropdownMenuItem disabled={!canEdit}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Lead
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {sortedLeads.map((lead) => (
+              <LeadTableRow
+                key={lead.id}
+                lead={lead}
+                selected={selectedLeads.includes(lead.id.toString())}
+                onSelect={onLeadSelect}
+                onAiOptInChange={onAiOptInChange}
+                canEdit={canEdit}
+                onQuickView={onQuickView}
+                handleMessageClick={handleMessageClick}
+                handleLeadClick={handleLeadClick}
+                getEngagementScore={getEngagementScore}
+              />
+            ))}
           </TableBody>
         </Table>
 
