@@ -203,30 +203,27 @@ const InventoryDashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800">Inventory Dashboard</h1>
-          <p className="text-slate-600 mt-1">Manage and analyze your vehicle inventory with enhanced new/used breakdown</p>
+    <div className="w-full max-w-7xl mx-auto py-6">
+      <h1 className="text-5xl font-black mb-6">
+        Inventory <span className="accent">Dashboard</span>
+      </h1>
+      <Card className="mb-10">
+        <div className="flex flex-col md:flex-row gap-8 items-center">
+          <div className="flex-1">
+            <h2 className="text-3xl font-bold mb-2 text-white">Welcome to your digital car-lot!</h2>
+            <p className="text-xl text-slate-300 mb-6">
+              Explore, upload, and manage all inventory with ease.<br />
+              <span className="text-accent-neon font-semibold">Try the new look and feel!</span>
+            </p>
+            <Button className="neon-btn">Add New Vehicle</Button>
+          </div>
+          <img
+            src="https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=400&q=80"
+            alt="car"
+            className="rounded-2xl shadow-lg w-full max-w-xs md:max-w-sm border-4 border-accent-neon"
+          />
         </div>
-        <div className="flex items-center space-x-3">
-          <InventoryCleanupButton />
-          <Link to="/rpo-insights">
-            <Button variant="outline" className="flex items-center space-x-2">
-              <BarChart3 className="w-4 h-4" />
-              <span>RPO Insights</span>
-            </Button>
-          </Link>
-          <Link to="/upload-inventory-report">
-            <Button className="flex items-center space-x-2">
-              <Car className="w-4 h-4" />
-              <span>Upload Inventory</span>
-            </Button>
-          </Link>
-        </div>
-      </div>
-
+      </Card>
       {/* Enhanced Stats with New/Used Breakdown */}
       <EnhancedInventoryMetrics />
 
