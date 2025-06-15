@@ -1,3 +1,4 @@
+
 import { PhoneNumber } from '@/types/lead';
 
 // Format phone number for Telnyx E.164 compatibility
@@ -72,10 +73,12 @@ export const createPhoneNumbers = (
     const formatted = formatPhoneForTwilio(cellphone);
     if (!seen.has(formatted)) {
       phones.push({
+        id: crypto.randomUUID(),
         number: formatted,
         type: 'cell',
         priority: 1,
-        status: 'active'
+        status: 'active',
+        isPrimary: true
       });
       seen.add(formatted);
     }
@@ -85,10 +88,12 @@ export const createPhoneNumbers = (
     const formatted = formatPhoneForTwilio(dayphone);
     if (!seen.has(formatted)) {
       phones.push({
+        id: crypto.randomUUID(),
         number: formatted,
         type: 'day',
         priority: 2,
-        status: 'active'
+        status: 'active',
+        isPrimary: phones.length === 0
       });
       seen.add(formatted);
     }
@@ -98,10 +103,12 @@ export const createPhoneNumbers = (
     const formatted = formatPhoneForTwilio(evephone);
     if (!seen.has(formatted)) {
       phones.push({
+        id: crypto.randomUUID(),
         number: formatted,
         type: 'eve',
         priority: 3,
-        status: 'active'
+        status: 'active',
+        isPrimary: phones.length === 0
       });
       seen.add(formatted);
     }
@@ -114,3 +121,4 @@ export const getPrimaryPhone = (phoneNumbers: PhoneNumber[]): string => {
   const activePhones = phoneNumbers.filter(p => p.status === 'active');
   return activePhones.length > 0 ? activePhones[0].number : '';
 };
+

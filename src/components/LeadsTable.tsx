@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -132,7 +131,7 @@ const LeadsTable = ({
     navigate(`/inbox?leadId=${lead.id}`);
   };
 
-  const handleLeadClick = (leadId: number) => {
+  const handleLeadClick = (leadId: string) => {
     navigate(`/lead/${leadId}`);
   };
 

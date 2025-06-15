@@ -55,7 +55,7 @@ export const useLeadDetail = () => {
     vehicleMake: lead.vehicleMake,
     vehicleModel: lead.vehicleModel,
     vehicleVIN: lead.vehicleVIN,
-    status: lead.status,
+    status: lead.status as 'new' | 'engaged' | 'paused' | 'closed' | 'lost',
     source: lead.source,
     aiOptIn: lead.aiOptIn,
     aiStage: lead.aiStage,
@@ -107,3 +107,4 @@ export const useLeadDetail = () => {
     handlePhoneSelect
   };
 };
+
