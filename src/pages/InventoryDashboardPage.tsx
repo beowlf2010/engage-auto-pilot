@@ -4,14 +4,37 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import InventoryDashboard from '@/components/InventoryDashboard';
 
 const InventoryDashboardPage = () => {
-  const { profile } = useAuth();
+  console.log('InventoryDashboardPage rendering...');
+  
+  const { profile, loading } = useAuth();
+  
+  console.log('Auth state:', { profile: !!profile, loading });
+  
+  if (loading) {
+    console.log('Auth loading, showing spinner...');
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2">Loading...</span>
+      </div>
+    );
+  }
   
   if (!profile) {
-    return <div>Please sign in to access inventory</div>;
+    console.log('No profile, showing sign-in message...');
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Authentication Required</h2>
+          <p className="text-gray-600">Please sign in to access inventory dashboard</p>
+        </div>
+      </div>
+    );
   }
 
+  console.log('Rendering InventoryDashboard component...');
   return (
-    <div className="container mx-auto py-6">
+    <div className="w-full">
       <InventoryDashboard />
     </div>
   );

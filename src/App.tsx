@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,6 +18,8 @@ import MessageExportPage from "@/pages/MessageExportPage";
 const queryClient = new QueryClient();
 
 function App() {
+  console.log('App component rendering...');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -34,6 +35,34 @@ function App() {
                       <StreamlinedNavigation />
                       <main className="flex-1 overflow-auto">
                         <DashboardPage />
+                      </main>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              {/* Fix inventory dashboard route */}
+              <Route path="/inventory-dashboard" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto p-6">
+                        <InventoryDashboardPage />
+                      </main>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              {/* Also fix the /inventory route to point to dashboard */}
+              <Route path="/inventory" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto p-6">
+                        <InventoryDashboardPage />
                       </main>
                     </div>
                   </div>
@@ -60,32 +89,6 @@ function App() {
                       <StreamlinedNavigation />
                       <main className="flex-1 overflow-auto">
                         <StreamlinedLeadsPage />
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              } />
-
-              <Route path="/inventory" element={
-                <ProtectedRoute>
-                  <div className="flex h-screen bg-gray-50">
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                      <StreamlinedNavigation />
-                      <main className="flex-1 overflow-auto">
-                        <InventoryDashboardPage />
-                      </main>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              } />
-
-              <Route path="/inventory-dashboard" element={
-                <ProtectedRoute>
-                  <div className="flex h-screen bg-gray-50">
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                      <StreamlinedNavigation />
-                      <main className="flex-1 overflow-auto">
-                        <InventoryDashboardPage />
                       </main>
                     </div>
                   </div>
