@@ -1,4 +1,3 @@
-
 import { Deal, SummaryTotals } from "./DealManagementTypes";
 
 export const getVehicleType = (stockNumber?: string): 'new' | 'used' => {
@@ -29,8 +28,12 @@ export const getAdjustedGrossProfit = (deal: Deal, packAdjustment: number) => {
 };
 
 export const getAdjustedTotalProfit = (deal: Deal, packAdjustment: number) => {
-  const adjustedGross = getAdjustedGrossProfit(deal, packAdjustment);
+  const baseGross = deal.gross_profit || 0;
   const fiProfit = deal.fi_profit || 0;
+  
+  // Apply pack adjustment to used vehicles for the total calculation
+  const adjustedGross = isUsedVehicle(deal.stock_number) ? baseGross + packAdjustment : baseGross;
+  
   return adjustedGross + fiProfit;
 };
 
