@@ -1,16 +1,15 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, CheckCircle, Clock, AlertTriangle, Bot, User } from "lucide-react";
-import { format, isToday, isYesterday } from "date-fns";
+import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import type { MessageData } from "@/types/conversation";
+import MessageBubble from './MessageBubble';
+import MessageInput from './MessageInput';
+import DateSeparator from './DateSeparator';
+import MessageEmptyState from './MessageEmptyState';
 
 interface EnhancedMessageThreadProps {
   messages: MessageData[];
@@ -19,37 +18,6 @@ interface EnhancedMessageThreadProps {
   leadName: string;
   disabled?: boolean;
 }
-
-const MessageStatusIcon = ({ status, aiGenerated }: { status?: string; aiGenerated: boolean }) => {
-  const iconClass = "w-3 h-3";
-  
-  if (aiGenerated) {
-    return <Bot className={`${iconClass} text-blue-500`} />;
-  }
-  
-  switch (status) {
-    case 'delivered':
-      return <CheckCircle className={`${iconClass} text-green-500`} />;
-    case 'pending':
-      return <Clock className={`${iconClass} text-yellow-500`} />;
-    case 'failed':
-      return <AlertTriangle className={`${iconClass} text-red-500`} />;
-    default:
-      return <CheckCircle className={`${iconClass} text-gray-400`} />;
-  }
-};
-
-const formatMessageTime = (timestamp: string) => {
-  const date = new Date(timestamp);
-  
-  if (isToday(date)) {
-    return format(date, 'h:mm a');
-  } else if (isYesterday(date)) {
-    return `Yesterday ${format(date, 'h:mm a')}`;
-  } else {
-    return format(date, 'MMM d, h:mm a');
-  }
-};
 
 const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
   messages,
@@ -62,7 +30,6 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,13 +66,6 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
   const groupedMessages = messages.reduce((groups, message) => {
     const date = format(new Date(message.sentAt), 'yyyy-MM-dd');
     if (!groups[date]) {
@@ -129,109 +89,33 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
           <div className="space-y-4 pb-4">
             {Object.entries(groupedMessages).map(([date, dayMessages]) => (
               <div key={date}>
-                <div className="flex items-center justify-center my-4">
-                  <Separator className="flex-1" />
-                  <span className="px-3 text-xs text-muted-foreground bg-background">
-                    {format(new Date(date), 'MMMM d, yyyy')}
-                  </span>
-                  <Separator className="flex-1" />
-                </div>
+                <DateSeparator date={date} />
                 
                 {dayMessages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex items-start space-x-3 mb-4 ${
-                      message.direction === 'out' ? 'flex-row-reverse space-x-reverse' : ''
-                    }`}
-                  >
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className={`text-xs ${
-                        message.direction === 'out' 
-                          ? 'bg-blue-100 text-blue-700' 
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {message.direction === 'out' ? 'You' : leadName.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div className={`flex-1 max-w-[70%] ${
-                      message.direction === 'out' ? 'text-right' : ''
-                    }`}>
-                      <div className={`rounded-lg p-3 ${
-                        message.direction === 'out'
-                          ? 'bg-blue-600 text-white ml-auto'
-                          : 'bg-gray-100 text-gray-900'
-                      }`}>
-                        <p className="text-sm whitespace-pre-wrap">{message.body}</p>
-                      </div>
-                      
-                      <div className={`flex items-center space-x-2 mt-1 text-xs text-muted-foreground ${
-                        message.direction === 'out' ? 'justify-end' : ''
-                      }`}>
-                        <span>{formatMessageTime(message.sentAt)}</span>
-                        {message.direction === 'out' && (
-                          <MessageStatusIcon 
-                            status={message.smsStatus} 
-                            aiGenerated={message.aiGenerated} 
-                          />
-                        )}
-                        {message.aiGenerated && message.direction === 'out' && (
-                          <Badge variant="secondary" className="text-xs">AI</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <MessageBubble 
+                    key={message.id} 
+                    message={message} 
+                    leadName={leadName} 
+                  />
                 ))}
               </div>
             ))}
             
-            {messages.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <User className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No messages yet</p>
-                <p className="text-sm">Start a conversation to engage with this lead</p>
-              </div>
-            )}
+            {messages.length === 0 && <MessageEmptyState />}
             
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
         
-        <div className="border-t p-4 flex-shrink-0">
-          {error && (
-            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-          
-          <div className="flex space-x-2">
-            <Textarea
-              ref={textareaRef}
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              className="flex-1 h-[60px] resize-none"
-              disabled={sending || isLoading || disabled}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim() || sending || isLoading || disabled}
-              size="sm"
-              className="px-3 h-[60px]"
-            >
-              {sending ? (
-                <Clock className="w-4 h-4" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-          
-          <div className="text-xs text-muted-foreground mt-2">
-            Press Enter to send, Shift+Enter for new line
-          </div>
-        </div>
+        <MessageInput
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          onSendMessage={handleSendMessage}
+          sending={sending}
+          isLoading={isLoading}
+          disabled={disabled}
+          error={error}
+        />
       </CardContent>
     </Card>
   );
