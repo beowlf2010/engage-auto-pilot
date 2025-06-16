@@ -200,7 +200,7 @@ const DealManagement = ({
                 getAdjustedGrossProfit={(deal) => getAdjustedGrossProfit(deal, packAdjustment)}
                 formatCurrency={formatCurrency}
                 packAdjustmentEnabled={packAdjustmentEnabled}
-                localPackAdjustment={localPackAdjustment}
+                localPackAdjustment={packAdjustment}
               />
 
               {filteredDeals.length === 0 && (
