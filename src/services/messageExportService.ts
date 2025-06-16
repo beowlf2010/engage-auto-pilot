@@ -266,29 +266,54 @@ export const parseVINExcelFile = (file: File): Promise<VINMessageExport> => {
 
         // Process Excel data to match VIN format
         const leads = jsonData.map((row: any, index: number) => {
-          const leadId = row.lead_id || row.id || `excel_lead_${index + 1}`;
-          const name = row.name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Unknown';
-          const phone = row.phone || row.phone_number || row.mobile;
-          const email = row.email;
-          const vehicle_interest = row.vehicle_interest || row.vehicle || 'Unknown';
+          const leadId = String(row.lead_id || row.id || `excel_lead_${index + 1}`);
+          const name = String(row.name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Unknown');
+          const phone = String(row.phone || row.phone_number || row.mobile || '');
+          const email = row.email ? String(row.email) : undefined;
+          const vehicle_interest = row.vehicle_interest ? String(row.vehicle_interest) : (row.vehicle ? String(row.vehicle) : undefined);
           
           // Handle messages - they might be in separate columns or a JSON string
-          let messages = [];
+          let messages: Array<{
+            id: string;
+            direction: 'in' | 'out';
+            content: string;
+            sent_at: string;
+            metadata?: any;
+          }> = [];
+          
           if (row.messages) {
             try {
-              messages = typeof row.messages === 'string' ? JSON.parse(row.messages) : row.messages;
+              const parsedMessages = typeof row.messages === 'string' ? JSON.parse(row.messages) : row.messages;
+              if (Array.isArray(parsedMessages)) {
+                messages = parsedMessages.map((msg: any, msgIndex: number) => ({
+                  id: String(msg.id || `excel_msg_${index + 1}_${msgIndex + 1}`),
+                  direction: (msg.direction === 'incoming' || msg.direction === 'in') ? 'in' as const : 'out' as const,
+                  content: String(msg.content || msg.message || msg.body || ''),
+                  sent_at: String(msg.sent_at || msg.timestamp || new Date().toISOString()),
+                  metadata: msg.metadata || {}
+                }));
+              }
             } catch {
               // If parsing fails, create a single message from the row data
               if (row.message_content || row.last_message) {
                 messages = [{
                   id: `excel_msg_${index + 1}`,
-                  direction: row.message_direction === 'incoming' || row.message_direction === 'in' ? 'in' : 'out',
-                  content: row.message_content || row.last_message || '',
-                  sent_at: row.message_sent_at || row.last_contact || new Date().toISOString(),
+                  direction: (row.message_direction === 'incoming' || row.message_direction === 'in') ? 'in' as const : 'out' as const,
+                  content: String(row.message_content || row.last_message || ''),
+                  sent_at: String(row.message_sent_at || row.last_contact || new Date().toISOString()),
                   metadata: {}
                 }];
               }
             }
+          } else if (row.message_content || row.last_message) {
+            // Create a single message from row data
+            messages = [{
+              id: `excel_msg_${index + 1}`,
+              direction: (row.message_direction === 'incoming' || row.message_direction === 'in') ? 'in' as const : 'out' as const,
+              content: String(row.message_content || row.last_message || ''),
+              sent_at: String(row.message_sent_at || row.last_contact || new Date().toISOString()),
+              metadata: {}
+            }];
           }
 
           return {
@@ -297,21 +322,20 @@ export const parseVINExcelFile = (file: File): Promise<VINMessageExport> => {
             phone,
             email,
             vehicle_interest,
-            messages: messages.map((msg: any, msgIndex: number) => ({
-              id: msg.id || `excel_msg_${index + 1}_${msgIndex + 1}`,
-              direction: msg.direction === 'incoming' || msg.direction === 'in' ? 'in' : 'out',
-              content: msg.content || msg.message || msg.body || '',
-              sent_at: msg.sent_at || msg.timestamp || new Date().toISOString(),
-              metadata: msg.metadata || {}
-            }))
+            messages
           };
         });
 
+        // Filter out leads that don't have meaningful data
+        const validLeads = leads.filter(lead => 
+          lead.name !== 'Unknown' || lead.phone || lead.email
+        );
+
         const processedData: VINMessageExport = {
-          leads: leads.filter(lead => lead.name !== 'Unknown' || lead.phone || lead.email),
+          leads: validLeads,
           export_info: {
-            total_leads: leads.length,
-            total_messages: leads.reduce((sum, lead) => sum + lead.messages.length, 0),
+            total_leads: validLeads.length,
+            total_messages: validLeads.reduce((sum, lead) => sum + lead.messages.length, 0),
             export_date: new Date().toISOString(),
             source: 'excel'
           }
