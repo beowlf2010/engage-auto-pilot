@@ -49,52 +49,74 @@ const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
     icon: !!Icon
   });
 
+  // Special styling for debugging the inventory item
+  const isInventory = item.path === '/inventory';
+  const debugStyle = isInventory ? {
+    backgroundColor: '#fef2f2',
+    border: '2px solid #dc2626',
+    minWidth: '140px',
+    minHeight: '44px'
+  } : {};
+
   return (
-    <HoverCard openDelay={100} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleClick}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer ${getGlassColorClasses(itemColor, isActive)}`}
-        >
-          <Icon size={18} />
-          <span className="font-medium">{item.label}</span>
-          {item.badge && (
-            <span className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
-              {item.badge}
-            </span>
-          )}
-        </Button>
-      </HoverCardTrigger>
-      {item.hoverActions && item.hoverActions.length > 0 && (
-        <HoverCardContent 
-          className="w-64 p-3" 
-          side="bottom" 
-          align="start"
-          sideOffset={5}
-        >
-          <div className="space-y-2">
-            <div className="font-semibold text-sm text-slate-800 mb-3">
-              Quick Actions
+    <div style={debugStyle} className={isInventory ? 'p-1 rounded' : ''}>
+      <HoverCard openDelay={100} closeDelay={100}>
+        <HoverCardTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClick}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer min-w-[120px] ${getGlassColorClasses(itemColor, isActive)} ${isInventory ? 'bg-red-50 hover:bg-red-100 border-red-200' : ''}`}
+            style={{
+              whiteSpace: 'nowrap',
+              ...(isInventory && {
+                color: '#dc2626',
+                fontWeight: 'bold',
+                fontSize: '14px'
+              })
+            }}
+          >
+            <Icon size={18} />
+            <span className="font-medium">{item.label}</span>
+            {item.badge && (
+              <span className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                {item.badge}
+              </span>
+            )}
+            {isInventory && (
+              <span className="ml-1 text-xs bg-red-600 text-white px-1 rounded">DEBUG</span>
+            )}
+          </Button>
+        </HoverCardTrigger>
+        {item.hoverActions && item.hoverActions.length > 0 && (
+          <HoverCardContent 
+            className="w-64 p-3 bg-white border shadow-lg z-50" 
+            side="bottom" 
+            align="start"
+            sideOffset={5}
+          >
+            <div className="space-y-2">
+              <div className="font-semibold text-sm text-slate-800 mb-3">
+                Quick Actions
+              </div>
+              {item.hoverActions.map((action, index) => {
+                const ActionIcon = action.icon;
+                return (
+                  <button
+                    key={index}
+                    onClick={action.action}
+                    className="w-full flex items-center space-x-3 p-2 rounded-md hover:bg-slate-100 transition-colors text-left text-sm"
+                  >
+                    <ActionIcon size={16} className="text-slate-600" />
+                    <span>{action.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            {item.hoverActions.map((action, index) => {
-              const ActionIcon = action.icon;
-              return (
-                <button
-                  key={index}
-                  onClick={action.action}
-                  className="w-full flex items-center space-x-3 p-2 rounded-md hover:bg-slate-100 transition-colors text-left text-sm"
-                >
-                  <ActionIcon size={16} className="text-slate-600" />
-                  <span>{action.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </HoverCardContent>
-      )}
-    </HoverCard>
+          </HoverCardContent>
+        )}
+      </HoverCard>
+    </div>
   );
 };
 
