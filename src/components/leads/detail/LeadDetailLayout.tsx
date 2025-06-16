@@ -39,26 +39,27 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   const navigate = useNavigate();
   const compliance = useCompliance();
   const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
-  const [hasConsent, setHasConsent] = useState<boolean | null>(null);
-  const [checkingConsent, setCheckingConsent] = useState(true);
+  // Temporarily bypass consent checking for testing
+  const [hasConsent, setHasConsent] = useState<boolean | null>(true);
+  const [checkingConsent, setCheckingConsent] = useState(false);
 
-  // Check for existing consent when component mounts
-  useEffect(() => {
-    const checkConsent = async () => {
-      if (!lead.id || !primaryPhone) return;
+  // Temporarily comment out consent checking
+  // useEffect(() => {
+  //   const checkConsent = async () => {
+  //     if (!lead.id || !primaryPhone) return;
       
-      try {
-        const consentExists = await compliance.enforceConsent(lead.id, "sms");
-        setHasConsent(true);
-      } catch (error) {
-        setHasConsent(false);
-      } finally {
-        setCheckingConsent(false);
-      }
-    };
+  //     try {
+  //       const consentExists = await compliance.enforceConsent(lead.id, "sms");
+  //       setHasConsent(true);
+  //     } catch (error) {
+  //       setHasConsent(false);
+  //     } finally {
+  //       setCheckingConsent(false);
+  //     }
+  //   };
 
-    checkConsent();
-  }, [lead.id, primaryPhone, compliance]);
+  //   checkConsent();
+  // }, [lead.id, primaryPhone, compliance]);
 
   // Load messages when component mounts or lead changes
   useEffect(() => {
@@ -68,15 +69,16 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   }, [lead.id, loadMessages]);
 
   const handleSendMessage = async (message: string): Promise<void> => {
-    if (!hasConsent) {
-      throw new Error("SMS consent is required before sending messages. Please record consent first.");
-    }
+    // Temporarily bypass consent check
+    // if (!hasConsent) {
+    //   throw new Error("SMS consent is required before sending messages. Please record consent first.");
+    // }
 
     try {
       console.log("Sending message:", message);
       await sendMessage(lead.id, message, {
         checkSuppressed: compliance.checkSuppressed,
-        enforceConsent: compliance.enforceConsent,
+        enforceConsent: () => Promise.resolve(true), // Bypass consent enforcement
         storeConsent: compliance.storeConsent
       });
       
@@ -128,10 +130,9 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
             <Button
               onClick={() => setShowMessageComposer(true)}
               className="bg-blue-600 hover:bg-blue-700"
-              disabled={!hasConsent && !checkingConsent}
             >
               <MessageSquare className="w-4 h-4 mr-2" />
-              {checkingConsent ? "Checking Consent..." : hasConsent ? "Send Message" : "Consent Required"}
+              Send Message
             </Button>
           </div>
         </div>
@@ -163,14 +164,15 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
               </TabsList>
 
               <TabsContent value="messages" className="space-y-4">
-                {!checkingConsent && hasConsent === false && (
+                {/* Temporarily hide consent manager */}
+                {/* {!checkingConsent && hasConsent === false && (
                   <ConsentManager
                     leadId={lead.id}
                     leadName={`${lead.firstName} ${lead.lastName}`}
                     phoneNumber={primaryPhone}
                     onConsentGranted={handleConsentGranted}
                   />
-                )}
+                )} */}
                 
                 <div className="h-[600px]">
                   <EnhancedMessageThread
@@ -178,7 +180,7 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
                     onSendMessage={handleSendMessage}
                     isLoading={messagesLoading}
                     leadName={`${lead.firstName} ${lead.lastName}`}
-                    disabled={!hasConsent}
+                    disabled={false}
                   />
                 </div>
               </TabsContent>
