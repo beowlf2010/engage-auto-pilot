@@ -693,6 +693,7 @@ export type Database = {
           cost_amount: number | null
           created_at: string
           deal_type: string | null
+          deal_type_locked: boolean | null
           fi_profit: number | null
           first_reported_date: string | null
           gross_profit: number | null
@@ -714,6 +715,7 @@ export type Database = {
           cost_amount?: number | null
           created_at?: string
           deal_type?: string | null
+          deal_type_locked?: boolean | null
           fi_profit?: number | null
           first_reported_date?: string | null
           gross_profit?: number | null
@@ -735,6 +737,7 @@ export type Database = {
           cost_amount?: number | null
           created_at?: string
           deal_type?: string | null
+          deal_type_locked?: boolean | null
           fi_profit?: number | null
           first_reported_date?: string | null
           gross_profit?: number | null
