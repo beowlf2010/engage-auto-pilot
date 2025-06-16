@@ -41,6 +41,10 @@ const StreamlinedNavigation = () => {
 
   const navItems = getNavigationItems(profile.role);
   console.log('StreamlinedNavigation: Navigation items for role', profile.role, ':', navItems);
+  
+  // Add specific debug for inventory item
+  const inventoryItem = navItems.find(item => item.path === '/inventory');
+  console.log('StreamlinedNavigation: Inventory item found:', inventoryItem);
 
   return (
     <nav className="backdrop-blur bg-white/80 border-b border-slate-200 px-8 py-3 shadow-md">
@@ -48,6 +52,7 @@ const StreamlinedNavigation = () => {
         <div className="flex items-center gap-4">
           <BrandLogo />
           <div className="h-8 w-px bg-slate-300 mx-2" /> {/* Divider */}
+          <div className="text-xs text-gray-500">Role: {profile.role}</div>
         </div>
         <div className="flex items-center gap-1">
           {navItems.map((item) => {
@@ -56,6 +61,11 @@ const StreamlinedNavigation = () => {
               <NavigationItem key={item.path} item={item} />
             );
           })}
+          
+          {/* Debug: Show total nav items count */}
+          <div className="text-xs text-gray-400 ml-4">
+            Items: {navItems.length}
+          </div>
         </div>
       </div>
     </nav>

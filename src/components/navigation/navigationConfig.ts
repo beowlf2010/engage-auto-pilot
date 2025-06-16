@@ -89,8 +89,18 @@ export const navigationConfig: NavConfig[] = [
 
 export const getNavigationItems = (userRole: string): NavigationItem[] => {
   console.log('getNavigationItems called with role:', userRole);
+  
+  if (!userRole) {
+    console.warn('getNavigationItems: No user role provided');
+    return [];
+  }
+  
   const items = navigationConfig
-    .filter(item => item.roles.includes(userRole))
+    .filter(item => {
+      const hasAccess = item.roles.includes(userRole);
+      console.log(`getNavigationItems: Item "${item.title}" - roles: [${item.roles.join(', ')}], user role: ${userRole}, has access: ${hasAccess}`);
+      return hasAccess;
+    })
     .map(item => ({
       path: item.href,
       label: item.title,
@@ -99,7 +109,13 @@ export const getNavigationItems = (userRole: string): NavigationItem[] => {
       color: getItemColor(item.title),
       hoverActions: []
     }));
-  console.log('getNavigationItems returning:', items);
+  
+  console.log('getNavigationItems returning:', items.length, 'items:', items.map(i => i.label));
+  
+  // Specific debug for inventory
+  const inventoryItem = items.find(item => item.path === '/inventory');
+  console.log('getNavigationItems: Inventory item in result:', inventoryItem);
+  
   return items;
 };
 

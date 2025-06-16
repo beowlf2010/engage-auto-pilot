@@ -27,12 +27,17 @@ const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
     e.stopPropagation();
     console.log('NavigationItem clicked:', item.label, 'navigating to:', item.path);
     console.log('Current location:', location.pathname);
+    console.log('Navigate function available:', typeof navigate);
     
     try {
+      console.log('Attempting navigation...');
       navigate(item.path);
       console.log('Navigation completed successfully to:', item.path);
     } catch (error) {
       console.error('Navigation error:', error);
+      // Try alternative navigation method
+      console.log('Trying window.location.href as fallback...');
+      window.location.href = item.path;
     }
   };
 
@@ -40,7 +45,8 @@ const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
     label: item.label,
     path: item.path,
     isActive,
-    currentPath: location.pathname
+    currentPath: location.pathname,
+    icon: !!Icon
   });
 
   return (
