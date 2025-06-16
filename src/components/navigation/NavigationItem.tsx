@@ -25,25 +25,8 @@ const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('NavigationItem clicked:', item.label, 'navigating to:', item.path);
-    console.log('Current location:', location.pathname);
-    
-    try {
-      navigate(item.path);
-      console.log('Navigation completed successfully to:', item.path);
-    } catch (error) {
-      console.error('Navigation error:', error);
-      window.location.href = item.path;
-    }
+    navigate(item.path);
   };
-
-  console.log('NavigationItem rendering:', {
-    label: item.label,
-    path: item.path,
-    isActive,
-    currentPath: location.pathname,
-    icon: !!Icon
-  });
 
   return (
     <HoverCard openDelay={100} closeDelay={100}>

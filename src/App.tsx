@@ -18,8 +18,6 @@ import MessageExportPage from "@/pages/MessageExportPage";
 const queryClient = new QueryClient();
 
 function App() {
-  console.log('App component rendering...');
-  
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -47,12 +45,7 @@ function App() {
               <Route path="/inventory" element={
                 <ProtectedRoute>
                   <Layout>
-                    <div className="p-6">
-                      <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded">
-                        Debug: Successfully reached /inventory route
-                      </div>
-                      <InventoryDashboardPage />
-                    </div>
+                    <InventoryDashboardPage />
                   </Layout>
                 </ProtectedRoute>
               } />
