@@ -2,14 +2,13 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardPage from '@/pages/Index';
 import LeadsPage from '@/pages/StreamlinedLeadsPage';
 import StreamlinedLeadsPage from '@/pages/StreamlinedLeadsPage';
 import InventoryDashboardPage from '@/pages/InventoryDashboardPage';
 import SmartInboxPage from '@/pages/SmartInboxPage';
 import PredictiveAnalyticsPage from '@/pages/PredictiveAnalyticsPage';
-import Sidebar from '@/components/Sidebar';
 import StreamlinedNavigation from '@/components/StreamlinedNavigation';
 import SettingsPage from '@/pages/Index';
 import MessageExportPage from "@/pages/MessageExportPage";
@@ -25,7 +24,6 @@ function App() {
             <Route path="/" element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <StreamlinedNavigation />
                     <main className="flex-1 overflow-auto">
@@ -39,7 +37,6 @@ function App() {
             <Route path="/leads" element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <StreamlinedNavigation />
                     <main className="flex-1 overflow-auto">
@@ -53,7 +50,6 @@ function App() {
             <Route path="/streamlined-leads" element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <StreamlinedNavigation />
                     <main className="flex-1 overflow-auto">
@@ -67,7 +63,6 @@ function App() {
             <Route path="/inventory" element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <StreamlinedNavigation />
                     <main className="flex-1 overflow-auto">
@@ -81,7 +76,6 @@ function App() {
             <Route path="/smart-inbox" element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <StreamlinedNavigation />
                     <main className="flex-1 overflow-auto">
@@ -95,7 +89,6 @@ function App() {
             <Route path="/predictive-analytics" element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <StreamlinedNavigation />
                     <main className="flex-1 overflow-auto">
@@ -109,7 +102,6 @@ function App() {
             <Route path="/settings" element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <StreamlinedNavigation />
                     <main className="flex-1 overflow-auto">
@@ -123,7 +115,6 @@ function App() {
             <Route path="/message-export" element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <StreamlinedNavigation />
                     <main className="flex-1 overflow-auto">

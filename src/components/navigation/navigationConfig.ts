@@ -1,4 +1,3 @@
-
 import {
   Home,
   LayoutDashboard,
@@ -27,6 +26,12 @@ export interface NavigationItem {
   label: string;
   icon: any;
   badge?: string;
+  color?: string;
+  hoverActions?: Array<{
+    label: string;
+    icon: any;
+    action: () => void;
+  }>;
 }
 
 export const navigationConfig: NavConfig[] = [
@@ -94,6 +99,8 @@ export const getNavigationItems = (userRole: string, navigate: (path: string) =>
       path: item.href,
       label: item.title,
       icon: item.icon,
-      badge: item.badge
+      badge: item.badge,
+      color: 'blue', // Default color
+      hoverActions: [] // Default empty actions
     }));
 };
