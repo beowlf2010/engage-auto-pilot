@@ -7,12 +7,14 @@ import type { MessageData } from '@/types/conversation';
 export const useConversationData = () => {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const loadMessages = useCallback(async (leadId: string) => {
     if (!leadId) return;
     
     setMessagesLoading(true);
+    setMessagesError(null);
     try {
       const { data, error } = await supabase
         .from('conversations')
@@ -22,11 +24,13 @@ export const useConversationData = () => {
 
       if (error) {
         console.error('Error loading messages:', error);
+        setMessagesError(error.message);
         return;
       }
 
       const transformedMessages: MessageData[] = data.map(msg => ({
         id: msg.id,
+        leadId: msg.lead_id, // Add the missing leadId property
         body: msg.body,
         direction: msg.direction as 'in' | 'out',
         sentAt: msg.sent_at,
@@ -37,6 +41,7 @@ export const useConversationData = () => {
       setMessages(transformedMessages);
     } catch (error) {
       console.error('Error loading messages:', error);
+      setMessagesError(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setMessagesLoading(false);
     }
@@ -82,7 +87,9 @@ export const useConversationData = () => {
   return {
     messages,
     messagesLoading,
+    messagesError,
     loadMessages,
-    sendMessage
+    sendMessage,
+    setMessages
   };
 };

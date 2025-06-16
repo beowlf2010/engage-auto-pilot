@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -5,14 +6,12 @@ import { Send, Loader2, MessageSquare, AlertTriangle, Wifi, WifiOff } from 'luci
 import MessageBubble from '@/components/inbox/MessageBubble';
 import { useConversationData } from '@/hooks/useConversationData';
 import { toast } from '@/hooks/use-toast';
-import { useCompliance } from "@/hooks/useCompliance";
 
 interface LeadMessagingProps {
   leadId: string;
 }
 
 const LeadMessaging = ({ leadId }: LeadMessagingProps) => {
-  const compliance = useCompliance();
   const { messages, messagesLoading, messagesError, loadMessages, sendMessage, setMessages } = useConversationData();
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -51,47 +50,32 @@ const LeadMessaging = ({ leadId }: LeadMessagingProps) => {
   }, []);
 
   const handleSend = async () => {
-    // ENFORCE consent before outbound message
-    try {
-      await compliance.enforceConsent(leadId, "sms");
-      if (newMessage.trim() && !isSending && leadId) {
-        if (connectionStatus === 'disconnected') {
-          toast({
-            title: "No Internet Connection",
-            description: "Please check your internet connection and try again.",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        setIsSending(true);
-        try {
-          console.log('LeadMessaging: Sending message:', newMessage.trim());
-          const result = await sendMessage(leadId, newMessage.trim(), {
-            checkSuppressed: compliance.checkSuppressed,
-            enforceConsent: compliance.enforceConsent,
-            storeConsent: compliance.storeConsent
-          });
-          
-          if (result.warning) {
-            console.log('Message sent with warning:', result.warning);
-          }
-          
-          setNewMessage('');
-        } catch (err) {
-          console.error("Failed to send message from LeadMessaging", err);
-          // Error handling is already done in the sendMessage service
-        } finally {
-          setIsSending(false);
-        }
+    if (newMessage.trim() && !isSending && leadId) {
+      if (connectionStatus === 'disconnected') {
+        toast({
+          title: "No Internet Connection",
+          description: "Please check your internet connection and try again.",
+          variant: "destructive"
+        });
+        return;
       }
-    } catch (err) {
-      toast({
-        title: "Consent Not Found",
-        description: "This lead cannot be messaged until opt-in is recorded.",
-        variant: "destructive"
-      });
-      return;
+
+      setIsSending(true);
+      try {
+        console.log('LeadMessaging: Sending message:', newMessage.trim());
+        const result = await sendMessage(leadId, newMessage.trim());
+        
+        if (result.warning) {
+          console.log('Message sent with warning:', result.warning);
+        }
+        
+        setNewMessage('');
+      } catch (err) {
+        console.error("Failed to send message from LeadMessaging", err);
+        // Error handling is already done in the sendMessage service
+      } finally {
+        setIsSending(false);
+      }
     }
   };
 
