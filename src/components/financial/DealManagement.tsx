@@ -12,6 +12,7 @@ import ProfitChangesReport from "./deal-management/ProfitChangesReport";
 import { useDealManagement } from "./deal-management/DealManagementLogic";
 import { DealManagementProps } from "./deal-management/DealManagementTypes";
 import { filterDeals, calculateSummaryTotals, formatCurrency, getAdjustedGrossProfit } from "./deal-management/DealManagementUtils";
+import ExportDropdown from "./deal-management/ExportDropdown";
 
 const DealManagement = ({ 
   user, 
@@ -167,10 +168,12 @@ const DealManagement = ({
                   Manage deal types and view financial performance by category. Wholesale and dealer trade deals are automatically locked but can be unlocked manually if needed.
                 </CardDescription>
               </div>
-              <Button onClick={handlePrint} className="print:hidden">
-                <Printer className="w-4 h-4 mr-2" />
-                Print Report
-              </Button>
+              <ExportDropdown 
+                deals={filteredDeals}
+                packAdjustment={packAdjustment}
+                packAdjustmentEnabled={packAdjustmentEnabled}
+                reportType="deal-management"
+              />
             </CardHeader>
             <CardContent>
               <DealFilters

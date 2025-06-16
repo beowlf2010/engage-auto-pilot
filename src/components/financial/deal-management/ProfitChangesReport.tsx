@@ -1,8 +1,6 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Printer } from "lucide-react";
 import { 
   getProfitChangesForPeriod, 
   calculateProfitChangesSummary,
@@ -11,6 +9,7 @@ import {
 import ProfitChangesSummaryCards from "./profit-changes/ProfitChangesSummaryCards";
 import ProfitChangesPrintHeader from "./profit-changes/ProfitChangesPrintHeader";
 import ProfitChangesTable from "./profit-changes/ProfitChangesTable";
+import ExportDropdown from "./ExportDropdown";
 
 interface ProfitChangesReportProps {
   startDate?: string;
@@ -42,9 +41,21 @@ const ProfitChangesReport = ({
 
   const summary = calculateProfitChangesSummary(profitHistory);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  // Convert profit history records to Deal format for export
+  const dealsForExport = summary.changesDetected.map(record => ({
+    id: record.id,
+    stock_number: record.stock_number,
+    year_model: record.stock_number || 'Unknown',
+    buyer_name: 'N/A',
+    deal_type: 'N/A',
+    sale_amount: 0,
+    gross_profit: record.gross_profit || 0,
+    fi_profit: record.fi_profit || 0,
+    total_profit: record.total_profit || 0,
+    upload_date: record.snapshot_date,
+    age: 0,
+    deal_type_locked: false
+  }));
 
   if (loading) {
     return (
@@ -74,10 +85,12 @@ const ProfitChangesReport = ({
               Deals with profit changes in the selected period (Total Profit includes pack adjustments)
             </CardDescription>
           </div>
-          <Button onClick={handlePrint} className="print:hidden">
-            <Printer className="w-4 h-4 mr-2" />
-            Print Report
-          </Button>
+          <ExportDropdown 
+            deals={dealsForExport}
+            packAdjustment={0}
+            packAdjustmentEnabled={false}
+            reportType="profit-changes"
+          />
         </CardHeader>
         <CardContent>
           <ProfitChangesTable summary={summary} />
