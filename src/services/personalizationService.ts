@@ -68,14 +68,14 @@ export const analyzeLeadPersonality = async (leadId: string): Promise<LeadPerson
         .eq('lead_id', leadId)
         .select()
         .single();
-      return data;
+      return data as LeadPersonality;
     } else {
       const { data } = await supabase
         .from('lead_personalities')
         .insert(personalityData)
         .select()
         .single();
-      return data;
+      return data as LeadPersonality;
     }
   } catch (error) {
     console.error('Error analyzing lead personality:', error);

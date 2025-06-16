@@ -136,7 +136,7 @@ const getUrgencyLevel = (score: number): 'low' | 'medium' | 'high' | 'critical' 
 // Process pending enhanced triggers
 export const processPendingEnhancedTriggers = async (): Promise<void> => {
   try {
-    const { data: triggers } = await supabase
+    const { data: triggers, error } = await supabase
       .from('enhanced_behavioral_triggers' as any)
       .select('*')
       .eq('processed', false)
@@ -144,13 +144,21 @@ export const processPendingEnhancedTriggers = async (): Promise<void> => {
       .order('trigger_score', { ascending: false })
       .limit(10);
 
+    if (error) {
+      console.error('Error fetching triggers:', error);
+      return;
+    }
+
     for (const trigger of triggers || []) {
       try {
+        // Type assertion to handle the any type
+        const typedTrigger = trigger as any;
+        
         // Generate personalized message based on trigger
-        const message = await generatePersonalizedMessage(trigger.lead_id, {
-          trigger_type: trigger.trigger_type,
-          trigger_data: trigger.trigger_data,
-          urgency_level: trigger.urgency_level
+        const message = await generatePersonalizedMessage(typedTrigger.lead_id, {
+          trigger_type: typedTrigger.trigger_type,
+          trigger_data: typedTrigger.trigger_data,
+          urgency_level: typedTrigger.urgency_level
         });
 
         if (message) {
@@ -158,10 +166,10 @@ export const processPendingEnhancedTriggers = async (): Promise<void> => {
           await supabase
             .from('ai_trigger_messages' as any)
             .insert({
-              lead_id: trigger.lead_id,
-              trigger_id: trigger.id,
+              lead_id: typedTrigger.lead_id,
+              trigger_id: typedTrigger.id,
               message_content: message,
-              urgency_level: trigger.urgency_level,
+              urgency_level: typedTrigger.urgency_level,
               generated_at: new Date().toISOString(),
               approved: false
             });
@@ -171,11 +179,11 @@ export const processPendingEnhancedTriggers = async (): Promise<void> => {
         await supabase
           .from('enhanced_behavioral_triggers' as any)
           .update({ processed: true })
-          .eq('id', trigger.id);
+          .eq('id', typedTrigger.id);
 
-        console.log(`Processed enhanced trigger ${trigger.id} for lead ${trigger.lead_id}`);
+        console.log(`Processed enhanced trigger ${typedTrigger.id} for lead ${typedTrigger.lead_id}`);
       } catch (error) {
-        console.error(`Error processing trigger ${trigger.id}:`, error);
+        console.error(`Error processing trigger:`, error);
       }
     }
   } catch (error) {
