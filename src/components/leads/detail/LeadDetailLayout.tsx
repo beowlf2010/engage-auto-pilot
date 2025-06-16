@@ -49,7 +49,7 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   const handleSendMessage = async (message: string): Promise<void> => {
     try {
       console.log("Sending message:", message);
-      await sendMessage(lead.id, message, false, {
+      await sendMessage(lead.id, message, {
         checkSuppressed: compliance.checkSuppressed,
         enforceConsent: compliance.enforceConsent,
         storeConsent: compliance.storeConsent
