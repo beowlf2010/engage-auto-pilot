@@ -95,7 +95,21 @@ export const getNavigationItems = (userRole: string, navigate: (path: string) =>
       label: item.title,
       icon: item.icon,
       badge: item.badge,
-      color: 'blue', // Default color
-      hoverActions: [] // Default empty actions
+      color: getItemColor(item.title),
+      hoverActions: []
     }));
+};
+
+const getItemColor = (title: string): string => {
+  const colorMap: { [key: string]: string } = {
+    'Dashboard': 'blue',
+    'Leads': 'green',
+    'Streamlined Leads': 'purple',
+    'Smart Inbox': 'orange',
+    'Inventory': 'red',
+    'Predictive Analytics': 'blue',
+    'Message Export': 'gray',
+    'Settings': 'gray'
+  };
+  return colorMap[title] || 'blue';
 };
