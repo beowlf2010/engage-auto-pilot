@@ -1,8 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +12,7 @@ interface EmailRequest {
   subject: string;
   html: string;
   text?: string;
-  from?: string; // Optionally allow custom sender
+  from?: string;
 }
 
 serve(async (req: Request) => {
@@ -34,18 +31,41 @@ serve(async (req: Request) => {
       );
     }
 
-    // Use a default sender address if not provided
-    const sender = from || "CRM <onboarding@resend.dev>";
+    const postmarkApiKey = Deno.env.get("POSTMARK_API_KEY");
+    if (!postmarkApiKey) {
+      throw new Error("POSTMARK_API_KEY not configured");
+    }
 
-    const emailResponse = await resend.emails.send({
-      from: sender,
-      to: [to],
-      subject,
-      html,
-      text,
+    // Use a default sender address if not provided
+    const sender = from || "CRM <noreply@yourdomain.com>";
+
+    const postmarkPayload = {
+      From: sender,
+      To: to,
+      Subject: subject,
+      HtmlBody: html,
+      TextBody: text || "",
+      MessageStream: "outbound"
+    };
+
+    const postmarkResponse = await fetch("https://api.postmarkapp.com/email", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-Postmark-Server-Token": postmarkApiKey
+      },
+      body: JSON.stringify(postmarkPayload)
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    if (!postmarkResponse.ok) {
+      const errorData = await postmarkResponse.json();
+      throw new Error(`Postmark API error: ${errorData.Message || 'Unknown error'}`);
+    }
+
+    const emailResponse = await postmarkResponse.json();
+
+    console.log("Email sent successfully via Postmark:", emailResponse);
 
     return new Response(JSON.stringify({ success: true, result: emailResponse }), {
       status: 200,

@@ -84,10 +84,18 @@ const EmailSettings = ({ userRole }: EmailSettingsProps) => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Mail className="w-5 h-5" />
-                <span>Email Configuration</span>
+                <span>Email Configuration (Postmark)</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-blue-800 mb-2">Postmark Integration</h4>
+                <p className="text-sm text-blue-700">
+                  This system uses Postmark for email delivery, which supports both sending and receiving emails. 
+                  Make sure your Postmark server is configured with a verified sender signature.
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="from_name">Default From Name</Label>
@@ -112,7 +120,7 @@ const EmailSettings = ({ userRole }: EmailSettingsProps) => {
                     placeholder="your.email@dealership.com"
                   />
                   <p className="text-xs text-gray-500">
-                    Make sure this email is verified with your email provider
+                    Make sure this email is verified as a sender signature in Postmark
                   </p>
                 </div>
               </div>

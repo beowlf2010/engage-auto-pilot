@@ -125,7 +125,7 @@ class EmailService {
         to: cleanEmail
       };
 
-      // Send email via Resend
+      // Send email via Postmark through our edge function
       const { data, error } = await supabase.functions.invoke('send-email', {
         body: cleanedEmailData
       });
@@ -143,11 +143,11 @@ class EmailService {
           body: emailData.html,
           sent_at: new Date().toISOString(),
           email_status: 'sent',
-          resend_message_id: data.result?.id
+          resend_message_id: data.result?.MessageID || data.result?.id
         });
       }
 
-      return { success: true, messageId: data.result?.id };
+      return { success: true, messageId: data.result?.MessageID || data.result?.id };
     } catch (error) {
       console.error('Error sending email:', error);
       
