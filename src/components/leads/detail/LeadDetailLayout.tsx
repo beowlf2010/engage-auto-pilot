@@ -1,15 +1,8 @@
 
-import React, { useState, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, MessageSquare } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
-import LeadDetailHeader from "./LeadDetailHeader";
-import LeadInfoCardsSection from "./LeadInfoCardsSection";
-import EnhancedMessageThread from "./EnhancedMessageThread";
-import ActivityTimelineComponent from "./ActivityTimelineComponent";
-import EmailTab from "./EmailTab";
+import LeadDetailPageHeader from "./LeadDetailPageHeader";
+import LeadDetailGrid from "./LeadDetailGrid";
 import type { Lead } from "@/types/lead";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
@@ -34,7 +27,6 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   setShowMessageComposer,
   onPhoneSelect
 }) => {
-  const navigate = useNavigate();
   const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
 
   // Load messages when component mounts or lead changes
@@ -57,104 +49,24 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
     }
   };
 
-  // Transform lead for header component
-  const headerLead = {
-    id: lead.id,
-    first_name: lead.firstName,
-    last_name: lead.lastName,
-    email: lead.email,
-    status: lead.status,
-    vehicle_interest: lead.vehicleInterest,
-    city: lead.city,
-    state: lead.state,
-    created_at: lead.createdAt
-  };
-
   // Use the messages from the conversation hook if available, otherwise use lead conversations
   const conversationMessages = messages.length > 0 ? messages : lead.conversations;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/leads")}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Leads
-              </Button>
-            </div>
-            <Button
-              onClick={() => setShowMessageComposer(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Send Message
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Lead Info */}
-          <div className="lg:col-span-1">
-            <div className="space-y-6">
-              <LeadDetailHeader lead={headerLead} />
-              <LeadInfoCardsSection 
-                lead={lead} 
-                phoneNumbers={phoneNumbers}
-                primaryPhone={primaryPhone}
-                onPhoneSelect={onPhoneSelect}
-              />
-            </div>
-          </div>
-
-          {/* Right Column - Tabs */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="messages" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="messages">Messages</TabsTrigger>
-                <TabsTrigger value="activity">Activity</TabsTrigger>
-                <TabsTrigger value="email">Email</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="messages" className="space-y-4">
-                <div className="h-[600px]">
-                  <EnhancedMessageThread
-                    messages={conversationMessages}
-                    onSendMessage={handleSendMessage}
-                    isLoading={messagesLoading}
-                    leadName={`${lead.firstName} ${lead.lastName}`}
-                    disabled={false}
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="activity" className="space-y-0">
-                <div className="h-[600px]">
-                  <ActivityTimelineComponent
-                    activities={lead.activityTimeline}
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="email" className="space-y-0">
-                <div className="h-[600px]">
-                  <EmailTab leadId={lead.id} />
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
-      </div>
+      <LeadDetailPageHeader 
+        onSendMessage={() => setShowMessageComposer(true)} 
+      />
+      
+      <LeadDetailGrid
+        lead={lead}
+        phoneNumbers={phoneNumbers}
+        primaryPhone={primaryPhone}
+        messages={conversationMessages}
+        messagesLoading={messagesLoading}
+        onPhoneSelect={onPhoneSelect}
+        onSendMessage={handleSendMessage}
+      />
     </div>
   );
 };
