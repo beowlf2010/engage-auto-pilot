@@ -60,7 +60,6 @@ const QuickControlsCard: React.FC<QuickControlsCardProps> = ({
               <Switch
                 checked={aiOptIn}
                 onCheckedChange={onAIOptInChange}
-                size="sm"
               />
               <Badge variant={aiOptIn ? "default" : "secondary"} className="text-xs">
                 {aiOptIn ? "ON" : "OFF"}
@@ -79,7 +78,6 @@ const QuickControlsCard: React.FC<QuickControlsCardProps> = ({
                 checked={automation.enabled}
                 onCheckedChange={handleEmailToggle}
                 disabled={loading}
-                size="sm"
               />
               <Badge variant={automation.enabled ? "default" : "secondary"} className="text-xs">
                 {automation.enabled ? "ON" : "OFF"}
