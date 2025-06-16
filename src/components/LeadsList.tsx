@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Users, MessageSquare, UserCheck, UserX, Plus } from "lucide-react";
+import { Search, Users, MessageSquare, UserCheck, UserX, Plus, Upload } from "lucide-react";
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -13,6 +13,7 @@ import LeadsTable from './LeadsTable';
 import LeadQuickView from './leads/LeadQuickView';
 import BulkActionsPanel from './leads/BulkActionsPanel';
 import EnhancedLeadSearch, { SearchFilters, SavedPreset } from './leads/EnhancedLeadSearch';
+import VINImportModal from './leads/VINImportModal';
 import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
 import { Lead } from '@/types/lead';
 import LeadsStatsCards from './leads/LeadsStatsCards';
@@ -32,8 +33,10 @@ const LeadsList = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({ searchTerm: '' });
   const [savedPresets] = useState<SavedPreset[]>([]);
+  const [isVINImportModalOpen, setIsVINImportModalOpen] = useState(false);
 
   const canEdit = profile?.role === 'manager' || profile?.role === 'admin';
+  const canImport = profile?.role === 'manager' || profile?.role === 'admin';
 
   // Simple filter implementation
   const filteredLeads = leads.filter(lead => {
@@ -294,6 +297,14 @@ const LeadsList = () => {
     });
   };
 
+  const handleVINImportSuccess = () => {
+    refetch();
+    toast({
+      title: "Import successful",
+      description: "VIN data has been imported and leads have been updated",
+    });
+  };
+
   // Transform selected leads for BulkActionsPanel
   const selectedLeadObjects = leads.filter(lead => 
     selectedLeads.includes(lead.id.toString())
@@ -338,10 +349,18 @@ const LeadsList = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Leads</h1>
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Lead
-        </Button>
+        <div className="flex space-x-2">
+          {canImport && (
+            <Button variant="outline" onClick={() => setIsVINImportModalOpen(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Import from VIN
+            </Button>
+          )}
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Lead
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -394,6 +413,13 @@ const LeadsList = () => {
           onSchedule={handleSchedule}
         />
       )}
+
+      {/* VIN Import Modal */}
+      <VINImportModal
+        isOpen={isVINImportModalOpen}
+        onClose={() => setIsVINImportModalOpen(false)}
+        onImportSuccess={handleVINImportSuccess}
+      />
     </div>
   );
 };
