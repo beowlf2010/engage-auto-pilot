@@ -1001,6 +1001,50 @@ export type Database = {
           },
         ]
       }
+      historical_messages: {
+        Row: {
+          content: string
+          created_at: string
+          direction: string
+          id: string
+          lead_id: string | null
+          message_metadata: Json | null
+          original_message_id: string | null
+          sent_at: string
+          source_system: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          direction: string
+          id?: string
+          lead_id?: string | null
+          message_metadata?: Json | null
+          original_message_id?: string | null
+          sent_at: string
+          source_system?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          lead_id?: string | null
+          message_metadata?: Json | null
+          original_message_id?: string | null
+          sent_at?: string
+          source_system?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historical_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           accidents_reported: number | null
@@ -1926,6 +1970,100 @@ export type Database = {
           seasonal_factor?: number | null
         }
         Relationships: []
+      }
+      message_exports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          export_data: Json
+          export_name: string
+          id: string
+          processed: boolean
+          processed_at: string | null
+          source_system: string
+          total_leads: number
+          total_messages: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          export_data?: Json
+          export_name: string
+          id?: string
+          processed?: boolean
+          processed_at?: string | null
+          source_system?: string
+          total_leads?: number
+          total_messages?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          export_data?: Json
+          export_name?: string
+          id?: string
+          processed?: boolean
+          processed_at?: string | null
+          source_system?: string
+          total_leads?: number
+          total_messages?: number
+        }
+        Relationships: []
+      }
+      message_import_mapping: {
+        Row: {
+          created_at: string
+          export_id: string | null
+          external_lead_id: string
+          external_message_id: string | null
+          id: string
+          internal_lead_id: string | null
+          internal_message_id: string | null
+          mapping_status: string
+        }
+        Insert: {
+          created_at?: string
+          export_id?: string | null
+          external_lead_id: string
+          external_message_id?: string | null
+          id?: string
+          internal_lead_id?: string | null
+          internal_message_id?: string | null
+          mapping_status?: string
+        }
+        Update: {
+          created_at?: string
+          export_id?: string | null
+          external_lead_id?: string
+          external_message_id?: string | null
+          id?: string
+          internal_lead_id?: string | null
+          internal_message_id?: string | null
+          mapping_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_import_mapping_export_id_fkey"
+            columns: ["export_id"]
+            isOneToOne: false
+            referencedRelation: "message_exports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_import_mapping_internal_lead_id_fkey"
+            columns: ["internal_lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_import_mapping_internal_message_id_fkey"
+            columns: ["internal_message_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       message_sentiment: {
         Row: {

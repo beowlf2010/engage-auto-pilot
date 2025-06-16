@@ -1,128 +1,80 @@
+import {
+  Home,
+  LayoutDashboard,
+  Settings,
+  User,
+  Users,
+  Calendar,
+  Mail,
+  Package,
+  TrendingUp,
+  BarChart3,
+  Brain,
+  Upload
+} from "lucide-react"
 
-import { LucideIcon, BarChart3, Users, MessageSquare, Upload, Settings, Car, DollarSign, Shield, Brain, TrendingUp } from 'lucide-react';
-
-export interface NavigationItem {
-  label: string;
-  path: string;
-  icon: LucideIcon;
-  color: string;
-  hoverActions?: Array<{
-    label: string;
-    icon: LucideIcon;
-    action: () => void;
-  }>;
+interface NavConfig {
+  title: string
+  href: string
+  icon: any
+  roles: string[]
+  badge?: string
 }
 
-export const getNavigationItems = (userRole: string, navigate: (path: string) => void): NavigationItem[] => {
-  const baseItems: NavigationItem[] = [
-    {
-      label: 'Dashboard',
-      path: '/dashboard',
-      icon: BarChart3,
-      color: 'blue',
-      hoverActions: [
-        {
-          label: 'View Analytics',
-          icon: BarChart3,
-          action: () => navigate('/dashboard')
-        }
-      ]
-    },
-    {
-      label: 'Leads',
-      path: '/leads',
-      icon: Users,
-      color: 'green',
-      hoverActions: [
-        {
-          label: 'Add New Lead',
-          icon: Users,
-          action: () => navigate('/leads')
-        }
-      ]
-    },
-    {
-      label: 'Smart Inbox',
-      path: '/inbox',
-      icon: MessageSquare,
-      color: 'purple',
-      hoverActions: [
-        {
-          label: 'AI Monitor',
-          icon: Shield,
-          action: () => navigate('/ai-monitor')
-        }
-      ]
-    },
-    {
-      label: 'Inventory',
-      path: '/inventory-dashboard',
-      icon: Car,
-      color: 'orange',
-      hoverActions: [
-        {
-          label: 'View Inventory',
-          icon: Car,
-          action: () => navigate('/inventory-dashboard')
-        }
-      ]
-    }
-  ];
-
-  const managerItems: NavigationItem[] = [
-    {
-      label: 'Predictive Analytics',
-      path: '/predictive-analytics',
-      icon: Brain,
-      color: 'purple',
-      hoverActions: [
-        {
-          label: 'Sales Forecast',
-          icon: TrendingUp,
-          action: () => navigate('/predictive-analytics')
-        },
-        {
-          label: 'Inventory Demand',
-          icon: Car,
-          action: () => navigate('/predictive-analytics')
-        }
-      ]
-    },
-    {
-      label: 'Financial',
-      path: '/financial-dashboard',
-      icon: DollarSign,
-      color: 'red',
-      hoverActions: [
-        {
-          label: 'Upload Reports',
-          icon: Upload,
-          action: () => navigate('/upload-leads')
-        }
-      ]
-    }
-  ];
-
-  const allItems = [...baseItems];
-
-  if (['manager', 'admin'].includes(userRole)) {
-    allItems.push(...managerItems);
-  }
-
-  // Add settings for all users
-  allItems.push({
-    label: 'Settings',
-    path: '/settings',
+export const navigationConfig: NavConfig[] = [
+  {
+    title: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    roles: ["admin", "manager", "salesperson"],
+  },
+  {
+    title: "Leads",
+    href: "/leads",
+    icon: Users,
+    roles: ["admin", "manager", "salesperson"],
+  },
+  {
+    title: "Streamlined Leads",
+    href: "/streamlined-leads",
+    icon: User,
+    roles: ["admin", "manager", "salesperson"],
+  },
+  {
+    title: "Smart Inbox",
+    href: "/smart-inbox",
+    icon: Mail,
+    roles: ["admin", "manager", "salesperson"],
+  },
+  {
+    title: "Inventory",
+    href: "/inventory",
+    icon: Package,
+    roles: ["admin", "manager", "salesperson"],
+  },
+  {
+    title: "Inventory Dashboard",
+    href: "/inventory-dashboard",
+    icon: BarChart3,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "Predictive Analytics",
+    href: "/predictive-analytics",
+    icon: Brain,
+    roles: ["admin", "manager"],
+  },
+  {
+    title: "Message Export",
+    href: "/message-export",
+    icon: Upload,
+    roles: ["admin", "manager"],
+    badge: "New"
+  },
+  {
+    title: "Settings",
+    href: "/settings",
     icon: Settings,
-    color: 'gray',
-    hoverActions: [
-      {
-        label: 'Account Settings',
-        icon: Settings,
-        action: () => navigate('/settings')
-      }
-    ]
-  });
-
-  return allItems;
-};
+    roles: ["admin"],
+  },
+]

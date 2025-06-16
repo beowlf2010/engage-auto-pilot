@@ -1,116 +1,139 @@
-
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/components/auth/AuthProvider";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import LeadDetailPage from "./pages/LeadDetailPage";
-import AIMonitorPage from "./pages/AIMonitorPage";
-import AdvancedAnalyticsPage from "./pages/AdvancedAnalyticsPage";
-import PersonalizationPage from "./pages/PersonalizationPage";
-import PredictiveAnalyticsPage from "./pages/PredictiveAnalyticsPage";
-import InventoryDashboardPage from "./pages/InventoryDashboardPage";
-import InventoryUploadPage from "./pages/InventoryUploadPage";
-import RPOInsightsPage from "./pages/RPOInsightsPage";
-import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient();
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { QueryClient } from './QueryClient';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import DashboardPage from '@/pages/DashboardPage';
+import LeadsPage from '@/pages/LeadsPage';
+import StreamlinedLeadsPage from '@/pages/StreamlinedLeadsPage';
+import InventoryDashboardPage from '@/pages/InventoryDashboardPage';
+import SmartInboxPage from '@/pages/SmartInboxPage';
+import PredictiveAnalyticsPage from '@/pages/PredictiveAnalyticsPage';
+import Sidebar from '@/components/navigation/Sidebar';
+import StreamlinedNavigation from '@/components/navigation/StreamlinedNavigation';
+import SettingsPage from '@/pages/SettingsPage';
+import MessageExportPage from "@/pages/MessageExportPage";
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/leads" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/leads/:id" element={
-                <ProtectedRoute>
-                  <LeadDetailPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/inbox" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/upload-leads" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/financial-dashboard" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/inventory-dashboard" element={
-                <ProtectedRoute>
-                  <InventoryDashboardPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/inventory-upload" element={
-                <ProtectedRoute>
-                  <InventoryUploadPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/rpo-insights" element={
-                <ProtectedRoute>
-                  <RPOInsightsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/ai-monitor" element={
-                <ProtectedRoute>
-                  <AIMonitorPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/advanced-analytics" element={
-                <ProtectedRoute>
-                  <AdvancedAnalyticsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/personalization" element={
-                <ProtectedRoute>
-                  <PersonalizationPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/predictive-analytics" element={
-                <ProtectedRoute>
-                  <PredictiveAnalyticsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <QueryClient>
+      <Router>
+        <div className="min-h-screen bg-gray-50">
+          <Routes>
+            <Route path="/" element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-gray-50">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <StreamlinedNavigation />
+                    <main className="flex-1 overflow-auto">
+                      <DashboardPage />
+                    </main>
+                  </div>
+                </div>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/leads" element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-gray-50">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <StreamlinedNavigation />
+                    <main className="flex-1 overflow-auto">
+                      <LeadsPage />
+                    </main>
+                  </div>
+                </div>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/streamlined-leads" element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-gray-50">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <StreamlinedNavigation />
+                    <main className="flex-1 overflow-auto">
+                      <StreamlinedLeadsPage />
+                    </main>
+                  </div>
+                </div>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/inventory" element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-gray-50">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <StreamlinedNavigation />
+                    <main className="flex-1 overflow-auto">
+                      <InventoryDashboardPage />
+                    </main>
+                  </div>
+                </div>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/smart-inbox" element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-gray-50">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <StreamlinedNavigation />
+                    <main className="flex-1 overflow-auto">
+                      <SmartInboxPage />
+                    </main>
+                  </div>
+                </div>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/predictive-analytics" element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-gray-50">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <StreamlinedNavigation />
+                    <main className="flex-1 overflow-auto">
+                      <PredictiveAnalyticsPage />
+                    </main>
+                  </div>
+                </div>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-gray-50">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <StreamlinedNavigation />
+                    <main className="flex-1 overflow-auto">
+                      <SettingsPage />
+                    </main>
+                  </div>
+                </div>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/message-export" element={
+              <ProtectedRoute>
+                <div className="flex h-screen bg-gray-50">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <StreamlinedNavigation />
+                    <main className="flex-1 overflow-auto">
+                      <MessageExportPage />
+                    </main>
+                  </div>
+                </div>
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </div>
+      </Router>
+    </QueryClient>
   );
 }
 
