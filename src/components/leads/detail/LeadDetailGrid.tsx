@@ -41,6 +41,7 @@ const LeadDetailGrid: React.FC<LeadDetailGridProps> = ({
           <ContactInfoCard 
             lead={lead} 
             phoneNumbers={phoneNumbers}
+            primaryPhone={primaryPhone}
             onPhoneSelect={onPhoneSelect}
           />
           <VehicleInfoCard lead={lead} />
