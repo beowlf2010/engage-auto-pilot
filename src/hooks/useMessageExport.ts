@@ -8,7 +8,7 @@ import {
   parseVINExportFile,
   parseVINExcelFile,
   type VINMessageExport 
-} from '@/services/messageExportService';
+} from '@/services/messageExport';
 
 export const useMessageExport = () => {
   const { toast } = useToast();
