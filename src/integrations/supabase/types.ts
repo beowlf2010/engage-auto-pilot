@@ -365,6 +365,47 @@ export type Database = {
           },
         ]
       }
+      conversation_summaries: {
+        Row: {
+          created_at: string
+          id: string
+          key_points: Json | null
+          last_message_at: string | null
+          lead_id: string
+          message_count: number
+          summary_text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_points?: Json | null
+          last_message_at?: string | null
+          lead_id: string
+          message_count?: number
+          summary_text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_points?: Json | null
+          last_message_at?: string | null
+          lead_id?: string
+          message_count?: number
+          summary_text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_summaries_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           ai_generated: boolean
@@ -1490,6 +1531,44 @@ export type Database = {
         }
         Relationships: []
       }
+      message_sentiment: {
+        Row: {
+          confidence_score: number
+          conversation_id: string
+          created_at: string
+          emotions: Json | null
+          id: string
+          sentiment_label: string
+          sentiment_score: number
+        }
+        Insert: {
+          confidence_score?: number
+          conversation_id: string
+          created_at?: string
+          emotions?: Json | null
+          id?: string
+          sentiment_label?: string
+          sentiment_score?: number
+        }
+        Update: {
+          confidence_score?: number
+          conversation_id?: string
+          created_at?: string
+          emotions?: Json | null
+          id?: string
+          sentiment_label?: string
+          sentiment_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_sentiment_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_templates: {
         Row: {
           category: string
@@ -1886,6 +1965,47 @@ export type Database = {
             columns: ["inventory_id"]
             isOneToOne: false
             referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      response_suggestions: {
+        Row: {
+          confidence_score: number
+          context_type: string
+          created_at: string
+          id: string
+          lead_id: string
+          success_count: number
+          suggestion_text: string
+          usage_count: number
+        }
+        Insert: {
+          confidence_score?: number
+          context_type?: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          success_count?: number
+          suggestion_text: string
+          usage_count?: number
+        }
+        Update: {
+          confidence_score?: number
+          context_type?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          success_count?: number
+          suggestion_text?: string
+          usage_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "response_suggestions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]

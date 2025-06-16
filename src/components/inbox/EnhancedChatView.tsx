@@ -17,11 +17,16 @@ import {
   MapPin,
   Mail,
   Calendar,
-  Sparkles
+  Sparkles,
+  BarChart3
 } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import LeadContextPanel from './LeadContextPanel';
 import AIMessageGenerator from './AIMessageGenerator';
+import ConversationSummaryPanel from '../conversation/ConversationSummaryPanel';
+import ResponseSuggestionsPanel from '../conversation/ResponseSuggestionsPanel';
+import SentimentIndicator from '../conversation/SentimentIndicator';
+import { useConversationAnalysis } from '@/hooks/useConversationAnalysis';
 
 interface EnhancedChatViewProps {
   selectedConversation: any;
@@ -46,8 +51,23 @@ const EnhancedChatView = ({
   const [newMessage, setNewMessage] = useState('');
   const [showLeadContext, setShowLeadContext] = useState(true);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const {
+    summary,
+    sentiments,
+    suggestions,
+    loading,
+    updateSummary,
+    loadExistingSummary,
+    analyzeSentiment,
+    loadSentiments,
+    updateSuggestions,
+    getSentimentForMessage,
+    getAverageSentiment
+  } = useConversationAnalysis(selectedConversation?.leadId || '');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,6 +77,17 @@ const EnhancedChatView = ({
     scrollToBottom();
   }, [messages]);
 
+  // Load analysis data when conversation changes
+  useEffect(() => {
+    if (selectedConversation?.leadId) {
+      loadExistingSummary();
+      const conversationIds = messages.map(msg => msg.id);
+      if (conversationIds.length > 0) {
+        loadSentiments(conversationIds);
+      }
+    }
+  }, [selectedConversation?.leadId, messages.length, loadExistingSummary, loadSentiments]);
+
   const handleSend = async () => {
     if (newMessage.trim() && !isSending) {
       setIsSending(true);
@@ -64,6 +95,12 @@ const EnhancedChatView = ({
         console.log('Sending message from chat view:', newMessage.trim());
         await onSendMessage(newMessage.trim());
         setNewMessage('');
+        
+        // Update analysis after sending
+        setTimeout(() => {
+          updateSummary();
+          updateSuggestions();
+        }, 1000);
       } catch (error) {
         console.error('Error sending message:', error);
       } finally {
@@ -84,11 +121,21 @@ const EnhancedChatView = ({
     try {
       await onSendMessage(message, false);
       setShowAIGenerator(false);
+      
+      // Update analysis after AI message
+      setTimeout(() => {
+        updateSummary();
+        updateSuggestions();
+      }, 1000);
     } catch (error) {
       console.error('Error sending AI message:', error);
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setNewMessage(suggestion);
   };
 
   const canReply = selectedConversation && (
@@ -97,6 +144,8 @@ const EnhancedChatView = ({
     selectedConversation.salespersonId === user.id || 
     !selectedConversation.salespersonId
   );
+
+  const averageSentiment = getAverageSentiment();
 
   if (!selectedConversation) {
     return (
@@ -114,6 +163,22 @@ const EnhancedChatView = ({
     <div className="grid grid-cols-12 gap-4 h-full">
       {/* Main Chat Area */}
       <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col space-y-4`}>
+        {/* Analysis Panels */}
+        {showAnalysis && (
+          <div className="space-y-4">
+            <ConversationSummaryPanel
+              leadId={selectedConversation.leadId}
+              messageCount={messages.length}
+              onSummaryUpdate={updateSummary}
+            />
+            <ResponseSuggestionsPanel
+              leadId={selectedConversation.leadId}
+              onSelectSuggestion={handleSelectSuggestion}
+              isVisible={canReply}
+            />
+          </div>
+        )}
+
         {/* AI Message Generator */}
         {showAIGenerator && canReply && (
           <AIMessageGenerator
@@ -142,10 +207,30 @@ const EnhancedChatView = ({
                         AI Active
                       </Badge>
                     )}
+                    {averageSentiment !== 0 && (
+                      <SentimentIndicator
+                        sentimentScore={averageSentiment}
+                        sentimentLabel={
+                          averageSentiment > 0.1 ? 'positive' : 
+                          averageSentiment < -0.1 ? 'negative' : 'neutral'
+                        }
+                        showDetails={false}
+                        size="sm"
+                      />
+                    )}
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAnalysis(!showAnalysis)}
+                  className={showAnalysis ? 'bg-blue-50 text-blue-700' : ''}
+                >
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  Analysis
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -171,9 +256,26 @@ const EnhancedChatView = ({
               </div>
             ) : (
               <>
-                {messages.map((message) => (
-                  <MessageBubble key={message.id} message={message} />
-                ))}
+                {messages.map((message) => {
+                  const sentiment = getSentimentForMessage(message.id);
+                  return (
+                    <div key={message.id} className="space-y-2">
+                      <MessageBubble message={message} />
+                      {sentiment && message.direction === 'in' && (
+                        <div className="flex justify-start">
+                          <SentimentIndicator
+                            sentimentScore={sentiment.sentimentScore}
+                            sentimentLabel={sentiment.sentimentLabel}
+                            confidenceScore={sentiment.confidenceScore}
+                            emotions={sentiment.emotions}
+                            size="sm"
+                            showDetails={false}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </>
             )}
