@@ -71,7 +71,7 @@ const EnhancedInventoryMetrics = () => {
 
   return (
     <div className="space-y-6">
-      {/* Overview Row - Separated New and Used */}
+      {/* Overview Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -86,32 +86,32 @@ const EnhancedInventoryMetrics = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-green-200">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">New Vehicles</CardTitle>
+            <CardTitle className="text-sm font-medium">New Vehicles Available</CardTitle>
             <Package className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {inventoryStats?.newVehicles.total || 0}
+              {inventoryStats?.newVehicles.available || 0}
             </div>
             <CardDescription>
-              {inventoryStats?.newVehicles.available || 0} available
+              {inventoryStats?.newVehicles.gmGlobalByStatus.available || 0} GM Global + {inventoryStats?.newVehicles.regularNew || 0} regular
             </CardDescription>
           </CardContent>
         </Card>
 
-        <Card className="border-orange-200">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-orange-700">Used Vehicles</CardTitle>
+            <CardTitle className="text-sm font-medium">Used Vehicles Available</CardTitle>
             <Car className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {inventoryStats?.usedVehicles.total || 0}
+              {inventoryStats?.usedVehicles.available || 0}
             </div>
             <CardDescription>
-              {inventoryStats?.usedVehicles.available || 0} available
+              {formatCurrency(inventoryStats?.usedVehicleStats.averagePrice || 0)} avg price
             </CardDescription>
           </CardContent>
         </Card>
@@ -130,86 +130,6 @@ const EnhancedInventoryMetrics = () => {
             </CardDescription>
           </CardContent>
         </Card>
-      </div>
-
-      {/* New vs Used Breakdown */}
-      <div>
-        <h3 className="text-lg font-semibold text-slate-800 mb-3">New vs Used Breakdown</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="border-green-200">
-            <CardHeader>
-              <CardTitle className="text-green-700 flex items-center">
-                <Package className="w-5 h-5 mr-2" />
-                New Vehicles
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total:</span>
-                <span className="font-semibold">{inventoryStats?.newVehicles.total || 0}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Available:</span>
-                <span className="font-semibold text-green-600">{inventoryStats?.newVehicles.available || 0}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Regular New:</span>
-                <span className="font-semibold">{inventoryStats?.newVehicles.regularNew || 0}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">GM Global:</span>
-                <span className="font-semibold">{inventoryStats?.newVehicles.gmGlobalByStatus.available || 0}</span>
-              </div>
-              <div className="pt-2 border-t">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Avg Price:</span>
-                  <span className="font-semibold">{formatCurrency(inventoryStats?.newVehicleStats.averagePrice || 0)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Avg Days:</span>
-                  <span className="font-semibold">{inventoryStats?.newVehicleStats.averageDaysInStock || 0} days</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-orange-200">
-            <CardHeader>
-              <CardTitle className="text-orange-700 flex items-center">
-                <Car className="w-5 h-5 mr-2" />
-                Used Vehicles
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total:</span>
-                <span className="font-semibold">{inventoryStats?.usedVehicles.total || 0}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Available:</span>
-                <span className="font-semibold text-orange-600">{inventoryStats?.usedVehicles.available || 0}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Sold:</span>
-                <span className="font-semibold text-red-600">{inventoryStats?.usedVehicles.sold || 0}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600"></span>
-                <span className="font-semibold"></span>
-              </div>
-              <div className="pt-2 border-t">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Avg Price:</span>
-                  <span className="font-semibold">{formatCurrency(inventoryStats?.usedVehicleStats.averagePrice || 0)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Avg Days:</span>
-                  <span className="font-semibold">{inventoryStats?.usedVehicleStats.averageDaysInStock || 0} days</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       {/* GM Global Orders Breakdown */}

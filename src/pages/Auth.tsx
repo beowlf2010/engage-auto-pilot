@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
@@ -19,30 +20,9 @@ const Auth = () => {
     lastName: "" 
   });
   
-  const { signIn, signUp, user, loading } = useAuth();
+  const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    if (!loading && user) {
-      navigate("/");
-    }
-  }, [user, loading, navigate]);
-
-  // Show loading while checking auth state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
-  }
-
-  // Don't render auth form if user is authenticated
-  if (user) {
-    return null;
-  }
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();

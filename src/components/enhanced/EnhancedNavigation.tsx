@@ -1,10 +1,10 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/glass-card';
 import { getNavigationItems } from '@/components/navigation/navigationConfig';
-import { getGlassColorClasses } from '@/components/navigation/glassNavigationStyles';
 import { cn } from '@/lib/utils';
 import { Menu, X, Bell, Search, Settings } from 'lucide-react';
 
@@ -16,7 +16,7 @@ const EnhancedNavigation = () => {
 
   if (!profile) return null;
 
-  const navItems = getNavigationItems(profile.role);
+  const navItems = getNavigationItems(profile.role, navigate);
 
   return (
     <nav className="relative z-50">
@@ -43,8 +43,8 @@ const EnhancedNavigation = () => {
           <div className="hidden md:flex items-center space-x-2">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              const itemColor = item.color || 'blue';
+              const isActive = location.pathname === item.path || 
+                (item.path === '/inventory-dashboard' && location.pathname.startsWith('/inventory'));
               
               return (
                 <Button
@@ -54,16 +54,14 @@ const EnhancedNavigation = () => {
                   onClick={() => navigate(item.path)}
                   className={cn(
                     "flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-300",
-                    getGlassColorClasses(itemColor, isActive)
+                    "hover:bg-white/20 hover:backdrop-blur-sm hover:scale-105",
+                    isActive ? 
+                      "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-700 shadow-lg" : 
+                      "text-gray-700 hover:text-gray-900"
                   )}
                 >
                   <Icon size={18} />
                   <span className="font-medium">{item.label}</span>
-                  {item.badge && (
-                    <span className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
-                      {item.badge}
-                    </span>
-                  )}
                 </Button>
               );
             })}
@@ -120,7 +118,6 @@ const EnhancedNavigation = () => {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
-                const itemColor = item.color || 'blue';
                 
                 return (
                   <Button
@@ -132,16 +129,13 @@ const EnhancedNavigation = () => {
                     }}
                     className={cn(
                       "w-full justify-start flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300",
-                      getGlassColorClasses(itemColor, isActive)
+                      isActive ? 
+                        "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-700" : 
+                        "hover:bg-white/20"
                     )}
                   >
                     <Icon size={20} />
                     <span>{item.label}</span>
-                    {item.badge && (
-                      <span className="ml-auto px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
-                        {item.badge}
-                      </span>
-                    )}
                   </Button>
                 );
               })}

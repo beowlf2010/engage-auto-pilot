@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/components/auth/AuthProvider';
 import { 
   createMessageExport, 
   getMessageExports, 
@@ -8,11 +7,10 @@ import {
   parseVINExportFile,
   parseVINExcelFile,
   type VINMessageExport 
-} from '@/services/messageExport';
+} from '@/services/messageExportService';
 
 export const useMessageExport = () => {
   const { toast } = useToast();
-  const { profile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [exports, setExports] = useState<any[]>([]);
 
@@ -34,15 +32,6 @@ export const useMessageExport = () => {
   }, [toast]);
 
   const importFromFile = useCallback(async (file: File, exportName: string) => {
-    if (!profile) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to import files",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
       setIsLoading(true);
       
@@ -83,7 +72,7 @@ export const useMessageExport = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, loadExports, profile]);
+  }, [toast, loadExports]);
 
   const processImport = useCallback(async (exportId: string) => {
     try {

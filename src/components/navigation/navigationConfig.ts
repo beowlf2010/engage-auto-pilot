@@ -1,4 +1,3 @@
-
 import {
   Home,
   LayoutDashboard,
@@ -67,6 +66,12 @@ export const navigationConfig: NavConfig[] = [
     roles: ["admin", "manager", "salesperson"],
   },
   {
+    title: "Inventory Dashboard",
+    href: "/inventory-dashboard",
+    icon: BarChart3,
+    roles: ["admin", "manager"],
+  },
+  {
     title: "Predictive Analytics",
     href: "/predictive-analytics",
     icon: Brain,
@@ -87,48 +92,15 @@ export const navigationConfig: NavConfig[] = [
   },
 ]
 
-export const getNavigationItems = (userRole: string): NavigationItem[] => {
-  console.log('getNavigationItems called with role:', userRole);
-  
-  if (!userRole) {
-    console.warn('getNavigationItems: No user role provided');
-    return [];
-  }
-  
-  const items = navigationConfig
-    .filter(item => {
-      const hasAccess = item.roles.includes(userRole);
-      console.log(`getNavigationItems: Item "${item.title}" - roles: [${item.roles.join(', ')}], user role: ${userRole}, has access: ${hasAccess}`);
-      return hasAccess;
-    })
+export const getNavigationItems = (userRole: string, navigate: (path: string) => void): NavigationItem[] => {
+  return navigationConfig
+    .filter(item => item.roles.includes(userRole))
     .map(item => ({
       path: item.href,
       label: item.title,
       icon: item.icon,
       badge: item.badge,
-      color: getItemColor(item.title),
-      hoverActions: []
+      color: 'blue', // Default color
+      hoverActions: [] // Default empty actions
     }));
-  
-  console.log('getNavigationItems returning:', items.length, 'items:', items.map(i => i.label));
-  
-  // Specific debug for inventory
-  const inventoryItem = items.find(item => item.path === '/inventory');
-  console.log('getNavigationItems: Inventory item in result:', inventoryItem);
-  
-  return items;
-};
-
-const getItemColor = (title: string): string => {
-  const colorMap: { [key: string]: string } = {
-    'Dashboard': 'blue',
-    'Leads': 'green',
-    'Streamlined Leads': 'purple',
-    'Smart Inbox': 'orange',
-    'Inventory': 'red',
-    'Predictive Analytics': 'blue',
-    'Message Export': 'gray',
-    'Settings': 'gray'
-  };
-  return colorMap[title] || 'blue';
 };
