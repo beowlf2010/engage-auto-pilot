@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { DealRecord, FinancialSummary } from "../dms/types";
+import { createInitialProfitSnapshot } from "@/services/financial/profitHistoryService";
 
 export const insertFinancialData = async (
   deals: DealRecord[],
@@ -59,6 +60,15 @@ export const insertFinancialData = async (
     console.log(`Prepared ${dealRecords.length} deal records for insertion`);
     console.log('Sample deal record to insert:', dealRecords[0]);
 
+    // Check which deals are new vs existing
+    const stockNumbers = dealRecords.map(deal => deal.stock_number).filter(Boolean);
+    const { data: existingDeals } = await supabase
+      .from('deals')
+      .select('id, stock_number, gross_profit, fi_profit, total_profit')
+      .in('stock_number', stockNumbers);
+
+    const existingStockNumbers = new Set(existingDeals?.map(deal => deal.stock_number) || []);
+
     // Use upsert with the unique constraint on stock_number only
     const { data: insertedDeals, error: insertError } = await supabase
       .from('deals')
@@ -75,6 +85,31 @@ export const insertFinancialData = async (
 
     const insertedCount = insertedDeals?.length || 0;
     console.log(`Successfully upserted ${insertedCount} deals`);
+
+    // Create initial profit snapshots for new deals
+    if (insertedDeals) {
+      const newDealSnapshots = insertedDeals.filter(deal => 
+        deal.stock_number && !existingStockNumbers.has(deal.stock_number)
+      );
+
+      console.log(`Creating initial profit snapshots for ${newDealSnapshots.length} new deals`);
+      
+      for (const deal of newDealSnapshots) {
+        try {
+          await createInitialProfitSnapshot(
+            deal.id,
+            deal.stock_number || '',
+            deal.gross_profit || 0,
+            deal.fi_profit || 0,
+            deal.total_profit || 0,
+            uploadHistoryId
+          );
+        } catch (snapshotError) {
+          console.warn(`Failed to create profit snapshot for deal ${deal.stock_number}:`, snapshotError);
+          // Don't fail the whole operation if snapshot creation fails
+        }
+      }
+    }
     
     if (insertedCount !== dealRecords.length) {
       console.warn(`Warning: Tried to insert ${dealRecords.length} deals but only ${insertedCount} were successful`);

@@ -686,6 +686,48 @@ export type Database = {
           },
         ]
       }
+      deal_profit_history: {
+        Row: {
+          change_type: string
+          created_at: string
+          deal_id: string
+          fi_profit: number | null
+          gross_profit: number | null
+          id: string
+          pack_adjustment_applied: number | null
+          snapshot_date: string
+          stock_number: string | null
+          total_profit: number | null
+          upload_history_id: string | null
+        }
+        Insert: {
+          change_type?: string
+          created_at?: string
+          deal_id: string
+          fi_profit?: number | null
+          gross_profit?: number | null
+          id?: string
+          pack_adjustment_applied?: number | null
+          snapshot_date?: string
+          stock_number?: string | null
+          total_profit?: number | null
+          upload_history_id?: string | null
+        }
+        Update: {
+          change_type?: string
+          created_at?: string
+          deal_id?: string
+          fi_profit?: number | null
+          gross_profit?: number | null
+          id?: string
+          pack_adjustment_applied?: number | null
+          snapshot_date?: string
+          stock_number?: string | null
+          total_profit?: number | null
+          upload_history_id?: string | null
+        }
+        Relationships: []
+      }
       deals: {
         Row: {
           age: number | null

@@ -1,11 +1,13 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PackAdjustmentControls from "./deal-management/PackAdjustmentControls";
 import DealSummaryCards from "./deal-management/DealSummaryCards";
 import DealFilters from "./deal-management/DealFilters";
 import BulkActions from "./deal-management/BulkActions";
 import DealsTable from "./deal-management/DealsTable";
+import ProfitChangesReport from "./deal-management/ProfitChangesReport";
 import { useDealManagement } from "./deal-management/DealManagementLogic";
 import { DealManagementProps } from "./deal-management/DealManagementTypes";
 import { filterDeals, calculateSummaryTotals, formatCurrency, getAdjustedGrossProfit } from "./deal-management/DealManagementUtils";
@@ -86,54 +88,67 @@ const DealManagement = ({
         formatCurrency={formatCurrency}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <span>Deal Management</span>
-            <Badge variant="secondary">{filteredDeals.length} deals</Badge>
-          </CardTitle>
-          <CardDescription>
-            Manage deal types and view financial performance by category. Wholesale and dealer trade deals are automatically locked but can be unlocked manually if needed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DealFilters
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            filterType={filterType}
-            setFilterType={setFilterType}
-            showProfitChanges={showProfitChanges}
-            setShowProfitChanges={setShowProfitChanges}
-          />
+      <Tabs defaultValue="management" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="management">Deal Management</TabsTrigger>
+          <TabsTrigger value="profit-changes">Profit Changes Report</TabsTrigger>
+        </TabsList>
 
-          <BulkActions
-            selectedDeals={selectedDeals}
-            bulkDealType={bulkDealType}
-            setBulkDealType={setBulkDealType}
-            onBulkUpdate={handleBulkDealTypeUpdate}
-            hasLockedDeals={hasLockedSelectedDeals}
-          />
+        <TabsContent value="management" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <span>Deal Management</span>
+                <Badge variant="secondary">{filteredDeals.length} deals</Badge>
+              </CardTitle>
+              <CardDescription>
+                Manage deal types and view financial performance by category. Wholesale and dealer trade deals are automatically locked but can be unlocked manually if needed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DealFilters
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                filterType={filterType}
+                setFilterType={setFilterType}
+                showProfitChanges={showProfitChanges}
+                setShowProfitChanges={setShowProfitChanges}
+              />
 
-          <DealsTable
-            deals={filteredDeals}
-            selectedDeals={selectedDeals}
-            onSelectDeal={handleSelectDeal}
-            onSelectAll={() => handleSelectAll(filteredDeals)}
-            onDealTypeUpdate={handleDealTypeUpdate}
-            onUnlockDeal={handleUnlockDeal}
-            getAdjustedGrossProfit={(deal) => getAdjustedGrossProfit(deal, packAdjustment)}
-            formatCurrency={formatCurrency}
-            packAdjustmentEnabled={packAdjustmentEnabled}
-            localPackAdjustment={localPackAdjustment}
-          />
+              <BulkActions
+                selectedDeals={selectedDeals}
+                bulkDealType={bulkDealType}
+                setBulkDealType={setBulkDealType}
+                onBulkUpdate={handleBulkDealTypeUpdate}
+                hasLockedDeals={hasLockedSelectedDeals}
+              />
 
-          {filteredDeals.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              No deals found matching your criteria
-            </div>
-            )}
-        </CardContent>
-      </Card>
+              <DealsTable
+                deals={filteredDeals}
+                selectedDeals={selectedDeals}
+                onSelectDeal={handleSelectDeal}
+                onSelectAll={() => handleSelectAll(filteredDeals)}
+                onDealTypeUpdate={handleDealTypeUpdate}
+                onUnlockDeal={handleUnlockDeal}
+                getAdjustedGrossProfit={(deal) => getAdjustedGrossProfit(deal, packAdjustment)}
+                formatCurrency={formatCurrency}
+                packAdjustmentEnabled={packAdjustmentEnabled}
+                localPackAdjustment={localPackAdjustment}
+              />
+
+              {filteredDeals.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No deals found matching your criteria
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="profit-changes" className="space-y-6">
+          <ProfitChangesReport />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
