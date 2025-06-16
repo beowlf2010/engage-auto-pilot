@@ -1,3 +1,4 @@
+
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
@@ -53,6 +54,28 @@ const DealRow = ({
     if (deal.deal_type_locked) return;
     onSelectDeal(deal.id);
   };
+
+  // Debug logging for the F-150 example
+  const adjustedTotalProfit = getAdjustedTotalProfit(deal, localPackAdjustment);
+  
+  if (deal.stock_number === 'XA19156A') {
+    console.log('=== F-150 XA19156A Debug ===');
+    console.log('Raw deal data:', {
+      stock_number: deal.stock_number,
+      gross_profit: deal.gross_profit,
+      fi_profit: deal.fi_profit,
+      total_profit: deal.total_profit
+    });
+    console.log('Props received:', {
+      packAdjustmentEnabled,
+      localPackAdjustment
+    });
+    console.log('Calculated values:', {
+      adjustedGrossProfit: getAdjustedGrossProfit(deal),
+      adjustedTotalProfit: adjustedTotalProfit
+    });
+    console.log('========================');
+  }
 
   return (
     <TableRow className="hover:bg-slate-50">
@@ -128,7 +151,7 @@ const DealRow = ({
         <ProfitCell
           deal={deal}
           field="total"
-          value={getAdjustedTotalProfit(deal, localPackAdjustment)}
+          value={adjustedTotalProfit}
           formatCurrency={formatCurrency}
           packAdjustmentEnabled={packAdjustmentEnabled}
           localPackAdjustment={0} // Don't show pack indicator on total - it's already included in the value

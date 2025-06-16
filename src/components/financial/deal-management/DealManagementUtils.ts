@@ -34,7 +34,26 @@ export const getAdjustedTotalProfit = (deal: Deal, packAdjustment: number) => {
   // Apply pack adjustment to used vehicles for the total calculation
   const adjustedGross = isUsedVehicle(deal.stock_number) ? baseGross + packAdjustment : baseGross;
   
-  return adjustedGross + fiProfit;
+  const totalResult = adjustedGross + fiProfit;
+  
+  // Debug logging for specific deal
+  if (deal.stock_number === 'XA19156A') {
+    console.log('=== getAdjustedTotalProfit Debug ===');
+    console.log('Input values:', {
+      stock_number: deal.stock_number,
+      baseGross,
+      fiProfit,
+      packAdjustment,
+      isUsed: isUsedVehicle(deal.stock_number)
+    });
+    console.log('Calculation:', {
+      adjustedGross,
+      totalResult
+    });
+    console.log('================================');
+  }
+  
+  return totalResult;
 };
 
 export const filterDeals = (
