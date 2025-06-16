@@ -1,3 +1,4 @@
+
 import {
   Home,
   LayoutDashboard,
@@ -10,7 +11,9 @@ import {
   TrendingUp,
   BarChart3,
   Brain,
-  Upload
+  Upload,
+  ChevronDown,
+  LogOut
 } from "lucide-react"
 
 interface NavConfig {
@@ -19,6 +22,7 @@ interface NavConfig {
   icon: any
   roles: string[]
   badge?: string
+  priority: 'primary' | 'secondary'
 }
 
 export interface NavigationItem {
@@ -27,6 +31,7 @@ export interface NavigationItem {
   icon: any;
   badge?: string;
   color?: string;
+  priority: 'primary' | 'secondary';
   hoverActions?: Array<{
     label: string;
     icon: any;
@@ -35,60 +40,58 @@ export interface NavigationItem {
 }
 
 export const navigationConfig: NavConfig[] = [
+  // Primary navigation items
   {
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
     roles: ["admin", "manager", "salesperson"],
+    priority: 'primary'
   },
   {
     title: "Leads",
-    href: "/leads",
+    href: "/streamlined-leads",
     icon: Users,
     roles: ["admin", "manager", "salesperson"],
+    priority: 'primary'
   },
   {
-    title: "Streamlined Leads",
-    href: "/streamlined-leads",
-    icon: User,
-    roles: ["admin", "manager", "salesperson"],
-  },
-  {
-    title: "Smart Inbox",
+    title: "Inbox",
     href: "/smart-inbox",
     icon: Mail,
     roles: ["admin", "manager", "salesperson"],
+    priority: 'primary'
   },
   {
     title: "Inventory",
-    href: "/inventory",
+    href: "/inventory-dashboard",
     icon: Package,
     roles: ["admin", "manager", "salesperson"],
+    priority: 'primary'
   },
-  {
-    title: "Inventory Dashboard",
-    href: "/inventory-dashboard",
-    icon: BarChart3,
-    roles: ["admin", "manager"],
-  },
+  
+  // Secondary navigation items (for dropdown)
   {
     title: "Predictive Analytics",
     href: "/predictive-analytics",
     icon: Brain,
     roles: ["admin", "manager"],
+    priority: 'secondary'
   },
   {
     title: "Message Export",
     href: "/message-export",
     icon: Upload,
     roles: ["admin", "manager"],
-    badge: "New"
+    badge: "New",
+    priority: 'secondary'
   },
   {
     title: "Settings",
     href: "/settings",
     icon: Settings,
     roles: ["admin"],
+    priority: 'secondary'
   },
 ]
 
@@ -100,7 +103,8 @@ export const getNavigationItems = (userRole: string, navigate: (path: string) =>
       label: item.title,
       icon: item.icon,
       badge: item.badge,
-      color: 'blue', // Default color
-      hoverActions: [] // Default empty actions
+      color: 'blue',
+      priority: item.priority,
+      hoverActions: []
     }));
 };

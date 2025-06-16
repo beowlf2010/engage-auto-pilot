@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -39,7 +38,33 @@ function App() {
                 </ProtectedRoute>
               } />
 
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <DashboardPage />
+                      </main>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
               <Route path="/inbox" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <SmartInboxPage />
+                      </main>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/smart-inbox" element={
                 <ProtectedRoute>
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
@@ -58,7 +83,7 @@ function App() {
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
                       <main className="flex-1 overflow-auto">
-                        <LeadsPage />
+                        <StreamlinedLeadsPage />
                       </main>
                     </div>
                   </div>
@@ -91,13 +116,13 @@ function App() {
                 </ProtectedRoute>
               } />
 
-              <Route path="/smart-inbox" element={
+              <Route path="/inventory-dashboard" element={
                 <ProtectedRoute>
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
                       <main className="flex-1 overflow-auto">
-                        <SmartInboxPage />
+                        <InventoryDashboardPage />
                       </main>
                     </div>
                   </div>
