@@ -13,6 +13,7 @@ import PredictiveAnalyticsPage from '@/pages/PredictiveAnalyticsPage';
 import StreamlinedNavigation from '@/components/StreamlinedNavigation';
 import SettingsPage from '@/pages/Index';
 import MessageExportPage from "@/pages/MessageExportPage";
+import LeadDetailPage from '@/pages/LeadDetailPage';
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,19 @@ function App() {
                       <StreamlinedNavigation />
                       <main className="flex-1 overflow-auto">
                         <DashboardPage />
+                      </main>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/lead/:leadId" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <LeadDetailPage />
                       </main>
                     </div>
                   </div>
