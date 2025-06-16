@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import UnifiedSmartInbox from '@/components/inbox/UnifiedSmartInbox';
@@ -145,3 +146,16 @@ export const AIMonitorPage = () => {
     </div>
   );
 };
+
+// Default export for compatibility with existing imports
+const StreamlinedPages = {
+  SmartInboxPage,
+  SalesDashboardPage,
+  ManagerDashboardPage,
+  AdminDashboardPage,
+  FinancialDashboardPage,
+  StreamlinedLeadsPage,
+  AIMonitorPage
+};
+
+export default StreamlinedPages;

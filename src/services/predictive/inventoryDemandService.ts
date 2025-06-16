@@ -1,11 +1,10 @@
 
 // Re-export everything from the core modules for backward compatibility
 export type { 
-  InventoryDemandPrediction, 
-  VehicleVelocityTracking 
+  InventoryDemandPrediction
 } from './inventory/demandPredictionCore';
 
-export type { VehicleVelocityTracking as VelocityTracking } from './inventory/velocityTrackingCore';
+export type { VehicleVelocityTracking } from './inventory/velocityTrackingCore';
 
 // Demand prediction functions
 export { 
