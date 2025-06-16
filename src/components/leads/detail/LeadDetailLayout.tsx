@@ -4,6 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useConversationData } from "@/hooks/useConversationData";
+import { useCompliance } from "@/hooks/useCompliance";
 import LeadDetailHeader from "./LeadDetailHeader";
 import LeadInfoCardsSection from "./LeadInfoCardsSection";
 import EnhancedMessageThread from "./EnhancedMessageThread";
@@ -34,10 +36,31 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   onPhoneSelect
 }) => {
   const navigate = useNavigate();
+  const compliance = useCompliance();
+  const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
+
+  // Load messages when component mounts or lead changes
+  React.useEffect(() => {
+    if (lead.id) {
+      loadMessages(lead.id);
+    }
+  }, [lead.id, loadMessages]);
 
   const handleSendMessage = async (message: string): Promise<void> => {
-    console.log("Sending message:", message);
-    // Implementation will be handled by parent component
+    try {
+      console.log("Sending message:", message);
+      await sendMessage(lead.id, message, false, {
+        checkSuppressed: compliance.checkSuppressed,
+        enforceConsent: compliance.enforceConsent,
+        storeConsent: compliance.storeConsent
+      });
+      
+      // Reload messages to show the new message
+      await loadMessages(lead.id);
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      throw error; // Let the EnhancedMessageThread handle the error display
+    }
   };
 
   // Transform lead for header component
@@ -52,6 +75,9 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
     state: lead.state,
     created_at: lead.createdAt
   };
+
+  // Use the messages from the conversation hook if available, otherwise use lead conversations
+  const conversationMessages = messages.length > 0 ? messages : lead.conversations;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -109,8 +135,9 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
               <TabsContent value="messages" className="space-y-0">
                 <div className="h-[600px]">
                   <EnhancedMessageThread
-                    messages={lead.conversations}
+                    messages={conversationMessages}
                     onSendMessage={handleSendMessage}
+                    isLoading={messagesLoading}
                     leadName={`${lead.firstName} ${lead.lastName}`}
                   />
                 </div>

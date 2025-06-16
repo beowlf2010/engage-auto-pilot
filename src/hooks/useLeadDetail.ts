@@ -1,13 +1,14 @@
 
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchLeadDetail, LeadDetailData } from '@/services/leadDetailService';
 import { PhoneNumber } from '@/types/lead';
 
 export const useLeadDetail = () => {
   const { leadId } = useParams<{ leadId: string }>();
   const [showMessageComposer, setShowMessageComposer] = useState(false);
+  const queryClient = useQueryClient();
 
   console.log('Lead ID from params:', leadId);
 
@@ -24,6 +25,13 @@ export const useLeadDetail = () => {
     },
     enabled: !!leadId,
   });
+
+  // Function to refresh lead data (useful after sending messages)
+  const refreshLeadData = () => {
+    if (leadId) {
+      queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+    }
+  };
 
   // Transform phone numbers for PhoneNumberDisplay component (PhoneNumber interface)
   const phoneNumbers: PhoneNumber[] = lead?.phoneNumbers?.map((phone: any) => ({
@@ -104,7 +112,7 @@ export const useLeadDetail = () => {
     error,
     showMessageComposer,
     setShowMessageComposer,
-    handlePhoneSelect
+    handlePhoneSelect,
+    refreshLeadData
   };
 };
-
