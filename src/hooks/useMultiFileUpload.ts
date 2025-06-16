@@ -6,6 +6,7 @@ import { storeUploadedFile, updateUploadHistory, type UploadHistoryRecord } from
 import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
 import { mapRowToInventoryItem } from "@/utils/enhancedFileParsingUtils";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
+import { syncInventoryData } from "@/services/inventoryService";
 import type { QueuedFile } from "@/components/inventory-upload/DragDropFileQueue";
 
 interface UseMultiFileUploadProps {
@@ -45,6 +46,11 @@ export const useMultiFileUpload = ({ userId }: UseMultiFileUploadProps) => {
         throw new Error('Multi-sheet Excel files require individual processing');
       }
       
+      // Determine if this is preliminary data
+      const isPreliminaryData = queuedFile.file.name.toLowerCase().includes('preliminary') || 
+                                queuedFile.file.name.toLowerCase().includes('prelim') ||
+                                queuedFile.condition === 'gm_global';
+      
       // Store the original file first
       const inventoryCondition = queuedFile.condition === 'gm_global' ? 'new' : queuedFile.condition;
       uploadRecord = await storeUploadedFile(queuedFile.file, userId, 'inventory', inventoryCondition);
@@ -71,10 +77,22 @@ export const useMultiFileUpload = ({ userId }: UseMultiFileUploadProps) => {
         error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
       });
 
+      // Only trigger automatic sync for actual inventory (not preliminary data)
+      if (!isPreliminaryData && validationResult.successCount > 0) {
+        try {
+          console.log(`Triggering automatic inventory sync for ${queuedFile.file.name}...`);
+          await syncInventoryData(uploadRecord.id);
+        } catch (syncError) {
+          console.error('Automatic sync failed for', queuedFile.file.name, ':', syncError);
+        }
+      } else if (isPreliminaryData) {
+        console.log(`Skipping automatic sync for preliminary data: ${queuedFile.file.name}`);
+      }
+
       if (validationResult.errorCount === 0) {
         toast({
           title: `${queuedFile.file.name} processed successfully`,
-          description: `${validationResult.successCount} records imported`,
+          description: `${validationResult.successCount} ${isPreliminaryData ? 'preliminary orders' : 'records'} imported`,
         });
       } else if (validationResult.successCount > 0) {
         toast({
@@ -109,6 +127,7 @@ export const useMultiFileUpload = ({ userId }: UseMultiFileUploadProps) => {
     let failedRecords = 0;
     let successfulFiles = 0;
     let failedFiles = 0;
+    let hasActualInventory = false;
 
     try {
       for (const file of files) {
@@ -120,6 +139,14 @@ export const useMultiFileUpload = ({ userId }: UseMultiFileUploadProps) => {
           totalRecords += parsed.rows.length;
           successfulRecords += parsed.rows.length; // Simplified - assume all succeeded if no error
           successfulFiles++;
+          
+          // Check if any file was actual inventory (not preliminary)
+          const isPreliminaryData = file.file.name.toLowerCase().includes('preliminary') || 
+                                    file.file.name.toLowerCase().includes('prelim') ||
+                                    file.condition === 'gm_global';
+          if (!isPreliminaryData) {
+            hasActualInventory = true;
+          }
           
           results.push({
             fileName: file.file.name,
@@ -149,9 +176,13 @@ export const useMultiFileUpload = ({ userId }: UseMultiFileUploadProps) => {
       setBatchResult(batchResult);
 
       if (failedFiles === 0) {
+        const message = hasActualInventory 
+          ? `${successfulFiles} files processed, ${successfulRecords} records imported, inventory automatically synced`
+          : `${successfulFiles} files processed, ${successfulRecords} preliminary orders imported`;
+        
         toast({
           title: "Batch upload successful!",
-          description: `${successfulFiles} files processed, ${successfulRecords} records imported`,
+          description: message,
         });
       } else {
         toast({

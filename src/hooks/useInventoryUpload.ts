@@ -5,6 +5,7 @@ import { storeUploadedFile, updateUploadHistory, type UploadHistoryRecord } from
 import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 import { useUploadState, type UploadResult } from "@/hooks/useUploadState";
+import { syncInventoryData } from "@/services/inventoryService";
 
 interface UseInventoryUploadProps {
   userId: string;
@@ -68,6 +69,11 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     try {
       console.log(`Processing ${file.name} as ${condition} inventory...`);
       
+      // Determine if this is preliminary data based on filename or condition
+      const isPreliminaryData = file.name.toLowerCase().includes('preliminary') || 
+                                file.name.toLowerCase().includes('prelim') ||
+                                condition === 'gm_global';
+      
       // Store the original file first - map gm_global to inventory type
       const inventoryCondition = condition === 'gm_global' ? 'new' : condition;
       uploadRecord = await storeUploadedFile(file, userId, 'inventory', inventoryCondition);
@@ -97,6 +103,31 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
       });
 
+      // Only trigger automatic sync for actual inventory (not preliminary data)
+      if (!isPreliminaryData && validationResult.successCount > 0) {
+        try {
+          console.log('Triggering automatic inventory sync for actual inventory upload...');
+          await syncInventoryData(uploadRecord.id);
+          toast({
+            title: "Inventory synced automatically",
+            description: "Previous inventory has been updated based on this upload",
+          });
+        } catch (syncError) {
+          console.error('Automatic sync failed:', syncError);
+          toast({
+            title: "Upload successful, sync failed",
+            description: "Upload completed but automatic inventory sync failed. You may need to run cleanup manually.",
+            variant: "default"
+          });
+        }
+      } else if (isPreliminaryData) {
+        console.log('Skipping automatic sync for preliminary data upload');
+        toast({
+          title: "Preliminary data uploaded",
+          description: "Preliminary orders uploaded successfully. No inventory cleanup performed.",
+        });
+      }
+
       setUploadResult({
         total: parsed.rows.length,
         success: validationResult.successCount,
@@ -114,18 +145,18 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       if (validationResult.errorCount === 0) {
         toast({
           title: "Upload successful!",
-          description: `${validationResult.successCount} ${conditionLabel} vehicles imported successfully`,
+          description: `${validationResult.successCount} ${conditionLabel} ${isPreliminaryData ? 'preliminary orders' : 'vehicles'} imported successfully`,
         });
       } else if (validationResult.successCount > 0) {
         toast({
           title: "Upload completed with errors",
-          description: `${validationResult.successCount} vehicles imported, ${validationResult.errorCount} failed. Check details below.`,
+          description: `${validationResult.successCount} ${isPreliminaryData ? 'orders' : 'vehicles'} imported, ${validationResult.errorCount} failed. Check details below.`,
           variant: "default"
         });
       } else {
         toast({
           title: "Upload failed",
-          description: `No vehicles could be imported. Check the console for detailed field mapping information.`,
+          description: `No ${isPreliminaryData ? 'orders' : 'vehicles'} could be imported. Check the console for detailed field mapping information.`,
           variant: "destructive"
         });
       }
