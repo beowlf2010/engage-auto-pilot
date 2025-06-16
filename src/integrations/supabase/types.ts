@@ -267,6 +267,45 @@ export type Database = {
           },
         ]
       }
+      compliance_rules: {
+        Row: {
+          auto_flag: boolean
+          created_at: string
+          description: string
+          detection_pattern: string | null
+          id: string
+          is_active: boolean
+          rule_name: string
+          rule_type: string
+          severity: string
+          updated_at: string
+        }
+        Insert: {
+          auto_flag?: boolean
+          created_at?: string
+          description: string
+          detection_pattern?: string | null
+          id?: string
+          is_active?: boolean
+          rule_name: string
+          rule_type: string
+          severity?: string
+          updated_at?: string
+        }
+        Update: {
+          auto_flag?: boolean
+          created_at?: string
+          description?: string
+          detection_pattern?: string | null
+          id?: string
+          is_active?: boolean
+          rule_name?: string
+          rule_type?: string
+          severity?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       compliance_settings: {
         Row: {
           email_disclaimer: string | null
@@ -327,6 +366,76 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_violations: {
+        Row: {
+          confidence_score: number
+          conversation_id: string
+          created_at: string
+          description: string
+          detected_content: string
+          id: string
+          lead_id: string
+          reviewed: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
+          severity: string
+          status: string
+          violation_type: string
+        }
+        Insert: {
+          confidence_score?: number
+          conversation_id: string
+          created_at?: string
+          description: string
+          detected_content: string
+          id?: string
+          lead_id: string
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string
+          status?: string
+          violation_type: string
+        }
+        Update: {
+          confidence_score?: number
+          conversation_id?: string
+          created_at?: string
+          description?: string
+          detected_content?: string
+          id?: string
+          lead_id?: string
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string
+          status?: string
+          violation_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_violations_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_violations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_violations_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_memory: {
         Row: {
           confidence: number | null
@@ -361,6 +470,79 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_quality_scores: {
+        Row: {
+          close_attempt_score: number
+          conversation_id: string
+          created_at: string
+          engagement_score: number
+          id: string
+          improvement_areas: Json | null
+          lead_id: string
+          overall_score: number
+          professionalism_score: number
+          quality_factors: Json | null
+          response_time_score: number
+          salesperson_id: string | null
+          sentiment_progression_score: number
+          updated_at: string
+        }
+        Insert: {
+          close_attempt_score?: number
+          conversation_id: string
+          created_at?: string
+          engagement_score?: number
+          id?: string
+          improvement_areas?: Json | null
+          lead_id: string
+          overall_score?: number
+          professionalism_score?: number
+          quality_factors?: Json | null
+          response_time_score?: number
+          salesperson_id?: string | null
+          sentiment_progression_score?: number
+          updated_at?: string
+        }
+        Update: {
+          close_attempt_score?: number
+          conversation_id?: string
+          created_at?: string
+          engagement_score?: number
+          id?: string
+          improvement_areas?: Json | null
+          lead_id?: string
+          overall_score?: number
+          professionalism_score?: number
+          quality_factors?: Json | null
+          response_time_score?: number
+          salesperson_id?: string | null
+          sentiment_progression_score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_quality_scores_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_quality_scores_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_quality_scores_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2036,6 +2218,62 @@ export type Database = {
           value?: string
         }
         Relationships: []
+      }
+      training_recommendations: {
+        Row: {
+          completion_status: string
+          conversation_examples: Json | null
+          created_at: string
+          created_by: string | null
+          description: string
+          due_date: string | null
+          id: string
+          priority: string
+          recommendation_type: string
+          salesperson_id: string
+          skills_focus: Json | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completion_status?: string
+          conversation_examples?: Json | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          due_date?: string | null
+          id?: string
+          priority?: string
+          recommendation_type: string
+          salesperson_id: string
+          skills_focus?: Json | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completion_status?: string
+          conversation_examples?: Json | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          due_date?: string | null
+          id?: string
+          priority?: string
+          recommendation_type?: string
+          salesperson_id?: string
+          skills_focus?: Json | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_recommendations_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       upload_history: {
         Row: {
