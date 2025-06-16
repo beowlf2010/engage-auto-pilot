@@ -1,3 +1,4 @@
+
 import {
   Home,
   LayoutDashboard,
@@ -64,12 +65,6 @@ export const navigationConfig: NavConfig[] = [
     href: "/inventory",
     icon: Package,
     roles: ["admin", "manager", "salesperson"],
-  },
-  {
-    title: "Inventory Dashboard",
-    href: "/inventory-dashboard",
-    icon: BarChart3,
-    roles: ["admin", "manager"],
   },
   {
     title: "Predictive Analytics",
