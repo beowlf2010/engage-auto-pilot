@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '@/components/auth/AuthProvider';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardPage from '@/pages/Index';
 import LeadsPage from '@/pages/StreamlinedLeadsPage';
@@ -18,115 +19,117 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <Routes>
-            <Route path="/" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-gray-50">
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <StreamlinedNavigation />
-                    <main className="flex-1 overflow-auto">
-                      <DashboardPage />
-                    </main>
+      <AuthProvider>
+        <Router>
+          <div className="min-h-screen bg-gray-50">
+            <Routes>
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <DashboardPage />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
-            } />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/leads" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-gray-50">
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <StreamlinedNavigation />
-                    <main className="flex-1 overflow-auto">
-                      <LeadsPage />
-                    </main>
+              <Route path="/leads" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <LeadsPage />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
-            } />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/streamlined-leads" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-gray-50">
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <StreamlinedNavigation />
-                    <main className="flex-1 overflow-auto">
-                      <StreamlinedLeadsPage />
-                    </main>
+              <Route path="/streamlined-leads" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <StreamlinedLeadsPage />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
-            } />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/inventory" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-gray-50">
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <StreamlinedNavigation />
-                    <main className="flex-1 overflow-auto">
-                      <InventoryDashboardPage />
-                    </main>
+              <Route path="/inventory" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <InventoryDashboardPage />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
-            } />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/smart-inbox" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-gray-50">
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <StreamlinedNavigation />
-                    <main className="flex-1 overflow-auto">
-                      <SmartInboxPage />
-                    </main>
+              <Route path="/smart-inbox" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <SmartInboxPage />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
-            } />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/predictive-analytics" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-gray-50">
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <StreamlinedNavigation />
-                    <main className="flex-1 overflow-auto">
-                      <PredictiveAnalyticsPage />
-                    </main>
+              <Route path="/predictive-analytics" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <PredictiveAnalyticsPage />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
-            } />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-gray-50">
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <StreamlinedNavigation />
-                    <main className="flex-1 overflow-auto">
-                      <SettingsPage />
-                    </main>
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <SettingsPage />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/message-export" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-gray-50">
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <StreamlinedNavigation />
-                    <main className="flex-1 overflow-auto">
-                      <MessageExportPage />
-                    </main>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/message-export" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <MessageExportPage />
+                      </main>
+                    </div>
                   </div>
-                </div>
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </div>
-      </Router>
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </div>
+        </Router>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
