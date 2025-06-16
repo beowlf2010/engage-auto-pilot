@@ -22,15 +22,26 @@ const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
   const isActive = location.pathname === item.path;
   const itemColor = item.color || 'blue'; // Fallback to blue if color is missing
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('NavigationItem clicked:', item.label, 'navigating to:', item.path);
+    console.log('Current location:', location.pathname);
+    
     try {
       navigate(item.path);
-      console.log('Navigation completed successfully');
+      console.log('Navigation completed successfully to:', item.path);
     } catch (error) {
       console.error('Navigation error:', error);
     }
   };
+
+  console.log('NavigationItem rendering:', {
+    label: item.label,
+    path: item.path,
+    isActive,
+    currentPath: location.pathname
+  });
 
   return (
     <HoverCard openDelay={100} closeDelay={100}>
@@ -39,7 +50,7 @@ const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
           variant="ghost"
           size="sm"
           onClick={handleClick}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${getGlassColorClasses(itemColor, isActive)}`}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer ${getGlassColorClasses(itemColor, isActive)}`}
         >
           <Icon size={18} />
           <span className="font-medium">{item.label}</span>

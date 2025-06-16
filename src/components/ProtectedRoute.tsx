@@ -8,9 +8,16 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, loading } = useAuth();
+  const { user, loading, profile } = useAuth();
+
+  console.log('ProtectedRoute: Auth state check:', { 
+    hasUser: !!user, 
+    hasProfile: !!profile, 
+    loading 
+  });
 
   if (loading) {
+    console.log('ProtectedRoute: Still loading, showing spinner');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin" />
@@ -19,9 +26,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   if (!user) {
+    console.log('ProtectedRoute: No user found, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
 
+  console.log('ProtectedRoute: User authenticated, rendering children');
   return <>{children}</>;
 };
 
