@@ -55,7 +55,6 @@ const DealRow = ({
     onSelectDeal(deal.id);
   };
 
-  // Use consistent pack adjustment variable
   const adjustedTotalProfit = getAdjustedTotalProfit(deal, localPackAdjustment);
 
   return (
@@ -135,7 +134,7 @@ const DealRow = ({
           value={adjustedTotalProfit}
           formatCurrency={formatCurrency}
           packAdjustmentEnabled={packAdjustmentEnabled}
-          localPackAdjustment={0}
+          localPackAdjustment={localPackAdjustment}
         />
       </TableCell>
       
