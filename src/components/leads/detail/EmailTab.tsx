@@ -1,17 +1,17 @@
 
 import React from 'react';
-import EmailConversationsList from '../../email/EmailConversationsList';
+import EnhancedEmailTab from './EnhancedEmailTab';
 
 interface EmailTabProps {
   leadId: string;
+  leadEmail?: string;
+  leadFirstName?: string;
+  leadLastName?: string;
+  vehicleInterest?: string;
 }
 
-const EmailTab = ({ leadId }: EmailTabProps) => {
-  return (
-    <div className="space-y-6">
-      <EmailConversationsList leadId={leadId} />
-    </div>
-  );
+const EmailTab: React.FC<EmailTabProps> = (props) => {
+  return <EnhancedEmailTab {...props} />;
 };
 
 export default EmailTab;

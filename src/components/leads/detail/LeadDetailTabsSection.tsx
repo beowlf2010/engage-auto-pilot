@@ -50,7 +50,13 @@ const LeadDetailTabsSection: React.FC<LeadDetailTabsSectionProps> = ({
 
       <TabsContent value="email" className="space-y-0">
         <div className="h-[600px]">
-          <EmailTab leadId={lead.id} />
+          <EmailTab 
+            leadId={lead.id}
+            leadEmail={lead.email}
+            leadFirstName={lead.firstName}
+            leadLastName={lead.lastName}
+            vehicleInterest={lead.vehicleInterest}
+          />
         </div>
       </TabsContent>
     </Tabs>
