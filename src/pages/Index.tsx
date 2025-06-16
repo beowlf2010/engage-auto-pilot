@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useConversations } from "@/hooks/useConversations";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
-import Dashboard from "@/components/Dashboard";
+import EnhancedDashboard from "@/components/enhanced/EnhancedDashboard";
 import LeadsList from "@/components/LeadsList";
 import SmartInbox from "@/components/SmartInbox";
 import UploadLeads from "@/components/UploadLeads";
@@ -38,10 +38,11 @@ const Index = () => {
 
   if (loading || !profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading...</p>
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-lg font-medium text-gray-700">Loading your dashboard...</p>
+          <p className="text-sm text-gray-500 mt-2">Preparing everything for you</p>
         </div>
       </div>
     );
@@ -59,7 +60,7 @@ const Index = () => {
   const renderContent = () => {
     switch (activeView) {
       case "dashboard":
-        return <Dashboard user={user} />;
+        return <EnhancedDashboard user={user} />;
       case "leads":
         return <LeadsList />;
       case "inbox":
@@ -71,16 +72,14 @@ const Index = () => {
       case "financial-dashboard":
         return <FinancialDashboard user={user} />;
       default:
-        return <Dashboard user={user} />;
+        return <EnhancedDashboard user={user} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
       <main className="flex-1">
-        <div className="p-6">
-          {renderContent()}
-        </div>
+        {renderContent()}
       </main>
     </div>
   );

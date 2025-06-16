@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import InventoryLayout from "./components/InventoryLayout";
+import PredictiveAnalyticsPage from "./pages/PredictiveAnalyticsPage";
 import { 
   SmartInboxPage, 
   SalesDashboardPage, 
@@ -18,7 +19,7 @@ import {
   AIMonitorPage,
   FinancialDashboardPage
 } from "./pages/StreamlinedPages";
-import StreamlinedNavigation from "./components/StreamlinedNavigation";
+import EnhancedNavigation from "./components/enhanced/EnhancedNavigation";
 import LeadDetailPage from "./pages/LeadDetailPage";
 
 const queryClient = new QueryClient();
@@ -28,8 +29,8 @@ const AppContent = () => {
   const showNavigation = !location.pathname.startsWith('/auth');
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {showNavigation && <StreamlinedNavigation />}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+      {showNavigation && <EnhancedNavigation />}
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/dashboard" element={<Index />} />
@@ -44,6 +45,7 @@ const AppContent = () => {
         <Route path="/upload-leads" element={<Index />} />
         <Route path="/settings" element={<Index />} />
         <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />
+        <Route path="/predictive-analytics" element={<PredictiveAnalyticsPage />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/upload-inventory-report" element={<Index />} />
         <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />

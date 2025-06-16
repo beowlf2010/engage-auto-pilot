@@ -1,188 +1,123 @@
 
-import { 
-  MessageSquare, 
-  Users, 
-  BarChart3, 
-  Settings, 
-  Package,
-  Plus,
-  Send,
-  Eye,
-  UserPlus,
-  DollarSign,
-  Upload
-} from 'lucide-react';
+import { LucideIcon, BarChart3, Users, MessageSquare, Upload, Settings, Car, DollarSign, Shield, Brain } from 'lucide-react';
 
 export interface NavigationItem {
-  path: string;
   label: string;
-  icon: any;
+  path: string;
+  icon: LucideIcon;
   color: string;
-  hoverActions: Array<{
+  hoverActions?: Array<{
     label: string;
-    icon: any;
+    icon: LucideIcon;
     action: () => void;
   }>;
 }
 
-export const getNavigationItems = (role: string, navigate: (path: string) => void): NavigationItem[] => {
+export const getNavigationItems = (userRole: string, navigate: (path: string) => void): NavigationItem[] => {
   const baseItems: NavigationItem[] = [
-    { 
-      path: '/smartinbox', 
-      label: 'Smart Inbox', 
-      icon: MessageSquare,
+    {
+      label: 'Dashboard',
+      path: '/dashboard',
+      icon: BarChart3,
       color: 'blue',
       hoverActions: [
-        { label: 'Send New Message', icon: Send, action: () => navigate('/smartinbox') },
-        { label: 'View All Conversations', icon: Eye, action: () => navigate('/smartinbox') }
+        {
+          label: 'View Analytics',
+          icon: BarChart3,
+          action: () => navigate('/dashboard')
+        }
       ]
     },
-    { 
-      path: '/leads', 
-      label: 'Leads', 
+    {
+      label: 'Leads',
+      path: '/leads',
       icon: Users,
       color: 'green',
       hoverActions: [
-        { label: 'Add New Lead', icon: UserPlus, action: () => navigate('/upload-leads') },
-        { label: 'View All Leads', icon: Eye, action: () => navigate('/leads') }
+        {
+          label: 'Add New Lead',
+          icon: Users,
+          action: () => navigate('/leads')
+        }
+      ]
+    },
+    {
+      label: 'Smart Inbox',
+      path: '/inbox',
+      icon: MessageSquare,
+      color: 'purple',
+      hoverActions: [
+        {
+          label: 'AI Monitor',
+          icon: Shield,
+          action: () => navigate('/ai-monitor')
+        }
+      ]
+    },
+    {
+      label: 'Inventory',
+      path: '/inventory-dashboard',
+      icon: Car,
+      color: 'orange',
+      hoverActions: [
+        {
+          label: 'View Inventory',
+          icon: Car,
+          action: () => navigate('/inventory-dashboard')
+        }
       ]
     }
   ];
 
-  if (role === 'sales') {
-    return [
-      ...baseItems,
-      { 
-        path: '/dash/sales', 
-        label: 'My Dashboard', 
-        icon: BarChart3,
-        color: 'purple',
-        hoverActions: [
-          { label: 'View Performance', icon: BarChart3, action: () => navigate('/dash/sales') }
-        ]
-      },
-      { 
-        path: '/settings', 
-        label: 'Settings', 
-        icon: Settings,
-        color: 'gray',
-        hoverActions: [
-          { label: 'Configure Settings', icon: Settings, action: () => navigate('/settings') }
-        ]
-      }
-    ];
+  const managerItems: NavigationItem[] = [
+    {
+      label: 'Predictive Analytics',
+      path: '/predictive-analytics',
+      icon: Brain,
+      color: 'purple',
+      hoverActions: [
+        {
+          label: 'Sales Forecast',
+          icon: BarChart3,
+          action: () => navigate('/predictive-analytics')
+        }
+      ]
+    },
+    {
+      label: 'Financial',
+      path: '/financial-dashboard',
+      icon: DollarSign,
+      color: 'red',
+      hoverActions: [
+        {
+          label: 'Upload Reports',
+          icon: Upload,
+          action: () => navigate('/upload-leads')
+        }
+      ]
+    }
+  ];
+
+  const allItems = [...baseItems];
+
+  if (['manager', 'admin'].includes(userRole)) {
+    allItems.push(...managerItems);
   }
 
-  if (role === 'manager') {
-    return [
-      ...baseItems,
-      { 
-        path: '/dash/manager', 
-        label: 'Manager Dashboard', 
-        icon: BarChart3,
-        color: 'purple',
-        hoverActions: [
-          { label: 'Sales Dashboard', icon: BarChart3, action: () => navigate('/dash/sales') },
-          { label: 'Manager Dashboard', icon: BarChart3, action: () => navigate('/dash/manager') }
-        ]
-      },
-      { 
-        path: '/financial-dashboard', 
-        label: 'Financial', 
-        icon: DollarSign,
-        color: 'emerald',
-        hoverActions: [
-          { label: 'Upload Data', icon: Upload, action: () => navigate('/financial-dashboard') },
-          { label: 'View Deals', icon: Eye, action: () => navigate('/financial-dashboard') }
-        ]
-      },
-      { 
-        path: '/inventory-dashboard', 
-        label: 'Inventory', 
-        icon: Package,
-        color: 'orange',
-        hoverActions: [
-          { label: 'Dashboard', icon: BarChart3, action: () => navigate('/inventory-dashboard') },
-          { label: 'Upload Inventory', icon: Plus, action: () => navigate('/inventory-upload') },
-          { label: 'RPO Insights', icon: Eye, action: () => navigate('/rpo-insights') }
-        ]
-      },
-      { 
-        path: '/ai-monitor', 
-        label: 'AI Monitor', 
+  // Add settings for all users
+  allItems.push({
+    label: 'Settings',
+    path: '/settings',
+    icon: Settings,
+    color: 'gray',
+    hoverActions: [
+      {
+        label: 'Account Settings',
         icon: Settings,
-        color: 'red',
-        hoverActions: [
-          { label: 'Monitor AI Activity', icon: Eye, action: () => navigate('/ai-monitor') }
-        ]
-      },
-      { 
-        path: '/settings', 
-        label: 'Settings', 
-        icon: Settings,
-        color: 'gray',
-        hoverActions: [
-          { label: 'Configure Settings', icon: Settings, action: () => navigate('/settings') }
-        ]
+        action: () => navigate('/settings')
       }
-    ];
-  }
+    ]
+  });
 
-  if (role === 'admin') {
-    return [
-      ...baseItems,
-      { 
-        path: '/dash/admin', 
-        label: 'Admin Dashboard', 
-        icon: BarChart3,
-        color: 'purple',
-        hoverActions: [
-          { label: 'Sales Dashboard', icon: BarChart3, action: () => navigate('/dash/sales') },
-          { label: 'Manager Dashboard', icon: BarChart3, action: () => navigate('/dash/manager') },
-          { label: 'Admin Dashboard', icon: BarChart3, action: () => navigate('/dash/admin') }
-        ]
-      },
-      { 
-        path: '/financial-dashboard', 
-        label: 'Financial', 
-        icon: DollarSign,
-        color: 'emerald',
-        hoverActions: [
-          { label: 'Upload Data', icon: Upload, action: () => navigate('/financial-dashboard') },
-          { label: 'View Deals', icon: Eye, action: () => navigate('/financial-dashboard') }
-        ]
-      },
-      { 
-        path: '/inventory-dashboard', 
-        label: 'Inventory', 
-        icon: Package,
-        color: 'orange',
-        hoverActions: [
-          { label: 'Dashboard', icon: BarChart3, action: () => navigate('/inventory-dashboard') },
-          { label: 'Upload Inventory', icon: Plus, action: () => navigate('/inventory-upload') },
-          { label: 'RPO Insights', icon: Eye, action: () => navigate('/rpo-insights') }
-        ]
-      },
-      { 
-        path: '/ai-monitor', 
-        label: 'AI Monitor', 
-        icon: Settings,
-        color: 'red',
-        hoverActions: [
-          { label: 'Monitor AI Activity', icon: Eye, action: () => navigate('/ai-monitor') }
-        ]
-      },
-      { 
-        path: '/settings', 
-        label: 'Settings', 
-        icon: Settings,
-        color: 'gray',
-        hoverActions: [
-          { label: 'Configure Settings', icon: Settings, action: () => navigate('/settings') }
-        ]
-      }
-    ];
-  }
-
-  return baseItems;
+  return allItems;
 };
