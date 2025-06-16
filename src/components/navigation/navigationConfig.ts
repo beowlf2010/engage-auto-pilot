@@ -69,6 +69,13 @@ export const navigationConfig: NavConfig[] = [
     roles: ["admin", "manager", "salesperson"],
     priority: 'primary'
   },
+  {
+    title: "Financial Dashboard",
+    href: "/financial-dashboard",
+    icon: BarChart3,
+    roles: ["admin", "manager"],
+    priority: 'primary'
+  },
   
   // Secondary navigation items (for dropdown)
   {
