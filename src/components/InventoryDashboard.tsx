@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -35,6 +34,8 @@ interface InventoryFilters {
 }
 
 const InventoryDashboard = () => {
+  console.log('InventoryDashboard component rendering...');
+  
   const [filters, setFilters] = useState<InventoryFilters>({
     sortBy: 'age',
     sortOrder: 'desc',
@@ -46,132 +47,143 @@ const InventoryDashboard = () => {
   const [qrModalOpen, setQRModalOpen] = useState(false);
   const [qrVehicle, setQRVehicle] = useState<any | null>(null);
 
+  console.log('Current filters:', filters);
+  console.log('Search term:', searchTerm);
+
   const { data: inventory, isLoading, error } = useQuery({
     queryKey: ['inventory-enhanced', filters, searchTerm],
     queryFn: async () => {
-      console.log('Fetching inventory data...');
-      let query = supabase
-        .from('inventory')
-        .select(`
-          *,
-          deals!stock_number(
-            id,
-            upload_date,
-            sale_amount,
-            total_profit,
-            deal_type
-          )
-        `);
-
-      if (filters.make) {
-        query = query.ilike('make', `%${filters.make}%`);
-      }
-      if (filters.model) {
-        query = query.ilike('model', `%${filters.model}%`);
-      }
-      if (filters.inventoryType && filters.inventoryType !== 'all') {
-        query = query.eq('condition', filters.inventoryType);
-      }
-      if (filters.sourceReport) {
-        query = query.eq('source_report', filters.sourceReport);
-      }
-      if (filters.rpoCode) {
-        query = query.contains('rpo_codes', [filters.rpoCode]);
-      }
-      if (filters.yearMin) {
-        query = query.gte('year', filters.yearMin);
-      }
-      if (filters.yearMax) {
-        query = query.lte('year', filters.yearMax);
-      }
-      if (filters.priceMin) {
-        query = query.gte('price', filters.priceMin);
-      }
-      if (filters.priceMax) {
-        query = query.lte('price', filters.priceMax);
-      }
-      if (searchTerm) {
-        query = query.or(`vin.ilike.%${searchTerm}%,stock_number.ilike.%${searchTerm}%,make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        console.error('Error fetching inventory:', error);
-        throw error;
-      }
+      console.log('Starting inventory fetch with filters:', filters, 'searchTerm:', searchTerm);
       
-      console.log('Raw inventory data:', data);
-      
-      // Process the data to include deal information and data quality
-      let processedData = data?.map(vehicle => ({
-        ...vehicle,
-        deal_count: Array.isArray(vehicle.deals) ? vehicle.deals.length : 0,
-        latest_deal: Array.isArray(vehicle.deals) && vehicle.deals.length > 0 
-          ? vehicle.deals.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0]
-          : null,
-        data_completeness: getDataCompletenessScore(vehicle)
-      })) || [];
+      try {
+        let query = supabase
+          .from('inventory')
+          .select(`
+            *,
+            deals!stock_number(
+              id,
+              upload_date,
+              sale_amount,
+              total_profit,
+              deal_type
+            )
+          `);
 
-      console.log('Processed inventory data:', processedData);
+        if (filters.make) {
+          query = query.ilike('make', `%${filters.make}%`);
+        }
+        if (filters.model) {
+          query = query.ilike('model', `%${filters.model}%`);
+        }
+        if (filters.inventoryType && filters.inventoryType !== 'all') {
+          query = query.eq('condition', filters.inventoryType);
+        }
+        if (filters.sourceReport) {
+          query = query.eq('source_report', filters.sourceReport);
+        }
+        if (filters.rpoCode) {
+          query = query.contains('rpo_codes', [filters.rpoCode]);
+        }
+        if (filters.yearMin) {
+          query = query.gte('year', filters.yearMin);
+        }
+        if (filters.yearMax) {
+          query = query.lte('year', filters.yearMax);
+        }
+        if (filters.priceMin) {
+          query = query.gte('price', filters.priceMin);
+        }
+        if (filters.priceMax) {
+          query = query.lte('price', filters.priceMax);
+        }
+        if (searchTerm) {
+          query = query.or(`vin.ilike.%${searchTerm}%,stock_number.ilike.%${searchTerm}%,make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+        }
 
-      // Apply data quality filter
-      if (filters.dataQuality === 'complete') {
-        processedData = processedData.filter(v => v.data_completeness >= 80);
-      } else if (filters.dataQuality === 'incomplete') {
-        processedData = processedData.filter(v => v.data_completeness < 80);
-      }
-
-      // Apply sorting
-      processedData.sort((a, b) => {
-        let aVal, bVal;
+        console.log('Executing Supabase query...');
+        const { data, error } = await query;
         
-        switch (filters.sortBy) {
-          case 'age':
-            aVal = a.days_in_inventory || 0;
-            bVal = b.days_in_inventory || 0;
-            break;
-          case 'price':
-            aVal = a.price || 0;
-            bVal = b.price || 0;
-            break;
-          case 'year':
-            aVal = a.year || 0;
-            bVal = b.year || 0;
-            break;
-          case 'make':
-            aVal = a.make || '';
-            bVal = b.make || '';
-            break;
-          case 'model':
-            aVal = a.model || '';
-            bVal = b.model || '';
-            break;
-          case 'completeness':
-            aVal = a.data_completeness;
-            bVal = b.data_completeness;
-            break;
-          default:
-            return 0;
+        if (error) {
+          console.error('Supabase query error:', error);
+          throw error;
         }
         
-        if (typeof aVal === 'string') {
-          return filters.sortOrder === 'asc' 
-            ? aVal.localeCompare(bVal) 
-            : bVal.localeCompare(aVal);
-        }
+        console.log('Raw inventory data received:', data?.length, 'records');
         
-        return filters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-      });
-      
-      return processedData;
+        let processedData = data?.map(vehicle => ({
+          ...vehicle,
+          deal_count: Array.isArray(vehicle.deals) ? vehicle.deals.length : 0,
+          latest_deal: Array.isArray(vehicle.deals) && vehicle.deals.length > 0 
+            ? vehicle.deals.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0]
+            : null,
+          data_completeness: getDataCompletenessScore(vehicle)
+        })) || [];
+
+        console.log('Processed inventory data:', processedData.length, 'records');
+
+        if (filters.dataQuality === 'complete') {
+          processedData = processedData.filter(v => v.data_completeness >= 80);
+        } else if (filters.dataQuality === 'incomplete') {
+          processedData = processedData.filter(v => v.data_completeness < 80);
+        }
+
+        processedData.sort((a, b) => {
+          let aVal, bVal;
+          
+          switch (filters.sortBy) {
+            case 'age':
+              aVal = a.days_in_inventory || 0;
+              bVal = b.days_in_inventory || 0;
+              break;
+            case 'price':
+              aVal = a.price || 0;
+              bVal = b.price || 0;
+              break;
+            case 'year':
+              aVal = a.year || 0;
+              bVal = b.year || 0;
+              break;
+            case 'make':
+              aVal = a.make || '';
+              bVal = b.make || '';
+              break;
+            case 'model':
+              aVal = a.model || '';
+              bVal = b.model || '';
+              break;
+            case 'completeness':
+              aVal = a.data_completeness;
+              bVal = b.data_completeness;
+              break;
+            default:
+              return 0;
+          }
+          
+          if (typeof aVal === 'string') {
+            return filters.sortOrder === 'asc' 
+              ? aVal.localeCompare(bVal) 
+              : bVal.localeCompare(aVal);
+          }
+          
+          return filters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+        
+        console.log('Final processed and sorted data:', processedData.length, 'records');
+        return processedData;
+      } catch (err) {
+        console.error('Error in inventory query function:', err);
+        throw err;
+      }
     }
   });
+
+  console.log('Query state - isLoading:', isLoading, 'error:', error, 'data length:', inventory?.length);
 
   // Show error state if there's an error
   if (error) {
     console.error('Inventory dashboard error:', error);
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-slate-800">Inventory Dashboard</h1>
         </div>
@@ -230,6 +242,8 @@ const InventoryDashboard = () => {
       });
     }
   };
+
+  console.log('About to render main dashboard UI...');
 
   return (
     <div className="space-y-6">
