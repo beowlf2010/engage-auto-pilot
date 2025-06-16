@@ -64,6 +64,11 @@ const ProfitChangesReport = ({
     );
   };
 
+  // Calculate total profit including pack adjustment
+  const getTotalProfitWithPack = (record: ProfitHistoryRecord) => {
+    return (record.total_profit || 0) + record.pack_adjustment_applied;
+  };
+
   if (loading) {
     return (
       <Card>
@@ -105,7 +110,7 @@ const ProfitChangesReport = ({
               <div className="text-2xl font-bold">{formatCurrency(summary.totalFiChange)}</div>
             </div>
             <div className="text-center">
-              <div className="text-sm font-medium text-gray-600 mb-1">Total Profit Change</div>
+              <div className="text-sm font-medium text-gray-600 mb-1">Total Profit Change (with Pack)</div>
               <div className="text-2xl font-bold">{formatCurrency(summary.totalProfitChange)}</div>
             </div>
           </div>
@@ -157,7 +162,7 @@ const ProfitChangesReport = ({
           <div>
             <CardTitle>Profit Changes Detail</CardTitle>
             <CardDescription>
-              Deals with profit changes in the selected period
+              Deals with profit changes in the selected period (Total Profit includes pack adjustments)
             </CardDescription>
           </div>
           <Button onClick={handlePrint} className="print:hidden">
@@ -176,13 +181,12 @@ const ProfitChangesReport = ({
                   <TableHead className="text-right">Gross Profit</TableHead>
                   <TableHead className="text-right">F&I Profit</TableHead>
                   <TableHead className="text-right">Total Profit</TableHead>
-                  <TableHead className="text-right">Pack Adjustment</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {summary.changesDetected.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                       No profit changes found in the selected period
                     </TableCell>
                   </TableRow>
@@ -207,10 +211,7 @@ const ProfitChangesReport = ({
                         {formatCurrency(record.fi_profit || 0)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(record.total_profit || 0)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(record.pack_adjustment_applied)}
+                        {formatCurrency(getTotalProfitWithPack(record))}
                       </TableCell>
                     </TableRow>
                   ))
@@ -225,7 +226,7 @@ const ProfitChangesReport = ({
               <h3 className="text-lg font-bold mb-2">Report Summary</h3>
               <p className="text-sm">
                 This report shows {summary.totalDealsWithChanges} deals with profit changes, 
-                totaling {formatCurrency(summary.totalProfitChange)} in total profit variance.
+                totaling {formatCurrency(summary.totalProfitChange)} in total profit variance (including pack adjustments).
               </p>
             </div>
           </div>

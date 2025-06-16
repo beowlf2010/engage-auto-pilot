@@ -104,11 +104,17 @@ export const calculateProfitChangesSummary = (
 
   const uniqueChanges = Array.from(latestChanges.values());
   
+  // Calculate total profit change including pack adjustments
+  const totalProfitChangeWithPack = uniqueChanges.reduce((sum, record) => {
+    const totalProfitWithPack = (record.total_profit || 0) + record.pack_adjustment_applied;
+    return sum + totalProfitWithPack;
+  }, 0);
+  
   return {
     totalDealsWithChanges: uniqueChanges.length,
     totalGrossChange: uniqueChanges.reduce((sum, record) => sum + (record.gross_profit || 0), 0),
     totalFiChange: uniqueChanges.reduce((sum, record) => sum + (record.fi_profit || 0), 0),
-    totalProfitChange: uniqueChanges.reduce((sum, record) => sum + (record.total_profit || 0), 0),
+    totalProfitChange: totalProfitChangeWithPack,
     changesDetected: uniqueChanges
   };
 };
