@@ -1,5 +1,7 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AnimatedStatCard from '@/components/ui/animated-stat-card';
 import GlassCard from '@/components/ui/glass-card';
@@ -14,6 +16,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { getInventoryStats } from '@/services/inventory/inventoryStatsService';
 
 interface EnhancedDashboardProps {
   user: any;
@@ -21,6 +24,12 @@ interface EnhancedDashboardProps {
 
 const EnhancedDashboard: React.FC<EnhancedDashboardProps> = ({ user }) => {
   const navigate = useNavigate();
+
+  // Fetch real inventory data
+  const { data: inventoryStats, isLoading: inventoryLoading } = useQuery({
+    queryKey: ['inventory-stats-enhanced'],
+    queryFn: getInventoryStats,
+  });
 
   // Sample data for charts
   const performanceData = [
@@ -38,6 +47,29 @@ const EnhancedDashboard: React.FC<EnhancedDashboardProps> = ({ user }) => {
     { name: 'Qualified', value: 20, color: '#10B981' },
     { name: 'Negotiating', value: 15, color: '#8B5CF6' }
   ];
+
+  // Format inventory count with loading state
+  const formatInventoryCount = () => {
+    if (inventoryLoading) return "...";
+    if (!inventoryStats) return "0";
+    return inventoryStats.totalVehicles.toString();
+  };
+
+  // Format inventory subtitle with new/used breakdown
+  const formatInventorySubtitle = () => {
+    if (inventoryLoading) return "Loading...";
+    if (!inventoryStats) return "No vehicles";
+    
+    const newCount = inventoryStats.newVehicles.available || 0;
+    const usedCount = inventoryStats.usedVehicles.available || 0;
+    return `${newCount} new, ${usedCount} used available`;
+  };
+
+  // Calculate trend - mock for now, could be enhanced with historical data
+  const inventoryTrendValue = inventoryStats ? 
+    ((inventoryStats.newVehicles.available + inventoryStats.usedVehicles.available) / inventoryStats.totalVehicles * 100) - 85 
+    : 0;
+  const inventoryTrendPositive = inventoryTrendValue >= 0;
 
   return (
     <div className="space-y-8 p-6 bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 min-h-screen">
@@ -87,10 +119,14 @@ const EnhancedDashboard: React.FC<EnhancedDashboardProps> = ({ user }) => {
         />
         <AnimatedStatCard
           title="Inventory Count"
-          value="342"
+          value={formatInventoryCount()}
           icon={Car}
           gradient="bg-gradient-to-br from-orange-500 to-red-500"
-          trend={{ value: 3.1, isPositive: false }}
+          trend={{ 
+            value: Math.abs(inventoryTrendValue), 
+            isPositive: inventoryTrendPositive 
+          }}
+          subtitle={formatInventorySubtitle()}
         />
       </div>
 
