@@ -16,12 +16,13 @@ export const useBehavioralTriggers = () => {
 
   const loadTriggers = async () => {
     try {
-      // First try the RPC function, fallback to direct table query
+      // Try the RPC function first, then fallback to direct table query
       let data: any[] = [];
       
       try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('get_enhanced_triggers');
-        if (!rpcError && rpcData) {
+        // Use any type for the RPC call since the function isn't in the types yet
+        const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_enhanced_triggers');
+        if (!rpcError && rpcData && Array.isArray(rpcData)) {
           data = rpcData;
         }
       } catch (rpcError) {
@@ -44,7 +45,7 @@ export const useBehavioralTriggers = () => {
         }
       }
 
-      if (data) {
+      if (data && Array.isArray(data)) {
         setTriggers(data);
       }
     } catch (error) {
@@ -59,7 +60,7 @@ export const useBehavioralTriggers = () => {
         .from('enhanced_behavioral_triggers' as any)
         .select('processed, urgency_level');
 
-      if (allTriggers) {
+      if (allTriggers && Array.isArray(allTriggers)) {
         const total = allTriggers.length;
         const pending = allTriggers.filter((t: any) => !t.processed).length;
         const processed = allTriggers.filter((t: any) => t.processed).length;
