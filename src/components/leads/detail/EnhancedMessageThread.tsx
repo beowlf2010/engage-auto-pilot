@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, CheckCircle, Clock, AlertTriangle, Bot, User } from "lucide-react";
+import { Send, CheckCircle, Clock, AlertTriangle, Bot, User, Shield } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import type { MessageData } from "@/types/conversation";
@@ -17,6 +17,7 @@ interface EnhancedMessageThreadProps {
   onSendMessage: (message: string) => Promise<void>;
   isLoading?: boolean;
   leadName: string;
+  disabled?: boolean;
 }
 
 const MessageStatusIcon = ({ status, aiGenerated }: { status?: string; aiGenerated: boolean }) => {
@@ -54,10 +55,12 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
   messages,
   onSendMessage,
   isLoading = false,
-  leadName
+  leadName,
+  disabled = false
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -70,9 +73,11 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || sending) return;
+    if (!newMessage.trim() || sending || disabled) return;
 
     setSending(true);
+    setError(null);
+    
     try {
       await onSendMessage(newMessage.trim());
       setNewMessage('');
@@ -81,9 +86,12 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
         description: "Your message has been sent successfully",
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "There was an error sending your message. Please try again.";
+      
+      setError(errorMessage);
       toast({
         title: "Failed to send message",
-        description: "There was an error sending your message. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -112,7 +120,15 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <span>Messages</span>
-          <Badge variant="outline">{messages.length} messages</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">{messages.length} messages</Badge>
+            {disabled && (
+              <Badge variant="secondary" className="text-orange-700 bg-orange-100">
+                <Shield className="w-3 h-3 mr-1" />
+                Consent Required
+              </Badge>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       
@@ -181,7 +197,9 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
               <div className="text-center py-8 text-muted-foreground">
                 <User className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>No messages yet</p>
-                <p className="text-sm">Start a conversation to engage with this lead</p>
+                <p className="text-sm">
+                  {disabled ? "Record SMS consent to start messaging" : "Start a conversation to engage with this lead"}
+                </p>
               </div>
             )}
             
@@ -190,19 +208,25 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
         </ScrollArea>
         
         <div className="border-t p-4">
+          {error && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+          
           <div className="flex space-x-2">
             <Textarea
               ref={textareaRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
+              placeholder={disabled ? "SMS consent required to send messages..." : "Type your message..."}
               className="flex-1 min-h-[40px] max-h-[120px] resize-none"
-              disabled={sending || isLoading}
+              disabled={sending || isLoading || disabled}
             />
             <Button
               onClick={handleSendMessage}
-              disabled={!newMessage.trim() || sending || isLoading}
+              disabled={!newMessage.trim() || sending || isLoading || disabled}
               size="sm"
               className="px-3"
             >
@@ -215,7 +239,11 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
           </div>
           
           <div className="text-xs text-muted-foreground mt-2">
-            Press Enter to send, Shift+Enter for new line
+            {disabled ? (
+              <span className="text-orange-600">Record SMS consent above to enable messaging</span>
+            ) : (
+              "Press Enter to send, Shift+Enter for new line"
+            )}
           </div>
         </div>
       </CardContent>

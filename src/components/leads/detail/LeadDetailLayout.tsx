@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MessageSquare } from "lucide-react";
@@ -11,6 +11,7 @@ import LeadInfoCardsSection from "./LeadInfoCardsSection";
 import EnhancedMessageThread from "./EnhancedMessageThread";
 import ActivityTimelineComponent from "./ActivityTimelineComponent";
 import EmailTab from "./EmailTab";
+import ConsentManager from "@/components/compliance/ConsentManager";
 import type { Lead } from "@/types/lead";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
@@ -38,15 +39,39 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   const navigate = useNavigate();
   const compliance = useCompliance();
   const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
+  const [hasConsent, setHasConsent] = useState<boolean | null>(null);
+  const [checkingConsent, setCheckingConsent] = useState(true);
+
+  // Check for existing consent when component mounts
+  useEffect(() => {
+    const checkConsent = async () => {
+      if (!lead.id || !primaryPhone) return;
+      
+      try {
+        const consentExists = await compliance.enforceConsent(lead.id, "sms");
+        setHasConsent(true);
+      } catch (error) {
+        setHasConsent(false);
+      } finally {
+        setCheckingConsent(false);
+      }
+    };
+
+    checkConsent();
+  }, [lead.id, primaryPhone, compliance]);
 
   // Load messages when component mounts or lead changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (lead.id) {
       loadMessages(lead.id);
     }
   }, [lead.id, loadMessages]);
 
   const handleSendMessage = async (message: string): Promise<void> => {
+    if (!hasConsent) {
+      throw new Error("SMS consent is required before sending messages. Please record consent first.");
+    }
+
     try {
       console.log("Sending message:", message);
       await sendMessage(lead.id, message, {
@@ -61,6 +86,10 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
       console.error("Failed to send message:", error);
       throw error; // Let the EnhancedMessageThread handle the error display
     }
+  };
+
+  const handleConsentGranted = () => {
+    setHasConsent(true);
   };
 
   // Transform lead for header component
@@ -99,9 +128,10 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
             <Button
               onClick={() => setShowMessageComposer(true)}
               className="bg-blue-600 hover:bg-blue-700"
+              disabled={!hasConsent && !checkingConsent}
             >
               <MessageSquare className="w-4 h-4 mr-2" />
-              Send Message
+              {checkingConsent ? "Checking Consent..." : hasConsent ? "Send Message" : "Consent Required"}
             </Button>
           </div>
         </div>
@@ -132,13 +162,23 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
                 <TabsTrigger value="email">Email</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="messages" className="space-y-0">
+              <TabsContent value="messages" className="space-y-4">
+                {!checkingConsent && hasConsent === false && (
+                  <ConsentManager
+                    leadId={lead.id}
+                    leadName={`${lead.firstName} ${lead.lastName}`}
+                    phoneNumber={primaryPhone}
+                    onConsentGranted={handleConsentGranted}
+                  />
+                )}
+                
                 <div className="h-[600px]">
                   <EnhancedMessageThread
                     messages={conversationMessages}
                     onSendMessage={handleSendMessage}
                     isLoading={messagesLoading}
                     leadName={`${lead.firstName} ${lead.lastName}`}
+                    disabled={!hasConsent}
                   />
                 </div>
               </TabsContent>
