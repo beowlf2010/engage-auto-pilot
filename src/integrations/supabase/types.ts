@@ -219,6 +219,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_trigger_messages: {
+        Row: {
+          approved: boolean
+          generated_at: string
+          id: string
+          lead_id: string
+          message_content: string
+          sent_at: string | null
+          trigger_id: string | null
+          urgency_level: string
+        }
+        Insert: {
+          approved?: boolean
+          generated_at?: string
+          id?: string
+          lead_id: string
+          message_content: string
+          sent_at?: string | null
+          trigger_id?: string | null
+          urgency_level?: string
+        }
+        Update: {
+          approved?: boolean
+          generated_at?: string
+          id?: string
+          lead_id?: string
+          message_content?: string
+          sent_at?: string | null
+          trigger_id?: string | null
+          urgency_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_trigger_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_trigger_messages_trigger_id_fkey"
+            columns: ["trigger_id"]
+            isOneToOne: false
+            referencedRelation: "enhanced_behavioral_triggers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compliance_settings: {
         Row: {
           email_disclaimer: string | null
@@ -640,6 +688,47 @@ export type Database = {
           variables?: Json | null
         }
         Relationships: []
+      }
+      enhanced_behavioral_triggers: {
+        Row: {
+          created_at: string
+          id: string
+          lead_id: string
+          processed: boolean
+          trigger_data: Json | null
+          trigger_score: number
+          trigger_type: string
+          urgency_level: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lead_id: string
+          processed?: boolean
+          trigger_data?: Json | null
+          trigger_score?: number
+          trigger_type: string
+          urgency_level?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lead_id?: string
+          processed?: boolean
+          trigger_data?: Json | null
+          trigger_score?: number
+          trigger_type?: string
+          urgency_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enhanced_behavioral_triggers_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory: {
         Row: {
@@ -1077,6 +1166,44 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_contact_timing: {
+        Row: {
+          best_contact_days: number[] | null
+          best_contact_hours: number[] | null
+          id: string
+          last_optimal_contact: string | null
+          lead_id: string
+          response_delay_pattern: number | null
+          timezone: string | null
+        }
+        Insert: {
+          best_contact_days?: number[] | null
+          best_contact_hours?: number[] | null
+          id?: string
+          last_optimal_contact?: string | null
+          lead_id: string
+          response_delay_pattern?: number | null
+          timezone?: string | null
+        }
+        Update: {
+          best_contact_days?: number[] | null
+          best_contact_hours?: number[] | null
+          id?: string
+          last_optimal_contact?: string | null
+          lead_id?: string
+          response_delay_pattern?: number | null
+          timezone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_contact_timing_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_inventory_interests: {
         Row: {
           created_at: string
@@ -1103,6 +1230,53 @@ export type Database = {
           notes?: string | null
         }
         Relationships: []
+      }
+      lead_personalities: {
+        Row: {
+          communication_style: string
+          decision_speed: string
+          id: string
+          interest_level: string
+          last_updated: string
+          lead_id: string
+          personality_score: number
+          preferred_contact_method: string
+          price_sensitivity: string
+          response_preference: string
+        }
+        Insert: {
+          communication_style?: string
+          decision_speed?: string
+          id?: string
+          interest_level?: string
+          last_updated?: string
+          lead_id: string
+          personality_score?: number
+          preferred_contact_method?: string
+          price_sensitivity?: string
+          response_preference?: string
+        }
+        Update: {
+          communication_style?: string
+          decision_speed?: string
+          id?: string
+          interest_level?: string
+          last_updated?: string
+          lead_id?: string
+          personality_score?: number
+          preferred_contact_method?: string
+          price_sensitivity?: string
+          response_preference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_personalities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_response_patterns: {
         Row: {
@@ -1820,6 +1994,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      website_activities: {
+        Row: {
+          actions_taken: string[] | null
+          id: string
+          lead_id: string
+          page_type: string
+          page_url: string
+          time_spent: number
+          timestamp: string
+        }
+        Insert: {
+          actions_taken?: string[] | null
+          id?: string
+          lead_id: string
+          page_type: string
+          page_url: string
+          time_spent?: number
+          timestamp?: string
+        }
+        Update: {
+          actions_taken?: string[] | null
+          id?: string
+          lead_id?: string
+          page_type?: string
+          page_url?: string
+          time_spent?: number
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

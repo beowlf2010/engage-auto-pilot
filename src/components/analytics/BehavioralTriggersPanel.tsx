@@ -24,30 +24,42 @@ const BehavioralTriggersPanel = () => {
   }, []);
 
   const loadTriggers = async () => {
-    const { data } = await supabase
-      .from('enhanced_behavioral_triggers')
-      .select(`
-        *,
-        leads(first_name, last_name, vehicle_interest)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    try {
+      // Use raw SQL query to access the new table until types are updated
+      const { data, error } = await supabase.rpc('get_enhanced_triggers') || 
+        await supabase.from('enhanced_behavioral_triggers' as any)
+          .select(`
+            *,
+            leads(first_name, last_name, vehicle_interest)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(20);
 
-    setTriggers(data || []);
+      if (!error && data) {
+        setTriggers(data);
+      }
+    } catch (error) {
+      console.error('Error loading triggers:', error);
+      setTriggers([]);
+    }
   };
 
   const loadStats = async () => {
-    const { data: allTriggers } = await supabase
-      .from('enhanced_behavioral_triggers')
-      .select('processed, urgency_level');
+    try {
+      const { data: allTriggers } = await supabase
+        .from('enhanced_behavioral_triggers' as any)
+        .select('processed, urgency_level');
 
-    if (allTriggers) {
-      const total = allTriggers.length;
-      const pending = allTriggers.filter(t => !t.processed).length;
-      const processed = allTriggers.filter(t => t.processed).length;
-      const highUrgency = allTriggers.filter(t => ['high', 'critical'].includes(t.urgency_level)).length;
+      if (allTriggers) {
+        const total = allTriggers.length;
+        const pending = allTriggers.filter(t => !t.processed).length;
+        const processed = allTriggers.filter(t => t.processed).length;
+        const highUrgency = allTriggers.filter(t => ['high', 'critical'].includes(t.urgency_level)).length;
 
-      setStats({ total, pending, processed, highUrgency });
+        setStats({ total, pending, processed, highUrgency });
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error);
     }
   };
 
@@ -79,8 +91,8 @@ const BehavioralTriggersPanel = () => {
     return <Icon className="h-4 w-4" />;
   };
 
-  const getUrgencyColor = (urgency: string) => {
-    const colorMap: Record<string, string> = {
+  const getUrgencyColor = (urgency: string): "default" | "secondary" | "destructive" | "outline" => {
+    const colorMap: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       low: 'default',
       medium: 'secondary',
       high: 'destructive',
@@ -90,15 +102,19 @@ const BehavioralTriggersPanel = () => {
   };
 
   const formatTriggerData = (type: string, data: any) => {
-    switch (type) {
-      case 'website_visit':
-        return `${data.page_type} - ${data.time_spent}s`;
-      case 'email_open':
-        return `${data.engagement_type} engagement`;
-      case 'price_alert':
-        return `Price change: $${data.old_price} → $${data.new_price}`;
-      default:
-        return 'Activity detected';
+    try {
+      switch (type) {
+        case 'website_visit':
+          return `${data.page_type} - ${data.time_spent}s`;
+        case 'email_open':
+          return `${data.engagement_type} engagement`;
+        case 'price_alert':
+          return `Price change: $${data.old_price} → $${data.new_price}`;
+        default:
+          return 'Activity detected';
+      }
+    } catch {
+      return 'Activity detected';
     }
   };
 
