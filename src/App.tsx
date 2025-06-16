@@ -13,7 +13,9 @@ import AIMonitorPage from "./pages/AIMonitorPage";
 import AdvancedAnalyticsPage from "./pages/AdvancedAnalyticsPage";
 import PersonalizationPage from "./pages/PersonalizationPage";
 import PredictiveAnalyticsPage from "./pages/PredictiveAnalyticsPage";
-import StreamlinedPages from "./pages/StreamlinedPages";
+import InventoryDashboardPage from "./pages/InventoryDashboardPage";
+import InventoryUploadPage from "./pages/InventoryUploadPage";
+import RPOInsightsPage from "./pages/RPOInsightsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,17 +72,17 @@ function App() {
               } />
               <Route path="/inventory-dashboard" element={
                 <ProtectedRoute>
-                  <StreamlinedPages.InventoryDashboardPage />
+                  <InventoryDashboardPage />
                 </ProtectedRoute>
               } />
               <Route path="/inventory-upload" element={
                 <ProtectedRoute>
-                  <StreamlinedPages.InventoryUploadPage />
+                  <InventoryUploadPage />
                 </ProtectedRoute>
               } />
               <Route path="/rpo-insights" element={
                 <ProtectedRoute>
-                  <StreamlinedPages.RPOInsightsPage />
+                  <RPOInsightsPage />
                 </ProtectedRoute>
               } />
               <Route path="/ai-monitor" element={
