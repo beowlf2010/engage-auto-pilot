@@ -1,12 +1,12 @@
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Car, Lock, Unlock } from "lucide-react";
+import { Eye, Car, Lock, Unlock, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
+import { isUsedVehicle } from "@/components/financial/deal-management/DealManagementUtils";
 
 interface Deal {
   id: string;
@@ -186,14 +186,24 @@ const DealsTable = ({
               </TableCell>
               
               <TableCell className="text-right">
-                <div className="font-semibold">
-                  {formatCurrency(getAdjustedGrossProfit(deal))}
-                </div>
-                {hasChangedFromOriginal(deal, 'gross') && (
-                  <div className="text-xs text-slate-500">
-                    Was: {formatCurrency(deal.original_gross_profit || 0)}
+                <div className="flex items-center justify-end space-x-2">
+                  <div>
+                    <div className="font-semibold">
+                      {formatCurrency(getAdjustedGrossProfit(deal))}
+                    </div>
+                    {hasChangedFromOriginal(deal, 'gross') && (
+                      <div className="text-xs text-slate-500">
+                        Was: {formatCurrency(deal.original_gross_profit || 0)}
+                      </div>
+                    )}
                   </div>
-                )}
+                  {packAdjustmentEnabled && isUsedVehicle(deal.stock_number) && (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 flex items-center space-x-1">
+                      <Plus className="w-3 h-3" />
+                      <span>{formatCurrency(localPackAdjustment)}</span>
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               
               <TableCell className="text-right">
