@@ -30,6 +30,15 @@ export interface ComplianceRule {
   updatedAt: string;
 }
 
+// Type guards for validation
+const isValidSeverity = (severity: string): severity is 'low' | 'medium' | 'high' | 'critical' => {
+  return ['low', 'medium', 'high', 'critical'].includes(severity);
+};
+
+const isValidStatus = (status: string): status is 'open' | 'resolved' | 'false_positive' => {
+  return ['open', 'resolved', 'false_positive'].includes(status);
+};
+
 // Scan message for compliance violations
 export const scanMessageForViolations = async (conversationId: string, messageBody: string, leadId: string): Promise<ComplianceViolation[]> => {
   try {
@@ -77,11 +86,13 @@ export const scanMessageForViolations = async (conversationId: string, messageBo
       }
 
       if (violationDetected) {
+        const validatedSeverity = isValidSeverity(rule.severity) ? rule.severity : 'medium';
+        
         const violationData = {
           conversation_id: conversationId,
           lead_id: leadId,
           violation_type: rule.rule_name,
-          severity: rule.severity,
+          severity: validatedSeverity,
           description: rule.description,
           detected_content: detectedContent,
           confidence_score: 0.8, // Default confidence
@@ -100,14 +111,14 @@ export const scanMessageForViolations = async (conversationId: string, messageBo
             conversationId: violation.conversation_id,
             leadId: violation.lead_id,
             violationType: violation.violation_type,
-            severity: violation.severity,
+            severity: validatedSeverity,
             description: violation.description,
             detectedContent: violation.detected_content,
             confidenceScore: violation.confidence_score,
             reviewed: violation.reviewed,
             reviewedBy: violation.reviewed_by,
             reviewedAt: violation.reviewed_at,
-            status: violation.status,
+            status: isValidStatus(violation.status) ? violation.status : 'open',
             createdAt: violation.created_at
           });
         }
@@ -139,14 +150,14 @@ export const getComplianceViolations = async (leadId: string): Promise<Complianc
       conversationId: item.conversation_id,
       leadId: item.lead_id,
       violationType: item.violation_type,
-      severity: item.severity,
+      severity: isValidSeverity(item.severity) ? item.severity : 'medium',
       description: item.description,
       detectedContent: item.detected_content,
       confidenceScore: item.confidence_score,
       reviewed: item.reviewed,
       reviewedBy: item.reviewed_by,
       reviewedAt: item.reviewed_at,
-      status: item.status,
+      status: isValidStatus(item.status) ? item.status : 'open',
       createdAt: item.created_at
     }));
   } catch (error) {

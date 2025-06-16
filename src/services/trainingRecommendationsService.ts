@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface TrainingRecommendation {
   id: string;
@@ -16,6 +17,20 @@ export interface TrainingRecommendation {
   createdAt: string;
   updatedAt: string;
 }
+
+// Type guards for validation
+const isValidPriority = (priority: string): priority is 'low' | 'medium' | 'high' => {
+  return ['low', 'medium', 'high'].includes(priority);
+};
+
+const isValidCompletionStatus = (status: string): status is 'pending' | 'in_progress' | 'completed' => {
+  return ['pending', 'in_progress', 'completed'].includes(status);
+};
+
+const parseJsonArray = (jsonValue: Json[] | null | undefined): string[] => {
+  if (!jsonValue || !Array.isArray(jsonValue)) return [];
+  return jsonValue.filter((item): item is string => typeof item === 'string');
+};
 
 // Generate training recommendations based on quality scores and violations
 export const generateTrainingRecommendations = async (salespersonId: string): Promise<TrainingRecommendation[]> => {
@@ -63,12 +78,14 @@ export const generateTrainingRecommendations = async (salespersonId: string): Pr
 
     // Store recommendations in database
     for (const rec of aiResponse.recommendations) {
+      const validatedPriority = isValidPriority(rec.priority) ? rec.priority : 'medium';
+      
       const recommendationData = {
         salesperson_id: salespersonId,
         recommendation_type: rec.type,
         title: rec.title,
         description: rec.description,
-        priority: rec.priority,
+        priority: validatedPriority,
         skills_focus: rec.skillsFocus || [],
         conversation_examples: rec.conversationExamples || [],
         completion_status: 'pending' as const,
@@ -89,10 +106,10 @@ export const generateTrainingRecommendations = async (salespersonId: string): Pr
           recommendationType: recommendation.recommendation_type,
           title: recommendation.title,
           description: recommendation.description,
-          priority: recommendation.priority,
-          skillsFocus: Array.isArray(recommendation.skills_focus) ? recommendation.skills_focus : [],
-          conversationExamples: Array.isArray(recommendation.conversation_examples) ? recommendation.conversation_examples : [],
-          completionStatus: recommendation.completion_status,
+          priority: validatedPriority,
+          skillsFocus: parseJsonArray(recommendation.skills_focus as Json[]),
+          conversationExamples: parseJsonArray(recommendation.conversation_examples as Json[]),
+          completionStatus: isValidCompletionStatus(recommendation.completion_status) ? recommendation.completion_status : 'pending',
           dueDate: recommendation.due_date,
           createdBy: recommendation.created_by,
           createdAt: recommendation.created_at,
@@ -127,10 +144,10 @@ export const getTrainingRecommendations = async (salespersonId: string): Promise
       recommendationType: item.recommendation_type,
       title: item.title,
       description: item.description,
-      priority: item.priority,
-      skillsFocus: Array.isArray(item.skills_focus) ? item.skills_focus : [],
-      conversationExamples: Array.isArray(item.conversation_examples) ? item.conversation_examples : [],
-      completionStatus: item.completion_status,
+      priority: isValidPriority(item.priority) ? item.priority : 'medium',
+      skillsFocus: parseJsonArray(item.skills_focus as Json[]),
+      conversationExamples: parseJsonArray(item.conversation_examples as Json[]),
+      completionStatus: isValidCompletionStatus(item.completion_status) ? item.completion_status : 'pending',
       dueDate: item.due_date,
       createdBy: item.created_by,
       createdAt: item.created_at,
