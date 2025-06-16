@@ -5,13 +5,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useConversationData } from "@/hooks/useConversationData";
-import { useCompliance } from "@/hooks/useCompliance";
 import LeadDetailHeader from "./LeadDetailHeader";
 import LeadInfoCardsSection from "./LeadInfoCardsSection";
 import EnhancedMessageThread from "./EnhancedMessageThread";
 import ActivityTimelineComponent from "./ActivityTimelineComponent";
 import EmailTab from "./EmailTab";
-import ConsentManager from "@/components/compliance/ConsentManager";
 import type { Lead } from "@/types/lead";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
@@ -37,29 +35,7 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   onPhoneSelect
 }) => {
   const navigate = useNavigate();
-  const compliance = useCompliance();
   const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
-  // Temporarily bypass consent checking for testing
-  const [hasConsent, setHasConsent] = useState<boolean | null>(true);
-  const [checkingConsent, setCheckingConsent] = useState(false);
-
-  // Temporarily comment out consent checking
-  // useEffect(() => {
-  //   const checkConsent = async () => {
-  //     if (!lead.id || !primaryPhone) return;
-      
-  //     try {
-  //       const consentExists = await compliance.enforceConsent(lead.id, "sms");
-  //       setHasConsent(true);
-  //     } catch (error) {
-  //       setHasConsent(false);
-  //     } finally {
-  //       setCheckingConsent(false);
-  //     }
-  //   };
-
-  //   checkConsent();
-  // }, [lead.id, primaryPhone, compliance]);
 
   // Load messages when component mounts or lead changes
   useEffect(() => {
@@ -69,18 +45,9 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   }, [lead.id, loadMessages]);
 
   const handleSendMessage = async (message: string): Promise<void> => {
-    // Temporarily bypass consent check
-    // if (!hasConsent) {
-    //   throw new Error("SMS consent is required before sending messages. Please record consent first.");
-    // }
-
     try {
       console.log("Sending message:", message);
-      await sendMessage(lead.id, message, {
-        checkSuppressed: compliance.checkSuppressed,
-        enforceConsent: () => Promise.resolve(true), // Bypass consent enforcement
-        storeConsent: compliance.storeConsent
-      });
+      await sendMessage(lead.id, message);
       
       // Reload messages to show the new message
       await loadMessages(lead.id);
@@ -88,10 +55,6 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
       console.error("Failed to send message:", error);
       throw error; // Let the EnhancedMessageThread handle the error display
     }
-  };
-
-  const handleConsentGranted = () => {
-    setHasConsent(true);
   };
 
   // Transform lead for header component
@@ -164,16 +127,6 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
               </TabsList>
 
               <TabsContent value="messages" className="space-y-4">
-                {/* Temporarily hide consent manager */}
-                {/* {!checkingConsent && hasConsent === false && (
-                  <ConsentManager
-                    leadId={lead.id}
-                    leadName={`${lead.firstName} ${lead.lastName}`}
-                    phoneNumber={primaryPhone}
-                    onConsentGranted={handleConsentGranted}
-                  />
-                )} */}
-                
                 <div className="h-[600px]">
                   <EnhancedMessageThread
                     messages={conversationMessages}
