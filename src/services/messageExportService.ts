@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 
@@ -29,6 +30,13 @@ export const createMessageExport = async (
   exportData: VINMessageExport
 ) => {
   try {
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      throw new Error('User must be authenticated to create message exports');
+    }
+
     const { data, error } = await supabase
       .from('message_exports')
       .insert({
@@ -36,7 +44,8 @@ export const createMessageExport = async (
         source_system: 'vin',
         total_messages: exportData.export_info.total_messages,
         total_leads: exportData.export_info.total_leads,
-        export_data: exportData as any
+        export_data: exportData as any,
+        created_by: user.id
       })
       .select()
       .single();
