@@ -18,6 +18,14 @@ export interface Deal {
   original_total_profit?: number;
 }
 
+export interface SummaryTotals {
+  newRetail: { units: number; gross: number; fi: number; total: number };
+  usedRetail: { units: number; gross: number; fi: number; total: number };
+  totalRetail: { units: number; gross: number; fi: number; total: number };
+  dealerTrade: { units: number; gross: number; fi: number; total: number };
+  wholesale: { units: number; gross: number; fi: number; total: number };
+}
+
 export interface DealManagementProps {
   user: {
     id: string;
