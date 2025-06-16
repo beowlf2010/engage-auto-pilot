@@ -267,6 +267,54 @@ export type Database = {
           },
         ]
       }
+      competitive_analysis: {
+        Row: {
+          analysis_date: string
+          competitive_advantages: Json | null
+          competitor_avg_price: number | null
+          competitor_count: number | null
+          created_at: string
+          id: string
+          market_share_estimate: number | null
+          our_price: number | null
+          price_position: string
+          updated_at: string
+          vehicle_make: string
+          vehicle_model: string
+          vehicle_year: number | null
+        }
+        Insert: {
+          analysis_date?: string
+          competitive_advantages?: Json | null
+          competitor_avg_price?: number | null
+          competitor_count?: number | null
+          created_at?: string
+          id?: string
+          market_share_estimate?: number | null
+          our_price?: number | null
+          price_position?: string
+          updated_at?: string
+          vehicle_make: string
+          vehicle_model: string
+          vehicle_year?: number | null
+        }
+        Update: {
+          analysis_date?: string
+          competitive_advantages?: Json | null
+          competitor_avg_price?: number | null
+          competitor_count?: number | null
+          created_at?: string
+          id?: string
+          market_share_estimate?: number | null
+          our_price?: number | null
+          price_position?: string
+          updated_at?: string
+          vehicle_make?: string
+          vehicle_model?: string
+          vehicle_year?: number | null
+        }
+        Relationships: []
+      }
       compliance_rules: {
         Row: {
           auto_flag: boolean
@@ -970,6 +1018,7 @@ export type Database = {
           days_in_inventory: number | null
           dealer_notes: string | null
           dealer_pack: number | null
+          demand_score: number | null
           description: string | null
           drivetrain: string | null
           engine: string | null
@@ -1000,8 +1049,10 @@ export type Database = {
           msrp: number | null
           pack: number | null
           photos_urls: string[] | null
+          predicted_sale_date: string | null
           previous_owners: number | null
           price: number | null
+          price_competitiveness: string | null
           profit_margin: number | null
           rebates: number | null
           reconditioning_cost: number | null
@@ -1024,6 +1075,7 @@ export type Database = {
           updated_at: string
           upload_history_id: string | null
           vehicle_history_report: string | null
+          velocity_category: string | null
           vin: string | null
           warranty_miles: number | null
           warranty_months: number | null
@@ -1048,6 +1100,7 @@ export type Database = {
           days_in_inventory?: number | null
           dealer_notes?: string | null
           dealer_pack?: number | null
+          demand_score?: number | null
           description?: string | null
           drivetrain?: string | null
           engine?: string | null
@@ -1078,8 +1131,10 @@ export type Database = {
           msrp?: number | null
           pack?: number | null
           photos_urls?: string[] | null
+          predicted_sale_date?: string | null
           previous_owners?: number | null
           price?: number | null
+          price_competitiveness?: string | null
           profit_margin?: number | null
           rebates?: number | null
           reconditioning_cost?: number | null
@@ -1102,6 +1157,7 @@ export type Database = {
           updated_at?: string
           upload_history_id?: string | null
           vehicle_history_report?: string | null
+          velocity_category?: string | null
           vin?: string | null
           warranty_miles?: number | null
           warranty_months?: number | null
@@ -1126,6 +1182,7 @@ export type Database = {
           days_in_inventory?: number | null
           dealer_notes?: string | null
           dealer_pack?: number | null
+          demand_score?: number | null
           description?: string | null
           drivetrain?: string | null
           engine?: string | null
@@ -1156,8 +1213,10 @@ export type Database = {
           msrp?: number | null
           pack?: number | null
           photos_urls?: string[] | null
+          predicted_sale_date?: string | null
           previous_owners?: number | null
           price?: number | null
+          price_competitiveness?: string | null
           profit_margin?: number | null
           rebates?: number | null
           reconditioning_cost?: number | null
@@ -1180,6 +1239,7 @@ export type Database = {
           updated_at?: string
           upload_history_id?: string | null
           vehicle_history_report?: string | null
+          velocity_category?: string | null
           vin?: string | null
           warranty_miles?: number | null
           warranty_months?: number | null
@@ -1194,6 +1254,56 @@ export type Database = {
             columns: ["upload_history_id"]
             isOneToOne: false
             referencedRelation: "upload_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_demand_predictions: {
+        Row: {
+          created_at: string
+          demand_score: number
+          id: string
+          inventory_id: string
+          last_calculated_at: string
+          market_demand_level: string
+          predicted_days_to_sell: number | null
+          prediction_accuracy: number | null
+          price_competitiveness: string
+          seasonal_factor: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          demand_score?: number
+          id?: string
+          inventory_id: string
+          last_calculated_at?: string
+          market_demand_level?: string
+          predicted_days_to_sell?: number | null
+          prediction_accuracy?: number | null
+          price_competitiveness?: string
+          seasonal_factor?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          demand_score?: number
+          id?: string
+          inventory_id?: string
+          last_calculated_at?: string
+          market_demand_level?: string
+          predicted_days_to_sell?: number | null
+          prediction_accuracy?: number | null
+          price_competitiveness?: string
+          seasonal_factor?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_demand_predictions_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
             referencedColumns: ["id"]
           },
         ]
@@ -1427,6 +1537,53 @@ export type Database = {
           },
         ]
       }
+      lead_conversion_predictions: {
+        Row: {
+          conversion_probability: number
+          created_at: string
+          id: string
+          last_calculated_at: string
+          lead_id: string
+          predicted_close_date: string | null
+          predicted_sale_amount: number | null
+          prediction_factors: Json | null
+          temperature_score: number
+          updated_at: string
+        }
+        Insert: {
+          conversion_probability?: number
+          created_at?: string
+          id?: string
+          last_calculated_at?: string
+          lead_id: string
+          predicted_close_date?: string | null
+          predicted_sale_amount?: number | null
+          prediction_factors?: Json | null
+          temperature_score?: number
+          updated_at?: string
+        }
+        Update: {
+          conversion_probability?: number
+          created_at?: string
+          id?: string
+          last_calculated_at?: string
+          lead_id?: string
+          predicted_close_date?: string | null
+          predicted_sale_amount?: number | null
+          prediction_factors?: Json | null
+          temperature_score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_conversion_predictions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_inventory_interests: {
         Row: {
           created_at: string
@@ -1557,6 +1714,7 @@ export type Database = {
           ai_sequence_paused: boolean | null
           ai_stage: string | null
           city: string | null
+          conversion_probability: number | null
           created_at: string
           do_not_call: boolean
           do_not_email: boolean
@@ -1567,10 +1725,12 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          last_prediction_update: string | null
           last_reply_at: string | null
           middle_name: string | null
           next_ai_send_at: string | null
           postal_code: string | null
+          predicted_close_date: string | null
           preferred_mileage_max: number | null
           preferred_price_max: number | null
           preferred_price_min: number | null
@@ -1580,6 +1740,7 @@ export type Database = {
           source: string
           state: string | null
           status: string
+          temperature_score: number | null
           trade_in_vehicle: string | null
           updated_at: string
           vehicle_interest: string
@@ -1598,6 +1759,7 @@ export type Database = {
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
           city?: string | null
+          conversion_probability?: number | null
           created_at?: string
           do_not_call?: boolean
           do_not_email?: boolean
@@ -1608,10 +1770,12 @@ export type Database = {
           first_name: string
           id?: string
           last_name: string
+          last_prediction_update?: string | null
           last_reply_at?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
           postal_code?: string | null
+          predicted_close_date?: string | null
           preferred_mileage_max?: number | null
           preferred_price_max?: number | null
           preferred_price_min?: number | null
@@ -1621,6 +1785,7 @@ export type Database = {
           source?: string
           state?: string | null
           status?: string
+          temperature_score?: number | null
           trade_in_vehicle?: string | null
           updated_at?: string
           vehicle_interest: string
@@ -1639,6 +1804,7 @@ export type Database = {
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
           city?: string | null
+          conversion_probability?: number | null
           created_at?: string
           do_not_call?: boolean
           do_not_email?: boolean
@@ -1649,10 +1815,12 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          last_prediction_update?: string | null
           last_reply_at?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
           postal_code?: string | null
+          predicted_close_date?: string | null
           preferred_mileage_max?: number | null
           preferred_price_max?: number | null
           preferred_price_min?: number | null
@@ -1662,6 +1830,7 @@ export type Database = {
           source?: string
           state?: string | null
           status?: string
+          temperature_score?: number | null
           trade_in_vehicle?: string | null
           updated_at?: string
           vehicle_interest?: string
@@ -1710,6 +1879,51 @@ export type Database = {
           name?: string
           updated_at?: string
           url?: string
+        }
+        Relationships: []
+      }
+      market_intelligence: {
+        Row: {
+          analysis_date: string
+          competitive_pressure: string
+          created_at: string
+          data_sources: Json | null
+          demand_trend: string
+          economic_indicators: Json | null
+          id: string
+          inventory_levels: string
+          market_segment: string
+          price_trend: string
+          recommendations: Json | null
+          seasonal_factor: number | null
+        }
+        Insert: {
+          analysis_date: string
+          competitive_pressure?: string
+          created_at?: string
+          data_sources?: Json | null
+          demand_trend?: string
+          economic_indicators?: Json | null
+          id?: string
+          inventory_levels?: string
+          market_segment: string
+          price_trend?: string
+          recommendations?: Json | null
+          seasonal_factor?: number | null
+        }
+        Update: {
+          analysis_date?: string
+          competitive_pressure?: string
+          created_at?: string
+          data_sources?: Json | null
+          demand_trend?: string
+          economic_indicators?: Json | null
+          id?: string
+          inventory_levels?: string
+          market_segment?: string
+          price_trend?: string
+          recommendations?: Json | null
+          seasonal_factor?: number | null
         }
         Relationships: []
       }
@@ -1841,6 +2055,89 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pipeline_forecasts: {
+        Row: {
+          confidence_level: string
+          created_at: string
+          forecast_month: string
+          id: string
+          predicted_closes: number
+          predicted_revenue: number
+          salesperson_id: string | null
+          updated_at: string
+          weighted_pipeline: number
+        }
+        Insert: {
+          confidence_level?: string
+          created_at?: string
+          forecast_month: string
+          id?: string
+          predicted_closes?: number
+          predicted_revenue?: number
+          salesperson_id?: string | null
+          updated_at?: string
+          weighted_pipeline?: number
+        }
+        Update: {
+          confidence_level?: string
+          created_at?: string
+          forecast_month?: string
+          id?: string
+          predicted_closes?: number
+          predicted_revenue?: number
+          salesperson_id?: string | null
+          updated_at?: string
+          weighted_pipeline?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_forecasts_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prediction_model_performance: {
+        Row: {
+          accuracy_score: number
+          created_at: string
+          evaluation_date: string
+          id: string
+          model_type: string
+          model_version: string
+          performance_notes: string | null
+          precision_score: number | null
+          recall_score: number | null
+          sample_size: number
+        }
+        Insert: {
+          accuracy_score?: number
+          created_at?: string
+          evaluation_date?: string
+          id?: string
+          model_type: string
+          model_version?: string
+          performance_notes?: string | null
+          precision_score?: number | null
+          recall_score?: number | null
+          sample_size?: number
+        }
+        Update: {
+          accuracy_score?: number
+          created_at?: string
+          evaluation_date?: string
+          id?: string
+          model_type?: string
+          model_version?: string
+          performance_notes?: string | null
+          precision_score?: number | null
+          recall_score?: number | null
+          sample_size?: number
+        }
+        Relationships: []
       }
       pricing_disclaimers: {
         Row: {
@@ -2192,6 +2489,42 @@ export type Database = {
           },
         ]
       }
+      sales_forecasts: {
+        Row: {
+          confidence_score: number
+          created_at: string
+          forecast_date: string
+          forecast_factors: Json | null
+          forecast_period: string
+          id: string
+          predicted_revenue: number
+          predicted_units: number
+          updated_at: string
+        }
+        Insert: {
+          confidence_score?: number
+          created_at?: string
+          forecast_date: string
+          forecast_factors?: Json | null
+          forecast_period?: string
+          id?: string
+          predicted_revenue?: number
+          predicted_units?: number
+          updated_at?: string
+        }
+        Update: {
+          confidence_score?: number
+          created_at?: string
+          forecast_date?: string
+          forecast_factors?: Json | null
+          forecast_period?: string
+          id?: string
+          predicted_revenue?: number
+          predicted_units?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           created_at: string
@@ -2353,6 +2686,51 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_velocity_tracking: {
+        Row: {
+          avg_days_to_sell: number
+          body_style: string | null
+          created_at: string
+          current_inventory_count: number
+          id: string
+          last_sale_date: string | null
+          make: string
+          model: string
+          total_sold: number
+          updated_at: string
+          velocity_trend: string
+          year: number | null
+        }
+        Insert: {
+          avg_days_to_sell?: number
+          body_style?: string | null
+          created_at?: string
+          current_inventory_count?: number
+          id?: string
+          last_sale_date?: string | null
+          make: string
+          model: string
+          total_sold?: number
+          updated_at?: string
+          velocity_trend?: string
+          year?: number | null
+        }
+        Update: {
+          avg_days_to_sell?: number
+          body_style?: string | null
+          created_at?: string
+          current_inventory_count?: number
+          id?: string
+          last_sale_date?: string | null
+          make?: string
+          model?: string
+          total_sold?: number
+          updated_at?: string
+          velocity_trend?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
       website_activities: {
         Row: {
           actions_taken: string[] | null
@@ -2407,6 +2785,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_lead_temperature: {
+        Args: { p_lead_id: string }
+        Returns: number
+      }
       calculate_leads_count: {
         Args: { p_vin: string; p_stock_number: string }
         Returns: number
@@ -2477,6 +2859,10 @@ export type Database = {
         Returns: undefined
       }
       update_inventory_leads_count: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_inventory_velocity_tracking: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
