@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -6,6 +5,7 @@ import {
   getMessageExports, 
   processMessageImport, 
   parseVINExportFile,
+  parseVINExcelFile,
   type VINMessageExport 
 } from '@/services/messageExportService';
 
@@ -35,8 +35,19 @@ export const useMessageExport = () => {
     try {
       setIsLoading(true);
       
-      const fileContent = await file.text();
-      const parsedData = parseVINExportFile(fileContent);
+      let parsedData: VINMessageExport;
+      
+      // Check file type and parse accordingly
+      const fileExtension = file.name.toLowerCase().split('.').pop();
+      
+      if (fileExtension === 'json') {
+        const fileContent = await file.text();
+        parsedData = parseVINExportFile(fileContent);
+      } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        parsedData = await parseVINExcelFile(file);
+      } else {
+        throw new Error('Unsupported file format. Please upload a JSON or Excel file.');
+      }
       
       // Create the export record
       const exportRecord = await createMessageExport(exportName, parsedData);

@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import * as XLSX from 'xlsx';
 
 export interface VINMessageExport {
   leads: Array<{
@@ -248,4 +248,82 @@ export const parseVINExportFile = (fileContent: string): VINMessageExport => {
     console.error('Error parsing VIN export file:', error);
     throw new Error('Failed to parse VIN export file. Please ensure it\'s a valid JSON format.');
   }
+};
+
+export const parseVINExcelFile = (file: File): Promise<VINMessageExport> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Assume the first sheet contains the data
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        // Process Excel data to match VIN format
+        const leads = jsonData.map((row: any, index: number) => {
+          const leadId = row.lead_id || row.id || `excel_lead_${index + 1}`;
+          const name = row.name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Unknown';
+          const phone = row.phone || row.phone_number || row.mobile;
+          const email = row.email;
+          const vehicle_interest = row.vehicle_interest || row.vehicle || 'Unknown';
+          
+          // Handle messages - they might be in separate columns or a JSON string
+          let messages = [];
+          if (row.messages) {
+            try {
+              messages = typeof row.messages === 'string' ? JSON.parse(row.messages) : row.messages;
+            } catch {
+              // If parsing fails, create a single message from the row data
+              if (row.message_content || row.last_message) {
+                messages = [{
+                  id: `excel_msg_${index + 1}`,
+                  direction: row.message_direction === 'incoming' || row.message_direction === 'in' ? 'in' : 'out',
+                  content: row.message_content || row.last_message || '',
+                  sent_at: row.message_sent_at || row.last_contact || new Date().toISOString(),
+                  metadata: {}
+                }];
+              }
+            }
+          }
+
+          return {
+            id: leadId,
+            name,
+            phone,
+            email,
+            vehicle_interest,
+            messages: messages.map((msg: any, msgIndex: number) => ({
+              id: msg.id || `excel_msg_${index + 1}_${msgIndex + 1}`,
+              direction: msg.direction === 'incoming' || msg.direction === 'in' ? 'in' : 'out',
+              content: msg.content || msg.message || msg.body || '',
+              sent_at: msg.sent_at || msg.timestamp || new Date().toISOString(),
+              metadata: msg.metadata || {}
+            }))
+          };
+        });
+
+        const processedData: VINMessageExport = {
+          leads: leads.filter(lead => lead.name !== 'Unknown' || lead.phone || lead.email),
+          export_info: {
+            total_leads: leads.length,
+            total_messages: leads.reduce((sum, lead) => sum + lead.messages.length, 0),
+            export_date: new Date().toISOString(),
+            source: 'excel'
+          }
+        };
+
+        resolve(processedData);
+      } catch (error) {
+        reject(new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Error reading Excel file'));
+    reader.readAsArrayBuffer(file);
+  });
 };

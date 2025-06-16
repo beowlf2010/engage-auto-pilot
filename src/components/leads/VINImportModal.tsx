@@ -63,11 +63,11 @@ const VINImportModal = ({ isOpen, onClose, onImportSuccess }: VINImportModalProp
         
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="file-upload">Select VIN Export File (JSON)</Label>
+            <Label htmlFor="file-upload">Select VIN Export File (JSON or Excel)</Label>
             <Input
               id="file-upload"
               type="file"
-              accept=".json"
+              accept=".json,.xlsx,.xls"
               onChange={handleFileSelect}
               ref={fileInputRef}
             />
@@ -101,7 +101,7 @@ const VINImportModal = ({ isOpen, onClose, onImportSuccess }: VINImportModalProp
               <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
               <div className="text-sm text-yellow-800">
                 <strong>Note:</strong> This will import leads and messages from your VIN export file. 
-                Existing leads will be matched by phone/email.
+                Existing leads will be matched by phone/email. Supports both JSON and Excel formats.
               </div>
             </div>
           </div>
