@@ -33,6 +33,24 @@ export interface ResponseSuggestion {
   createdAt: string;
 }
 
+// Type guards and validation functions
+const isValidSentimentLabel = (label: string): label is 'positive' | 'negative' | 'neutral' => {
+  return ['positive', 'negative', 'neutral'].includes(label);
+};
+
+const parseJsonArray = (jsonValue: any): string[] => {
+  if (Array.isArray(jsonValue)) return jsonValue;
+  if (typeof jsonValue === 'string') {
+    try {
+      const parsed = JSON.parse(jsonValue);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 // Generate conversation summary using AI
 export const generateConversationSummary = async (leadId: string): Promise<ConversationSummary | null> => {
   try {
@@ -92,7 +110,7 @@ export const generateConversationSummary = async (leadId: string): Promise<Conve
       id: summaryData.id,
       leadId: summaryData.lead_id,
       summaryText: summaryData.summary_text,
-      keyPoints: summaryData.key_points,
+      keyPoints: parseJsonArray(summaryData.key_points),
       messageCount: summaryData.message_count,
       lastMessageAt: summaryData.last_message_at,
       createdAt: summaryData.created_at,
@@ -121,13 +139,16 @@ export const analyzeMessageSentiment = async (conversationId: string, messageBod
 
     const { sentimentScore, sentimentLabel, confidenceScore, emotions } = aiResponse;
 
+    // Validate sentiment label
+    const validatedSentimentLabel = isValidSentimentLabel(sentimentLabel) ? sentimentLabel : 'neutral';
+
     // Store sentiment in database
     const { data: sentimentData, error: sentimentError } = await supabase
       .from('message_sentiment')
       .insert({
         conversation_id: conversationId,
         sentiment_score: sentimentScore,
-        sentiment_label: sentimentLabel,
+        sentiment_label: validatedSentimentLabel,
         confidence_score: confidenceScore,
         emotions: emotions
       })
@@ -143,9 +164,9 @@ export const analyzeMessageSentiment = async (conversationId: string, messageBod
       id: sentimentData.id,
       conversationId: sentimentData.conversation_id,
       sentimentScore: sentimentData.sentiment_score,
-      sentimentLabel: sentimentData.sentiment_label,
+      sentimentLabel: validatedSentimentLabel,
       confidenceScore: sentimentData.confidence_score,
-      emotions: sentimentData.emotions,
+      emotions: parseJsonArray(sentimentData.emotions),
       createdAt: sentimentData.created_at
     };
   } catch (error) {
@@ -255,7 +276,7 @@ export const getConversationSummary = async (leadId: string): Promise<Conversati
       id: data.id,
       leadId: data.lead_id,
       summaryText: data.summary_text,
-      keyPoints: data.key_points,
+      keyPoints: parseJsonArray(data.key_points),
       messageCount: data.message_count,
       lastMessageAt: data.last_message_at,
       createdAt: data.created_at,
@@ -284,9 +305,9 @@ export const getMessageSentiments = async (conversationIds: string[]): Promise<M
       id: item.id,
       conversationId: item.conversation_id,
       sentimentScore: item.sentiment_score,
-      sentimentLabel: item.sentiment_label,
+      sentimentLabel: isValidSentimentLabel(item.sentiment_label) ? item.sentiment_label : 'neutral',
       confidenceScore: item.confidence_score,
-      emotions: item.emotions,
+      emotions: parseJsonArray(item.emotions),
       createdAt: item.created_at
     }));
   } catch (error) {
