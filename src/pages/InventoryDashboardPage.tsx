@@ -8,10 +8,10 @@ const InventoryDashboardPage = () => {
   
   const { profile, loading } = useAuth();
   
-  console.log('Auth state:', { profile: !!profile, loading });
+  console.log('InventoryDashboardPage - Auth state:', { profile: !!profile, loading, role: profile?.role });
   
   if (loading) {
-    console.log('Auth loading, showing spinner...');
+    console.log('InventoryDashboardPage - Auth loading, showing spinner...');
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -21,7 +21,7 @@ const InventoryDashboardPage = () => {
   }
   
   if (!profile) {
-    console.log('No profile, showing sign-in message...');
+    console.log('InventoryDashboardPage - No profile, showing sign-in message...');
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -32,7 +32,7 @@ const InventoryDashboardPage = () => {
     );
   }
 
-  console.log('Rendering InventoryDashboard component...');
+  console.log('InventoryDashboardPage - Rendering InventoryDashboard component...');
   return (
     <div className="w-full">
       <InventoryDashboard />

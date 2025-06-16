@@ -22,13 +22,23 @@ const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
   const isActive = location.pathname === item.path;
   const itemColor = item.color || 'blue'; // Fallback to blue if color is missing
 
+  const handleClick = () => {
+    console.log('NavigationItem clicked:', item.label, 'navigating to:', item.path);
+    try {
+      navigate(item.path);
+      console.log('Navigation completed successfully');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
   return (
     <HoverCard openDelay={100} closeDelay={100}>
       <HoverCardTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(item.path)}
+          onClick={handleClick}
           className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${getGlassColorClasses(itemColor, isActive)}`}
         >
           <Icon size={18} />
