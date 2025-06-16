@@ -12,8 +12,15 @@ interface EmailAutomationCardProps {
   leadId: string;
 }
 
+interface EmailAutomationState {
+  enabled: boolean;
+  currentStage: string | null;
+  paused: boolean;
+  nextEmailAt: string | null;
+}
+
 const EmailAutomationCard: React.FC<EmailAutomationCardProps> = ({ leadId }) => {
-  const [automation, setAutomation] = useState({
+  const [automation, setAutomation] = useState<EmailAutomationState>({
     enabled: false,
     currentStage: null,
     paused: false,
@@ -27,7 +34,12 @@ const EmailAutomationCard: React.FC<EmailAutomationCardProps> = ({ leadId }) => 
 
   const loadAutomationStatus = async () => {
     const status = await finnEmailService.getEmailAutomationStatus(leadId);
-    setAutomation(status);
+    setAutomation({
+      enabled: status.enabled,
+      currentStage: status.currentStage,
+      paused: status.paused,
+      nextEmailAt: status.nextEmailAt
+    });
   };
 
   const handleToggleAutomation = async (enabled: boolean) => {

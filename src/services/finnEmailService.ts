@@ -105,7 +105,7 @@ class FinnEmailService {
     try {
       const { data: lead } = await supabase
         .from('leads')
-        .select('first_name, vehicle_interest, last_contact_date')
+        .select('first_name, vehicle_interest')
         .eq('id', leadId)
         .single();
 
@@ -124,7 +124,9 @@ class FinnEmailService {
         stage: 'email_subject',
         context: {
           ...context,
-          request_type: 'subject_line_only'
+          urgency_factor: 'medium',
+          inventory_mentioned: [],
+          behavioral_trigger: 'email_subject_generation'
         }
       });
 
@@ -224,7 +226,7 @@ class FinnEmailService {
         .update({
           email_sequence_paused: true,
           ai_sequence_paused: true,
-          pause_reason: 'email_response_requires_attention'
+          ai_pause_reason: 'email_response_requires_attention'
         })
         .eq('id', emailConv.lead_id);
     }
@@ -279,7 +281,7 @@ class FinnEmailService {
       };
     } catch (error) {
       console.error('Error getting email automation status:', error);
-      return { enabled: false, paused: true };
+      return { enabled: false, paused: true, currentStage: null, nextEmailAt: null };
     }
   }
 }

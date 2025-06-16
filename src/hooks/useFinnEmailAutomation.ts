@@ -2,8 +2,15 @@
 import { useState, useEffect } from 'react';
 import { finnEmailService } from '@/services/finnEmailService';
 
+interface EmailAutomationState {
+  enabled: boolean;
+  currentStage: string | null;
+  paused: boolean;
+  nextEmailAt: string | null;
+}
+
 export const useFinnEmailAutomation = (leadId: string) => {
-  const [automation, setAutomation] = useState({
+  const [automation, setAutomation] = useState<EmailAutomationState>({
     enabled: false,
     currentStage: null,
     paused: false,
@@ -19,7 +26,12 @@ export const useFinnEmailAutomation = (leadId: string) => {
 
   const loadAutomationStatus = async () => {
     const status = await finnEmailService.getEmailAutomationStatus(leadId);
-    setAutomation(status);
+    setAutomation({
+      enabled: status.enabled,
+      currentStage: status.currentStage,
+      paused: status.paused,
+      nextEmailAt: status.nextEmailAt
+    });
   };
 
   const toggleAutomation = async (enabled: boolean) => {

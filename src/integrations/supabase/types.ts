@@ -809,6 +809,47 @@ export type Database = {
         }
         Relationships: []
       }
+      email_conversation_analysis: {
+        Row: {
+          analyzed_at: string
+          created_at: string
+          email_conversation_id: string
+          id: string
+          intent: string[] | null
+          key_phrases: string[] | null
+          sentiment: string
+          urgency_level: string
+        }
+        Insert: {
+          analyzed_at?: string
+          created_at?: string
+          email_conversation_id: string
+          id?: string
+          intent?: string[] | null
+          key_phrases?: string[] | null
+          sentiment?: string
+          urgency_level?: string
+        }
+        Update: {
+          analyzed_at?: string
+          created_at?: string
+          email_conversation_id?: string
+          id?: string
+          intent?: string[] | null
+          key_phrases?: string[] | null
+          sentiment?: string
+          urgency_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_conversation_analysis_email_conversation_id_fkey"
+            columns: ["email_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "email_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_conversations: {
         Row: {
           body: string
@@ -1765,6 +1806,9 @@ export type Database = {
           do_not_mail: boolean
           email: string | null
           email_alt: string | null
+          email_opt_in: boolean | null
+          email_sequence_paused: boolean | null
+          email_sequence_stage: string | null
           financing_needed: boolean | null
           first_name: string
           id: string
@@ -1773,6 +1817,7 @@ export type Database = {
           last_reply_at: string | null
           middle_name: string | null
           next_ai_send_at: string | null
+          next_email_send_at: string | null
           postal_code: string | null
           predicted_close_date: string | null
           preferred_mileage_max: number | null
@@ -1810,6 +1855,9 @@ export type Database = {
           do_not_mail?: boolean
           email?: string | null
           email_alt?: string | null
+          email_opt_in?: boolean | null
+          email_sequence_paused?: boolean | null
+          email_sequence_stage?: string | null
           financing_needed?: boolean | null
           first_name: string
           id?: string
@@ -1818,6 +1866,7 @@ export type Database = {
           last_reply_at?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
+          next_email_send_at?: string | null
           postal_code?: string | null
           predicted_close_date?: string | null
           preferred_mileage_max?: number | null
@@ -1855,6 +1904,9 @@ export type Database = {
           do_not_mail?: boolean
           email?: string | null
           email_alt?: string | null
+          email_opt_in?: boolean | null
+          email_sequence_paused?: boolean | null
+          email_sequence_stage?: string | null
           financing_needed?: boolean | null
           first_name?: string
           id?: string
@@ -1863,6 +1915,7 @@ export type Database = {
           last_reply_at?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
+          next_email_send_at?: string | null
           postal_code?: string | null
           predicted_close_date?: string | null
           preferred_mileage_max?: number | null
