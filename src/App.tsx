@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import Auth from '@/pages/Auth';
 import DashboardPage from '@/pages/Index';
 import LeadsPage from '@/pages/StreamlinedLeadsPage';
 import StreamlinedLeadsPage from '@/pages/StreamlinedLeadsPage';
@@ -23,6 +24,8 @@ function App() {
         <Router>
           <div className="min-h-screen bg-gray-50">
             <Routes>
+              <Route path="/auth" element={<Auth />} />
+              
               <Route path="/" element={
                 <ProtectedRoute>
                   <div className="flex h-screen bg-gray-50">
