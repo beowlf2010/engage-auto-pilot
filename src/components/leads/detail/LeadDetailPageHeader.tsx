@@ -1,41 +1,43 @@
 
 import React from "react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import LeadDetailHeader from "./LeadDetailHeader";
 
 interface LeadDetailPageHeaderProps {
-  onSendMessage: () => void;
+  lead: any;
+  onSendMessage?: () => void;
+  onAIOptInChange?: (enabled: boolean) => Promise<void>;
 }
 
-const LeadDetailPageHeader: React.FC<LeadDetailPageHeaderProps> = ({
-  onSendMessage
+const LeadDetailPageHeader: React.FC<LeadDetailPageHeaderProps> = ({ 
+  lead, 
+  onSendMessage,
+  onAIOptInChange 
 }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="bg-white border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/leads")}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Leads
-            </Button>
-          </div>
+    <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center space-x-4 mb-6">
           <Button
-            onClick={onSendMessage}
-            className="bg-blue-600 hover:bg-blue-700"
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(-1)}
+            className="flex items-center space-x-2"
           >
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Send Message
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Leads</span>
           </Button>
         </div>
+        
+        <LeadDetailHeader 
+          lead={lead} 
+          onSendMessage={onSendMessage}
+          onAIOptInChange={onAIOptInChange}
+        />
       </div>
     </div>
   );

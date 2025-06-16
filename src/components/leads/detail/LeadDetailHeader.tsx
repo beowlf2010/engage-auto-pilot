@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Phone, MessageSquare, Mail, User, Calendar, MapPin, Car } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import EmailComposer from "../../email/EmailComposer";
+import QuickControlsCard from "./QuickControlsCard";
 
 interface Lead {
   id: string;
@@ -16,14 +17,16 @@ interface Lead {
   city?: string;
   state?: string;
   created_at: string;
+  aiOptIn?: boolean;
 }
 
 interface LeadDetailHeaderProps {
   lead: Lead;
   onSendMessage?: () => void;
+  onAIOptInChange?: (enabled: boolean) => Promise<void>;
 }
 
-const LeadDetailHeader = ({ lead, onSendMessage }: LeadDetailHeaderProps) => {
+const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange }: LeadDetailHeaderProps) => {
   const [showEmailComposer, setShowEmailComposer] = useState(false);
 
   const getStatusColor = (status: string) => {
@@ -41,9 +44,15 @@ const LeadDetailHeader = ({ lead, onSendMessage }: LeadDetailHeaderProps) => {
     }
   };
 
+  const handleAIOptInChange = async (enabled: boolean) => {
+    if (onAIOptInChange) {
+      await onAIOptInChange(enabled);
+    }
+  };
+
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm border p-6">
+      <div className="bg-white rounded-lg shadow-sm border p-6 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
           <div className="flex items-start space-x-4">
             <div className="bg-blue-100 p-3 rounded-full">
@@ -102,6 +111,13 @@ const LeadDetailHeader = ({ lead, onSendMessage }: LeadDetailHeaderProps) => {
             </div>
           </div>
         </div>
+
+        {/* Quick Controls for AI and Email */}
+        <QuickControlsCard
+          leadId={lead.id}
+          aiOptIn={lead.aiOptIn || false}
+          onAIOptInChange={handleAIOptInChange}
+        />
       </div>
 
       <EmailComposer

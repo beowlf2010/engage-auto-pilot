@@ -1,13 +1,12 @@
 
 import React, { useState } from "react";
-import { User, Car, Bot, MessageSquare, ExpandIcon, ShrinkIcon } from "lucide-react";
+import { User, Car, MessageSquare, ExpandIcon, ShrinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CollapsibleCard from "./CollapsibleCard";
 import LeadSummaryCard from "./LeadSummaryCard";
 import ContactInfoCard from "./ContactInfoCard";
 import VehicleInfoCard from "./VehicleInfoCard";
 import EnhancedPhoneManager from "./EnhancedPhoneManager";
-import EnhancedAIControls from "./EnhancedAIControls";
 import CommunicationPrefsCard from "./CommunicationPrefsCard";
 import type { LeadDetailData } from "@/services/leadDetailService";
 import type { PhoneNumber } from "@/types/lead";
@@ -26,14 +25,32 @@ const LeadInfoCardsSection: React.FC<LeadInfoCardsSectionProps> = ({
   onPhoneSelect
 }) => {
   const [expandAll, setExpandAll] = useState(false);
-
-  const handleAIOptInChange = async (enabled: boolean): Promise<void> => {
-    console.log("AI opt-in changed:", enabled);
-    // Implementation would update the lead's AI opt-in status
-  };
+  const [cardStates, setCardStates] = useState({
+    contact: true, // Contact info expanded by default
+    vehicle: false,
+    communication: false
+  });
 
   const toggleExpandAll = () => {
-    setExpandAll(!expandAll);
+    const newExpandAll = !expandAll;
+    setExpandAll(newExpandAll);
+    
+    // Update all card states
+    setCardStates({
+      contact: newExpandAll,
+      vehicle: newExpandAll,
+      communication: newExpandAll
+    });
+  };
+
+  const handleCardToggle = (cardKey: string, isOpen: boolean) => {
+    setCardStates(prev => ({
+      ...prev,
+      [cardKey]: isOpen
+    }));
+    
+    // If any card is manually toggled, disable the global expand all state
+    setExpandAll(false);
   };
 
   const getContactSummary = () => {
@@ -42,10 +59,6 @@ const LeadInfoCardsSection: React.FC<LeadInfoCardsSectionProps> = ({
 
   const getVehicleSummary = () => {
     return lead.vehicleInterest || "No vehicle specified";
-  };
-
-  const getAISummary = () => {
-    return lead.aiOptIn ? "Active" : "Inactive";
   };
 
   const getCommunicationSummary = () => {
@@ -80,11 +93,12 @@ const LeadInfoCardsSection: React.FC<LeadInfoCardsSectionProps> = ({
         </Button>
       </div>
 
-      {/* Contact Information - Expanded by default */}
+      {/* Contact Information */}
       <CollapsibleCard
         title="Contact Information"
         icon={<User className="w-4 h-4" />}
-        defaultOpen={!expandAll ? true : expandAll}
+        isOpen={cardStates.contact}
+        onOpenChange={(open) => handleCardToggle('contact', open)}
         summary={getContactSummary()}
       >
         <div className="space-y-4">
@@ -106,35 +120,19 @@ const LeadInfoCardsSection: React.FC<LeadInfoCardsSectionProps> = ({
       <CollapsibleCard
         title="Vehicle Details"
         icon={<Car className="w-4 h-4" />}
-        defaultOpen={expandAll}
+        isOpen={cardStates.vehicle}
+        onOpenChange={(open) => handleCardToggle('vehicle', open)}
         summary={getVehicleSummary()}
       >
         <VehicleInfoCard lead={lead} />
       </CollapsibleCard>
 
-      {/* AI Automation */}
-      <CollapsibleCard
-        title="AI Automation"
-        icon={<Bot className="w-4 h-4" />}
-        defaultOpen={expandAll}
-        badge={lead.aiOptIn ? "Active" : "Inactive"}
-        badgeVariant={lead.aiOptIn ? "default" : "secondary"}
-        summary={getAISummary()}
-      >
-        <EnhancedAIControls
-          leadId={lead.id}
-          aiOptIn={lead.aiOptIn}
-          aiStage={lead.aiStage}
-          nextAiSendAt={lead.nextAiSendAt}
-          onAIOptInChange={handleAIOptInChange}
-        />
-      </CollapsibleCard>
-
       {/* Communication Preferences */}
       <CollapsibleCard
-        title="Communication"
+        title="Communication Preferences"
         icon={<MessageSquare className="w-4 h-4" />}
-        defaultOpen={expandAll}
+        isOpen={cardStates.communication}
+        onOpenChange={(open) => handleCardToggle('communication', open)}
         summary={getCommunicationSummary()}
       >
         <CommunicationPrefsCard lead={lead} />

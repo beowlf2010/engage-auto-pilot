@@ -49,13 +49,21 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
     }
   };
 
+  const handleAIOptInChange = async (enabled: boolean): Promise<void> => {
+    console.log("AI opt-in changed:", enabled);
+    // TODO: Implementation would update the lead's AI opt-in status
+    // This should be implemented to update the actual lead data
+  };
+
   // Use the messages from the conversation hook if available, otherwise use lead conversations
   const conversationMessages = messages.length > 0 ? messages : lead.conversations;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <LeadDetailPageHeader 
-        onSendMessage={() => setShowMessageComposer(true)} 
+        lead={transformedLead}
+        onSendMessage={() => setShowMessageComposer(true)}
+        onAIOptInChange={handleAIOptInChange}
       />
       
       <LeadDetailGrid
