@@ -15,15 +15,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
+  console.log('useAuth: Hook called');
   const context = useContext(AuthContext);
   if (!context) {
+    console.error('useAuth: Called outside of AuthProvider context');
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  console.log('useAuth: Returning context:', {
+    hasUser: !!context.user,
+    hasProfile: !!context.profile,
+    loading: context.loading
+  });
   return context;
 };
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  console.log('AuthProvider: Initializing...');
+  
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
@@ -127,7 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await supabase.auth.signOut();
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     session,
     profile,
@@ -144,5 +153,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     profileRole: profile?.role 
   });
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
