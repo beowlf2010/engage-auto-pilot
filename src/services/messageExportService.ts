@@ -71,7 +71,7 @@ export const createMessageExport = async (exportName: string, exportData: VINMes
     .from('message_exports')
     .insert({
       export_name: exportName,
-      export_data: exportData,
+      export_data: exportData as any, // Cast to any to satisfy Json type
       total_leads: exportData.export_info.total_leads,
       total_messages: exportData.export_info.total_messages,
       source_system: 'vin'
@@ -102,7 +102,7 @@ export const processMessageImport = async (exportId: string): Promise<MessageImp
 
   if (exportError) throw exportError;
 
-  const exportData = exportRecord.export_data as VINMessageExport;
+  const exportData = exportRecord.export_data as unknown as VINMessageExport;
   const result: MessageImportResult = {
     leads_created: 0,
     leads_matched: 0,
