@@ -1,11 +1,14 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, Plus, Zap, Clock } from 'lucide-react';
-import { useEmailTemplates } from '@/hooks/useEmailTemplates';
-import { useSendEmail } from '@/hooks/useEmailConversations';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Mail, Send, AlertTriangle } from 'lucide-react';
 import { emailService } from '@/services/emailService';
+import { useToast } from '@/hooks/use-toast';
+import EmailComposer from '../../email/EmailComposer';
 
 interface QuickEmailActionsProps {
   leadId: string;
@@ -13,93 +16,154 @@ interface QuickEmailActionsProps {
   leadFirstName?: string;
   leadLastName?: string;
   vehicleInterest?: string;
-  onComposeClick: () => void;
 }
 
-const QuickEmailActions: React.FC<QuickEmailActionsProps> = ({
+const QuickEmailActions = ({
   leadId,
   leadEmail,
-  leadFirstName = '',
-  leadLastName = '',
-  vehicleInterest = '',
-  onComposeClick
-}) => {
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
-  const { data: templates = [] } = useEmailTemplates();
-  const sendEmailMutation = useSendEmail();
+  leadFirstName,
+  leadLastName,
+  vehicleInterest
+}: QuickEmailActionsProps) => {
+  const [showComposer, setShowComposer] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const { toast } = useToast();
 
-  const handleQuickSend = async (templateId: string) => {
-    if (!leadEmail || !templateId) return;
-
-    const template = templates.find(t => t.id === templateId);
-    if (!template) return;
-
-    const variables = {
-      lead_first_name: leadFirstName,
-      lead_last_name: leadLastName,
-      vehicle_interest: vehicleInterest,
-      salesperson_name: 'Your Sales Representative'
-    };
-
-    const subject = emailService.replaceTemplateVariables(template.subject, variables);
-    const content = emailService.replaceTemplateVariables(template.content, variables);
-
-    try {
-      await sendEmailMutation.mutateAsync({
-        to: leadEmail,
-        subject,
-        html: content,
-        leadId,
-        templateId
+  const handleQuickTest = async () => {
+    if (!testEmail) {
+      toast({
+        title: "Email required",
+        description: "Please enter an email address for the test",
+        variant: "destructive",
       });
-      setSelectedTemplate('');
+      return;
+    }
+
+    setTestLoading(true);
+    try {
+      await emailService.sendEmail({
+        to: testEmail,
+        subject: "Email System Test",
+        html: `
+          <h2>Email System Test</h2>
+          <p>This is a test email from your CRM system.</p>
+          <p><strong>Lead:</strong> ${leadFirstName} ${leadLastName}</p>
+          <p><strong>Vehicle Interest:</strong> ${vehicleInterest || 'Not specified'}</p>
+          <p>If you received this email, your email integration is working!</p>
+        `,
+        leadId
+      });
+      
+      toast({
+        title: "Test email sent",
+        description: "Check the specified email address for the test message",
+      });
     } catch (error) {
-      console.error('Failed to send quick email:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({
+        title: "Test email failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      console.error('Test email error:', error);
+    } finally {
+      setTestLoading(false);
     }
   };
 
+  const extractDomain = (email: string) => {
+    return email.split('@')[1] || '';
+  };
+
+  const testEmailDomain = testEmail ? extractDomain(testEmail) : '';
+  const leadEmailDomain = leadEmail ? extractDomain(leadEmail) : '';
+
   return (
-    <div className="flex flex-wrap gap-3 mb-6">
-      <Button onClick={onComposeClick} className="flex items-center space-x-2">
-        <Plus className="w-4 h-4" />
-        <span>Compose Email</span>
-      </Button>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Mail className="w-4 h-4" />
+            <span>Email Actions</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setShowComposer(true)}
+              className="flex-1"
+              disabled={!leadEmail}
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Compose Email
+            </Button>
+          </div>
 
-      <div className="flex items-center space-x-2">
-        <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Quick templates" />
-          </SelectTrigger>
-          <SelectContent>
-            {templates.map((template) => (
-              <SelectItem key={template.id} value={template.id}>
-                <div className="flex items-center space-x-2">
-                  <Mail className="w-4 h-4" />
-                  <span>{template.name}</span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {selectedTemplate && (
-          <Button
-            onClick={() => handleQuickSend(selectedTemplate)}
-            disabled={sendEmailMutation.isPending || !leadEmail}
-            size="sm"
-            variant="outline"
-          >
-            <Zap className="w-4 h-4 mr-1" />
-            Send
-          </Button>
-        )}
-      </div>
+          {!leadEmail && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                No email address found for this lead. Add an email address to send emails.
+              </AlertDescription>
+            </Alert>
+          )}
 
-      <Button variant="outline" size="sm" className="flex items-center space-x-2">
-        <Clock className="w-4 h-4" />
-        <span>Schedule</span>
-      </Button>
-    </div>
+          {/* Quick Email Test */}
+          <div className="border-t pt-4">
+            <Label htmlFor="quick_test_email" className="text-sm font-medium">
+              Quick Email Test
+            </Label>
+            <div className="space-y-2 mt-2">
+              <Input
+                id="quick_test_email"
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="test@example.com"
+                className="text-sm"
+              />
+              
+              {testEmail && leadEmail && testEmailDomain !== leadEmailDomain && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Domain mismatch detected. If your Postmark account is pending approval, 
+                    try using an email with the same domain as your configured sender address.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              <Button 
+                onClick={handleQuickTest}
+                disabled={testLoading || !testEmail}
+                size="sm"
+                className="w-full"
+              >
+                {testLoading ? (
+                  <>Sending...</>
+                ) : (
+                  <>
+                    <Send className="w-3 h-3 mr-2" />
+                    Send Test Email
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <EmailComposer
+        open={showComposer}
+        onOpenChange={setShowComposer}
+        leadId={leadId}
+        leadEmail={leadEmail}
+        leadFirstName={leadFirstName}
+        leadLastName={leadLastName}
+        vehicleInterest={vehicleInterest}
+      />
+    </>
   );
 };
 

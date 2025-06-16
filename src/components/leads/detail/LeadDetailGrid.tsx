@@ -1,16 +1,18 @@
 
 import React from "react";
-import LeadDetailHeader from "./LeadDetailHeader";
-import LeadInfoCardsSection from "./LeadInfoCardsSection";
+import { Card } from "@/components/ui/card";
+import LeadSummaryCard from "./LeadSummaryCard";
+import ContactInfoCard from "./ContactInfoCard";
+import VehicleInfoCard from "./VehicleInfoCard";
+import QuickControlsCard from "./QuickControlsCard";
+import QuickEmailActions from "./QuickEmailActions";
 import LeadDetailTabsSection from "./LeadDetailTabsSection";
-import type { LeadDetailData } from "@/services/leadDetailService";
-import type { MessageData } from "@/types/conversation";
 
 interface LeadDetailGridProps {
-  lead: LeadDetailData;
+  lead: any;
   phoneNumbers: any[];
   primaryPhone: string;
-  messages: MessageData[];
+  messages: any[];
   messagesLoading: boolean;
   onPhoneSelect: (phone: any) => void;
   onSendMessage: (message: string) => Promise<void>;
@@ -25,43 +27,47 @@ const LeadDetailGrid: React.FC<LeadDetailGridProps> = ({
   onPhoneSelect,
   onSendMessage
 }) => {
-  // Transform lead for header component
-  const headerLead = {
-    id: lead.id,
-    first_name: lead.firstName,
-    last_name: lead.lastName,
-    email: lead.email,
-    status: lead.status,
-    vehicle_interest: lead.vehicleInterest,
-    city: lead.city,
-    state: lead.state,
-    created_at: lead.createdAt
+  const handleAIOptInChange = async (enabled: boolean): Promise<void> => {
+    console.log("AI opt-in changed:", enabled);
+    // TODO: Implementation would update the lead's AI opt-in status
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="max-w-7xl mx-auto px-6 py-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Lead Info */}
-        <div className="lg:col-span-1">
-          <div className="space-y-6">
-            <LeadDetailHeader lead={headerLead} />
-            <LeadInfoCardsSection 
-              lead={lead} 
-              phoneNumbers={phoneNumbers}
-              primaryPhone={primaryPhone}
-              onPhoneSelect={onPhoneSelect}
-            />
-          </div>
+        <div className="lg:col-span-1 space-y-6">
+          <LeadSummaryCard lead={lead} />
+          <ContactInfoCard 
+            lead={lead} 
+            phoneNumbers={phoneNumbers}
+            onPhoneSelect={onPhoneSelect}
+          />
+          <VehicleInfoCard lead={lead} />
+          <QuickControlsCard
+            leadId={lead.id}
+            aiOptIn={lead.aiOptIn || false}
+            onAIOptInChange={handleAIOptInChange}
+          />
+          <QuickEmailActions
+            leadId={lead.id}
+            leadEmail={lead.email}
+            leadFirstName={lead.firstName}
+            leadLastName={lead.lastName}
+            vehicleInterest={lead.vehicleInterest}
+          />
         </div>
 
         {/* Right Column - Tabs */}
         <div className="lg:col-span-2">
-          <LeadDetailTabsSection
-            lead={lead}
-            messages={messages}
-            messagesLoading={messagesLoading}
-            onSendMessage={onSendMessage}
-          />
+          <Card className="h-full">
+            <LeadDetailTabsSection
+              lead={lead}
+              messages={messages}
+              messagesLoading={messagesLoading}
+              onSendMessage={onSendMessage}
+            />
+          </Card>
         </div>
       </div>
     </div>
