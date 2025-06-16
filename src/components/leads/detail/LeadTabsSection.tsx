@@ -13,6 +13,27 @@ interface LeadTabsSectionProps {
 }
 
 const LeadTabsSection = ({ lead }: LeadTabsSectionProps) => {
+  // Sample activities data - in a real implementation, this would come from a hook or service
+  const sampleActivities = [
+    {
+      id: '1',
+      type: 'lead_created',
+      description: 'Lead was created',
+      timestamp: new Date().toISOString(),
+    },
+    {
+      id: '2', 
+      type: 'message_sent',
+      description: 'Welcome message sent',
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+    }
+  ];
+
+  const handleAIOptInChange = async (enabled: boolean) => {
+    // TODO: Implement AI opt-in change logic
+    console.log('AI opt-in changed:', enabled);
+  };
+
   return (
     <Tabs defaultValue="messaging" className="w-full">
       <TabsList className="grid w-full grid-cols-5">
@@ -36,11 +57,15 @@ const LeadTabsSection = ({ lead }: LeadTabsSectionProps) => {
       </TabsContent>
 
       <TabsContent value="activity" className="mt-6">
-        <ActivityTimelineComponent leadId={lead.id} />
+        <ActivityTimelineComponent activities={sampleActivities} />
       </TabsContent>
 
       <TabsContent value="ai-automation" className="mt-6">
-        <EnhancedAIControls leadId={lead.id} />
+        <EnhancedAIControls 
+          leadId={lead.id}
+          aiOptIn={lead.aiOptIn || false}
+          onAIOptInChange={handleAIOptInChange}
+        />
       </TabsContent>
     </Tabs>
   );
