@@ -1,5 +1,5 @@
 
-import { LucideIcon, BarChart3, Users, MessageSquare, Upload, Settings, Car, DollarSign, Shield, Brain } from 'lucide-react';
+import { LucideIcon, BarChart3, Users, MessageSquare, Upload, Settings, Car, DollarSign, Shield, Brain, TrendingUp } from 'lucide-react';
 
 export interface NavigationItem {
   label: string;
@@ -78,7 +78,12 @@ export const getNavigationItems = (userRole: string, navigate: (path: string) =>
       hoverActions: [
         {
           label: 'Sales Forecast',
-          icon: BarChart3,
+          icon: TrendingUp,
+          action: () => navigate('/predictive-analytics')
+        },
+        {
+          label: 'Inventory Demand',
+          icon: Car,
           action: () => navigate('/predictive-analytics')
         }
       ]

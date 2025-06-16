@@ -3,73 +3,113 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { AuthProvider } from "./components/auth/AuthProvider";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import InventoryLayout from "./components/InventoryLayout";
-import PredictiveAnalyticsPage from "./pages/PredictiveAnalyticsPage";
-import { 
-  SmartInboxPage, 
-  SalesDashboardPage, 
-  ManagerDashboardPage, 
-  AdminDashboardPage,
-  StreamlinedLeadsPage,
-  AIMonitorPage,
-  FinancialDashboardPage
-} from "./pages/StreamlinedPages";
-import EnhancedNavigation from "./components/enhanced/EnhancedNavigation";
 import LeadDetailPage from "./pages/LeadDetailPage";
+import AIMonitorPage from "./pages/AIMonitorPage";
+import AdvancedAnalyticsPage from "./pages/AdvancedAnalyticsPage";
+import PersonalizationPage from "./pages/PersonalizationPage";
+import PredictiveAnalyticsPage from "./pages/PredictiveAnalyticsPage";
+import StreamlinedPages from "./pages/StreamlinedPages";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const AppContent = () => {
-  const location = useLocation();
-  const showNavigation = !location.pathname.startsWith('/auth');
-
+function App() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      {showNavigation && <EnhancedNavigation />}
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/dashboard" element={<Index />} />
-        <Route path="/smartinbox" element={<SmartInboxPage />} />
-        <Route path="/leads" element={<StreamlinedLeadsPage />} />
-        <Route path="/lead/:leadId" element={<LeadDetailPage />} />
-        <Route path="/dash/sales" element={<SalesDashboardPage />} />
-        <Route path="/dash/manager" element={<ManagerDashboardPage />} />
-        <Route path="/dash/admin" element={<AdminDashboardPage />} />
-        <Route path="/ai-monitor" element={<AIMonitorPage />} />
-        <Route path="/inbox" element={<SmartInboxPage />} />
-        <Route path="/upload-leads" element={<Index />} />
-        <Route path="/settings" element={<Index />} />
-        <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />
-        <Route path="/predictive-analytics" element={<PredictiveAnalyticsPage />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/upload-inventory-report" element={<Index />} />
-        <Route path="/inventory-dashboard" element={<InventoryLayout page="dashboard" />} />
-        <Route path="/inventory-upload" element={<InventoryLayout page="inventory-upload" />} />
-        <Route path="/vehicle-detail/:identifier" element={<InventoryLayout page="vehicle-detail" />} />
-        <Route path="/rpo-insights" element={<InventoryLayout page="rpo-insights" />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </div>
-  );
-};
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
+    <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AppContent />
+          <AuthProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/leads" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/leads/:id" element={
+                <ProtectedRoute>
+                  <LeadDetailPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/inbox" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/upload-leads" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/financial-dashboard" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/inventory-dashboard" element={
+                <ProtectedRoute>
+                  <StreamlinedPages />
+                </ProtectedRoute>
+              } />
+              <Route path="/inventory-upload" element={
+                <ProtectedRoute>
+                  <StreamlinedPages />
+                </ProtectedRoute>
+              } />
+              <Route path="/rpo-insights" element={
+                <ProtectedRoute>
+                  <StreamlinedPages />
+                </ProtectedRoute>
+              } />
+              <Route path="/ai-monitor" element={
+                <ProtectedRoute>
+                  <AIMonitorPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/advanced-analytics" element={
+                <ProtectedRoute>
+                  <AdvancedAnalyticsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/personalization" element={
+                <ProtectedRoute>
+                  <PersonalizationPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/predictive-analytics" element={
+                <ProtectedRoute>
+                  <PredictiveAnalyticsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+}
 
 export default App;
