@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { findMatchingInventory } from './inventoryService';
 
@@ -282,12 +281,13 @@ export const generateAIRecommendations = async (leadId: string): Promise<Vehicle
         matchReasons.push(`Recent model year for urgent buyer`);
       }
 
-      // Family considerations
+      // Family considerations - check if trim exists before using it
       if (leadProfile.conversationInsights.familySize && leadProfile.conversationInsights.familySize > 2) {
         const familyFriendlyModels = ['suv', 'crossover', 'minivan', 'wagon', 'crew cab'];
+        const vehicleTrim = (vehicle as any).trim || '';
         if (familyFriendlyModels.some(type => 
           vehicle.model.toLowerCase().includes(type) || 
-          (vehicle.trim && vehicle.trim.toLowerCase().includes(type))
+          vehicleTrim.toLowerCase().includes(type)
         )) {
           matchScore += 15;
           matchReasons.push(`Family-friendly vehicle for household needs`);
@@ -335,7 +335,7 @@ export const generateAIRecommendations = async (leadId: string): Promise<Vehicle
         year: vehicle.year,
         make: vehicle.make,
         model: vehicle.model,
-        trim: vehicle.trim,
+        trim: (vehicle as any).trim || undefined,
         price: vehicle.price,
         matchScore: Math.min(100, matchScore),
         matchReasons,

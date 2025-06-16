@@ -1,16 +1,16 @@
+
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LeadMessaging from '@/components/leads/LeadMessaging';
-import EmailTab from '@/components/leads/EmailTab';
-import ActivityTimelineComponent from '@/components/leads/ActivityTimelineComponent';
-import EnhancedAIControls from '@/components/leads/EnhancedAIControls';
+import EmailTab from './EmailTab';
+import ActivityTimelineComponent from './ActivityTimelineComponent';
+import EnhancedAIControls from './EnhancedAIControls';
 import { LeadDetailData } from '@/services/leadDetailService';
+import VehicleRecommendationsTab from './VehicleRecommendationsTab';
 
 interface LeadTabsSectionProps {
   lead: LeadDetailData;
 }
-
-import VehicleRecommendationsTab from './VehicleRecommendationsTab';
 
 const LeadTabsSection = ({ lead }: LeadTabsSectionProps) => {
   return (
