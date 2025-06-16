@@ -1,84 +1,57 @@
 
 import { useState, useCallback } from 'react';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { fetchConversations } from '@/services/conversationsService';
 import { fetchMessages, sendMessage as sendMessageService } from '@/services/messagesService';
-import type { ConversationData, MessageData } from '@/types/conversation';
+import { useAuth } from '@/components/auth/AuthProvider';
+import type { MessageData } from '@/types/conversation';
 
 export const useConversationData = () => {
-  const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const { profile } = useAuth();
 
-  const loadConversations = useCallback(async () => {
-    if (!profile) {
-      console.log('No profile available for loading conversations');
-      return;
-    }
-
-    try {
-      console.log('Loading conversations for profile:', profile.id);
-      const conversationsData = await fetchConversations(profile);
-      setConversations(conversationsData);
-      console.log('Loaded conversations:', conversationsData.length);
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [profile]);
-
   const loadMessages = useCallback(async (leadId: string) => {
     setMessagesLoading(true);
     setMessagesError(null);
+    
     try {
-      console.log('Loading messages for lead:', leadId);
-      const messagesData = await fetchMessages(leadId);
-      setMessages(messagesData);
-      console.log('Loaded messages:', messagesData.length);
+      const data = await fetchMessages(leadId);
+      setMessages(data);
     } catch (error) {
       console.error('Error loading messages:', error);
-      setMessagesError(error instanceof Error ? error.message : "An unexpected error occurred.");
+      setMessagesError(error instanceof Error ? error.message : 'Failed to load messages');
     } finally {
       setMessagesLoading(false);
     }
   }, []);
 
-  const sendMessage = useCallback(async (leadId: string, body: string, aiGenerated = false) => {
-    try {
-      console.log('Sending message:', { leadId, body, aiGenerated, profile: !!profile });
-      
-      if (!profile) {
-        throw new Error('No profile available');
-      }
-
-      const result = await sendMessageService(leadId, body, profile, aiGenerated);
-      console.log('Message sent result:', result);
-      
-      // Refresh messages and conversations to show updated status
-      await loadMessages(leadId);
-      await loadConversations();
-      
-      return result;
-    } catch (error) {
-      console.error('Error in sendMessage:', error);
-      throw error;
+  const sendMessage = useCallback(async (
+    leadId: string, 
+    message: string,
+    complianceFunctions?: {
+      checkSuppressed: (contact: string, type: "sms" | "email") => Promise<boolean>;
+      enforceConsent: (leadId: string, channel: "sms" | "email") => Promise<boolean>;
+      storeConsent: (params: any) => Promise<void>;
     }
-  }, [profile, loadMessages, loadConversations]);
+  ) => {
+    if (!profile) {
+      throw new Error('User profile not available');
+    }
+
+    const result = await sendMessageService(leadId, message, profile, false, complianceFunctions);
+    
+    // Reload messages to show the new message
+    await loadMessages(leadId);
+    
+    return result;
+  }, [profile, loadMessages]);
 
   return {
-    conversations,
     messages,
-    loading,
     messagesLoading,
     messagesError,
-    setMessages,
-    loadConversations,
     loadMessages,
     sendMessage,
-    profile
+    setMessages
   };
 };

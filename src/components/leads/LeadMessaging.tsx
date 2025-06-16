@@ -67,7 +67,11 @@ const LeadMessaging = ({ leadId }: LeadMessagingProps) => {
         setIsSending(true);
         try {
           console.log('LeadMessaging: Sending message:', newMessage.trim());
-          const result = await sendMessage(leadId, newMessage.trim());
+          const result = await sendMessage(leadId, newMessage.trim(), {
+            checkSuppressed: compliance.checkSuppressed,
+            enforceConsent: compliance.enforceConsent,
+            storeConsent: compliance.storeConsent
+          });
           
           if (result.warning) {
             console.log('Message sent with warning:', result.warning);

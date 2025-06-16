@@ -1,13 +1,11 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { extractAndStoreMemory } from './aiMemoryService';
 import { addDisclaimersToMessage, validateMessageForCompliance } from './pricingDisclaimerService';
 import type { MessageData } from '@/types/conversation';
-import { useCompliance } from '@/hooks/useCompliance';
 import { getBusinessHours, isWithinBusinessHours } from "./businessHours";
 import { fetchDisclaimerFooter } from "./disclaimerFooter";
-
-const compliance = useCompliance();
 
 export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
   try {
@@ -43,7 +41,12 @@ export const sendMessage = async (
   leadId: string, 
   message: string, 
   profile: any, 
-  isAI: boolean = false
+  isAI: boolean = false,
+  complianceFunctions?: {
+    checkSuppressed: (contact: string, type: "sms" | "email") => Promise<boolean>;
+    enforceConsent: (leadId: string, channel: "sms" | "email") => Promise<boolean>;
+    storeConsent: (params: any) => Promise<void>;
+  }
 ) => {
   try {
     // Business hours enforcement
@@ -69,19 +72,21 @@ export const sendMessage = async (
       throw new Error('No primary phone number found for this lead');
     }
 
-    // Check for suppression (opt-outs)
-    const isSuppressed = await compliance.checkSuppressed(phoneData.number, "sms");
-    if (isSuppressed) {
-      toast({
-        title: "Cannot Send Message",
-        description: "This lead has opted out of SMS messages.",
-        variant: "destructive"
-      });
-      throw new Error("Lead is suppressed and cannot be messaged by SMS.");
-    }
+    // Check for suppression (opt-outs) if compliance functions are provided
+    if (complianceFunctions) {
+      const isSuppressed = await complianceFunctions.checkSuppressed(phoneData.number, "sms");
+      if (isSuppressed) {
+        toast({
+          title: "Cannot Send Message",
+          description: "This lead has opted out of SMS messages.",
+          variant: "destructive"
+        });
+        throw new Error("Lead is suppressed and cannot be messaged by SMS.");
+      }
 
-    // Fail-safe: enforce consent log exists for this lead/channel
-    await compliance.enforceConsent(leadId, "sms"); // will throw if missing
+      // Fail-safe: enforce consent log exists for this lead/channel
+      await complianceFunctions.enforceConsent(leadId, "sms"); // will throw if missing
+    }
 
     console.log('Starting to send message for lead:', leadId);
     console.log('Message content:', message);
@@ -211,15 +216,17 @@ export const sendMessage = async (
     }
 
     // After successful send, auto-log consent audit if first message (opt-in confirmation)
-    await compliance.storeConsent({
-      leadId,
-      channel: "sms",
-      method: "webform", // reference: update if sending from another source
-      consentText: "Express written consent confirmed via message send.",
-      ipAddress: null,
-      userAgent: null,
-      capturedBy: profile?.id,
-    });
+    if (complianceFunctions) {
+      await complianceFunctions.storeConsent({
+        leadId,
+        channel: "sms",
+        method: "webform", // reference: update if sending from another source
+        consentText: "Express written consent confirmed via message send.",
+        ipAddress: null,
+        userAgent: null,
+        capturedBy: profile?.id,
+      });
+    }
 
     // Store memory from outgoing message
     try {
