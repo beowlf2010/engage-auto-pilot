@@ -1,7 +1,8 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Printer } from "lucide-react";
 import PackAdjustmentControls from "./deal-management/PackAdjustmentControls";
 import DealSummaryCards from "./deal-management/DealSummaryCards";
 import DealFilters from "./deal-management/DealFilters";
@@ -70,8 +71,68 @@ const DealManagement = ({
     );
   }
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6">
+      {/* Print Header - Only visible when printing */}
+      <div className="print:block hidden">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold mb-2">Deal Management Report</h1>
+          <p className="text-lg text-gray-600 mb-4">
+            Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+          </p>
+          {packAdjustmentEnabled && (
+            <p className="text-sm text-blue-600">
+              Pack Adjustment Applied: {formatCurrency(localPackAdjustment)}
+            </p>
+          )}
+        </div>
+
+        {/* Print Summary Section */}
+        <div className="mb-8 p-6 border-2 border-gray-300">
+          <h2 className="text-xl font-bold mb-4 text-center">Summary Totals</h2>
+          <div className="grid grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="text-sm font-medium text-gray-600 mb-1">New Retail</div>
+              <div className="text-lg font-bold">{summaryTotals.newRetail.units} units</div>
+              <div className="text-sm">{formatCurrency(summaryTotals.newRetail.total)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-medium text-gray-600 mb-1">Used Retail</div>
+              <div className="text-lg font-bold">{summaryTotals.usedRetail.units} units</div>
+              <div className="text-sm">{formatCurrency(summaryTotals.usedRetail.total)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-medium text-gray-600 mb-1">Total Retail</div>
+              <div className="text-lg font-bold">{summaryTotals.totalRetail.units} units</div>
+              <div className="text-sm">{formatCurrency(summaryTotals.totalRetail.total)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-medium text-gray-600 mb-1">Dealer Trade</div>
+              <div className="text-lg font-bold">{summaryTotals.dealerTrade.units} units</div>
+              <div className="text-sm">{formatCurrency(summaryTotals.dealerTrade.total)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-medium text-gray-600 mb-1">Wholesale</div>
+              <div className="text-lg font-bold">{summaryTotals.wholesale.units} units</div>
+              <div className="text-sm">{formatCurrency(summaryTotals.wholesale.total)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-medium text-gray-600 mb-1">Total Deals</div>
+              <div className="text-lg font-bold">{filteredDeals.length} deals</div>
+              <div className="text-sm">{formatCurrency(
+                summaryTotals.totalRetail.total + 
+                summaryTotals.dealerTrade.total + 
+                summaryTotals.wholesale.total
+              )}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {setPackAdjustmentEnabled && setLocalPackAdjustment && (
         <PackAdjustmentControls
           packAdjustmentEnabled={packAdjustmentEnabled}
@@ -96,14 +157,20 @@ const DealManagement = ({
 
         <TabsContent value="management" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <span>Deal Management</span>
-                <Badge variant="secondary">{filteredDeals.length} deals</Badge>
-              </CardTitle>
-              <CardDescription>
-                Manage deal types and view financial performance by category. Wholesale and dealer trade deals are automatically locked but can be unlocked manually if needed.
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between print:block">
+              <div>
+                <CardTitle className="flex items-center space-x-2">
+                  <span>Deal Management</span>
+                  <Badge variant="secondary">{filteredDeals.length} deals</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Manage deal types and view financial performance by category. Wholesale and dealer trade deals are automatically locked but can be unlocked manually if needed.
+                </CardDescription>
+              </div>
+              <Button onClick={handlePrint} className="print:hidden">
+                <Printer className="w-4 h-4 mr-2" />
+                Print Report
+              </Button>
             </CardHeader>
             <CardContent>
               <DealFilters
@@ -141,6 +208,24 @@ const DealManagement = ({
                   No deals found matching your criteria
                 </div>
               )}
+
+              {/* Print Footer */}
+              <div className="print:block hidden mt-8 pt-4 border-t-2 border-gray-300">
+                <div className="text-center">
+                  <h3 className="text-lg font-bold mb-2">Deal Management Summary</h3>
+                  <p className="text-sm">
+                    This report shows {filteredDeals.length} deals with a total profit of{' '}
+                    {formatCurrency(
+                      summaryTotals.totalRetail.total + 
+                      summaryTotals.dealerTrade.total + 
+                      summaryTotals.wholesale.total
+                    )}
+                    {packAdjustmentEnabled && (
+                      <span> (including pack adjustments of {formatCurrency(localPackAdjustment)} per used vehicle)</span>
+                    )}.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
