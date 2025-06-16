@@ -1,9 +1,11 @@
 
 import { Button } from "@/components/ui/button";
-import { History, Package, BarChart3 } from "lucide-react";
+import { History, Package, BarChart3, Trash2 } from "lucide-react";
 import { useInventoryUpload } from "@/hooks/useInventoryUpload";
 import { useMultiFileUpload } from "@/hooks/useMultiFileUpload";
 import { Link } from "react-router-dom";
+import { performInventoryCleanup } from "@/services/inventory/core/inventoryCleanupService";
+import { toast } from "@/hooks/use-toast";
 import AccessDenied from "./inventory-upload/AccessDenied";
 import UploadInfoCards from "./inventory-upload/UploadInfoCards";
 import UploadHistoryViewer from "./inventory-upload/UploadHistoryViewer";
@@ -42,6 +44,14 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
   if (!["manager", "admin"].includes(user.role)) {
     return <AccessDenied />;
   }
+
+  const handleCleanup = async () => {
+    try {
+      await performInventoryCleanup();
+    } catch (error) {
+      console.error('Cleanup failed:', error);
+    }
+  };
 
   if (showHistory) {
     return (
@@ -110,6 +120,14 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
           </p>
         </div>
         <div className="flex items-center space-x-3">
+          <Button
+            onClick={handleCleanup}
+            variant="outline"
+            className="flex items-center space-x-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Cleanup Old Data</span>
+          </Button>
           <Link to="/inventory-dashboard">
             <Button variant="outline" className="flex items-center space-x-2">
               <Package className="w-4 h-4" />

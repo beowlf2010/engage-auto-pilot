@@ -1,3 +1,4 @@
+
 import { getFieldValue, extractRPOCodes, findVINInRow, findMakeInRow, findModelInRow, findYearInRow, extractGMGlobalStatus, extractOptionDescriptions } from './field-extraction';
 
 // Enhanced mapping function that handles GM Global specific fields with smart detection
@@ -58,18 +59,25 @@ export const mapRowToInventoryItem = (
   const drivetrain = getFieldValue(row, ['Drivetrain', 'Drive', 'DriveTrain', 'Drive Type', 'Drive Code']);
   const fuelType = getFieldValue(row, ['Fuel Type', 'Fuel', 'Fuel System', 'Fuel Code']);
 
-  // Enhanced price extraction
-  const price = parseFloat(getFieldValue(row, [
+  // Enhanced price extraction with better parsing
+  const parsePrice = (value: string) => {
+    if (!value) return undefined;
+    const cleanValue = String(value).replace(/[$,]/g, '');
+    const parsed = parseFloat(cleanValue);
+    return isNaN(parsed) ? undefined : parsed;
+  };
+
+  const price = parsePrice(getFieldValue(row, [
     'Price', 'MSRP', 'Selling Price', 'Retail Price', 'List Price'
-  ])) || undefined;
+  ]));
 
-  const msrp = parseFloat(getFieldValue(row, [
+  const msrp = parsePrice(getFieldValue(row, [
     'MSRP', 'MSRP w/DFC†', 'Retail Price', 'List Price', 'Suggested Retail'
-  ])) || undefined;
+  ]));
 
-  const invoice = parseFloat(getFieldValue(row, [
+  const invoice = parsePrice(getFieldValue(row, [
     'Invoice', 'Invoice Price', 'Dealer Cost', 'Cost'
-  ])) || undefined;
+  ]));
 
   const mileage = parseInt(getFieldValue(row, [
     'Mileage', 'Odometer', 'Miles', 'Current Mileage', 'Odo'
@@ -106,12 +114,21 @@ export const mapRowToInventoryItem = (
   console.log('Option Descriptions:', optionDescriptions);
   console.log('===================================');
 
+  // Ensure we have required fields
+  if (!make || make.trim().length === 0) {
+    throw new Error('Missing required field: Make');
+  }
+  
+  if (!model || model.trim().length === 0) {
+    throw new Error('Missing required field: Model');
+  }
+
   return {
     vin: vin, // This will be null if no valid VIN found, preventing constraint violations
     stock_number: stockNumber || undefined,
     year: year ? parseInt(year) : undefined,
-    make: make || '',
-    model: model || '',
+    make: make.trim(),
+    model: model.trim(),
     trim: trim || undefined,
     body_style: bodyStyle || undefined,
     color_exterior: colorExterior || undefined,
@@ -124,17 +141,17 @@ export const mapRowToInventoryItem = (
     price: price,
     msrp: msrp,
     invoice: invoice,
-    rebates: parseFloat(getFieldValue(row, ['Rebates', 'rebates', 'REBATES', 'Incentives', 'incentives'])) || undefined,
-    pack: parseFloat(getFieldValue(row, ['Pack', 'pack', 'PACK', 'DealerPack', 'Dealer_Pack'])) || undefined,
+    rebates: parsePrice(getFieldValue(row, ['Rebates', 'rebates', 'REBATES', 'Incentives', 'incentives'])),
+    pack: parsePrice(getFieldValue(row, ['Pack', 'pack', 'PACK', 'DealerPack', 'Dealer_Pack'])),
     condition: dbCondition,
     status: status, // Now uses actual GM Global status codes
     rpo_codes: rpoCodes.length > 0 ? rpoCodes : undefined,
-    rpo_descriptions: optionDescriptions.length > 0 ? optionDescriptions : undefined, // Store option descriptions
-    source_report: condition === 'gm_global' ? 'orders_all' as any : undefined,
-    full_option_blob: row, // Store complete raw data for future analysis
+    rpo_descriptions: optionDescriptions.length > 0 ? optionDescriptions : undefined,
+    upload_history_id: uploadHistoryId,
+    full_option_blob: rpoCodes.length > 0 || optionDescriptions.length > 0 ? { rpo_codes: rpoCodes, descriptions: optionDescriptions } : undefined,
     first_seen_at: new Date().toISOString(),
     last_seen_at: new Date().toISOString(),
-    upload_history_id: uploadHistoryId,
+    leads_count: 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };

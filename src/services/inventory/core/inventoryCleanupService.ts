@@ -1,194 +1,143 @@
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 
-export interface CleanupSummary {
-  totalProcessed: number;
-  latestUploads: {
-    mostRecentUploads: string[];
-  };
-}
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
-export const getLatestUploads = async (): Promise<CleanupSummary['latestUploads']> => {
-  console.log('Getting latest upload batches...');
-  
-  // Get the most recent upload_history_id values (regardless of source_report)
-  const { data: recentUploads } = await supabase
-    .from('inventory')
-    .select('upload_history_id')
-    .not('upload_history_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(500); // Get enough to find recent unique uploads
-
-  if (!recentUploads) {
-    console.warn('No upload history found');
-    return { mostRecentUploads: [] };
-  }
-
-  // Get unique upload_history_ids and take the 2 most recent ones
-  const uniqueUploads = [...new Set(recentUploads.map(r => r.upload_history_id))];
-  const mostRecentUploads = uniqueUploads.slice(0, 2); // Keep vehicles from 2 most recent upload batches
-
-  console.log('Most recent upload batches:', mostRecentUploads);
-  return { mostRecentUploads };
-};
-
-export const cleanupInventoryData = async (): Promise<CleanupSummary> => {
+export const getLatestUploads = async (count: number = 2) => {
   try {
-    console.log('Starting inventory cleanup process...');
-    
-    const latestUploads = await getLatestUploads();
-    console.log('Latest uploads identified:', latestUploads);
-
-    // --- Duplicate VIN Cleanup ---
-    // Get all NON-sold inventory grouped by VIN
-    const { data: dupes, error: dupesError } = await supabase
+    const { data, error } = await supabase
       .from('inventory')
-      .select('id, vin, created_at, updated_at, status')
-      .neq('status', 'sold')
-      .not('vin', 'is', null);
+      .select('upload_history_id, created_at')
+      .not('upload_history_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1000); // Get more records to find unique upload IDs
 
-    if (dupesError) {
-      console.error('Error fetching inventory for VIN deduplication:', dupesError);
-      throw dupesError;
+    if (error) throw error;
+
+    // Get unique upload history IDs
+    const uniqueUploadIds = [];
+    const seenIds = new Set();
+    
+    for (const row of data || []) {
+      if (row.upload_history_id && !seenIds.has(row.upload_history_id)) {
+        seenIds.add(row.upload_history_id);
+        uniqueUploadIds.push(row.upload_history_id);
+        
+        if (uniqueUploadIds.length >= count) break;
+      }
     }
 
-    // Identify VINs with more than one non-sold record
-    const vinMap: Record<string, { id: string; created_at: string; updated_at: string; status: string }[]> = {};
-    dupes?.forEach((row) => {
-      if (!vinMap[row.vin]) vinMap[row.vin] = [];
-      vinMap[row.vin].push(row);
-    });
+    return uniqueUploadIds;
+  } catch (error) {
+    console.error('Error getting latest uploads:', error);
+    return [];
+  }
+};
 
-    let toMarkSold: string[] = [];
-    Object.entries(vinMap).forEach(([vin, records]) => {
-      if (records.length > 1) {
-        // Sort so we keep the latest (by updated_at, then created_at)
-        const sorted = [...records].sort((a, b) =>
-          new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()
-        );
-        // Keep the most recent, mark others as sold
-        const markSold = sorted.slice(1).map((r) => r.id);
-        toMarkSold.push(...markSold);
-      }
-    });
+export const cleanupInventoryData = async () => {
+  try {
+    console.log('Starting inventory cleanup...');
+    
+    // Get the 2 most recent upload IDs
+    const recentUploadIds = await getLatestUploads(2);
+    
+    if (recentUploadIds.length === 0) {
+      console.log('No recent uploads found, skipping cleanup');
+      return { success: true, message: 'No recent uploads found' };
+    }
 
-    if (toMarkSold.length > 0) {
-      console.log(`Marking ${toMarkSold.length} duplicate VIN records as sold`);
-      const { error: updateDupesError } = await supabase
+    console.log('Recent upload IDs:', recentUploadIds);
+
+    // Instead of using a complex filter, we'll do this in smaller batches
+    // First, get all inventory IDs that should be kept (from recent uploads)
+    const { data: vehiclesToKeep, error: keepError } = await supabase
+      .from('inventory')
+      .select('id')
+      .in('upload_history_id', recentUploadIds);
+
+    if (keepError) throw keepError;
+
+    const keepIds = vehiclesToKeep.map(v => v.id);
+    console.log(`Found ${keepIds.length} vehicles to keep from recent uploads`);
+
+    // Get vehicles that should be marked as sold (not in recent uploads and currently available)
+    const { data: vehiclesToUpdate, error: fetchError } = await supabase
+      .from('inventory')
+      .select('id, stock_number, make, model, year')
+      .eq('status', 'available')
+      .limit(500); // Process in batches to avoid large queries
+
+    if (fetchError) throw fetchError;
+
+    // Filter out vehicles that should be kept
+    const vehiclesToMarkSold = vehiclesToUpdate.filter(v => !keepIds.includes(v.id));
+    
+    if (vehiclesToMarkSold.length === 0) {
+      console.log('No vehicles need to be marked as sold');
+      return { success: true, message: 'No cleanup needed' };
+    }
+
+    console.log(`Marking ${vehiclesToMarkSold.length} vehicles as sold`);
+
+    // Update in smaller batches to avoid query size limits
+    const batchSize = 100;
+    let totalUpdated = 0;
+
+    for (let i = 0; i < vehiclesToMarkSold.length; i += batchSize) {
+      const batch = vehiclesToMarkSold.slice(i, i + batchSize);
+      const batchIds = batch.map(v => v.id);
+
+      const { data: updated, error: updateError } = await supabase
         .from('inventory')
         .update({
           status: 'sold',
           sold_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
-        .in('id', toMarkSold);
-      if (updateDupesError) {
-        console.error('Error marking duplicate VINs as sold:', updateDupesError);
-        throw updateDupesError;
+        .in('id', batchIds)
+        .select('id');
+
+      if (updateError) {
+        console.error('Error updating batch:', updateError);
+        continue;
       }
-    } else {
-      console.log('No duplicate VIN groups needing cleanup.');
+
+      totalUpdated += updated?.length || 0;
+      console.log(`Updated batch ${Math.floor(i/batchSize) + 1}, ${updated?.length} vehicles marked as sold`);
     }
 
-    // --- Proceed with existing cleanup logic (keep only recent upload vehicles) ---
-    // Step 1: Get all vehicle IDs that should be KEPT (from recent uploads)
-    const { data: vehiclesToKeep, error: keepError } = await supabase
-      .from('inventory')
-      .select('id')
-      .in('upload_history_id', latestUploads.mostRecentUploads);
-
-    if (keepError) {
-      console.error('Error fetching vehicles to keep:', keepError);
-      throw keepError;
-    }
-
-    console.log(`Found ${vehiclesToKeep?.length || 0} vehicles to keep from recent uploads`);
-
-    if (!vehiclesToKeep || vehiclesToKeep.length === 0) {
-      console.log('No vehicles found in recent uploads');
-      return {
-        totalProcessed: toMarkSold.length,
-        latestUploads,
-      };
-    }
-
-    // Step 2: Get all vehicles that should be marked as sold (NOT in the keep list and not already sold)
-    const keepIds = vehiclesToKeep.map(v => v.id);
+    console.log(`Cleanup completed. Total vehicles marked as sold: ${totalUpdated}`);
     
-    const { data: vehiclesToUpdate, error: fetchError } = await supabase
-      .from('inventory')
-      .select('id, upload_history_id, status')
-      .neq('status', 'sold')
-      .not('id', 'in', keepIds);
-
-    if (fetchError) {
-      console.error('Error fetching vehicles to update:', fetchError);
-      throw fetchError;
-    }
-
-    console.log(`Found ${vehiclesToUpdate?.length || 0} vehicles to mark as sold`);
-
-    if (!vehiclesToUpdate || vehiclesToUpdate.length === 0) {
-      console.log('No vehicles need to be marked as sold');
-      return {
-        totalProcessed: toMarkSold.length,
-        latestUploads,
-      };
-    }
-
-    // Step 3: Mark old vehicles as sold using their IDs
-    const vehicleIds = vehiclesToUpdate.map(v => v.id);
-    
-    const { data: updatedVehicles, error: updateError } = await supabase
-      .from('inventory')
-      .update({
-        status: 'sold',
-        sold_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .in('id', vehicleIds)
-      .select('id');
-
-    if (updateError) {
-      console.error('Error marking vehicles as sold:', updateError);
-      throw updateError;
-    }
-
-    const totalProcessed = (updatedVehicles?.length || 0) + toMarkSold.length;
-    console.log(`Cleanup completed. Total processed: ${totalProcessed}`);
-
     return {
-      totalProcessed,
-      latestUploads,
+      success: true,
+      message: `Cleanup completed: ${totalUpdated} vehicles marked as sold`,
+      totalProcessed: totalUpdated
     };
+
   } catch (error) {
-    console.error('Error during inventory cleanup:', error);
+    console.error('Cleanup error:', error);
     throw error;
   }
 };
 
-export const performInventoryCleanup = async (): Promise<void> => {
+export const performInventoryCleanup = async () => {
   try {
+    const result = await cleanupInventoryData();
+    
     toast({
-      title: "Cleanup Started",
-      description: "Processing inventory data cleanup...",
+      title: "Cleanup Complete",
+      description: result.message,
     });
-
-    const summary = await cleanupInventoryData();
-
-    toast({
-      title: "Cleanup Completed",
-      description: `Processed ${summary.totalProcessed} vehicles and marked them as sold`,
-    });
-
-    // Refresh the page to show updated counts
-    window.location.reload();
+    
+    return result;
   } catch (error) {
     console.error('Cleanup failed:', error);
+    
     toast({
-      title: "Cleanup Failed",
-      description: error instanceof Error ? error.message : "Failed to clean up inventory data. Please try again.",
+      title: "Cleanup Failed", 
+      description: "There was an error during cleanup. Check console for details.",
       variant: "destructive"
     });
+    
+    throw error;
   }
 };
