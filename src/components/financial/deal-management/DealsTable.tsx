@@ -1,9 +1,10 @@
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Car, Lock } from "lucide-react";
+import { Eye, Car, Lock, Unlock } from "lucide-react";
 import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 
@@ -31,7 +32,8 @@ interface DealsTableProps {
   selectedDeals: string[];
   onSelectDeal: (dealId: string) => void;
   onSelectAll: () => void;
-  onDealTypeUpdate: (dealId: string, newType: string) => void;
+  onDealTypeUpdate: (dealId: string, newType: string, forceUnlock?: boolean) => void;
+  onUnlockDeal: (dealId: string) => void;
   getAdjustedGrossProfit: (deal: Deal) => number;
   formatCurrency: (amount: number) => string;
   packAdjustmentEnabled: boolean;
@@ -44,6 +46,7 @@ const DealsTable = ({
   onSelectDeal,
   onSelectAll,
   onDealTypeUpdate,
+  onUnlockDeal,
   getAdjustedGrossProfit,
   formatCurrency,
   packAdjustmentEnabled,
@@ -149,6 +152,14 @@ const DealsTable = ({
                         <Lock className="w-3 h-3" />
                         <span>{deal.deal_type?.replace('_', ' ') || 'used'}</span>
                       </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onUnlockDeal(deal.id)}
+                        className="h-6 px-2"
+                      >
+                        <Unlock className="w-3 h-3" />
+                      </Button>
                     </div>
                   ) : (
                     <Select

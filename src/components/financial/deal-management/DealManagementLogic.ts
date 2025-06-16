@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { updateDealType } from "@/utils/financial/dealOperations";
+import { updateDealType, unlockDeal } from "@/utils/financial/dealOperations";
 import { useToast } from "@/hooks/use-toast";
 import { Deal } from "./DealManagementTypes";
 
@@ -47,9 +46,9 @@ export const useDealManagement = () => {
     }
   };
 
-  const handleDealTypeUpdate = async (dealId: string, newType: 'retail' | 'dealer_trade' | 'wholesale') => {
+  const handleDealTypeUpdate = async (dealId: string, newType: 'retail' | 'dealer_trade' | 'wholesale', forceUnlock: boolean = false) => {
     try {
-      await updateDealType(dealId, newType);
+      await updateDealType(dealId, newType, forceUnlock);
       
       // Determine if the new type should be locked
       const shouldLock = ['wholesale', 'dealer_trade'].includes(newType);
@@ -75,6 +74,33 @@ export const useDealManagement = () => {
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update deal type",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUnlockDeal = async (dealId: string) => {
+    try {
+      await unlockDeal(dealId);
+      
+      setDeals(prevDeals => 
+        prevDeals.map(deal => 
+          deal.id === dealId ? { 
+            ...deal, 
+            deal_type_locked: false
+          } : deal
+        )
+      );
+      
+      toast({
+        title: "Success",
+        description: "Deal unlocked successfully"
+      });
+    } catch (error) {
+      console.error('Error unlocking deal:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to unlock deal",
         variant: "destructive"
       });
     }
@@ -170,6 +196,7 @@ export const useDealManagement = () => {
     bulkDealType,
     setBulkDealType,
     handleDealTypeUpdate,
+    handleUnlockDeal,
     handleBulkDealTypeUpdate,
     handleSelectDeal,
     handleSelectAll,

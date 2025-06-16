@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import PackAdjustmentControls from "./deal-management/PackAdjustmentControls";
@@ -30,6 +31,7 @@ const DealManagement = ({
     bulkDealType,
     setBulkDealType,
     handleDealTypeUpdate,
+    handleUnlockDeal,
     handleBulkDealTypeUpdate,
     handleSelectDeal,
     handleSelectAll
@@ -91,7 +93,7 @@ const DealManagement = ({
             <Badge variant="secondary">{filteredDeals.length} deals</Badge>
           </CardTitle>
           <CardDescription>
-            Manage deal types and view financial performance by category. Wholesale and dealer trade deals are automatically locked.
+            Manage deal types and view financial performance by category. Wholesale and dealer trade deals are automatically locked but can be unlocked manually if needed.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -118,6 +120,7 @@ const DealManagement = ({
             onSelectDeal={handleSelectDeal}
             onSelectAll={() => handleSelectAll(filteredDeals)}
             onDealTypeUpdate={handleDealTypeUpdate}
+            onUnlockDeal={handleUnlockDeal}
             getAdjustedGrossProfit={(deal) => getAdjustedGrossProfit(deal, packAdjustment)}
             formatCurrency={formatCurrency}
             packAdjustmentEnabled={packAdjustmentEnabled}
@@ -128,7 +131,7 @@ const DealManagement = ({
             <div className="text-center py-8 text-gray-500">
               No deals found matching your criteria
             </div>
-          )}
+            )}
         </CardContent>
       </Card>
     </div>

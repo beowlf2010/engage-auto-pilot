@@ -2,8 +2,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { updateInventoryStatusFromDeals } from "@/utils/inventoryDealSync";
 
-export const updateDealType = async (dealId: string, newType: 'retail' | 'dealer_trade' | 'wholesale') => {
-  // Check if the deal is locked before allowing updates
+export const updateDealType = async (dealId: string, newType: 'retail' | 'dealer_trade' | 'wholesale', forceUnlock: boolean = false) => {
+  // Check if the deal is locked before allowing updates (unless force unlock is requested)
   const { data: existingDeal, error: fetchError } = await supabase
     .from('deals')
     .select('deal_type_locked, deal_type')
@@ -14,8 +14,8 @@ export const updateDealType = async (dealId: string, newType: 'retail' | 'dealer
     throw new Error(`Failed to fetch deal: ${fetchError.message}`);
   }
 
-  if (existingDeal?.deal_type_locked) {
-    throw new Error('Cannot change deal type: This deal is locked');
+  if (existingDeal?.deal_type_locked && !forceUnlock) {
+    throw new Error('Cannot change deal type: This deal is locked. Use unlock option to override.');
   }
 
   // Determine if the new type should be locked
@@ -31,6 +31,19 @@ export const updateDealType = async (dealId: string, newType: 'retail' | 'dealer
 
   if (error) {
     throw new Error(`Failed to update deal type: ${error.message}`);
+  }
+};
+
+export const unlockDeal = async (dealId: string) => {
+  const { error } = await supabase
+    .from('deals')
+    .update({ 
+      deal_type_locked: false
+    })
+    .eq('id', dealId);
+
+  if (error) {
+    throw new Error(`Failed to unlock deal: ${error.message}`);
   }
 };
 
