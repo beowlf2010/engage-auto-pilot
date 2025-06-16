@@ -1,7 +1,12 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import * as XLSX from 'xlsx';
 
 export interface VINMessageExport {
+  export_info: {
+    export_date: string;
+    total_leads: number;
+    total_messages: number;
+  };
   leads: Array<{
     id: string;
     name: string;
@@ -10,320 +15,224 @@ export interface VINMessageExport {
     vehicle_interest?: string;
     messages: Array<{
       id: string;
-      direction: 'in' | 'out';
+      direction: "in" | "out";
       content: string;
       sent_at: string;
       metadata?: any;
     }>;
   }>;
-  export_info: {
-    total_leads: number;
-    total_messages: number;
-    export_date: string;
-    source: string;
-  };
 }
 
-export const createMessageExport = async (
-  exportName: string, 
-  exportData: VINMessageExport
-) => {
-  try {
-    const { data, error } = await supabase
-      .from('message_exports')
-      .insert({
-        export_name: exportName,
-        source_system: 'vin',
-        total_messages: exportData.export_info.total_messages,
-        total_leads: exportData.export_info.total_leads,
-        export_data: exportData as any
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error creating message export:', error);
-    throw error;
-  }
-};
-
-export const getMessageExports = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('message_exports')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching message exports:', error);
-    return [];
-  }
-};
-
-export const processMessageImport = async (exportId: string) => {
-  try {
-    // Get the export data
-    const { data: exportData, error: exportError } = await supabase
-      .from('message_exports')
-      .select('*')
-      .eq('id', exportId)
-      .single();
-
-    if (exportError) throw exportError;
-
-    const importResults = {
-      leads_created: 0,
-      leads_matched: 0,
-      messages_imported: 0,
-      errors: [] as string[]
-    };
-
-    // Cast export_data to our expected type
-    const exportDataTyped = exportData.export_data as any as VINMessageExport;
-
-    // Process each lead from the export
-    for (const exportedLead of exportDataTyped.leads) {
-      try {
-        // Try to find existing lead by phone or email
-        let { data: existingLead } = await supabase
-          .from('leads')
-          .select('id, phone_numbers(*)')
-          .or(`email.eq.${exportedLead.email},phone_numbers.number.eq.${exportedLead.phone}`)
-          .maybeSingle();
-
-        let leadId = existingLead?.id;
-
-        // If no existing lead, create new one
-        if (!existingLead) {
-          const [firstName, ...lastNameParts] = exportedLead.name.split(' ');
-          const { data: newLead, error: leadError } = await supabase
-            .from('leads')
-            .insert({
-              first_name: firstName || 'Unknown',
-              last_name: lastNameParts.join(' ') || 'Unknown',
-              email: exportedLead.email,
-              vehicle_interest: exportedLead.vehicle_interest || 'Imported from VIN',
-              source: 'VIN Import'
-            })
-            .select()
-            .single();
-
-          if (leadError) throw leadError;
-          leadId = newLead.id;
-
-          // Add phone number
-          if (exportedLead.phone) {
-            await supabase
-              .from('phone_numbers')
-              .insert({
-                lead_id: leadId,
-                number: exportedLead.phone,
-                type: 'mobile',
-                is_primary: true
-              });
-          }
-
-          importResults.leads_created++;
-        } else {
-          importResults.leads_matched++;
-        }
-
-        // Create mapping record
-        await supabase
-          .from('message_import_mapping')
-          .insert({
-            export_id: exportId,
-            external_lead_id: exportedLead.id,
-            internal_lead_id: leadId,
-            mapping_status: 'completed'
-          });
-
-        // Import messages
-        for (const message of exportedLead.messages) {
-          // Import to conversations table
-          const { data: conversation, error: convError } = await supabase
-            .from('conversations')
-            .insert({
-              lead_id: leadId,
-              direction: message.direction,
-              body: message.content,
-              sent_at: message.sent_at,
-              ai_generated: message.direction === 'out'
-            })
-            .select()
-            .single();
-
-          if (convError) {
-            importResults.errors.push(`Failed to import message: ${convError.message}`);
-            continue;
-          }
-
-          // Also store in historical_messages for analytics
-          await supabase
-            .from('historical_messages')
-            .insert({
-              lead_id: leadId,
-              original_message_id: message.id,
-              direction: message.direction,
-              content: message.content,
-              sent_at: message.sent_at,
-              source_system: 'vin',
-              message_metadata: message.metadata || {}
-            });
-
-          // Update mapping with message IDs
-          await supabase
-            .from('message_import_mapping')
-            .update({
-              external_message_id: message.id,
-              internal_message_id: conversation.id
-            })
-            .eq('export_id', exportId)
-            .eq('external_lead_id', exportedLead.id);
-
-          importResults.messages_imported++;
-        }
-
-      } catch (error) {
-        console.error(`Error processing lead ${exportedLead.id}:`, error);
-        importResults.errors.push(`Failed to process lead ${exportedLead.name}: ${error}`);
-      }
-    }
-
-    // Mark export as processed
-    await supabase
-      .from('message_exports')
-      .update({
-        processed: true,
-        processed_at: new Date().toISOString()
-      })
-      .eq('id', exportId);
-
-    return importResults;
-  } catch (error) {
-    console.error('Error processing message import:', error);
-    throw error;
-  }
-};
+export interface MessageImportResult {
+  leads_created: number;
+  leads_matched: number;
+  messages_imported: number;
+  errors: Array<{
+    lead_id?: string;
+    message_id?: string;
+    error: string;
+  }>;
+}
 
 export const parseVINExportFile = (fileContent: string): VINMessageExport => {
   try {
-    const data = JSON.parse(fileContent);
+    const parsed = JSON.parse(fileContent);
     
     // Validate the structure
-    if (!data.leads || !Array.isArray(data.leads)) {
-      throw new Error('Invalid VIN export format: missing leads array');
+    if (!parsed.export_info || !parsed.leads) {
+      throw new Error('Invalid VIN export file format');
     }
-
-    // Ensure required fields exist
-    const processedData: VINMessageExport = {
-      leads: data.leads.map((lead: any) => ({
-        id: lead.id || `imported_${Date.now()}_${Math.random()}`,
-        name: lead.name || lead.first_name + ' ' + lead.last_name || 'Unknown',
-        phone: lead.phone || lead.phone_number,
-        email: lead.email,
-        vehicle_interest: lead.vehicle_interest || lead.vehicle || 'Unknown',
-        messages: (lead.messages || []).map((msg: any) => ({
-          id: msg.id || `msg_${Date.now()}_${Math.random()}`,
-          direction: msg.direction === 'incoming' ? 'in' : 'out',
-          content: msg.content || msg.body || msg.message,
-          sent_at: msg.sent_at || msg.timestamp || new Date().toISOString(),
-          metadata: msg.metadata || {}
-        }))
-      })),
-      export_info: {
-        total_leads: data.leads.length,
-        total_messages: data.leads.reduce((sum: number, lead: any) => sum + (lead.messages?.length || 0), 0),
-        export_date: new Date().toISOString(),
-        source: 'vin'
-      }
+    
+    // Ensure messages have proper direction typing
+    const processedLeads = parsed.leads.map((lead: any) => ({
+      ...lead,
+      messages: lead.messages.map((msg: any) => ({
+        ...msg,
+        direction: msg.direction === 'in' || msg.direction === 'out' ? msg.direction as "in" | "out" : "out"
+      }))
+    }));
+    
+    return {
+      export_info: parsed.export_info,
+      leads: processedLeads
     };
-
-    return processedData;
   } catch (error) {
-    console.error('Error parsing VIN export file:', error);
-    throw new Error('Failed to parse VIN export file. Please ensure it\'s a valid JSON format.');
+    throw new Error(`Failed to parse VIN export file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 
-export const parseVINExcelFile = (file: File): Promise<VINMessageExport> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+export const parseVINExcelFile = async (file: File): Promise<VINMessageExport> => {
+  // This would parse Excel files - for now, throw an error to indicate it's not implemented
+  throw new Error('Excel parsing not yet implemented. Please use JSON files.');
+};
+
+export const createMessageExport = async (exportName: string, exportData: VINMessageExport) => {
+  const { data, error } = await supabase
+    .from('message_exports')
+    .insert({
+      export_name: exportName,
+      export_data: exportData,
+      total_leads: exportData.export_info.total_leads,
+      total_messages: exportData.export_info.total_messages,
+      source_system: 'vin'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const getMessageExports = async () => {
+  const { data, error } = await supabase
+    .from('message_exports')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+};
+
+export const processMessageImport = async (exportId: string): Promise<MessageImportResult> => {
+  const { data: exportRecord, error: exportError } = await supabase
+    .from('message_exports')
+    .select('*')
+    .eq('id', exportId)
+    .single();
+
+  if (exportError) throw exportError;
+
+  const exportData = exportRecord.export_data as VINMessageExport;
+  const result: MessageImportResult = {
+    leads_created: 0,
+    leads_matched: 0,
+    messages_imported: 0,
+    errors: []
+  };
+
+  for (const leadData of exportData.leads) {
+    try {
+      // Try to find existing lead by phone or email
+      let existingLead = null;
+      
+      if (leadData.phone) {
+        const { data: phoneMatches } = await supabase
+          .from('phone_numbers')
+          .select('lead_id')
+          .eq('number', leadData.phone);
         
-        // Assume the first sheet contains the data
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-        // Process Excel data to match VIN format
-        const leads = jsonData.map((row: any, index: number) => {
-          const leadId = row.lead_id || row.id || `excel_lead_${index + 1}`;
-          const name = row.name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Unknown';
-          const phone = row.phone || row.phone_number || row.mobile;
-          const email = row.email;
-          const vehicle_interest = row.vehicle_interest || row.vehicle || 'Unknown';
-          
-          // Handle messages - they might be in separate columns or a JSON string
-          let messages = [];
-          if (row.messages) {
-            try {
-              messages = typeof row.messages === 'string' ? JSON.parse(row.messages) : row.messages;
-            } catch {
-              // If parsing fails, create a single message from the row data
-              if (row.message_content || row.last_message) {
-                messages = [{
-                  id: `excel_msg_${index + 1}`,
-                  direction: row.message_direction === 'incoming' || row.message_direction === 'in' ? 'in' : 'out',
-                  content: row.message_content || row.last_message || '',
-                  sent_at: row.message_sent_at || row.last_contact || new Date().toISOString(),
-                  metadata: {}
-                }];
-              }
-            }
-          }
-
-          return {
-            id: leadId,
-            name,
-            phone,
-            email,
-            vehicle_interest,
-            messages: messages.map((msg: any, msgIndex: number) => ({
-              id: msg.id || `excel_msg_${index + 1}_${msgIndex + 1}`,
-              direction: msg.direction === 'incoming' || msg.direction === 'in' ? 'in' : 'out',
-              content: msg.content || msg.message || msg.body || '',
-              sent_at: msg.sent_at || msg.timestamp || new Date().toISOString(),
-              metadata: msg.metadata || {}
-            }))
-          };
-        });
-
-        const processedData: VINMessageExport = {
-          leads: leads.filter(lead => lead.name !== 'Unknown' || lead.phone || lead.email),
-          export_info: {
-            total_leads: leads.length,
-            total_messages: leads.reduce((sum, lead) => sum + lead.messages.length, 0),
-            export_date: new Date().toISOString(),
-            source: 'excel'
-          }
-        };
-
-        resolve(processedData);
-      } catch (error) {
-        reject(new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`));
+        if (phoneMatches && phoneMatches.length > 0) {
+          const { data: lead } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', phoneMatches[0].lead_id)
+            .single();
+          existingLead = lead;
+        }
       }
-    };
-    
-    reader.onerror = () => reject(new Error('Error reading Excel file'));
-    reader.readAsArrayBuffer(file);
-  });
+
+      if (!existingLead && leadData.email) {
+        const { data: emailMatches } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('email', leadData.email);
+        
+        if (emailMatches && emailMatches.length > 0) {
+          existingLead = emailMatches[0];
+        }
+      }
+
+      let targetLeadId: string;
+
+      if (existingLead) {
+        targetLeadId = existingLead.id;
+        result.leads_matched++;
+      } else {
+        // Create new lead
+        const nameParts = leadData.name.split(' ');
+        const firstName = nameParts[0] || 'Unknown';
+        const lastName = nameParts.slice(1).join(' ') || 'Customer';
+
+        const { data: newLead, error: leadError } = await supabase
+          .from('leads')
+          .insert({
+            first_name: firstName,
+            last_name: lastName,
+            email: leadData.email,
+            vehicle_interest: leadData.vehicle_interest || 'Not specified',
+            source: 'VIN Import'
+          })
+          .select()
+          .single();
+
+        if (leadError) {
+          result.errors.push({
+            lead_id: leadData.id,
+            error: `Failed to create lead: ${leadError.message}`
+          });
+          continue;
+        }
+
+        targetLeadId = newLead.id;
+        result.leads_created++;
+
+        // Add phone number if provided
+        if (leadData.phone) {
+          await supabase
+            .from('phone_numbers')
+            .insert({
+              lead_id: targetLeadId,
+              number: leadData.phone,
+              type: 'cell',
+              is_primary: true
+            });
+        }
+      }
+
+      // Import messages
+      for (const message of leadData.messages) {
+        try {
+          const { error: messageError } = await supabase
+            .from('conversations')
+            .insert({
+              lead_id: targetLeadId,
+              body: message.content,
+              direction: message.direction,
+              sent_at: message.sent_at,
+              ai_generated: false
+            });
+
+          if (messageError) {
+            result.errors.push({
+              lead_id: leadData.id,
+              message_id: message.id,
+              error: `Failed to import message: ${messageError.message}`
+            });
+          } else {
+            result.messages_imported++;
+          }
+        } catch (error) {
+          result.errors.push({
+            lead_id: leadData.id,
+            message_id: message.id,
+            error: `Message import error: ${error instanceof Error ? error.message : 'Unknown error'}`
+          });
+        }
+      }
+
+    } catch (error) {
+      result.errors.push({
+        lead_id: leadData.id,
+        error: `Lead processing error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  }
+
+  // Mark export as processed
+  await supabase
+    .from('message_exports')
+    .update({ processed: true, processed_at: new Date().toISOString() })
+    .eq('id', exportId);
+
+  return result;
 };
