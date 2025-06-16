@@ -79,6 +79,19 @@ function App() {
                 </ProtectedRoute>
               } />
 
+              <Route path="/inventory-dashboard" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <InventoryDashboardPage />
+                      </main>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
               <Route path="/upload-inventory-report" element={
                 <ProtectedRoute>
                   <div className="flex h-screen bg-gray-50">
