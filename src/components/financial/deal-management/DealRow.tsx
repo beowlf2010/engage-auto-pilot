@@ -4,6 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 import DealTypeCell from "./DealTypeCell";
 import ProfitCell from "./ProfitCell";
+import PackAdjustmentCell from "./PackAdjustmentCell";
 import ActionsCell from "./ActionsCell";
 import { getAdjustedTotalProfit } from "./DealManagementUtils";
 
@@ -109,10 +110,19 @@ const DealRow = ({
         <ProfitCell
           deal={deal}
           field="gross"
-          value={getAdjustedGrossProfit(deal)}
+          value={deal.gross_profit || 0}
           formatCurrency={formatCurrency}
           packAdjustmentEnabled={packAdjustmentEnabled}
+          localPackAdjustment={0}
+        />
+      </TableCell>
+      
+      <TableCell className="text-right">
+        <PackAdjustmentCell
+          deal={deal}
+          packAdjustmentEnabled={packAdjustmentEnabled}
           localPackAdjustment={localPackAdjustment}
+          formatCurrency={formatCurrency}
         />
       </TableCell>
       
@@ -134,7 +144,7 @@ const DealRow = ({
           value={adjustedTotalProfit}
           formatCurrency={formatCurrency}
           packAdjustmentEnabled={packAdjustmentEnabled}
-          localPackAdjustment={localPackAdjustment}
+          localPackAdjustment={0}
         />
       </TableCell>
       

@@ -30,6 +30,7 @@ const DealsTableHeader = ({
         <TableHead className="font-semibold">Deal Type</TableHead>
         <TableHead className="font-semibold">Salesperson Code</TableHead>
         <TableHead className="font-semibold text-right">Gross Profit</TableHead>
+        <TableHead className="font-semibold text-right">Pack Adjustment</TableHead>
         <TableHead className="font-semibold text-right">F&I Profit</TableHead>
         <TableHead className="font-semibold text-right">Total Profit</TableHead>
         <TableHead className="font-semibold">Date</TableHead>

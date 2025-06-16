@@ -1,7 +1,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
-import { isUsedVehicle } from "./DealManagementUtils";
 
 interface Deal {
   id: string;
@@ -49,45 +48,13 @@ const ProfitCell = ({
     }
   };
 
-  // Show pack indicator for gross profit on used vehicles
-  const showGrossPackIndicator = field === 'gross' && 
-                                packAdjustmentEnabled && 
-                                isUsedVehicle(deal.stock_number) && 
-                                localPackAdjustment && 
-                                localPackAdjustment > 0;
-
-  // Show pack breakdown for total profit on used vehicles
-  const showTotalPackBreakdown = field === 'total' && 
-                                packAdjustmentEnabled && 
-                                isUsedVehicle(deal.stock_number) && 
-                                localPackAdjustment && 
-                                localPackAdjustment > 0;
-
-  // Calculate base values for display
-  const baseGrossProfit = deal.gross_profit || 0;
-  const baseFiProfit = deal.fi_profit || 0;
-  const baseTotalWithoutPack = baseGrossProfit + baseFiProfit;
-
   return (
     <div className="text-right">
       <div className="flex items-center justify-end space-x-1">
         <span className="font-semibold">
           {formatCurrency(value)}
         </span>
-        {showGrossPackIndicator && (
-          <span className="text-xs text-green-600 font-medium">
-            +{formatCurrency(localPackAdjustment)}
-          </span>
-        )}
       </div>
-      
-      {showTotalPackBreakdown && (
-        <div className="text-xs text-slate-500 mt-1">
-          Base: {formatCurrency(baseTotalWithoutPack)}
-          <br />
-          Pack: +{formatCurrency(localPackAdjustment)}
-        </div>
-      )}
       
       {hasChangedFromOriginal(field) && (
         <div className="text-xs text-slate-500">
