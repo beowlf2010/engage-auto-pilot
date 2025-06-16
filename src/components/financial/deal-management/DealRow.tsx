@@ -1,4 +1,3 @@
-
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
@@ -121,7 +120,7 @@ const DealRow = ({
           value={deal.fi_profit || 0}
           formatCurrency={formatCurrency}
           packAdjustmentEnabled={packAdjustmentEnabled}
-          localPackAdjustment={localPackAdjustment}
+          localPackAdjustment={0} // No pack adjustment for F&I
         />
       </TableCell>
       
@@ -132,7 +131,7 @@ const DealRow = ({
           value={getAdjustedTotalProfit(deal, localPackAdjustment)}
           formatCurrency={formatCurrency}
           packAdjustmentEnabled={packAdjustmentEnabled}
-          localPackAdjustment={localPackAdjustment}
+          localPackAdjustment={0} // Don't show pack indicator on total - it's already included in the value
         />
       </TableCell>
       

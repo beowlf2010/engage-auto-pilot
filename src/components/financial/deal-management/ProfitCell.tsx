@@ -49,7 +49,7 @@ const ProfitCell = ({
     }
   };
 
-  // Only show pack indicator for gross profit, not total profit
+  // ONLY show pack indicator for gross profit on used vehicles
   const showPackIndicator = field === 'gross' && 
                            packAdjustmentEnabled && 
                            isUsedVehicle(deal.stock_number) && 
