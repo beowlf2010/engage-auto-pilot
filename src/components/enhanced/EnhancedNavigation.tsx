@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -17,7 +16,7 @@ const EnhancedNavigation = () => {
 
   if (!profile) return null;
 
-  const navItems = getNavigationItems(profile.role, navigate);
+  const navItems = getNavigationItems(profile.role);
 
   return (
     <nav className="relative z-50">
