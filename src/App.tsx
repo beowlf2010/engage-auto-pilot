@@ -70,17 +70,17 @@ function App() {
               } />
               <Route path="/inventory-dashboard" element={
                 <ProtectedRoute>
-                  <StreamlinedPages />
+                  <StreamlinedPages.InventoryDashboardPage />
                 </ProtectedRoute>
               } />
               <Route path="/inventory-upload" element={
                 <ProtectedRoute>
-                  <StreamlinedPages />
+                  <StreamlinedPages.InventoryUploadPage />
                 </ProtectedRoute>
               } />
               <Route path="/rpo-insights" element={
                 <ProtectedRoute>
-                  <StreamlinedPages />
+                  <StreamlinedPages.RPOInsightsPage />
                 </ProtectedRoute>
               } />
               <Route path="/ai-monitor" element={

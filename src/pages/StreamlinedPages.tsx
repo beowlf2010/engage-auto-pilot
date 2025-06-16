@@ -6,6 +6,9 @@ import { SalesDashboard, ManagerDashboard } from '@/components/StreamlinedDashbo
 import LeadsList from '@/components/LeadsList';
 import AIMessageMonitor from '@/components/AIMessageMonitor';
 import FinancialDashboard from '@/components/financial/FinancialDashboard';
+import InventoryDashboard from '@/components/InventoryDashboard';
+import InventoryUpload from '@/components/InventoryUpload';
+import RPOInsights from '@/components/RPOInsights';
 
 export const SmartInboxPage = () => {
   const { profile } = useAuth();
@@ -147,6 +150,62 @@ export const AIMonitorPage = () => {
   );
 };
 
+export const InventoryDashboardPage = () => {
+  const { profile } = useAuth();
+  
+  if (!profile) {
+    return <div>Please sign in to access inventory</div>;
+  }
+
+  return (
+    <div className="container mx-auto py-6">
+      <InventoryDashboard />
+    </div>
+  );
+};
+
+export const InventoryUploadPage = () => {
+  const { profile } = useAuth();
+  
+  if (!profile || !['manager', 'admin'].includes(profile.role)) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-slate-800 mb-4">Access Denied</h1>
+          <p className="text-slate-600">Manager or Admin role required to upload inventory.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-6">
+      <InventoryUpload />
+    </div>
+  );
+};
+
+export const RPOInsightsPage = () => {
+  const { profile } = useAuth();
+  
+  if (!profile || !['manager', 'admin'].includes(profile.role)) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-slate-800 mb-4">Access Denied</h1>
+          <p className="text-slate-600">Manager or Admin role required to access RPO insights.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-6">
+      <RPOInsights />
+    </div>
+  );
+};
+
 // Default export for compatibility with existing imports
 const StreamlinedPages = {
   SmartInboxPage,
@@ -155,7 +214,10 @@ const StreamlinedPages = {
   AdminDashboardPage,
   FinancialDashboardPage,
   StreamlinedLeadsPage,
-  AIMonitorPage
+  AIMonitorPage,
+  InventoryDashboardPage,
+  InventoryUploadPage,
+  RPOInsightsPage
 };
 
 export default StreamlinedPages;
