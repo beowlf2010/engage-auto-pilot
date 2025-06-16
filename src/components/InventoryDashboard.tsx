@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -45,9 +46,10 @@ const InventoryDashboard = () => {
   const [qrModalOpen, setQRModalOpen] = useState(false);
   const [qrVehicle, setQRVehicle] = useState<any | null>(null);
 
-  const { data: inventory, isLoading } = useQuery({
+  const { data: inventory, isLoading, error } = useQuery({
     queryKey: ['inventory-enhanced', filters, searchTerm],
     queryFn: async () => {
+      console.log('Fetching inventory data...');
       let query = supabase
         .from('inventory')
         .select(`
@@ -93,7 +95,12 @@ const InventoryDashboard = () => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching inventory:', error);
+        throw error;
+      }
+      
+      console.log('Raw inventory data:', data);
       
       // Process the data to include deal information and data quality
       let processedData = data?.map(vehicle => ({
@@ -104,6 +111,8 @@ const InventoryDashboard = () => {
           : null,
         data_completeness: getDataCompletenessScore(vehicle)
       })) || [];
+
+      console.log('Processed inventory data:', processedData);
 
       // Apply data quality filter
       if (filters.dataQuality === 'complete') {
@@ -158,7 +167,27 @@ const InventoryDashboard = () => {
     }
   });
 
-  // Compute data quality stats (inside InventoryDashboard, before return)
+  // Show error state if there's an error
+  if (error) {
+    console.error('Inventory dashboard error:', error);
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-slate-800">Inventory Dashboard</h1>
+        </div>
+        <Card className="p-6">
+          <div className="text-center text-red-600">
+            <p>Error loading inventory data: {error.message}</p>
+            <Button onClick={() => window.location.reload()} className="mt-4">
+              Retry
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Compute data quality stats
   const completenessStats = (() => {
     if (!Array.isArray(inventory)) return { total: 0, complete: 0, incomplete: 0 };
     let complete = 0, incomplete = 0;

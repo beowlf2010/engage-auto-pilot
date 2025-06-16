@@ -1,13 +1,12 @@
+
 import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, Calendar, DollarSign, Eye, Car } from "lucide-react";
+import { ArrowUpDown, Calendar, DollarSign, Eye, Car, QrCode } from "lucide-react";
 import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 import { formatVehicleTitle, getVehicleDescription, formatPrice, getVehicleStatusDisplay } from "@/services/inventory/vehicleFormattingService";
-import DataCompletenessModal from "./DataCompletenessModal";
-import { QrCode } from "lucide-react";
 
 interface InventoryTableProps {
   inventory: any[] | undefined;
@@ -17,9 +16,7 @@ interface InventoryTableProps {
   onQRCode: (vehicle: any) => void;
 }
 
-const InventoryTable: React.FC<InventoryTableProps & {
-  onQRCode: (vehicle: any) => void;
-}> = ({
+const InventoryTable: React.FC<InventoryTableProps> = ({
   inventory,
   isLoading,
   onSort,
@@ -54,6 +51,7 @@ const InventoryTable: React.FC<InventoryTableProps & {
               Data Quality <ArrowUpDown className="w-3 h-3 ml-1" />
             </Button>
           </TableHead>
+          <TableHead className="font-semibold">QR Code</TableHead>
           <TableHead className="font-semibold">Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -61,7 +59,7 @@ const InventoryTable: React.FC<InventoryTableProps & {
         {isLoading ? (
           Array.from({ length: 10 }).map((_, i) => (
             <TableRow key={i}>
-              {Array.from({ length: 9 }).map((_, j) => (
+              {Array.from({ length: 10 }).map((_, j) => (
                 <TableCell key={j}><div className="h-4 bg-slate-200 rounded animate-pulse"></div></TableCell>
               ))}
             </TableRow>
@@ -199,15 +197,6 @@ const InventoryTable: React.FC<InventoryTableProps & {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Link to={`/vehicle-detail/${vehicle.stock_number || vehicle.vin || vehicle.id}`}>
-                    <Button variant="outline" size="sm" className="flex items-center space-x-1">
-                      <Eye className="w-4 h-4" />
-                      <span>View</span>
-                    </Button>
-                  </Link>
-                </TableCell>
-                {/* Insert QR column just before Actions */}
-                <TableCell>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -216,6 +205,14 @@ const InventoryTable: React.FC<InventoryTableProps & {
                   >
                     <QrCode className="w-5 h-5" />
                   </Button>
+                </TableCell>
+                <TableCell>
+                  <Link to={`/vehicle-detail/${vehicle.stock_number || vehicle.vin || vehicle.id}`}>
+                    <Button variant="outline" size="sm" className="flex items-center space-x-1">
+                      <Eye className="w-4 h-4" />
+                      <span>View</span>
+                    </Button>
+                  </Link>
                 </TableCell>
               </TableRow>
             );
