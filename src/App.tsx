@@ -9,6 +9,7 @@ import DashboardPage from '@/pages/Index';
 import LeadsPage from '@/pages/StreamlinedLeadsPage';
 import StreamlinedLeadsPage from '@/pages/StreamlinedLeadsPage';
 import InventoryDashboardPage from '@/pages/InventoryDashboardPage';
+import InventoryUploadPage from '@/pages/InventoryUploadPage';
 import SmartInboxPage from '@/pages/SmartInboxPage';
 import PredictiveAnalyticsPage from '@/pages/PredictiveAnalyticsPage';
 import StreamlinedNavigation from '@/components/StreamlinedNavigation';
@@ -72,6 +73,19 @@ function App() {
                       <StreamlinedNavigation />
                       <main className="flex-1 overflow-auto">
                         <InventoryDashboardPage />
+                      </main>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/upload-inventory-report" element={
+                <ProtectedRoute>
+                  <div className="flex h-screen bg-gray-50">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <StreamlinedNavigation />
+                      <main className="flex-1 overflow-auto">
+                        <InventoryUploadPage />
                       </main>
                     </div>
                   </div>
