@@ -8,7 +8,7 @@ import {
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
 import { NavigationItem as NavigationItemType } from './navigationConfig';
-import { getColorClasses } from './navigationStyles';
+import { getGlassColorClasses } from './glassNavigationStyles';
 
 interface NavigationItemProps {
   item: NavigationItemType;
@@ -29,7 +29,7 @@ const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
           variant="ghost"
           size="sm"
           onClick={() => navigate(item.path)}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${getColorClasses(itemColor, isActive)}`}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${getGlassColorClasses(itemColor, isActive)}`}
         >
           <Icon size={18} />
           <span className="font-medium">{item.label}</span>

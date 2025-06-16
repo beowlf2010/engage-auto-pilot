@@ -32,4 +32,3 @@ const StreamlinedNavigation = () => {
 };
 
 export default StreamlinedNavigation;
-
