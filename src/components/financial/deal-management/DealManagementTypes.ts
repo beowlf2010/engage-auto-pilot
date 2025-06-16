@@ -1,18 +1,21 @@
 
 export interface Deal {
   id: string;
-  upload_date: string;
   stock_number?: string;
-  year_model?: string;
   buyer_name?: string;
+  year_model?: string;
+  deal_type?: string;
+  deal_type_locked?: boolean;
+  sale_amount?: number;
+  cost_amount?: number;
   gross_profit?: number;
   fi_profit?: number;
   total_profit?: number;
-  deal_type?: string;
+  upload_date: string;
+  age?: number;
   original_gross_profit?: number;
   original_fi_profit?: number;
   original_total_profit?: number;
-  first_reported_date?: string;
 }
 
 export interface DealManagementProps {
@@ -24,13 +27,5 @@ export interface DealManagementProps {
   packAdjustmentEnabled?: boolean;
   setPackAdjustmentEnabled?: (enabled: boolean) => void;
   localPackAdjustment?: number;
-  setLocalPackAdjustment?: (value: number) => void;
-}
-
-export interface SummaryTotals {
-  newRetail: { units: number; gross: number; fi: number; total: number };
-  usedRetail: { units: number; gross: number; fi: number; total: number };
-  totalRetail: { units: number; gross: number; fi: number; total: number };
-  dealerTrade: { units: number; gross: number; fi: number; total: number };
-  wholesale: { units: number; gross: number; fi: number; total: number };
+  setLocalPackAdjustment?: (adjustment: number) => void;
 }

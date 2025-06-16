@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { updateDealType } from "@/utils/financialDataOperations";
+import { updateDealType } from "@/utils/financial/dealOperations";
 import { useToast } from "@/hooks/use-toast";
 import { Deal } from "./DealManagementTypes";
 
@@ -51,21 +51,30 @@ export const useDealManagement = () => {
     try {
       await updateDealType(dealId, newType);
       
+      // Determine if the new type should be locked
+      const shouldLock = ['wholesale', 'dealer_trade'].includes(newType);
+      
       setDeals(prevDeals => 
         prevDeals.map(deal => 
-          deal.id === dealId ? { ...deal, deal_type: newType } : deal
+          deal.id === dealId ? { 
+            ...deal, 
+            deal_type: newType,
+            deal_type_locked: shouldLock
+          } : deal
         )
       );
       
       toast({
         title: "Success",
-        description: "Deal type updated successfully"
+        description: shouldLock 
+          ? `Deal type updated to ${newType} and locked` 
+          : "Deal type updated successfully"
       });
     } catch (error) {
       console.error('Error updating deal type:', error);
       toast({
         title: "Error",
-        description: "Failed to update deal type",
+        description: error instanceof Error ? error.message : "Failed to update deal type",
         variant: "destructive"
       });
     }
@@ -81,6 +90,20 @@ export const useDealManagement = () => {
       return;
     }
 
+    // Filter out locked deals
+    const lockedDeals = deals.filter(deal => 
+      selectedDeals.includes(deal.id) && deal.deal_type_locked
+    );
+
+    if (lockedDeals.length > 0) {
+      toast({
+        title: "Warning",
+        description: `${lockedDeals.length} deals are locked and cannot be changed`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const promises = selectedDeals.map(dealId => 
         updateDealType(dealId, bulkDealType as 'retail' | 'dealer_trade' | 'wholesale')
@@ -88,9 +111,15 @@ export const useDealManagement = () => {
       
       await Promise.all(promises);
       
+      const shouldLock = ['wholesale', 'dealer_trade'].includes(bulkDealType);
+      
       setDeals(prevDeals => 
         prevDeals.map(deal => 
-          selectedDeals.includes(deal.id) ? { ...deal, deal_type: bulkDealType } : deal
+          selectedDeals.includes(deal.id) ? { 
+            ...deal, 
+            deal_type: bulkDealType,
+            deal_type_locked: shouldLock
+          } : deal
         )
       );
       
@@ -99,7 +128,7 @@ export const useDealManagement = () => {
       
       toast({
         title: "Success",
-        description: `Updated ${selectedDeals.length} deals`
+        description: `Updated ${selectedDeals.length} deals${shouldLock ? ' and locked them' : ''}`
       });
     } catch (error) {
       console.error('Error bulk updating deal types:', error);

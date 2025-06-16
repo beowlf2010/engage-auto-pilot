@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Car } from "lucide-react";
+import { Eye, Car, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 
@@ -14,6 +14,7 @@ interface Deal {
   buyer_name?: string;
   year_model?: string;
   deal_type?: string;
+  deal_type_locked?: boolean;
   sale_amount?: number;
   cost_amount?: number;
   gross_profit?: number;
@@ -76,6 +77,13 @@ const DealsTable = ({
     }
   };
 
+  const handleSelectDeal = (dealId: string) => {
+    const deal = deals.find(d => d.id === dealId);
+    // Don't allow selection of locked deals for bulk operations
+    if (deal?.deal_type_locked) return;
+    onSelectDeal(dealId);
+  };
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -83,7 +91,7 @@ const DealsTable = ({
           <TableRow className="bg-slate-50">
             <TableHead className="w-12">
               <Checkbox
-                checked={selectedDeals.length === deals.length && deals.length > 0}
+                checked={selectedDeals.length === deals.filter(d => !d.deal_type_locked).length && deals.length > 0}
                 onCheckedChange={onSelectAll}
               />
             </TableHead>
@@ -105,7 +113,8 @@ const DealsTable = ({
               <TableCell>
                 <Checkbox
                   checked={selectedDeals.includes(deal.id)}
-                  onCheckedChange={() => onSelectDeal(deal.id)}
+                  onCheckedChange={() => handleSelectDeal(deal.id)}
+                  disabled={deal.deal_type_locked}
                 />
               </TableCell>
               
@@ -134,22 +143,30 @@ const DealsTable = ({
               </TableCell>
               
               <TableCell>
-                <Select
-                  value={deal.deal_type || 'used'}
-                  onValueChange={(value) => onDealTypeUpdate(deal.id, value)}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="retail">Retail</SelectItem>
-                    <SelectItem value="wholesale">Wholesale</SelectItem>
-                    <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Badge className={`mt-1 ${getDealTypeColor(deal.deal_type)}`}>
-                  {deal.deal_type?.replace('_', ' ') || 'used'}
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  {deal.deal_type_locked ? (
+                    <div className="flex items-center space-x-2">
+                      <Badge className={`${getDealTypeColor(deal.deal_type)} flex items-center space-x-1`}>
+                        <Lock className="w-3 h-3" />
+                        <span>{deal.deal_type?.replace('_', ' ') || 'used'}</span>
+                      </Badge>
+                    </div>
+                  ) : (
+                    <Select
+                      value={deal.deal_type || 'retail'}
+                      onValueChange={(value) => onDealTypeUpdate(deal.id, value)}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="retail">Retail</SelectItem>
+                        <SelectItem value="wholesale">Wholesale</SelectItem>
+                        <SelectItem value="dealer_trade">Dealer Trade</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
               </TableCell>
               
               <TableCell className="text-right">

@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import PackAdjustmentControls from "./deal-management/PackAdjustmentControls";
@@ -50,6 +49,11 @@ const DealManagement = ({
 
   const filteredDeals = filterDeals(deals, searchTerm, filterType, showProfitChanges);
   const summaryTotals = calculateSummaryTotals(filteredDeals, packAdjustment);
+  
+  // Check if any selected deals are locked
+  const hasLockedSelectedDeals = selectedDeals.some(dealId => 
+    deals.find(deal => deal.id === dealId)?.deal_type_locked
+  );
 
   if (loading) {
     return (
@@ -87,7 +91,7 @@ const DealManagement = ({
             <Badge variant="secondary">{filteredDeals.length} deals</Badge>
           </CardTitle>
           <CardDescription>
-            Manage deal types and view financial performance by category
+            Manage deal types and view financial performance by category. Wholesale and dealer trade deals are automatically locked.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -105,6 +109,7 @@ const DealManagement = ({
             bulkDealType={bulkDealType}
             setBulkDealType={setBulkDealType}
             onBulkUpdate={handleBulkDealTypeUpdate}
+            hasLockedDeals={hasLockedSelectedDeals}
           />
 
           <DealsTable
