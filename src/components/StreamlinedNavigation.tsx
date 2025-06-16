@@ -1,14 +1,12 @@
 
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useNavigate } from 'react-router-dom';
 import BrandLogo from './navigation/BrandLogo';
 import NavigationItem from './navigation/NavigationItem';
 import { getNavigationItems } from './navigation/navigationConfig';
 
 const StreamlinedNavigation = () => {
   const { profile } = useAuth();
-  const navigate = useNavigate();
 
   console.log('StreamlinedNavigation rendering, profile:', profile);
 
@@ -17,7 +15,7 @@ const StreamlinedNavigation = () => {
     return null;
   }
 
-  const navItems = getNavigationItems(profile.role, navigate);
+  const navItems = getNavigationItems(profile.role);
   console.log('Navigation items for role', profile.role, ':', navItems);
 
   return (

@@ -87,8 +87,9 @@ export const navigationConfig: NavConfig[] = [
   },
 ]
 
-export const getNavigationItems = (userRole: string, navigate: (path: string) => void): NavigationItem[] => {
-  return navigationConfig
+export const getNavigationItems = (userRole: string): NavigationItem[] => {
+  console.log('getNavigationItems called with role:', userRole);
+  const items = navigationConfig
     .filter(item => item.roles.includes(userRole))
     .map(item => ({
       path: item.href,
@@ -98,6 +99,8 @@ export const getNavigationItems = (userRole: string, navigate: (path: string) =>
       color: getItemColor(item.title),
       hoverActions: []
     }));
+  console.log('getNavigationItems returning:', items);
+  return items;
 };
 
 const getItemColor = (title: string): string => {

@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import Layout from '@/components/Layout';
 import Auth from '@/pages/Auth';
 import DashboardPage from '@/pages/Index';
 import LeadsPage from '@/pages/StreamlinedLeadsPage';
@@ -12,9 +13,7 @@ import InventoryDashboardPage from '@/pages/InventoryDashboardPage';
 import InventoryUploadPage from '@/pages/InventoryUploadPage';
 import SmartInboxPage from '@/pages/SmartInboxPage';
 import PredictiveAnalyticsPage from '@/pages/PredictiveAnalyticsPage';
-import StreamlinedNavigation from '@/components/StreamlinedNavigation';
 import MessageExportPage from "@/pages/MessageExportPage";
-import ErrorBoundary from '@/components/ErrorBoundary';
 
 const queryClient = new QueryClient();
 
@@ -31,151 +30,83 @@ function App() {
               
               <Route path="/" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <DashboardPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <DashboardPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
 
               <Route path="/dashboard" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <DashboardPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <DashboardPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
 
               <Route path="/inventory" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto p-6">
-                          <InventoryDashboardPage />
-                        </main>
-                      </div>
+                  <Layout>
+                    <div className="p-6">
+                      <InventoryDashboardPage />
                     </div>
-                  </ErrorBoundary>
+                  </Layout>
                 </ProtectedRoute>
               } />
 
               <Route path="/leads" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <LeadsPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <LeadsPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
 
               <Route path="/streamlined-leads" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <StreamlinedLeadsPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <StreamlinedLeadsPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
 
               <Route path="/upload-inventory-report" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <InventoryUploadPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <InventoryUploadPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
 
               <Route path="/smart-inbox" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <SmartInboxPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <SmartInboxPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
 
               <Route path="/predictive-analytics" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <PredictiveAnalyticsPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <PredictiveAnalyticsPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
 
               <Route path="/settings" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <DashboardPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <DashboardPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
               
               <Route path="/message-export" element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <div className="flex h-screen bg-gray-50">
-                      <div className="flex-1 flex flex-col overflow-hidden">
-                        <StreamlinedNavigation />
-                        <main className="flex-1 overflow-auto">
-                          <MessageExportPage />
-                        </main>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
+                  <Layout>
+                    <MessageExportPage />
+                  </Layout>
                 </ProtectedRoute>
               } />
             </Routes>
