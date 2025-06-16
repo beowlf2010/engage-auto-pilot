@@ -1,3 +1,4 @@
+
 import {
   Home,
   LayoutDashboard,
@@ -19,6 +20,13 @@ interface NavConfig {
   icon: any
   roles: string[]
   badge?: string
+}
+
+export interface NavigationItem {
+  path: string;
+  label: string;
+  icon: any;
+  badge?: string;
 }
 
 export const navigationConfig: NavConfig[] = [
@@ -78,3 +86,14 @@ export const navigationConfig: NavConfig[] = [
     roles: ["admin"],
   },
 ]
+
+export const getNavigationItems = (userRole: string, navigate: (path: string) => void): NavigationItem[] => {
+  return navigationConfig
+    .filter(item => item.roles.includes(userRole))
+    .map(item => ({
+      path: item.href,
+      label: item.title,
+      icon: item.icon,
+      badge: item.badge
+    }));
+};

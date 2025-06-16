@@ -1,21 +1,24 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { QueryClient } from './QueryClient';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import DashboardPage from '@/pages/DashboardPage';
-import LeadsPage from '@/pages/LeadsPage';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import DashboardPage from '@/pages/Index';
+import LeadsPage from '@/pages/StreamlinedLeadsPage';
 import StreamlinedLeadsPage from '@/pages/StreamlinedLeadsPage';
 import InventoryDashboardPage from '@/pages/InventoryDashboardPage';
 import SmartInboxPage from '@/pages/SmartInboxPage';
 import PredictiveAnalyticsPage from '@/pages/PredictiveAnalyticsPage';
-import Sidebar from '@/components/navigation/Sidebar';
-import StreamlinedNavigation from '@/components/navigation/StreamlinedNavigation';
-import SettingsPage from '@/pages/SettingsPage';
+import Sidebar from '@/components/Sidebar';
+import StreamlinedNavigation from '@/components/StreamlinedNavigation';
+import SettingsPage from '@/pages/Index';
 import MessageExportPage from "@/pages/MessageExportPage";
+
+const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClient>
+    <QueryClientProvider client={queryClient}>
       <Router>
         <div className="min-h-screen bg-gray-50">
           <Routes>
@@ -133,7 +136,7 @@ function App() {
           </Routes>
         </div>
       </Router>
-    </QueryClient>
+    </QueryClientProvider>
   );
 }
 

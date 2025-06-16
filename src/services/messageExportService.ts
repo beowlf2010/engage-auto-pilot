@@ -36,7 +36,7 @@ export const createMessageExport = async (
         source_system: 'vin',
         total_messages: exportData.export_info.total_messages,
         total_leads: exportData.export_info.total_leads,
-        export_data: exportData
+        export_data: exportData as any
       })
       .select()
       .single();
@@ -82,15 +82,18 @@ export const processMessageImport = async (exportId: string) => {
       errors: [] as string[]
     };
 
+    // Cast export_data to our expected type
+    const exportDataTyped = exportData.export_data as any as VINMessageExport;
+
     // Process each lead from the export
-    for (const exportedLead of exportData.export_data.leads) {
+    for (const exportedLead of exportDataTyped.leads) {
       try {
         // Try to find existing lead by phone or email
         let { data: existingLead } = await supabase
           .from('leads')
           .select('id, phone_numbers(*)')
           .or(`email.eq.${exportedLead.email},phone_numbers.number.eq.${exportedLead.phone}`)
-          .single();
+          .maybeSingle();
 
         let leadId = existingLead?.id;
 
