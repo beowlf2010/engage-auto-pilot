@@ -116,15 +116,15 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
   }, {} as Record<string, MessageData[]>);
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="pb-3">
+    <Card className="h-[600px] flex flex-col">
+      <CardHeader className="pb-3 flex-shrink-0">
         <CardTitle className="flex items-center justify-between">
           <span>Messages</span>
           <Badge variant="outline">{messages.length} messages</Badge>
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col p-0">
+      <CardContent className="flex-1 flex flex-col p-0 min-h-0">
         <ScrollArea className="flex-1 px-6">
           <div className="space-y-4 pb-4">
             {Object.entries(groupedMessages).map(([date, dayMessages]) => (
@@ -197,7 +197,7 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
           </div>
         </ScrollArea>
         
-        <div className="border-t p-4">
+        <div className="border-t p-4 flex-shrink-0">
           {error && (
             <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-800">{error}</p>
@@ -211,14 +211,14 @@ const EnhancedMessageThread: React.FC<EnhancedMessageThreadProps> = ({
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
-              className="flex-1 min-h-[40px] max-h-[120px] resize-none"
+              className="flex-1 h-[60px] resize-none"
               disabled={sending || isLoading || disabled}
             />
             <Button
               onClick={handleSendMessage}
               disabled={!newMessage.trim() || sending || isLoading || disabled}
               size="sm"
-              className="px-3"
+              className="px-3 h-[60px]"
             >
               {sending ? (
                 <Clock className="w-4 h-4" />
