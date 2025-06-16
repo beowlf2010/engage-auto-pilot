@@ -180,7 +180,7 @@ export const InventoryUploadPage = () => {
 
   return (
     <div className="container mx-auto py-6">
-      <InventoryUpload />
+      <InventoryUpload user={{ id: profile.id, role: profile.role }} />
     </div>
   );
 };
