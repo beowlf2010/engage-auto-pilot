@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import GlassCard from '@/components/ui/glass-card';
 import { getNavigationItems } from '@/components/navigation/navigationConfig';
-import { getColorClasses } from '@/components/navigation/navigationStyles';
+import { getGlassColorClasses } from '@/components/navigation/glassNavigationStyles';
 import { cn } from '@/lib/utils';
 import { Menu, X, Bell, Search, Settings } from 'lucide-react';
 
@@ -55,7 +55,7 @@ const EnhancedNavigation = () => {
                   onClick={() => navigate(item.path)}
                   className={cn(
                     "flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-300",
-                    getColorClasses(itemColor, isActive)
+                    getGlassColorClasses(itemColor, isActive)
                   )}
                 >
                   <Icon size={18} />
@@ -133,7 +133,7 @@ const EnhancedNavigation = () => {
                     }}
                     className={cn(
                       "w-full justify-start flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300",
-                      getColorClasses(itemColor, isActive)
+                      getGlassColorClasses(itemColor, isActive)
                     )}
                   >
                     <Icon size={20} />
