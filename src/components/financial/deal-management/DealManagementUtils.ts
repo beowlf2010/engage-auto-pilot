@@ -18,13 +18,20 @@ export const isUsedVehicle = (stockNumber?: string): boolean => {
 export const hasProfitChanges = (deal: Deal) => {
   return deal.original_gross_profit !== undefined && 
          (deal.gross_profit !== deal.original_gross_profit || 
-          deal.fi_profit !== deal.original_fi_profit);
+          deal.fi_profit !== deal.original_fi_profit ||
+          deal.total_profit !== deal.original_total_profit);
 };
 
 export const getAdjustedGrossProfit = (deal: Deal, packAdjustment: number) => {
   const baseGross = deal.gross_profit || 0;
   // Only apply pack adjustment to used vehicles (B and X prefixes)
   return isUsedVehicle(deal.stock_number) ? baseGross + packAdjustment : baseGross;
+};
+
+export const getAdjustedTotalProfit = (deal: Deal, packAdjustment: number) => {
+  const adjustedGross = getAdjustedGrossProfit(deal, packAdjustment);
+  const fiProfit = deal.fi_profit || 0;
+  return adjustedGross + fiProfit;
 };
 
 export const filterDeals = (
@@ -60,13 +67,11 @@ export const calculateSummaryTotals = (filteredDeals: Deal[], packAdjustment: nu
   filteredDeals.forEach(deal => {
     const vehicleType = getVehicleType(deal.stock_number);
     const dealType = deal.deal_type || 'retail';
-    const baseGross = deal.gross_profit || 0;
-    const packAdj = isUsedVehicle(deal.stock_number) ? packAdjustment : 0;
-    const adjustedGross = baseGross + packAdj;
+    const adjustedGross = getAdjustedGrossProfit(deal, packAdjustment);
     const fiProfit = deal.fi_profit || 0;
-    const totalProfit = adjustedGross + fiProfit;
+    const totalProfit = getAdjustedTotalProfit(deal, packAdjustment);
 
-    console.log(`Deal ${deal.stock_number}: type=${dealType}, vehicle=${vehicleType}, gross=${baseGross}, pack=${packAdj}, fi=${fiProfit}, total=${totalProfit}`);
+    console.log(`Deal ${deal.stock_number}: type=${dealType}, vehicle=${vehicleType}, gross=${adjustedGross}, fi=${fiProfit}, total=${totalProfit}`);
 
     if (dealType === 'retail') {
       if (vehicleType === 'new') {

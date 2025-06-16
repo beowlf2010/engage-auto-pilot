@@ -49,32 +49,31 @@ const ProfitCell = ({
     }
   };
 
-  const showPackBadge = field === 'gross' && 
-                       packAdjustmentEnabled && 
-                       isUsedVehicle(deal.stock_number) && 
-                       localPackAdjustment;
+  const showPackIndicator = (field === 'gross' || field === 'total') && 
+                           packAdjustmentEnabled && 
+                           isUsedVehicle(deal.stock_number) && 
+                           localPackAdjustment;
 
   return (
-    <div className="flex items-center justify-end space-x-2">
-      <div>
-        <div className="font-semibold">
+    <div className="text-right">
+      <div className="flex items-center justify-end space-x-1">
+        <span className="font-semibold">
           {formatCurrency(value)}
-        </div>
-        {hasChangedFromOriginal(field) && (
-          <div className="text-xs text-slate-500">
-            Was: {formatCurrency(
-              field === 'gross' ? deal.original_gross_profit || 0 :
-              field === 'fi' ? deal.original_fi_profit || 0 :
-              deal.original_total_profit || 0
-            )}
-          </div>
+        </span>
+        {showPackIndicator && (
+          <span className="text-xs text-green-600 font-medium">
+            +{formatCurrency(localPackAdjustment)}
+          </span>
         )}
       </div>
-      {showPackBadge && (
-        <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 flex items-center space-x-1">
-          <Plus className="w-3 h-3" />
-          <span>{formatCurrency(localPackAdjustment)}</span>
-        </Badge>
+      {hasChangedFromOriginal(field) && (
+        <div className="text-xs text-slate-500">
+          Was: {formatCurrency(
+            field === 'gross' ? deal.original_gross_profit || 0 :
+            field === 'fi' ? deal.original_fi_profit || 0 :
+            deal.original_total_profit || 0
+          )}
+        </div>
       )}
     </div>
   );

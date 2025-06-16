@@ -5,6 +5,7 @@ import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 import DealTypeCell from "./DealTypeCell";
 import ProfitCell from "./ProfitCell";
 import ActionsCell from "./ActionsCell";
+import { getAdjustedTotalProfit } from "./DealManagementUtils";
 
 interface Deal {
   id: string;
@@ -128,7 +129,7 @@ const DealRow = ({
         <ProfitCell
           deal={deal}
           field="total"
-          value={deal.total_profit || 0}
+          value={getAdjustedTotalProfit(deal, localPackAdjustment)}
           formatCurrency={formatCurrency}
           packAdjustmentEnabled={packAdjustmentEnabled}
           localPackAdjustment={localPackAdjustment}
