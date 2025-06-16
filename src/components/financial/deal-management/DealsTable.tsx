@@ -101,7 +101,7 @@ const DealsTable = ({
             <TableHead className="font-semibold">Stock #</TableHead>
             <TableHead className="font-semibold">Customer</TableHead>
             <TableHead className="font-semibold">Deal Type</TableHead>
-            <TableHead className="font-semibold text-right">Sale Amount</TableHead>
+            <TableHead className="font-semibold">Salesperson Code</TableHead>
             <TableHead className="font-semibold text-right">Gross Profit</TableHead>
             <TableHead className="font-semibold text-right">F&I Profit</TableHead>
             <TableHead className="font-semibold text-right">Total Profit</TableHead>
@@ -179,9 +179,9 @@ const DealsTable = ({
                 </div>
               </TableCell>
               
-              <TableCell className="text-right">
-                <div className="font-semibold">
-                  {deal.sale_amount ? formatCurrency(deal.sale_amount) : '-'}
+              <TableCell>
+                <div className="font-medium">
+                  {deal.sale_amount || '-'}
                 </div>
               </TableCell>
               
