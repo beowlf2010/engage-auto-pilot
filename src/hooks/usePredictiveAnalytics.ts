@@ -3,13 +3,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getSalesForecasts,
-  getInventoryDemandPredictions,
-  getMarketIntelligence,
-  type SalesForecast,
-  type InventoryDemandPrediction,
-  type MarketIntelligence
+  type SalesForecast
 } from '@/services/predictive/salesForecastingService';
-import { getMarketIntelligence as getMarketIntelligenceData } from '@/services/predictive/marketIntelligenceService';
+import { 
+  getInventoryDemandPredictions,
+  type InventoryDemandPrediction
+} from '@/services/predictive/inventoryDemandService';
+import { 
+  getMarketIntelligence,
+  type MarketIntelligence
+} from '@/services/predictive/marketIntelligenceService';
 
 interface PredictiveAnalyticsData {
   salesForecasts: SalesForecast[];
@@ -36,7 +39,7 @@ export const usePredictiveAnalytics = () => {
       const [forecasts, demandPredictions, intelligence] = await Promise.allSettled([
         getSalesForecasts('monthly').catch(() => []),
         getInventoryDemandPredictions().catch(() => []),
-        getMarketIntelligenceData().catch(() => [])
+        getMarketIntelligence().catch(() => [])
       ]);
 
       setData({
