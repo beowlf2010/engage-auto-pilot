@@ -38,8 +38,7 @@ const ExportDropdown = ({
   };
 
   const handlePrintToPDF = () => {
-    // Open print dialog with instructions
-    if (window.confirm('This will open the print dialog. To save as PDF, select "Save as PDF" as your printer destination.')) {
+    if (window.confirm('This will open the print dialog. To save as PDF, select "Save as PDF" or "Microsoft Print to PDF" as your printer destination.')) {
       printReport();
     }
   };
@@ -53,29 +52,29 @@ const ExportDropdown = ({
           <ChevronDown className="w-4 h-4 ml-2" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem onClick={handlePrint}>
-          <Printer className="w-4 h-4 mr-2" />
-          Print Report
-        </DropdownMenuItem>
-        
-        <DropdownMenuItem onClick={handlePrintToPDF}>
+      <DropdownMenuContent align="end" className="w-56 bg-white border shadow-lg z-50">
+        <DropdownMenuItem onClick={handlePrintToPDF} className="cursor-pointer">
           <FileText className="w-4 h-4 mr-2" />
           Save as PDF
         </DropdownMenuItem>
         
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuItem onClick={handlePrintableView}>
-          <ExternalLink className="w-4 h-4 mr-2" />
-          Printable View
+        <DropdownMenuItem onClick={handlePrint} className="cursor-pointer">
+          <Printer className="w-4 h-4 mr-2" />
+          Quick Print
         </DropdownMenuItem>
         
         <DropdownMenuSeparator />
         
-        <DropdownMenuItem onClick={handleCSVExport}>
+        <DropdownMenuItem onClick={handlePrintableView} className="cursor-pointer">
+          <ExternalLink className="w-4 h-4 mr-2" />
+          Multi-Page Report View
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        
+        <DropdownMenuItem onClick={handleCSVExport} className="cursor-pointer">
           <Download className="w-4 h-4 mr-2" />
-          Export to CSV
+          Export to CSV/Excel
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
