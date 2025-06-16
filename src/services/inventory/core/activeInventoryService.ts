@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { getLatestUploads } from './inventoryCleanupService';
 
 export interface ActiveVehicleCounts {
   totalVehicles: number;
@@ -13,27 +12,24 @@ export interface ActiveVehicleCounts {
 }
 
 export const getActiveVehicleCounts = async (): Promise<ActiveVehicleCounts> => {
-  // Get latest upload IDs for filtering
-  const latestUploads = await getLatestUploads();
-  
-  // Count only vehicles from latest uploads or with status 'available'
-  const activeFilter = (query: any) => {
-    return query.or(`and(status.eq.available),and(status.neq.sold)`);
-  };
+  console.log('Fetching active vehicle counts...');
 
-  // Get total active vehicles count
+  // Get total vehicles count (excluding sold)
   const { count: totalVehicles } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
     .neq('status', 'sold');
 
-  // Get regular new vehicles (not GM Global orders) - active only
+  console.log('Total non-sold vehicles:', totalVehicles);
+
+  // Get regular new vehicles (not GM Global orders)
   const { count: regularNewTotal } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
     .eq('condition', 'new')
-    .or('source_report.is.null,source_report.neq.orders_all')
-    .neq('status', 'sold');
+    .or('source_report.is.null,source_report.neq.orders_all');
+
+  console.log('Regular new total:', regularNewTotal);
 
   const { count: regularNewAvailable } = await supabase
     .from('inventory')
@@ -42,12 +38,15 @@ export const getActiveVehicleCounts = async (): Promise<ActiveVehicleCounts> => 
     .eq('status', 'available')
     .or('source_report.is.null,source_report.neq.orders_all');
 
-  // Get used vehicles - active only
+  console.log('Regular new available:', regularNewAvailable);
+
+  // Get used vehicles
   const { count: usedTotal } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
-    .eq('condition', 'used')
-    .neq('status', 'sold');
+    .eq('condition', 'used');
+
+  console.log('Used total:', usedTotal);
 
   const { count: usedAvailable } = await supabase
     .from('inventory')
@@ -55,11 +54,15 @@ export const getActiveVehicleCounts = async (): Promise<ActiveVehicleCounts> => 
     .eq('condition', 'used')
     .eq('status', 'available');
 
+  console.log('Used available:', usedAvailable);
+
   const { count: usedSold } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
     .eq('condition', 'used')
     .eq('status', 'sold');
+
+  console.log('Used sold:', usedSold);
 
   // Get sold vehicles
   const { count: soldVehicles } = await supabase
@@ -67,7 +70,9 @@ export const getActiveVehicleCounts = async (): Promise<ActiveVehicleCounts> => 
     .select('*', { count: 'exact', head: true })
     .eq('status', 'sold');
 
-  return {
+  console.log('Total sold vehicles:', soldVehicles);
+
+  const result = {
     totalVehicles: totalVehicles || 0,
     regularNewTotal: regularNewTotal || 0,
     regularNewAvailable: regularNewAvailable || 0,
@@ -76,14 +81,20 @@ export const getActiveVehicleCounts = async (): Promise<ActiveVehicleCounts> => 
     usedSold: usedSold || 0,
     soldVehicles: soldVehicles || 0,
   };
+
+  console.log('Final vehicle counts:', result);
+  return result;
 };
 
 export const getActiveGMGlobalOrderCounts = async () => {
+  console.log('Fetching GM Global order counts...');
+  
   const { data: gmGlobalData } = await supabase
     .from('inventory')
     .select('status')
-    .eq('source_report', 'orders_all')
-    .neq('status', 'sold'); // Only count non-sold GM Global orders
+    .eq('source_report', 'orders_all');
+  
+  console.log('GM Global data:', gmGlobalData?.length, 'records');
   
   let gmGlobalAvailable = 0;
   let gmGlobalInProduction = 0;
@@ -108,7 +119,7 @@ export const getActiveGMGlobalOrderCounts = async () => {
     });
   }
 
-  return {
+  const result = {
     gmGlobalData: gmGlobalData || [],
     gmGlobalByStatus: {
       available: gmGlobalAvailable,
@@ -117,4 +128,7 @@ export const getActiveGMGlobalOrderCounts = async () => {
       placed: gmGlobalPlaced,
     }
   };
+
+  console.log('GM Global counts:', result);
+  return result;
 };
