@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { EmailTemplate, EmailCampaign, EmailConversation, EmailSettings, SendEmailRequest } from '@/types/email';
 
@@ -114,15 +113,42 @@ class EmailService {
     return data as EmailSettings;
   }
 
-  // Send Email - using arrow function to preserve 'this' context
+  // Send Email - enhanced to use user settings
   sendEmail = async (emailData: SendEmailRequest): Promise<{ success: boolean; messageId?: string }> => {
     try {
+      // Get user email settings
+      const emailSettings = await this.getEmailSettings();
+      
       // Clean the email address - remove quotes if present
       const cleanEmail = emailData.to.replace(/^"|"$/g, '');
       
+      // Construct the from field using user settings
+      let fromAddress = emailData.from;
+      if (!fromAddress && emailSettings) {
+        if (emailSettings.default_from_name && emailSettings.default_from_email) {
+          fromAddress = `${emailSettings.default_from_name} <${emailSettings.default_from_email}>`;
+        } else if (emailSettings.default_from_email) {
+          fromAddress = emailSettings.default_from_email;
+        }
+      }
+      
+      // Fallback to default if no settings configured
+      if (!fromAddress) {
+        fromAddress = "CRM <onboarding@resend.dev>";
+      }
+      
+      // Add signature to HTML content if available
+      let htmlContent = emailData.html;
+      if (emailSettings?.signature) {
+        const signatureHtml = emailSettings.signature.replace(/\n/g, '<br>');
+        htmlContent += `<br><br>---<br>${signatureHtml}`;
+      }
+      
       const cleanedEmailData = {
         ...emailData,
-        to: cleanEmail
+        to: cleanEmail,
+        from: fromAddress,
+        html: htmlContent
       };
 
       // Send email via Resend

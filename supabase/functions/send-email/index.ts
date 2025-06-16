@@ -15,7 +15,7 @@ interface EmailRequest {
   subject: string;
   html: string;
   text?: string;
-  from?: string; // Optionally allow custom sender
+  from?: string;
 }
 
 serve(async (req: Request) => {
@@ -34,8 +34,10 @@ serve(async (req: Request) => {
       );
     }
 
-    // Use a default sender address if not provided
+    // Use the provided sender address or fall back to default
     const sender = from || "CRM <onboarding@resend.dev>";
+
+    console.log(`Sending email from: ${sender} to: ${to} with subject: ${subject}`);
 
     const emailResponse = await resend.emails.send({
       from: sender,
