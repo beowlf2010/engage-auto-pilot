@@ -30,7 +30,7 @@ export const useConversationData = () => {
 
       const transformedMessages: MessageData[] = data.map(msg => ({
         id: msg.id,
-        leadId: msg.lead_id, // Add the missing leadId property
+        leadId: msg.lead_id,
         body: msg.body,
         direction: msg.direction as 'in' | 'out',
         sentAt: msg.sent_at,
@@ -53,25 +53,88 @@ export const useConversationData = () => {
     }
 
     try {
-      // Call the send-sms edge function
+      // Get the phone number for this lead first
+      const { data: phoneData, error: phoneError } = await supabase
+        .from('phone_numbers')
+        .select('number')
+        .eq('lead_id', leadId)
+        .eq('is_primary', true)
+        .single();
+
+      if (phoneError || !phoneData) {
+        throw new Error('No primary phone number found for this lead');
+      }
+
+      // Store the conversation record first
+      const { data: conversation, error: conversationError } = await supabase
+        .from('conversations')
+        .insert({
+          lead_id: leadId,
+          body: messageBody.trim(),
+          direction: 'out',
+          ai_generated: false,
+          sent_at: new Date().toISOString(),
+          sms_status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (conversationError) {
+        console.error('Error creating conversation record:', conversationError);
+        throw conversationError;
+      }
+
+      console.log('Created conversation record:', conversation.id);
+
+      // Call the send-sms edge function with correct parameters
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: {
-          leadId,
-          message: messageBody.trim()
+          to: phoneData.number,
+          body: messageBody.trim(),
+          conversationId: conversation.id
         }
       });
 
       if (error) {
         console.error('SMS sending error:', error);
+        
+        // Update conversation with error status
+        await supabase
+          .from('conversations')
+          .update({
+            sms_status: 'failed',
+            sms_error: `SMS service error: ${error.message || 'Unknown error'}`
+          })
+          .eq('id', conversation.id);
+        
         throw new Error(error.message || 'Failed to send message');
       }
 
       if (!data?.success) {
         console.error('SMS sending failed:', data);
+        
+        // Update conversation with error status
+        await supabase
+          .from('conversations')
+          .update({
+            sms_status: 'failed',
+            sms_error: data?.error || 'Failed to send message'
+          })
+          .eq('id', conversation.id);
+        
         throw new Error(data?.error || 'Failed to send message');
       }
 
       console.log('Message sent successfully:', data);
+      
+      // Update conversation with success status
+      await supabase
+        .from('conversations')
+        .update({
+          sms_status: 'sent',
+          twilio_message_id: data?.telnyxMessageId
+        })
+        .eq('id', conversation.id);
       
       // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
