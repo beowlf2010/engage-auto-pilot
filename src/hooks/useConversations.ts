@@ -1,6 +1,6 @@
 
 import { useEffect } from 'react';
-import { useConversationData } from './useConversationData';
+import { useConversationOperations } from './useConversationOperations';
 import { useRealtimeChannels } from './useRealtimeChannels';
 
 export const useConversations = () => {
@@ -10,9 +10,8 @@ export const useConversations = () => {
     loading,
     loadConversations,
     loadMessages,
-    sendMessage,
-    profile
-  } = useConversationData();
+    sendMessage
+  } = useConversationOperations();
 
   const {
     setupConversationChannel,
@@ -29,17 +28,15 @@ export const useConversations = () => {
     setupMessageChannel(leadId, loadMessages);
   };
 
-  // Setup conversation channel when profile is available
+  // Setup conversation channel when available
   useEffect(() => {
-    if (profile) {
-      setupConversationChannel(profile.id, loadConversations);
-      loadConversations();
-    }
+    setupConversationChannel('', loadConversations);
+    loadConversations();
 
     return () => {
       cleanupAllChannels();
     };
-  }, [profile, setupConversationChannel, loadConversations, cleanupAllChannels]);
+  }, [setupConversationChannel, loadConversations, cleanupAllChannels]);
 
   return { 
     conversations, 
