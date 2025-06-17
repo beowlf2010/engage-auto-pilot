@@ -1,5 +1,3 @@
-
-
 import { extractVehicleFields } from './field-extraction';
 import { extractVINField } from './field-extraction';
 import { extractOptionsFields } from './field-extraction';
@@ -105,7 +103,7 @@ export const mapRowToInventoryItem = (
         ...extractVehicleFields(row),
         ...extractVINField(row),
         ...extractOptionsFields(row),
-        condition: condition === 'gm_global' ? 'new' : condition,
+        condition: condition === 'new' ? 'new' : 'used',
         status: 'available'
       };
 
@@ -167,4 +165,3 @@ export const mapRowToInventoryItem = (
 
   return inventoryItem;
 };
-
