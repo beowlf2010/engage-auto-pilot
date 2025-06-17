@@ -9,7 +9,7 @@ export const insertFinancialData = async (
   uploadHistoryId: string,
   reportDate?: string
 ) => {
-  console.log('=== FINANCIAL DATA INSERTION ===');
+  console.log('=== FINANCIAL DATA INSERTION WITH DEAL TYPE PRESERVATION ===');
   console.log(`Starting with ${deals.length} extracted deals`);
   
   // Filter out deals with invalid data BEFORE processing
@@ -32,10 +32,36 @@ export const insertFinancialData = async (
   }
   
   try {
-    // Map deals to database format - use individual deal dates and ensure correct deal_type
+    // Get existing deals to preserve their deal_type and lock status
+    const stockNumbers = validDeals.map(deal => deal.stockNumber).filter(Boolean);
+    const { data: existingDeals } = await supabase
+      .from('deals')
+      .select('id, stock_number, deal_type, deal_type_locked, gross_profit, fi_profit, total_profit')
+      .in('stock_number', stockNumbers);
+
+    console.log(`Found ${existingDeals?.length || 0} existing deals to preserve deal types for`);
+
+    // Create a map of existing deal types and lock status
+    const existingDealMap = new Map(
+      existingDeals?.map(deal => [
+        deal.stock_number, 
+        { 
+          id: deal.id,
+          deal_type: deal.deal_type, 
+          deal_type_locked: deal.deal_type_locked,
+          existing_gross: deal.gross_profit,
+          existing_fi: deal.fi_profit,
+          existing_total: deal.total_profit
+        }
+      ]) || []
+    );
+
+    // Map deals to database format - preserving existing deal types and lock status
     const dealRecords = validDeals.map(deal => {
       const dealDate = deal.saleDate!; // We know it's valid from filtering above
-      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, dealType=${deal.dealType}`);
+      const existing = existingDealMap.get(deal.stockNumber || '');
+      
+      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, existing_type=${existing?.deal_type}, locked=${existing?.deal_type_locked}`);
       
       return {
         upload_date: dealDate, // Use individual deal date as upload_date for database storage
@@ -48,26 +74,19 @@ export const insertFinancialData = async (
         gross_profit: deal.grossProfit || null,
         fi_profit: deal.fiProfit || null,
         total_profit: deal.totalProfit || null,
-        deal_type: deal.dealType || 'retail', // Ensure valid deal_type
+        // PRESERVE existing deal_type and lock status, only default to retail for truly new deals
+        deal_type: existing?.deal_type || deal.dealType || 'retail',
+        deal_type_locked: existing?.deal_type_locked ?? false,
         upload_history_id: uploadHistoryId,
         original_gross_profit: deal.grossProfit || null,
         original_fi_profit: deal.fiProfit || null,
         original_total_profit: deal.totalProfit || null,
-        first_reported_date: dealDate // Store the individual deal date here too
+        first_reported_date: existing ? undefined : dealDate // Only set for new deals
       };
     });
 
-    console.log(`Prepared ${dealRecords.length} deal records for insertion`);
+    console.log(`Prepared ${dealRecords.length} deal records for insertion with preserved deal types`);
     console.log('Sample deal record to insert:', dealRecords[0]);
-
-    // Check which deals are new vs existing
-    const stockNumbers = dealRecords.map(deal => deal.stock_number).filter(Boolean);
-    const { data: existingDeals } = await supabase
-      .from('deals')
-      .select('id, stock_number, gross_profit, fi_profit, total_profit')
-      .in('stock_number', stockNumbers);
-
-    const existingStockNumbers = new Set(existingDeals?.map(deal => deal.stock_number) || []);
 
     // Use upsert with the unique constraint on stock_number only
     const { data: insertedDeals, error: insertError } = await supabase
@@ -84,12 +103,12 @@ export const insertFinancialData = async (
     }
 
     const insertedCount = insertedDeals?.length || 0;
-    console.log(`Successfully upserted ${insertedCount} deals`);
+    console.log(`Successfully upserted ${insertedCount} deals while preserving deal types`);
 
-    // Create initial profit snapshots for new deals
+    // Create initial profit snapshots only for truly new deals (not in existingDealMap)
     if (insertedDeals) {
       const newDealSnapshots = insertedDeals.filter(deal => 
-        deal.stock_number && !existingStockNumbers.has(deal.stock_number)
+        deal.stock_number && !existingDealMap.has(deal.stock_number)
       );
 
       console.log(`Creating initial profit snapshots for ${newDealSnapshots.length} new deals`);
@@ -110,6 +129,16 @@ export const insertFinancialData = async (
         }
       }
     }
+
+    // Log preservation summary
+    const preservedCount = dealRecords.filter(deal => 
+      existingDealMap.has(deal.stock_number || '') && existingDealMap.get(deal.stock_number || '')?.deal_type !== 'retail'
+    ).length;
+    
+    console.log(`=== DEAL TYPE PRESERVATION SUMMARY ===`);
+    console.log(`Total deals processed: ${insertedCount}`);
+    console.log(`Existing deals with preserved types: ${preservedCount}`);
+    console.log(`New deals defaulted to retail: ${insertedCount - preservedCount}`);
     
     if (insertedCount !== dealRecords.length) {
       console.warn(`Warning: Tried to insert ${dealRecords.length} deals but only ${insertedCount} were successful`);
@@ -120,7 +149,8 @@ export const insertFinancialData = async (
       validDeals,
       dealRecords: dealRecords.length,
       totalExtracted: deals.length,
-      skippedDeals: deals.length - validDeals.length
+      skippedDeals: deals.length - validDeals.length,
+      preservedDealTypes: preservedCount
     };
 
   } catch (error) {

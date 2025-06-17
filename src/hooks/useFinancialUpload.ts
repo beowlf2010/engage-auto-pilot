@@ -11,6 +11,7 @@ interface UploadResult {
   dealsProcessed?: number;
   summary?: any;
   reportDate?: string;
+  preservedDealTypes?: number;
 }
 
 export const useFinancialUpload = (userId: string) => {
@@ -84,17 +85,22 @@ export const useFinancialUpload = (userId: string) => {
         })
         .eq('id', uploadHistory.id);
 
+      const preservationMessage = result.preservedDealTypes && result.preservedDealTypes > 0 
+        ? ` (${result.preservedDealTypes} existing deal types preserved)`
+        : '';
+
       setUploadResult({
         status: 'success',
-        message: `Successfully processed ${result.insertedDeals} deals for ${result.reportDate}`,
+        message: `Successfully processed ${result.insertedDeals} deals for ${result.reportDate}${preservationMessage}`,
         dealsProcessed: result.insertedDeals,
         summary: result.summary,
-        reportDate: result.reportDate
+        reportDate: result.reportDate,
+        preservedDealTypes: result.preservedDealTypes
       });
 
       toast({
         title: "Upload successful!",
-        description: `Processed ${result.insertedDeals} deals from ${fileName} for ${result.reportDate}`,
+        description: `Processed ${result.insertedDeals} deals from ${fileName} for ${result.reportDate}${preservationMessage}`,
       });
 
     } catch (error) {
