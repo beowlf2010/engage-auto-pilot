@@ -1,4 +1,5 @@
 
+
 import { extractVehicleFields } from './field-extraction';
 import { extractVINField } from './field-extraction';
 import { extractOptionsFields } from './field-extraction';
@@ -118,11 +119,19 @@ export const mapRowToInventoryItem = (
     }
   }
 
+  // Determine the final condition value
+  let finalCondition: 'new' | 'used' | 'certified';
+  if (condition === 'gm_global') {
+    finalCondition = 'new';
+  } else {
+    finalCondition = condition;
+  }
+
   // Ensure required fields have defaults
   const inventoryItem: InventoryItem = {
     make: mappedData.make || 'Unknown',
     model: mappedData.model || 'Unknown',
-    condition: mappedData.condition || (condition === 'gm_global' ? 'new' : condition as 'new' | 'used'),
+    condition: mappedData.condition || finalCondition,
     status: mappedData.status || 'available',
     upload_history_id: uploadId,
     ...mappedData
@@ -158,3 +167,4 @@ export const mapRowToInventoryItem = (
 
   return inventoryItem;
 };
+
