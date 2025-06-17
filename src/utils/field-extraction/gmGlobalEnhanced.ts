@@ -5,76 +5,86 @@ import { findVINInRow } from './vin';
 import { extractRPOCodes, extractOptionDescriptions } from './options';
 import { translateDivisionCode, translateColorCode, translateTrimCode } from '@/services/inventory/gmCodeLookupService';
 
-// Enhanced GM Global field extraction with correct field mappings
+// Enhanced GM Global field extraction with CORRECT field mappings
 export const extractGMGlobalFields = (row: Record<string, any>): any => {
-  console.log('=== ENHANCED GM GLOBAL EXTRACTION ===');
+  console.log('=== ENHANCED GM GLOBAL EXTRACTION (FIXED) ===');
   console.log('Available fields:', Object.keys(row));
+  console.log('Sample row data:', row);
   
   const result: any = {
-    // GM Global specific fields
-    condition: 'new', // GM Global orders are always new
-    status: 'available', // Default status
+    condition: 'new',
+    status: 'available',
     source_report: 'orders_all'
   };
   
-  // Apply GM Global field mappings based on user specification:
-  // year = model year, make = division, model = allocation, trim = peg
-  // body_style = model, exterior color = color, interior color = trim
+  // CORRECTED FIELD MAPPINGS based on actual GM Global data structure:
   
-  // Year mapping: model year → year
-  const modelYearFields = ['Model Year', 'model year', 'ModelYear', 'model_year'];
-  const yearStr = getFieldValue(row, modelYearFields);
-  if (yearStr) {
-    const year = parseInteger(yearStr);
-    if (year !== null) {
+  // Year: Extract from "Model Year" field (not model year -> year confusion)
+  const modelYearFields = ['Model Year', 'model year', 'ModelYear', 'model_year', 'MY'];
+  const yearValue = getFieldValue(row, modelYearFields);
+  console.log('Year extraction - trying fields:', modelYearFields, 'found:', yearValue);
+  if (yearValue) {
+    const year = parseInteger(yearValue);
+    if (year && year >= 1900 && year <= 2030) {
       result.year = year;
+      console.log('Successfully extracted year:', year);
     }
   }
   
-  // Make mapping: division → make (with code translation)
-  const divisionFields = ['Division', 'division', 'DIVISION'];
+  // Make: Extract from "Division" field and translate the code
+  const divisionFields = ['Division', 'division', 'DIVISION', 'DIV'];
   const divisionCode = getFieldValue(row, divisionFields);
+  console.log('Make extraction - trying fields:', divisionFields, 'found:', divisionCode);
   if (divisionCode) {
     result.make = translateDivisionCode(divisionCode);
+    console.log('Successfully extracted make:', result.make, 'from code:', divisionCode);
   }
   
-  // Model mapping: allocation → model
-  const allocationFields = ['Allocation', 'allocation', 'ALLOCATION'];
-  const allocation = getFieldValue(row, allocationFields);
-  if (allocation) {
-    result.model = allocation;
+  // Model: Extract from "Model" field (NOT allocation)
+  const modelFields = ['Model', 'model', 'MODEL', 'Vehicle Model', 'VehicleModel'];
+  const modelValue = getFieldValue(row, modelFields);
+  console.log('Model extraction - trying fields:', modelFields, 'found:', modelValue);
+  if (modelValue && !modelValue.includes('/') && !modelValue.includes('-') && modelValue.length < 50) {
+    result.model = modelValue;
+    console.log('Successfully extracted model:', modelValue);
   }
   
-  // Trim mapping: peg → trim
-  const pegFields = ['Peg', 'peg', 'PEG'];
-  const peg = getFieldValue(row, pegFields);
-  if (peg) {
-    result.trim = peg;
+  // Trim: Extract from "Allocation Group", "PEG", or similar trim identifiers
+  const trimFields = ['Allocation Group', 'allocation group', 'AllocationGroup', 'Peg', 'peg', 'PEG', 'Trim Level', 'TrimLevel'];
+  const trimValue = getFieldValue(row, trimFields);
+  console.log('Trim extraction - trying fields:', trimFields, 'found:', trimValue);
+  if (trimValue) {
+    result.trim = trimValue;
+    console.log('Successfully extracted trim:', trimValue);
   }
   
-  // Body Style mapping: model → body_style
-  const modelFields = ['Model', 'model', 'MODEL'];
-  const model = getFieldValue(row, modelFields);
-  if (model) {
-    result.body_style = model;
+  // Body Style: Extract from "Body Style" or "Style" field
+  const bodyStyleFields = ['Body Style', 'body style', 'BodyStyle', 'Style', 'style', 'STYLE'];
+  const bodyStyle = getFieldValue(row, bodyStyleFields);
+  if (bodyStyle) {
+    result.body_style = bodyStyle;
   }
   
-  // Exterior Color mapping: color → color_exterior (with code translation)
-  const colorFields = ['Color', 'color', 'COLOR'];
+  // Exterior Color: Extract from "Color" field and translate if needed
+  const colorFields = ['Color', 'color', 'COLOR', 'Exterior Color', 'ExteriorColor'];
   const colorCode = getFieldValue(row, colorFields);
   if (colorCode) {
     result.color_exterior = translateColorCode(colorCode);
   }
   
-  // Interior Color mapping: trim → color_interior (with code translation)
-  const trimFields = ['Trim', 'trim', 'TRIM'];
-  const trimCode = getFieldValue(row, trimFields);
+  // Interior Color: Extract from "Trim" field and translate if needed
+  const interiorFields = ['Trim', 'trim', 'TRIM', 'Interior Color', 'InteriorColor', 'Interior'];
+  const trimCode = getFieldValue(row, interiorFields);
   if (trimCode) {
     result.color_interior = translateTrimCode(trimCode);
   }
   
-  // VIN - try multiple field names
+  // VIN extraction
   result.vin = findVINInRow(row);
+  
+  // Stock Number - for GM Global this might be in various fields
+  const stockFields = ['Stock Number', 'StockNumber', 'Stock_Number', 'Stock#', 'StockNo', 'Stock', 'Unit#'];
+  result.stock_number = getFieldValue(row, stockFields);
   
   // GM Order Number
   const orderNumberFields = [
@@ -159,21 +169,6 @@ export const extractGMGlobalFields = (row: Record<string, any>): any => {
   const buildWeekFields = ['Build Week', 'BuildWeek', 'Build_Week'];
   result.build_week = getFieldValue(row, buildWeekFields);
   
-  const productionSeqFields = ['Production Sequence', 'ProductionSequence', 'Production_Sequence'];
-  result.production_sequence = getFieldValue(row, productionSeqFields);
-  
-  const deliveryMethodFields = ['Delivery Method', 'DeliveryMethod', 'Delivery_Method'];
-  result.delivery_method = getFieldValue(row, deliveryMethodFields);
-  
-  const priorityCodeFields = ['Priority Code', 'PriorityCode', 'Priority_Code'];
-  result.priority_code = getFieldValue(row, priorityCodeFields);
-  
-  const orderTypeFields = ['Order Type', 'OrderType', 'Order_Type'];
-  result.order_type = getFieldValue(row, orderTypeFields);
-  
-  const plantCodeFields = ['Plant Code', 'PlantCode', 'Plant_Code'];
-  result.plant_code = getFieldValue(row, plantCodeFields);
-  
   // RPOs and options
   result.rpo_codes = extractRPOCodes(row);
   result.rpo_descriptions = extractOptionDescriptions(row);
@@ -188,33 +183,17 @@ export const extractGMGlobalFields = (row: Record<string, any>): any => {
     }
   }
   
-  const msrpFields = ['MSRP', 'Retail Price', 'RetailPrice', 'Sticker Price'];
-  const msrpStr = getFieldValue(row, msrpFields);
-  if (msrpStr) {
-    const msrp = parseNumber(msrpStr);
-    if (msrp !== null) {
-      result.msrp = msrp;
-    }
-  }
-  
-  // Stock number (might not be available for orders)
-  const stockFields = ['Stock Number', 'StockNumber', 'Stock_Number', 'Stock#', 'StockNo'];
-  result.stock_number = getFieldValue(row, stockFields);
-  
   // Store full row data for reference
   result.full_option_blob = row;
   
-  console.log('Enhanced GM Global extraction result:', {
-    year: result.year,
-    make: result.make,
-    model: result.model,
-    trim: result.trim,
-    body_style: result.body_style,
-    color_exterior: result.color_exterior,
-    color_interior: result.color_interior,
-    vin: result.vin,
-    gm_order_number: result.gm_order_number
-  });
+  console.log('=== FINAL EXTRACTION RESULT ===');
+  console.log('Year:', result.year);
+  console.log('Make:', result.make);
+  console.log('Model:', result.model);
+  console.log('Trim:', result.trim);
+  console.log('VIN:', result.vin);
+  console.log('Stock Number:', result.stock_number);
+  console.log('GM Order Number:', result.gm_order_number);
   
   return result;
 };

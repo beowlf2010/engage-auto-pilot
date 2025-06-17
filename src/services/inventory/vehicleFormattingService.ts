@@ -1,16 +1,17 @@
 
 export const formatVehicleTitle = (vehicle: any): string => {
-  console.log('=== VEHICLE TITLE FORMATTING ===');
+  console.log('=== VEHICLE TITLE FORMATTING (UPDATED) ===');
   console.log('Vehicle data:', { 
     year: vehicle.year, 
     make: vehicle.make, 
     model: vehicle.model, 
     trim: vehicle.trim,
-    source_report: vehicle.source_report
+    source_report: vehicle.source_report,
+    gm_order_number: vehicle.gm_order_number
   });
   
-  // For GM Global data, prioritize database fields since they should now be correctly mapped
-  if (vehicle.source_report === 'orders_all') {
+  // For GM Global data (orders_all), use database fields directly since they should now be correctly mapped
+  if (vehicle.source_report === 'orders_all' || vehicle.gm_order_number) {
     console.log('Processing GM Global vehicle data...');
     
     const year = vehicle.year ? String(vehicle.year) : '';
@@ -18,35 +19,53 @@ export const formatVehicleTitle = (vehicle: any): string => {
     const model = vehicle.model || '';
     const trim = vehicle.trim || '';
 
-    console.log('GM Global fields:', { year, make, model, trim });
+    console.log('GM Global fields after extraction:', { year, make, model, trim });
 
     let parts: string[] = [];
 
     // Add year if available
-    if (year) {
+    if (year && year !== 'null' && year !== '0') {
       parts.push(year);
     }
 
-    // Add make if available
-    if (make) {
+    // Add make if available and not a code
+    if (make && make !== 'null' && !make.match(/^[A-Z]\d+$/)) {
       parts.push(make);
     }
 
-    // Add model if available
-    if (model) {
+    // Add model if available and not a date or weird value
+    if (model && model !== 'null' && !model.includes('/') && !model.includes('-') && model.length < 50) {
       parts.push(model);
     }
 
     // Add trim if available and not already included
-    if (trim && !parts.some(part => part.toLowerCase().includes(trim.toLowerCase()))) {
+    if (trim && trim !== 'null' && !parts.some(part => part.toLowerCase().includes(trim.toLowerCase()))) {
       parts.push(trim);
     }
 
     const result = parts.filter(Boolean).join(' ');
     console.log('GM Global formatted title:', result);
     
-    if (result) {
+    if (result && result !== '' && !result.toLowerCase().includes('unknown')) {
       return result;
+    }
+    
+    // Fallback to extracting from full_option_blob if database fields are incomplete
+    if (vehicle.full_option_blob) {
+      console.log('Trying to extract from full_option_blob as fallback...');
+      const blob = vehicle.full_option_blob;
+      
+      const blobYear = blob['Model Year'] || blob.year || blob.Year;
+      const blobMake = blob.Division ? (blob.Division === 'A64' ? 'Chevrolet' : blob.Division) : blob.make || blob.Make;
+      const blobModel = blob.Model || blob.model;
+      const blobTrim = blob['Allocation Group'] || blob.Peg || blob.trim || blob.Trim;
+      
+      const fallbackParts = [blobYear, blobMake, blobModel, blobTrim].filter(Boolean);
+      if (fallbackParts.length >= 2) {
+        const fallbackResult = fallbackParts.join(' ');
+        console.log('Fallback extraction result:', fallbackResult);
+        return fallbackResult;
+      }
     }
   }
   
@@ -96,18 +115,18 @@ export const formatVehicleTitle = (vehicle: any): string => {
 
   let parts: string[] = [];
 
-  // Add year if not already included in make/model
-  if (year && !makeContainsYear && !modelContainsYear) {
+  // Add year if not already included in make/model and it's valid
+  if (year && year !== 'null' && !makeContainsYear && !modelContainsYear) {
     parts.push(year);
   }
 
-  // Add make if it's not redundant with model
-  if (make && !modelContainsMake) {
+  // Add make if it's not redundant with model and not a code
+  if (make && make !== 'null' && !modelContainsMake && !make.match(/^[A-Z]\d+$/)) {
     parts.push(make);
   }
 
-  // Always add model if available
-  if (model) {
+  // Always add model if available and it looks like a real model name
+  if (model && model !== 'null' && !model.includes('/') && !model.includes('-') && model.length < 50) {
     parts.push(model);
   } else if (make && !model) {
     // If no model but we have make, ensure make is included
@@ -117,7 +136,7 @@ export const formatVehicleTitle = (vehicle: any): string => {
   }
 
   // Add trim if available and not already included
-  if (trim && !parts.some(part => part.toLowerCase().includes(trim.toLowerCase()))) {
+  if (trim && trim !== 'null' && !parts.some(part => part.toLowerCase().includes(trim.toLowerCase()))) {
     parts.push(trim);
   }
 

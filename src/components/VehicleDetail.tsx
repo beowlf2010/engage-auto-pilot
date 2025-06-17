@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -14,11 +15,12 @@ import VehicleInfoCard from "./vehicle/VehicleInfoCard";
 import VehicleTimelineCard from "./vehicle/VehicleTimelineCard";
 import VehicleActionsCard from "./vehicle/VehicleActionsCard";
 import VehicleLinkedLeadsCard from "./vehicle/VehicleLinkedLeadsCard";
+import FixGMGlobalButton from "./vehicle/FixGMGlobalButton";
 
 const VehicleDetail = () => {
   const { identifier } = useParams();
 
-  const { data: vehicleWithDeals, isLoading } = useQuery({
+  const { data: vehicleWithDeals, isLoading, refetch } = useQuery({
     queryKey: ['vehicle-with-deals', identifier],
     queryFn: async () => {
       if (!identifier) throw new Error('No identifier provided');
@@ -88,26 +90,61 @@ const VehicleDetail = () => {
     );
   }
 
+  const isGMGlobal = vehicleWithDeals.source_report === 'orders_all' || vehicleWithDeals.gm_order_number;
+  const needsFixing = isGMGlobal && (
+    !vehicleWithDeals.year || 
+    !vehicleWithDeals.make || 
+    vehicleWithDeals.make.match(/^[A-Z]\d+$/) ||
+    !vehicleWithDeals.model ||
+    vehicleWithDeals.model.includes('/')
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center space-x-4">
-        <Link to="/inventory-dashboard">
-          <Button variant="outline" size="sm" className="flex items-center space-x-2">
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Inventory</span>
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800">
-            {vehicleWithDeals.year} {vehicleWithDeals.make} {vehicleWithDeals.model}
-          </h1>
-          <p className="text-slate-600 mt-1">
-            {vehicleWithDeals.trim && `${vehicleWithDeals.trim} • `}
-            Stock: {vehicleWithDeals.stock_number} • VIN: {vehicleWithDeals.vin}
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Link to="/inventory-dashboard">
+            <Button variant="outline" size="sm" className="flex items-center space-x-2">
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Inventory</span>
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">
+              {vehicleWithDeals.year} {vehicleWithDeals.make} {vehicleWithDeals.model}
+            </h1>
+            <p className="text-slate-600 mt-1">
+              {vehicleWithDeals.trim && `${vehicleWithDeals.trim} • `}
+              Stock: {vehicleWithDeals.stock_number} • VIN: {vehicleWithDeals.vin}
+              {isGMGlobal && <span className="ml-2 text-blue-600">• GM Global Order</span>}
+            </p>
+          </div>
         </div>
+        
+        {/* Fix Button for GM Global vehicles that need fixing */}
+        {needsFixing && (
+          <FixGMGlobalButton 
+            stockNumber={vehicleWithDeals.stock_number} 
+            onVehicleUpdated={() => refetch()}
+          />
+        )}
       </div>
+
+      {/* Alert for vehicles that need fixing */}
+      {needsFixing && (
+        <Card className="p-4 border-orange-200 bg-orange-50">
+          <div className="flex items-center space-x-2">
+            <Wrench className="w-4 h-4 text-orange-600" />
+            <div>
+              <p className="text-orange-800 font-medium">GM Global Data Issue Detected</p>
+              <p className="text-orange-700 text-sm">
+                This vehicle's data may not be displaying correctly. Click "Fix GM Global Data" to re-extract the fields properly.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Details */}
