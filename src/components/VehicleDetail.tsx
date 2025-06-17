@@ -90,7 +90,8 @@ const VehicleDetail = () => {
     );
   }
 
-  const isGMGlobal = vehicleWithDeals.source_report === 'orders_all' || vehicleWithDeals.gm_order_number;
+  // Check if this is a GM Global vehicle and if it needs fixing
+  const isGMGlobal = vehicleWithDeals.source_report === 'orders_all';
   const needsFixing = isGMGlobal && (
     !vehicleWithDeals.year || 
     !vehicleWithDeals.make || 

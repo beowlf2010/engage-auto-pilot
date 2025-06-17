@@ -1158,6 +1158,7 @@ export type Database = {
           delivery_variance_days: number | null
           demand_score: number | null
           description: string | null
+          detailed_done: boolean | null
           drivetrain: string | null
           engine: string | null
           estimated_delivery_date: string | null
@@ -1195,6 +1196,7 @@ export type Database = {
           order_type: string | null
           original_order_date: string | null
           pack: number | null
+          photos_done: boolean | null
           photos_urls: string[] | null
           plant_code: string | null
           predicted_sale_date: string | null
@@ -1211,6 +1213,7 @@ export type Database = {
           rpo_descriptions: string[] | null
           sales_rep: string | null
           selling_dealer_code: string | null
+          service_done: boolean | null
           service_records_available: boolean | null
           ship_to_dealer_code: string | null
           sold_at: string | null
@@ -1265,6 +1268,7 @@ export type Database = {
           delivery_variance_days?: number | null
           demand_score?: number | null
           description?: string | null
+          detailed_done?: boolean | null
           drivetrain?: string | null
           engine?: string | null
           estimated_delivery_date?: string | null
@@ -1302,6 +1306,7 @@ export type Database = {
           order_type?: string | null
           original_order_date?: string | null
           pack?: number | null
+          photos_done?: boolean | null
           photos_urls?: string[] | null
           plant_code?: string | null
           predicted_sale_date?: string | null
@@ -1318,6 +1323,7 @@ export type Database = {
           rpo_descriptions?: string[] | null
           sales_rep?: string | null
           selling_dealer_code?: string | null
+          service_done?: boolean | null
           service_records_available?: boolean | null
           ship_to_dealer_code?: string | null
           sold_at?: string | null
@@ -1372,6 +1378,7 @@ export type Database = {
           delivery_variance_days?: number | null
           demand_score?: number | null
           description?: string | null
+          detailed_done?: boolean | null
           drivetrain?: string | null
           engine?: string | null
           estimated_delivery_date?: string | null
@@ -1409,6 +1416,7 @@ export type Database = {
           order_type?: string | null
           original_order_date?: string | null
           pack?: number | null
+          photos_done?: boolean | null
           photos_urls?: string[] | null
           plant_code?: string | null
           predicted_sale_date?: string | null
@@ -1425,6 +1433,7 @@ export type Database = {
           rpo_descriptions?: string[] | null
           sales_rep?: string | null
           selling_dealer_code?: string | null
+          service_done?: boolean | null
           service_records_available?: boolean | null
           ship_to_dealer_code?: string | null
           sold_at?: string | null

@@ -19,9 +19,9 @@ export const fixGMGlobalVehicleRecord = async (stockNumber: string) => {
   console.log('Current vehicle data:', vehicle);
   
   // If we have the full_option_blob, re-extract the fields correctly
-  if (vehicle.full_option_blob) {
+  if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
     console.log('Re-extracting fields from full_option_blob...');
-    const correctedFields = extractGMGlobalFields(vehicle.full_option_blob);
+    const correctedFields = extractGMGlobalFields(vehicle.full_option_blob as Record<string, any>);
     
     console.log('Corrected fields:', correctedFields);
     
@@ -72,30 +72,32 @@ export const fixAllGMGlobalRecords = async () => {
   const results = [];
   for (const vehicle of vehicles) {
     try {
-      const correctedFields = extractGMGlobalFields(vehicle.full_option_blob);
-      
-      const { data: updatedVehicle, error: updateError } = await supabase
-        .from('inventory')
-        .update({
-          year: correctedFields.year,
-          make: correctedFields.make,
-          model: correctedFields.model,
-          trim: correctedFields.trim,
-          body_style: correctedFields.body_style,
-          color_exterior: correctedFields.color_exterior,
-          color_interior: correctedFields.color_interior,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', vehicle.id)
-        .select()
-        .single();
+      if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
+        const correctedFields = extractGMGlobalFields(vehicle.full_option_blob as Record<string, any>);
         
-      if (updateError) {
-        console.error(`Failed to update vehicle ${vehicle.stock_number}:`, updateError);
-        results.push({ success: false, vehicle: vehicle.stock_number, error: updateError.message });
-      } else {
-        console.log(`Successfully updated vehicle ${vehicle.stock_number}`);
-        results.push({ success: true, vehicle: vehicle.stock_number, updated: updatedVehicle });
+        const { data: updatedVehicle, error: updateError } = await supabase
+          .from('inventory')
+          .update({
+            year: correctedFields.year,
+            make: correctedFields.make,
+            model: correctedFields.model,
+            trim: correctedFields.trim,
+            body_style: correctedFields.body_style,
+            color_exterior: correctedFields.color_exterior,
+            color_interior: correctedFields.color_interior,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', vehicle.id)
+          .select()
+          .single();
+          
+        if (updateError) {
+          console.error(`Failed to update vehicle ${vehicle.stock_number}:`, updateError);
+          results.push({ success: false, vehicle: vehicle.stock_number, error: updateError.message });
+        } else {
+          console.log(`Successfully updated vehicle ${vehicle.stock_number}`);
+          results.push({ success: true, vehicle: vehicle.stock_number, updated: updatedVehicle });
+        }
       }
     } catch (error) {
       console.error(`Error processing vehicle ${vehicle.stock_number}:`, error);
