@@ -27,7 +27,8 @@ export const insertFinancialData = async (
       reportDate: snapshotResult.reportDate,
       totalExtracted: insertResult.totalExtracted,
       validDeals: insertResult.validDeals.length,
-      skippedDeals: insertResult.skippedDeals
+      skippedDeals: insertResult.skippedDeals,
+      preservedDealTypes: insertResult.preservedDealTypes
     };
 
   } catch (error) {
