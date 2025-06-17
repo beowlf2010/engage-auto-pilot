@@ -1,8 +1,8 @@
-import { extractVehicleFields } from './field-extraction/vehicle';
-import { extractVINField } from './field-extraction/vin';
-import { extractOptionsFields } from './field-extraction/options';
+import { extractVehicleFields } from './field-extraction';
+import { extractVINField } from './field-extraction';
+import { extractOptionsFields } from './field-extraction';
 import { extractGMGlobalFields } from './field-extraction/gmGlobalEnhanced';
-import { extractVautoFields } from './field-extraction/vauto';
+import { extractVautoFields } from './field-extraction';
 
 export interface InventoryItem {
   id?: string;

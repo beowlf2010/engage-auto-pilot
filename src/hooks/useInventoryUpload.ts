@@ -1,4 +1,3 @@
-
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile, mapRowToInventoryItem } from "@/utils/enhancedFileParsingUtils";
 import { storeUploadedFile, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
@@ -6,6 +5,7 @@ import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 import { useUploadState, type UploadResult } from "@/hooks/useUploadState";
 import { syncInventoryData } from "@/services/inventoryService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UseInventoryUploadProps {
   userId: string;
