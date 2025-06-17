@@ -9,6 +9,47 @@ export const formatVehicleTitle = (vehicle: any): string => {
     source_report: vehicle.source_report
   });
   
+  // For GM Global data, prioritize database fields since they should now be correctly mapped
+  if (vehicle.source_report === 'orders_all') {
+    console.log('Processing GM Global vehicle data...');
+    
+    const year = vehicle.year ? String(vehicle.year) : '';
+    const make = vehicle.make || '';
+    const model = vehicle.model || '';
+    const trim = vehicle.trim || '';
+
+    console.log('GM Global fields:', { year, make, model, trim });
+
+    let parts: string[] = [];
+
+    // Add year if available
+    if (year) {
+      parts.push(year);
+    }
+
+    // Add make if available
+    if (make) {
+      parts.push(make);
+    }
+
+    // Add model if available
+    if (model) {
+      parts.push(model);
+    }
+
+    // Add trim if available and not already included
+    if (trim && !parts.some(part => part.toLowerCase().includes(trim.toLowerCase()))) {
+      parts.push(trim);
+    }
+
+    const result = parts.filter(Boolean).join(' ');
+    console.log('GM Global formatted title:', result);
+    
+    if (result) {
+      return result;
+    }
+  }
+  
   // Handle vAuto data where vehicle info might be in full_option_blob
   if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
     const blob = vehicle.full_option_blob;

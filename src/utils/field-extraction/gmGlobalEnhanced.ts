@@ -3,24 +3,78 @@ import { getFieldValue, parseDate, parseNumber, parseInteger } from './core';
 import { findMakeInRow, findModelInRow, findYearInRow } from './vehicle';
 import { findVINInRow } from './vin';
 import { extractRPOCodes, extractOptionDescriptions } from './options';
+import { translateDivisionCode, translateColorCode, translateTrimCode } from '@/services/inventory/gmCodeLookupService';
 
-// Enhanced GM Global field extraction with comprehensive data capture
+// Enhanced GM Global field extraction with correct field mappings
 export const extractGMGlobalFields = (row: Record<string, any>): any => {
   console.log('=== ENHANCED GM GLOBAL EXTRACTION ===');
   console.log('Available fields:', Object.keys(row));
   
   const result: any = {
-    // Basic vehicle info
-    make: findMakeInRow(row),
-    model: findModelInRow(row),
-    year: findYearInRow(row),
-    vin: findVINInRow(row),
-    
     // GM Global specific fields
     condition: 'new', // GM Global orders are always new
     status: 'available', // Default status
     source_report: 'orders_all'
   };
+  
+  // Apply GM Global field mappings based on user specification:
+  // year = model year, make = division, model = allocation, trim = peg
+  // body_style = model, exterior color = color, interior color = trim
+  
+  // Year mapping: model year → year
+  const modelYearFields = ['Model Year', 'model year', 'ModelYear', 'model_year'];
+  const yearStr = getFieldValue(row, modelYearFields);
+  if (yearStr) {
+    const year = parseInteger(yearStr);
+    if (year !== null) {
+      result.year = year;
+    }
+  }
+  
+  // Make mapping: division → make (with code translation)
+  const divisionFields = ['Division', 'division', 'DIVISION'];
+  const divisionCode = getFieldValue(row, divisionFields);
+  if (divisionCode) {
+    result.make = translateDivisionCode(divisionCode);
+  }
+  
+  // Model mapping: allocation → model
+  const allocationFields = ['Allocation', 'allocation', 'ALLOCATION'];
+  const allocation = getFieldValue(row, allocationFields);
+  if (allocation) {
+    result.model = allocation;
+  }
+  
+  // Trim mapping: peg → trim
+  const pegFields = ['Peg', 'peg', 'PEG'];
+  const peg = getFieldValue(row, pegFields);
+  if (peg) {
+    result.trim = peg;
+  }
+  
+  // Body Style mapping: model → body_style
+  const modelFields = ['Model', 'model', 'MODEL'];
+  const model = getFieldValue(row, modelFields);
+  if (model) {
+    result.body_style = model;
+  }
+  
+  // Exterior Color mapping: color → color_exterior (with code translation)
+  const colorFields = ['Color', 'color', 'COLOR'];
+  const colorCode = getFieldValue(row, colorFields);
+  if (colorCode) {
+    result.color_exterior = translateColorCode(colorCode);
+  }
+  
+  // Interior Color mapping: trim → color_interior (with code translation)
+  const trimFields = ['Trim', 'trim', 'TRIM'];
+  const trimCode = getFieldValue(row, trimFields);
+  if (trimCode) {
+    result.color_interior = translateTrimCode(trimCode);
+  }
+  
+  // VIN - try multiple field names
+  result.vin = findVINInRow(row);
   
   // GM Order Number
   const orderNumberFields = [
@@ -95,14 +149,13 @@ export const extractGMGlobalFields = (row: Record<string, any>): any => {
     }
   }
   
-  // Dealer codes
+  // Additional GM Global fields
   const dealerOrderCodeFields = ['Dealer Order Code', 'DealerOrderCode', 'Dealer_Order_Code'];
   result.dealer_order_code = getFieldValue(row, dealerOrderCodeFields);
   
   const sellingDealerFields = ['Selling Dealer', 'SellingDealer', 'Selling_Dealer_Code'];
   result.selling_dealer_code = getFieldValue(row, sellingDealerFields);
   
-  // Additional GM Global fields
   const buildWeekFields = ['Build Week', 'BuildWeek', 'Build_Week'];
   result.build_week = getFieldValue(row, buildWeekFields);
   
@@ -148,27 +201,19 @@ export const extractGMGlobalFields = (row: Record<string, any>): any => {
   const stockFields = ['Stock Number', 'StockNumber', 'Stock_Number', 'Stock#', 'StockNo'];
   result.stock_number = getFieldValue(row, stockFields);
   
-  // Vehicle details
-  const trimFields = ['Trim', 'TrimLevel', 'Trim_Level', 'Package'];
-  result.trim = getFieldValue(row, trimFields);
-  
-  const colorExtFields = ['Exterior Color', 'ExteriorColor', 'Exterior_Color', 'Color'];
-  result.color_exterior = getFieldValue(row, colorExtFields);
-  
-  const colorIntFields = ['Interior Color', 'InteriorColor', 'Interior_Color'];
-  result.color_interior = getFieldValue(row, colorIntFields);
-  
   // Store full row data for reference
   result.full_option_blob = row;
   
   console.log('Enhanced GM Global extraction result:', {
+    year: result.year,
     make: result.make,
     model: result.model,
-    year: result.year,
-    gm_order_number: result.gm_order_number,
-    customer_name: result.customer_name,
-    estimated_delivery_date: result.estimated_delivery_date,
-    gm_status_description: result.gm_status_description
+    trim: result.trim,
+    body_style: result.body_style,
+    color_exterior: result.color_exterior,
+    color_interior: result.color_interior,
+    vin: result.vin,
+    gm_order_number: result.gm_order_number
   });
   
   return result;
