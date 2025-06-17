@@ -3,13 +3,16 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Trash2, AlertTriangle, RefreshCw, Archive, BarChart3 } from "lucide-react";
 import { performInventoryCleanup } from "@/services/inventory/core/inventoryCleanupService";
 import { resetIncorrectlySoldVehicles } from "@/services/inventory/vehicleStatusCleanup";
+import { archiveOldSoldVehicles, cleanupInflatedCounts } from "@/services/inventory/core/inventoryArchiveService";
 
 const InventoryCleanupButton = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showStatusReset, setShowStatusReset] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [showCountAnalysis, setShowCountAnalysis] = useState(false);
 
   const handleCleanup = async () => {
     setIsLoading(true);
@@ -30,8 +33,29 @@ const InventoryCleanupButton = () => {
     }
   };
 
+  const handleArchive = async () => {
+    setIsLoading(true);
+    try {
+      await archiveOldSoldVehicles();
+    } finally {
+      setIsLoading(false);
+      setShowArchive(false);
+    }
+  };
+
+  const handleCountAnalysis = async () => {
+    setIsLoading(true);
+    try {
+      await cleanupInflatedCounts();
+    } finally {
+      setIsLoading(false);
+      setShowCountAnalysis(false);
+    }
+  };
+
   return (
     <div className="flex items-center space-x-2">
+      {/* Original cleanup */}
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button variant="outline" className="flex items-center space-x-2 text-orange-600 border-orange-200 hover:bg-orange-50">
@@ -80,6 +104,7 @@ const InventoryCleanupButton = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Status reset */}
       <AlertDialog open={showStatusReset} onOpenChange={setShowStatusReset}>
         <AlertDialogTrigger asChild>
           <Button variant="outline" className="flex items-center space-x-2 text-blue-600 border-blue-200 hover:bg-blue-50">
@@ -118,6 +143,97 @@ const InventoryCleanupButton = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleStatusReset} disabled={isLoading}>
               {isLoading ? "Processing..." : "Reset Vehicle Status"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* NEW: Count Analysis */}
+      <AlertDialog open={showCountAnalysis} onOpenChange={setShowCountAnalysis}>
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" className="flex items-center space-x-2 text-green-600 border-green-200 hover:bg-green-50">
+            <BarChart3 className="w-4 h-4" />
+            <span>Analyze Counts</span>
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              NEW
+            </Badge>
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center space-x-2">
+              <BarChart3 className="w-5 h-5 text-green-600" />
+              <span>Analyze Vehicle Counts</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                This will analyze your current vehicle counts and show you the breakdown 
+                between active inventory and sold vehicles.
+              </p>
+              <div className="bg-green-50 p-3 rounded-md border border-green-200">
+                <p className="text-sm text-green-800">
+                  <strong>What this shows:</strong>
+                </p>
+                <ul className="text-sm text-green-700 mt-1 space-y-1">
+                  <li>• Available vehicles for sale</li>
+                  <li>• GM Global orders in progress</li>
+                  <li>• Sold vehicles (excluded from active count)</li>
+                  <li>• True active inventory total</li>
+                </ul>
+              </div>
+              <p className="text-sm text-slate-600">
+                This helps verify that your dashboard shows accurate counts.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCountAnalysis} disabled={isLoading}>
+              {isLoading ? "Analyzing..." : "Analyze Counts"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Archive old sold vehicles */}
+      <AlertDialog open={showArchive} onOpenChange={setShowArchive}>
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" className="flex items-center space-x-2 text-purple-600 border-purple-200 hover:bg-purple-50">
+            <Archive className="w-4 h-4" />
+            <span>Archive Old</span>
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center space-x-2">
+              <Archive className="w-5 h-5 text-purple-600" />
+              <span>Archive Old Sold Vehicles</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                This will archive vehicles that have been sold for more than 90 days 
+                to improve dashboard performance and count accuracy.
+              </p>
+              <div className="bg-purple-50 p-3 rounded-md border border-purple-200">
+                <p className="text-sm text-purple-800">
+                  <strong>What this does:</strong>
+                </p>
+                <ul className="text-sm text-purple-700 mt-1 space-y-1">
+                  <li>• Finds vehicles sold over 90 days ago</li>
+                  <li>• Changes their status to "archived"</li>
+                  <li>• Removes them from active counts</li>
+                  <li>• Preserves all data for historical reference</li>
+                </ul>
+              </div>
+              <p className="text-sm text-slate-600">
+                This is safe and helps clean up inflated vehicle counts.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchive} disabled={isLoading}>
+              {isLoading ? "Archiving..." : "Archive Old Vehicles"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

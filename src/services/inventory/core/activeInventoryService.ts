@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { getLatestUploads } from './inventoryCleanupService';
 
 export interface ActiveVehicleCounts {
   totalVehicles: number;
@@ -13,28 +12,30 @@ export interface ActiveVehicleCounts {
 }
 
 export const getActiveVehicleCounts = async (): Promise<ActiveVehicleCounts> => {
-  // Get latest upload IDs for filtering
-  const latestUploads = await getLatestUploads();
+  console.log('=== ACTIVE VEHICLE COUNTING (FIXED) ===');
   
-  // Count only vehicles from latest uploads or with status 'available'
-  const activeFilter = (query: any) => {
-    return query.or(`and(status.eq.available),and(status.neq.sold)`);
-  };
-
-  // Get total active vehicles count
-  const { count: totalVehicles } = await supabase
+  // Count only truly available vehicles (not sold)
+  const { count: totalAvailableVehicles } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
-    .neq('status', 'sold');
+    .eq('status', 'available');
 
-  // Get regular new vehicles (not GM Global orders) - active only
-  const { count: regularNewTotal } = await supabase
+  console.log('Total available vehicles:', totalAvailableVehicles);
+
+  // Count GM Global orders (these have numeric status codes, not 'available')
+  const { count: gmGlobalOrders } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
-    .eq('condition', 'new')
-    .or('source_report.is.null,source_report.neq.orders_all')
+    .eq('source_report', 'orders_all')
     .neq('status', 'sold');
 
+  console.log('GM Global orders (not sold):', gmGlobalOrders);
+
+  // Calculate actual total: available inventory + GM Global orders
+  const actualTotalVehicles = (totalAvailableVehicles || 0) + (gmGlobalOrders || 0);
+  console.log('Actual total active vehicles:', actualTotalVehicles);
+
+  // Get regular new vehicles (not GM Global orders) - available only
   const { count: regularNewAvailable } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
@@ -42,18 +43,24 @@ export const getActiveVehicleCounts = async (): Promise<ActiveVehicleCounts> => 
     .eq('status', 'available')
     .or('source_report.is.null,source_report.neq.orders_all');
 
-  // Get used vehicles - active only
-  const { count: usedTotal } = await supabase
-    .from('inventory')
-    .select('*', { count: 'exact', head: true })
-    .eq('condition', 'used')
-    .neq('status', 'sold');
+  console.log('Regular new available:', regularNewAvailable);
 
+  // Get used vehicles - available only
   const { count: usedAvailable } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
     .eq('condition', 'used')
     .eq('status', 'available');
+
+  console.log('Used available:', usedAvailable);
+
+  // Count sold vehicles (for reference only)
+  const { count: soldVehicles } = await supabase
+    .from('inventory')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'sold');
+
+  console.log('Total sold vehicles (excluded from active count):', soldVehicles);
 
   const { count: usedSold } = await supabase
     .from('inventory')
@@ -61,24 +68,23 @@ export const getActiveVehicleCounts = async (): Promise<ActiveVehicleCounts> => 
     .eq('condition', 'used')
     .eq('status', 'sold');
 
-  // Get sold vehicles
-  const { count: soldVehicles } = await supabase
-    .from('inventory')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'sold');
+  console.log('Used sold vehicles:', usedSold);
 
   return {
-    totalVehicles: totalVehicles || 0,
-    regularNewTotal: regularNewTotal || 0,
+    // This is the key fix: only count active inventory
+    totalVehicles: actualTotalVehicles,
+    regularNewTotal: (regularNewAvailable || 0) + (gmGlobalOrders || 0), // New available + GM Global
     regularNewAvailable: regularNewAvailable || 0,
-    usedTotal: usedTotal || 0,
+    usedTotal: usedAvailable || 0, // Only available used vehicles
     usedAvailable: usedAvailable || 0,
     usedSold: usedSold || 0,
-    soldVehicles: soldVehicles || 0,
+    soldVehicles: soldVehicles || 0, // For reference, but not included in total
   };
 };
 
 export const getActiveGMGlobalOrderCounts = async () => {
+  console.log('Getting GM Global order counts...');
+  
   const { data: gmGlobalData } = await supabase
     .from('inventory')
     .select('status')
@@ -107,6 +113,14 @@ export const getActiveGMGlobalOrderCounts = async () => {
       }
     });
   }
+
+  console.log('GM Global breakdown:', {
+    available: gmGlobalAvailable,
+    inTransit: gmGlobalInTransit,
+    inProduction: gmGlobalInProduction,
+    placed: gmGlobalPlaced,
+    total: gmGlobalData?.length || 0
+  });
 
   return {
     gmGlobalData: gmGlobalData || [],
