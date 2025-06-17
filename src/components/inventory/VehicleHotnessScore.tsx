@@ -23,6 +23,44 @@ interface VehicleHotnessScoreProps {
   compact?: boolean;
 }
 
+const getHotnessColor = (score: number) => {
+  if (score >= 80) return 'bg-red-500 text-white';
+  if (score >= 60) return 'bg-orange-500 text-white';
+  if (score >= 40) return 'bg-yellow-500 text-black';
+  return 'bg-blue-500 text-white';
+};
+
+const getHotnessIcon = (score: number) => {
+  if (score >= 80) return <Zap className="w-3 h-3" />;
+  if (score >= 60) return <TrendingUp className="w-3 h-3" />;
+  if (score >= 40) return <Minus className="w-3 h-3" />;
+  return <TrendingDown className="w-3 h-3" />;
+};
+
+const getPriceRecommendationIcon = (rec: string) => {
+  switch (rec) {
+    case 'increase':
+      return <TrendingUp className="w-3 h-3 text-green-600" />;
+    case 'decrease':
+      return <TrendingDown className="w-3 h-3 text-red-600" />;
+    default:
+      return <Minus className="w-3 h-3 text-gray-600" />;
+  }
+};
+
+const getMarketPositionColor = (position: string) => {
+  switch (position) {
+    case 'hot':
+      return 'text-red-600 bg-red-50';
+    case 'warm':
+      return 'text-orange-600 bg-orange-50';
+    case 'cold':
+      return 'text-blue-600 bg-blue-50';
+    default:
+      return 'text-gray-600 bg-gray-50';
+  }
+};
+
 const VehicleHotnessScore = ({ vehicleId, compact = false }: VehicleHotnessScoreProps) => {
   const { data: intelligence, isLoading } = useQuery({
     queryKey: ['vehicle-hotness', vehicleId],
@@ -47,31 +85,6 @@ const VehicleHotnessScore = ({ vehicleId, compact = false }: VehicleHotnessScore
       </div>
     );
   }
-
-  const getHotnessColor = (score: number) => {
-    if (score >= 80) return 'bg-red-500 text-white';
-    if (score >= 60) return 'bg-orange-500 text-white';
-    if (score >= 40) return 'bg-yellow-500 text-black';
-    return 'bg-blue-500 text-white';
-  };
-
-  const getHotnessIcon = (score: number) => {
-    if (score >= 80) return <Zap className="w-3 h-3" />;
-    if (score >= 60) return <TrendingUp className="w-3 h-3" />;
-    if (score >= 40) return <Minus className="w-3 h-3" />;
-    return <TrendingDown className="w-3 h-3" />;
-  };
-
-  const getPriceRecommendationIcon = (rec: string) => {
-    switch (rec) {
-      case 'increase':
-        return <TrendingUp className="w-3 h-3 text-green-600" />;
-      case 'decrease':
-        return <TrendingDown className="w-3 h-3 text-red-600" />;
-      default:
-        return <Minus className="w-3 h-3 text-gray-600" />;
-    }
-  };
 
   if (compact) {
     return (
@@ -101,19 +114,6 @@ const VehicleHotnessScore = ({ vehicleId, compact = false }: VehicleHotnessScore
 };
 
 const VehicleIntelligenceDetails = ({ intelligence }: { intelligence: VehicleIntelligence }) => {
-  const getMarketPositionColor = (position: string) => {
-    switch (position) {
-      case 'hot':
-        return 'text-red-600 bg-red-50';
-      case 'warm':
-        return 'text-orange-600 bg-orange-50';
-      case 'cold':
-        return 'text-blue-600 bg-blue-50';
-      default:
-        return 'text-gray-600 bg-gray-50';
-    }
-  };
-
   return (
     <div className="space-y-4">
       {/* Hotness Score */}
