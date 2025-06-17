@@ -7,6 +7,12 @@ export { findMakeInRow, findModelInRow, findYearInRow, isValidYear } from './veh
 export { extractGMGlobalStatus } from './gmGlobal';
 export { extractRPOCodes, extractOptionDescriptions } from './options';
 
+// Import the functions we need for the wrapper functions
+import { findYearInRow, findMakeInRow, findModelInRow } from './vehicle';
+import { findVINInRow } from './vin';
+import { extractRPOCodes, extractOptionDescriptions } from './options';
+import { parseVautoVehicleField } from './vauto';
+
 // Add missing extraction functions that are being imported
 export const extractVehicleFields = (row: any) => {
   return {
