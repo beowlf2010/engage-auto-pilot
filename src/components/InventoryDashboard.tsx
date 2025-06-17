@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -5,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar, Clock, DollarSign } from "lucide-react";
+import { Search, Filter, Car, Eye, BarChart3, ArrowUpDown, Calendar, Clock, DollarSign, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 import EnhancedInventoryMetrics from "@/components/inventory/EnhancedInventoryMetrics";
@@ -45,23 +45,18 @@ const InventoryDashboard = () => {
   const [qrModalOpen, setQRModalOpen] = useState(false);
   const [qrVehicle, setQRVehicle] = useState<any | null>(null);
 
-  const { data: inventory, isLoading, error } = useQuery({
+  const { data: inventory, isLoading, error, refetch } = useQuery({
     queryKey: ['inventory-enhanced', filters, searchTerm],
     queryFn: async () => {
       try {
+        console.log('Fetching inventory with filters:', filters);
+        
+        // First, get inventory data without the problematic join
         let query = supabase
           .from('inventory')
-          .select(`
-            *,
-            deals!stock_number(
-              id,
-              upload_date,
-              sale_amount,
-              total_profit,
-              deal_type
-            )
-          `);
+          .select('*');
 
+        // Apply filters
         if (filters.make) {
           query = query.ilike('make', `%${filters.make}%`);
         }
@@ -93,17 +88,48 @@ const InventoryDashboard = () => {
           query = query.or(`vin.ilike.%${searchTerm}%,stock_number.ilike.%${searchTerm}%,make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        // Process the data to include deal information and data quality with error handling
-        let processedData = data?.map(vehicle => {
+        const { data: inventoryData, error: inventoryError } = await query;
+        if (inventoryError) throw inventoryError;
+
+        console.log(`Fetched ${inventoryData?.length || 0} inventory items`);
+
+        // Get deals data separately to avoid join issues
+        let dealsData: any[] = [];
+        if (inventoryData && inventoryData.length > 0) {
           try {
+            const stockNumbers = inventoryData
+              .map(item => item.stock_number)
+              .filter(Boolean);
+            
+            if (stockNumbers.length > 0) {
+              const { data: deals, error: dealsError } = await supabase
+                .from('deals')
+                .select('*')
+                .in('stock_number', stockNumbers);
+              
+              if (!dealsError) {
+                dealsData = deals || [];
+              }
+            }
+          } catch (dealsError) {
+            console.warn('Could not fetch deals data:', dealsError);
+          }
+        }
+
+        // Process the data to include deal information and data quality with error handling
+        let processedData = inventoryData?.map(vehicle => {
+          try {
+            // Find related deals for this vehicle
+            const vehicleDeals = dealsData.filter(deal => 
+              deal.stock_number === vehicle.stock_number
+            );
+
             return {
               ...vehicle,
-              deal_count: Array.isArray(vehicle.deals) ? vehicle.deals.length : 0,
-              latest_deal: Array.isArray(vehicle.deals) && vehicle.deals.length > 0 
-                ? vehicle.deals.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0]
+              deals: vehicleDeals,
+              deal_count: vehicleDeals.length,
+              latest_deal: vehicleDeals.length > 0 
+                ? vehicleDeals.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0]
                 : null,
               data_completeness: getDataCompletenessScore(vehicle)
             };
@@ -111,6 +137,7 @@ const InventoryDashboard = () => {
             console.error('Error processing vehicle data:', error, vehicle);
             return {
               ...vehicle,
+              deals: [],
               deal_count: 0,
               latest_deal: null,
               data_completeness: 0
@@ -167,6 +194,7 @@ const InventoryDashboard = () => {
           return filters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
         });
         
+        console.log(`Processed ${processedData.length} inventory items with deals data`);
         return processedData;
       } catch (error) {
         console.error('Error fetching inventory:', error);
@@ -175,7 +203,7 @@ const InventoryDashboard = () => {
     }
   });
 
-  // Compute data quality stats (inside InventoryDashboard, before return)
+  // Compute data quality stats
   const completenessStats = (() => {
     if (!Array.isArray(inventory)) return { total: 0, complete: 0, incomplete: 0 };
     let complete = 0, incomplete = 0;
@@ -234,6 +262,10 @@ const InventoryDashboard = () => {
             <h3 className="text-lg font-semibold mb-2">Unable to load inventory</h3>
             <p className="text-sm">{error.message || 'An unexpected error occurred'}</p>
           </div>
+          <Button onClick={() => refetch()} variant="outline" className="mr-2">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </Button>
           <Button onClick={() => window.location.reload()} variant="outline">
             Refresh Page
           </Button>

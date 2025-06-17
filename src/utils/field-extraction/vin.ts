@@ -1,41 +1,46 @@
 
 import { getFieldValue } from './core';
 
-// Smart VIN detection that scans all columns for VIN patterns
+// Find VIN in row data with smart detection
 export const findVINInRow = (row: Record<string, any>): string => {
   console.log('=== SMART VIN DETECTION ===');
   
-  // First try standard VIN fields
   const vinFields = [
-    'VIN', 'vin', 'Vin', 'Vehicle VIN', 'Unit VIN',
-    'VIN Number', 'Vehicle Identification Number'
+    'VIN', 'vin', 'Vin', 'Vehicle Identification Number',
+    'VehicleVIN', 'vehicle_vin', 'SerialNumber', 'Serial Number'
   ];
   
-  const standardVin = getFieldValue(row, vinFields);
-  if (isValidVIN(standardVin)) {
-    console.log(`Found VIN in standard field: ${standardVin}`);
-    return standardVin;
+  const vin = getFieldValue(row, vinFields);
+  
+  if (!vin) {
+    console.log('No VIN found');
+    return '';
   }
   
-  // Scan all columns for VIN pattern
-  console.log('Standard VIN fields failed, scanning all columns...');
-  for (const [key, value] of Object.entries(row)) {
-    if (value && typeof value === 'string') {
-      const cleanValue = String(value).trim().toUpperCase();
-      if (isValidVIN(cleanValue)) {
-        console.log(`✓ Found VIN in column "${key}": ${cleanValue}`);
-        return cleanValue;
-      }
-    }
+  const cleanVin = vin.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  
+  if (isValidVIN(cleanVin)) {
+    console.log(`Found valid VIN: ${cleanVin}`);
+    return cleanVin;
   }
   
-  console.log('✗ No valid VIN found in any column');
-  return '';
+  console.log(`Invalid VIN format: ${vin}`);
+  return vin; // Return original if validation fails
 };
 
-// Validate VIN format (17 characters, alphanumeric, no I/O/Q)
+// Validate VIN format (17 characters, alphanumeric, no I, O, Q)
 export const isValidVIN = (vin: string): boolean => {
-  if (!vin || typeof vin !== 'string') return false;
-  const cleanVin = vin.trim().toUpperCase();
-  return cleanVin.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(cleanVin);
+  if (!vin || vin.length !== 17) {
+    return false;
+  }
+  
+  // VINs cannot contain I, O, or Q
+  const invalidChars = /[IOQ]/;
+  if (invalidChars.test(vin)) {
+    return false;
+  }
+  
+  // Must be alphanumeric
+  const validFormat = /^[A-HJ-NPR-Z0-9]{17}$/;
+  return validFormat.test(vin);
 };

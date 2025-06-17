@@ -1,277 +1,175 @@
 
-import { parseDate } from './core';
+import { getFieldValue, parseDate, parseNumber, parseInteger } from './core';
+import { findMakeInRow, findModelInRow, findYearInRow } from './vehicle';
+import { findVINInRow } from './vin';
+import { extractRPOCodes, extractOptionDescriptions } from './options';
 
-// Enhanced GM Global field extraction with comprehensive column mapping
-export const extractGMGlobalFields = (row: any) => {
-  console.log('Extracting GM Global fields from row:', Object.keys(row));
+// Enhanced GM Global field extraction with comprehensive data capture
+export const extractGMGlobalFields = (row: Record<string, any>): any => {
+  console.log('=== ENHANCED GM GLOBAL EXTRACTION ===');
+  console.log('Available fields:', Object.keys(row));
   
   const result: any = {
-    // Core vehicle information
-    year: null,
-    make: null,
-    model: null,
-    trim: null,
-    vin: null,
-    stock_number: null,
-    color_exterior: null,
-    color_interior: null,
-    engine: null,
-    transmission: null,
-    drivetrain: null,
-    fuel_type: null,
-    body_style: null,
-    
-    // Pricing information
-    msrp: null,
-    invoice: null,
-    price: null,
-    rebates: null,
-    pack: null,
+    // Basic vehicle info
+    make: findMakeInRow(row),
+    model: findModelInRow(row),
+    year: findYearInRow(row),
+    vin: findVINInRow(row),
     
     // GM Global specific fields
-    estimated_delivery_date: null,
-    actual_delivery_date: null,
-    order_date: null,
-    gm_order_number: null,
-    customer_name: null,
-    dealer_order_code: null,
-    build_week: null,
-    production_sequence: null,
-    gm_status_description: null,
-    delivery_method: null,
-    priority_code: null,
-    order_type: null,
-    plant_code: null,
-    ship_to_dealer_code: null,
-    selling_dealer_code: null,
-    order_priority: null,
-    special_equipment: null,
-    customer_order_number: null,
-    trade_hold_status: null,
-    allocation_code: null,
-    gm_model_code: null,
-    order_source: null,
-    original_order_date: null,
-    revised_delivery_date: null,
-    
-    // Set defaults for GM Global records
-    condition: 'new',
-    status: 'available',
+    condition: 'new', // GM Global orders are always new
+    status: 'available', // Default status
     source_report: 'orders_all'
   };
-
-  // Field mapping patterns - comprehensive list of possible column names
-  const fieldMappings = {
-    // Vehicle basics
-    year: ['Model Year', 'Year', 'MY', 'model_year'],
-    make: ['Make', 'Brand', 'Manufacturer'],
-    model: ['Model', 'Model Name', 'Vehicle Model'],
-    trim: ['Trim', 'Trim Level', 'Series', 'Package'],
-    vin: ['VIN', 'Vehicle Identification Number', 'Vin Number'],
-    stock_number: ['Stock Number', 'Stock #', 'Stock', 'Dealer Stock Number'],
-    
-    // Colors and styling
-    color_exterior: ['Exterior Color', 'Ext Color', 'Outside Color', 'Paint Color'],
-    color_interior: ['Interior Color', 'Int Color', 'Inside Color', 'Upholstery'],
-    
-    // Technical specs
-    engine: ['Engine', 'Engine Type', 'Motor', 'Power Plant'],
-    transmission: ['Transmission', 'Trans', 'Gearbox'],
-    drivetrain: ['Drive', 'Drivetrain', 'Drive Type', 'AWD/FWD/RWD'],
-    fuel_type: ['Fuel Type', 'Fuel', 'Engine Fuel'],
-    body_style: ['Body Style', 'Body Type', 'Style'],
-    
-    // Pricing
-    msrp: ['MSRP', 'List Price', 'Retail Price', 'Manufacturer Suggested Retail Price'],
-    invoice: ['Invoice', 'Invoice Price', 'Dealer Cost', 'Cost'],
-    price: ['Price', 'Selling Price', 'Current Price', 'Sale Price'],
-    rebates: ['Rebates', 'Incentives', 'Rebate Amount', 'Factory Incentives'],
-    pack: ['Pack', 'Dealer Pack', 'Pack Amount'],
-    
-    // GM Global Order Information
-    estimated_delivery_date: [
-      'Estimated Delivery Date', 'EDD', 'Est Delivery', 'Delivery Date Est',
-      'Expected Delivery', 'Projected Delivery', 'Target Delivery'
-    ],
-    actual_delivery_date: [
-      'Actual Delivery Date', 'Delivered Date', 'Delivery Date', 'Date Delivered',
-      'Actual Arrival', 'Received Date'
-    ],
-    order_date: [
-      'Order Date', 'Date Ordered', 'Original Order Date', 'Placed Date',
-      'Order Placement Date'
-    ],
-    gm_order_number: [
-      'GM Order Number', 'Order Number', 'GM Order #', 'Order #',
-      'GM Order ID', 'Factory Order Number'
-    ],
-    customer_name: [
-      'Customer Name', 'Buyer Name', 'Customer', 'Purchaser',
-      'Customer Full Name', 'Ordered By'
-    ],
-    dealer_order_code: [
-      'Dealer Order Code', 'DOC', 'Dealer Code', 'Order Code'
-    ],
-    build_week: [
-      'Build Week', 'Production Week', 'Scheduled Build Week', 'BW'
-    ],
-    production_sequence: [
-      'Production Sequence', 'Sequence', 'Build Sequence', 'Production Order'
-    ],
-    gm_status_description: [
-      'Status Description', 'Order Status', 'GM Status', 'Current Status',
-      'Status', 'Order State'
-    ],
-    delivery_method: [
-      'Delivery Method', 'Ship Method', 'Transportation', 'Delivery Type'
-    ],
-    priority_code: [
-      'Priority Code', 'Priority', 'Order Priority Code', 'Rush Code'
-    ],
-    order_type: [
-      'Order Type', 'Type', 'Order Category', 'Sales Type'
-    ],
-    plant_code: [
-      'Plant Code', 'Manufacturing Plant', 'Factory Code', 'Plant'
-    ],
-    ship_to_dealer_code: [
-      'Ship To Dealer', 'Destination Dealer', 'Ship To Code', 'Delivery Dealer'
-    ],
-    selling_dealer_code: [
-      'Selling Dealer', 'Dealer Code', 'Selling Dealer Code', 'Sales Dealer'
-    ],
-    order_priority: [
-      'Order Priority', 'Priority Level', 'Rush Priority'
-    ],
-    special_equipment: [
-      'Special Equipment', 'Special Options', 'Custom Equipment', 'Add-ons'
-    ],
-    customer_order_number: [
-      'Customer Order Number', 'Customer Order #', 'Customer Reference'
-    ],
-    trade_hold_status: [
-      'Trade Hold Status', 'Hold Status', 'Trade Hold', 'Hold Reason'
-    ],
-    allocation_code: [
-      'Allocation Code', 'Allocation', 'Alloc Code'
-    ],
-    gm_model_code: [
-      'GM Model Code', 'Model Code', 'Factory Model Code', 'GM Code'
-    ],
-    order_source: [
-      'Order Source', 'Source', 'Origin', 'Channel'
-    ],
-    original_order_date: [
-      'Original Order Date', 'First Order Date', 'Initial Order Date'
-    ],
-    revised_delivery_date: [
-      'Revised Delivery Date', 'Updated Delivery', 'New Delivery Date'
-    ]
-  };
-
-  // Extract all fields using the mapping patterns
-  Object.entries(fieldMappings).forEach(([fieldName, patterns]) => {
-    const value = findFieldValue(row, patterns);
-    if (value !== null && value !== undefined && value !== '') {
-      if (fieldName.includes('date')) {
-        result[fieldName] = parseDate(value);
-      } else if (['year', 'msrp', 'invoice', 'price', 'rebates', 'pack'].includes(fieldName)) {
-        const numValue = parseFloat(String(value).replace(/[$,]/g, ''));
-        if (!isNaN(numValue)) {
-          result[fieldName] = numValue;
-        }
-      } else {
-        result[fieldName] = String(value).trim();
-      }
+  
+  // GM Order Number
+  const orderNumberFields = [
+    'Order Number', 'OrderNumber', 'GM Order Number', 'GMOrderNumber',
+    'Order_Number', 'GM_Order_Number', 'OrderNo', 'Order No'
+  ];
+  result.gm_order_number = getFieldValue(row, orderNumberFields);
+  
+  // Customer Information
+  const customerFields = [
+    'Customer', 'CustomerName', 'Customer Name', 'Buyer Name',
+    'Customer_Name', 'BuyerName', 'Purchaser'
+  ];
+  result.customer_name = getFieldValue(row, customerFields);
+  
+  // Delivery Dates
+  const estimatedDeliveryFields = [
+    'Estimated Delivery', 'EstimatedDelivery', 'ETA', 'Estimated_Delivery_Date',
+    'Est Delivery', 'Est_Delivery', 'Delivery_ETA', 'Expected_Delivery'
+  ];
+  const estimatedDeliveryStr = getFieldValue(row, estimatedDeliveryFields);
+  if (estimatedDeliveryStr) {
+    const date = parseDate(estimatedDeliveryStr);
+    if (date) {
+      result.estimated_delivery_date = date.toISOString().split('T')[0];
     }
-  });
-
-  // Log what we extracted for debugging
-  console.log('GM Global extraction result:', {
+  }
+  
+  const actualDeliveryFields = [
+    'Actual Delivery', 'ActualDelivery', 'Delivered Date', 'Actual_Delivery_Date',
+    'Delivery_Date', 'DeliveryDate', 'Completed_Date'
+  ];
+  const actualDeliveryStr = getFieldValue(row, actualDeliveryFields);
+  if (actualDeliveryStr) {
+    const date = parseDate(actualDeliveryStr);
+    if (date) {
+      result.actual_delivery_date = date.toISOString().split('T')[0];
+    }
+  }
+  
+  // Order Dates
+  const orderDateFields = [
+    'Order Date', 'OrderDate', 'Placed Date', 'Order_Date',
+    'Date_Placed', 'PlacedDate', 'Order_Placed'
+  ];
+  const orderDateStr = getFieldValue(row, orderDateFields);
+  if (orderDateStr) {
+    const date = parseDate(orderDateStr);
+    if (date) {
+      result.order_date = date.toISOString().split('T')[0];
+    }
+  }
+  
+  // GM Status
+  const statusFields = [
+    'Status', 'OrderStatus', 'GM Status', 'GMStatus',
+    'Production Status', 'ProductionStatus',
+    'Order_Status', 'GM_Status'
+  ];
+  const gmStatus = getFieldValue(row, statusFields);
+  if (gmStatus) {
+    result.gm_status_description = gmStatus;
+    
+    // Map GM status to our status values
+    const statusLower = gmStatus.toLowerCase();
+    if (statusLower.includes('delivered') || statusLower.includes('complete')) {
+      result.status = 'available';
+    } else if (statusLower.includes('transit') || statusLower.includes('shipping')) {
+      result.status = 'pending';
+    } else {
+      result.status = 'pending';
+    }
+  }
+  
+  // Dealer codes
+  const dealerOrderCodeFields = ['Dealer Order Code', 'DealerOrderCode', 'Dealer_Order_Code'];
+  result.dealer_order_code = getFieldValue(row, dealerOrderCodeFields);
+  
+  const sellingDealerFields = ['Selling Dealer', 'SellingDealer', 'Selling_Dealer_Code'];
+  result.selling_dealer_code = getFieldValue(row, sellingDealerFields);
+  
+  // Additional GM Global fields
+  const buildWeekFields = ['Build Week', 'BuildWeek', 'Build_Week'];
+  result.build_week = getFieldValue(row, buildWeekFields);
+  
+  const productionSeqFields = ['Production Sequence', 'ProductionSequence', 'Production_Sequence'];
+  result.production_sequence = getFieldValue(row, productionSeqFields);
+  
+  const deliveryMethodFields = ['Delivery Method', 'DeliveryMethod', 'Delivery_Method'];
+  result.delivery_method = getFieldValue(row, deliveryMethodFields);
+  
+  const priorityCodeFields = ['Priority Code', 'PriorityCode', 'Priority_Code'];
+  result.priority_code = getFieldValue(row, priorityCodeFields);
+  
+  const orderTypeFields = ['Order Type', 'OrderType', 'Order_Type'];
+  result.order_type = getFieldValue(row, orderTypeFields);
+  
+  const plantCodeFields = ['Plant Code', 'PlantCode', 'Plant_Code'];
+  result.plant_code = getFieldValue(row, plantCodeFields);
+  
+  // RPOs and options
+  result.rpo_codes = extractRPOCodes(row);
+  result.rpo_descriptions = extractOptionDescriptions(row);
+  
+  // Price information
+  const priceFields = ['Price', 'MSRP', 'List Price', 'ListPrice', 'Invoice'];
+  const priceStr = getFieldValue(row, priceFields);
+  if (priceStr) {
+    const price = parseNumber(priceStr);
+    if (price !== null) {
+      result.price = price;
+    }
+  }
+  
+  const msrpFields = ['MSRP', 'Retail Price', 'RetailPrice', 'Sticker Price'];
+  const msrpStr = getFieldValue(row, msrpFields);
+  if (msrpStr) {
+    const msrp = parseNumber(msrpStr);
+    if (msrp !== null) {
+      result.msrp = msrp;
+    }
+  }
+  
+  // Stock number (might not be available for orders)
+  const stockFields = ['Stock Number', 'StockNumber', 'Stock_Number', 'Stock#', 'StockNo'];
+  result.stock_number = getFieldValue(row, stockFields);
+  
+  // Vehicle details
+  const trimFields = ['Trim', 'TrimLevel', 'Trim_Level', 'Package'];
+  result.trim = getFieldValue(row, trimFields);
+  
+  const colorExtFields = ['Exterior Color', 'ExteriorColor', 'Exterior_Color', 'Color'];
+  result.color_exterior = getFieldValue(row, colorExtFields);
+  
+  const colorIntFields = ['Interior Color', 'InteriorColor', 'Interior_Color'];
+  result.color_interior = getFieldValue(row, colorIntFields);
+  
+  // Store full row data for reference
+  result.full_option_blob = row;
+  
+  console.log('Enhanced GM Global extraction result:', {
+    make: result.make,
+    model: result.model,
+    year: result.year,
     gm_order_number: result.gm_order_number,
     customer_name: result.customer_name,
     estimated_delivery_date: result.estimated_delivery_date,
-    order_date: result.order_date,
-    make: result.make,
-    model: result.model,
-    vin: result.vin
+    gm_status_description: result.gm_status_description
   });
-
+  
   return result;
-};
-
-// Helper function to find field value using multiple possible column names
-const findFieldValue = (row: any, patterns: string[]) => {
-  for (const pattern of patterns) {
-    // Exact match first
-    if (row[pattern] !== undefined) {
-      return row[pattern];
-    }
-    
-    // Case-insensitive search
-    const keys = Object.keys(row);
-    const matchingKey = keys.find(key => 
-      key.toLowerCase() === pattern.toLowerCase()
-    );
-    
-    if (matchingKey) {
-      return row[matchingKey];
-    }
-    
-    // Partial match search
-    const partialMatch = keys.find(key => 
-      key.toLowerCase().includes(pattern.toLowerCase()) ||
-      pattern.toLowerCase().includes(key.toLowerCase())
-    );
-    
-    if (partialMatch) {
-      return row[partialMatch];
-    }
-  }
-  
-  return null;
-};
-
-// Enhanced date parsing specifically for GM Global formats
-export const parseGMDate = (dateStr: string | number | Date): string | null => {
-  if (!dateStr) return null;
-  
-  try {
-    // Handle various GM date formats
-    let date: Date;
-    
-    if (typeof dateStr === 'number') {
-      // Excel serial date
-      date = new Date((dateStr - 25569) * 86400 * 1000);
-    } else if (typeof dateStr === 'string') {
-      // Clean the string
-      const cleaned = dateStr.trim();
-      
-      // Common GM date formats
-      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleaned)) {
-        // MM/DD/YYYY
-        date = new Date(cleaned);
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
-        // YYYY-MM-DD
-        date = new Date(cleaned);
-      } else if (/^\d{2}\/\d{2}\/\d{2}$/.test(cleaned)) {
-        // MM/DD/YY - assume 20xx
-        const parts = cleaned.split('/');
-        date = new Date(`20${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`);
-      } else {
-        date = new Date(cleaned);
-      }
-    } else {
-      date = new Date(dateStr);
-    }
-    
-    if (isNaN(date.getTime())) {
-      return null;
-    }
-    
-    return date.toISOString().split('T')[0];
-  } catch (error) {
-    console.error('Error parsing GM date:', dateStr, error);
-    return null;
-  }
 };
