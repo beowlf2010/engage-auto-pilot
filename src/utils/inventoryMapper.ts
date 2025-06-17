@@ -1,3 +1,4 @@
+
 import { extractVehicleFields } from './field-extraction';
 import { extractVINField } from './field-extraction';
 import { extractOptionsFields } from './field-extraction';
@@ -69,9 +70,12 @@ export interface InventoryItem {
   upload_history_id?: string;
 }
 
+// Define the upload condition type
+export type UploadCondition = 'new' | 'used' | 'gm_global';
+
 export const mapRowToInventoryItem = (
   row: any,
-  condition: 'new' | 'used' | 'gm_global',
+  condition: UploadCondition,
   uploadId: string
 ): InventoryItem => {
   console.log('Mapping row to inventory item:', { condition, keys: Object.keys(row) });
@@ -118,7 +122,7 @@ export const mapRowToInventoryItem = (
   const inventoryItem: InventoryItem = {
     make: mappedData.make || 'Unknown',
     model: mappedData.model || 'Unknown',
-    condition: mappedData.condition || (condition === 'gm_global' ? 'new' : condition),
+    condition: mappedData.condition || (condition === 'gm_global' ? 'new' : condition as 'new' | 'used'),
     status: mappedData.status || 'available',
     upload_history_id: uploadId,
     ...mappedData
