@@ -81,87 +81,113 @@ export const mapRowToInventoryItem = (
 
   let mappedData: any;
 
-  // Determine file type and use appropriate extraction
-  if (condition === 'gm_global') {
-    console.log('Using GM Global extraction for comprehensive data capture');
-    mappedData = extractGMGlobalFields(row);
-  } else {
-    // Check if this looks like a GM Global file even if not explicitly marked
-    const hasGMGlobalFields = Object.keys(row).some(key => 
-      key.toLowerCase().includes('order') ||
-      key.toLowerCase().includes('delivery') ||
-      key.toLowerCase().includes('customer') ||
-      key.toLowerCase().includes('gm ')
-    );
-
-    if (hasGMGlobalFields) {
-      console.log('Detected GM Global fields, using enhanced extraction');
+  try {
+    // Determine file type and use appropriate extraction
+    if (condition === 'gm_global') {
+      console.log('Using GM Global extraction for comprehensive data capture');
       mappedData = extractGMGlobalFields(row);
     } else {
-      // Use existing extraction methods
-      mappedData = {
-        ...extractVehicleFields(row),
-        ...extractVINField(row),
-        ...extractOptionsFields(row),
-        condition: condition === 'new' ? 'new' : 'used',
-        status: 'available'
-      };
+      // Check if this looks like a GM Global file even if not explicitly marked
+      const hasGMGlobalFields = Object.keys(row).some(key => 
+        key.toLowerCase().includes('order') ||
+        key.toLowerCase().includes('delivery') ||
+        key.toLowerCase().includes('customer') ||
+        key.toLowerCase().includes('gm ')
+      );
 
-      // Try Vauto-specific extraction if available
-      try {
-        const vautoData = extractVautoFields(row);
-        mappedData = { ...mappedData, ...vautoData };
-      } catch (error) {
-        console.log('Vauto extraction not applicable:', error);
+      if (hasGMGlobalFields) {
+        console.log('Detected GM Global fields, using enhanced extraction');
+        mappedData = extractGMGlobalFields(row);
+      } else {
+        // Use existing extraction methods with error handling
+        try {
+          mappedData = {
+            ...extractVehicleFields(row),
+            ...extractVINField(row),
+            ...extractOptionsFields(row),
+            condition: condition === 'new' ? 'new' : 'used',
+            status: 'available'
+          };
+
+          // Try Vauto-specific extraction if available
+          const vautoData = extractVautoFields(row);
+          mappedData = { ...mappedData, ...vautoData };
+        } catch (error) {
+          console.error('Error in field extraction:', error);
+          // Fallback to basic mapping
+          mappedData = {
+            make: row.make || row.Make || 'Unknown',
+            model: row.model || row.Model || 'Unknown',
+            condition: condition === 'new' ? 'new' : 'used',
+            status: 'available'
+          };
+        }
       }
     }
+
+    // Determine the final condition value
+    let finalCondition: 'new' | 'used' | 'certified';
+    if (condition === 'gm_global') {
+      finalCondition = 'new';
+    } else {
+      finalCondition = condition;
+    }
+
+    // Ensure required fields have defaults with error handling
+    const inventoryItem: InventoryItem = {
+      make: mappedData.make || 'Unknown',
+      model: mappedData.model || 'Unknown',
+      condition: mappedData.condition || finalCondition,
+      status: mappedData.status || 'available',
+      upload_history_id: uploadId,
+      ...mappedData
+    };
+
+    // Set source_report based on condition and data type
+    if (condition === 'gm_global' || mappedData.gm_order_number) {
+      inventoryItem.source_report = 'orders_all';
+    } else if (condition === 'new') {
+      inventoryItem.source_report = 'new_car_main_view';
+    } else {
+      inventoryItem.source_report = 'merch_inv_view';
+    }
+
+    // Calculate delivery variance if we have both dates
+    if (inventoryItem.actual_delivery_date && inventoryItem.estimated_delivery_date) {
+      try {
+        const actualDate = new Date(inventoryItem.actual_delivery_date);
+        const estimatedDate = new Date(inventoryItem.estimated_delivery_date);
+        const diffTime = actualDate.getTime() - estimatedDate.getTime();
+        inventoryItem.delivery_variance_days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      } catch (error) {
+        console.error('Error calculating delivery variance:', error);
+        inventoryItem.delivery_variance_days = null;
+      }
+    }
+
+    console.log('Final mapped inventory item:', {
+      make: inventoryItem.make,
+      model: inventoryItem.model,
+      condition: inventoryItem.condition,
+      source_report: inventoryItem.source_report,
+      gm_order_number: inventoryItem.gm_order_number,
+      customer_name: inventoryItem.customer_name,
+      estimated_delivery_date: inventoryItem.estimated_delivery_date,
+      hasGMData: !!(inventoryItem.gm_order_number || inventoryItem.customer_name)
+    });
+
+    return inventoryItem;
+  } catch (error) {
+    console.error('Critical error in mapRowToInventoryItem:', error);
+    
+    // Return a minimal valid inventory item to prevent complete failure
+    return {
+      make: row.make || row.Make || 'Unknown',
+      model: row.model || row.Model || 'Unknown',
+      condition: condition === 'gm_global' ? 'new' : (condition === 'new' ? 'new' : 'used'),
+      status: 'available',
+      upload_history_id: uploadId,
+      source_report: condition === 'gm_global' ? 'orders_all' : (condition === 'new' ? 'new_car_main_view' : 'merch_inv_view')
+    };
   }
-
-  // Determine the final condition value
-  let finalCondition: 'new' | 'used' | 'certified';
-  if (condition === 'gm_global') {
-    finalCondition = 'new';
-  } else {
-    finalCondition = condition;
-  }
-
-  // Ensure required fields have defaults
-  const inventoryItem: InventoryItem = {
-    make: mappedData.make || 'Unknown',
-    model: mappedData.model || 'Unknown',
-    condition: mappedData.condition || finalCondition,
-    status: mappedData.status || 'available',
-    upload_history_id: uploadId,
-    ...mappedData
-  };
-
-  // Set source_report based on condition and data type
-  if (condition === 'gm_global' || mappedData.gm_order_number) {
-    inventoryItem.source_report = 'orders_all';
-  } else if (condition === 'new') {
-    inventoryItem.source_report = 'new_car_main_view';
-  } else {
-    inventoryItem.source_report = 'merch_inv_view';
-  }
-
-  // Calculate delivery variance if we have both dates
-  if (inventoryItem.actual_delivery_date && inventoryItem.estimated_delivery_date) {
-    const actualDate = new Date(inventoryItem.actual_delivery_date);
-    const estimatedDate = new Date(inventoryItem.estimated_delivery_date);
-    const diffTime = actualDate.getTime() - estimatedDate.getTime();
-    inventoryItem.delivery_variance_days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }
-
-  console.log('Final mapped inventory item:', {
-    make: inventoryItem.make,
-    model: inventoryItem.model,
-    condition: inventoryItem.condition,
-    source_report: inventoryItem.source_report,
-    gm_order_number: inventoryItem.gm_order_number,
-    customer_name: inventoryItem.customer_name,
-    estimated_delivery_date: inventoryItem.estimated_delivery_date,
-    hasGMData: !!(inventoryItem.gm_order_number || inventoryItem.customer_name)
-  });
-
-  return inventoryItem;
 };

@@ -45,116 +45,133 @@ const InventoryDashboard = () => {
   const [qrModalOpen, setQRModalOpen] = useState(false);
   const [qrVehicle, setQRVehicle] = useState<any | null>(null);
 
-  const { data: inventory, isLoading } = useQuery({
+  const { data: inventory, isLoading, error } = useQuery({
     queryKey: ['inventory-enhanced', filters, searchTerm],
     queryFn: async () => {
-      let query = supabase
-        .from('inventory')
-        .select(`
-          *,
-          deals!stock_number(
-            id,
-            upload_date,
-            sale_amount,
-            total_profit,
-            deal_type
-          )
-        `);
+      try {
+        let query = supabase
+          .from('inventory')
+          .select(`
+            *,
+            deals!stock_number(
+              id,
+              upload_date,
+              sale_amount,
+              total_profit,
+              deal_type
+            )
+          `);
 
-      if (filters.make) {
-        query = query.ilike('make', `%${filters.make}%`);
-      }
-      if (filters.model) {
-        query = query.ilike('model', `%${filters.model}%`);
-      }
-      if (filters.inventoryType && filters.inventoryType !== 'all') {
-        query = query.eq('condition', filters.inventoryType);
-      }
-      if (filters.sourceReport) {
-        query = query.eq('source_report', filters.sourceReport);
-      }
-      if (filters.rpoCode) {
-        query = query.contains('rpo_codes', [filters.rpoCode]);
-      }
-      if (filters.yearMin) {
-        query = query.gte('year', filters.yearMin);
-      }
-      if (filters.yearMax) {
-        query = query.lte('year', filters.yearMax);
-      }
-      if (filters.priceMin) {
-        query = query.gte('price', filters.priceMin);
-      }
-      if (filters.priceMax) {
-        query = query.lte('price', filters.priceMax);
-      }
-      if (searchTerm) {
-        query = query.or(`vin.ilike.%${searchTerm}%,stock_number.ilike.%${searchTerm}%,make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      // Process the data to include deal information and data quality
-      let processedData = data?.map(vehicle => ({
-        ...vehicle,
-        deal_count: Array.isArray(vehicle.deals) ? vehicle.deals.length : 0,
-        latest_deal: Array.isArray(vehicle.deals) && vehicle.deals.length > 0 
-          ? vehicle.deals.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0]
-          : null,
-        data_completeness: getDataCompletenessScore(vehicle)
-      })) || [];
-
-      // Apply data quality filter
-      if (filters.dataQuality === 'complete') {
-        processedData = processedData.filter(v => v.data_completeness >= 80);
-      } else if (filters.dataQuality === 'incomplete') {
-        processedData = processedData.filter(v => v.data_completeness < 80);
-      }
-
-      // Apply sorting
-      processedData.sort((a, b) => {
-        let aVal, bVal;
-        
-        switch (filters.sortBy) {
-          case 'age':
-            aVal = a.days_in_inventory || 0;
-            bVal = b.days_in_inventory || 0;
-            break;
-          case 'price':
-            aVal = a.price || 0;
-            bVal = b.price || 0;
-            break;
-          case 'year':
-            aVal = a.year || 0;
-            bVal = b.year || 0;
-            break;
-          case 'make':
-            aVal = a.make || '';
-            bVal = b.make || '';
-            break;
-          case 'model':
-            aVal = a.model || '';
-            bVal = b.model || '';
-            break;
-          case 'completeness':
-            aVal = a.data_completeness;
-            bVal = b.data_completeness;
-            break;
-          default:
-            return 0;
+        if (filters.make) {
+          query = query.ilike('make', `%${filters.make}%`);
         }
-        
-        if (typeof aVal === 'string') {
-          return filters.sortOrder === 'asc' 
-            ? aVal.localeCompare(bVal) 
-            : bVal.localeCompare(aVal);
+        if (filters.model) {
+          query = query.ilike('model', `%${filters.model}%`);
         }
+        if (filters.inventoryType && filters.inventoryType !== 'all') {
+          query = query.eq('condition', filters.inventoryType);
+        }
+        if (filters.sourceReport) {
+          query = query.eq('source_report', filters.sourceReport);
+        }
+        if (filters.rpoCode) {
+          query = query.contains('rpo_codes', [filters.rpoCode]);
+        }
+        if (filters.yearMin) {
+          query = query.gte('year', filters.yearMin);
+        }
+        if (filters.yearMax) {
+          query = query.lte('year', filters.yearMax);
+        }
+        if (filters.priceMin) {
+          query = query.gte('price', filters.priceMin);
+        }
+        if (filters.priceMax) {
+          query = query.lte('price', filters.priceMax);
+        }
+        if (searchTerm) {
+          query = query.or(`vin.ilike.%${searchTerm}%,stock_number.ilike.%${searchTerm}%,make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
         
-        return filters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-      });
-      
-      return processedData;
+        // Process the data to include deal information and data quality with error handling
+        let processedData = data?.map(vehicle => {
+          try {
+            return {
+              ...vehicle,
+              deal_count: Array.isArray(vehicle.deals) ? vehicle.deals.length : 0,
+              latest_deal: Array.isArray(vehicle.deals) && vehicle.deals.length > 0 
+                ? vehicle.deals.sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0]
+                : null,
+              data_completeness: getDataCompletenessScore(vehicle)
+            };
+          } catch (error) {
+            console.error('Error processing vehicle data:', error, vehicle);
+            return {
+              ...vehicle,
+              deal_count: 0,
+              latest_deal: null,
+              data_completeness: 0
+            };
+          }
+        }) || [];
+
+        // Apply data quality filter
+        if (filters.dataQuality === 'complete') {
+          processedData = processedData.filter(v => v.data_completeness >= 80);
+        } else if (filters.dataQuality === 'incomplete') {
+          processedData = processedData.filter(v => v.data_completeness < 80);
+        }
+
+        // Apply sorting
+        processedData.sort((a, b) => {
+          let aVal, bVal;
+          
+          switch (filters.sortBy) {
+            case 'age':
+              aVal = a.days_in_inventory || 0;
+              bVal = b.days_in_inventory || 0;
+              break;
+            case 'price':
+              aVal = a.price || 0;
+              bVal = b.price || 0;
+              break;
+            case 'year':
+              aVal = a.year || 0;
+              bVal = b.year || 0;
+              break;
+            case 'make':
+              aVal = a.make || '';
+              bVal = b.make || '';
+              break;
+            case 'model':
+              aVal = a.model || '';
+              bVal = b.model || '';
+              break;
+            case 'completeness':
+              aVal = a.data_completeness;
+              bVal = b.data_completeness;
+              break;
+            default:
+              return 0;
+          }
+          
+          if (typeof aVal === 'string') {
+            return filters.sortOrder === 'asc' 
+              ? aVal.localeCompare(bVal) 
+              : bVal.localeCompare(aVal);
+          }
+          
+          return filters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+        
+        return processedData;
+      } catch (error) {
+        console.error('Error fetching inventory:', error);
+        throw error;
+      }
     }
   });
 
@@ -201,6 +218,29 @@ const InventoryDashboard = () => {
       });
     }
   };
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">Inventory Dashboard</h1>
+            <p className="text-slate-600 mt-1">Error loading inventory data</p>
+          </div>
+        </div>
+        <Card className="p-8 text-center">
+          <div className="text-red-600 mb-4">
+            <Car className="w-12 h-12 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold mb-2">Unable to load inventory</h3>
+            <p className="text-sm">{error.message || 'An unexpected error occurred'}</p>
+          </div>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Refresh Page
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -310,21 +350,22 @@ const InventoryDashboard = () => {
         onFilterChange={handleDataQualityFilter}
       />
 
-      {/* Enhanced Inventory Table */}
+      {/* Enhanced Inventory Table with Error Boundary */}
       <Card>
-        <InventoryTable
-          inventory={inventory}
-          isLoading={isLoading}
-          onSort={toggleSort}
-          openCompletenessModal={handleOpenCompletenessModal}
-          onQRCode={handleOpenQRCodeModal}
-        />
-        {inventory && inventory.length === 0 && (
+        {inventory && inventory.length > 0 ? (
+          <InventoryTable
+            inventory={inventory}
+            isLoading={isLoading}
+            onSort={toggleSort}
+            openCompletenessModal={handleOpenCompletenessModal}
+            onQRCode={handleOpenQRCodeModal}
+          />
+        ) : !isLoading ? (
           <div className="p-8 text-center">
             <Car className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <p className="text-slate-600">No vehicles found matching your criteria</p>
           </div>
-        )}
+        ) : null}
       </Card>
 
       {/* Modal for QR Code print */}
