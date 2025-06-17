@@ -1,8 +1,7 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
-import { storeUploadedFile, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
+import { storeUploadedFile, createUploadHistoryWithoutStorage, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
 import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
 import { mapRowToInventoryItem } from "@/utils/enhancedFileParsingUtils";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
@@ -51,10 +50,24 @@ export const useMultiFileUpload = ({ userId }: UseMultiFileUploadProps) => {
                                 queuedFile.file.name.toLowerCase().includes('prelim') ||
                                 queuedFile.condition === 'gm_global';
       
-      // Store the original file first
+      // Try to store the original file first, with fallback
       const inventoryCondition = queuedFile.condition === 'gm_global' ? 'new' : queuedFile.condition;
-      uploadRecord = await storeUploadedFile(queuedFile.file, userId, 'inventory', inventoryCondition);
-      console.log('File stored with ID:', uploadRecord.id);
+      
+      try {
+        uploadRecord = await storeUploadedFile(queuedFile.file, userId, 'inventory', inventoryCondition);
+        console.log('File stored with ID:', uploadRecord.id);
+      } catch (storageError) {
+        console.warn('File storage failed, using fallback method:', storageError);
+        // Fallback: create upload history without storing the file
+        uploadRecord = await createUploadHistoryWithoutStorage(queuedFile.file, userId, 'inventory', inventoryCondition);
+        console.log('Upload history created without storage, ID:', uploadRecord.id);
+        
+        toast({
+          title: "Processing without file storage",
+          description: "File storage unavailable, but processing will continue normally",
+          variant: "default"
+        });
+      }
       
       // Parse the file
       const parsed = await parseEnhancedInventoryFile(queuedFile.file);
