@@ -1,158 +1,156 @@
+import { extractVehicleFields } from './field-extraction/vehicle';
+import { extractVINField } from './field-extraction/vin';
+import { extractOptionsFields } from './field-extraction/options';
+import { extractGMGlobalFields } from './field-extraction/gmGlobalEnhanced';
+import { extractVautoFields } from './field-extraction/vauto';
 
-import { getFieldValue, extractRPOCodes, findVINInRow, findMakeInRow, findModelInRow, findYearInRow, extractGMGlobalStatus, extractOptionDescriptions } from './field-extraction';
+export interface InventoryItem {
+  id?: string;
+  vin?: string;
+  stock_number?: string;
+  year?: number;
+  make: string;
+  model: string;
+  trim?: string;
+  body_style?: string;
+  color_exterior?: string;
+  color_interior?: string;
+  engine?: string;
+  transmission?: string;
+  drivetrain?: string;
+  fuel_type?: string;
+  mileage?: number;
+  price?: number;
+  msrp?: number;
+  invoice?: number;
+  rebates?: number;
+  pack?: number;
+  condition: 'new' | 'used' | 'certified';
+  status: 'available' | 'sold' | 'pending' | 'service' | 'wholesale';
+  source_report?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
+  rpo_codes?: string[];
+  rpo_descriptions?: string[];
+  full_option_blob?: any;
+  
+  // GM Global specific fields
+  estimated_delivery_date?: string;
+  actual_delivery_date?: string;
+  order_date?: string;
+  gm_order_number?: string;
+  customer_name?: string;
+  dealer_order_code?: string;
+  build_week?: string;
+  production_sequence?: string;
+  gm_status_description?: string;
+  delivery_method?: string;
+  priority_code?: string;
+  order_type?: string;
+  plant_code?: string;
+  ship_to_dealer_code?: string;
+  selling_dealer_code?: string;
+  order_priority?: string;
+  special_equipment?: string;
+  customer_order_number?: string;
+  trade_hold_status?: string;
+  allocation_code?: string;
+  gm_model_code?: string;
+  order_source?: string;
+  original_order_date?: string;
+  revised_delivery_date?: string;
+  delivery_variance_days?: number;
+  
+  // Other fields
+  features?: string[];
+  description?: string;
+  dealer_notes?: string;
+  images?: string[];
+  carfax_url?: string;
+  location?: string;
+  upload_history_id?: string;
+}
 
-// Enhanced mapping function that handles GM Global specific fields with smart detection
 export const mapRowToInventoryItem = (
-  row: Record<string, any>, 
-  condition: 'new' | 'used' | 'gm_global', 
-  uploadHistoryId: string
-) => {
-  console.log('=== ENHANCED FIELD MAPPING DEBUG ===');
-  console.log('Row data received:', row);
-  console.log('Available column names:', Object.keys(row));
-  console.log('Number of columns:', Object.keys(row).length);
-  console.log('Condition:', condition);
-  console.log('Sample values from first few columns:');
-  Object.keys(row).slice(0, 5).forEach(key => {
-    console.log(`  "${key}": "${row[key]}"`);
-  });
+  row: any,
+  condition: 'new' | 'used' | 'gm_global',
+  uploadId: string
+): InventoryItem => {
+  console.log('Mapping row to inventory item:', { condition, keys: Object.keys(row) });
 
-  // Use smart detection for critical fields
-  const detectedVin = findVINInRow(row);
-  const make = findMakeInRow(row);
-  const model = findModelInRow(row);
-  const year = findYearInRow(row);
+  let mappedData: any;
 
-  // For VIN, set to null if not found (instead of empty string to avoid constraint violations)
-  const vin = detectedVin && detectedVin.length >= 10 ? detectedVin : null;
-
-  // For stock number, try multiple approaches
-  let stockNumber = '';
+  // Determine file type and use appropriate extraction
   if (condition === 'gm_global') {
-    stockNumber = getFieldValue(row, [
-      'Order #', 'Order Number', 'GM Order Number',
-      'Stock Number', 'Stock', 'Dealer Stock', 'Unit Number', 'Order ID'
-    ]);
+    console.log('Using GM Global extraction for comprehensive data capture');
+    mappedData = extractGMGlobalFields(row);
   } else {
-    stockNumber = getFieldValue(row, [
-      'Stock', 'stock', 'StockNumber', 'Stock_Number', 'Stock Number', 'Stock No.',
-      'VehicleStockNumber', 'Dealer Stock', 'Unit Number',
-      'Inventory Number', 'Stock #'
-    ]);
-  }
+    // Check if this looks like a GM Global file even if not explicitly marked
+    const hasGMGlobalFields = Object.keys(row).some(key => 
+      key.toLowerCase().includes('order') ||
+      key.toLowerCase().includes('delivery') ||
+      key.toLowerCase().includes('customer') ||
+      key.toLowerCase().includes('gm ')
+    );
 
-  console.log('=== SMART DETECTION RESULTS ===');
-  console.log('VIN:', vin);
-  console.log('Make:', make);
-  console.log('Model:', model);
-  console.log('Year:', year);
-  console.log('Stock Number:', stockNumber);
-  console.log('=================================');
-
-  // Enhanced field extraction for other properties
-  const trim = getFieldValue(row, ['Trim', 'Series', 'Level', 'Grade', 'Style Level']);
-  const bodyStyle = getFieldValue(row, ['Body Style', 'Body', 'Style', 'Body Type', 'Body Code']);
-  const colorExterior = getFieldValue(row, ['Exterior Color', 'ExtColor', 'Color', 'Paint Code', 'Ext Color Code']);
-  const colorInterior = getFieldValue(row, ['Interior Color', 'IntColor', 'Interior', 'Trim Color', 'Int Color Code']);
-  const engine = getFieldValue(row, ['Engine', 'Engine Description', 'Motor', 'Engine Code', 'Engine Type']);
-  const transmission = getFieldValue(row, ['Transmission', 'Trans', 'Transmission Type', 'Trans Code']);
-  const drivetrain = getFieldValue(row, ['Drivetrain', 'Drive', 'DriveTrain', 'Drive Type', 'Drive Code']);
-  const fuelType = getFieldValue(row, ['Fuel Type', 'Fuel', 'Fuel System', 'Fuel Code']);
-
-  // Enhanced price extraction with better parsing
-  const parsePrice = (value: string) => {
-    if (!value) return undefined;
-    const cleanValue = String(value).replace(/[$,]/g, '');
-    const parsed = parseFloat(cleanValue);
-    return isNaN(parsed) ? undefined : parsed;
-  };
-
-  const price = parsePrice(getFieldValue(row, [
-    'Price', 'MSRP', 'Selling Price', 'Retail Price', 'List Price'
-  ]));
-
-  const msrp = parsePrice(getFieldValue(row, [
-    'MSRP', 'MSRP w/DFC†', 'Retail Price', 'List Price', 'Suggested Retail'
-  ]));
-
-  const invoice = parsePrice(getFieldValue(row, [
-    'Invoice', 'Invoice Price', 'Dealer Cost', 'Cost'
-  ]));
-
-  const mileage = parseInt(getFieldValue(row, [
-    'Mileage', 'Odometer', 'Miles', 'Current Mileage', 'Odo'
-  ])) || undefined;
-
-  // Enhanced RPO and option extraction
-  const rpoCodes = extractRPOCodes(row);
-  const optionDescriptions = extractOptionDescriptions(row);
-
-  // CRITICAL FIX: Extract actual GM Global status instead of hardcoding
-  let status = 'available'; // Default for regular inventory
-  if (condition === 'gm_global') {
-    const gmStatus = extractGMGlobalStatus(row);
-    if (gmStatus) {
-      status = gmStatus; // Use actual GM status code (5000, 4200, etc.)
-      console.log(`✓ Using GM Global status: ${status}`);
+    if (hasGMGlobalFields) {
+      console.log('Detected GM Global fields, using enhanced extraction');
+      mappedData = extractGMGlobalFields(row);
     } else {
-      console.log('⚠ No GM Global status found, defaulting to available');
+      // Use existing extraction methods
+      mappedData = {
+        ...extractVehicleFields(row),
+        ...extractVINField(row),
+        ...extractOptionsFields(row),
+        condition: condition === 'gm_global' ? 'new' : condition,
+        status: 'available'
+      };
+
+      // Try Vauto-specific extraction if available
+      try {
+        const vautoData = extractVautoFields(row);
+        mappedData = { ...mappedData, ...vautoData };
+      } catch (error) {
+        console.log('Vauto extraction not applicable:', error);
+      }
     }
   }
 
-  // Map condition to database-compatible condition
-  const dbCondition: 'new' | 'used' = condition === 'used' ? 'used' : 'new';
-
-  console.log('=== FINAL MAPPED INVENTORY ITEM ===');
-  console.log('VIN:', vin);
-  console.log('Make:', make);
-  console.log('Model:', model);
-  console.log('Year:', year);
-  console.log('Stock Number:', stockNumber);
-  console.log('Condition:', dbCondition);
-  console.log('Status:', status);
-  console.log('RPO Codes:', rpoCodes);
-  console.log('Option Descriptions:', optionDescriptions);
-  console.log('===================================');
-
-  // Ensure we have required fields
-  if (!make || make.trim().length === 0) {
-    throw new Error('Missing required field: Make');
-  }
-  
-  if (!model || model.trim().length === 0) {
-    throw new Error('Missing required field: Model');
-  }
-
-  return {
-    vin: vin, // This will be null if no valid VIN found, preventing constraint violations
-    stock_number: stockNumber || undefined,
-    year: year ? parseInt(year) : undefined,
-    make: make.trim(),
-    model: model.trim(),
-    trim: trim || undefined,
-    body_style: bodyStyle || undefined,
-    color_exterior: colorExterior || undefined,
-    color_interior: colorInterior || undefined,
-    engine: engine || undefined,
-    transmission: transmission || undefined,
-    drivetrain: drivetrain || undefined,
-    fuel_type: fuelType || undefined,
-    mileage: mileage,
-    price: price,
-    msrp: msrp,
-    invoice: invoice,
-    rebates: parsePrice(getFieldValue(row, ['Rebates', 'rebates', 'REBATES', 'Incentives', 'incentives'])),
-    pack: parsePrice(getFieldValue(row, ['Pack', 'pack', 'PACK', 'DealerPack', 'Dealer_Pack'])),
-    condition: dbCondition,
-    status: status, // Now uses actual GM Global status codes
-    rpo_codes: rpoCodes.length > 0 ? rpoCodes : undefined,
-    rpo_descriptions: optionDescriptions.length > 0 ? optionDescriptions : undefined,
-    upload_history_id: uploadHistoryId,
-    full_option_blob: rpoCodes.length > 0 || optionDescriptions.length > 0 ? { rpo_codes: rpoCodes, descriptions: optionDescriptions } : undefined,
-    first_seen_at: new Date().toISOString(),
-    last_seen_at: new Date().toISOString(),
-    leads_count: 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+  // Ensure required fields have defaults
+  const inventoryItem: InventoryItem = {
+    make: mappedData.make || 'Unknown',
+    model: mappedData.model || 'Unknown',
+    condition: mappedData.condition || (condition === 'gm_global' ? 'new' : condition),
+    status: mappedData.status || 'available',
+    upload_history_id: uploadId,
+    ...mappedData
   };
+
+  // Set source_report based on condition and data type
+  if (condition === 'gm_global' || mappedData.gm_order_number) {
+    inventoryItem.source_report = 'orders_all';
+  } else if (condition === 'new') {
+    inventoryItem.source_report = 'new_car_main_view';
+  } else {
+    inventoryItem.source_report = 'merch_inv_view';
+  }
+
+  // Calculate delivery variance if we have both dates
+  if (inventoryItem.actual_delivery_date && inventoryItem.estimated_delivery_date) {
+    const actualDate = new Date(inventoryItem.actual_delivery_date);
+    const estimatedDate = new Date(inventoryItem.estimated_delivery_date);
+    const diffTime = actualDate.getTime() - estimatedDate.getTime();
+    inventoryItem.delivery_variance_days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  console.log('Final mapped inventory item:', {
+    make: inventoryItem.make,
+    model: inventoryItem.model,
+    condition: inventoryItem.condition,
+    source_report: inventoryItem.source_report,
+    gm_order_number: inventoryItem.gm_order_number,
+    customer_name: inventoryItem.customer_name,
+    estimated_delivery_date: inventoryItem.estimated_delivery_date,
+    hasGMData: !!(inventoryItem.gm_order_number || inventoryItem.customer_name)
+  });
+
+  return inventoryItem;
 };

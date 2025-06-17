@@ -1135,9 +1135,12 @@ export type Database = {
         Row: {
           accidents_reported: number | null
           acquisition_date: string | null
+          actual_delivery_date: string | null
           age_group: string | null
+          allocation_code: string | null
           body_style: string | null
           book_value: number | null
+          build_week: string | null
           carfax_url: string | null
           cash_down_payment: number | null
           certification_type: string | null
@@ -1145,13 +1148,19 @@ export type Database = {
           color_interior: string | null
           condition: string
           created_at: string
+          customer_name: string | null
+          customer_order_number: string | null
           days_in_inventory: number | null
           dealer_notes: string | null
+          dealer_order_code: string | null
           dealer_pack: number | null
+          delivery_method: string | null
+          delivery_variance_days: number | null
           demand_score: number | null
           description: string | null
           drivetrain: string | null
           engine: string | null
+          estimated_delivery_date: string | null
           expected_sale_date: string | null
           factory_warranty_remaining: boolean | null
           features: string[] | null
@@ -1159,6 +1168,9 @@ export type Database = {
           first_seen_at: string | null
           fuel_type: string | null
           full_option_blob: Json | null
+          gm_model_code: string | null
+          gm_order_number: string | null
+          gm_status_description: string | null
           holdback: number | null
           id: string
           images: string[] | null
@@ -1177,27 +1189,40 @@ export type Database = {
           mileage: number | null
           model: string
           msrp: number | null
+          order_date: string | null
+          order_priority: string | null
+          order_source: string | null
+          order_type: string | null
+          original_order_date: string | null
           pack: number | null
           photos_urls: string[] | null
+          plant_code: string | null
           predicted_sale_date: string | null
           previous_owners: number | null
           price: number | null
           price_competitiveness: string | null
+          priority_code: string | null
+          production_sequence: string | null
           profit_margin: number | null
           rebates: number | null
           reconditioning_cost: number | null
+          revised_delivery_date: string | null
           rpo_codes: string[] | null
           rpo_descriptions: string[] | null
           sales_rep: string | null
+          selling_dealer_code: string | null
           service_records_available: boolean | null
+          ship_to_dealer_code: string | null
           sold_at: string | null
           source_acquired: string | null
           source_report:
             | Database["public"]["Enums"]["source_report_type"]
             | null
+          special_equipment: string | null
           status: string
           stock_number: string | null
           title_status: string | null
+          trade_hold_status: string | null
           trade_value: number | null
           transmission: string | null
           trim: string | null
@@ -1217,9 +1242,12 @@ export type Database = {
         Insert: {
           accidents_reported?: number | null
           acquisition_date?: string | null
+          actual_delivery_date?: string | null
           age_group?: string | null
+          allocation_code?: string | null
           body_style?: string | null
           book_value?: number | null
+          build_week?: string | null
           carfax_url?: string | null
           cash_down_payment?: number | null
           certification_type?: string | null
@@ -1227,13 +1255,19 @@ export type Database = {
           color_interior?: string | null
           condition?: string
           created_at?: string
+          customer_name?: string | null
+          customer_order_number?: string | null
           days_in_inventory?: number | null
           dealer_notes?: string | null
+          dealer_order_code?: string | null
           dealer_pack?: number | null
+          delivery_method?: string | null
+          delivery_variance_days?: number | null
           demand_score?: number | null
           description?: string | null
           drivetrain?: string | null
           engine?: string | null
+          estimated_delivery_date?: string | null
           expected_sale_date?: string | null
           factory_warranty_remaining?: boolean | null
           features?: string[] | null
@@ -1241,6 +1275,9 @@ export type Database = {
           first_seen_at?: string | null
           fuel_type?: string | null
           full_option_blob?: Json | null
+          gm_model_code?: string | null
+          gm_order_number?: string | null
+          gm_status_description?: string | null
           holdback?: number | null
           id?: string
           images?: string[] | null
@@ -1259,27 +1296,40 @@ export type Database = {
           mileage?: number | null
           model: string
           msrp?: number | null
+          order_date?: string | null
+          order_priority?: string | null
+          order_source?: string | null
+          order_type?: string | null
+          original_order_date?: string | null
           pack?: number | null
           photos_urls?: string[] | null
+          plant_code?: string | null
           predicted_sale_date?: string | null
           previous_owners?: number | null
           price?: number | null
           price_competitiveness?: string | null
+          priority_code?: string | null
+          production_sequence?: string | null
           profit_margin?: number | null
           rebates?: number | null
           reconditioning_cost?: number | null
+          revised_delivery_date?: string | null
           rpo_codes?: string[] | null
           rpo_descriptions?: string[] | null
           sales_rep?: string | null
+          selling_dealer_code?: string | null
           service_records_available?: boolean | null
+          ship_to_dealer_code?: string | null
           sold_at?: string | null
           source_acquired?: string | null
           source_report?:
             | Database["public"]["Enums"]["source_report_type"]
             | null
+          special_equipment?: string | null
           status?: string
           stock_number?: string | null
           title_status?: string | null
+          trade_hold_status?: string | null
           trade_value?: number | null
           transmission?: string | null
           trim?: string | null
@@ -1299,9 +1349,12 @@ export type Database = {
         Update: {
           accidents_reported?: number | null
           acquisition_date?: string | null
+          actual_delivery_date?: string | null
           age_group?: string | null
+          allocation_code?: string | null
           body_style?: string | null
           book_value?: number | null
+          build_week?: string | null
           carfax_url?: string | null
           cash_down_payment?: number | null
           certification_type?: string | null
@@ -1309,13 +1362,19 @@ export type Database = {
           color_interior?: string | null
           condition?: string
           created_at?: string
+          customer_name?: string | null
+          customer_order_number?: string | null
           days_in_inventory?: number | null
           dealer_notes?: string | null
+          dealer_order_code?: string | null
           dealer_pack?: number | null
+          delivery_method?: string | null
+          delivery_variance_days?: number | null
           demand_score?: number | null
           description?: string | null
           drivetrain?: string | null
           engine?: string | null
+          estimated_delivery_date?: string | null
           expected_sale_date?: string | null
           factory_warranty_remaining?: boolean | null
           features?: string[] | null
@@ -1323,6 +1382,9 @@ export type Database = {
           first_seen_at?: string | null
           fuel_type?: string | null
           full_option_blob?: Json | null
+          gm_model_code?: string | null
+          gm_order_number?: string | null
+          gm_status_description?: string | null
           holdback?: number | null
           id?: string
           images?: string[] | null
@@ -1341,27 +1403,40 @@ export type Database = {
           mileage?: number | null
           model?: string
           msrp?: number | null
+          order_date?: string | null
+          order_priority?: string | null
+          order_source?: string | null
+          order_type?: string | null
+          original_order_date?: string | null
           pack?: number | null
           photos_urls?: string[] | null
+          plant_code?: string | null
           predicted_sale_date?: string | null
           previous_owners?: number | null
           price?: number | null
           price_competitiveness?: string | null
+          priority_code?: string | null
+          production_sequence?: string | null
           profit_margin?: number | null
           rebates?: number | null
           reconditioning_cost?: number | null
+          revised_delivery_date?: string | null
           rpo_codes?: string[] | null
           rpo_descriptions?: string[] | null
           sales_rep?: string | null
+          selling_dealer_code?: string | null
           service_records_available?: boolean | null
+          ship_to_dealer_code?: string | null
           sold_at?: string | null
           source_acquired?: string | null
           source_report?:
             | Database["public"]["Enums"]["source_report_type"]
             | null
+          special_equipment?: string | null
           status?: string
           stock_number?: string | null
           title_status?: string | null
+          trade_hold_status?: string | null
           trade_value?: number | null
           transmission?: string | null
           trim?: string | null
@@ -3021,6 +3096,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_delivery_variance: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       calculate_lead_temperature: {
         Args: { p_lead_id: string }
         Returns: number
@@ -3048,6 +3127,23 @@ export type Database = {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_gm_orders_by_delivery_timeline: {
+        Args: { p_start_date?: string; p_end_date?: string }
+        Returns: {
+          id: string
+          gm_order_number: string
+          customer_name: string
+          estimated_delivery_date: string
+          actual_delivery_date: string
+          make: string
+          model: string
+          year: number
+          status: string
+          gm_status_description: string
+          delivery_variance_days: number
+          is_overdue: boolean
+        }[]
       }
       get_rpo_analytics: {
         Args: Record<PropertyKey, never>

@@ -86,6 +86,19 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       console.log('Sample row keys:', Object.keys(parsed.sample));
       console.log('Sample row data:', parsed.sample);
       
+      // Enhanced logging for GM Global files
+      if (condition === 'gm_global') {
+        console.log('GM Global file detected - checking for order data:');
+        const sampleKeys = Object.keys(parsed.sample);
+        const gmFields = sampleKeys.filter(key => 
+          key.toLowerCase().includes('order') ||
+          key.toLowerCase().includes('delivery') ||
+          key.toLowerCase().includes('customer') ||
+          key.toLowerCase().includes('gm ')
+        );
+        console.log('Detected GM Global fields:', gmFields);
+      }
+      
       // Validate and process all rows
       const validationResult = await validateAndProcessInventoryRows(
         parsed.rows,
@@ -122,9 +135,21 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         }
       } else if (isPreliminaryData) {
         console.log('Skipping automatic sync for preliminary data upload');
+        
+        // For GM Global uploads, update delivery variances
+        if (condition === 'gm_global') {
+          try {
+            const { error } = await supabase.rpc('calculate_delivery_variance');
+            if (error) throw error;
+            console.log('Updated delivery variances for GM Global orders');
+          } catch (error) {
+            console.error('Failed to update delivery variances:', error);
+          }
+        }
+        
         toast({
-          title: "Preliminary data uploaded",
-          description: "Preliminary orders uploaded successfully. No inventory cleanup performed.",
+          title: "GM Global orders uploaded",
+          description: "Order data uploaded successfully with delivery tracking enabled.",
         });
       }
 
@@ -141,22 +166,22 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         status: validationResult.errorCount === 0 ? 'success' : 'partial'
       });
 
-      const conditionLabel = condition === 'gm_global' ? 'GM Global' : condition;
+      const conditionLabel = condition === 'gm_global' ? 'GM Global Orders' : condition;
       if (validationResult.errorCount === 0) {
         toast({
           title: "Upload successful!",
-          description: `${validationResult.successCount} ${conditionLabel} ${isPreliminaryData ? 'preliminary orders' : 'vehicles'} imported successfully`,
+          description: `${validationResult.successCount} ${conditionLabel.toLowerCase()} imported with complete data capture`,
         });
       } else if (validationResult.successCount > 0) {
         toast({
           title: "Upload completed with errors",
-          description: `${validationResult.successCount} ${isPreliminaryData ? 'orders' : 'vehicles'} imported, ${validationResult.errorCount} failed. Check details below.`,
+          description: `${validationResult.successCount} ${conditionLabel.toLowerCase()} imported, ${validationResult.errorCount} failed. Check details below.`,
           variant: "default"
         });
       } else {
         toast({
           title: "Upload failed",
-          description: `No ${isPreliminaryData ? 'orders' : 'vehicles'} could be imported. Check the console for detailed field mapping information.`,
+          description: `No ${conditionLabel.toLowerCase()} could be imported. Check the console for detailed field mapping information.`,
           variant: "destructive"
         });
       }
