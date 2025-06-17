@@ -1,10 +1,10 @@
+
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile, mapRowToInventoryItem } from "@/utils/enhancedFileParsingUtils";
 import { storeUploadedFile, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
 import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 import { useUploadState, type UploadResult } from "@/hooks/useUploadState";
-import { syncInventoryData } from "@/services/inventoryService";
 import { supabase } from "@/integrations/supabase/client";
 
 interface UseInventoryUploadProps {
@@ -116,41 +116,16 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
       });
 
-      // Only trigger automatic sync for actual inventory (not preliminary data)
-      if (!isPreliminaryData && validationResult.successCount > 0) {
+      // NO AUTOMATIC SYNC - inventory uploads should not mark vehicles as sold
+      // Only financial data should determine sold status
+      if (condition === 'gm_global') {
         try {
-          console.log('Triggering automatic inventory sync for actual inventory upload...');
-          await syncInventoryData(uploadRecord.id);
-          toast({
-            title: "Inventory synced automatically",
-            description: "Previous inventory has been updated based on this upload",
-          });
-        } catch (syncError) {
-          console.error('Automatic sync failed:', syncError);
-          toast({
-            title: "Upload successful, sync failed",
-            description: "Upload completed but automatic inventory sync failed. You may need to run cleanup manually.",
-            variant: "default"
-          });
+          const { error } = await supabase.rpc('calculate_delivery_variance');
+          if (error) throw error;
+          console.log('Updated delivery variances for GM Global orders');
+        } catch (error) {
+          console.error('Failed to update delivery variances:', error);
         }
-      } else if (isPreliminaryData) {
-        console.log('Skipping automatic sync for preliminary data upload');
-        
-        // For GM Global uploads, update delivery variances
-        if (condition === 'gm_global') {
-          try {
-            const { error } = await supabase.rpc('calculate_delivery_variance');
-            if (error) throw error;
-            console.log('Updated delivery variances for GM Global orders');
-          } catch (error) {
-            console.error('Failed to update delivery variances:', error);
-          }
-        }
-        
-        toast({
-          title: "GM Global orders uploaded",
-          description: "Order data uploaded successfully with delivery tracking enabled.",
-        });
       }
 
       setUploadResult({
@@ -170,7 +145,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       if (validationResult.errorCount === 0) {
         toast({
           title: "Upload successful!",
-          description: `${validationResult.successCount} ${conditionLabel.toLowerCase()} imported with complete data capture`,
+          description: `${validationResult.successCount} ${conditionLabel.toLowerCase()} imported successfully. Vehicles remain available until financial data marks them as sold.`,
         });
       } else if (validationResult.successCount > 0) {
         toast({

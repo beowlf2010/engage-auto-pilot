@@ -4,10 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 export const updateInventoryStatusFromDeals = async (stockNumbers: string[]) => {
   if (stockNumbers.length === 0) return;
 
-  console.log('Updating inventory status for stock numbers:', stockNumbers);
+  console.log('Marking vehicles as sold based on financial data for stock numbers:', stockNumbers);
 
   try {
-    // Update inventory status to 'sold' for vehicles that have deals
+    // Mark inventory as sold only when deals are found - this is the correct way
     const { error } = await supabase
       .from('inventory')
       .update({ 
@@ -16,14 +16,14 @@ export const updateInventoryStatusFromDeals = async (stockNumbers: string[]) => 
         updated_at: new Date().toISOString()
       })
       .in('stock_number', stockNumbers)
-      .eq('status', 'available'); // Only update if currently available
+      .neq('status', 'sold'); // Only update if not already sold
 
     if (error) {
-      console.error('Error updating inventory status:', error);
+      console.error('Error updating inventory status from deals:', error);
       throw error;
     }
 
-    console.log(`Updated inventory status for ${stockNumbers.length} vehicles`);
+    console.log(`Successfully marked ${stockNumbers.length} vehicles as sold based on financial data`);
   } catch (error) {
     console.error('Failed to sync inventory with deals:', error);
     throw error;

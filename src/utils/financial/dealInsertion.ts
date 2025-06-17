@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { DealRecord, FinancialSummary } from "../dms/types";
 import { createInitialProfitSnapshot } from "@/services/financial/profitHistoryService";
+import { updateInventoryStatusFromDeals } from "../inventoryDealSync";
 
 export const insertFinancialData = async (
   deals: DealRecord[],
@@ -104,6 +105,17 @@ export const insertFinancialData = async (
 
     const insertedCount = insertedDeals?.length || 0;
     console.log(`Successfully upserted ${insertedCount} deals while preserving deal types`);
+
+    // Mark corresponding inventory as sold based on the deals we just inserted
+    if (stockNumbers.length > 0) {
+      try {
+        console.log('Marking vehicles as sold based on financial data...');
+        await updateInventoryStatusFromDeals(stockNumbers);
+      } catch (syncError) {
+        console.warn('Failed to sync inventory status:', syncError);
+        // Don't fail the whole operation if sync fails
+      }
+    }
 
     // Create initial profit snapshots only for truly new deals (not in existingDealMap)
     if (insertedDeals) {
