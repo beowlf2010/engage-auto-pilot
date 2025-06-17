@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -17,6 +16,7 @@ import DataCompletenessModal from "./inventory/DataCompletenessModal";
 import SummaryDataQualityCard from "./inventory/SummaryDataQualityCard";
 import InventoryTable from "./inventory/InventoryTable";
 import VehicleQRCodeModal from "./inventory/VehicleQRCodeModal";
+import AIInventoryMetrics from "./inventory/AIInventoryMetrics";
 
 interface InventoryFilters {
   make?: string;
@@ -280,7 +280,7 @@ const InventoryDashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Inventory Dashboard</h1>
-          <p className="text-slate-600 mt-1">Manage and analyze your vehicle inventory with enhanced new/used breakdown</p>
+          <p className="text-slate-600 mt-1">AI-powered inventory management and analysis</p>
         </div>
         <div className="flex items-center space-x-3">
           <InventoryCleanupButton />
@@ -301,6 +301,9 @@ const InventoryDashboard = () => {
 
       {/* Enhanced Stats with New/Used Breakdown */}
       <EnhancedInventoryMetrics />
+
+      {/* NEW: AI Inventory Intelligence */}
+      <AIInventoryMetrics totalVehicles={inventory?.length || 0} />
 
       {/* Enhanced Filters */}
       <Card className="p-6">
