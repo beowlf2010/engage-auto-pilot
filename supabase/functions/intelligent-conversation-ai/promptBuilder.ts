@@ -1,7 +1,7 @@
 
 import { classifyVehicle } from './vehicleClassification.ts';
 import { analyzeConversationPattern } from './conversationAnalysis.ts';
-import { analyzeCustomerIntent, generateFollowUpContent } from './intentAnalysis.ts';
+import { analyzeCustomerIntent, generateFollowUpContent, detectRedundantPatterns } from './intentAnalysis.ts';
 
 export const buildSystemPrompt = (
   leadName: string,
@@ -24,7 +24,9 @@ CRITICAL RULES:
 - Focus on the customer's actual question or concern
 - If we don't have what they want, acknowledge it directly and offer helpful alternatives
 - NEVER repeat questions the customer has already answered positively
+- NEVER ask the same question twice in a row
 - If customer shows interest in something, provide that information instead of asking again
+- If customer makes a direct request, fulfill it immediately without asking if they want it
 
 Customer Information:
 - Name: ${leadName}
@@ -106,22 +108,43 @@ export const buildUserPrompt = (
   requestedCategory: any,
   conversationPattern: any
 ) => {
-  // Analyze customer intent to detect if they're agreeing to something
+  // Analyze customer intent to understand what they're asking for
   const intentAnalysis = analyzeCustomerIntent(conversationHistory, lastCustomerMessage);
-  const followUpContent = intentAnalysis.agreedToOffer ? 
-    generateFollowUpContent(intentAnalysis.agreedToOffer, requestedCategory) : null;
+  const followUpContent = generateFollowUpContent(intentAnalysis, requestedCategory);
+  const redundancyCheck = detectRedundantPatterns(conversationHistory);
 
   let promptInstructions = `Customer's latest message: "${lastCustomerMessage}"
 
 Recent conversation context:
-${conversationHistory}`;
+${conversationHistory}
 
-  // Add intent-based instructions
-  if (intentAnalysis.shouldFollowUp && followUpContent) {
-    promptInstructions += `\n\nIMPORTANT - CUSTOMER INTENT DETECTED:
-- Customer has expressed interest in: ${followUpContent.context}
+INTENT ANALYSIS RESULTS:
+- Primary Intent: ${intentAnalysis.primaryIntent}
+- Is Direct Request: ${intentAnalysis.isDirectRequest}
+- Requested Topic: ${intentAnalysis.requestedTopic || 'none'}
+- Is Affirmative Response: ${intentAnalysis.isAffirmativeResponse}
+- Should Provide Information: ${intentAnalysis.shouldProvideInformation}`;
+
+  // Add specific instructions based on intent analysis
+  if (intentAnalysis.primaryIntent === 'direct_request') {
+    promptInstructions += `\n\nCUSTOMER MADE A DIRECT REQUEST:
+- They asked for: "${intentAnalysis.requestedTopic}"
+- PROVIDE the requested information immediately
+- DO NOT ask if they want the information - they already requested it
+- DO NOT repeat offers or ask redundant questions`;
+  } else if (intentAnalysis.primaryIntent === 'agreement' && followUpContent) {
+    promptInstructions += `\n\nCUSTOMER AGREED TO SOMETHING:
+- They agreed to: ${followUpContent.context}
 - FOLLOW UP ACTION REQUIRED: ${followUpContent.instruction}
-- DO NOT ask the same question again - provide the requested information`;
+- DO NOT ask the same question again - provide what was agreed upon`;
+  }
+
+  // Add redundancy warnings
+  if (redundancyCheck.hasRepeatedOffers) {
+    promptInstructions += `\n\nWARNING: REDUNDANT PATTERN DETECTED
+- You have been repeating similar offers/questions
+- STOP asking the same questions
+- Move the conversation forward with new information or next steps`;
   }
 
   promptInstructions += `\n\nGenerate a response that:
@@ -129,8 +152,8 @@ ${conversationHistory}`;
      'Continues the conversation naturally (NO generic greetings)' : 
      'Provides a warm, professional greeting'
    }
-2. ${intentAnalysis.shouldFollowUp ? 
-     'Follows through on what the customer agreed to (don\'t repeat offers)' : 
+2. ${intentAnalysis.shouldProvideInformation ? 
+     'Provides the specific information requested or agreed upon' : 
      'Directly and honestly addresses their question'
    }
 3. ${requestedCategory.isTesla ? 
@@ -142,23 +165,27 @@ ${conversationHistory}`;
      ) : 
      'Provides accurate inventory information'
    }
-4. ${intentAnalysis.shouldFollowUp ? 
-     'Provides the specific information they requested' : 
+4. ${intentAnalysis.shouldProvideInformation ? 
+     'Moves to next logical step after providing information' : 
      'Offers genuinely helpful next steps'
    }
 5. Is conversational and under 160 characters
 6. Builds trust through transparency
+7. NEVER repeats questions already asked or offers already made
 
-${intentAnalysis.shouldFollowUp ? 
-  `CUSTOMER AGREEMENT DETECTED: They said "${lastCustomerMessage}" in response to an offer. Provide the requested information instead of asking again.` : 
+${intentAnalysis.primaryIntent === 'direct_request' ? 
+  `DIRECT REQUEST DETECTED: Customer asked for "${intentAnalysis.requestedTopic}". Provide this information immediately without asking if they want it.` : 
   ''
 }
 
-${requestedCategory.isTesla && requestedCategory.condition === 'new' ? 
-  'NEW TESLA RESPONSE: Politely explain that Tesla only sells new vehicles direct and offer to help with other new EVs.' : 
-  requestedCategory.isTesla && requestedCategory.condition === 'used' ?
-    'USED TESLA RESPONSE: Be honest about current used Tesla inventory and offer alternatives or to watch for trade-ins.' :
-    ''
+${intentAnalysis.primaryIntent === 'agreement' && followUpContent ? 
+  `CUSTOMER AGREEMENT DETECTED: They agreed to receive information. Provide what was agreed upon instead of asking again.` : 
+  ''
+}
+
+${redundancyCheck.shouldAvoidRedundancy ?
+  `REDUNDANCY WARNING: Stop repeating the same offers. Provide new information or move to next steps.` :
+  ''
 }`;
 
   return promptInstructions;
