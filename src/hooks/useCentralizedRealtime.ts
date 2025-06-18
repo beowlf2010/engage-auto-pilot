@@ -8,10 +8,12 @@ import type { RealtimeCallbacks } from '@/types/realtime';
 let globalChannel: any = null;
 let globalCallbacks: RealtimeCallbacks[] = [];
 let isSubscribing = false;
+let isSubscribed = false;
 
 export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
   const { profile } = useAuth();
   const callbacksRef = useRef(callbacks);
+  const hasAddedCallbacks = useRef(false);
   
   // Update callbacks ref when they change
   useEffect(() => {
@@ -19,15 +21,16 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
   }, [callbacks]);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || hasAddedCallbacks.current) return;
 
     console.log('🔗 Adding callbacks to centralized realtime');
     
     // Add callbacks to global list
     globalCallbacks.push(callbacksRef.current);
+    hasAddedCallbacks.current = true;
     
-    // Only create channel if it doesn't exist and we're not already subscribing
-    if (!globalChannel && !isSubscribing) {
+    // Only create channel if it doesn't exist and we're not already subscribing/subscribed
+    if (!globalChannel && !isSubscribing && !isSubscribed) {
       console.log('🔗 Setting up centralized realtime subscriptions');
       isSubscribing = true;
 
@@ -105,28 +108,39 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
           if (status === 'SUBSCRIBED') {
             globalChannel = channel;
             isSubscribing = false;
+            isSubscribed = true;
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             globalChannel = null;
             isSubscribing = false;
+            isSubscribed = false;
           }
         });
     }
 
     return () => {
-      console.log('🔌 Removing callbacks from centralized realtime');
-      
-      // Remove callbacks from global list
-      const index = globalCallbacks.findIndex(cb => cb === callbacksRef.current);
-      if (index > -1) {
-        globalCallbacks.splice(index, 1);
-      }
-      
-      // Clean up channel if no more callbacks
-      if (globalCallbacks.length === 0 && globalChannel) {
-        console.log('🔌 Cleaning up centralized realtime subscriptions');
-        supabase.removeChannel(globalChannel);
-        globalChannel = null;
-        isSubscribing = false;
+      if (hasAddedCallbacks.current) {
+        console.log('🔌 Removing callbacks from centralized realtime');
+        
+        // Remove callbacks from global list
+        const index = globalCallbacks.findIndex(cb => cb === callbacksRef.current);
+        if (index > -1) {
+          globalCallbacks.splice(index, 1);
+        }
+        
+        hasAddedCallbacks.current = false;
+        
+        // Clean up channel if no more callbacks
+        if (globalCallbacks.length === 0 && globalChannel) {
+          console.log('🔌 Cleaning up centralized realtime subscriptions');
+          try {
+            supabase.removeChannel(globalChannel);
+          } catch (error) {
+            console.warn('⚠️ Error removing channel:', error);
+          }
+          globalChannel = null;
+          isSubscribing = false;
+          isSubscribed = false;
+        }
       }
     };
   }, [profile]);
