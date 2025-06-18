@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -15,7 +14,7 @@ import {
 } from "lucide-react";
 import { triggerImmediateMessage } from "@/services/proactiveAIService";
 import { triggerAITakeover } from "@/services/aiTakeoverService";
-import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface CompactAIControlsProps {
   leadId: string;
@@ -42,7 +41,7 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   onAIOptInChange,
   onAITakeoverChange
 }) => {
-  const { user } = useAuthContext();
+  const { user } = useAuth();
   const [isToggling, setIsToggling] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isTakingOver, setIsTakingOver] = useState(false);
