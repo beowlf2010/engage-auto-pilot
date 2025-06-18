@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Car, Plus, DollarSign, TrendingUp } from 'lucide-react';
 import TradeManagementSection from '../trades/TradeManagementSection';
+import QuickTradeAction from '../trades/QuickTradeAction';
 import { getTradeVehiclesByLeadId } from '@/services/tradeVehicleService';
 import type { TradeVehicle } from '@/types/trade';
 
@@ -68,13 +69,16 @@ const TradeInfoPanel = ({ leadId, leadName, hasTradeVehicle }: TradeInfoPanelPro
         {loading ? (
           <div className="text-center py-4 text-sm text-gray-500">Loading...</div>
         ) : tradeVehicles.length === 0 ? (
-          <div className="text-center py-4">
-            <Car className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-            <p className="text-sm text-gray-500 mb-3">No trade vehicles added</p>
-            <Button size="sm" onClick={() => setShowFullManagement(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Trade Vehicle
-            </Button>
+          <div className="space-y-3">
+            <div className="text-center py-2">
+              <Car className="h-6 w-6 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm text-gray-500 mb-3">No trade vehicles added</p>
+            </div>
+            <QuickTradeAction
+              leadId={leadId}
+              leadName={leadName}
+              onTradeAdded={loadTradeVehicles}
+            />
           </div>
         ) : (
           <>
@@ -102,11 +106,17 @@ const TradeInfoPanel = ({ leadId, leadName, hasTradeVehicle }: TradeInfoPanelPro
               )}
             </div>
 
-            <div className="flex space-x-2">
-              <Button size="sm" onClick={() => setShowFullManagement(true)} className="flex-1">
+            <div className="space-y-2">
+              <Button size="sm" onClick={() => setShowFullManagement(true)} className="w-full">
                 <TrendingUp className="h-4 w-4 mr-1" />
                 Manage Trades
               </Button>
+              
+              <QuickTradeAction
+                leadId={leadId}
+                leadName={leadName}
+                onTradeAdded={loadTradeVehicles}
+              />
             </div>
           </>
         )}

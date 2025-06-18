@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { DollarSign, Calculator, Save } from 'lucide-react';
+import { DollarSign, Save } from 'lucide-react';
 import { createTradeValuation } from '@/services/tradeVehicleService';
 import { toast } from '@/hooks/use-toast';
 import type { TradeVehicle } from '@/types/trade';
@@ -20,60 +20,41 @@ interface TradeValuationModalProps {
 
 const TradeValuationModal = ({ tradeVehicle, isOpen, onClose, onValuationAdded }: TradeValuationModalProps) => {
   const [formData, setFormData] = useState({
-    valuationSource: 'dealer_estimate' as const,
+    valuationSource: 'manual' as 'kbb' | 'edmunds' | 'manual' | 'dealer_estimate',
     tradeInValue: 0,
     privatePartyValue: 0,
     retailValue: 0,
-    wholesaleValue: 0,
     estimatedValue: 0,
     marketConditions: '',
-    valuationNotes: '',
-    isFinalOffer: false
+    valuationNotes: ''
   });
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  const handleSave = async () => {
     try {
+      setSaving(true);
       await createTradeValuation({
         tradeVehicleId: tradeVehicle.id,
-        valuationSource: formData.valuationSource,
-        tradeInValue: formData.tradeInValue || undefined,
-        privatePartyValue: formData.privatePartyValue || undefined,
-        retailValue: formData.retailValue || undefined,
-        wholesaleValue: formData.wholesaleValue || undefined,
-        estimatedValue: formData.estimatedValue || undefined,
         valuationDate: new Date().toISOString().split('T')[0],
-        marketConditions: formData.marketConditions || undefined,
-        valuationNotes: formData.valuationNotes || undefined,
-        isFinalOffer: formData.isFinalOffer
+        ...formData
       });
-
+      
       toast({
         title: "Success",
-        description: "Trade valuation added successfully"
+        description: "Trade valuation saved successfully"
       });
-
+      
       onValuationAdded();
     } catch (error) {
-      console.error('Error creating trade valuation:', error);
+      console.error('Error saving valuation:', error);
       toast({
         title: "Error",
-        description: "Failed to create trade valuation",
+        description: "Failed to save valuation",
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(value);
   };
 
   return (
@@ -82,14 +63,11 @@ const TradeValuationModal = ({ tradeVehicle, isOpen, onClose, onValuationAdded }
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <DollarSign className="h-5 w-5" />
-            <span>Value Trade Vehicle</span>
+            <span>Trade Valuation - {tradeVehicle.year} {tradeVehicle.make} {tradeVehicle.model}</span>
           </DialogTitle>
-          <p className="text-sm text-gray-600">
-            {tradeVehicle.year} {tradeVehicle.make} {tradeVehicle.model} • {tradeVehicle.mileage?.toLocaleString()} miles
-          </p>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+        
+        <div className="space-y-4">
           <div>
             <Label htmlFor="valuationSource">Valuation Source</Label>
             <Select 
@@ -100,10 +78,10 @@ const TradeValuationModal = ({ tradeVehicle, isOpen, onClose, onValuationAdded }
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="dealer_estimate">Dealer Estimate</SelectItem>
                 <SelectItem value="kbb">Kelley Blue Book</SelectItem>
                 <SelectItem value="edmunds">Edmunds</SelectItem>
-                <SelectItem value="manual">Manual Entry</SelectItem>
+                <SelectItem value="manual">Manual Appraisal</SelectItem>
+                <SelectItem value="dealer_estimate">Dealer Estimate</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -114,10 +92,9 @@ const TradeValuationModal = ({ tradeVehicle, isOpen, onClose, onValuationAdded }
               <Input
                 id="tradeInValue"
                 type="number"
-                step="0.01"
-                value={formData.tradeInValue || ''}
+                value={formData.tradeInValue}
                 onChange={(e) => setFormData(prev => ({ ...prev, tradeInValue: parseFloat(e.target.value) || 0 }))}
-                placeholder="0.00"
+                placeholder="0"
               />
             </div>
 
@@ -126,10 +103,9 @@ const TradeValuationModal = ({ tradeVehicle, isOpen, onClose, onValuationAdded }
               <Input
                 id="privatePartyValue"
                 type="number"
-                step="0.01"
-                value={formData.privatePartyValue || ''}
+                value={formData.privatePartyValue}
                 onChange={(e) => setFormData(prev => ({ ...prev, privatePartyValue: parseFloat(e.target.value) || 0 }))}
-                placeholder="0.00"
+                placeholder="0"
               />
             </div>
           </div>
@@ -140,60 +116,32 @@ const TradeValuationModal = ({ tradeVehicle, isOpen, onClose, onValuationAdded }
               <Input
                 id="retailValue"
                 type="number"
-                step="0.01"
-                value={formData.retailValue || ''}
+                value={formData.retailValue}
                 onChange={(e) => setFormData(prev => ({ ...prev, retailValue: parseFloat(e.target.value) || 0 }))}
-                placeholder="0.00"
+                placeholder="0"
               />
             </div>
 
             <div>
-              <Label htmlFor="wholesaleValue">Wholesale Value</Label>
+              <Label htmlFor="estimatedValue">Our Estimate</Label>
               <Input
-                id="wholesaleValue"
+                id="estimatedValue"
                 type="number"
-                step="0.01"
-                value={formData.wholesaleValue || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, wholesaleValue: parseFloat(e.target.value) || 0 }))}
-                placeholder="0.00"
+                value={formData.estimatedValue}
+                onChange={(e) => setFormData(prev => ({ ...prev, estimatedValue: parseFloat(e.target.value) || 0 }))}
+                placeholder="0"
               />
             </div>
           </div>
 
-          <div className="bg-green-50 p-4 rounded-lg">
-            <Label htmlFor="estimatedValue" className="text-green-800 font-medium">Our Estimated Offer</Label>
-            <Input
-              id="estimatedValue"
-              type="number"
-              step="0.01"
-              value={formData.estimatedValue || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, estimatedValue: parseFloat(e.target.value) || 0 }))}
-              placeholder="0.00"
-              className="mt-1 border-green-200 focus:border-green-500"
-            />
-            {formData.estimatedValue > 0 && (
-              <p className="text-sm text-green-700 mt-1">
-                Formatted: {formatCurrency(formData.estimatedValue)}
-              </p>
-            )}
-          </div>
-
           <div>
             <Label htmlFor="marketConditions">Market Conditions</Label>
-            <Select 
-              value={formData.marketConditions} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, marketConditions: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select market conditions" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="strong">Strong Market</SelectItem>
-                <SelectItem value="normal">Normal Market</SelectItem>
-                <SelectItem value="soft">Soft Market</SelectItem>
-                <SelectItem value="declining">Declining Market</SelectItem>
-              </SelectContent>
-            </Select>
+            <Input
+              id="marketConditions"
+              value={formData.marketConditions}
+              onChange={(e) => setFormData(prev => ({ ...prev, marketConditions: e.target.value }))}
+              placeholder="e.g., High demand, Low inventory"
+            />
           </div>
 
           <div>
@@ -202,21 +150,21 @@ const TradeValuationModal = ({ tradeVehicle, isOpen, onClose, onValuationAdded }
               id="valuationNotes"
               value={formData.valuationNotes}
               onChange={(e) => setFormData(prev => ({ ...prev, valuationNotes: e.target.value }))}
-              placeholder="Add any notes about the valuation..."
+              placeholder="Additional notes about the valuation..."
               rows={3}
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button onClick={handleSave} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
-              {loading ? 'Saving...' : 'Save Valuation'}
+              {saving ? 'Saving...' : 'Save Valuation'}
             </Button>
           </div>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
