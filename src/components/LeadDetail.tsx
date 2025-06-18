@@ -1,7 +1,7 @@
 
 import React from "react";
 import { useLeadDetail } from "@/hooks/useLeadDetail";
-import LeadDetailLayout from "./leads/detail/LeadDetailLayout";
+import StreamlinedLeadDetail from "./leads/detail/StreamlinedLeadDetail";
 
 const LeadDetail = () => {
   const {
@@ -40,16 +40,20 @@ const LeadDetail = () => {
   }
 
   return (
-    <LeadDetailLayout
-      lead={lead}
-      transformedLead={transformedLead}
-      messageThreadLead={messageThreadLead}
-      phoneNumbers={phoneNumbers}
-      primaryPhone={primaryPhone}
-      showMessageComposer={showMessageComposer}
-      setShowMessageComposer={setShowMessageComposer}
-      onPhoneSelect={handlePhoneSelect}
-    />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <StreamlinedLeadDetail
+          lead={lead}
+          transformedLead={transformedLead}
+          messageThreadLead={messageThreadLead}
+          phoneNumbers={phoneNumbers}
+          primaryPhone={primaryPhone}
+          showMessageComposer={showMessageComposer}
+          setShowMessageComposer={setShowMessageComposer}
+          onPhoneSelect={handlePhoneSelect}
+        />
+      </div>
+    </div>
   );
 };
 
