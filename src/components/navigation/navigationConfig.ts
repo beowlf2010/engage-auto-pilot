@@ -50,7 +50,7 @@ export const navigationConfig: NavConfig[] = [
   },
   {
     title: "Leads",
-    href: "/streamlined-leads",
+    href: "/leads",
     icon: Users,
     roles: ["admin", "manager", "salesperson"],
     priority: 'primary'
