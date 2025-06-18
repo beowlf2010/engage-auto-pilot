@@ -6,6 +6,7 @@ import { useCentralizedRealtime } from './useCentralizedRealtime';
 export const useRealtimeInbox = () => {
   const currentLeadIdRef = useRef<string | null>(null);
   const lastRefreshRef = useRef<number>(0);
+  const pendingRefreshRef = useRef<NodeJS.Timeout | null>(null);
   
   // Use conversation operations hook
   const {
@@ -33,10 +34,10 @@ export const useRealtimeInbox = () => {
     }
   };
 
-  // Enhanced real-time callbacks with debouncing and immediate refresh
+  // Enhanced real-time callbacks with immediate refresh and debouncing
   const handleConversationUpdate = useCallback(() => {
     const now = Date.now();
-    if (now - lastRefreshRef.current < 1000) {
+    if (now - lastRefreshRef.current < 500) {
       console.log('⏱️ Debouncing conversation update');
       return;
     }
@@ -48,6 +49,11 @@ export const useRealtimeInbox = () => {
 
   const handleMessageUpdate = useCallback((leadId: string) => {
     console.log('🔄 Enhanced real-time: Message update for lead:', leadId, 'Current lead:', currentLeadIdRef.current);
+    
+    // Clear any pending refresh
+    if (pendingRefreshRef.current) {
+      clearTimeout(pendingRefreshRef.current);
+    }
     
     // Always refresh conversations immediately for unread counts and last messages
     loadConversations();
@@ -90,7 +96,7 @@ export const useRealtimeInbox = () => {
     loadWithRetry();
   }, [loadConversations]);
 
-  // Enhanced send message function with immediate UI updates and error handling
+  // Enhanced send message function with immediate UI updates and optimistic updates
   const enhancedSendMessage = async (leadId: string, message: string) => {
     try {
       console.log('📤 Enhanced sending message with immediate refresh preparation');
@@ -98,23 +104,25 @@ export const useRealtimeInbox = () => {
       // Send the message
       await sendMessage(leadId, message);
       
-      // Multiple immediate refresh triggers for instant UI updates
+      // Immediate refresh triggers for instant UI updates
       console.log('🔄 Triggering enhanced immediate refresh after message sent');
       
-      // Immediate refresh without delay
-      loadConversations();
-      if (currentLeadIdRef.current === leadId) {
-        loadMessages(leadId);
-      }
+      // Immediate refresh without delay for instant feedback
+      const refreshPromises = [
+        loadConversations(),
+        currentLeadIdRef.current === leadId ? loadMessages(leadId) : Promise.resolve()
+      ];
       
-      // Additional refresh after short delay to ensure consistency
-      setTimeout(() => {
+      await Promise.all(refreshPromises);
+      
+      // Additional safety refresh after a short delay to ensure consistency
+      pendingRefreshRef.current = setTimeout(async () => {
         console.log('🔄 Secondary refresh for consistency');
-        loadConversations();
+        await loadConversations();
         if (currentLeadIdRef.current === leadId) {
-          loadMessages(leadId);
+          await loadMessages(leadId);
         }
-      }, 500);
+      }, 200);
       
     } catch (error) {
       console.error('❌ Error in enhanced send message:', error);
@@ -134,6 +142,15 @@ export const useRealtimeInbox = () => {
     manualRefresh();
     forceRefresh();
   }, [manualRefresh, forceRefresh, isConnected, reconnect]);
+
+  // Cleanup pending timeouts
+  useEffect(() => {
+    return () => {
+      if (pendingRefreshRef.current) {
+        clearTimeout(pendingRefreshRef.current);
+      }
+    };
+  }, []);
 
   return {
     conversations,
