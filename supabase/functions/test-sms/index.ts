@@ -7,22 +7,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Utility to get Telnyx API credentials
-async function getTelnyxSecrets() {
+// Utility to get Twilio API credentials
+async function getTwilioSecrets() {
   console.log('🔍 Checking environment variables first...');
-  const envApiKey = Deno.env.get('TELNYX_API_KEY')
-  const envProfileId = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID')
+  const envAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
+  const envAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN')
+  const envPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
   
   console.log('🔍 Environment check:', {
-    hasEnvApiKey: !!envApiKey,
-    hasEnvProfileId: !!envProfileId,
-    envApiKeyStart: envApiKey ? envApiKey.substring(0, 6) + '...' : 'none',
-    envProfileId: envProfileId || 'none'
+    hasEnvAccountSid: !!envAccountSid,
+    hasEnvAuthToken: !!envAuthToken,
+    hasEnvPhoneNumber: !!envPhoneNumber,
+    envAccountSidStart: envAccountSid ? envAccountSid.substring(0, 6) + '...' : 'none',
+    envPhoneNumber: envPhoneNumber || 'none'
   });
 
-  if (envApiKey && envProfileId) {
+  if (envAccountSid && envAuthToken && envPhoneNumber) {
     console.log('✅ Using environment variables');
-    return { apiKey: envApiKey, messagingProfileId: envProfileId }
+    return { accountSid: envAccountSid, authToken: envAuthToken, phoneNumber: envPhoneNumber }
   }
 
   console.log('📊 Environment variables not found, checking database...');
@@ -34,11 +36,11 @@ async function getTelnyxSecrets() {
   const { data: settings, error } = await supabase
     .from('settings')
     .select('key, value')
-    .in('key', ['TELNYX_API_KEY', 'TELNYX_MESSAGING_PROFILE_ID'])
+    .in('key', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER'])
 
   if (error) {
     console.error('❌ Database error:', error);
-    return { apiKey: null, messagingProfileId: null }
+    return { accountSid: null, authToken: null, phoneNumber: null }
   }
 
   console.log('📊 Retrieved settings from database:', settings?.map(s => ({ key: s.key, hasValue: !!s.value })));
@@ -48,19 +50,22 @@ async function getTelnyxSecrets() {
     settingsMap[setting.key] = setting.value
   })
 
-  const dbApiKey = settingsMap['TELNYX_API_KEY']
-  const dbProfileId = settingsMap['TELNYX_MESSAGING_PROFILE_ID']
+  const dbAccountSid = settingsMap['TWILIO_ACCOUNT_SID']
+  const dbAuthToken = settingsMap['TWILIO_AUTH_TOKEN']
+  const dbPhoneNumber = settingsMap['TWILIO_PHONE_NUMBER']
 
   console.log('📊 Database settings parsed:', {
-    hasDbApiKey: !!dbApiKey,
-    hasDbProfileId: !!dbProfileId,
-    dbApiKeyStart: dbApiKey ? dbApiKey.substring(0, 6) + '...' : 'none',
-    dbProfileId: dbProfileId || 'none'
+    hasDbAccountSid: !!dbAccountSid,
+    hasDbAuthToken: !!dbAuthToken,
+    hasDbPhoneNumber: !!dbPhoneNumber,
+    dbAccountSidStart: dbAccountSid ? dbAccountSid.substring(0, 6) + '...' : 'none',
+    dbPhoneNumber: dbPhoneNumber || 'none'
   });
 
   return {
-    apiKey: dbApiKey,
-    messagingProfileId: dbProfileId
+    accountSid: dbAccountSid,
+    authToken: dbAuthToken,
+    phoneNumber: dbPhoneNumber
   }
 }
 
@@ -125,88 +130,90 @@ serve(async (req) => {
       )
     }
 
-    console.log('🔑 Fetching Telnyx credentials...');
-    const { apiKey, messagingProfileId } = await getTelnyxSecrets()
+    console.log('🔑 Fetching Twilio credentials...');
+    const { accountSid, authToken, phoneNumber } = await getTwilioSecrets()
     
-    if (!apiKey || !messagingProfileId) {
-      console.error('❌ Missing Telnyx credentials:', { 
-        hasApiKey: !!apiKey, 
-        hasProfile: !!messagingProfileId,
-        apiKeyStart: apiKey ? apiKey.substring(0, 6) + '...' : 'none',
-        profileId: messagingProfileId || 'none'
+    if (!accountSid || !authToken || !phoneNumber) {
+      console.error('❌ Missing Twilio credentials:', { 
+        hasAccountSid: !!accountSid, 
+        hasAuthToken: !!authToken,
+        hasPhoneNumber: !!phoneNumber,
+        accountSidStart: accountSid ? accountSid.substring(0, 6) + '...' : 'none',
+        phoneNumber: phoneNumber || 'none'
       });
       return new Response(
         JSON.stringify({ 
           success: false,
-          error: 'Missing Telnyx credentials. Please configure your API key and messaging profile ID first.',
+          error: 'Missing Twilio credentials. Please configure your Account SID, Auth Token, and Phone Number first.',
           details: {
-            hasApiKey: !!apiKey,
-            hasProfile: !!messagingProfileId,
-            debugInfo: `API Key: ${apiKey ? 'present' : 'missing'}, Profile: ${messagingProfileId ? 'present' : 'missing'}`
+            hasAccountSid: !!accountSid,
+            hasAuthToken: !!authToken,
+            hasPhoneNumber: !!phoneNumber,
+            debugInfo: `Account SID: ${accountSid ? 'present' : 'missing'}, Auth Token: ${authToken ? 'present' : 'missing'}, Phone: ${phoneNumber ? 'present' : 'missing'}`
           }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log('✅ Telnyx credentials found - API Key:', apiKey.substring(0, 6) + '...', 'Profile:', messagingProfileId);
+    console.log('✅ Twilio credentials found - Account SID:', accountSid.substring(0, 6) + '...', 'Phone:', phoneNumber);
 
-    // Send test SMS
-    const telnyxUrl = "https://api.telnyx.com/v2/messages"
-    const payload = {
-      to: testPhoneNumber,
-      text: `🔥 Test SMS from your CRM system sent at ${new Date().toLocaleString()}! This confirms your Telnyx integration is working.`,
-      messaging_profile_id: messagingProfileId
-    }
+    // Send test SMS using Twilio
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+    const payload = new URLSearchParams({
+      To: testPhoneNumber,
+      From: phoneNumber,
+      Body: `🔥 Test SMS from your CRM system sent at ${new Date().toLocaleString()}! This confirms your Twilio integration is working.`
+    })
     
-    console.log('📤 Sending to Telnyx API:', {
-      url: telnyxUrl,
+    console.log('📤 Sending to Twilio API:', {
+      url: twilioUrl,
       to: testPhoneNumber,
-      profileId: messagingProfileId,
-      messageLength: payload.text.length,
-      apiKeyStart: apiKey.substring(0, 6) + '...'
+      from: phoneNumber,
+      messageLength: payload.get('Body')?.length || 0,
+      accountSidStart: accountSid.substring(0, 6) + '...'
     });
 
-    const response = await fetch(telnyxUrl, {
+    const response = await fetch(twilioUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: JSON.stringify(payload)
+      body: payload
     })
 
-    console.log('📡 Telnyx API response status:', response.status);
+    console.log('📡 Twilio API response status:', response.status);
     const result = await response.json()
-    console.log('📡 Telnyx API full response:', JSON.stringify(result, null, 2));
+    console.log('📡 Twilio API full response:', JSON.stringify(result, null, 2));
 
     if (!response.ok) {
-      console.error('❌ Telnyx API error details:', {
+      console.error('❌ Twilio API error details:', {
         status: response.status,
         statusText: response.statusText,
         result: result,
-        usedApiKey: apiKey.substring(0, 6) + '...',
-        usedProfileId: messagingProfileId
+        usedAccountSid: accountSid.substring(0, 6) + '...',
+        usedPhoneNumber: phoneNumber
       });
       
       let errorMessage = 'Failed to send test SMS';
-      if (result.errors && result.errors.length > 0) {
-        errorMessage = result.errors[0].detail || result.errors[0].title || errorMessage;
+      if (result.message) {
+        errorMessage = result.message;
         
         // Add specific help for common errors
-        if (result.errors[0].code === '10015') {
-          errorMessage += '. Please verify your Messaging Profile ID in your Telnyx dashboard under Messaging > Messaging Profiles.';
+        if (result.code === 21211) {
+          errorMessage += '. Please verify that your phone number is in E.164 format (e.g., +15551234567).';
+        } else if (result.code === 21608) {
+          errorMessage += '. Please verify your Twilio phone number in your Twilio Console.';
         }
-      } else if (result.message) {
-        errorMessage = result.message;
       }
       
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: errorMessage,
-          telnyxError: result,
+          twilioError: result,
           statusCode: response.status,
-          debugInfo: `Using Profile ID: ${messagingProfileId}`
+          debugInfo: `Using Phone Number: ${phoneNumber}`
         }),
         { 
           status: 400, 
@@ -215,14 +222,14 @@ serve(async (req) => {
       )
     }
 
-    console.log('✅ SUCCESS! Telnyx SMS sent:', result.data?.id);
+    console.log('✅ SUCCESS! Twilio SMS sent:', result.sid);
 
     return new Response(
       JSON.stringify({ 
         success: true,
         message: 'Test SMS sent successfully!',
-        telnyxMessageId: result.data?.id,
-        status: result.data?.record_type || 'submitted',
+        twilioMessageId: result.sid,
+        status: result.status || 'queued',
         to: testPhoneNumber,
         sentAt: new Date().toISOString()
       }),
