@@ -67,8 +67,6 @@ const QuickTradeAction = ({ leadId, leadName, onTradeAdded }: QuickTradeActionPr
         onClose={() => setShowAppointmentScheduler(false)}
         leadId={leadId}
         leadName={leadName}
-        defaultType="consultation"
-        defaultTitle={tradeVehicle ? `Trade Appraisal - ${tradeVehicle.year} ${tradeVehicle.make} ${tradeVehicle.model}` : "Trade Vehicle Appraisal"}
       />
     </>
   );
