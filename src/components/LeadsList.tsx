@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,12 @@ const LeadsList = () => {
     selectedLeads,
     quickViewLead,
     refetch,
-    getEngagementScore
+    getEngagementScore,
+    selectAllFiltered,
+    clearSelection,
+    toggleLeadSelection,
+    showQuickView,
+    hideQuickView
   } = useAdvancedLeads();
 
   const { profile } = useAuth();
@@ -116,26 +122,6 @@ const LeadsList = () => {
 
   const handleLoadPreset = (preset: SavedPreset) => {
     setSearchFilters(preset.filters);
-  };
-
-  const clearSelection = () => {
-    // Mock implementation
-  };
-
-  const toggleLeadSelection = (leadId: string) => {
-    // Mock implementation
-  };
-
-  const showQuickView = (lead: Lead) => {
-    // Mock implementation
-  };
-
-  const hideQuickView = () => {
-    // Mock implementation
-  };
-
-  const selectAllFiltered = () => {
-    // Mock implementation
   };
 
   // Bulk action handlers
