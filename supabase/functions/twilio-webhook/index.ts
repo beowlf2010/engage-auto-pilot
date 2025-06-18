@@ -45,62 +45,44 @@ serve(async (req) => {
     const cleanPhone = from.startsWith('+') ? from : `+${from}`;
     console.log('🔍 Looking up lead by phone number:', cleanPhone);
 
-    // Find lead by phone number
-    const { data: phoneData, error: phoneError } = await supabase
-      .from('phone_numbers')
-      .select(`
-        lead_id,
-        leads (
-          id,
-          first_name,
-          last_name,
-          ai_takeover_enabled,
-          ai_takeover_delay_minutes,
-          ai_opt_in
-        )
-      `)
-      .eq('number', cleanPhone)
-      .single()
+    // Find lead by phone number with retry logic for different formats
+    let phoneData = null;
+    const phoneFormats = [
+      cleanPhone,
+      from.replace('+1', ''),
+      from.replace(/\D/g, ''),
+      '+1' + from.replace(/\D/g, '')
+    ];
 
-    if (phoneError || !phoneData || !phoneData.leads) {
-      console.error('❌ Lead not found for phone:', cleanPhone, phoneError);
+    for (const phoneFormat of phoneFormats) {
+      console.log('🔄 Trying phone format:', phoneFormat);
       
-      // Try alternative phone formats
-      const altFormats = [
-        from.replace('+1', ''),
-        from.replace(/\D/g, ''),
-        '+1' + from.replace(/\D/g, '')
-      ];
-      
-      console.log('🔄 Trying alternative phone formats:', altFormats);
-      
-      for (const altPhone of altFormats) {
-        const { data: altPhoneData } = await supabase
-          .from('phone_numbers')
-          .select(`
-            lead_id,
-            leads (
-              id,
-              first_name,
-              last_name,
-              ai_takeover_enabled,
-              ai_takeover_delay_minutes,
-              ai_opt_in
-            )
-          `)
-          .eq('number', altPhone)
-          .maybeSingle();
-          
-        if (altPhoneData?.leads) {
-          console.log('✅ Found lead with alternative format:', altPhone);
-          phoneData = altPhoneData;
-          break;
-        }
+      const { data, error } = await supabase
+        .from('phone_numbers')
+        .select(`
+          lead_id,
+          leads (
+            id,
+            first_name,
+            last_name,
+            ai_takeover_enabled,
+            ai_takeover_delay_minutes,
+            ai_opt_in
+          )
+        `)
+        .eq('number', phoneFormat)
+        .single()
+
+      if (!error && data?.leads) {
+        phoneData = data;
+        console.log('✅ Found lead with phone format:', phoneFormat);
+        break;
       }
-      
-      if (!phoneData?.leads) {
-        return new Response('Lead not found', { status: 404, headers: corsHeaders })
-      }
+    }
+
+    if (!phoneData?.leads) {
+      console.error('❌ Lead not found for any phone format. Tried:', phoneFormats);
+      return new Response('Lead not found', { status: 404, headers: corsHeaders })
     }
 
     const lead = phoneData.leads;

@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.inventory-cleanup-edge]
 verify_jwt = true
+
+[functions.twilio-webhook]
+verify_jwt = false

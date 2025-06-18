@@ -41,10 +41,10 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
 
   const handleIncomingMessage = useCallback(async (payload: any) => {
     const newMessage = payload.new;
-    console.log('New incoming message:', newMessage);
+    console.log('🔔 New incoming message detected:', newMessage);
 
     try {
-      // Call all registered callbacks
+      // Call all registered callbacks immediately
       globalCallbacks.forEach(cb => {
         if (cb.onConversationUpdate) {
           cb.onConversationUpdate();
@@ -57,8 +57,10 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
         }
       });
 
-      // Handle notifications for incoming messages
+      // Handle notifications for incoming messages only
       if (newMessage.direction === 'in') {
+        console.log('📩 Processing incoming message notification');
+        
         const { data: leadData } = await supabase
           .from('leads')
           .select('first_name, last_name, salesperson_id')
@@ -99,12 +101,12 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
         }
       }
     } catch (error) {
-      console.error('Error handling incoming message:', error);
+      console.error('❌ Error handling incoming message:', error);
     }
   }, [profile, toast]);
 
   const handleIncomingEmail = useCallback(async (payload: any) => {
-    console.log('New inbound email received:', payload);
+    console.log('📧 New inbound email received:', payload);
     
     try {
       // Call all registered callbacks
@@ -157,7 +159,7 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
         }
       }
     } catch (error) {
-      console.error('Error handling email notification:', error);
+      console.error('❌ Error handling email notification:', error);
     }
   }, [profile, toast]);
 
@@ -174,21 +176,19 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
       isSubscribing = true;
       
       const channelName = `centralized-realtime-${profile.id}-${Date.now()}`;
-      console.log('Creating centralized realtime channel:', channelName);
+      console.log('🔌 Creating centralized realtime channel:', channelName);
       
       const channel = supabase
         .channel(channelName)
-        // SMS conversations
+        // SMS conversations - listen to all conversation changes
         .on('postgres_changes', {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'conversations'
-        }, handleIncomingMessage)
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations'
-        }, handleIncomingMessage)
+        }, (payload) => {
+          console.log('🔄 Conversation change detected:', payload.eventType, payload.new?.direction);
+          handleIncomingMessage(payload);
+        })
         // Email conversations
         .on('postgres_changes', {
           event: 'INSERT',
@@ -198,17 +198,17 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
         }, handleIncomingEmail);
 
       channel.subscribe((status) => {
-        console.log('Centralized realtime channel status:', status);
+        console.log('📡 Centralized realtime channel status:', status);
         if (status === 'SUBSCRIBED') {
           globalChannel = channel;
           isSubscribing = false;
-          console.log('Centralized realtime channel subscribed successfully');
+          console.log('✅ Centralized realtime channel subscribed successfully');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('Centralized realtime channel error');
+          console.error('❌ Centralized realtime channel error');
           globalChannel = null;
           isSubscribing = false;
         } else if (status === 'CLOSED') {
-          console.log('Centralized realtime channel closed');
+          console.log('🔌 Centralized realtime channel closed');
           globalChannel = null;
           isSubscribing = false;
         }
@@ -227,12 +227,12 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
       // Clean up channel only if no more callbacks are registered
       if (globalCallbacks.length === 0 && globalChannel) {
         try {
-          console.log('Cleaning up centralized realtime channel');
+          console.log('🧹 Cleaning up centralized realtime channel');
           supabase.removeChannel(globalChannel);
           globalChannel = null;
           isSubscribing = false;
         } catch (error) {
-          console.error('Error removing centralized realtime channel:', error);
+          console.error('❌ Error removing centralized realtime channel:', error);
         }
       }
     };
