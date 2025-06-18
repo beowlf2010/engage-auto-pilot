@@ -65,7 +65,7 @@ const LeadTableRow = ({
       <TableCell>
         <div className="space-y-1">
           <LeadStatusBadge status={lead.status} />
-          <LeadContactStatusBadge status={lead.contactStatus} />
+          <LeadContactStatusBadge contactStatus={lead.contactStatus} />
         </div>
       </TableCell>
 
@@ -90,7 +90,6 @@ const LeadTableRow = ({
               <Switch
                 checked={lead.aiOptIn}
                 onCheckedChange={(value) => onAiOptInChange(lead.id, value)}
-                size="sm"
               />
             </div>
           )}
