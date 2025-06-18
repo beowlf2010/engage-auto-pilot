@@ -57,10 +57,10 @@ const LeadDetailTabsSection = ({
         <div className="flex-1 overflow-hidden">
           <TabsContent value="messages" className="h-full m-0">
             <EnhancedMessageThread
-              leadId={lead.id}
               messages={messages}
-              messagesLoading={messagesLoading}
               onSendMessage={onSendMessage}
+              isLoading={messagesLoading}
+              leadName={leadName}
             />
           </TabsContent>
 

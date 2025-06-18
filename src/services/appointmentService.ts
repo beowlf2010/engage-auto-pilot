@@ -10,7 +10,7 @@ export const appointmentService = {
       .select(`
         *,
         leads!inner(first_name, last_name),
-        profiles:salesperson_id(first_name, last_name)
+        salesperson:profiles!salesperson_id(first_name, last_name)
       `)
       .eq('lead_id', leadId)
       .order('scheduled_at', { ascending: true });
@@ -19,9 +19,11 @@ export const appointmentService = {
 
     return data.map(appointment => ({
       ...appointment,
+      appointment_type: appointment.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
+      status: appointment.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
       lead_name: `${appointment.leads.first_name} ${appointment.leads.last_name}`,
-      salesperson_name: appointment.profiles 
-        ? `${appointment.profiles.first_name} ${appointment.profiles.last_name}`
+      salesperson_name: appointment.salesperson 
+        ? `${appointment.salesperson.first_name} ${appointment.salesperson.last_name}`
         : undefined
     }));
   },
@@ -33,7 +35,7 @@ export const appointmentService = {
       .select(`
         *,
         leads!inner(first_name, last_name),
-        profiles:salesperson_id(first_name, last_name)
+        salesperson:profiles!salesperson_id(first_name, last_name)
       `)
       .order('scheduled_at', { ascending: true });
 
@@ -41,9 +43,11 @@ export const appointmentService = {
 
     return data.map(appointment => ({
       ...appointment,
+      appointment_type: appointment.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
+      status: appointment.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
       lead_name: `${appointment.leads.first_name} ${appointment.leads.last_name}`,
-      salesperson_name: appointment.profiles 
-        ? `${appointment.profiles.first_name} ${appointment.profiles.last_name}`
+      salesperson_name: appointment.salesperson 
+        ? `${appointment.salesperson.first_name} ${appointment.salesperson.last_name}`
         : undefined
     }));
   },
@@ -59,7 +63,7 @@ export const appointmentService = {
       .select(`
         *,
         leads!inner(first_name, last_name),
-        profiles:salesperson_id(first_name, last_name)
+        salesperson:profiles!salesperson_id(first_name, last_name)
       `)
       .single();
 
@@ -67,9 +71,11 @@ export const appointmentService = {
 
     return {
       ...data,
+      appointment_type: data.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
+      status: data.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
       lead_name: `${data.leads.first_name} ${data.leads.last_name}`,
-      salesperson_name: data.profiles 
-        ? `${data.profiles.first_name} ${data.profiles.last_name}`
+      salesperson_name: data.salesperson 
+        ? `${data.salesperson.first_name} ${data.salesperson.last_name}`
         : undefined
     };
   },
@@ -86,7 +92,7 @@ export const appointmentService = {
       .select(`
         *,
         leads!inner(first_name, last_name),
-        profiles:salesperson_id(first_name, last_name)
+        salesperson:profiles!salesperson_id(first_name, last_name)
       `)
       .single();
 
@@ -94,9 +100,11 @@ export const appointmentService = {
 
     return {
       ...data,
+      appointment_type: data.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
+      status: data.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
       lead_name: `${data.leads.first_name} ${data.leads.last_name}`,
-      salesperson_name: data.profiles 
-        ? `${data.profiles.first_name} ${data.profiles.last_name}`
+      salesperson_name: data.salesperson 
+        ? `${data.salesperson.first_name} ${data.salesperson.last_name}`
         : undefined
     };
   },
