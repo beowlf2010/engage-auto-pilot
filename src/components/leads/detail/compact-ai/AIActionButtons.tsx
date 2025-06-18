@@ -1,14 +1,14 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Clock } from "lucide-react";
+import { MessageSquare, Clock, Eye } from "lucide-react";
 
 interface AIActionButtonsProps {
   aiOptIn: boolean;
   pendingHumanResponse: boolean;
   nextAiSendAt?: string;
   isSending: boolean;
-  onSendMessage: () => void;
+  onPreviewMessage: () => void;
 }
 
 const AIActionButtons: React.FC<AIActionButtonsProps> = ({
@@ -16,7 +16,7 @@ const AIActionButtons: React.FC<AIActionButtonsProps> = ({
   pendingHumanResponse,
   nextAiSendAt,
   isSending,
-  onSendMessage
+  onPreviewMessage
 }) => {
   const formatNextSendTime = () => {
     if (!nextAiSendAt) return null;
@@ -47,12 +47,12 @@ const AIActionButtons: React.FC<AIActionButtonsProps> = ({
         <Button
           size="sm"
           variant="outline"
-          onClick={onSendMessage}
+          onClick={onPreviewMessage}
           disabled={isSending}
           className="flex-1"
         >
-          <MessageSquare className="w-3 h-3 mr-1" />
-          {isSending ? "Sending..." : "Send Now"}
+          <Eye className="w-3 h-3 mr-1" />
+          {isSending ? "Sending..." : "Preview & Send"}
         </Button>
       </div>
     </>

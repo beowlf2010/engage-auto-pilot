@@ -2,13 +2,14 @@
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Bot } from "lucide-react";
-import { triggerImmediateMessage } from "@/services/proactiveAIService";
 import { triggerAITakeover } from "@/services/aiTakeoverService";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useAIMessagePreview } from "@/hooks/useAIMessagePreview";
 import AIStatusBadge from "./compact-ai/AIStatusBadge";
 import AIControlsSection from "./compact-ai/AIControlsSection";
 import PendingResponseAlert from "./compact-ai/PendingResponseAlert";
 import AIActionButtons from "./compact-ai/AIActionButtons";
+import AIMessagePreviewPanel from "./compact-ai/AIMessagePreviewPanel";
 
 interface CompactAIControlsProps {
   leadId: string;
@@ -21,6 +22,10 @@ interface CompactAIControlsProps {
   nextAiSendAt?: string;
   onAIOptInChange: (enabled: boolean) => Promise<void>;
   onAITakeoverChange: (enabled: boolean, delayMinutes: number) => Promise<void>;
+  // Lead info for preview
+  leadName?: string;
+  vehicleInterest?: string;
+  onMessageSent?: () => void;
 }
 
 const CompactAIControls: React.FC<CompactAIControlsProps> = ({
@@ -33,12 +38,27 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   pendingHumanResponse,
   nextAiSendAt,
   onAIOptInChange,
-  onAITakeoverChange
+  onAITakeoverChange,
+  leadName,
+  vehicleInterest,
+  onMessageSent
 }) => {
   const { user } = useAuth();
   const [isToggling, setIsToggling] = useState(false);
-  const [isSending, setIsSending] = useState(false);
   const [isTakingOver, setIsTakingOver] = useState(false);
+
+  const {
+    isGenerating,
+    generatedMessage,
+    showPreview,
+    isSending,
+    generatePreview,
+    sendNow,
+    cancel
+  } = useAIMessagePreview({ 
+    leadId, 
+    onMessageSent 
+  });
 
   const handleOptInToggle = async () => {
     if (isToggling) return;
@@ -52,16 +72,6 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
 
   const handleTakeoverToggle = async () => {
     await onAITakeoverChange(!aiTakeoverEnabled, aiTakeoverDelayMinutes);
-  };
-
-  const handleSendMessage = async () => {
-    if (!user || isSending) return;
-    setIsSending(true);
-    try {
-      await triggerImmediateMessage(leadId, user);
-    } finally {
-      setIsSending(false);
-    }
   };
 
   const handleTriggerTakeover = async () => {
@@ -107,12 +117,25 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
           onTriggerTakeover={handleTriggerTakeover}
         />
 
+        {/* AI Message Preview Panel */}
+        {showPreview && (
+          <AIMessagePreviewPanel
+            leadId={leadId}
+            leadName={leadName || 'Lead'}
+            vehicleInterest={vehicleInterest}
+            generatedMessage={generatedMessage}
+            isGenerating={isGenerating}
+            onSendNow={sendNow}
+            onCancel={cancel}
+          />
+        )}
+
         <AIActionButtons
           aiOptIn={aiOptIn}
           pendingHumanResponse={pendingHumanResponse}
           nextAiSendAt={nextAiSendAt}
-          isSending={isSending}
-          onSendMessage={handleSendMessage}
+          isSending={isSending || isGenerating}
+          onPreviewMessage={generatePreview}
         />
       </div>
     </Card>

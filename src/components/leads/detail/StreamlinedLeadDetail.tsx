@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
 import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
@@ -161,6 +160,7 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
         lead={lead}
         onAIOptInChange={handleAIOptInChange}
         onAITakeoverChange={handleAITakeoverChange}
+        onMessageSent={() => loadMessages(lead.id)}
       />
     </div>
   );
