@@ -1,6 +1,7 @@
 
 import { classifyVehicle } from './vehicleClassification.ts';
 import { analyzeConversationPattern } from './conversationAnalysis.ts';
+import { analyzeCustomerIntent, generateFollowUpContent } from './intentAnalysis.ts';
 
 export const buildSystemPrompt = (
   leadName: string,
@@ -22,6 +23,8 @@ CRITICAL RULES:
 - DO NOT use generic greetings if this is an established conversation
 - Focus on the customer's actual question or concern
 - If we don't have what they want, acknowledge it directly and offer helpful alternatives
+- NEVER repeat questions the customer has already answered positively
+- If customer shows interest in something, provide that information instead of asking again
 
 Customer Information:
 - Name: ${leadName}
@@ -103,17 +106,33 @@ export const buildUserPrompt = (
   requestedCategory: any,
   conversationPattern: any
 ) => {
-  return `Customer's latest message: "${lastCustomerMessage}"
+  // Analyze customer intent to detect if they're agreeing to something
+  const intentAnalysis = analyzeCustomerIntent(conversationHistory, lastCustomerMessage);
+  const followUpContent = intentAnalysis.agreedToOffer ? 
+    generateFollowUpContent(intentAnalysis.agreedToOffer, requestedCategory) : null;
+
+  let promptInstructions = `Customer's latest message: "${lastCustomerMessage}"
 
 Recent conversation context:
-${conversationHistory}
+${conversationHistory}`;
 
-Generate a response that:
+  // Add intent-based instructions
+  if (intentAnalysis.shouldFollowUp && followUpContent) {
+    promptInstructions += `\n\nIMPORTANT - CUSTOMER INTENT DETECTED:
+- Customer has expressed interest in: ${followUpContent.context}
+- FOLLOW UP ACTION REQUIRED: ${followUpContent.instruction}
+- DO NOT ask the same question again - provide the requested information`;
+  }
+
+  promptInstructions += `\n\nGenerate a response that:
 1. ${conversationPattern.isEstablishedConversation ? 
      'Continues the conversation naturally (NO generic greetings)' : 
      'Provides a warm, professional greeting'
    }
-2. Directly and honestly addresses their question
+2. ${intentAnalysis.shouldFollowUp ? 
+     'Follows through on what the customer agreed to (don\'t repeat offers)' : 
+     'Directly and honestly addresses their question'
+   }
 3. ${requestedCategory.isTesla ? 
      (requestedCategory.condition === 'new' ? 
        'Explains we cannot help with NEW Tesla vehicles (Tesla direct sales only)' :
@@ -123,9 +142,17 @@ Generate a response that:
      ) : 
      'Provides accurate inventory information'
    }
-4. Offers genuinely helpful next steps
+4. ${intentAnalysis.shouldFollowUp ? 
+     'Provides the specific information they requested' : 
+     'Offers genuinely helpful next steps'
+   }
 5. Is conversational and under 160 characters
 6. Builds trust through transparency
+
+${intentAnalysis.shouldFollowUp ? 
+  `CUSTOMER AGREEMENT DETECTED: They said "${lastCustomerMessage}" in response to an offer. Provide the requested information instead of asking again.` : 
+  ''
+}
 
 ${requestedCategory.isTesla && requestedCategory.condition === 'new' ? 
   'NEW TESLA RESPONSE: Politely explain that Tesla only sells new vehicles direct and offer to help with other new EVs.' : 
@@ -133,4 +160,6 @@ ${requestedCategory.isTesla && requestedCategory.condition === 'new' ?
     'USED TESLA RESPONSE: Be honest about current used Tesla inventory and offer alternatives or to watch for trade-ins.' :
     ''
 }`;
+
+  return promptInstructions;
 };
