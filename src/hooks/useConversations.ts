@@ -22,15 +22,15 @@ export const useConversations = () => {
 
   const fetchMessages = async (leadId: string) => {
     await loadMessages(leadId);
-    setCurrentLeadId(leadId);
+    setCurrentLeadId();
     
-    // Set up message channel for this specific lead
-    setupMessageChannel(leadId, loadMessages);
+    // Set up message channel for this specific lead (disabled)
+    setupMessageChannel();
   };
 
   // Setup conversation channel when available
   useEffect(() => {
-    setupConversationChannel('', loadConversations);
+    setupConversationChannel();
     loadConversations();
 
     return () => {
