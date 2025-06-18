@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,6 +13,7 @@ import InventoryUploadPage from '@/pages/InventoryUploadPage';
 import SmartInboxPage from '@/pages/SmartInboxPage';
 import PredictiveAnalyticsPage from '@/pages/PredictiveAnalyticsPage';
 import StreamlinedNavigation from '@/components/StreamlinedNavigation';
+import UnreadMessageBanner from '@/components/inbox/UnreadMessageBanner';
 import SettingsPage from '@/pages/Index';
 import MessageExportPage from "@/pages/MessageExportPage";
 import LeadDetailPage from '@/pages/LeadDetailPage';
@@ -34,6 +36,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <DashboardPage />
                       </main>
@@ -47,6 +50,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <DashboardPage />
                       </main>
@@ -60,6 +64,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <LeadDetailPage />
                       </main>
@@ -73,6 +78,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <VehicleDetailPage />
                       </main>
@@ -112,6 +118,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <StreamlinedLeadsPage />
                       </main>
@@ -125,6 +132,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <StreamlinedLeadsPage />
                       </main>
@@ -138,6 +146,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <InventoryDashboardPage />
                       </main>
@@ -151,6 +160,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <InventoryDashboardPage />
                       </main>
@@ -164,6 +174,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <InventoryUploadPage />
                       </main>
@@ -177,6 +188,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <PredictiveAnalyticsPage />
                       </main>
@@ -190,6 +202,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <SettingsPage />
                       </main>
@@ -203,6 +216,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <MessageExportPage />
                       </main>
@@ -216,6 +230,7 @@ function App() {
                   <div className="flex h-screen bg-gray-50">
                     <div className="flex-1 flex flex-col overflow-hidden">
                       <StreamlinedNavigation />
+                      <UnreadMessageBanner />
                       <main className="flex-1 overflow-auto">
                         <FinancialDashboardPage />
                       </main>

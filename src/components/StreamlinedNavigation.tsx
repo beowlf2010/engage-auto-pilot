@@ -14,17 +14,27 @@ import BrandLogo from './navigation/BrandLogo';
 import NavigationItem from './navigation/NavigationItem';
 import { getNavigationItems } from './navigation/navigationConfig';
 import { ChevronDown, User, LogOut } from 'lucide-react';
+import { useGlobalUnreadCount } from '@/hooks/useGlobalUnreadCount';
 
 const StreamlinedNavigation = () => {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { unreadCount } = useGlobalUnreadCount();
 
   if (!profile) return null;
 
   const allNavItems = getNavigationItems(profile.role, navigate);
   const primaryItems = allNavItems.filter(item => item.priority === 'primary');
   const secondaryItems = allNavItems.filter(item => item.priority === 'secondary');
+
+  // Add unread count to inbox item
+  const enhancedPrimaryItems = primaryItems.map(item => {
+    if (item.path === '/smart-inbox' && unreadCount > 0) {
+      return { ...item, badge: unreadCount.toString() };
+    }
+    return item;
+  });
 
   const handleSignOut = async () => {
     await signOut();
@@ -39,7 +49,7 @@ const StreamlinedNavigation = () => {
           <BrandLogo />
           <div className="h-6 w-px bg-slate-300" />
           <div className="flex items-center gap-1">
-            {primaryItems.map((item) => (
+            {enhancedPrimaryItems.map((item) => (
               <NavigationItem key={item.path} item={item} />
             ))}
           </div>

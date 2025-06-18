@@ -90,3 +90,82 @@ export const generateEnhancedAIMessage = async (leadId: string): Promise<string 
     return null;
   }
 };
+
+export const getAIAnalyticsDashboard = async () => {
+  try {
+    const { data: conversations, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('ai_generated', true);
+
+    if (error) throw error;
+
+    const { data: responses, error: responsesError } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('direction', 'in');
+
+    if (responsesError) throw responsesError;
+
+    const totalMessagesSent = conversations?.length || 0;
+    const totalResponses = responses?.length || 0;
+    const overallResponseRate = totalMessagesSent > 0 ? totalResponses / totalMessagesSent : 0;
+    const averageMessagesPerLead = totalMessagesSent > 0 ? totalMessagesSent / new Set(conversations?.map(c => c.lead_id)).size : 0;
+
+    return {
+      totalMessagesSent,
+      totalResponses,
+      overallResponseRate,
+      averageMessagesPerLead
+    };
+  } catch (error) {
+    console.error('Error fetching AI analytics:', error);
+    return {
+      totalMessagesSent: 0,
+      totalResponses: 0,
+      overallResponseRate: 0,
+      averageMessagesPerLead: 0
+    };
+  }
+};
+
+export const trackLeadResponse = async (leadId: string, responseData: any) => {
+  try {
+    await supabase
+      .from('leads')
+      .update({ 
+        last_reply_at: new Date().toISOString(),
+        ai_sequence_paused: true 
+      })
+      .eq('id', leadId);
+  } catch (error) {
+    console.error('Error tracking lead response:', error);
+  }
+};
+
+export const scheduleEnhancedAIMessages = async () => {
+  try {
+    const { data, error } = await supabase.functions.invoke('ai-automation');
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error scheduling AI messages:', error);
+    return null;
+  }
+};
+
+export const resumePausedSequences = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('leads')
+      .update({ ai_sequence_paused: false })
+      .eq('ai_sequence_paused', true)
+      .lt('ai_resume_at', new Date().toISOString());
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error resuming paused sequences:', error);
+    return null;
+  }
+};
