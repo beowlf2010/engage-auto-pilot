@@ -31,7 +31,7 @@ const CompactMetricsCard: React.FC<CompactMetricsCardProps> = ({ lead }) => {
           {lastMessage && (
             <div className="flex items-center gap-1 text-gray-600">
               <Clock className="w-3 h-3" />
-              <span>{formatDistanceToNow(new Date(lastMessage.sent_at), { addSuffix: true })}</span>
+              <span>{formatDistanceToNow(new Date(lastMessage.sentAt), { addSuffix: true })}</span>
             </div>
           )}
         </div>
