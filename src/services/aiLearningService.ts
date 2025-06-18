@@ -195,14 +195,19 @@ export const aiLearningService = {
   generateRecommendations(feedback: any[]) {
     const recommendations = [];
     
-    const negativeCount = feedback.filter(f => f.feedback_type === 'negative').length;
-    const lowRatings = feedback.filter(f => f.rating && f.rating <= 2).length;
+    if (!feedback || feedback.length === 0) {
+      return recommendations;
+    }
     
-    if (negativeCount > feedback.length * 0.3) {
+    const negativeCount = feedback.filter(f => f.feedback_type === 'negative').length;
+    const lowRatings = feedback.filter(f => f.rating && typeof f.rating === 'number' && f.rating <= 2).length;
+    const totalCount = feedback.length;
+    
+    if (totalCount > 0 && (negativeCount / totalCount) > 0.3) {
       recommendations.push('Consider adjusting message tone - high negative feedback rate');
     }
     
-    if (lowRatings > feedback.length * 0.2) {
+    if (totalCount > 0 && (lowRatings / totalCount) > 0.2) {
       recommendations.push('Message quality needs improvement - low ratings detected');
     }
     
