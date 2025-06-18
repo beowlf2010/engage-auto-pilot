@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
-import { processLeads } from "@/components/upload-leads/processLeads";
+import { processLeadsEnhanced } from "@/components/upload-leads/enhancedProcessLeads";
 import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 
@@ -85,7 +85,6 @@ export const useMultiFileLeadUpload = () => {
       console.log(`Parsed lead file with ${parsed.rows.length} rows`);
       
       // Create a basic field mapping for lead processing
-      // This assumes the CSV has standard lead field names
       const basicMapping = {
         firstName: 'first_name',
         lastName: 'last_name',
@@ -112,11 +111,20 @@ export const useMultiFileLeadUpload = () => {
         status: 'status'
       };
       
-      // Process leads with proper mapping
-      const processingResult = processLeads(parsed, basicMapping);
+      // Process leads with enhanced data preservation
+      const processingResult = await processLeadsEnhanced(
+        parsed, 
+        basicMapping,
+        queuedFile.file.name,
+        queuedFile.file.size,
+        queuedFile.file.type
+      );
       
-      // Insert leads to database
-      const insertResult = await insertLeadsToDatabase(processingResult.validLeads);
+      // Insert leads to database with upload history tracking
+      const insertResult = await insertLeadsToDatabase(
+        processingResult.validLeads,
+        processingResult.uploadHistoryId
+      );
       
       updateFileStatus(queuedFile.id, 'completed', undefined, {
         totalRows: parsed.rows.length,
@@ -126,7 +134,7 @@ export const useMultiFileLeadUpload = () => {
       });
 
     } catch (error) {
-      console.error(`Upload error for ${queuedFile.file.name}:`, error);
+      console.error(`Enhanced upload error for ${queuedFile.file.name}:`, error);
       updateFileStatus(queuedFile.id, 'error', error instanceof Error ? error.message : 'Processing failed');
     }
   };

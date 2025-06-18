@@ -7,7 +7,7 @@ import CSVTemplateCard from "./upload-leads/CSVTemplateCard";
 import PhonePriorityCard from "./upload-leads/PhonePriorityCard";
 import ImportFeaturesCard from "./upload-leads/ImportFeaturesCard";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
-import { processLeads } from "./upload-leads/processLeads";
+import { processLeadsEnhanced } from "./upload-leads/enhancedProcessLeads";
 import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
 import { 
   AlertCircle,
@@ -26,6 +26,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [csvData, setCsvData] = useState<{headers: string[], rows: any[], sample: Record<string, string>} | null>(null);
   const [showMapper, setShowMapper] = useState(false);
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   // Check permissions
@@ -43,6 +44,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
 
   const handleFiles = async (files: FileList) => {
     const file = files[0];
+    setCurrentFile(file);
     
     const validExtensions = ['.csv', '.xlsx', '.xls', '.txt'];
     const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
@@ -79,24 +81,36 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
   };
 
   const handleMappingComplete = async (mapping: any) => {
-    if (!csvData) return;
+    if (!csvData || !currentFile) return;
     
     setUploading(true);
     
     try {
-      console.log('Starting lead processing with mapping:', mapping);
+      console.log('Starting enhanced lead processing with mapping:', mapping);
       
-      // Process the data with the field mapping and duplicate detection
-      const processingResult = processLeads(csvData, mapping);
-      console.log('Processing complete:', {
+      // Process the data with enhanced data preservation
+      const processingResult = await processLeadsEnhanced(
+        csvData, 
+        mapping,
+        currentFile.name,
+        currentFile.size,
+        currentFile.type
+      );
+      
+      console.log('Enhanced processing complete:', {
         validLeads: processingResult.validLeads.length,
         duplicates: processingResult.duplicates.length,
-        errors: processingResult.errors.length
+        errors: processingResult.errors.length,
+        uploadHistoryId: processingResult.uploadHistoryId
       });
 
-      // Insert leads to database
-      const insertResult = await insertLeadsToDatabase(processingResult.validLeads);
-      console.log('Database insertion complete:', insertResult);
+      // Insert leads to database with upload history tracking
+      const insertResult = await insertLeadsToDatabase(
+        processingResult.validLeads,
+        processingResult.uploadHistoryId
+      );
+      
+      console.log('Enhanced database insertion complete:', insertResult);
 
       // Combine duplicates
       const allDuplicates = [
@@ -119,20 +133,27 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
         successfulImports: insertResult.successfulInserts,
         errors: processingResult.errors.length + insertResult.errors.length,
         duplicates: allDuplicates.length,
-        fileName: 'leads file',
+        fileName: currentFile.name,
+        uploadHistoryId: processingResult.uploadHistoryId,
         phoneNumberStats: {
           cellOnly: processingResult.validLeads.filter(l => l.phoneNumbers.length === 1 && l.phoneNumbers[0].type === 'cell').length,
           multipleNumbers: processingResult.validLeads.filter(l => l.phoneNumbers.length > 1).length,
           dayPrimary: processingResult.validLeads.filter(l => l.phoneNumbers.length > 0 && l.phoneNumbers[0].type === 'day').length
         },
-        duplicateDetails: allDuplicates
+        duplicateDetails: allDuplicates,
+        dataQualityMetrics: {
+          averageQualityScore: processingResult.validLeads.length > 0 
+            ? processingResult.validLeads.reduce((sum, lead) => sum + ((lead as any).dataSourceQualityScore || 0), 0) / processingResult.validLeads.length 
+            : 0,
+          statusMappingCount: processingResult.validLeads.filter(lead => (lead as any).originalStatus && (lead as any).originalStatus !== lead.status).length
+        }
       };
       
       setUploadResult(result);
       setUploading(false);
       setShowMapper(false);
       
-      console.log('Upload process complete:', result);
+      console.log('Enhanced upload process complete:', result);
       
       if (allDuplicates.length > 0) {
         toast({
@@ -143,7 +164,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       } else {
         toast({
           title: "Upload successful!",
-          description: `${insertResult.successfulInserts} leads imported with no duplicates`,
+          description: `${insertResult.successfulInserts} leads imported with enhanced data preservation`,
         });
       }
 
@@ -158,7 +179,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       
     } catch (error) {
       setUploading(false);
-      console.error('Upload error:', error);
+      console.error('Enhanced upload error:', error);
       toast({
         title: "Processing error",
         description: "Error processing the data or saving to database",
@@ -202,7 +223,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       <div>
         <h1 className="text-3xl font-bold text-slate-800">Upload Leads</h1>
         <p className="text-slate-600 mt-1">
-          Import leads from CSV or Excel files with automatic field mapping
+          Import leads from CSV or Excel files with enhanced data preservation and comprehensive tracking
         </p>
       </div>
 

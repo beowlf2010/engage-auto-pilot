@@ -2,11 +2,15 @@
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { BulkInsertResult } from './leadOperations/types';
 import { checkExistingDuplicates } from './leadOperations/duplicateChecker';
-import { insertSingleLead } from './leadOperations/singleLeadInserter';
+import { insertEnhancedLead, EnhancedLeadData } from './leadOperations/enhancedSingleLeadInserter';
+import { updateUploadHistory } from './leadOperations/uploadHistoryService';
 
-// Bulk insert leads with duplicate detection
-export const insertLeadsToDatabase = async (leads: ProcessedLead[]): Promise<BulkInsertResult> => {
-  console.log(`Starting bulk insert for ${leads.length} leads`);
+// Enhanced bulk insert with comprehensive data preservation
+export const insertLeadsToDatabase = async (
+  leads: ProcessedLead[], 
+  uploadHistoryId?: string
+): Promise<BulkInsertResult> => {
+  console.log(`Starting enhanced bulk insert for ${leads.length} leads`);
   
   // First check for duplicates against existing database records
   const duplicates = await checkExistingDuplicates(leads);
@@ -21,12 +25,23 @@ export const insertLeadsToDatabase = async (leads: ProcessedLead[]): Promise<Bul
   const errors: BulkInsertResult['errors'] = [];
   let successfulInserts = 0;
 
-  // Insert leads one by one (could be optimized with batch operations later)
+  // Insert leads with enhanced data preservation
   for (let i = 0; i < leadsToInsert.length; i++) {
     const lead = leadsToInsert[i];
     const originalIndex = leads.indexOf(lead);
     
-    const result = await insertSingleLead(lead);
+    // Prepare enhanced lead data
+    const enhancedLead: EnhancedLeadData = {
+      ...lead,
+      uploadHistoryId,
+      originalRowIndex: originalIndex + 1,
+      rawUploadData: (lead as any).rawUploadData || {},
+      originalStatus: (lead as any).originalStatus,
+      statusMappingLog: (lead as any).statusMappingLog || {},
+      dataSourceQualityScore: 0 // Will be calculated in insertEnhancedLead
+    };
+    
+    const result = await insertEnhancedLead(enhancedLead);
     
     if (result.success) {
       successfulInserts++;
@@ -41,7 +56,21 @@ export const insertLeadsToDatabase = async (leads: ProcessedLead[]): Promise<Bul
     }
   }
 
-  console.log(`Bulk insert complete: ${successfulInserts} successful, ${errors.length} errors, ${duplicates.length} duplicates`);
+  // Update upload history with final results if provided
+  if (uploadHistoryId) {
+    try {
+      await updateUploadHistory(uploadHistoryId, {
+        successful_imports: successfulInserts,
+        failed_imports: errors.length,
+        duplicate_imports: duplicates.length,
+        upload_status: 'completed'
+      });
+    } catch (error) {
+      console.error('Error updating upload history:', error);
+    }
+  }
+
+  console.log(`Enhanced bulk insert complete: ${successfulInserts} successful, ${errors.length} errors, ${duplicates.length} duplicates`);
 
   return {
     totalProcessed: leads.length,

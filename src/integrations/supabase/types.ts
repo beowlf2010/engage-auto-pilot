@@ -2026,6 +2026,7 @@ export type Database = {
           city: string | null
           conversion_probability: number | null
           created_at: string
+          data_source_quality_score: number | null
           do_not_call: boolean
           do_not_email: boolean
           do_not_mail: boolean
@@ -2045,6 +2046,8 @@ export type Database = {
           middle_name: string | null
           next_ai_send_at: string | null
           next_email_send_at: string | null
+          original_row_index: number | null
+          original_status: string | null
           pending_human_response: boolean | null
           postal_code: string | null
           predicted_close_date: string | null
@@ -2053,10 +2056,14 @@ export type Database = {
           preferred_price_min: number | null
           preferred_year_max: number | null
           preferred_year_min: number | null
+          raw_upload_data: Json | null
+          salesperson_first_name: string | null
           salesperson_id: string | null
+          salesperson_last_name: string | null
           source: string
           state: string | null
           status: string
+          status_mapping_log: Json | null
           temperature_score: number | null
           trade_decision_timeline: string | null
           trade_financing_bank: string | null
@@ -2064,6 +2071,7 @@ export type Database = {
           trade_motivation: string | null
           trade_payoff_amount: number | null
           updated_at: string
+          upload_history_id: string | null
           vehicle_interest: string
           vehicle_make: string | null
           vehicle_model: string | null
@@ -2084,6 +2092,7 @@ export type Database = {
           city?: string | null
           conversion_probability?: number | null
           created_at?: string
+          data_source_quality_score?: number | null
           do_not_call?: boolean
           do_not_email?: boolean
           do_not_mail?: boolean
@@ -2103,6 +2112,8 @@ export type Database = {
           middle_name?: string | null
           next_ai_send_at?: string | null
           next_email_send_at?: string | null
+          original_row_index?: number | null
+          original_status?: string | null
           pending_human_response?: boolean | null
           postal_code?: string | null
           predicted_close_date?: string | null
@@ -2111,10 +2122,14 @@ export type Database = {
           preferred_price_min?: number | null
           preferred_year_max?: number | null
           preferred_year_min?: number | null
+          raw_upload_data?: Json | null
+          salesperson_first_name?: string | null
           salesperson_id?: string | null
+          salesperson_last_name?: string | null
           source?: string
           state?: string | null
           status?: string
+          status_mapping_log?: Json | null
           temperature_score?: number | null
           trade_decision_timeline?: string | null
           trade_financing_bank?: string | null
@@ -2122,6 +2137,7 @@ export type Database = {
           trade_motivation?: string | null
           trade_payoff_amount?: number | null
           updated_at?: string
+          upload_history_id?: string | null
           vehicle_interest: string
           vehicle_make?: string | null
           vehicle_model?: string | null
@@ -2142,6 +2158,7 @@ export type Database = {
           city?: string | null
           conversion_probability?: number | null
           created_at?: string
+          data_source_quality_score?: number | null
           do_not_call?: boolean
           do_not_email?: boolean
           do_not_mail?: boolean
@@ -2161,6 +2178,8 @@ export type Database = {
           middle_name?: string | null
           next_ai_send_at?: string | null
           next_email_send_at?: string | null
+          original_row_index?: number | null
+          original_status?: string | null
           pending_human_response?: boolean | null
           postal_code?: string | null
           predicted_close_date?: string | null
@@ -2169,10 +2188,14 @@ export type Database = {
           preferred_price_min?: number | null
           preferred_year_max?: number | null
           preferred_year_min?: number | null
+          raw_upload_data?: Json | null
+          salesperson_first_name?: string | null
           salesperson_id?: string | null
+          salesperson_last_name?: string | null
           source?: string
           state?: string | null
           status?: string
+          status_mapping_log?: Json | null
           temperature_score?: number | null
           trade_decision_timeline?: string | null
           trade_financing_bank?: string | null
@@ -2180,6 +2203,7 @@ export type Database = {
           trade_motivation?: string | null
           trade_payoff_amount?: number | null
           updated_at?: string
+          upload_history_id?: string | null
           vehicle_interest?: string
           vehicle_make?: string | null
           vehicle_model?: string | null
@@ -2192,6 +2216,13 @@ export type Database = {
             columns: ["salesperson_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_upload_history_id_fkey"
+            columns: ["upload_history_id"]
+            isOneToOne: false
+            referencedRelation: "upload_history"
             referencedColumns: ["id"]
           },
         ]
@@ -3280,17 +3311,23 @@ export type Database = {
           duplicate_count: number
           error_details: string | null
           failed_imports: number
+          field_mapping: Json | null
           file_size: number
           file_type: string
           id: string
           inventory_condition: string | null
           original_filename: string
           processed_at: string | null
+          processing_errors: Json | null
           processing_status: string
           stored_filename: string
           successful_imports: number
           total_rows: number
+          upload_completed_at: string | null
+          upload_started_at: string | null
+          upload_status: string | null
           upload_type: string
+          uploaded_by: string | null
           user_id: string
         }
         Insert: {
@@ -3298,17 +3335,23 @@ export type Database = {
           duplicate_count?: number
           error_details?: string | null
           failed_imports?: number
+          field_mapping?: Json | null
           file_size: number
           file_type: string
           id?: string
           inventory_condition?: string | null
           original_filename: string
           processed_at?: string | null
+          processing_errors?: Json | null
           processing_status?: string
           stored_filename: string
           successful_imports?: number
           total_rows?: number
+          upload_completed_at?: string | null
+          upload_started_at?: string | null
+          upload_status?: string | null
           upload_type: string
+          uploaded_by?: string | null
           user_id: string
         }
         Update: {
@@ -3316,17 +3359,23 @@ export type Database = {
           duplicate_count?: number
           error_details?: string | null
           failed_imports?: number
+          field_mapping?: Json | null
           file_size?: number
           file_type?: string
           id?: string
           inventory_condition?: string | null
           original_filename?: string
           processed_at?: string | null
+          processing_errors?: Json | null
           processing_status?: string
           stored_filename?: string
           successful_imports?: number
           total_rows?: number
+          upload_completed_at?: string | null
+          upload_started_at?: string | null
+          upload_status?: string | null
           upload_type?: string
+          uploaded_by?: string | null
           user_id?: string
         }
         Relationships: []
