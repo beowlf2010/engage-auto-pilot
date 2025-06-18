@@ -19,7 +19,7 @@ const InventoryDashboardHeader = () => {
             <span>RPO Insights</span>
           </Button>
         </Link>
-        <Link to="/upload-inventory-report">
+        <Link to="/upload-inventory">
           <Button className="flex items-center space-x-2">
             <Car className="w-4 h-4" />
             <span>Upload Inventory</span>
