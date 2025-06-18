@@ -1,10 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Play, Pause, RefreshCw, AlertTriangle } from "lucide-react";
+import { Bot, Play, Pause, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
 import { fixLeadAIStage } from '@/services/aiStageFixService';
 
 interface CompactAIControlsProps {
@@ -30,8 +30,29 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   onAIOptInChange,
   onAITakeoverChange
 }) => {
+  const [isToggling, setIsToggling] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
+
   const handleFixAIStage = async () => {
-    await fixLeadAIStage(leadId);
+    setIsFixing(true);
+    try {
+      await fixLeadAIStage(leadId);
+    } catch (error) {
+      console.error('Failed to fix AI stage:', error);
+    } finally {
+      setIsFixing(false);
+    }
+  };
+
+  const handleAIOptInToggle = async (enabled: boolean) => {
+    setIsToggling(true);
+    try {
+      await onAIOptInChange(enabled);
+    } catch (error) {
+      console.error('Failed to toggle AI opt-in:', error);
+    } finally {
+      setIsToggling(false);
+    }
   };
 
   const getStatusColor = () => {
@@ -42,6 +63,7 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   };
 
   const getStatusIcon = () => {
+    if (isToggling) return <Loader2 className="w-3 h-3 animate-spin text-blue-500" />;
     if (!aiOptIn) return <Bot className="w-3 h-3 text-gray-500" />;
     if (pendingHumanResponse) return <Pause className="w-3 h-3 text-blue-500" />;
     if (aiSequencePaused) return <Pause className="w-3 h-3 text-yellow-500" />;
@@ -49,6 +71,7 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   };
 
   const getStatusText = () => {
+    if (isToggling) return 'Updating...';
     if (!aiOptIn) return 'Disabled';
     if (pendingHumanResponse) return 'Waiting for Human';
     if (aiSequencePaused) return 'Paused';
@@ -86,7 +109,8 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
           </div>
           <Switch
             checked={aiOptIn}
-            onCheckedChange={onAIOptInChange}
+            onCheckedChange={handleAIOptInToggle}
+            disabled={isToggling}
           />
         </div>
 
@@ -129,9 +153,14 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={handleFixAIStage}
+                  disabled={isFixing}
                   className="w-full text-xs h-7"
                 >
-                  <RefreshCw className="w-3 h-3 mr-1" />
+                  {isFixing ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                  )}
                   Fix AI Sequence
                 </Button>
               </div>
