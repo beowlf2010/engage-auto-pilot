@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
 import { processLeads } from "@/components/upload-leads/processLeads";
+import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 
 interface QueuedLeadFile {
@@ -83,14 +84,45 @@ export const useMultiFileLeadUpload = () => {
       const parsed = await parseEnhancedInventoryFile(queuedFile.file);
       console.log(`Parsed lead file with ${parsed.rows.length} rows`);
       
-      // Process leads using existing logic
-      const result = await processLeads(parsed.rows);
+      // Create a basic field mapping for lead processing
+      // This assumes the CSV has standard lead field names
+      const basicMapping = {
+        firstName: 'first_name',
+        lastName: 'last_name',
+        middleName: 'middle_name',
+        email: 'email',
+        emailAlt: 'email_alt',
+        cellphone: 'phone',
+        dayphone: 'day_phone',
+        evephone: 'evening_phone',
+        address: 'address',
+        city: 'city',
+        state: 'state',
+        postalCode: 'postal_code',
+        vehicleYear: 'vehicle_year',
+        vehicleMake: 'vehicle_make',
+        vehicleModel: 'vehicle_model',
+        vehicleVIN: 'vin',
+        source: 'source',
+        salesPersonFirstName: 'salesperson_first_name',
+        salesPersonLastName: 'salesperson_last_name',
+        doNotCall: 'do_not_call',
+        doNotEmail: 'do_not_email',
+        doNotMail: 'do_not_mail',
+        status: 'status'
+      };
+      
+      // Process leads with proper mapping
+      const processingResult = processLeads(parsed, basicMapping);
+      
+      // Insert leads to database
+      const insertResult = await insertLeadsToDatabase(processingResult.validLeads);
       
       updateFileStatus(queuedFile.id, 'completed', undefined, {
         totalRows: parsed.rows.length,
-        successfulImports: result.successfulInserts,
-        errors: result.errors.length,
-        duplicates: result.duplicates.length
+        successfulImports: insertResult.successfulInserts,
+        errors: processingResult.errors.length + insertResult.errors.length,
+        duplicates: processingResult.duplicates.length + insertResult.duplicates.length
       });
 
     } catch (error) {
