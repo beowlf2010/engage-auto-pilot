@@ -50,7 +50,7 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       return { success: false, leadId, error: 'Failed to generate message' };
     }
 
-    // Send the message and handle the void return properly
+    // Send the message - sendMessage returns void, so we just await it
     try {
       await sendMessage(leadId, message, profile, true);
       
@@ -76,6 +76,7 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       );
     } catch (error) {
       console.error('Error sending message or adding note:', error);
+      return { success: false, leadId, error: 'Failed to send message' };
     }
 
     // Update lead status
