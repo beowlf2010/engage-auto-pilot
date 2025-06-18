@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateIntelligentAIMessage } from './intelligentAIMessageService';
 import { sendMessage } from './messagesService';
 import { toast } from '@/hooks/use-toast';
+import { addAIConversationNote } from './vehicleMentionService';
 
 export interface ProactiveMessageResult {
   success: boolean;
@@ -50,7 +51,16 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
     }
 
     // Send the message
-    await sendMessage(leadId, message, profile, true);
+    const messageResult = await sendMessage(leadId, message, profile, true);
+
+    // Add AI conversation note about initial contact
+    await addAIConversationNote(
+      leadId,
+      messageResult?.id || null,
+      'inventory_discussion',
+      `Initial AI contact: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
+      []
+    );
 
     // Update lead status
     await supabase

@@ -56,6 +56,51 @@ export type Database = {
           },
         ]
       }
+      ai_conversation_notes: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          id: string
+          lead_id: string
+          note_content: string
+          note_type: string
+          vehicles_discussed: Json | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          lead_id: string
+          note_content: string
+          note_type?: string
+          vehicles_discussed?: Json | null
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string
+          note_content?: string
+          note_type?: string
+          vehicles_discussed?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversation_notes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_conversation_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_message_analytics: {
         Row: {
           created_at: string
@@ -2010,6 +2055,66 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      lead_vehicle_mentions: {
+        Row: {
+          ai_response_notes: string | null
+          context_type: string
+          conversation_id: string | null
+          created_at: string
+          id: string
+          inventory_available: boolean | null
+          lead_id: string
+          mentioned_at: string
+          mentioned_vehicle: string
+          vehicle_make: string | null
+          vehicle_model: string | null
+          vehicle_year: number | null
+        }
+        Insert: {
+          ai_response_notes?: string | null
+          context_type?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          inventory_available?: boolean | null
+          lead_id: string
+          mentioned_at?: string
+          mentioned_vehicle: string
+          vehicle_make?: string | null
+          vehicle_model?: string | null
+          vehicle_year?: number | null
+        }
+        Update: {
+          ai_response_notes?: string | null
+          context_type?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          inventory_available?: boolean | null
+          lead_id?: string
+          mentioned_at?: string
+          mentioned_vehicle?: string
+          vehicle_make?: string | null
+          vehicle_model?: string | null
+          vehicle_year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_vehicle_mentions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_vehicle_mentions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads: {
         Row: {

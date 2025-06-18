@@ -1,197 +1,130 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { generateIntelligentResponse, type ConversationContext } from './intelligentConversationAI';
+import { generateEnhancedIntelligentResponse, processCustomerVehicleMentions } from './enhancedIntelligentConversationAI';
 
-interface LeadContext {
-  id: string;
-  firstName: string;
-  lastName: string;
-  vehicleInterest: string;
-  phone: string;
-  aiStage: string;
-  messagesSent: number;
-  lastReplyAt?: string;
-}
+class CentralizedAIService {
+  private processedMessages = new Set<string>();
 
-interface ConversationMessage {
-  id: string;
-  body: string;
-  direction: 'in' | 'out';
-  sentAt: string;
-  aiGenerated?: boolean;
-}
-
-// Central AI service to coordinate all AI message generation with duplicate prevention
-export class CentralizedAIService {
-  private static instance: CentralizedAIService;
-  private isGenerating = new Set<string>();
-  private recentlyProcessed = new Map<string, number>(); // leadId -> timestamp
-
-  static getInstance(): CentralizedAIService {
-    if (!CentralizedAIService.instance) {
-      CentralizedAIService.instance = new CentralizedAIService();
-    }
-    return CentralizedAIService.instance;
-  }
-
-  // Enhanced duplicate prevention - check if we should generate a response
   async shouldGenerateResponse(leadId: string): Promise<boolean> {
-    if (this.isGenerating.has(leadId)) {
-      console.log(`🔒 AI already generating for lead ${leadId}`);
-      return false;
-    }
-
-    // Check if we recently processed this lead (within last 30 seconds)
-    const lastProcessed = this.recentlyProcessed.get(leadId);
-    const now = Date.now();
-    if (lastProcessed && (now - lastProcessed) < 30000) {
-      console.log(`⏱️ Recently processed lead ${leadId}, skipping to prevent duplicates`);
-      return false;
-    }
-
-    // Get the lead's conversation context
-    const context = await this.getConversationContext(leadId);
-    if (!context) return false;
-
-    // Check if there's an unresponded customer message
-    const lastCustomerMessage = context.messages
-      .filter(msg => msg.direction === 'in')
-      .slice(-1)[0];
-
-    if (!lastCustomerMessage) return false;
-
-    // Check if we've already responded to this message
-    const messagesAfterCustomer = context.messages.filter(msg => 
-      new Date(msg.sentAt) > new Date(lastCustomerMessage.sentAt) && 
-      msg.direction === 'out'
-    );
-
-    const shouldGenerate = messagesAfterCustomer.length === 0;
-    
-    if (shouldGenerate) {
-      console.log(`✅ Should generate response for lead ${leadId} - unresponded customer message found`);
-    } else {
-      console.log(`⏭️ Skipping lead ${leadId} - already responded to latest customer message`);
-    }
-
-    return shouldGenerate;
-  }
-
-  // Generate intelligent response using our enhanced system with duplicate prevention
-  async generateResponse(leadId: string): Promise<string | null> {
-    if (this.isGenerating.has(leadId)) {
-      console.log(`🔒 Already generating response for lead ${leadId}`);
-      return null;
-    }
-
-    this.isGenerating.add(leadId);
-
     try {
-      console.log(`🤖 Generating centralized AI response for lead ${leadId}`);
+      // Get recent messages for this lead
+      const { data: messages } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: false })
+        .limit(10);
 
-      const context = await this.getConversationContext(leadId);
-      if (!context) {
-        console.log(`❌ No context available for lead ${leadId}`);
-        return null;
+      if (!messages || messages.length === 0) return false;
+
+      // Find the last customer message
+      const lastCustomerMessage = messages.find(msg => msg.direction === 'in');
+      if (!lastCustomerMessage) return false;
+
+      // Check if we already processed this message
+      if (this.processedMessages.has(lastCustomerMessage.id)) {
+        return false;
       }
 
-      // Use our intelligent conversation AI service (Tesla-aware)
-      const response = await generateIntelligentResponse(context);
-      
-      if (response) {
-        console.log(`✅ Generated intelligent response: ${response.message}`);
-        
-        // Mark as recently processed to prevent duplicates
-        this.recentlyProcessed.set(leadId, Date.now());
-        
-        // Clean up old entries (older than 5 minutes)
-        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-        for (const [id, timestamp] of this.recentlyProcessed.entries()) {
-          if (timestamp < fiveMinutesAgo) {
-            this.recentlyProcessed.delete(id);
-          }
-        }
-        
-        return response.message;
-      }
+      // Check if there's already a response after this customer message
+      const responseAfter = messages.find(msg => 
+        msg.direction === 'out' && 
+        new Date(msg.sent_at) > new Date(lastCustomerMessage.sent_at)
+      );
 
-      return null;
+      return !responseAfter;
     } catch (error) {
-      console.error(`❌ Error generating AI response for lead ${leadId}:`, error);
-      return null;
-    } finally {
-      this.isGenerating.delete(leadId);
+      console.error('Error checking if response needed:', error);
+      return false;
     }
   }
 
-  // Get full conversation context for a lead
-  private async getConversationContext(leadId: string): Promise<ConversationContext | null> {
+  async generateResponse(leadId: string): Promise<string | null> {
     try {
-      // Get lead details
-      const { data: lead, error: leadError } = await supabase
+      // Get lead data
+      const { data: lead } = await supabase
         .from('leads')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          vehicle_interest,
-          ai_stage,
-          ai_messages_sent,
-          last_reply_at,
-          phone_numbers (number, is_primary)
-        `)
+        .select('first_name, last_name, vehicle_interest, phone')
         .eq('id', leadId)
         .single();
 
-      if (leadError || !lead) {
-        console.error('Error fetching lead:', leadError);
-        return null;
-      }
+      if (!lead) return null;
 
-      // Get conversation messages
-      const { data: messages, error: messagesError } = await supabase
+      // Get conversation history
+      const { data: conversations } = await supabase
         .from('conversations')
-        .select('id, body, direction, sent_at, ai_generated')
+        .select('*')
         .eq('lead_id', leadId)
-        .order('sent_at', { ascending: true });
+        .order('sent_at', { ascending: true })
+        .limit(20);
 
-      if (messagesError) {
-        console.error('Error fetching messages:', messagesError);
-        return null;
-      }
+      if (!conversations || conversations.length === 0) return null;
 
-      // Transform messages to expected format
-      const conversationMessages: ConversationMessage[] = messages?.map(msg => ({
+      // Get the last customer message
+      const lastCustomerMessage = conversations
+        .filter(msg => msg.direction === 'in')
+        .slice(-1)[0];
+
+      if (!lastCustomerMessage) return null;
+
+      // Process vehicle mentions from the customer message
+      await processCustomerVehicleMentions(
+        leadId,
+        lastCustomerMessage.id,
+        lastCustomerMessage.body
+      );
+
+      // Format messages for AI
+      const formattedMessages = conversations.map(msg => ({
         id: msg.id,
         body: msg.body,
         direction: msg.direction as 'in' | 'out',
         sentAt: msg.sent_at,
-        aiGenerated: msg.ai_generated || false
-      })) || [];
+        aiGenerated: msg.ai_generated
+      }));
 
-      return {
-        leadId: lead.id,
+      // Create enhanced context
+      const context = {
+        leadId,
         leadName: `${lead.first_name} ${lead.last_name}`,
-        vehicleInterest: lead.vehicle_interest,
-        messages: conversationMessages,
+        vehicleInterest: lead.vehicle_interest || '',
+        messages: formattedMessages,
         leadInfo: {
-          phone: lead.phone_numbers?.find(p => p.is_primary)?.number || '',
-          status: lead.ai_stage || 'initial',
-          lastReplyAt: lead.last_reply_at
+          phone: lead.phone || '',
+          status: 'active',
+          lastReplyAt: lastCustomerMessage.sent_at
         }
       };
+
+      // Generate enhanced response
+      const aiResponse = await generateEnhancedIntelligentResponse(context);
+
+      if (aiResponse?.message) {
+        // Mark this message as processed
+        this.processedMessages.add(lastCustomerMessage.id);
+        console.log(`🤖 Generated enhanced AI response for lead ${leadId}:`, aiResponse.message);
+        return aiResponse.message;
+      }
+
+      return null;
     } catch (error) {
-      console.error('Error getting conversation context:', error);
+      console.error('Error generating AI response:', error);
       return null;
     }
   }
 
-  // Mark an AI response as processed to prevent duplicates
-  markResponseProcessed(leadId: string, messageContent: string): void {
-    console.log(`✅ Marked response processed for lead ${leadId}`);
-    this.recentlyProcessed.set(leadId, Date.now());
+  markResponseProcessed(leadId: string, message: string): void {
+    console.log(`✅ Marked AI response as processed for lead ${leadId}`);
+  }
+
+  // Process incoming message for vehicle mentions
+  async processIncomingMessage(leadId: string, conversationId: string, messageBody: string): Promise<void> {
+    try {
+      await processCustomerVehicleMentions(leadId, conversationId, messageBody);
+    } catch (error) {
+      console.error('Error processing incoming message:', error);
+    }
   }
 }
 
-// Export singleton instance
-export const centralizedAI = CentralizedAIService.getInstance();
+export const centralizedAI = new CentralizedAIService();
