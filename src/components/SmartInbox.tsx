@@ -9,7 +9,7 @@ import ChatView from "./inbox/ChatView";
 import ConversationMemory from "./ConversationMemory";
 import { useRealtimeInbox } from "@/hooks/useRealtimeInbox";
 import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
-import { markMessagesAsRead, assignCurrentUserToLead } from "@/services/conversationsService";
+import { markAllMessagesAsRead, assignCurrentUserToLead } from "@/services/conversationsService";
 import { trackLeadResponse } from "@/services/enhancedAIMessageService";
 import { toast } from "@/hooks/use-toast";
 
@@ -46,25 +46,20 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   const handleSelectConversation = useCallback(async (leadId: string) => {
     try {
-      console.log('Selecting conversation for lead:', leadId);
+      console.log('📱 Selecting conversation for lead:', leadId);
       setSelectedLead(leadId);
+      
+      // Load messages (which will also mark them as read)
       await fetchMessages(leadId);
       
-      // Check if this lead has incoming messages to track as responses
+      // Track any incoming messages as responses
       const incomingMessages = messages.filter(msg => msg.direction === 'in');
       if (incomingMessages.length > 0) {
-        // Track the most recent incoming message as a response
         const latestIncoming = incomingMessages[incomingMessages.length - 1];
         await trackLeadResponse(leadId, new Date(latestIncoming.sentAt));
       }
       
-      // Mark messages as read when viewing the conversation
-      await markMessagesAsRead(leadId);
-      
-      // Refresh conversations to update unread counts
-      setTimeout(() => {
-        refetch();
-      }, 500);
+      console.log('✅ Conversation selected and messages marked as read');
     } catch (err) {
       console.error('Error selecting conversation:', err);
       toast({
@@ -73,14 +68,14 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         variant: "destructive"
       });
     }
-  }, [fetchMessages, messages, refetch]);
+  }, [fetchMessages, messages]);
 
   const handleSendMessage = useCallback(async (message: string) => {
     if (selectedLead && selectedConversation) {
       try {
         // Auto-assign lead if it's unassigned and user can reply
         if (!selectedConversation.salespersonId && canReply(selectedConversation)) {
-          console.log(`Auto-assigning lead ${selectedLead} to user ${user.id}`);
+          console.log(`🎯 Auto-assigning lead ${selectedLead} to user ${user.id}`);
           
           const assigned = await assignCurrentUserToLead(selectedLead, user.id);
           if (assigned) {
@@ -96,7 +91,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         
         await sendMessage(selectedLead, message);
         
-        // Refresh conversations to show updated assignment
+        // Refresh conversations to show updated assignment and clear unread badges
         setTimeout(() => {
           refetch();
         }, 1000);
@@ -120,26 +115,26 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     if (loading || isInitialized || filteredConversations.length === 0) return;
 
     const leadIdFromUrl = searchParams.get('leadId');
-    console.log('URL leadId:', leadIdFromUrl);
-    console.log('Available conversations:', filteredConversations.length);
+    console.log('🔗 URL leadId:', leadIdFromUrl);
+    console.log('📊 Available conversations:', filteredConversations.length);
 
     if (leadIdFromUrl) {
       // Check if the lead exists in conversations
       const conversation = filteredConversations.find(conv => conv.leadId === leadIdFromUrl);
       if (conversation) {
-        console.log('Found conversation for URL leadId, selecting...');
+        console.log('✅ Found conversation for URL leadId, selecting...');
         handleSelectConversation(leadIdFromUrl);
         setIsInitialized(true);
         return;
       } else {
-        console.log('Lead from URL not found in conversations');
+        console.log('❌ Lead from URL not found in conversations');
       }
     }
 
     // Default selection if no URL parameter or conversation not found
     if (filteredConversations.length > 0 && !selectedLead) {
       const firstConv = filteredConversations[0];
-      console.log('Selecting first conversation:', firstConv.leadId);
+      console.log('📌 Selecting first conversation:', firstConv.leadId);
       handleSelectConversation(firstConv.leadId);
     }
     

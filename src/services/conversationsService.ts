@@ -148,15 +148,46 @@ export const assignCurrentUserToLead = async (leadId: string, profileId: string)
 
 export const markMessagesAsRead = async (leadId: string): Promise<void> => {
   try {
-    const { error } = await supabase
+    console.log('📖 Marking messages as read for lead:', leadId);
+    
+    const { data, error } = await supabase
       .from('conversations')
       .update({ read_at: new Date().toISOString() })
       .eq('lead_id', leadId)
       .eq('direction', 'in')
-      .is('read_at', null);
+      .is('read_at', null)
+      .select('id');
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error marking messages as read:', error);
+      throw error;
+    }
+    
+    console.log('✅ Marked', data?.length || 0, 'messages as read');
   } catch (error) {
     console.error('Error marking messages as read:', error);
+    throw error;
+  }
+};
+
+export const markAllMessagesAsRead = async (leadId: string): Promise<void> => {
+  try {
+    console.log('📖 Marking ALL messages as read for lead:', leadId);
+    
+    const { error } = await supabase
+      .from('conversations')
+      .update({ read_at: new Date().toISOString() })
+      .eq('lead_id', leadId)
+      .is('read_at', null);
+
+    if (error) {
+      console.error('❌ Error marking all messages as read:', error);
+      throw error;
+    }
+    
+    console.log('✅ All messages marked as read for lead:', leadId);
+  } catch (error) {
+    console.error('Error marking all messages as read:', error);
+    throw error;
   }
 };

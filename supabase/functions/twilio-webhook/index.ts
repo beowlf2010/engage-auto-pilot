@@ -38,7 +38,7 @@ serve(async (req) => {
 
     if (!from || !body) {
       console.error('❌ Missing required fields:', { from: !!from, body: !!body });
-      return new Response('Missing required fields', { status: 400, headers: corsHeaders })
+      return new Response('', { status: 400, headers: corsHeaders })
     }
 
     // Clean phone number format
@@ -82,7 +82,7 @@ serve(async (req) => {
 
     if (!phoneData?.leads) {
       console.error('❌ Lead not found for any phone format. Tried:', phoneFormats);
-      return new Response('Lead not found', { status: 404, headers: corsHeaders })
+      return new Response('', { status: 404, headers: corsHeaders })
     }
 
     const lead = phoneData.leads;
@@ -108,7 +108,7 @@ serve(async (req) => {
 
     if (messageError) {
       console.error('❌ Error inserting message:', messageError);
-      return new Response('Error saving message', { status: 500, headers: corsHeaders })
+      return new Response('', { status: 500, headers: corsHeaders })
     }
 
     console.log('💾 Message saved with ID:', messageData.id);
@@ -165,7 +165,7 @@ serve(async (req) => {
         .from('conversation_memory')
         .upsert({
           lead_id: lead.id,
-          memory_type: 'recent_interaction',
+          memory_type: 'conversation_context',
           content: `Lead replied: "${body}"`,
           confidence: 1.0,
           created_at: new Date().toISOString()
@@ -183,7 +183,14 @@ serve(async (req) => {
     console.log('✅ Webhook processed successfully');
     console.log('=== TWILIO WEBHOOK END ===');
     
-    return new Response('OK', { status: 200, headers: corsHeaders })
+    // Return empty response with 204 status - no content for customer
+    return new Response('', { 
+      status: 204, 
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/plain'
+      }
+    })
 
   } catch (error) {
     console.error('💥 CRITICAL ERROR in webhook:', {
@@ -191,6 +198,6 @@ serve(async (req) => {
       stack: error.stack,
       name: error.name
     });
-    return new Response('Internal error', { status: 500, headers: corsHeaders })
+    return new Response('', { status: 500, headers: corsHeaders })
   }
 })

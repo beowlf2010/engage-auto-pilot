@@ -18,7 +18,8 @@ import {
   Mail,
   Calendar,
   Sparkles,
-  BarChart3
+  BarChart3,
+  ArrowDown
 } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import LeadContextPanel from './LeadContextPanel';
@@ -53,7 +54,9 @@ const EnhancedChatView = ({
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const {
     summary,
@@ -69,13 +72,30 @@ const EnhancedChatView = ({
     getAverageSentiment
   } = useConversationAnalysis(selectedConversation?.leadId || '');
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
   };
 
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollButton(!isNearBottom);
+    }
+  };
+
+  // Auto-scroll to bottom when messages change or conversation changes
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > 0) {
+      // Immediate scroll when conversation changes
+      if (selectedConversation) {
+        scrollToBottom(false);
+      } else {
+        // Smooth scroll for new messages
+        setTimeout(() => scrollToBottom(true), 100);
+      }
+    }
+  }, [messages.length, selectedConversation?.leadId]);
 
   // Load analysis data when conversation changes
   useEffect(() => {
@@ -92,7 +112,7 @@ const EnhancedChatView = ({
     if (newMessage.trim() && !isSending) {
       setIsSending(true);
       try {
-        console.log('Sending message from chat view:', newMessage.trim());
+        console.log('📤 Sending message from chat view:', newMessage.trim());
         await onSendMessage(newMessage.trim());
         setNewMessage('');
         
@@ -248,7 +268,11 @@ const EnhancedChatView = ({
           </CardHeader>
 
           {/* Messages Area */}
-          <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+          <CardContent 
+            ref={messagesContainerRef}
+            className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+            onScroll={handleScroll}
+          >
             {messages.length === 0 ? (
               <div className="text-center text-slate-500 py-8">
                 <MessageSquare className="h-8 w-8 mx-auto mb-2 text-slate-300" />
@@ -256,10 +280,21 @@ const EnhancedChatView = ({
               </div>
             ) : (
               <>
-                {messages.map((message) => {
+                {messages.map((message, index) => {
                   const sentiment = getSentimentForMessage(message.id);
+                  const prevMessage = messages[index - 1];
+                  const showDateSeparator = prevMessage && 
+                    new Date(message.sentAt).toDateString() !== new Date(prevMessage.sentAt).toDateString();
+                  
                   return (
                     <div key={message.id} className="space-y-2">
+                      {showDateSeparator && (
+                        <div className="flex items-center justify-center py-2">
+                          <div className="bg-slate-100 px-3 py-1 rounded-full text-xs text-slate-600">
+                            {new Date(message.sentAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      )}
                       <MessageBubble message={message} />
                       {sentiment && message.direction === 'in' && (
                         <div className="flex justify-start">
@@ -278,6 +313,18 @@ const EnhancedChatView = ({
                 })}
                 <div ref={messagesEndRef} />
               </>
+            )}
+            
+            {/* Scroll to bottom button */}
+            {showScrollButton && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="fixed bottom-32 right-8 rounded-full shadow-lg bg-white hover:bg-slate-50 z-10"
+                onClick={() => scrollToBottom(true)}
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
             )}
           </CardContent>
 
