@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface UploadHistoryRecord {
   id: string;
-  file_name: string;
   file_size: number;
   file_type: string;
   uploaded_by?: string;
@@ -16,6 +15,8 @@ export interface UploadHistoryRecord {
   field_mapping: Record<string, any>;
   processing_errors: any[];
   upload_status: 'processing' | 'completed' | 'failed';
+  created_at: string;
+  user_id: string;
 }
 
 export const createUploadHistory = async (
@@ -27,16 +28,16 @@ export const createUploadHistory = async (
   const { data, error } = await supabase
     .from('upload_history')
     .insert({
-      file_name: fileName,
       file_size: fileSize,
       file_type: fileType,
       field_mapping: fieldMapping,
       total_rows: 0,
       successful_imports: 0,
       failed_imports: 0,
-      duplicate_imports: 0,
+      duplicate_count: 0,
       processing_errors: [],
-      upload_status: 'processing'
+      upload_status: 'processing',
+      user_id: (await supabase.auth.getUser()).data.user?.id || ''
     })
     .select('id')
     .single();
@@ -51,14 +52,31 @@ export const createUploadHistory = async (
 
 export const updateUploadHistory = async (
   uploadId: string,
-  updates: Partial<UploadHistoryRecord>
+  updates: {
+    total_rows?: number;
+    successful_imports?: number;
+    failed_imports?: number;
+    duplicate_imports?: number;
+    processing_errors?: any[];
+    upload_status?: 'processing' | 'completed' | 'failed';
+  }
 ): Promise<void> => {
+  const updateData: any = { ...updates };
+  
+  // Map duplicate_imports to duplicate_count if needed
+  if (updates.duplicate_imports !== undefined) {
+    updateData.duplicate_count = updates.duplicate_imports;
+    delete updateData.duplicate_imports;
+  }
+  
+  // Add completion timestamp if status is completed
+  if (updates.upload_status === 'completed') {
+    updateData.upload_completed_at = new Date().toISOString();
+  }
+
   const { error } = await supabase
     .from('upload_history')
-    .update({
-      ...updates,
-      upload_completed_at: updates.upload_status === 'completed' ? new Date().toISOString() : undefined
-    })
+    .update(updateData)
     .eq('id', uploadId);
 
   if (error) {
@@ -71,12 +89,17 @@ export const getUploadHistory = async (): Promise<UploadHistoryRecord[]> => {
   const { data, error } = await supabase
     .from('upload_history')
     .select('*')
-    .order('upload_started_at', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching upload history:', error);
     throw error;
   }
 
-  return data || [];
+  // Transform the data to match our interface
+  return (data || []).map(record => ({
+    ...record,
+    duplicate_imports: record.duplicate_count || 0,
+    upload_started_at: record.created_at
+  }));
 };
