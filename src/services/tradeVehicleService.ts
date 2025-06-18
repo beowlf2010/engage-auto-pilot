@@ -22,7 +22,7 @@ export const getTradeVehiclesByLeadId = async (leadId: string): Promise<TradeVeh
     model: vehicle.model,
     trim: vehicle.trim,
     mileage: vehicle.mileage,
-    condition: vehicle.condition,
+    condition: vehicle.condition as 'excellent' | 'very_good' | 'good' | 'fair' | 'poor',
     vin: vehicle.vin,
     exteriorColor: vehicle.exterior_color,
     interiorColor: vehicle.interior_color,
@@ -35,7 +35,7 @@ export const getTradeVehiclesByLeadId = async (leadId: string): Promise<TradeVeh
     liensOutstanding: vehicle.liens_outstanding,
     modifications: vehicle.modifications,
     additionalNotes: vehicle.additional_notes,
-    photos: vehicle.photos || [],
+    photos: Array.isArray(vehicle.photos) ? vehicle.photos as string[] : [],
     createdAt: vehicle.created_at,
     updatedAt: vehicle.updated_at
   }));
@@ -82,7 +82,7 @@ export const createTradeVehicle = async (tradeVehicle: Omit<TradeVehicle, 'id' |
     model: data.model,
     trim: data.trim,
     mileage: data.mileage,
-    condition: data.condition,
+    condition: data.condition as 'excellent' | 'very_good' | 'good' | 'fair' | 'poor',
     vin: data.vin,
     exteriorColor: data.exterior_color,
     interiorColor: data.interior_color,
@@ -95,7 +95,7 @@ export const createTradeVehicle = async (tradeVehicle: Omit<TradeVehicle, 'id' |
     liensOutstanding: data.liens_outstanding,
     modifications: data.modifications,
     additionalNotes: data.additional_notes,
-    photos: data.photos || [],
+    photos: Array.isArray(data.photos) ? data.photos as string[] : [],
     createdAt: data.created_at,
     updatedAt: data.updated_at
   };
@@ -143,7 +143,7 @@ export const updateTradeVehicle = async (id: string, updates: Partial<TradeVehic
     model: data.model,
     trim: data.trim,
     mileage: data.mileage,
-    condition: data.condition,
+    condition: data.condition as 'excellent' | 'very_good' | 'good' | 'fair' | 'poor',
     vin: data.vin,
     exteriorColor: data.exterior_color,
     interiorColor: data.interior_color,
@@ -156,7 +156,7 @@ export const updateTradeVehicle = async (id: string, updates: Partial<TradeVehic
     liensOutstanding: data.liens_outstanding,
     modifications: data.modifications,
     additionalNotes: data.additional_notes,
-    photos: data.photos || [],
+    photos: Array.isArray(data.photos) ? data.photos as string[] : [],
     createdAt: data.created_at,
     updatedAt: data.updated_at
   };
@@ -189,7 +189,7 @@ export const getTradeValuations = async (tradeVehicleId: string): Promise<TradeV
   return (data || []).map(valuation => ({
     id: valuation.id,
     tradeVehicleId: valuation.trade_vehicle_id,
-    valuationSource: valuation.valuation_source,
+    valuationSource: valuation.valuation_source as 'kbb' | 'edmunds' | 'manual' | 'dealer_estimate',
     tradeInValue: valuation.trade_in_value,
     privatePartyValue: valuation.private_party_value,
     retailValue: valuation.retail_value,
@@ -197,7 +197,9 @@ export const getTradeValuations = async (tradeVehicleId: string): Promise<TradeV
     estimatedValue: valuation.estimated_value,
     valuationDate: valuation.valuation_date,
     marketConditions: valuation.market_conditions,
-    depreciationFactors: valuation.depreciation_factors,
+    depreciationFactors: typeof valuation.depreciation_factors === 'object' && valuation.depreciation_factors !== null 
+      ? valuation.depreciation_factors as Record<string, any> 
+      : {},
     valuationNotes: valuation.valuation_notes,
     appraisedBy: valuation.appraised_by,
     isFinalOffer: valuation.is_final_offer,
@@ -236,7 +238,7 @@ export const createTradeValuation = async (valuation: Omit<TradeValuation, 'id' 
   return {
     id: data.id,
     tradeVehicleId: data.trade_vehicle_id,
-    valuationSource: data.valuation_source,
+    valuationSource: data.valuation_source as 'kbb' | 'edmunds' | 'manual' | 'dealer_estimate',
     tradeInValue: data.trade_in_value,
     privatePartyValue: data.private_party_value,
     retailValue: data.retail_value,
@@ -244,7 +246,9 @@ export const createTradeValuation = async (valuation: Omit<TradeValuation, 'id' 
     estimatedValue: data.estimated_value,
     valuationDate: data.valuation_date,
     marketConditions: data.market_conditions,
-    depreciationFactors: data.depreciation_factors,
+    depreciationFactors: typeof data.depreciation_factors === 'object' && data.depreciation_factors !== null 
+      ? data.depreciation_factors as Record<string, any> 
+      : {},
     valuationNotes: data.valuation_notes,
     appraisedBy: data.appraised_by,
     isFinalOffer: data.is_final_offer,
