@@ -1,11 +1,11 @@
 
-import React, { useState } from "react";
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Bot, ChevronDown, Play, Pause, Timer } from "lucide-react";
+import { Bot, Play, Pause, RefreshCw, AlertTriangle } from "lucide-react";
+import { fixLeadAIStage } from '@/services/aiStageFixService';
 
 interface CompactAIControlsProps {
   leadId: string;
@@ -24,99 +24,118 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   aiOptIn,
   aiStage,
   aiSequencePaused,
-  aiTakeoverEnabled = false,
+  aiTakeoverEnabled,
   aiTakeoverDelayMinutes = 7,
-  pendingHumanResponse = false,
+  pendingHumanResponse,
   onAIOptInChange,
   onAITakeoverChange
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const getStatusBadge = () => {
-    if (!aiOptIn) return <Badge variant="secondary">Disabled</Badge>;
-    if (pendingHumanResponse) return <Badge className="bg-blue-100 text-blue-700">Waiting</Badge>;
-    if (aiSequencePaused) return <Badge variant="outline">Paused</Badge>;
-    return <Badge className="bg-green-100 text-green-700">Active</Badge>;
+  const handleFixAIStage = async () => {
+    await fixLeadAIStage(leadId);
   };
 
-  const handleTakeoverToggle = async (enabled: boolean) => {
-    if (onAITakeoverChange) {
-      await onAITakeoverChange(enabled, aiTakeoverDelayMinutes);
-    }
+  const getStatusColor = () => {
+    if (!aiOptIn) return 'bg-gray-100 text-gray-800';
+    if (pendingHumanResponse) return 'bg-blue-100 text-blue-800';
+    if (aiSequencePaused) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
   };
+
+  const getStatusIcon = () => {
+    if (!aiOptIn) return <Bot className="w-3 h-3 text-gray-500" />;
+    if (pendingHumanResponse) return <Pause className="w-3 h-3 text-blue-500" />;
+    if (aiSequencePaused) return <Pause className="w-3 h-3 text-yellow-500" />;
+    return <Play className="w-3 h-3 text-green-500" />;
+  };
+
+  const getStatusText = () => {
+    if (!aiOptIn) return 'Disabled';
+    if (pendingHumanResponse) return 'Waiting for Human';
+    if (aiSequencePaused) return 'Paused';
+    return 'Active';
+  };
+
+  // Check if stage looks problematic
+  const isProblematicStage = aiOptIn && (aiStage === 'scheduled' || !aiStage);
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center space-x-2 text-base">
+        <CardTitle className="flex items-center justify-between text-sm">
+          <span className="flex items-center space-x-2">
             <Bot className="w-4 h-4" />
-            <span>AI Assistant</span>
-          </CardTitle>
-          {getStatusBadge()}
-        </div>
+            <span>Finn AI</span>
+          </span>
+          <Badge className={getStatusColor()}>
+            <span className="flex items-center space-x-1">
+              {getStatusIcon()}
+              <span>{getStatusText()}</span>
+            </span>
+          </Badge>
+        </CardTitle>
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Main AI Toggle */}
+        {/* AI Opt-in Toggle */}
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium text-sm">AI Messaging</div>
-            <div className="text-xs text-gray-500">Automated follow-up sequences</div>
+            <div className="text-xs text-muted-foreground">
+              Automated follow-ups
+            </div>
           </div>
-          <Switch checked={aiOptIn} onCheckedChange={onAIOptInChange} />
+          <Switch
+            checked={aiOptIn}
+            onCheckedChange={onAIOptInChange}
+          />
         </div>
 
         {aiOptIn && (
           <>
-            {/* AI Takeover */}
-            <div className="flex items-center justify-between pt-2 border-t">
-              <div className="flex items-center space-x-2">
-                <Timer className="w-4 h-4 text-blue-500" />
+            {/* AI Takeover Toggle */}
+            <div className="p-2 border rounded bg-blue-50">
+              <div className="flex items-center justify-between mb-2">
                 <div>
-                  <div className="font-medium text-sm">Auto-takeover</div>
-                  <div className="text-xs text-gray-500">
-                    {aiTakeoverEnabled ? `After ${aiTakeoverDelayMinutes} min` : 'Manual only'}
+                  <div className="font-medium text-xs text-blue-900">AI Takeover</div>
+                  <div className="text-xs text-blue-700">
+                    Auto-respond after {aiTakeoverDelayMinutes}min
                   </div>
                 </div>
+                <Switch
+                  checked={aiTakeoverEnabled}
+                  onCheckedChange={(enabled) => onAITakeoverChange?.(enabled, aiTakeoverDelayMinutes)}
+                />
               </div>
-              <Switch 
-                checked={aiTakeoverEnabled} 
-                onCheckedChange={handleTakeoverToggle} 
-              />
             </div>
 
-            {/* Expandable Advanced Controls */}
-            <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full justify-between text-xs">
-                  Advanced Controls
-                  <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-3 pt-3">
-                {aiStage && (
-                  <div className="text-xs">
-                    <span className="text-gray-500">Current Stage:</span>
-                    <span className="ml-2 font-medium capitalize">{aiStage}</span>
-                  </div>
-                )}
-                
-                <div className="flex space-x-2">
-                  {aiSequencePaused ? (
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Play className="w-3 h-3 mr-1" />
-                      Resume
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Pause className="w-3 h-3 mr-1" />
-                      Pause
-                    </Button>
-                  )}
+            {/* Current Stage Info */}
+            <div className="text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Stage:</span>
+                <span className="font-medium">{aiStage || 'Not Set'}</span>
+              </div>
+            </div>
+
+            {/* Fix Button for Problematic Stages */}
+            {isProblematicStage && (
+              <div className="p-2 bg-orange-50 border border-orange-200 rounded">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-3 h-3 text-orange-600" />
+                  <span className="text-xs font-medium text-orange-900">
+                    AI sequence needs fixing
+                  </span>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleFixAIStage}
+                  className="w-full text-xs h-7"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Fix AI Sequence
+                </Button>
+              </div>
+            )}
           </>
         )}
       </CardContent>

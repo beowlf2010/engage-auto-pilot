@@ -1,172 +1,175 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 
 export const generateEnhancedAIMessage = async (leadId: string): Promise<string | null> => {
   try {
-    console.log('🤖 Starting AI message generation for lead:', leadId);
+    console.log(`🎯 Generating enhanced AI message for lead ${leadId}`);
     
-    // Check if it's within business hours (9 AM - 6 PM)
-    const now = new Date();
-    const hour = now.getHours();
-    const isBusinessHours = hour >= 9 && hour <= 18;
-    
-    if (!isBusinessHours) {
-      console.log('⏰ Outside business hours, but proceeding with generation');
-    }
-
-    // Get lead information first
-    const { data: leadData, error: leadError } = await supabase
+    // Get lead data
+    const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select('*')
       .eq('id', leadId)
       .single();
 
-    if (leadError || !leadData) {
-      console.error('❌ Error fetching lead data:', leadError);
-      toast({
-        title: "Error",
-        description: "Could not fetch lead information",
-        variant: "destructive"
-      });
+    if (leadError || !lead) {
+      console.error('Error fetching lead:', leadError);
       return null;
     }
 
-    console.log('📋 Lead data retrieved:', {
-      name: `${leadData.first_name} ${leadData.last_name}`,
-      vehicle: leadData.vehicle_interest,
-      aiOptIn: leadData.ai_opt_in
-    });
+    // Get recent conversations to avoid repetition
+    const { data: recentMessages } = await supabase
+      .from('conversations')
+      .select('body, direction')
+      .eq('lead_id', leadId)
+      .order('sent_at', { ascending: false })
+      .limit(5);
 
-    // Call the AI generation function
-    const { data, error } = await supabase.functions.invoke('generate-ai-message', {
-      body: {
-        leadId: leadId,
-        stage: 'manual_generation',
-        context: {
-          trigger_type: 'manual',
-          business_hours: isBusinessHours,
-          timestamp: new Date().toISOString()
-        }
-      }
-    });
+    const firstName = lead.first_name || 'there';
+    const vehicleInterest = lead.vehicle_interest || 'a vehicle';
+    const messagesSent = lead.ai_messages_sent || 0;
+    const stage = lead.ai_stage || 'day_1_morning';
 
-    if (error) {
-      console.error('❌ Edge function error:', error);
-      toast({
-        title: "AI Generation Failed",
-        description: error.message || "Failed to generate AI message",
-        variant: "destructive"
-      });
-      return null;
+    console.log(`📋 Lead info: ${firstName}, Stage: ${stage}, Messages sent: ${messagesSent}`);
+
+    // Generate message based on stage and message count
+    let message = '';
+
+    if (stage.includes('day_1') || messagesSent === 0) {
+      message = `Hi ${firstName}! I'm Finn from the dealership. I see you're interested in ${vehicleInterest}. I'd love to help you find the perfect match! Any specific features you're looking for?`;
+    } else if (stage.includes('day_2') || messagesSent === 1) {
+      message = `Hey ${firstName}! Following up on ${vehicleInterest}. We have some great options available. Would you like to see what we have in stock?`;
+    } else if (stage.includes('day_3') || messagesSent === 2) {
+      message = `Hi ${firstName}! Hope you're doing well. Still thinking about ${vehicleInterest}? I'm here if you have any questions or want to schedule a test drive!`;
+    } else if (stage.includes('week_1') || messagesSent >= 3) {
+      message = `${firstName}, just wanted to check in about ${vehicleInterest}. No pressure - I'm here whenever you're ready to move forward!`;
+    } else {
+      // Fallback message
+      message = `Hi ${firstName}! Hope you're having a great day. Any updates on your ${vehicleInterest} search? I'm here to help!`;
     }
 
-    if (!data || !data.message) {
-      console.error('❌ No message returned from AI function');
-      toast({
-        title: "No Message Generated",
-        description: "AI service returned empty response",
-        variant: "destructive"
-      });
-      return null;
+    // Avoid sending duplicate messages
+    const recentBodies = recentMessages?.map(m => m.body.toLowerCase()) || [];
+    if (recentBodies.some(body => body.includes(message.toLowerCase().substring(0, 20)))) {
+      // Generate alternative message
+      message = `${firstName}, hope you're doing well! Wanted to follow up about ${vehicleInterest}. What questions can I answer for you?`;
     }
 
-    console.log('✅ AI message generated successfully:', data.message.substring(0, 50) + '...');
-    
-    toast({
-      title: "AI Message Generated",
-      description: "Message is ready for review and sending",
-    });
-
-    return data.message;
+    console.log(`✅ Generated message: "${message}"`);
+    return message;
 
   } catch (error) {
-    console.error('💥 Unexpected error in AI generation:', error);
-    toast({
-      title: "Generation Error",
-      description: error instanceof Error ? error.message : "Unexpected error occurred",
-      variant: "destructive"
-    });
+    console.error('Error generating enhanced AI message:', error);
     return null;
   }
 };
 
-export const getAIAnalyticsDashboard = async () => {
+export const scheduleEnhancedAIMessages = async (leadId: string): Promise<void> => {
   try {
-    const { data: conversations, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('ai_generated', true);
-
-    if (error) throw error;
-
-    const { data: responses, error: responsesError } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('direction', 'in');
-
-    if (responsesError) throw responsesError;
-
-    const totalMessagesSent = conversations?.length || 0;
-    const totalResponses = responses?.length || 0;
-    const overallResponseRate = totalMessagesSent > 0 ? totalResponses / totalMessagesSent : 0;
-    const averageMessagesPerLead = totalMessagesSent > 0 ? totalMessagesSent / new Set(conversations?.map(c => c.lead_id)).size : 0;
-
-    return {
-      totalMessagesSent,
-      totalResponses,
-      overallResponseRate,
-      averageMessagesPerLead
-    };
-  } catch (error) {
-    console.error('Error fetching AI analytics:', error);
-    return {
-      totalMessagesSent: 0,
-      totalResponses: 0,
-      overallResponseRate: 0,
-      averageMessagesPerLead: 0
-    };
-  }
-};
-
-export const trackLeadResponse = async (leadId: string, responseData: any) => {
-  try {
-    await supabase
+    console.log(`📅 Scheduling next AI message for lead ${leadId}`);
+    
+    // Get lead data
+    const { data: lead, error } = await supabase
       .from('leads')
-      .update({ 
-        last_reply_at: new Date().toISOString(),
-        ai_sequence_paused: true 
+      .select('created_at, ai_messages_sent, ai_stage')
+      .eq('id', leadId)
+      .single();
+
+    if (error || !lead) {
+      console.error('Error fetching lead for scheduling:', error);
+      return;
+    }
+
+    const messagesSent = lead.ai_messages_sent || 0;
+    const daysSinceCreated = Math.floor(
+      (new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    // Determine next stage and delay
+    let nextStage = 'day_1_morning';
+    let delayHours = 24; // Default 24 hours
+
+    if (messagesSent === 0) {
+      nextStage = 'day_2_followup';
+      delayHours = 24;
+    } else if (messagesSent === 1) {
+      nextStage = 'day_3_followup';
+      delayHours = 24;
+    } else if (messagesSent === 2) {
+      nextStage = 'week_1_followup';
+      delayHours = 96; // 4 days
+    } else if (messagesSent >= 3) {
+      nextStage = 'week_2_followup';
+      delayHours = 168; // 7 days
+    }
+
+    // Calculate next send time
+    const nextSendTime = new Date();
+    nextSendTime.setHours(nextSendTime.getHours() + delayHours);
+
+    // Don't schedule too many messages
+    if (messagesSent >= 5) {
+      console.log(`🛑 Not scheduling more messages for lead ${leadId} - already sent ${messagesSent}`);
+      await supabase
+        .from('leads')
+        .update({
+          next_ai_send_at: null,
+          ai_sequence_paused: true,
+          ai_pause_reason: 'max_messages_reached'
+        })
+        .eq('id', leadId);
+      return;
+    }
+
+    // Update lead with next stage and send time
+    const { error: updateError } = await supabase
+      .from('leads')
+      .update({
+        ai_stage: nextStage,
+        next_ai_send_at: nextSendTime.toISOString()
       })
       .eq('id', leadId);
+
+    if (updateError) {
+      console.error('Error scheduling next AI message:', updateError);
+      return;
+    }
+
+    console.log(`📅 Scheduled next AI message for ${nextSendTime.toISOString()}, stage: ${nextStage}`);
+
   } catch (error) {
-    console.error('Error tracking lead response:', error);
+    console.error('Error scheduling enhanced AI messages:', error);
   }
 };
 
-export const scheduleEnhancedAIMessages = async (leadId?: string) => {
+export const resumePausedSequences = async (): Promise<void> => {
   try {
-    const { data, error } = await supabase.functions.invoke('ai-automation', {
-      body: leadId ? { leadId } : {}
-    });
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error scheduling AI messages:', error);
-    return null;
-  }
-};
-
-export const resumePausedSequences = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('leads')
-      .update({ ai_sequence_paused: false })
-      .eq('ai_sequence_paused', true)
-      .lt('ai_resume_at', new Date().toISOString());
+    const now = new Date();
     
-    if (error) throw error;
-    return data;
+    const { data: leadsToResume } = await supabase
+      .from('leads')
+      .select('id, first_name, last_name')
+      .eq('ai_opt_in', true)
+      .eq('ai_sequence_paused', true)
+      .not('ai_resume_at', 'is', null)
+      .lte('ai_resume_at', now.toISOString());
+
+    console.log(`🔄 Resuming ${leadsToResume?.length || 0} paused sequences`);
+
+    for (const lead of leadsToResume || []) {
+      await supabase
+        .from('leads')
+        .update({
+          ai_sequence_paused: false,
+          ai_pause_reason: null,
+          ai_resume_at: null
+        })
+        .eq('id', lead.id);
+
+      await scheduleEnhancedAIMessages(lead.id);
+      console.log(`▶️ Resumed AI sequence for ${lead.first_name} ${lead.last_name}`);
+    }
   } catch (error) {
     console.error('Error resuming paused sequences:', error);
-    return null;
   }
 };
