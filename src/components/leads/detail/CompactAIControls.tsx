@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Play, Pause, RefreshCw, AlertTriangle, Loader2, Clock } from "lucide-react";
 import { fixLeadAIStage } from '@/services/aiStageFixService';
-import CountdownBadge from '../../../inbox/CountdownBadge';
+import CountdownBadge from '../../inbox/CountdownBadge';
 
 interface CompactAIControlsProps {
   leadId: string;
