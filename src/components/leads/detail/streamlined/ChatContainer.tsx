@@ -96,11 +96,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   };
 
   const handleSendAIMessage = async (message: string) => {
+    console.log('📤 Auto-sending AI message:', message);
     setNewMessage(message);
-    // Auto-send the AI message
-    setTimeout(() => {
+    
+    // Use requestAnimationFrame to ensure state is updated before calling onSendMessage
+    requestAnimationFrame(() => {
       onSendMessage();
-    }, 100);
+    });
   };
 
   // Create conversation context for AI panel

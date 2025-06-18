@@ -1,6 +1,8 @@
+
 import React, { useEffect, useState } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
 import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
+import { useEnhancedMessageProcessor } from "@/hooks/useEnhancedMessageProcessor";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { toggleFinnAI } from '@/services/finnAIService';
@@ -37,6 +39,9 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  // Initialize enhanced message processor
+  useEnhancedMessageProcessor();
+
   // Load messages when component mounts or lead changes
   useEffect(() => {
     if (lead.id) {
@@ -44,14 +49,27 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
     }
   }, [lead.id, loadMessages]);
 
+  // Watch for newMessage changes and send if it's set
+  useEffect(() => {
+    if (newMessage.trim() && !isSending) {
+      handleSendMessage();
+    }
+  }, [newMessage]);
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || isSending) return;
     
     setIsSending(true);
     try {
+      console.log('📤 Sending message:', newMessage);
       await sendMessage(lead.id, newMessage);
       setNewMessage("");
       await loadMessages(lead.id);
+      
+      toast({
+        title: "Message Sent",
+        description: "Your message has been sent successfully",
+      });
     } catch (error) {
       console.error("Failed to send message:", error);
       toast({

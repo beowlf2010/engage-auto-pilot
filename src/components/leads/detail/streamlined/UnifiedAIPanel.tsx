@@ -93,12 +93,14 @@ const UnifiedAIPanel: React.FC<UnifiedAIPanelProps> = ({
     }
   };
 
-  const sendAIMessage = async () => {
-    if (!user || !editedMessage || isSending) return;
+  const sendAIMessage = async (messageToSend?: string) => {
+    const finalMessage = messageToSend || editedMessage;
+    if (!user || !finalMessage || isSending) return;
 
     setIsSending(true);
     try {
-      await sendMessage(lead.id, editedMessage, user, true);
+      console.log('🤖 Sending AI message:', finalMessage);
+      await sendMessage(lead.id, finalMessage, user, true);
       
       toast({
         title: "Message Sent",
@@ -106,6 +108,7 @@ const UnifiedAIPanel: React.FC<UnifiedAIPanelProps> = ({
         variant: "default"
       });
 
+      // Clear states after successful send
       setGeneratedMessage('');
       setEditedMessage('');
       setShowMessageEditor(false);
@@ -119,6 +122,41 @@ const UnifiedAIPanel: React.FC<UnifiedAIPanelProps> = ({
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const generateAndSendAIMessage = async () => {
+    if (isGenerating || isSending) return;
+
+    setIsGenerating(true);
+    try {
+      console.log('🤖 Generating and auto-sending AI message...');
+      const message = await generateIntelligentAIMessage({
+        leadId: lead.id,
+        stage: 'follow_up',
+        context: {
+          availableInventory: inventoryContext,
+          inventoryCount: inventoryContext.length,
+          strictInventoryMode: true,
+          vehicleInterest: lead.vehicleInterest || ''
+        }
+      });
+
+      if (message) {
+        setIsGenerating(false);
+        // Directly send the message without showing editor
+        await sendAIMessage(message);
+      } else {
+        throw new Error('Failed to generate message');
+      }
+    } catch (error) {
+      console.error('Error generating and sending AI message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate and send AI message",
+        variant: "destructive"
+      });
+      setIsGenerating(false);
     }
   };
 
@@ -218,18 +256,34 @@ const UnifiedAIPanel: React.FC<UnifiedAIPanelProps> = ({
         {/* AI Message Generation */}
         {!showMessageEditor ? (
           <div className="space-y-2">
-            <Button 
-              onClick={generateAIMessage} 
-              disabled={isGenerating}
-              className="w-full bg-purple-600 hover:bg-purple-700"
-            >
-              {isGenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
-                <Sparkles className="w-4 h-4 mr-2" />
-              )}
-              {isGenerating ? "Generating..." : "Generate AI Response"}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={generateAIMessage} 
+                disabled={isGenerating}
+                variant="outline"
+                className="flex-1"
+              >
+                {isGenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Sparkles className="w-4 h-4 mr-2" />
+                )}
+                {isGenerating ? "Generating..." : "Generate & Review"}
+              </Button>
+              
+              <Button 
+                onClick={generateAndSendAIMessage} 
+                disabled={isGenerating || isSending}
+                className="flex-1 bg-purple-600 hover:bg-purple-700"
+              >
+                {isGenerating || isSending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {isGenerating ? "Generating..." : isSending ? "Sending..." : "Generate & Send"}
+              </Button>
+            </div>
             
             {!hasValidInventory && (
               <Alert className="border-yellow-200 bg-yellow-50">
@@ -262,7 +316,7 @@ const UnifiedAIPanel: React.FC<UnifiedAIPanelProps> = ({
             
             <div className="flex gap-2">
               <Button 
-                onClick={sendAIMessage} 
+                onClick={() => sendAIMessage()} 
                 disabled={!editedMessage.trim() || isSending}
                 className="flex-1"
               >
