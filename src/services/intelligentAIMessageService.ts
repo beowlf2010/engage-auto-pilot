@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface AIMessageRequest {
@@ -8,6 +7,10 @@ export interface AIMessageRequest {
     urgency_factor?: string;
     inventory_mentioned?: any[];
     behavioral_trigger?: string;
+    availableInventory?: any[];
+    inventoryCount?: number;
+    strictInventoryMode?: boolean;
+    vehicleInterest?: string;
   };
 }
 
