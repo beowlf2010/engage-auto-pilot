@@ -181,7 +181,7 @@ const EnhancedChatView = ({
             selectedConversation={selectedConversation}
             showAnalysis={showAnalysis}
             showLeadContext={showLeadContext}
-            averageSentiment={averageSentiment}
+            averageSentiment={getAverageSentiment()}
             onToggleAnalysis={() => setShowAnalysis(!showAnalysis)}
             onToggleLeadContext={() => setShowLeadContext(!showLeadContext)}
           />

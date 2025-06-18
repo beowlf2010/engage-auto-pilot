@@ -59,7 +59,7 @@ const IntelligentAIPanel = ({
         toast({
           title: "No Response Needed",
           description: "Finn determined no response is needed at this time",
-          variant: "secondary"
+          variant: "default"
         });
       }
     } catch (error) {
@@ -99,7 +99,7 @@ const IntelligentAIPanel = ({
         <CardTitle className="flex items-center gap-2 text-sm">
           <Brain className="h-4 w-4 text-purple-600" />
           Finn AI Assistant
-          <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+          <Badge variant="outline" className="bg-purple-100 text-purple-700">
             Intelligent
           </Badge>
         </CardTitle>
