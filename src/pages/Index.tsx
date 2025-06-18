@@ -1,42 +1,20 @@
 
-import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useConversations } from "@/hooks/useConversations";
-import { useUnreadCount } from "@/hooks/useUnreadCount";
-import EnhancedDashboard from "@/components/enhanced/EnhancedDashboard";
-import LeadsList from "@/components/LeadsList";
-import SmartInbox from "@/components/SmartInbox";
-import UploadLeads from "@/components/UploadLeads";
-import Settings from "@/components/Settings";
-import FinancialDashboard from "@/components/financial/FinancialDashboard";
 
 const Index = () => {
-  const location = useLocation();
-  const [activeView, setActiveView] = useState("dashboard");
+  const navigate = useNavigate();
   const { profile, loading } = useAuth();
-  const { conversations } = useConversations();
-  const unreadCount = useUnreadCount(conversations);
 
-  // Update active view based on route
   useEffect(() => {
-    const path = location.pathname;
-    if (path === '/' || path === '/dashboard') {
-      setActiveView("dashboard");
-    } else if (path === '/leads') {
-      setActiveView("leads");
-    } else if (path === '/inbox') {
-      setActiveView("inbox");
-    } else if (path === '/upload-leads') {
-      setActiveView("upload");
-    } else if (path === '/settings') {
-      setActiveView("settings");
-    } else if (path === '/financial-dashboard') {
-      setActiveView("financial-dashboard");
+    if (!loading && profile) {
+      // Redirect to dashboard when user is authenticated
+      navigate("/dashboard", { replace: true });
     }
-  }, [location.pathname]);
+  }, [loading, profile, navigate]);
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
         <div className="text-center">
@@ -48,41 +26,7 @@ const Index = () => {
     );
   }
 
-  const user = {
-    id: profile.id,
-    email: profile.email,
-    role: profile.role,
-    firstName: profile.first_name,
-    lastName: profile.last_name,
-    phone: profile.phone
-  };
-
-  const renderContent = () => {
-    switch (activeView) {
-      case "dashboard":
-        return <EnhancedDashboard user={user} />;
-      case "leads":
-        return <LeadsList />;
-      case "inbox":
-        return <SmartInbox user={user} />;
-      case "upload":
-        return <UploadLeads user={user} />;
-      case "settings":
-        return <Settings user={user} />;
-      case "financial-dashboard":
-        return <FinancialDashboard user={user} />;
-      default:
-        return <EnhancedDashboard user={user} />;
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <main className="flex-1">
-        {renderContent()}
-      </main>
-    </div>
-  );
+  return null;
 };
 
 export default Index;

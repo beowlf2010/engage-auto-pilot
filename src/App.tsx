@@ -7,6 +7,14 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import { AuthProvider } from './components/auth/AuthProvider';
 import LeadDetailPage from './pages/LeadDetailPage';
+import DashboardPage from './pages/DashboardPage';
+import StreamlinedLeadsPage from './pages/StreamlinedLeadsPage';
+import SmartInboxPage from './pages/SmartInboxPage';
+import InventoryDashboardPage from './pages/InventoryDashboardPage';
+import FinancialDashboardPage from './pages/FinancialDashboardPage';
+import PredictiveAnalyticsPage from './pages/PredictiveAnalyticsPage';
+import MessageExportPage from './pages/MessageExportPage';
+import SettingsPage from './pages/SettingsPage';
 import { useGlobalAIScheduler } from './hooks/useGlobalAIScheduler';
 
 const queryClient = new QueryClient();
@@ -29,6 +37,14 @@ function App() {
             <div className="min-h-screen bg-gray-50">
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/streamlined-leads" element={<StreamlinedLeadsPage />} />
+                <Route path="/smart-inbox" element={<SmartInboxPage />} />
+                <Route path="/inventory-dashboard" element={<InventoryDashboardPage />} />
+                <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />
+                <Route path="/predictive-analytics" element={<PredictiveAnalyticsPage />} />
+                <Route path="/message-export" element={<MessageExportPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/lead/:leadId" element={<LeadDetailPage />} />
               </Routes>
             </div>
