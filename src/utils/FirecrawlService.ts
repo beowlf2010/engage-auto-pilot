@@ -45,7 +45,8 @@ export class FirecrawlService {
       }
 
       console.log('Test API key response:', data);
-      return data?.success || false;
+      // The edge function now correctly returns success: true/false
+      return data?.success === true;
     } catch (error) {
       console.error('Error testing Firecrawl API key:', error);
       return false;

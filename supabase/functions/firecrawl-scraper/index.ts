@@ -75,11 +75,14 @@ serve(async (req) => {
         }),
       });
 
-      const testData = await testResponse.json() as FirecrawlCrawlResponse;
+      const testData = await testResponse.json();
       console.log('API key test result:', testData);
 
+      // Firecrawl returns a jobId for successful requests, not success: true
+      const isSuccessful = testData.jobId || testData.success;
+      
       return new Response(
-        JSON.stringify({ success: testData.success }),
+        JSON.stringify({ success: !!isSuccessful }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
@@ -105,10 +108,13 @@ serve(async (req) => {
         }),
       });
 
-      const crawlData = await crawlResponse.json() as FirecrawlCrawlResponse;
+      const crawlData = await crawlResponse.json();
       console.log('Crawl initiated:', crawlData);
 
-      if (!crawlData.success) {
+      // Check for successful response - either success: true or presence of jobId
+      const isSuccessful = crawlData.success || crawlData.jobId;
+      
+      if (!isSuccessful) {
         return new Response(
           JSON.stringify({ 
             success: false, 
