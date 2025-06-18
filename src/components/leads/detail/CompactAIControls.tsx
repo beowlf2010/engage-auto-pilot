@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Play, Pause, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
+import { Bot, Play, Pause, RefreshCw, AlertTriangle, Loader2, Clock } from "lucide-react";
 import { fixLeadAIStage } from '@/services/aiStageFixService';
+import CountdownBadge from '../../../inbox/CountdownBadge';
 
 interface CompactAIControlsProps {
   leadId: string;
@@ -15,6 +16,7 @@ interface CompactAIControlsProps {
   aiTakeoverEnabled?: boolean;
   aiTakeoverDelayMinutes?: number;
   pendingHumanResponse?: boolean;
+  nextAiSendAt?: string;
   onAIOptInChange: (enabled: boolean) => Promise<void>;
   onAITakeoverChange?: (enabled: boolean, delayMinutes: number) => Promise<void>;
 }
@@ -27,6 +29,7 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   aiTakeoverEnabled,
   aiTakeoverDelayMinutes = 7,
   pendingHumanResponse,
+  nextAiSendAt,
   onAIOptInChange,
   onAITakeoverChange
 }) => {
@@ -81,6 +84,9 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   // Check if stage looks problematic
   const isProblematicStage = aiOptIn && (aiStage === 'scheduled' || !aiStage);
 
+  // Show countdown when AI is active and has a scheduled send time
+  const showCountdown = aiOptIn && !aiSequencePaused && !pendingHumanResponse && nextAiSendAt;
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -116,6 +122,19 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
 
         {aiOptIn && (
           <>
+            {/* Next Message Countdown */}
+            {showCountdown && (
+              <div className="p-2 border rounded bg-green-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-3 h-3 text-green-600" />
+                    <span className="font-medium text-xs text-green-900">Next message in:</span>
+                  </div>
+                  <CountdownBadge dt={nextAiSendAt} />
+                </div>
+              </div>
+            )}
+
             {/* AI Takeover Toggle */}
             <div className="p-2 border rounded bg-blue-50">
               <div className="flex items-center justify-between mb-2">

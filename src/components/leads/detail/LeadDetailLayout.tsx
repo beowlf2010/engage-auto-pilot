@@ -150,6 +150,7 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
               aiTakeoverEnabled={lead.aiTakeoverEnabled || false}
               aiTakeoverDelayMinutes={lead.aiTakeoverDelayMinutes || 7}
               pendingHumanResponse={lead.pendingHumanResponse || false}
+              nextAiSendAt={lead.nextAiSendAt}
               onAIOptInChange={handleAIOptInChange}
               onAITakeoverChange={handleAITakeoverChange}
             />
