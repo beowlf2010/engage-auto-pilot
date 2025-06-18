@@ -1,42 +1,21 @@
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
+import type { RealtimeCallbacks } from '@/types/realtime';
 
-interface RealtimeCallbacks {
-  onConversationUpdate?: () => void;
-  onMessageUpdate?: (leadId: string) => void;
-  onEmailNotification?: (payload: any) => void;
-  onUnreadCountUpdate?: () => void;
-}
-
-// Global state to prevent multiple subscriptions
-let globalChannel: any = null;
-let globalCallbacks: RealtimeCallbacks[] = [];
-let isSubscribing = false;
-
-export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
+export const useRealtimeNotificationHandlers = (globalCallbacks: RealtimeCallbacks[]) => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const notificationPermission = useRef<NotificationPermission>('default');
-  const callbacksRef = useRef(callbacks);
-  const mountedRef = useRef(true);
-
-  // Update callbacks ref when they change
-  useEffect(() => {
-    callbacksRef.current = callbacks;
-  }, [callbacks]);
 
   // Request notification permission on mount
-  useEffect(() => {
-    const requestPermission = async () => {
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        notificationPermission.current = permission;
-      }
-    };
-    requestPermission();
+  const requestNotificationPermission = useCallback(async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      notificationPermission.current = permission;
+    }
   }, []);
 
   const handleIncomingMessage = useCallback(async (payload: any) => {
@@ -119,7 +98,7 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
     } catch (error) {
       console.error('❌ Error handling incoming message:', error);
     }
-  }, [profile, toast]);
+  }, [profile, toast, globalCallbacks]);
 
   const handleIncomingEmail = useCallback(async (payload: any) => {
     console.log('📧 New inbound email received:', payload);
@@ -177,93 +156,12 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
     } catch (error) {
       console.error('❌ Error handling email notification:', error);
     }
-  }, [profile, toast]);
-
-  useEffect(() => {
-    if (!profile) return;
-
-    mountedRef.current = true;
-
-    // Add callbacks to global registry
-    globalCallbacks.push(callbacksRef.current);
-    console.log('✅ Added callbacks, total subscribers:', globalCallbacks.length);
-
-    // Only create subscription if none exists and not currently subscribing
-    if (!globalChannel && !isSubscribing) {
-      isSubscribing = true;
-      
-      const channelName = `centralized-realtime-${profile.id}-${Date.now()}`;
-      console.log('🔌 Creating centralized realtime channel:', channelName);
-      
-      const channel = supabase
-        .channel(channelName)
-        // SMS conversations - listen to all conversation changes
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'conversations'
-        }, (payload) => {
-          console.log('🔄 Conversation database change:', {
-            event: payload.eventType,
-            table: payload.table,
-            hasNew: !!payload.new,
-            hasOld: !!payload.old
-          });
-          handleIncomingMessage(payload);
-        })
-        // Email conversations
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'email_conversations',
-          filter: 'direction=eq.in'
-        }, handleIncomingEmail);
-
-      channel.subscribe((status) => {
-        console.log('📡 Centralized realtime channel status:', status);
-        if (status === 'SUBSCRIBED') {
-          globalChannel = channel;
-          isSubscribing = false;
-          console.log('✅ Centralized realtime channel subscribed successfully');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Centralized realtime channel error');
-          globalChannel = null;
-          isSubscribing = false;
-        } else if (status === 'CLOSED') {
-          console.log('🔌 Centralized realtime channel closed');
-          globalChannel = null;
-          isSubscribing = false;
-        }
-      });
-    } else if (globalChannel) {
-      console.log('🔌 Using existing centralized realtime channel');
-    }
-
-    return () => {
-      mountedRef.current = false;
-      
-      // Remove callbacks from global registry
-      const index = globalCallbacks.findIndex(cb => cb === callbacksRef.current);
-      if (index > -1) {
-        globalCallbacks.splice(index, 1);
-        console.log('🗑️ Removed callbacks, remaining subscribers:', globalCallbacks.length);
-      }
-
-      // Clean up channel only if no more callbacks are registered
-      if (globalCallbacks.length === 0 && globalChannel) {
-        try {
-          console.log('🧹 Cleaning up centralized realtime channel');
-          supabase.removeChannel(globalChannel);
-          globalChannel = null;
-          isSubscribing = false;
-        } catch (error) {
-          console.error('❌ Error removing centralized realtime channel:', error);
-        }
-      }
-    };
-  }, [profile?.id, handleIncomingMessage, handleIncomingEmail]);
+  }, [profile, toast, globalCallbacks]);
 
   return {
+    handleIncomingMessage,
+    handleIncomingEmail,
+    requestNotificationPermission,
     notificationPermission: notificationPermission.current
   };
 };
