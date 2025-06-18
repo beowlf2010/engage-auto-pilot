@@ -44,8 +44,8 @@ const LeadsTableHeader = ({
       <TableHead className="w-12">
         <Checkbox
           checked={isAllSelected}
-          ref={(el: HTMLInputElement | null) => {
-            if (el) el.indeterminate = isIndeterminate;
+          ref={(el: HTMLButtonElement | null) => {
+            if (el) (el as any).indeterminate = isIndeterminate;
           }}
           onCheckedChange={onSelectAll}
         />
