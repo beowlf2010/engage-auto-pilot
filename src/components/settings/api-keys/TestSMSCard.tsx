@@ -37,14 +37,14 @@ const TestSMSCard = ({
               />
               <Button 
                 onClick={onTestSMS}
-                disabled={isTestingSMS}
+                disabled={isTestingSMS || !testPhoneNumber.trim()}
               >
                 {isTestingSMS ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
                 Send Test SMS
               </Button>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Enter your phone number to test if your Telnyx configuration is working
+              Enter your phone number to test if your Twilio configuration is working correctly
             </p>
           </div>
         </div>

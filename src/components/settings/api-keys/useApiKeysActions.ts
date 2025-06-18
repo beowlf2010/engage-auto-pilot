@@ -118,14 +118,14 @@ export const useApiKeysActions = ({
       console.log('Testing Twilio connection...');
       const result = await testTwilioConnection(apiKeys.twilioAccountSid, apiKeys.twilioAuthToken);
       toast({
-        title: "Connection Test",
-        description: result.message,
+        title: "Connection Test Successful",
+        description: "Your Twilio credentials are working correctly!",
       });
     } catch (error) {
       console.error('Connection test error:', error);
       toast({
         title: "Connection Test Failed",
-        description: error instanceof Error ? error.message : "Failed to test connection",
+        description: error instanceof Error ? error.message : "Failed to test Twilio connection",
         variant: "destructive"
       });
     } finally {
@@ -163,15 +163,16 @@ export const useApiKeysActions = ({
       
       if (result && result.success) {
         toast({
-          title: "Test SMS Sent!",
-          description: `Test message sent successfully to ${formattedPhone}`,
+          title: "Test SMS Sent Successfully! 🎉",
+          description: `Test message sent to ${formattedPhone}. Check your phone for the message.`,
         });
+        // Clear the phone number field after successful send
         setTestPhoneNumber("");
       } else {
         const errorMsg = result?.error || result?.twilioError?.message || "SMS sending failed";
         toast({
           title: "Test SMS Failed",
-          description: errorMsg,
+          description: `Failed to send test SMS: ${errorMsg}`,
           variant: "destructive"
         });
       }
@@ -180,7 +181,7 @@ export const useApiKeysActions = ({
       const description = getErrorMessage(error);
       toast({
         title: "Test SMS Failed",
-        description: description,
+        description: `Unable to send test SMS: ${description}`,
         variant: "destructive"
       });
     } finally {
