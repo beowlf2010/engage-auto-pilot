@@ -50,10 +50,21 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       return { success: false, leadId, error: 'Failed to generate message' };
     }
 
-    // Send the message - handle potential void return
+    // Send the message and handle the void return properly
     try {
-      const messageResult = await sendMessage(leadId, message, profile, true);
-      const messageId = messageResult && typeof messageResult === 'object' && 'id' in messageResult ? messageResult.id : null;
+      await sendMessage(leadId, message, profile, true);
+      
+      // Get the most recent conversation for this lead to get the message ID
+      const { data: recentMessage } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('lead_id', leadId)
+        .eq('direction', 'out')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      const messageId = recentMessage?.id || null;
 
       // Add AI conversation note about initial contact
       await addAIConversationNote(
