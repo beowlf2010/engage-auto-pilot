@@ -13,7 +13,13 @@ import {
   Brain,
   Upload,
   ChevronDown,
-  LogOut
+  LogOut,
+  DollarSign,
+  MessageSquare,
+  Shield,
+  Car,
+  Eye,
+  Palette
 } from "lucide-react"
 
 interface NavConfig {
@@ -72,7 +78,7 @@ export const navigationConfig: NavConfig[] = [
   {
     title: "Financial Dashboard",
     href: "/financial-dashboard",
-    icon: BarChart3,
+    icon: DollarSign,
     roles: ["admin", "manager"],
     priority: 'primary'
   },
@@ -98,6 +104,55 @@ export const navigationConfig: NavConfig[] = [
     icon: Upload,
     roles: ["admin", "manager"],
     badge: "New",
+    priority: 'secondary'
+  },
+  {
+    title: "AI Monitor",
+    href: "/ai-monitor",
+    icon: Eye,
+    roles: ["admin", "manager"],
+    priority: 'secondary'
+  },
+  {
+    title: "Admin Dashboard",
+    href: "/admin-dashboard",
+    icon: Shield,
+    roles: ["admin"],
+    priority: 'secondary'
+  },
+  {
+    title: "Manager Dashboard",
+    href: "/manager-dashboard",
+    icon: BarChart3,
+    roles: ["admin", "manager"],
+    priority: 'secondary'
+  },
+  {
+    title: "Sales Dashboard",
+    href: "/sales-dashboard",
+    icon: TrendingUp,
+    roles: ["admin", "manager", "salesperson"],
+    priority: 'secondary'
+  },
+  {
+    title: "Personalization",
+    href: "/personalization",
+    icon: Palette,
+    roles: ["admin", "manager"],
+    priority: 'secondary'
+  },
+  {
+    title: "RPO Insights",
+    href: "/rpo-insights",
+    icon: Car,
+    roles: ["admin", "manager", "salesperson"],
+    priority: 'secondary'
+  },
+  {
+    title: "Analytics",
+    href: "/analytics",
+    icon: BarChart3,
+    roles: ["admin", "manager"],
     priority: 'secondary'
   },
   {

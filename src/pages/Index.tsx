@@ -11,6 +11,9 @@ const Index = () => {
     if (!loading && profile) {
       // Redirect to dashboard when user is authenticated
       navigate("/dashboard", { replace: true });
+    } else if (!loading && !profile) {
+      // Redirect to auth if not authenticated
+      navigate("/auth", { replace: true });
     }
   }, [loading, profile, navigate]);
 
