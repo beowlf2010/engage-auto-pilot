@@ -1,12 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { BookOpen, CheckCircle, Clock, TrendingUp, User, Target } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { getTrainingRecommendations, updateTrainingRecommendationStatus } from '@/services/trainingRecommendationsService';
+import { BookOpen, TrendingUp, Clock, CheckCircle, AlertCircle, Users } from 'lucide-react';
+import { getTrainingRecommendations, updateTrainingRecommendationStatus, generateTrainingRecommendations } from '@/services/trainingRecommendationsService';
 import type { TrainingRecommendation } from '@/services/trainingRecommendationsService';
+import { toast } from '@/hooks/use-toast';
 
 const TrainingRecommendationsPanel = () => {
   const [recommendations, setRecommendations] = useState<TrainingRecommendation[]>([]);
@@ -19,41 +20,15 @@ const TrainingRecommendationsPanel = () => {
 
   const fetchRecommendations = async () => {
     try {
-      // Get all training recommendations
-      const { data, error } = await supabase
-        .from('training_recommendations')
-        .select(`
-          *,
-          profiles!training_recommendations_salesperson_id_fkey(first_name, last_name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-
-      const formattedRecommendations: TrainingRecommendation[] = data?.map(item => ({
-        id: item.id,
-        salespersonId: item.salesperson_id,
-        recommendationType: item.recommendation_type,
-        title: item.title,
-        description: item.description,
-        priority: item.priority as 'low' | 'medium' | 'high',
-        skillsFocus: Array.isArray(item.skills_focus) 
-          ? item.skills_focus.filter((skill): skill is string => typeof skill === 'string')
-          : [],
-        conversationExamples: Array.isArray(item.conversation_examples) 
-          ? item.conversation_examples.filter((example): example is string => typeof example === 'string')
-          : [],
-        completionStatus: item.completion_status as 'pending' | 'in_progress' | 'completed',
-        dueDate: item.due_date,
-        createdBy: item.created_by,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at
-      })) || [];
-
-      setRecommendations(formattedRecommendations);
+      const data = await getTrainingRecommendations();
+      setRecommendations(data);
     } catch (error) {
       console.error('Error fetching training recommendations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load training recommendations",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -66,29 +41,48 @@ const TrainingRecommendationsPanel = () => {
       const success = await updateTrainingRecommendationStatus(recommendationId, status);
       
       if (success) {
-        setRecommendations(prev => prev.map(r => 
-          r.id === recommendationId 
-            ? { ...r, completionStatus: status, updatedAt: new Date().toISOString() }
-            : r
+        setRecommendations(prev => prev.map(rec => 
+          rec.id === recommendationId ? { ...rec, completionStatus: status } : rec
         ));
+        
+        toast({
+          title: "Status Updated",
+          description: `Training recommendation marked as ${status}`,
+        });
       }
     } catch (error) {
-      console.error('Error updating recommendation status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update recommendation status",
+        variant: "destructive"
+      });
     } finally {
       setProcessingId(null);
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium': return 'text-orange-600 bg-orange-50 border-orange-200';
-      case 'low': return 'text-green-600 bg-green-50 border-green-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+  const handleGenerateRecommendations = async () => {
+    try {
+      setLoading(true);
+      await generateTrainingRecommendations('current-salesperson-id');
+      await fetchRecommendations();
+      
+      toast({
+        title: "Recommendations Generated",
+        description: "New training recommendations have been created",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate recommendations",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getPriorityBadgeVariant = (priority: string) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high': return 'destructive';
       case 'medium': return 'secondary';
@@ -97,18 +91,22 @@ const TrainingRecommendationsPanel = () => {
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'default';
-      case 'in_progress': return 'secondary';
-      case 'pending': return 'outline';
-      default: return 'outline';
+      case 'completed': return 'text-green-600';
+      case 'in_progress': return 'text-blue-600';
+      case 'pending': return 'text-yellow-600';
+      default: return 'text-gray-600';
     }
   };
 
   const pendingRecommendations = recommendations.filter(r => r.completionStatus === 'pending');
   const inProgressRecommendations = recommendations.filter(r => r.completionStatus === 'in_progress');
   const completedRecommendations = recommendations.filter(r => r.completionStatus === 'completed');
+
+  const completionRate = recommendations.length > 0 
+    ? (completedRecommendations.length / recommendations.length) * 100 
+    : 0;
 
   if (loading) {
     return (
@@ -122,17 +120,30 @@ const TrainingRecommendationsPanel = () => {
 
   return (
     <div className="space-y-6">
-      {/* Summary */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-orange-600" />
+              <BookOpen className="w-4 h-4 mr-2 text-blue-600" />
+              Total Recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{recommendations.length}</div>
+            <p className="text-xs text-muted-foreground">Training items</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <Clock className="w-4 h-4 mr-2 text-yellow-600" />
               Pending
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{pendingRecommendations.length}</div>
+            <div className="text-2xl font-bold text-yellow-600">{pendingRecommendations.length}</div>
             <p className="text-xs text-muted-foreground">Need attention</p>
           </CardContent>
         </Card>
@@ -159,97 +170,79 @@ const TrainingRecommendationsPanel = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{completedRecommendations.length}</div>
-            <p className="text-xs text-muted-foreground">Finished</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Target className="w-4 h-4 mr-2 text-purple-600" />
-              Completion Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {recommendations.length > 0 ? Math.round((completedRecommendations.length / recommendations.length) * 100) : 0}%
+            <div className="mt-2">
+              <Progress value={completionRate} className="h-1" />
+              <p className="text-xs text-muted-foreground mt-1">{Math.round(completionRate)}% complete</p>
             </div>
-            <Progress 
-              value={recommendations.length > 0 ? (completedRecommendations.length / recommendations.length) * 100 : 0} 
-              className="h-2 mt-2" 
-            />
           </CardContent>
         </Card>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Training Recommendations</h2>
+        <Button onClick={handleGenerateRecommendations} disabled={loading}>
+          <BookOpen className="w-4 h-4 mr-2" />
+          Generate New Recommendations
+        </Button>
       </div>
 
       {/* Pending Recommendations */}
       {pendingRecommendations.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center">
-                <Clock className="w-5 h-5 mr-2 text-orange-600" />
-                Pending Recommendations ({pendingRecommendations.length})
-              </span>
-              <Badge variant="secondary">Action Required</Badge>
+            <CardTitle className="flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2 text-yellow-600" />
+              Pending Recommendations ({pendingRecommendations.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {pendingRecommendations.map((recommendation) => (
-              <div key={recommendation.id} className={`p-4 rounded-lg border ${getPriorityColor(recommendation.priority)}`}>
-                <div className="flex items-start justify-between">
+            {pendingRecommendations.map((rec) => (
+              <div key={rec.id} className="border rounded-lg p-4">
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
-                      <Badge variant={getPriorityBadgeVariant(recommendation.priority)} className="text-xs">
-                        {recommendation.priority.toUpperCase()}
+                      <h4 className="font-semibold">{rec.title}</h4>
+                      <Badge variant={getPriorityColor(rec.priority)}>
+                        {rec.priority} priority
                       </Badge>
-                      <span className="font-medium text-sm">{recommendation.recommendationType}</span>
-                      {recommendation.dueDate && (
-                        <span className="text-xs text-muted-foreground">
-                          Due: {new Date(recommendation.dueDate).toLocaleDateString()}
-                        </span>
-                      )}
                     </div>
                     
-                    <h3 className="font-semibold mb-2">{recommendation.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-3">{recommendation.description}</p>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {rec.description}
+                    </p>
                     
-                    {recommendation.skillsFocus.length > 0 && (
-                      <div className="mb-3">
-                        <span className="text-xs font-medium text-muted-foreground">Skills Focus:</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {recommendation.skillsFocus.map((skill, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {skill}
-                            </Badge>
-                          ))}
-                        </div>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {rec.skillsFocus.map((skill, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                    
+                    {rec.conversationExamples.length > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        <strong>Examples:</strong> {rec.conversationExamples.slice(0, 2).join(', ')}
+                        {rec.conversationExamples.length > 2 && '...'}
                       </div>
                     )}
-                    
-                    <div className="text-xs text-muted-foreground">
-                      Created: {new Date(recommendation.createdAt).toLocaleDateString()} • 
-                      Created by: {recommendation.createdBy}
-                    </div>
                   </div>
                   
-                  <div className="flex flex-col space-y-2 ml-4">
-                    <Button 
-                      variant="outline" 
+                  <div className="flex space-x-2 ml-4">
+                    <Button
                       size="sm"
-                      onClick={() => handleStatusUpdate(recommendation.id, 'in_progress')}
-                      disabled={processingId === recommendation.id}
+                      variant="outline"
+                      onClick={() => handleStatusUpdate(rec.id, 'in_progress')}
+                      disabled={processingId === rec.id}
                     >
-                      Start Training
+                      Start
                     </Button>
-                    
-                    <Button 
-                      variant="outline" 
+                    <Button
                       size="sm"
-                      onClick={() => handleStatusUpdate(recommendation.id, 'completed')}
-                      disabled={processingId === recommendation.id}
+                      onClick={() => handleStatusUpdate(rec.id, 'completed')}
+                      disabled={processingId === rec.id}
                     >
-                      Mark Complete
+                      Complete
                     </Button>
                   </div>
                 </div>
@@ -268,32 +261,28 @@ const TrainingRecommendationsPanel = () => {
               In Progress ({inProgressRecommendations.length})
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {inProgressRecommendations.map((recommendation) => (
-                <div key={recommendation.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center space-x-3">
-                    <Badge variant="secondary" className="text-xs">
-                      {recommendation.recommendationType}
-                    </Badge>
-                    <span className="font-medium">{recommendation.title}</span>
-                    <Badge variant={getPriorityBadgeVariant(recommendation.priority)} className="text-xs">
-                      {recommendation.priority}
+          <CardContent className="space-y-3">
+            {inProgressRecommendations.map((rec) => (
+              <div key={rec.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">{rec.title}</span>
+                    <Badge variant={getPriorityColor(rec.priority)} className="text-xs">
+                      {rec.priority}
                     </Badge>
                   </div>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleStatusUpdate(recommendation.id, 'completed')}
-                    disabled={processingId === recommendation.id}
-                  >
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    Complete
-                  </Button>
+                  <p className="text-sm text-muted-foreground">{rec.description}</p>
                 </div>
-              ))}
-            </div>
+                
+                <Button
+                  size="sm"
+                  onClick={() => handleStatusUpdate(rec.id, 'completed')}
+                  disabled={processingId === rec.id}
+                >
+                  Complete
+                </Button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -304,28 +293,23 @@ const TrainingRecommendationsPanel = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
-              Recent Completions
+              Recently Completed
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {completedRecommendations.slice(0, 5).map((recommendation) => (
-                <div key={recommendation.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center space-x-3">
-                    <Badge variant="outline" className="text-xs">
-                      {recommendation.recommendationType}
-                    </Badge>
-                    <span className="font-medium">{recommendation.title}</span>
-                  </div>
-                  
+            <div className="space-y-2">
+              {completedRecommendations.slice(0, 5).map((rec) => (
+                <div key={rec.id} className="flex items-center justify-between p-2 bg-green-50 rounded">
                   <div className="flex items-center space-x-2">
-                    <Badge variant="default" className="text-xs">
-                      Completed
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium">{rec.title}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {rec.priority}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(recommendation.updatedAt).toLocaleDateString()}
-                    </span>
                   </div>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(rec.updatedAt).toLocaleDateString()}
+                  </span>
                 </div>
               ))}
             </div>
@@ -333,15 +317,18 @@ const TrainingRecommendationsPanel = () => {
         </Card>
       )}
 
-      {/* No Recommendations */}
+      {/* Empty State */}
       {recommendations.length === 0 && (
         <Card>
           <CardContent className="text-center py-8">
-            <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">No Training Recommendations</h3>
-            <p className="text-muted-foreground">
-              All team members are performing well. New recommendations will appear here when needed.
+            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Training Recommendations</h3>
+            <p className="text-muted-foreground mb-4">
+              Generate training recommendations to improve AI messaging quality
             </p>
+            <Button onClick={handleGenerateRecommendations}>
+              Generate Recommendations
+            </Button>
           </CardContent>
         </Card>
       )}

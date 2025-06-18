@@ -2,8 +2,8 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Shield, AlertTriangle, CheckCircle, BookOpen, BarChart } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
+import { TrendingUp, TrendingDown, Activity, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface QualityMetrics {
   totalQualityScores: number;
@@ -22,15 +22,15 @@ interface QualityMetricsCardsProps {
 const QualityMetricsCards = ({ metrics, loading }: QualityMetricsCardsProps) => {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <Card key={i}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
             <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-8 w-16 mb-2" />
-              <Skeleton className="h-3 w-20" />
+              <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-1/2"></div>
             </CardContent>
           </Card>
         ))}
@@ -38,33 +38,40 @@ const QualityMetricsCards = ({ metrics, loading }: QualityMetricsCardsProps) => 
     );
   }
 
-  const getQualityScoreColor = (score: number) => {
-    if (score >= 8.0) return 'text-green-600';
-    if (score >= 7.0) return 'text-blue-600';
-    if (score >= 6.0) return 'text-yellow-600';
-    return 'text-red-600';
+  const getQualityStatus = () => {
+    if (metrics.avgQualityScore >= 8.0) return { color: 'text-green-600', trend: 'up', label: 'Excellent' };
+    if (metrics.avgQualityScore >= 7.0) return { color: 'text-blue-600', trend: 'stable', label: 'Good' };
+    if (metrics.avgQualityScore >= 6.0) return { color: 'text-yellow-600', trend: 'down', label: 'Fair' };
+    return { color: 'text-red-600', trend: 'down', label: 'Poor' };
   };
 
-  const getComplianceColor = (violations: number) => {
-    if (violations === 0) return 'text-green-600';
-    if (violations <= 3) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+  const qualityStatus = getQualityStatus();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-      {/* Average Quality Score */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Overall Quality Score */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Quality Score</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Average Quality Score</CardTitle>
+          {qualityStatus.trend === 'up' ? (
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          ) : qualityStatus.trend === 'down' ? (
+            <TrendingDown className="h-4 w-4 text-red-600" />
+          ) : (
+            <Activity className="h-4 w-4 text-blue-600" />
+          )}
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${getQualityScoreColor(metrics.avgQualityScore)}`}>
-            {metrics.avgQualityScore}/10
+          <div className={`text-2xl font-bold ${qualityStatus.color}`}>
+            {metrics.avgQualityScore.toFixed(1)}/10
           </div>
-          <p className="text-xs text-muted-foreground">
-            Average quality rating
+          <div className="mt-2">
+            <Progress value={metrics.avgQualityScore * 10} className="h-2" />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            <Badge variant={qualityStatus.label === 'Excellent' ? 'default' : 'secondary'}>
+              {qualityStatus.label}
+            </Badge>
           </p>
         </CardContent>
       </Card>
@@ -72,51 +79,43 @@ const QualityMetricsCards = ({ metrics, loading }: QualityMetricsCardsProps) => 
       {/* Messages Reviewed */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Reviewed</CardTitle>
-          <BarChart className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Messages Reviewed</CardTitle>
+          <CheckCircle className="h-4 w-4 text-blue-600" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-blue-600">{metrics.messagesReviewed}</div>
+          <div className="text-2xl font-bold">{metrics.messagesReviewed}</div>
           <p className="text-xs text-muted-foreground">
-            Messages analyzed
+            Quality assessed messages
           </p>
+          <div className="mt-2">
+            <div className="text-sm font-medium text-green-600">
+              {metrics.autoApprovalRate}% Auto-approved
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Auto-Approval Rate */}
-      <Card>
+      {/* Compliance Status */}
+      <Card className={metrics.complianceViolations > 0 ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Auto-Approved</CardTitle>
-          <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Compliance Status</CardTitle>
+          {metrics.complianceViolations > 0 ? (
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+          ) : (
+            <Shield className="h-4 w-4 text-green-600" />
+          )}
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">{metrics.autoApprovalRate}%</div>
-          <p className="text-xs text-muted-foreground">
-            Automatic approval rate
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Compliance Violations */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Violations</CardTitle>
-          <Shield className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className={`text-2xl font-bold ${getComplianceColor(metrics.complianceViolations)}`}>
+          <div className={`text-2xl font-bold ${metrics.complianceViolations > 0 ? 'text-red-600' : 'text-green-600'}`}>
             {metrics.complianceViolations}
           </div>
-          <div className="flex items-center space-x-1 mt-1">
-            {metrics.complianceViolations === 0 ? (
-              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                Clean
-              </Badge>
-            ) : (
-              <Badge variant="destructive" className="text-xs">
-                Review Required
-              </Badge>
-            )}
+          <p className="text-xs text-muted-foreground">
+            {metrics.complianceViolations > 0 ? 'Open violations' : 'No violations'}
+          </p>
+          <div className="mt-2">
+            <Badge variant={metrics.complianceViolations > 0 ? 'destructive' : 'default'}>
+              {metrics.complianceViolations > 0 ? 'Action Required' : 'Compliant'}
+            </Badge>
           </div>
         </CardContent>
       </Card>
@@ -124,29 +123,22 @@ const QualityMetricsCards = ({ metrics, loading }: QualityMetricsCardsProps) => 
       {/* Training Recommendations */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Training</CardTitle>
-          <BookOpen className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Training Items</CardTitle>
+          <TrendingUp className="h-4 w-4 text-purple-600" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-orange-600">{metrics.trainingRecommendations}</div>
+          <div className="text-2xl font-bold text-purple-600">
+            {metrics.trainingRecommendations}
+          </div>
           <p className="text-xs text-muted-foreground">
             Pending recommendations
           </p>
-        </CardContent>
-      </Card>
-
-      {/* System Health */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">System Health</CardTitle>
-          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-green-600">98%</div>
-          <div className="flex items-center space-x-1 mt-1">
-            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-              Operational
-            </Badge>
+          <div className="mt-2">
+            {metrics.trainingRecommendations > 0 ? (
+              <Badge variant="secondary">Review Available</Badge>
+            ) : (
+              <Badge variant="outline">Up to Date</Badge>
+            )}
           </div>
         </CardContent>
       </Card>
