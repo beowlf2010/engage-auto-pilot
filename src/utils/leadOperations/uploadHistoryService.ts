@@ -35,6 +35,8 @@ export const createUploadHistory = async (
       original_filename: fileName,
       stored_filename: fileName,
       upload_type: 'leads',
+      file_size: fileSize,
+      file_type: fileType,
       field_mapping: fieldMapping as any,
       total_rows: 0,
       successful_imports: 0,
