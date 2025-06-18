@@ -27,7 +27,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
       const message = await generateIntelligentAIMessage({
         leadId,
         stage: 'follow_up',
-        context: { preview: true }
+        context: {}
       });
 
       if (message) {
