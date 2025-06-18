@@ -64,10 +64,8 @@ export class FirecrawlService {
         scrapeOptions: {
           formats: ['markdown', 'html'],
           onlyMainContent: true,
-        },
-        crawlerOptions: {
-          includes: ['/inventory/', '/vehicles/', '/new/', '/used/'],
-          excludes: ['/service/', '/parts/', '/contact/']
+          includeTags: ['inventory', 'vehicles', 'new', 'used'],
+          excludeTags: ['nav', 'header', 'footer', 'service', 'parts', 'contact']
         }
       }) as CrawlResponse;
 
