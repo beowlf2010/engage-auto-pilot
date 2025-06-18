@@ -200,9 +200,9 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
                 </h1>
                 <p className="text-sm text-gray-500">{primaryPhone}</p>
               </div>
-              {lead.unreadCount > 0 && (
+              {transformedLead.unreadCount > 0 && (
                 <Badge variant="destructive" className="text-xs">
-                  {lead.unreadCount} unread
+                  {transformedLead.unreadCount} unread
                 </Badge>
               )}
             </div>
