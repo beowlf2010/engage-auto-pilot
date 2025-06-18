@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { MessageSquare } from 'lucide-react';
-import ChatContainer from './ChatContainer';
 import ChatAIPanelsContainer from './ChatAIPanelsContainer';
 import LeadContextPanel from './LeadContextPanel';
 import AppointmentScheduler from '../appointments/AppointmentScheduler';
@@ -182,28 +181,53 @@ const EnhancedChatView = ({
             onCloseAIGenerator={() => setShowAIGenerator(false)}
           />
 
-          <ChatContainer
-            selectedConversation={selectedConversation}
-            messages={messages}
-            newMessage={newMessage}
-            isSending={isSending}
-            canReply={canReply}
-            showAnalysis={showAnalysis}
-            showLeadContext={showLeadContext}
-            showScrollButton={showScrollButton}
-            averageSentiment={getAverageSentiment()}
-            getSentimentForMessage={getSentimentForMessage}
-            onMessageChange={setNewMessage}
-            onSend={handleSend}
-            onKeyPress={handleKeyPress}
-            onToggleAnalysis={() => setShowAnalysis(!showAnalysis)}
-            onToggleLeadContext={() => setShowLeadContext(!showLeadContext)}
-            onToggleAI={() => setShowAIGenerator(!showAIGenerator)}
-            onToggleTemplates={onToggleTemplates}
-            onScroll={handleScroll}
-            onScrollToBottom={handleScrollToBottom}
-            onScheduleAppointment={handleScheduleAppointment}
-          />
+          {/* Simple Chat Display - replacing ChatContainer */}
+          <Card className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 p-4 overflow-y-auto">
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        message.direction === 'out'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-800'
+                      }`}
+                    >
+                      {message.body}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Message Input */}
+            {canReply && (
+              <div className="border-t p-4">
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Type your message..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isSending}
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={isSending || !newMessage.trim()}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSending ? 'Sending...' : 'Send'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </Card>
         </div>
 
         {/* Lead Context Panel */}
