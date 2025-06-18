@@ -1,14 +1,14 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useCentralizedRealtime } from './useCentralizedRealtime';
 
 export const useGlobalUnreadCount = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { profile } = useAuth();
-  const channelsRef = useRef<any[]>([]);
 
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
     if (!profile) return;
 
     try {
@@ -45,58 +45,17 @@ export const useGlobalUnreadCount = () => {
       console.error('Error fetching unread count:', error);
       setUnreadCount(0);
     }
-  };
+  }, [profile]);
 
-  const cleanupChannels = () => {
-    channelsRef.current.forEach(channel => {
-      try {
-        supabase.removeChannel(channel);
-      } catch (error) {
-        console.error('Error removing channel:', error);
-      }
-    });
-    channelsRef.current = [];
-  };
+  // Use centralized realtime for updates
+  useCentralizedRealtime({
+    onUnreadCountUpdate: fetchUnreadCount
+  });
 
+  // Initial load
   useEffect(() => {
-    if (!profile) return;
-
-    // Clean up any existing channels first
-    cleanupChannels();
-
     fetchUnreadCount();
-
-    // Subscribe to real-time updates for conversations
-    const smsChannel = supabase
-      .channel(`conversations-unread-${profile.id}-${Date.now()}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'conversations'
-      }, () => {
-        fetchUnreadCount();
-      })
-      .subscribe();
-
-    // Subscribe to real-time updates for email conversations
-    const emailChannel = supabase
-      .channel(`email-conversations-unread-${profile.id}-${Date.now()}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'email_conversations'
-      }, () => {
-        fetchUnreadCount();
-      })
-      .subscribe();
-
-    // Store channels for cleanup
-    channelsRef.current = [smsChannel, emailChannel];
-
-    return () => {
-      cleanupChannels();
-    };
-  }, [profile?.id]); // Only depend on profile.id to avoid unnecessary re-subscriptions
+  }, [fetchUnreadCount]);
 
   return { unreadCount, refreshUnreadCount: fetchUnreadCount };
 };

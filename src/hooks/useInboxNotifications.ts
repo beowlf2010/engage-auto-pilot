@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 export const useInboxNotifications = () => {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { profile } = useAuth();
   const channelRef = useRef<any>(null);
   const notificationPermission = useRef<NotificationPermission>('default');

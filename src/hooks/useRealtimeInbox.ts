@@ -1,14 +1,10 @@
 
 import { useRef, useEffect } from 'react';
-import { useInboxNotifications } from './useInboxNotifications';
 import { useConversationOperations } from './useConversationOperations';
-import { useRealtimeSubscriptions } from './useRealtimeSubscriptions';
+import { useCentralizedRealtime } from './useCentralizedRealtime';
 
 export const useRealtimeInbox = () => {
   const currentLeadIdRef = useRef<string | null>(null);
-  
-  // Use the inbox notifications hook
-  useInboxNotifications();
   
   // Use conversation operations hook
   const {
@@ -28,11 +24,15 @@ export const useRealtimeInbox = () => {
     await loadMessages(leadId);
   };
 
-  // Use realtime subscriptions hook
-  useRealtimeSubscriptions({
+  // Use centralized realtime subscriptions
+  useCentralizedRealtime({
     onConversationUpdate: loadConversations,
-    onMessageUpdate: loadMessages,
-    currentLeadId: currentLeadIdRef.current
+    onMessageUpdate: (leadId: string) => {
+      if (currentLeadIdRef.current === leadId) {
+        loadMessages(leadId);
+      }
+    },
+    onUnreadCountUpdate: loadConversations
   });
 
   // Load initial conversations
