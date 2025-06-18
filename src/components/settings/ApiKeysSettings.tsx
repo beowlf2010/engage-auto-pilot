@@ -5,6 +5,7 @@ import { useApiKeysActions } from "./api-keys/useApiKeysActions";
 import ApiKeyField from "./api-keys/ApiKeyField";
 import TwilioAccountSidField from "./api-keys/TwilioAccountSidField";
 import TestSMSCard from "./api-keys/TestSMSCard";
+import WebhookConfiguration from "./WebhookConfiguration";
 import AccessDeniedView from "./api-keys/AccessDeniedView";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
@@ -97,6 +98,8 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
         </CardContent>
       </Card>
 
+      <WebhookConfiguration />
+
       <Alert>
         <Info className="h-4 w-4" />
         <AlertTitle>Having trouble connecting Twilio?</AlertTitle>
@@ -107,6 +110,7 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
             <li>Your <strong>Twilio Phone Number</strong> must be in E.164 format (e.g., <code>+15551234567</code>) and purchased from Twilio.</li>
             <li>Use the "Test" button next to the Account SID to verify your credentials. If it fails, the error message will provide details.</li>
             <li>Make sure the phone number you are testing with is in E.164 format (e.g., <code>+15551234567</code>).</li>
+            <li><strong>Configure the webhook URL</strong> in your Twilio console using the configuration section above.</li>
           </ul>
         </AlertDescription>
       </Alert>

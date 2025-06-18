@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Bot, Send, RefreshCw, X, Sparkles } from 'lucide-react';
+import { Bot, Send, RefreshCw, X, Sparkles, AlertCircle } from 'lucide-react';
 import { generateEnhancedAIMessage } from '@/services/enhancedAIMessageService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,32 +17,33 @@ const AIMessageGenerator = ({ leadId, onSendMessage, onClose }: AIMessageGenerat
   const [generatedMessage, setGeneratedMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleGenerateMessage = async () => {
     try {
       setIsGenerating(true);
+      setError(null);
+      
+      console.log('🚀 Starting AI message generation for lead:', leadId);
+      
       const message = await generateEnhancedAIMessage(leadId);
       
       if (message) {
         setGeneratedMessage(message);
         setIsEditing(true);
-        toast({
-          title: "AI Message Generated",
-          description: "Review and edit the message before sending",
-        });
+        console.log('✅ Message generated and ready for editing');
       } else {
-        toast({
-          title: "Unable to Generate",
-          description: "AI message generation was blocked by quality controls",
-          variant: "destructive"
-        });
+        setError("Failed to generate message. This could be due to:\n• Missing OpenAI API key\n• Quality control restrictions\n• Rate limiting\n• Lead data issues");
+        console.log('❌ No message generated - check logs for details');
       }
     } catch (error) {
-      console.error('Error generating AI message:', error);
+      console.error('💥 Error in handleGenerateMessage:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Generation failed: ${errorMessage}`);
       toast({
         title: "Generation Failed",
-        description: "Failed to generate AI message. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -52,6 +53,7 @@ const AIMessageGenerator = ({ leadId, onSendMessage, onClose }: AIMessageGenerat
 
   const handleSendMessage = () => {
     if (generatedMessage.trim()) {
+      console.log('📤 Sending AI generated message');
       onSendMessage(generatedMessage.trim());
       onClose();
     }
@@ -60,7 +62,14 @@ const AIMessageGenerator = ({ leadId, onSendMessage, onClose }: AIMessageGenerat
   const handleRegenerate = () => {
     setGeneratedMessage('');
     setIsEditing(false);
+    setError(null);
     handleGenerateMessage();
+  };
+
+  const handleReset = () => {
+    setGeneratedMessage('');
+    setIsEditing(false);
+    setError(null);
   };
 
   return (
@@ -83,7 +92,24 @@ const AIMessageGenerator = ({ leadId, onSendMessage, onClose }: AIMessageGenerat
           </Button>
         </div>
 
-        {!isEditing ? (
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-red-800 whitespace-pre-line">{error}</div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              className="mt-2 text-red-700 border-red-300 hover:bg-red-50"
+            >
+              Try Again
+            </Button>
+          </div>
+        )}
+
+        {!isEditing && !error ? (
           <div className="text-center py-6">
             <div className="bg-purple-100 p-3 rounded-full w-fit mx-auto mb-4">
               <Sparkles className="h-6 w-6 text-purple-600" />
@@ -109,7 +135,7 @@ const AIMessageGenerator = ({ leadId, onSendMessage, onClose }: AIMessageGenerat
               )}
             </Button>
           </div>
-        ) : (
+        ) : isEditing ? (
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-purple-800 mb-2 block">
@@ -145,7 +171,7 @@ const AIMessageGenerator = ({ leadId, onSendMessage, onClose }: AIMessageGenerat
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );

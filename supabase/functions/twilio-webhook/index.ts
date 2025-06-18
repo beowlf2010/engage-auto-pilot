@@ -14,6 +14,9 @@ serve(async (req) => {
 
   try {
     console.log('=== TWILIO WEBHOOK START ===');
+    console.log('📍 Request method:', req.method);
+    console.log('📍 Request URL:', req.url);
+    console.log('📍 Headers:', Object.fromEntries(req.headers.entries()));
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -24,16 +27,25 @@ serve(async (req) => {
     const from = formData.get('From')?.toString()
     const body = formData.get('Body')?.toString()
     const messageSid = formData.get('MessageSid')?.toString()
+    const messageStatus = formData.get('MessageStatus')?.toString()
     
-    console.log('📱 Incoming SMS:', { from, body: body?.substring(0, 50) + '...', messageSid });
+    console.log('📱 Incoming SMS Details:', { 
+      from, 
+      body: body?.substring(0, 100) + (body?.length > 100 ? '...' : ''), 
+      messageSid,
+      messageStatus
+    });
 
     if (!from || !body) {
       console.error('❌ Missing required fields:', { from: !!from, body: !!body });
       return new Response('Missing required fields', { status: 400, headers: corsHeaders })
     }
 
+    // Clean phone number format
+    const cleanPhone = from.startsWith('+') ? from : `+${from}`;
+    console.log('🔍 Looking up lead by phone number:', cleanPhone);
+
     // Find lead by phone number
-    console.log('🔍 Looking up lead by phone number:', from);
     const { data: phoneData, error: phoneError } = await supabase
       .from('phone_numbers')
       .select(`
@@ -43,19 +55,61 @@ serve(async (req) => {
           first_name,
           last_name,
           ai_takeover_enabled,
-          ai_takeover_delay_minutes
+          ai_takeover_delay_minutes,
+          ai_opt_in
         )
       `)
-      .eq('number', from)
+      .eq('number', cleanPhone)
       .single()
 
-    if (phoneError || !phoneData) {
-      console.error('❌ Lead not found for phone:', from, phoneError);
-      return new Response('Lead not found', { status: 404, headers: corsHeaders })
+    if (phoneError || !phoneData || !phoneData.leads) {
+      console.error('❌ Lead not found for phone:', cleanPhone, phoneError);
+      
+      // Try alternative phone formats
+      const altFormats = [
+        from.replace('+1', ''),
+        from.replace(/\D/g, ''),
+        '+1' + from.replace(/\D/g, '')
+      ];
+      
+      console.log('🔄 Trying alternative phone formats:', altFormats);
+      
+      for (const altPhone of altFormats) {
+        const { data: altPhoneData } = await supabase
+          .from('phone_numbers')
+          .select(`
+            lead_id,
+            leads (
+              id,
+              first_name,
+              last_name,
+              ai_takeover_enabled,
+              ai_takeover_delay_minutes,
+              ai_opt_in
+            )
+          `)
+          .eq('number', altPhone)
+          .maybeSingle();
+          
+        if (altPhoneData?.leads) {
+          console.log('✅ Found lead with alternative format:', altPhone);
+          phoneData = altPhoneData;
+          break;
+        }
+      }
+      
+      if (!phoneData?.leads) {
+        return new Response('Lead not found', { status: 404, headers: corsHeaders })
+      }
     }
 
-    const lead = phoneData.leads
-    console.log('✅ Lead found:', lead.first_name, lead.last_name, 'ID:', lead.id);
+    const lead = phoneData.leads;
+    console.log('✅ Lead found:', {
+      name: `${lead.first_name} ${lead.last_name}`,
+      id: lead.id,
+      aiEnabled: lead.ai_opt_in,
+      aiTakeover: lead.ai_takeover_enabled
+    });
 
     // Insert the incoming message
     const { data: messageData, error: messageError } = await supabase
@@ -65,7 +119,7 @@ serve(async (req) => {
         direction: 'in',
         body: body,
         twilio_message_id: messageSid,
-        sms_status: 'delivered'
+        sms_status: messageStatus || 'delivered'
       })
       .select()
       .single()
@@ -78,7 +132,7 @@ serve(async (req) => {
     console.log('💾 Message saved with ID:', messageData.id);
 
     // Handle AI takeover logic for incoming messages
-    if (lead.ai_takeover_enabled) {
+    if (lead.ai_takeover_enabled && lead.ai_opt_in) {
       const delayMinutes = lead.ai_takeover_delay_minutes || 7;
       const deadlineTime = new Date(Date.now() + delayMinutes * 60 * 1000);
       
@@ -99,15 +153,18 @@ serve(async (req) => {
       } else {
         console.log('✅ AI takeover deadline set successfully');
       }
-    } else {
+    } else if (lead.ai_opt_in) {
       // Traditional behavior - pause AI sequence for 24 hours
+      const resumeTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      console.log(`⏸️ Pausing AI sequence until: ${resumeTime.toISOString()}`);
+      
       const { error: updateError } = await supabase
         .from('leads')
         .update({
           last_reply_at: new Date().toISOString(),
           ai_sequence_paused: true,
           ai_pause_reason: 'lead_responded',
-          ai_resume_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          ai_resume_at: resumeTime.toISOString()
         })
         .eq('id', lead.id);
 
@@ -116,6 +173,8 @@ serve(async (req) => {
       } else {
         console.log('✅ Lead reply status updated - AI paused for 24 hours');
       }
+    } else {
+      console.log('ℹ️ AI not enabled for this lead, skipping AI logic');
     }
 
     // Update conversation memory with the incoming message
@@ -126,7 +185,8 @@ serve(async (req) => {
           lead_id: lead.id,
           memory_type: 'recent_interaction',
           content: `Lead replied: "${body}"`,
-          confidence: 1.0
+          confidence: 1.0,
+          created_at: new Date().toISOString()
         });
 
       if (memoryError) {
@@ -139,6 +199,8 @@ serve(async (req) => {
     }
 
     console.log('✅ Webhook processed successfully');
+    console.log('=== TWILIO WEBHOOK END ===');
+    
     return new Response('OK', { status: 200, headers: corsHeaders })
 
   } catch (error) {
