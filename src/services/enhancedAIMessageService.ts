@@ -1,87 +1,134 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { generateIntelligentAIMessage } from './intelligentAIMessageService';
 
-// DEPRECATED: This service is being phased out in favor of the intelligent conversation AI
-// It generated basic template messages but has been replaced by context-aware responses
+export interface AIMessageSchedule {
+  leadId: string;
+  nextSendAt: string;
+  stage: string;
+  priority: 'low' | 'medium' | 'high';
+  messageType: 'follow_up' | 'inventory_alert' | 'appointment_reminder' | 'behavioral_trigger';
+}
 
-export const generateEnhancedAIMessage = async (leadId: string): Promise<string | null> => {
-  console.log('🚫 generateEnhancedAIMessage deprecated - using intelligent conversation AI instead');
-  
-  // Return null to prevent generic message generation
-  // The centralizedAIService with intelligent conversation AI will handle responses
-  return null;
-};
-
-export const scheduleEnhancedAIMessages = async (leadId: string): Promise<void> => {
-  console.log('🚫 scheduleEnhancedAIMessages deprecated - using intelligent conversation AI instead');
-  
-  // No longer scheduling basic template messages
-  // The intelligent system handles scheduling contextual responses
-};
-
-export const resumePausedSequences = async (): Promise<void> => {
-  console.log('🚫 resumePausedSequences deprecated');
-  // No longer managing basic sequence resumption
-};
-
-export const trackLeadResponse = async (leadId: string, responseTime: Date): Promise<void> => {
+export const scheduleEnhancedAIMessages = async (leadId: string): Promise<boolean> => {
   try {
-    console.log(`📊 Tracking lead response for lead ${leadId}`);
+    // Get lead information and conversation history
+    const { data: lead } = await supabase
+      .from('leads')
+      .select(`
+        *,
+        conversations (direction, sent_at, body),
+        lead_response_patterns (*),
+        lead_personalities (*)
+      `)
+      .eq('id', leadId)
+      .single();
+
+    if (!lead || !lead.ai_opt_in || lead.ai_sequence_paused) {
+      return false;
+    }
+
+    // Calculate next optimal send time based on response patterns
+    const responsePattern = lead.lead_response_patterns?.[0];
+    const personality = lead.lead_personalities?.[0];
     
-    // Still track responses for analytics, but don't trigger old AI logic
-    await supabase
+    let nextSendTime = new Date();
+    nextSendTime.setHours(nextSendTime.getHours() + 24); // Default to 24 hours
+
+    // Optimize based on response patterns
+    if (responsePattern?.best_response_hours?.length > 0) {
+      const bestHour = responsePattern.best_response_hours[0];
+      nextSendTime.setHours(bestHour, 0, 0, 0);
+      
+      // If that time has passed today, schedule for tomorrow
+      if (nextSendTime <= new Date()) {
+        nextSendTime.setDate(nextSendTime.getDate() + 1);
+      }
+    }
+
+    // Update lead with new schedule
+    const { error } = await supabase
       .from('leads')
       .update({
-        last_response_at: responseTime.toISOString(),
-        pending_human_response: true,
-        ai_sequence_paused: true,
-        ai_pause_reason: 'customer_responded'
+        next_ai_send_at: nextSendTime.toISOString(),
+        ai_stage: getNextAIStage(lead.ai_stage, lead.conversations?.length || 0)
       })
       .eq('id', leadId);
 
-    console.log(`✅ Tracked response for lead ${leadId}`);
+    if (error) throw error;
+
+    console.log(`Scheduled next AI message for lead ${leadId} at ${nextSendTime}`);
+    return true;
   } catch (error) {
-    console.error('Error tracking lead response:', error);
+    console.error('Error scheduling enhanced AI message:', error);
+    return false;
   }
 };
 
-export const getAIAnalyticsDashboard = async () => {
+const getNextAIStage = (currentStage: string | null, messageCount: number): string => {
+  if (!currentStage || currentStage === 'initial') {
+    return messageCount < 3 ? 'initial_follow_up' : 'engagement';
+  }
+  
+  switch (currentStage) {
+    case 'initial_follow_up':
+      return messageCount < 5 ? 'engagement' : 'nurture';
+    case 'engagement':
+      return messageCount < 8 ? 'nurture' : 'closing';
+    case 'nurture':
+      return 'closing';
+    case 'closing':
+      return 'long_term_follow_up';
+    default:
+      return 'follow_up';
+  }
+};
+
+export const processQueuedMessages = async (): Promise<void> => {
   try {
-    // Get basic AI stats
-    const { data: leads } = await supabase
+    // Get all messages due for sending
+    const { data: dueMessages } = await supabase
       .from('leads')
-      .select('ai_messages_sent, created_at')
-      .eq('ai_opt_in', true);
+      .select('id, first_name, last_name, ai_stage')
+      .eq('ai_opt_in', true)
+      .eq('ai_sequence_paused', false)
+      .not('next_ai_send_at', 'is', null)
+      .lte('next_ai_send_at', new Date().toISOString())
+      .limit(50);
 
-    const { data: conversations } = await supabase
-      .from('conversations')
-      .select('direction, created_at')
-      .eq('ai_generated', true);
+    if (!dueMessages?.length) {
+      console.log('No messages due for sending');
+      return;
+    }
 
-    const { data: responses } = await supabase
-      .from('conversations')
-      .select('lead_id, direction')
-      .eq('direction', 'in');
+    console.log(`Processing ${dueMessages.length} due messages`);
 
-    const totalMessagesSent = conversations?.length || 0;
-    const totalResponses = responses?.length || 0;
-    const overallResponseRate = totalMessagesSent > 0 ? totalResponses / totalMessagesSent : 0;
-    const averageMessagesPerLead = leads?.length > 0 ? 
-      (leads.reduce((sum, lead) => sum + (lead.ai_messages_sent || 0), 0) / leads.length) : 0;
+    for (const lead of dueMessages) {
+      try {
+        // Generate AI message
+        const message = await generateIntelligentAIMessage({
+          leadId: lead.id,
+          stage: lead.ai_stage || 'follow_up'
+        });
 
-    return {
-      totalMessagesSent,
-      totalResponses,
-      overallResponseRate,
-      averageMessagesPerLead
-    };
+        if (message) {
+          // Store message for manual approval in queue
+          await supabase
+            .from('ai_message_analytics')
+            .insert({
+              lead_id: lead.id,
+              message_content: message,
+              message_stage: lead.ai_stage || 'follow_up',
+              sent_at: new Date().toISOString()
+            });
+
+          console.log(`Generated message for ${lead.first_name} ${lead.last_name}`);
+        }
+      } catch (error) {
+        console.error(`Error processing message for lead ${lead.id}:`, error);
+      }
+    }
   } catch (error) {
-    console.error('Error fetching AI analytics:', error);
-    return {
-      totalMessagesSent: 0,
-      totalResponses: 0,
-      overallResponseRate: 0,
-      averageMessagesPerLead: 0
-    };
+    console.error('Error processing queued messages:', error);
   }
 };
