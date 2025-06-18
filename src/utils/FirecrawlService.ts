@@ -14,6 +14,11 @@ interface CrawlStatusResponse {
   creditsUsed: number;
   expiresAt: string;
   data: any[];
+  diagnostic?: {
+    foundPages: number;
+    sampleUrls: string[];
+    hasContent: boolean;
+  };
 }
 
 type CrawlResponse = CrawlStatusResponse | ErrorResponse;
@@ -45,7 +50,6 @@ export class FirecrawlService {
       }
 
       console.log('Test API key response:', data);
-      // The edge function now correctly returns success: true/false
       return data?.success === true;
     } catch (error) {
       console.error('Error testing Firecrawl API key:', error);
@@ -53,15 +57,44 @@ export class FirecrawlService {
     }
   }
 
-  static async scrapeVehicleInventory(dealershipUrl: string): Promise<{ success: boolean; error?: string; data?: any }> {
+  static async testDirectUrls(urls: string[]): Promise<{ success: boolean; results?: any[]; error?: string }> {
     try {
-      console.log('🚀 Starting optimized vehicle inventory scrape for:', dealershipUrl);
+      console.log('🔍 Testing specific URLs directly:', urls);
+      
+      const { data, error } = await supabase.functions.invoke('firecrawl-scraper', {
+        body: { 
+          action: 'direct-test',
+          testUrls: urls
+        }
+      });
+
+      if (error) {
+        console.error('❌ Error testing direct URLs:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ Direct URL test results:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Error during direct URL testing:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to test URLs'
+      };
+    }
+  }
+
+  static async scrapeVehicleInventory(dealershipUrl: string, diagnosticMode: boolean = false): Promise<{ success: boolean; error?: string; data?: any }> {
+    try {
+      const mode = diagnosticMode ? 'DIAGNOSTIC' : 'PRODUCTION';
+      console.log(`🚀 Starting ${mode} crawl for:`, dealershipUrl);
       
       // Step 1: Start the crawl
       const { data: crawlData, error: crawlError } = await supabase.functions.invoke('firecrawl-scraper', {
         body: { 
           action: 'crawl',
-          url: dealershipUrl
+          url: dealershipUrl,
+          diagnosticMode
         }
       });
 
@@ -76,11 +109,12 @@ export class FirecrawlService {
       }
 
       const jobId = crawlData.jobId;
-      console.log('✅ Optimized crawl started with job ID:', jobId);
+      const crawlMode = crawlData.mode || mode.toLowerCase();
+      console.log(`✅ ${mode} crawl started with job ID:`, jobId);
 
       // Step 2: Poll for completion with enhanced progress tracking
       let attempts = 0;
-      const maxAttempts = 36; // 3 minutes max (5 sec intervals)
+      const maxAttempts = diagnosticMode ? 24 : 36; // Shorter timeout for diagnostic
       let lastLoggedProgress = -1;
       
       while (attempts < maxAttempts) {
@@ -98,39 +132,58 @@ export class FirecrawlService {
           throw new Error(`Status check error: ${statusError.message || 'Unknown error'}`);
         }
 
-        // Check for presence of status field instead of success field
         if (!statusData || !statusData.status) {
           console.error('❌ Invalid status response:', statusData);
           throw new Error('Invalid status response from crawl service');
         }
 
-        // Enhanced progress logging
+        // Enhanced progress logging with diagnostic info
         const progress = statusData.total > 0 ? Math.round((statusData.completed / statusData.total) * 100) : 0;
         
-        // Only log progress updates when there's a meaningful change
         if (progress !== lastLoggedProgress) {
-          console.log(`📊 Crawl Progress: ${statusData.completed}/${statusData.total} pages (${progress}%) - Status: ${statusData.status}`);
+          console.log(`📊 ${mode} Crawl Progress: ${statusData.completed}/${statusData.total} pages (${progress}%) - Status: ${statusData.status}`);
           if (statusData.creditsUsed) {
             console.log(`💳 Credits used: ${statusData.creditsUsed}`);
+          }
+          if (statusData.diagnostic) {
+            console.log(`🔍 Diagnostic: Found ${statusData.diagnostic.foundPages} pages, has content: ${statusData.diagnostic.hasContent}`);
+            if (statusData.diagnostic.sampleUrls.length > 0) {
+              console.log(`📄 Sample URLs:`, statusData.diagnostic.sampleUrls);
+            }
           }
           lastLoggedProgress = progress;
         }
 
         if (statusData.status === 'completed') {
-          console.log('🎉 Crawl completed successfully!');
+          console.log(`🎉 ${mode} crawl completed!`);
           console.log(`📈 Final stats: ${statusData.completed} pages crawled, ${statusData.creditsUsed} credits used`);
           
-          // Log some sample URLs if available
-          if (statusData.data && statusData.data.length > 0) {
-            console.log('📄 Sample crawled pages:');
-            statusData.data.slice(0, 5).forEach((item, index) => {
-              console.log(`  ${index + 1}. ${item.url || 'URL not available'}`);
-            });
+          // Enhanced diagnostic output
+          if (diagnosticMode) {
+            console.log('🔍 DIAGNOSTIC RESULTS:');
+            console.log(`  - Pages discovered: ${statusData.diagnostic?.foundPages || statusData.data?.length || 0}`);
+            console.log(`  - Has content: ${statusData.diagnostic?.hasContent || false}`);
+            if (statusData.data && statusData.data.length > 0) {
+              console.log('📄 All discovered pages:');
+              statusData.data.forEach((item, index) => {
+                console.log(`  ${index + 1}. ${item.url || 'URL not available'} (${item.content ? Math.round(item.content.length/1000) + 'k chars' : 'no content'})`);
+              });
+            } else {
+              console.log('⚠️ NO PAGES DISCOVERED - Possible issues:');
+              console.log('  - Website uses JavaScript to load content');
+              console.log('  - Anti-bot protection blocking crawler');
+              console.log('  - Authentication required');
+              console.log('  - robots.txt blocking access');
+            }
           }
           
           return { 
             success: true,
-            data: statusData
+            data: {
+              ...statusData,
+              mode: crawlMode,
+              diagnostic: statusData.diagnostic
+            }
           };
         }
 
@@ -142,12 +195,12 @@ export class FirecrawlService {
         attempts++;
       }
 
-      // Timeout handling with partial results
-      console.warn('⏰ Crawl timed out after 3 minutes');
-      throw new Error(`Crawl timed out after ${maxAttempts * 5} seconds. Try reducing the scope or check your website's accessibility.`);
+      // Timeout handling
+      console.warn(`⏰ ${mode} crawl timed out after ${maxAttempts * 5} seconds`);
+      throw new Error(`Crawl timed out. ${diagnosticMode ? 'Try testing specific URLs directly.' : 'Try diagnostic mode first.'}`);
 
     } catch (error) {
-      console.error('❌ Error during vehicle inventory scrape:', error);
+      console.error(`❌ Error during ${diagnosticMode ? 'diagnostic' : 'production'} crawl:`, error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to scrape website'

@@ -55,8 +55,8 @@ serve(async (req) => {
       );
     }
 
-    const { action, url, jobId } = requestBody;
-    console.log(`Firecrawl action: ${action}`, { url, jobId });
+    const { action, url, jobId, diagnosticMode } = requestBody;
+    console.log(`Firecrawl action: ${action}`, { url, jobId, diagnosticMode });
 
     if (action === 'test') {
       console.log('Testing Firecrawl API key');
@@ -87,29 +87,46 @@ serve(async (req) => {
       );
 
     } else if (action === 'crawl') {
-      console.log('Starting optimized crawl for inventory URL:', url);
+      console.log('Starting crawl for URL:', url);
+      console.log('Diagnostic mode:', diagnosticMode);
       
-      // Optimized crawler options specifically for Jason Pilger Chevrolet inventory
-      const crawlerOptions = {
-        limit: 25, // Reduced from 100 to save credits
-        includes: [
-          'new-inventory',
-          'used-inventory', 
-          'index.htm',
-          'inventory',
-          'vehicles'
-        ],
-        excludes: [
-          'nav', 'header', 'footer', 'search', 'compare',
-          'service', 'parts', 'contact', 'about', 'financing', 
-          'specials', 'offers', 'coupons', 'maintenance',
-          'careers', 'reviews', 'testimonials', 'directions',
-          'hours', 'staff', 'management', 'history',
-          'warranty', 'recall', 'accessories', 'body-shop'
-        ]
-      };
+      let crawlerOptions;
+      
+      if (diagnosticMode) {
+        // Diagnostic crawl: minimal restrictions, broad discovery
+        crawlerOptions = {
+          limit: 15, // Keep low to save credits
+          includes: [], // No restrictions - see what's available
+          excludes: [
+            // Only exclude clearly non-content pages
+            'javascript:', 'mailto:', 'tel:', '#'
+          ]
+        };
+        console.log('🔍 Using DIAGNOSTIC mode - broad crawl with minimal restrictions');
+      } else {
+        // Production crawl: optimized for inventory
+        crawlerOptions = {
+          limit: 25,
+          includes: [
+            'new-inventory',
+            'used-inventory', 
+            'index.htm',
+            'inventory',
+            'vehicles'
+          ],
+          excludes: [
+            'nav', 'header', 'footer', 'search', 'compare',
+            'service', 'parts', 'contact', 'about', 'financing', 
+            'specials', 'offers', 'coupons', 'maintenance',
+            'careers', 'reviews', 'testimonials', 'directions',
+            'hours', 'staff', 'management', 'history',
+            'warranty', 'recall', 'accessories', 'body-shop'
+          ]
+        };
+        console.log('🎯 Using PRODUCTION mode - optimized for inventory');
+      }
 
-      console.log('Using optimized crawler options:', crawlerOptions);
+      console.log('Crawler options:', crawlerOptions);
       
       // Start crawling the website
       const crawlResponse = await fetch('https://api.firecrawl.dev/v0/crawl', {
@@ -122,23 +139,28 @@ serve(async (req) => {
           url: url,
           crawlerOptions,
           pageOptions: {
-            onlyMainContent: true
+            onlyMainContent: true,
+            includeHtml: false, // Reduce data size
+            includeRawHtml: false,
+            waitFor: 2000 // Wait 2 seconds for JS to load
           }
         }),
       });
 
       const crawlData = await crawlResponse.json();
-      console.log('Optimized crawl initiated:', crawlData);
+      console.log('Crawl response status:', crawlResponse.status);
+      console.log('Crawl response data:', crawlData);
 
       // Check for successful response - either success: true or presence of jobId
       const isSuccessful = crawlData.success || crawlData.jobId;
       
       if (!isSuccessful) {
-        console.error('Crawl failed:', crawlData);
+        console.error('❌ Crawl failed:', crawlData);
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: crawlData.error || 'Failed to start crawl'
+            error: crawlData.error || 'Failed to start crawl',
+            details: crawlData
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -148,7 +170,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          jobId: crawlData.jobId 
+          jobId: crawlData.jobId,
+          mode: diagnosticMode ? 'diagnostic' : 'production'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -165,10 +188,10 @@ serve(async (req) => {
       });
 
       const statusData = await statusResponse.json();
-      console.log('📊 Crawl status response:', statusData);
+      console.log('📊 Raw Firecrawl status response:', statusData);
 
-      // Enhanced logging for progress tracking
-      if (statusData.status && statusData.completed !== undefined && statusData.total !== undefined) {
+      // Enhanced logging for diagnostic purposes
+      if (statusData.status) {
         const progress = statusData.total > 0 ? Math.round((statusData.completed / statusData.total) * 100) : 0;
         console.log(`🔄 Crawl Progress: ${statusData.completed}/${statusData.total} pages (${progress}%) - Status: ${statusData.status}`);
         
@@ -176,22 +199,91 @@ serve(async (req) => {
           console.log(`💳 Credits used so far: ${statusData.creditsUsed}`);
         }
 
-        // Log some URLs being crawled if available
+        // Log discovered URLs for diagnostic purposes
         if (statusData.data && statusData.data.length > 0) {
-          console.log(`📄 Sample crawled URLs:`, statusData.data.slice(0, 3).map(item => item.url || 'URL not available'));
+          console.log(`📄 Found ${statusData.data.length} pages:`);
+          statusData.data.slice(0, 5).forEach((item, index) => {
+            console.log(`  ${index + 1}. ${item.url || 'URL not available'} (${item.content ? Math.round(item.content.length/1000) + 'k chars' : 'no content'})`);
+          });
+          if (statusData.data.length > 5) {
+            console.log(`  ... and ${statusData.data.length - 5} more pages`);
+          }
+        } else if (statusData.status === 'completed') {
+          console.log('⚠️ DIAGNOSTIC: Crawl completed but NO PAGES FOUND - possible causes:');
+          console.log('  - Website blocks crawlers (robots.txt, anti-bot)');
+          console.log('  - Content requires JavaScript to load');
+          console.log('  - Authentication required');
+          console.log('  - URL structure doesn\'t match includes/excludes');
         }
       }
 
-      // Return the raw status data - Firecrawl includes status field directly
+      // Return the raw status data with enhanced diagnostic info
       return new Response(
-        JSON.stringify(statusData),
+        JSON.stringify({
+          ...statusData,
+          diagnostic: {
+            foundPages: statusData.data?.length || 0,
+            sampleUrls: statusData.data?.slice(0, 3).map(item => item.url) || [],
+            hasContent: statusData.data?.some(item => item.content && item.content.length > 100) || false
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+    } else if (action === 'direct-test') {
+      // Test specific URLs directly
+      const { testUrls } = requestBody;
+      console.log('🔍 Testing specific URLs directly:', testUrls);
+      
+      const results = [];
+      for (const testUrl of testUrls) {
+        try {
+          const testResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: testUrl,
+              pageOptions: {
+                onlyMainContent: true,
+                waitFor: 2000
+              }
+            }),
+          });
+          
+          const testData = await testResponse.json();
+          results.push({
+            url: testUrl,
+            success: testData.success,
+            contentLength: testData.data?.content?.length || 0,
+            error: testData.error
+          });
+          console.log(`URL test result for ${testUrl}:`, {
+            success: testData.success,
+            contentLength: testData.data?.content?.length || 0,
+            hasContent: !!(testData.data?.content && testData.data.content.length > 100)
+          });
+        } catch (error) {
+          results.push({
+            url: testUrl,
+            success: false,
+            error: error.message
+          });
+          console.error(`Failed to test URL ${testUrl}:`, error);
+        }
+      }
+      
+      return new Response(
+        JSON.stringify({ success: true, results }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
     } else {
       console.error('Invalid action provided:', action);
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid action. Supported actions: test, crawl, status' }),
+        JSON.stringify({ success: false, error: 'Invalid action. Supported actions: test, crawl, status, direct-test' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
