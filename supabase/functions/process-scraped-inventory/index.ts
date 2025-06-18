@@ -272,7 +272,8 @@ serve(async (req) => {
         original_filename: 'Website Scrape - Jason Pilger Chevrolet',
         file_size: JSON.stringify(scrapedData).length,
         source_type: 'website_scrape',
-        processing_status: 'processing'
+        processing_status: 'processing',
+        upload_type: 'inventory'
       })
       .select()
       .single();
@@ -308,7 +309,6 @@ serve(async (req) => {
           color_exterior: vehicleData.color_exterior,
           condition: vehicleData.condition,
           status: 'available',
-          source_report: null, // Will be set to enum value if needed
           description: vehicleData.description,
           features: vehicleData.features,
           images: vehicleData.images,

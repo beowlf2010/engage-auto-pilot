@@ -3425,6 +3425,7 @@ export type Database = {
           processed_at: string | null
           processing_errors: Json | null
           processing_status: string
+          source_type: string | null
           stored_filename: string
           successful_imports: number
           total_rows: number
@@ -3449,6 +3450,7 @@ export type Database = {
           processed_at?: string | null
           processing_errors?: Json | null
           processing_status?: string
+          source_type?: string | null
           stored_filename: string
           successful_imports?: number
           total_rows?: number
@@ -3473,6 +3475,7 @@ export type Database = {
           processed_at?: string | null
           processing_errors?: Json | null
           processing_status?: string
+          source_type?: string | null
           stored_filename?: string
           successful_imports?: number
           total_rows?: number
