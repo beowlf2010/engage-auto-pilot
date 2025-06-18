@@ -1,14 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { MessageSquare } from 'lucide-react';
-import ChatHeader from './ChatHeader';
-import MessagesArea from './MessagesArea';
-import ChatMessageInput from './ChatMessageInput';
-import ChatAnalysisPanel from './ChatAnalysisPanel';
+import ChatContainer from './ChatContainer';
+import ChatAIPanelsContainer from './ChatAIPanelsContainer';
 import LeadContextPanel from './LeadContextPanel';
-import AIMessageGenerator from './AIMessageGenerator';
-import IntelligentAIPanel from './IntelligentAIPanel';
+import { useChatState } from './hooks/useChatState';
+import { useChatHandlers } from './hooks/useChatHandlers';
 import { useConversationAnalysis } from '@/hooks/useConversationAnalysis';
 
 interface EnhancedChatViewProps {
@@ -31,13 +29,23 @@ const EnhancedChatView = ({
   onToggleTemplates,
   user 
 }: EnhancedChatViewProps) => {
-  const [newMessage, setNewMessage] = useState('');
-  const [showLeadContext, setShowLeadContext] = useState(true);
-  const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [showAIPanel, setShowAIPanel] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [showScrollButton, setShowScrollButton] = useState(false);
+  const chatState = useChatState();
+  const {
+    newMessage,
+    setNewMessage,
+    showLeadContext,
+    setShowLeadContext,
+    showAIGenerator,
+    setShowAIGenerator,
+    showAnalysis,
+    setShowAnalysis,
+    showAIPanel,
+    setShowAIPanel,
+    isSending,
+    setIsSending,
+    showScrollButton,
+    setShowScrollButton
+  } = chatState;
 
   const {
     summary,
@@ -53,13 +61,26 @@ const EnhancedChatView = ({
     getAverageSentiment
   } = useConversationAnalysis(selectedConversation?.leadId || '');
 
-  const handleScroll = () => {
-    setShowScrollButton(Math.random() > 0.7); // Placeholder logic
-  };
+  const chatHandlers = useChatHandlers({
+    newMessage,
+    setNewMessage,
+    setIsSending,
+    setShowAIGenerator,
+    setShowScrollButton,
+    onSendMessage,
+    updateSummary,
+    updateSuggestions,
+    isSending
+  });
 
-  const handleScrollToBottom = () => {
-    setShowScrollButton(false);
-  };
+  const {
+    handleScroll,
+    handleScrollToBottom,
+    handleSend,
+    handleKeyPress,
+    handleAIGeneratedMessage,
+    handleSelectSuggestion
+  } = chatHandlers;
 
   // Load analysis data when conversation changes
   useEffect(() => {
@@ -71,56 +92,6 @@ const EnhancedChatView = ({
       }
     }
   }, [selectedConversation?.leadId, messages.length, loadExistingSummary, loadSentiments]);
-
-  const handleSend = async () => {
-    if (newMessage.trim() && !isSending) {
-      setIsSending(true);
-      try {
-        console.log('📤 Sending message from chat view:', newMessage.trim());
-        await onSendMessage(newMessage.trim());
-        setNewMessage('');
-        
-        // Update analysis after sending
-        setTimeout(() => {
-          updateSummary();
-          updateSuggestions();
-        }, 1000);
-      } catch (error) {
-        console.error('Error sending message:', error);
-      } finally {
-        setIsSending(false);
-      }
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const handleAIGeneratedMessage = async (message: string) => {
-    setIsSending(true);
-    try {
-      await onSendMessage(message, false);
-      setShowAIGenerator(false);
-      
-      // Update analysis after AI message
-      setTimeout(() => {
-        updateSummary();
-        updateSuggestions();
-      }, 1000);
-    } catch (error) {
-      console.error('Error sending AI message:', error);
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleSelectSuggestion = (suggestion: string) => {
-    setNewMessage(suggestion);
-  };
 
   const canReply = selectedConversation && (
     user.role === "manager" || 
@@ -145,68 +116,41 @@ const EnhancedChatView = ({
     <div className="grid grid-cols-12 gap-4 h-full">
       {/* Main Chat Area - Fixed Height */}
       <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col space-y-2`}>
-        {/* Compact AI Panels - Only show when needed */}
-        {showAnalysis && (
-          <ChatAnalysisPanel
-            leadId={selectedConversation.leadId}
-            messageCount={messages.length}
-            canReply={canReply}
-            onSummaryUpdate={updateSummary}
-            onSelectSuggestion={handleSelectSuggestion}
-          />
-        )}
+        <ChatAIPanelsContainer
+          showAnalysis={showAnalysis}
+          showAIPanel={showAIPanel}
+          showAIGenerator={showAIGenerator}
+          canReply={canReply}
+          selectedConversation={selectedConversation}
+          messages={messages}
+          onSummaryUpdate={updateSummary}
+          onSelectSuggestion={handleSelectSuggestion}
+          onToggleAIPanel={() => setShowAIPanel(!showAIPanel)}
+          onSendAIMessage={handleAIGeneratedMessage}
+          onCloseAIGenerator={() => setShowAIGenerator(false)}
+        />
 
-        {/* Collapsible Intelligent AI Panel */}
-        {canReply && (
-          <IntelligentAIPanel
-            conversation={selectedConversation}
-            messages={messages}
-            onSendMessage={handleAIGeneratedMessage}
-            canReply={canReply}
-            isCollapsed={!showAIPanel}
-            onToggleCollapse={() => setShowAIPanel(!showAIPanel)}
-          />
-        )}
-
-        {/* AI Message Generator */}
-        {showAIGenerator && canReply && (
-          <AIMessageGenerator
-            leadId={selectedConversation.leadId}
-            onSendMessage={handleAIGeneratedMessage}
-            onClose={() => setShowAIGenerator(false)}
-          />
-        )}
-
-        {/* Fixed Height Chat Card */}
-        <Card className="flex flex-col h-[600px]">
-          <ChatHeader
-            selectedConversation={selectedConversation}
-            showAnalysis={showAnalysis}
-            showLeadContext={showLeadContext}
-            averageSentiment={getAverageSentiment()}
-            onToggleAnalysis={() => setShowAnalysis(!showAnalysis)}
-            onToggleLeadContext={() => setShowLeadContext(!showLeadContext)}
-          />
-
-          <MessagesArea
-            messages={messages}
-            showScrollButton={showScrollButton}
-            getSentimentForMessage={getSentimentForMessage}
-            onScroll={handleScroll}
-            onScrollToBottom={handleScrollToBottom}
-          />
-
-          <ChatMessageInput
-            newMessage={newMessage}
-            isSending={isSending}
-            canReply={canReply}
-            onMessageChange={setNewMessage}
-            onSend={handleSend}
-            onKeyPress={handleKeyPress}
-            onToggleAI={() => setShowAIGenerator(!showAIGenerator)}
-            onToggleTemplates={onToggleTemplates}
-          />
-        </Card>
+        <ChatContainer
+          selectedConversation={selectedConversation}
+          messages={messages}
+          newMessage={newMessage}
+          isSending={isSending}
+          canReply={canReply}
+          showAnalysis={showAnalysis}
+          showLeadContext={showLeadContext}
+          showScrollButton={showScrollButton}
+          averageSentiment={getAverageSentiment()}
+          getSentimentForMessage={getSentimentForMessage}
+          onMessageChange={setNewMessage}
+          onSend={handleSend}
+          onKeyPress={handleKeyPress}
+          onToggleAnalysis={() => setShowAnalysis(!showAnalysis)}
+          onToggleLeadContext={() => setShowLeadContext(!showLeadContext)}
+          onToggleAI={() => setShowAIGenerator(!showAIGenerator)}
+          onToggleTemplates={onToggleTemplates}
+          onScroll={handleScroll}
+          onScrollToBottom={handleScrollToBottom}
+        />
       </div>
 
       {/* Lead Context Panel */}
