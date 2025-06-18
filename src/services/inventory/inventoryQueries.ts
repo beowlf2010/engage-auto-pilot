@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -114,9 +113,75 @@ export const findMatchingInventory = async (leadId: string) => {
     });
 
     if (error) throw error;
+    
+    // Log the inventory results for AI message debugging
+    console.log('Matching inventory for AI messages:', data);
+    if (data && data.length > 0) {
+      console.log('Sample inventory item for AI:', {
+        make: data[0].make,
+        model: data[0].model,
+        year: data[0].year,
+        hasUnknownModel: data[0].model === 'Unknown'
+      });
+    }
+    
     return data || [];
   } catch (error) {
     console.error('Error finding matching inventory:', error);
+    return [];
+  }
+};
+
+// New function to get inventory with proper model names for AI messaging
+export const getInventoryForAIMessaging = async (leadId: string) => {
+  try {
+    // First get the lead's vehicle interest
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('vehicle_interest, vehicle_make, vehicle_model, vehicle_year')
+      .eq('id', leadId)
+      .single();
+    
+    if (!lead) return [];
+    
+    // Build a query to find relevant inventory with proper model names
+    let query = supabase
+      .from('inventory')
+      .select('id, vin, year, make, model, trim, price, stock_number, condition')
+      .eq('status', 'available')
+      .not('model', 'eq', 'Unknown') // Exclude vehicles with Unknown model
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    // Add filters based on lead's interest
+    if (lead.vehicle_make) {
+      query = query.ilike('make', `%${lead.vehicle_make}%`);
+    }
+    
+    if (lead.vehicle_model) {
+      query = query.ilike('model', `%${lead.vehicle_model}%`);
+    }
+    
+    if (lead.vehicle_year) {
+      const year = parseInt(lead.vehicle_year);
+      if (!isNaN(year)) {
+        query = query.eq('year', year);
+      }
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    console.log('AI messaging inventory results:', {
+      leadInterest: lead.vehicle_interest,
+      foundCount: data?.length || 0,
+      sampleVehicles: data?.slice(0, 3).map(v => `${v.year} ${v.make} ${v.model}`) || []
+    });
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error getting inventory for AI messaging:', error);
     return [];
   }
 };

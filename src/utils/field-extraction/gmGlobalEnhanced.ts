@@ -4,10 +4,11 @@ import { findMakeInRow, findModelInRow, findYearInRow } from './vehicle';
 import { findVINInRow } from './vin';
 import { extractRPOCodes, extractOptionDescriptions } from './options';
 import { translateDivisionCode, translateColorCode, translateTrimCode } from '@/services/inventory/gmCodeLookupService';
+import { extractModelFromGMData } from '@/services/inventory/gmModelCodeLookupService';
 
-// Enhanced GM Global field extraction with CORRECT field mappings
+// Enhanced GM Global field extraction with CORRECT field mappings and model lookup
 export const extractGMGlobalFields = (row: Record<string, any>): any => {
-  console.log('=== ENHANCED GM GLOBAL EXTRACTION (FIXED) ===');
+  console.log('=== ENHANCED GM GLOBAL EXTRACTION WITH MODEL LOOKUP ===');
   console.log('Available fields:', Object.keys(row));
   console.log('Sample row data:', row);
   
@@ -17,9 +18,7 @@ export const extractGMGlobalFields = (row: Record<string, any>): any => {
     source_report: 'orders_all'
   };
   
-  // CORRECTED FIELD MAPPINGS based on actual GM Global data structure:
-  
-  // Year: Extract from "Model Year" field (not model year -> year confusion)
+  // Year: Extract from "Model Year" field
   const modelYearFields = ['Model Year', 'model year', 'ModelYear', 'model_year', 'MY'];
   const yearValue = getFieldValue(row, modelYearFields);
   console.log('Year extraction - trying fields:', modelYearFields, 'found:', yearValue);
@@ -40,13 +39,21 @@ export const extractGMGlobalFields = (row: Record<string, any>): any => {
     console.log('Successfully extracted make:', result.make, 'from code:', divisionCode);
   }
   
-  // Model: Extract from "Model" field (NOT allocation)
-  const modelFields = ['Model', 'model', 'MODEL', 'Vehicle Model', 'VehicleModel'];
-  const modelValue = getFieldValue(row, modelFields);
-  console.log('Model extraction - trying fields:', modelFields, 'found:', modelValue);
-  if (modelValue && !modelValue.includes('/') && !modelValue.includes('-') && modelValue.length < 50) {
-    result.model = modelValue;
-    console.log('Successfully extracted model:', modelValue);
+  // Model: Use the new GM model lookup service
+  const extractedModel = extractModelFromGMData(row);
+  console.log('Model extraction using GM lookup service - found:', extractedModel);
+  if (extractedModel && extractedModel !== 'Unknown') {
+    result.model = extractedModel;
+    console.log('Successfully extracted model:', extractedModel);
+  } else {
+    // Fallback to original method
+    const modelFields = ['Model', 'model', 'MODEL', 'Vehicle Model', 'VehicleModel'];
+    const modelValue = getFieldValue(row, modelFields);
+    console.log('Model fallback extraction - trying fields:', modelFields, 'found:', modelValue);
+    if (modelValue && !modelValue.includes('/') && !modelValue.includes('-') && modelValue.length < 50) {
+      result.model = modelValue;
+      console.log('Successfully extracted model via fallback:', modelValue);
+    }
   }
   
   // Trim: Extract from "Allocation Group", "PEG", or similar trim identifiers
@@ -186,7 +193,7 @@ export const extractGMGlobalFields = (row: Record<string, any>): any => {
   // Store full row data for reference
   result.full_option_blob = row;
   
-  console.log('=== FINAL EXTRACTION RESULT ===');
+  console.log('=== FINAL EXTRACTION RESULT WITH MODEL LOOKUP ===');
   console.log('Year:', result.year);
   console.log('Make:', result.make);
   console.log('Model:', result.model);

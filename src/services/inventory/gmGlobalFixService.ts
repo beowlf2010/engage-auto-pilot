@@ -20,18 +20,18 @@ export const fixGMGlobalVehicleRecord = async (stockNumber: string) => {
   
   // If we have the full_option_blob, re-extract the fields correctly
   if (vehicle.full_option_blob && typeof vehicle.full_option_blob === 'object') {
-    console.log('Re-extracting fields from full_option_blob...');
+    console.log('Re-extracting fields from full_option_blob with model lookup...');
     const correctedFields = extractGMGlobalFields(vehicle.full_option_blob as Record<string, any>);
     
-    console.log('Corrected fields:', correctedFields);
+    console.log('Corrected fields with model lookup:', correctedFields);
     
-    // Update the record with corrected fields
+    // Update the record with corrected fields including the new model
     const { data: updatedVehicle, error: updateError } = await supabase
       .from('inventory')
       .update({
         year: correctedFields.year,
         make: correctedFields.make,
-        model: correctedFields.model,
+        model: correctedFields.model, // This now uses the GM model lookup
         trim: correctedFields.trim,
         body_style: correctedFields.body_style,
         color_exterior: correctedFields.color_exterior,
@@ -46,7 +46,7 @@ export const fixGMGlobalVehicleRecord = async (stockNumber: string) => {
       throw new Error(`Failed to update vehicle: ${updateError.message}`);
     }
     
-    console.log('Successfully updated vehicle:', updatedVehicle);
+    console.log('Successfully updated vehicle with model lookup:', updatedVehicle);
     return updatedVehicle;
   } else {
     throw new Error('No full_option_blob data available for re-extraction');
@@ -54,7 +54,7 @@ export const fixGMGlobalVehicleRecord = async (stockNumber: string) => {
 };
 
 export const fixAllGMGlobalRecords = async () => {
-  console.log('Fixing all GM Global vehicle records...');
+  console.log('Fixing all GM Global vehicle records with model lookup...');
   
   // Get all GM Global records that need fixing
   const { data: vehicles, error } = await supabase
@@ -80,7 +80,7 @@ export const fixAllGMGlobalRecords = async () => {
           .update({
             year: correctedFields.year,
             make: correctedFields.make,
-            model: correctedFields.model,
+            model: correctedFields.model, // Now uses GM model lookup
             trim: correctedFields.trim,
             body_style: correctedFields.body_style,
             color_exterior: correctedFields.color_exterior,
@@ -95,8 +95,8 @@ export const fixAllGMGlobalRecords = async () => {
           console.error(`Failed to update vehicle ${vehicle.stock_number}:`, updateError);
           results.push({ success: false, vehicle: vehicle.stock_number, error: updateError.message });
         } else {
-          console.log(`Successfully updated vehicle ${vehicle.stock_number}`);
-          results.push({ success: true, vehicle: vehicle.stock_number, updated: updatedVehicle });
+          console.log(`Successfully updated vehicle ${vehicle.stock_number} with model: ${correctedFields.model}`);
+          results.push({ success: true, vehicle: vehicle.stock_number, updated: updatedVehicle, newModel: correctedFields.model });
         }
       }
     } catch (error) {
