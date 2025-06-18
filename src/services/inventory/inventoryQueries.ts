@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -24,7 +25,7 @@ export interface InventoryItem {
   pack?: number;
   condition: 'new' | 'used' | 'certified';
   status: 'available' | 'sold' | 'pending' | 'service' | 'wholesale';
-  source_report?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
+  source_report?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'website_scrape';
   rpo_codes?: string[];
   rpo_descriptions?: string[];
   full_option_blob?: any;
@@ -48,7 +49,7 @@ export interface InventoryFilters {
   make?: string;
   model?: string;
   status?: string;
-  sourceReport?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
+  sourceReport?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'website_scrape';
   rpoCode?: string;
   priceMin?: number;
   priceMax?: number;

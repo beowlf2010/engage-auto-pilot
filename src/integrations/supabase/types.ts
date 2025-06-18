@@ -3749,7 +3749,11 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "sales" | "user"
-      source_report_type: "new_car_main_view" | "merch_inv_view" | "orders_all"
+      source_report_type:
+        | "new_car_main_view"
+        | "merch_inv_view"
+        | "orders_all"
+        | "website_scrape"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3866,7 +3870,12 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "sales", "user"],
-      source_report_type: ["new_car_main_view", "merch_inv_view", "orders_all"],
+      source_report_type: [
+        "new_car_main_view",
+        "merch_inv_view",
+        "orders_all",
+        "website_scrape",
+      ],
     },
   },
 } as const
