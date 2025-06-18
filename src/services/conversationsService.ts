@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import type { ConversationData } from '@/types/conversation';
+import type { ConversationData, MessageData } from '@/types/conversation';
 
 export const fetchConversations = async (profile: any): Promise<ConversationData[]> => {
   if (!profile) return [];
@@ -101,6 +100,33 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
   } catch (error) {
     console.error('Error fetching conversations:', error);
     return [];
+  }
+};
+
+export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
+  try {
+    const { data: messagesData, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('sent_at', { ascending: true });
+
+    if (error) throw error;
+
+    return messagesData?.map(msg => ({
+      id: msg.id,
+      leadId: msg.lead_id,
+      body: msg.body,
+      direction: msg.direction,
+      sentAt: msg.sent_at,
+      readAt: msg.read_at,
+      smsStatus: msg.sms_status,
+      twilioMessageId: msg.twilio_message_id,
+      aiGenerated: msg.ai_generated
+    })) || [];
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    throw error;
   }
 };
 
