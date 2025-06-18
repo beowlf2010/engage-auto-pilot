@@ -214,15 +214,19 @@ export const aiLearningService = {
     const commonIssues = feedback
       .filter(f => f.issue_category)
       .reduce((acc, f) => {
-        acc[f.issue_category] = (acc[f.issue_category] || 0) + 1;
+        const category = f.issue_category;
+        acc[category] = (acc[category] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
     
-    const topIssue = Object.entries(commonIssues)
-      .sort(([,a], [,b]) => b - a)[0];
-    
-    if (topIssue) {
-      recommendations.push(`Address ${topIssue[0]} issues - most common problem`);
+    const issueEntries = Object.entries(commonIssues);
+    if (issueEntries.length > 0) {
+      const topIssue = issueEntries
+        .sort(([,a], [,b]) => (b as number) - (a as number))[0];
+      
+      if (topIssue && topIssue[1] > 0) {
+        recommendations.push(`Address ${topIssue[0]} issues - most common problem`);
+      }
     }
     
     return recommendations;
