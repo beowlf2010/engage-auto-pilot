@@ -350,8 +350,7 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
                   <span className="font-medium text-yellow-900">Sequence Paused</span>
                 </div>
                 {aiPauseReason && (
-                  <p className="text-sm text-yellow-700 mb-2">Reason: {aiPause
-Reason}</p>
+                  <p className="text-sm text-yellow-700 mb-2">Reason: {aiPauseReason}</p>
                 )}
                 {aiResumeAt && (
                   <p className="text-sm text-yellow-700">
