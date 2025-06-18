@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,18 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
 }) => {
   const [isToggling, setIsToggling] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
+
+  // Debug log for countdown display
+  React.useEffect(() => {
+    console.log('CompactAIControls nextAiSendAt:', nextAiSendAt);
+    console.log('ShowCountdown conditions:', {
+      aiOptIn,
+      aiSequencePaused,
+      pendingHumanResponse,
+      nextAiSendAt,
+      showCountdown: aiOptIn && !aiSequencePaused && !pendingHumanResponse && nextAiSendAt
+    });
+  }, [aiOptIn, aiSequencePaused, pendingHumanResponse, nextAiSendAt]);
 
   const handleFixAIStage = async () => {
     setIsFixing(true);
@@ -121,15 +134,33 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
 
         {aiOptIn && (
           <>
-            {/* Next Message Countdown */}
+            {/* Next Message Countdown - Enhanced */}
             {showCountdown && (
-              <div className="p-2 border rounded bg-green-50">
-                <div className="flex items-center justify-between">
+              <div className="p-3 border rounded-lg bg-green-50 border-green-200">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
-                    <Clock className="w-3 h-3 text-green-600" />
-                    <span className="font-medium text-xs text-green-900">Next message in:</span>
+                    <Clock className="w-4 h-4 text-green-600" />
+                    <span className="font-medium text-sm text-green-900">Next AI Message</span>
                   </div>
                   <CountdownBadge dt={nextAiSendAt} />
+                </div>
+                <div className="text-xs text-green-700">
+                  Finn will automatically send the next message in the sequence
+                </div>
+              </div>
+            )}
+
+            {/* Debug Info for Missing Countdown */}
+            {aiOptIn && !showCountdown && (
+              <div className="p-2 border rounded bg-yellow-50 border-yellow-200">
+                <div className="text-xs text-yellow-800">
+                  AI Debug: No scheduled message
+                  <div className="mt-1 space-y-1 font-mono text-xs">
+                    <div>Stage: {aiStage || 'None'}</div>
+                    <div>Next Send: {nextAiSendAt || 'None'}</div>
+                    <div>Paused: {aiSequencePaused ? 'Yes' : 'No'}</div>
+                    <div>Human Response: {pendingHumanResponse ? 'Pending' : 'None'}</div>
+                  </div>
                 </div>
               </div>
             )}
