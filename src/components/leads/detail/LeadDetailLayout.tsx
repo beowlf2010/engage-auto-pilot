@@ -2,8 +2,10 @@
 import React, { useEffect } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
 import { supabase } from '@/integrations/supabase/client';
-import LeadDetailPageHeader from "./LeadDetailPageHeader";
-import LeadDetailGrid from "./LeadDetailGrid";
+import StreamlinedLeadHeader from "./StreamlinedLeadHeader";
+import ConsolidatedInfoCard from "./ConsolidatedInfoCard";
+import CompactAIControls from "./CompactAIControls";
+import LeadDetailTabsSection from "./LeadDetailTabsSection";
 import type { Lead } from "@/types/lead";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
@@ -84,22 +86,42 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <LeadDetailPageHeader 
+      <StreamlinedLeadHeader 
         lead={transformedLead}
         onSendMessage={() => setShowMessageComposer(true)}
-        onAIOptInChange={handleAIOptInChange}
-        onAITakeoverChange={handleAITakeoverChange}
       />
       
-      <LeadDetailGrid
-        lead={lead}
-        phoneNumbers={phoneNumbers}
-        primaryPhone={primaryPhone}
-        messages={conversationMessages}
-        messagesLoading={messagesLoading}
-        onPhoneSelect={onPhoneSelect}
-        onSendMessage={handleSendMessage}
-      />
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Sidebar - Lead Info */}
+          <div className="lg:col-span-1 space-y-6">
+            <ConsolidatedInfoCard lead={lead} />
+            <CompactAIControls
+              leadId={lead.id}
+              aiOptIn={lead.aiOptIn || false}
+              aiStage={lead.aiStage}
+              aiSequencePaused={lead.aiSequencePaused}
+              aiTakeoverEnabled={(lead as any).aiTakeoverEnabled}
+              aiTakeoverDelayMinutes={(lead as any).aiTakeoverDelayMinutes}
+              pendingHumanResponse={(lead as any).pendingHumanResponse}
+              onAIOptInChange={handleAIOptInChange}
+              onAITakeoverChange={handleAITakeoverChange}
+            />
+          </div>
+
+          {/* Main Content - Messages and Tabs */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-lg border border-gray-200 h-[700px]">
+              <LeadDetailTabsSection
+                lead={lead}
+                messages={conversationMessages}
+                messagesLoading={messagesLoading}
+                onSendMessage={handleSendMessage}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

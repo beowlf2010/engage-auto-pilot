@@ -19,15 +19,18 @@ const LeadDetail = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading lead details...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !lead || !transformedLead || !messageThreadLead) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Lead Not Found</h2>
           <p className="text-gray-600">The lead you're looking for doesn't exist or you don't have permission to view it.</p>
