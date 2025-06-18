@@ -1,5 +1,4 @@
 
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import StreamlinedLeadsPage from "@/pages/StreamlinedLeadsPage";
 import LeadDetailPage from "@/pages/LeadDetailPage";
 import AdvancedAnalyticsPage from "@/pages/AdvancedAnalyticsPage";
+import InventoryDashboardPage from "@/pages/InventoryDashboardPage";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +39,14 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <SmartInboxPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/inventory-dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <InventoryDashboardPage />
                     </ProtectedRoute>
                   }
                 />
@@ -94,4 +102,3 @@ function App() {
 }
 
 export default App;
-
