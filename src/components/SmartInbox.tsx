@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
@@ -9,6 +8,7 @@ import EnhancedChatView from "./inbox/EnhancedChatView";
 import ConversationMemory from "./ConversationMemory";
 import { useRealtimeInbox } from "@/hooks/useRealtimeInbox";
 import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
+import { useEnhancedMessageProcessor } from "@/hooks/useEnhancedMessageProcessor";
 import { assignCurrentUserToLead } from "@/services/conversationsService";
 import { toast } from "@/hooks/use-toast";
 
@@ -28,6 +28,9 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   
   const { conversations, messages, loading, fetchMessages, sendMessage, refetch, error } = useRealtimeInbox();
   const { processing: aiProcessing } = useEnhancedAIScheduler();
+  
+  // Initialize enhanced message processor
+  useEnhancedMessageProcessor();
 
   // Filter conversations based on user role
   const filteredConversations = conversations.filter(conv => 
@@ -91,7 +94,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           setShowTemplates(false);
         }
         
-        console.log('✅ Message sent successfully from SmartInbox with immediate refresh');
+        console.log('✅ Message sent successfully from SmartInbox with enhanced processing');
         
       } catch (err) {
         console.error('Error sending message:', err);

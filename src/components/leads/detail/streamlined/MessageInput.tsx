@@ -1,7 +1,8 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, MessageSquare } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Send, Loader2 } from "lucide-react";
 
 interface MessageInputProps {
   newMessage: string;
@@ -20,26 +21,27 @@ const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   return (
     <div className="border-t p-4">
-      <div className="flex space-x-2">
-        <input
-          type="text"
+      <div className="relative">
+        <Textarea
+          placeholder="Type your message..."
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyPress={onKeyPress}
-          placeholder="Type your message..."
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="pr-14 min-h-[60px]"
           disabled={isSending}
         />
         <Button
           onClick={onSendMessage}
-          disabled={isSending || !newMessage.trim()}
-          className="px-4 py-2"
+          disabled={!newMessage.trim() || isSending}
+          size="icon"
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9"
         >
           {isSending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <MessageSquare className="w-4 h-4" />
+            <Send className="h-4 w-4" />
           )}
+          <span className="sr-only">Send</span>
         </Button>
       </div>
     </div>

@@ -1,5 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { generateIntelligentAIMessage } from './intelligentAIMessageService';
+import { generateEnhancedIntelligentResponse } from './enhancedIntelligentConversationAI';
 import { sendMessage } from './messagesService';
 import { toast } from '@/hooks/use-toast';
 import { addAIConversationNote } from './vehicleMention/aiConversationNotes';
@@ -12,10 +13,10 @@ export interface ProactiveMessageResult {
   error?: string;
 }
 
-// Send immediate first message when AI is enabled
+// Send immediate first message when AI is enabled - NOW USES ENHANCED AI
 export const sendInitialMessage = async (leadId: string, profile: any): Promise<ProactiveMessageResult> => {
   try {
-    console.log(`🚀 Sending initial proactive message to lead ${leadId}`);
+    console.log(`🚀 Sending initial proactive message to lead ${leadId} using ENHANCED AI`);
 
     // Get lead details
     const { data: lead, error: leadError } = await supabase
@@ -44,13 +45,13 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       return { success: false, leadId, error: 'Already contacted this lead' };
     }
 
-    // Generate initial message
-    const message = await generateInitialMessage(lead);
+    // Generate initial message using ENHANCED AI
+    const message = await generateInitialEnhancedMessage(lead);
     if (!message) {
       return { success: false, leadId, error: 'Failed to generate message' };
     }
 
-    // Send the message - sendMessage returns void, so we just await it
+    // Send the message
     try {
       await sendMessage(leadId, message, profile, true);
       
@@ -71,7 +72,7 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
         leadId,
         messageId,
         'inventory_discussion',
-        `Initial AI contact: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
+        `Enhanced AI initial contact: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
         []
       );
     } catch (error) {
@@ -85,15 +86,15 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       .update({
         ai_messages_sent: 1,
         ai_stage: 'initial_contact_sent',
-        next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Next message in 24 hours
+        next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       })
       .eq('id', leadId);
 
-    console.log(`✅ Initial message sent to ${lead.first_name}: ${message}`);
+    console.log(`✅ Enhanced AI initial message sent to ${lead.first_name}: ${message}`);
     
     return { success: true, leadId, message };
   } catch (error) {
-    console.error(`❌ Error sending initial message to lead ${leadId}:`, error);
+    console.error(`❌ Error sending enhanced AI initial message to lead ${leadId}:`, error);
     return { 
       success: false, 
       leadId, 
@@ -102,35 +103,42 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
   }
 };
 
-// Generate compelling initial outreach messages
-const generateInitialMessage = async (lead: any): Promise<string | null> => {
+// Generate compelling initial outreach messages using ENHANCED AI
+const generateInitialEnhancedMessage = async (lead: any): Promise<string | null> => {
   try {
-    // Try intelligent AI message first
-    const aiMessage = await generateIntelligentAIMessage({
+    console.log(`🤖 Generating enhanced AI initial message for ${lead.first_name}`);
+    
+    // Use the enhanced AI service for initial contact
+    const context = {
       leadId: lead.id,
-      stage: 'initial_contact',
-      context: {
-        urgency_factor: 'new_lead',
-        behavioral_trigger: 'first_contact'
+      leadName: `${lead.first_name} ${lead.last_name}`,
+      vehicleInterest: lead.vehicle_interest || '',
+      messages: [], // No previous messages for initial contact
+      leadInfo: {
+        phone: '',
+        status: 'new',
+        lastReplyAt: new Date().toISOString()
       }
-    });
+    };
 
-    if (aiMessage) {
-      return aiMessage;
+    const aiResponse = await generateEnhancedIntelligentResponse(context);
+    
+    if (aiResponse?.message) {
+      console.log(`✅ Enhanced AI generated initial message: ${aiResponse.message}`);
+      return aiResponse.message;
     }
 
-    // Fallback to template-based messages
+    // Fallback to template-based messages if enhanced AI fails
+    console.log('⚠️ Enhanced AI failed, using fallback templates');
     const templates = [
       `Hi ${lead.first_name}! I see you're interested in ${lead.vehicle_interest}. I'd love to help you find the perfect vehicle. Any questions I can answer?`,
       `Hello ${lead.first_name}! Thanks for your interest in ${lead.vehicle_interest}. I have some great options that might be perfect for you. When would be a good time to chat?`,
       `Hi ${lead.first_name}! I noticed you're looking for ${lead.vehicle_interest}. I specialize in helping customers find exactly what they need. What features are most important to you?`
     ];
 
-    // Select random template
-    const template = templates[Math.floor(Math.random() * templates.length)];
-    return template;
+    return templates[Math.floor(Math.random() * templates.length)];
   } catch (error) {
-    console.error('Error generating initial message:', error);
+    console.error('Error generating enhanced AI initial message:', error);
     return null;
   }
 };
@@ -171,14 +179,12 @@ export const processProactiveMessages = async (profile: any): Promise<ProactiveM
     const results: ProactiveMessageResult[] = [];
 
     for (const lead of leadsNeedingContact) {
-      // Check if scheduled time has passed or if it's immediate
       const shouldSend = !lead.next_ai_send_at || new Date(lead.next_ai_send_at) <= new Date();
       
       if (shouldSend) {
         const result = await sendInitialMessage(lead.id, profile);
         results.push(result);
         
-        // Add delay between messages to avoid overwhelming
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
@@ -190,14 +196,13 @@ export const processProactiveMessages = async (profile: any): Promise<ProactiveM
   }
 };
 
-// Trigger immediate first message for a specific lead
 export const triggerImmediateMessage = async (leadId: string, profile: any): Promise<void> => {
   const result = await sendInitialMessage(leadId, profile);
   
   if (result.success) {
     toast({
       title: "Message Sent",
-      description: `Initial message sent successfully: ${result.message}`,
+      description: `Enhanced AI initial message sent successfully: ${result.message}`,
       variant: "default"
     });
   } else {
