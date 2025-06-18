@@ -7,32 +7,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Utility to get Twilio API credentials
+// Utility to get Twilio API credentials - prioritize database over environment
 async function getTwilioSecrets() {
-  console.log('🔍 Checking environment variables first...');
-  const envAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
-  const envAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN')
-  const envPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
+  console.log('🔍 Fetching Twilio credentials - checking database first...');
   
-  console.log('🔍 Environment check:', {
-    hasEnvAccountSid: !!envAccountSid,
-    hasEnvAuthToken: !!envAuthToken,
-    hasEnvPhoneNumber: !!envPhoneNumber,
-    envAccountSidStart: envAccountSid ? envAccountSid.substring(0, 6) + '...' : 'none',
-    envPhoneNumber: envPhoneNumber || 'none'
-  });
-
-  if (envAccountSid && envAuthToken && envPhoneNumber) {
-    console.log('✅ Using environment variables');
-    return { accountSid: envAccountSid, authToken: envAuthToken, phoneNumber: envPhoneNumber }
-  }
-
-  console.log('📊 Environment variables not found, checking database...');
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
+  // First check database settings
   const { data: settings, error } = await supabase
     .from('settings')
     .select('key, value')
@@ -40,10 +24,9 @@ async function getTwilioSecrets() {
 
   if (error) {
     console.error('❌ Database error:', error);
-    return { accountSid: null, authToken: null, phoneNumber: null }
+  } else {
+    console.log('📊 Retrieved settings from database:', settings?.map(s => ({ key: s.key, hasValue: !!s.value })));
   }
-
-  console.log('📊 Retrieved settings from database:', settings?.map(s => ({ key: s.key, hasValue: !!s.value })));
 
   const settingsMap = {}
   settings?.forEach(setting => {
@@ -62,10 +45,47 @@ async function getTwilioSecrets() {
     dbPhoneNumber: dbPhoneNumber || 'none'
   });
 
-  return {
-    accountSid: dbAccountSid,
-    authToken: dbAuthToken,
-    phoneNumber: dbPhoneNumber
+  // If we have complete database settings, use them
+  if (dbAccountSid && dbAuthToken && dbPhoneNumber) {
+    console.log('✅ Using DATABASE credentials (from Settings UI)');
+    return { 
+      accountSid: dbAccountSid, 
+      authToken: dbAuthToken, 
+      phoneNumber: dbPhoneNumber,
+      source: 'database'
+    }
+  }
+
+  // Fall back to environment variables only if database is incomplete
+  console.log('⚠️ Database credentials incomplete, checking environment variables...');
+  const envAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
+  const envAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN')
+  const envPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
+  
+  console.log('🔍 Environment check:', {
+    hasEnvAccountSid: !!envAccountSid,
+    hasEnvAuthToken: !!envAuthToken,
+    hasEnvPhoneNumber: !!envPhoneNumber,
+    envAccountSidStart: envAccountSid ? envAccountSid.substring(0, 6) + '...' : 'none',
+    envPhoneNumber: envPhoneNumber || 'none'
+  });
+
+  if (envAccountSid && envAuthToken && envPhoneNumber) {
+    console.log('⚠️ Using ENVIRONMENT VARIABLES as fallback');
+    return { 
+      accountSid: envAccountSid, 
+      authToken: envAuthToken, 
+      phoneNumber: envPhoneNumber,
+      source: 'environment'
+    }
+  }
+
+  console.log('❌ No complete Twilio credentials found in database or environment');
+  return { 
+    accountSid: null, 
+    authToken: null, 
+    phoneNumber: null,
+    source: 'none'
   }
 }
 
@@ -131,38 +151,40 @@ serve(async (req) => {
     }
 
     console.log('🔑 Fetching Twilio credentials...');
-    const { accountSid, authToken, phoneNumber } = await getTwilioSecrets()
+    const { accountSid, authToken, phoneNumber, source } = await getTwilioSecrets()
     
     if (!accountSid || !authToken || !phoneNumber) {
       console.error('❌ Missing Twilio credentials:', { 
         hasAccountSid: !!accountSid, 
         hasAuthToken: !!authToken,
         hasPhoneNumber: !!phoneNumber,
+        source: source,
         accountSidStart: accountSid ? accountSid.substring(0, 6) + '...' : 'none',
         phoneNumber: phoneNumber || 'none'
       });
       return new Response(
         JSON.stringify({ 
           success: false,
-          error: 'Missing Twilio credentials. Please configure your Account SID, Auth Token, and Phone Number first.',
+          error: 'Missing Twilio credentials. Please configure your Account SID, Auth Token, and Phone Number in the Settings first.',
           details: {
             hasAccountSid: !!accountSid,
             hasAuthToken: !!authToken,
             hasPhoneNumber: !!phoneNumber,
-            debugInfo: `Account SID: ${accountSid ? 'present' : 'missing'}, Auth Token: ${authToken ? 'present' : 'missing'}, Phone: ${phoneNumber ? 'present' : 'missing'}`
+            credentialsSource: source,
+            debugInfo: `Account SID: ${accountSid ? 'present' : 'missing'}, Auth Token: ${authToken ? 'present' : 'missing'}, Phone: ${phoneNumber ? 'present' : 'missing'}, Source: ${source}`
           }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log('✅ Twilio credentials found - Account SID:', accountSid.substring(0, 6) + '...', 'Phone:', phoneNumber);
+    console.log('✅ Twilio credentials found from', source.toUpperCase(), '- Account SID:', accountSid.substring(0, 6) + '...', 'Phone:', phoneNumber);
 
     // Send test SMS using Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
     const payload = new URLSearchParams({
       To: testPhoneNumber,
       From: phoneNumber,
-      Body: `🔥 Test SMS from your CRM system sent at ${new Date().toLocaleString()}! This confirms your Twilio integration is working.`
+      Body: `🔥 Test SMS from your CRM system sent at ${new Date().toLocaleString()}! This confirms your Twilio integration is working properly.`
     })
     
     console.log('📤 Sending to Twilio API:', {
@@ -170,7 +192,8 @@ serve(async (req) => {
       to: testPhoneNumber,
       from: phoneNumber,
       messageLength: payload.get('Body')?.length || 0,
-      accountSidStart: accountSid.substring(0, 6) + '...'
+      accountSidStart: accountSid.substring(0, 6) + '...',
+      credentialsSource: source
     });
 
     const response = await fetch(twilioUrl, {
@@ -192,7 +215,8 @@ serve(async (req) => {
         statusText: response.statusText,
         result: result,
         usedAccountSid: accountSid.substring(0, 6) + '...',
-        usedPhoneNumber: phoneNumber
+        usedPhoneNumber: phoneNumber,
+        credentialsSource: source
       });
       
       let errorMessage = 'Failed to send test SMS';
@@ -213,7 +237,8 @@ serve(async (req) => {
           error: errorMessage,
           twilioError: result,
           statusCode: response.status,
-          debugInfo: `Using Phone Number: ${phoneNumber}`
+          credentialsSource: source,
+          debugInfo: `Using Phone Number: ${phoneNumber} from ${source}`
         }),
         { 
           status: 400, 
@@ -222,15 +247,17 @@ serve(async (req) => {
       )
     }
 
-    console.log('✅ SUCCESS! Twilio SMS sent:', result.sid);
+    console.log('✅ SUCCESS! Twilio SMS sent using', source.toUpperCase(), 'credentials:', result.sid);
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Test SMS sent successfully!',
+        message: 'Test SMS sent successfully using your configured settings!',
         twilioMessageId: result.sid,
         status: result.status || 'queued',
         to: testPhoneNumber,
+        from: phoneNumber,
+        credentialsSource: source,
         sentAt: new Date().toISOString()
       }),
       { 
