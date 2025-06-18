@@ -3,11 +3,12 @@ import { useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import type { RealtimeCallbacks } from '@/types/realtime';
 
 export const useRealtimeNotificationHandlers = (globalCallbacks: RealtimeCallbacks[]) => {
   const { profile } = useAuth();
-  const { toast } = useToast();
+  const { toast: useToastHook } = useToast();
   const notificationPermission = useRef<NotificationPermission>('default');
 
   // Request notification permission on mount
@@ -71,26 +72,45 @@ export const useRealtimeNotificationHandlers = (globalCallbacks: RealtimeCallbac
                                  profile?.role === 'admin';
 
           if (isForCurrentUser) {
-            toast({
+            // Enhanced popup notifications using both toast systems
+            
+            // Sonner toast for prominent popup
+            toast.success(`📱 New message from ${leadName}`, {
+              description: newMessage.body?.substring(0, 100) + (newMessage.body?.length > 100 ? '...' : ''),
+              duration: 8000,
+              action: {
+                label: 'View',
+                onClick: () => {
+                  window.location.href = `/smart-inbox?leadId=${newMessage.lead_id}`;
+                }
+              },
+              className: 'border-l-4 border-l-blue-500'
+            });
+
+            // Shadcn toast as backup
+            useToastHook({
               title: `📱 New message from ${leadName}`,
               description: newMessage.body?.substring(0, 100) + (newMessage.body?.length > 100 ? '...' : ''),
               duration: 5000,
             });
 
-            // Browser notification
+            // Browser notification with sound
             if (notificationPermission.current === 'granted') {
               const notification = new Notification(`New message from ${leadName}`, {
                 body: newMessage.body?.substring(0, 200) + (newMessage.body?.length > 200 ? '...' : ''),
                 icon: '/favicon.ico',
                 tag: `message-${newMessage.id}`,
+                requireInteraction: true, // Keeps notification until user interacts
               });
 
               notification.onclick = () => {
                 window.focus();
+                window.location.href = `/smart-inbox?leadId=${newMessage.lead_id}`;
                 notification.close();
               };
 
-              setTimeout(() => notification.close(), 5000);
+              // Auto-close after 10 seconds
+              setTimeout(() => notification.close(), 10000);
             }
           }
         }
@@ -98,7 +118,7 @@ export const useRealtimeNotificationHandlers = (globalCallbacks: RealtimeCallbac
     } catch (error) {
       console.error('❌ Error handling incoming message:', error);
     }
-  }, [profile, toast, globalCallbacks]);
+  }, [profile, useToastHook, globalCallbacks]);
 
   const handleIncomingEmail = useCallback(async (payload: any) => {
     console.log('📧 New inbound email received:', payload);
@@ -130,7 +150,20 @@ export const useRealtimeNotificationHandlers = (globalCallbacks: RealtimeCallbac
                                profile?.role === 'admin';
 
         if (isForCurrentUser) {
-          toast({
+          // Enhanced email popup notifications
+          toast.info(`📧 New email from ${leadName}`, {
+            description: payload.new.subject || 'No subject',
+            duration: 8000,
+            action: {
+              label: 'View',
+              onClick: () => {
+                window.location.href = `/lead/${payload.new.lead_id}`;
+              }
+            },
+            className: 'border-l-4 border-l-green-500'
+          });
+
+          useToastHook({
             title: `📧 New email from ${leadName}`,
             description: payload.new.subject || 'No subject',
             duration: 6000,
@@ -141,6 +174,7 @@ export const useRealtimeNotificationHandlers = (globalCallbacks: RealtimeCallbac
               body: payload.new.subject || 'New email received',
               icon: '/favicon.ico',
               tag: `email-${payload.new.id}`,
+              requireInteraction: true,
             });
 
             notification.onclick = () => {
@@ -149,14 +183,14 @@ export const useRealtimeNotificationHandlers = (globalCallbacks: RealtimeCallbac
               notification.close();
             };
 
-            setTimeout(() => notification.close(), 8000);
+            setTimeout(() => notification.close(), 10000);
           }
         }
       }
     } catch (error) {
       console.error('❌ Error handling email notification:', error);
     }
-  }, [profile, toast, globalCallbacks]);
+  }, [profile, useToastHook, globalCallbacks]);
 
   return {
     handleIncomingMessage,

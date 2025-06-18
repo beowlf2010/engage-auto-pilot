@@ -3,9 +3,22 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import StreamlinedNavigation from "@/components/StreamlinedNavigation";
 import SmartInbox from "@/components/SmartInbox";
 import { Navigate } from "react-router-dom";
+import { useEffect } from "react";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
+
+  // Request notification permission when the page loads
+  useEffect(() => {
+    const requestNotificationPermission = async () => {
+      if ('Notification' in window && Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        console.log('Notification permission:', permission);
+      }
+    };
+
+    requestNotificationPermission();
+  }, []);
 
   if (loading) {
     return (
