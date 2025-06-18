@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConversationContext {
@@ -36,9 +35,24 @@ const cleanVehicleInterest = (vehicleInterest: string): string => {
     .trim();
 };
 
-// Enhanced vehicle categorization for better matching
+// Enhanced vehicle categorization with new/used awareness
 const categorizeVehicle = (vehicleText: string) => {
   const text = vehicleText.toLowerCase();
+  
+  // Determine if this is likely a new or used inquiry
+  const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+  const currentYear = new Date().getFullYear();
+  const isUsedByYear = yearMatch && parseInt(yearMatch[0]) < currentYear;
+  const hasUsedKeywords = /\b(used|pre-owned|certified|pre owned)\b/i.test(text);
+  const hasNewKeywords = /\b(new|brand new|latest|2024|2025)\b/i.test(text);
+  
+  // Determine condition
+  let condition = 'unknown';
+  if (hasUsedKeywords || isUsedByYear) {
+    condition = 'used';
+  } else if (hasNewKeywords || (!yearMatch && !hasUsedKeywords)) {
+    condition = 'new'; // Default to new if no clear indicators
+  }
   
   // Electric/Hybrid classification
   const evIndicators = ['tesla', 'electric', 'ev', 'hybrid', 'plug-in', 'bolt', 'leaf', 'prius', 'model'];
@@ -48,10 +62,13 @@ const categorizeVehicle = (vehicleText: string) => {
   const luxuryBrands = ['tesla', 'bmw', 'mercedes', 'audi', 'lexus', 'cadillac', 'lincoln', 'genesis', 'porsche'];
   const isLuxury = luxuryBrands.some(brand => text.includes(brand));
   
+  // Tesla specific
+  const isTesla = text.includes('tesla');
+  
   // Price tier estimation
   let estimatedPriceRange = { min: 0, max: 200000 };
-  if (text.includes('tesla')) {
-    estimatedPriceRange = { min: 35000, max: 120000 };
+  if (isTesla) {
+    estimatedPriceRange = condition === 'used' ? { min: 15000, max: 80000 } : { min: 35000, max: 120000 };
   } else if (isLuxury) {
     estimatedPriceRange = { min: 30000, max: 100000 };
   }
@@ -59,12 +76,14 @@ const categorizeVehicle = (vehicleText: string) => {
   return {
     isEV,
     isLuxury,
+    isTesla,
+    condition,
     estimatedPriceRange,
-    category: isEV ? 'electric' : isLuxury ? 'luxury' : 'standard'
+    category: isTesla ? 'tesla' : isEV ? 'electric' : isLuxury ? 'luxury' : 'standard'
   };
 };
 
-// Enhanced inventory availability check with better categorization
+// Enhanced inventory availability check with Tesla new/used logic
 const checkInventoryAvailability = async (vehicleInterest: string) => {
   try {
     const cleanInterest = cleanVehicleInterest(vehicleInterest);
@@ -87,12 +106,18 @@ const checkInventoryAvailability = async (vehicleInterest: string) => {
     }
 
     if (make) {
-      const { data: inventory } = await supabase
+      let query = supabase
         .from('inventory')
         .select('id, make, model, year, price, fuel_type, condition')
         .eq('status', 'available')
-        .ilike('make', `%${make}%`)
-        .limit(5);
+        .ilike('make', `%${make}%`);
+
+      // For Tesla, filter by condition if we know it
+      if (make === 'tesla' && requestedCategory.condition !== 'unknown') {
+        query = query.eq('condition', requestedCategory.condition);
+      }
+
+      const { data: inventory } = await query.limit(5);
 
       return {
         hasInventory: inventory && inventory.length > 0,
@@ -114,7 +139,7 @@ const checkInventoryAvailability = async (vehicleInterest: string) => {
   }
 };
 
-// Enhanced alternative finding with category awareness
+// Enhanced alternative finding with Tesla awareness
 const findCategoryRelevantAlternatives = async (requestedCategory: any) => {
   try {
     let query = supabase
@@ -122,9 +147,33 @@ const findCategoryRelevantAlternatives = async (requestedCategory: any) => {
       .select('make, model, year, price, fuel_type, condition')
       .eq('status', 'available');
 
+    // If looking for Tesla, find alternatives based on condition
+    if (requestedCategory?.isTesla) {
+      if (requestedCategory.condition === 'used') {
+        // For used Tesla seekers, show luxury/EV alternatives
+        const { data: alternatives } = await query
+          .or('fuel_type.eq.Electric,fuel_type.eq.Hybrid,make.ilike.%bmw%,make.ilike.%mercedes%,make.ilike.%audi%,make.ilike.%lexus%')
+          .eq('condition', 'used')
+          .limit(5);
+        
+        if (alternatives && alternatives.length > 0) {
+          return alternatives;
+        }
+      } else if (requestedCategory.condition === 'new') {
+        // For new Tesla seekers, show new EVs/luxury alternatives
+        const { data: alternatives } = await query
+          .or('fuel_type.eq.Electric,fuel_type.eq.Hybrid')
+          .eq('condition', 'new')
+          .limit(5);
+        
+        if (alternatives && alternatives.length > 0) {
+          return alternatives;
+        }
+      }
+    }
+
     // If looking for EVs, prioritize electric vehicles
     if (requestedCategory?.isEV) {
-      // First try to find actual EVs
       const { data: evInventory } = await query
         .or('fuel_type.eq.Electric,fuel_type.eq.Hybrid,make.ilike.%tesla%')
         .limit(5);
@@ -229,7 +278,7 @@ export const generateIntelligentResponse = async (context: ConversationContext):
     return {
       message: data.message,
       confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'Enhanced AI analysis with category-aware inventory matching'
+      reasoning: data.reasoning || 'Enhanced AI analysis with Tesla new/used awareness and category-aware inventory matching'
     };
 
   } catch (error) {
