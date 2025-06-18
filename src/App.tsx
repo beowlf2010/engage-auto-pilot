@@ -1,4 +1,5 @@
 
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,20 +7,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import LoginPage from "@/pages/LoginPage";
-import RegisterPage from "@/pages/RegisterPage";
-import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
-import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import AuthPage from "@/pages/AuthPage";
 import SmartInboxPage from "@/pages/SmartInboxPage";
 import SettingsPage from "@/pages/SettingsPage";
-import UsersPage from "@/pages/UsersPage";
-import LeadsPage from "@/pages/LeadsPage";
-import LeadDetailsPage from "@/pages/LeadDetailsPage";
-import TemplatesPage from "@/pages/TemplatesPage";
-import PhoneNumbersPage from "@/pages/PhoneNumbersPage";
-import AnalyticsPage from "@/pages/AnalyticsPage";
-import BillingPage from "@/pages/BillingPage";
-import EmailPage from "@/pages/EmailPage";
+import StreamlinedLeadsPage from "@/pages/StreamlinedLeadsPage";
+import LeadDetailPage from "@/pages/LeadDetailPage";
+import AdvancedAnalyticsPage from "@/pages/AdvancedAnalyticsPage";
 
 const queryClient = new QueryClient();
 
@@ -31,10 +24,7 @@ function App() {
           <AuthProvider>
             <div className="min-h-screen bg-background font-sans antialiased">
               <Routes>
-                <Route path="/auth" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/auth" element={<AuthPage />} />
                 
                 <Route
                   path="/"
@@ -61,18 +51,10 @@ function App() {
                   }
                 />
                 <Route
-                  path="/users"
-                  element={
-                    <ProtectedRoute>
-                      <UsersPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
                   path="/leads"
                   element={
                     <ProtectedRoute>
-                      <LeadsPage />
+                      <StreamlinedLeadsPage />
                     </ProtectedRoute>
                   }
                 />
@@ -80,23 +62,7 @@ function App() {
                   path="/lead/:id"
                   element={
                     <ProtectedRoute>
-                      <LeadDetailsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/templates"
-                  element={
-                    <ProtectedRoute>
-                      <TemplatesPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/phone-numbers"
-                  element={
-                    <ProtectedRoute>
-                      <PhoneNumbersPage />
+                      <LeadDetailPage />
                     </ProtectedRoute>
                   }
                 />
@@ -104,23 +70,7 @@ function App() {
                   path="/analytics"
                   element={
                     <ProtectedRoute>
-                      <AnalyticsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/billing"
-                  element={
-                    <ProtectedRoute>
-                      <BillingPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/email"
-                  element={
-                    <ProtectedRoute>
-                      <EmailPage />
+                      <AdvancedAnalyticsPage />
                     </ProtectedRoute>
                   }
                 />
@@ -144,3 +94,4 @@ function App() {
 }
 
 export default App;
+
