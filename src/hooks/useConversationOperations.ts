@@ -1,8 +1,8 @@
 
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { fetchConversations } from '@/services/conversationsService';
-import { fetchMessages, sendMessage as sendMessageService } from '@/services/messagesService';
+import { fetchConversations, fetchMessages } from '@/services/conversationsService';
+import { sendMessage as sendMessageService } from '@/services/messagesService';
 import type { ConversationData, MessageData } from '@/types/conversation';
 
 export const useConversationOperations = () => {
