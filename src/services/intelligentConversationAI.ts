@@ -36,19 +36,48 @@ const cleanVehicleInterest = (vehicleInterest: string): string => {
     .trim();
 };
 
-// Check if we have matching inventory for the vehicle interest
+// Enhanced vehicle categorization for better matching
+const categorizeVehicle = (vehicleText: string) => {
+  const text = vehicleText.toLowerCase();
+  
+  // Electric/Hybrid classification
+  const evIndicators = ['tesla', 'electric', 'ev', 'hybrid', 'plug-in', 'bolt', 'leaf', 'prius', 'model'];
+  const isEV = evIndicators.some(indicator => text.includes(indicator));
+  
+  // Luxury classification
+  const luxuryBrands = ['tesla', 'bmw', 'mercedes', 'audi', 'lexus', 'cadillac', 'lincoln', 'genesis', 'porsche'];
+  const isLuxury = luxuryBrands.some(brand => text.includes(brand));
+  
+  // Price tier estimation
+  let estimatedPriceRange = { min: 0, max: 200000 };
+  if (text.includes('tesla')) {
+    estimatedPriceRange = { min: 35000, max: 120000 };
+  } else if (isLuxury) {
+    estimatedPriceRange = { min: 30000, max: 100000 };
+  }
+  
+  return {
+    isEV,
+    isLuxury,
+    estimatedPriceRange,
+    category: isEV ? 'electric' : isLuxury ? 'luxury' : 'standard'
+  };
+};
+
+// Enhanced inventory availability check with better categorization
 const checkInventoryAvailability = async (vehicleInterest: string) => {
   try {
     const cleanInterest = cleanVehicleInterest(vehicleInterest);
-    if (!cleanInterest) return { hasInventory: false, matchingVehicles: [] };
+    if (!cleanInterest) return { hasInventory: false, matchingVehicles: [], requestedCategory: null };
 
+    const requestedCategory = categorizeVehicle(cleanInterest);
+    
     // Extract make/model from vehicle interest
     const words = cleanInterest.toLowerCase().split(' ');
     let make = '';
-    let model = '';
     
     // Common vehicle makes to check for
-    const knownMakes = ['tesla', 'ford', 'chevrolet', 'honda', 'toyota', 'bmw', 'mercedes', 'audi', 'nissan', 'hyundai'];
+    const knownMakes = ['tesla', 'ford', 'chevrolet', 'honda', 'toyota', 'bmw', 'mercedes', 'audi', 'nissan', 'hyundai', 'lexus', 'cadillac'];
     
     for (const word of words) {
       if (knownMakes.includes(word)) {
@@ -60,7 +89,7 @@ const checkInventoryAvailability = async (vehicleInterest: string) => {
     if (make) {
       const { data: inventory } = await supabase
         .from('inventory')
-        .select('id, make, model, year, price')
+        .select('id, make, model, year, price, fuel_type, condition')
         .eq('status', 'available')
         .ilike('make', `%${make}%`)
         .limit(5);
@@ -68,14 +97,61 @@ const checkInventoryAvailability = async (vehicleInterest: string) => {
       return {
         hasInventory: inventory && inventory.length > 0,
         matchingVehicles: inventory || [],
-        searchedMake: make
+        searchedMake: make,
+        requestedCategory
       };
     }
 
-    return { hasInventory: false, matchingVehicles: [], searchedMake: make };
+    return { 
+      hasInventory: false, 
+      matchingVehicles: [], 
+      searchedMake: make,
+      requestedCategory 
+    };
   } catch (error) {
     console.error('Error checking inventory:', error);
-    return { hasInventory: false, matchingVehicles: [] };
+    return { hasInventory: false, matchingVehicles: [], requestedCategory: null };
+  }
+};
+
+// Enhanced alternative finding with category awareness
+const findCategoryRelevantAlternatives = async (requestedCategory: any) => {
+  try {
+    let query = supabase
+      .from('inventory')
+      .select('make, model, year, price, fuel_type, condition')
+      .eq('status', 'available');
+
+    // If looking for EVs, prioritize electric vehicles
+    if (requestedCategory?.isEV) {
+      // First try to find actual EVs
+      const { data: evInventory } = await query
+        .or('fuel_type.eq.Electric,fuel_type.eq.Hybrid,make.ilike.%tesla%')
+        .limit(5);
+      
+      if (evInventory && evInventory.length > 0) {
+        return evInventory;
+      }
+    }
+
+    // If looking for luxury, filter by price range and luxury brands
+    if (requestedCategory?.isLuxury) {
+      const { data: luxuryInventory } = await query
+        .gte('price', 30000)
+        .or('make.ilike.%bmw%,make.ilike.%mercedes%,make.ilike.%audi%,make.ilike.%lexus%,make.ilike.%cadillac%')
+        .limit(5);
+      
+      if (luxuryInventory && luxuryInventory.length > 0) {
+        return luxuryInventory;
+      }
+    }
+
+    // Fallback to general inventory
+    const { data: generalInventory } = await query.limit(10);
+    return generalInventory || [];
+  } catch (error) {
+    console.error('Error finding alternatives:', error);
+    return [];
   }
 };
 
@@ -112,15 +188,13 @@ export const generateIntelligentResponse = async (context: ConversationContext):
       return null;
     }
 
-    // Check inventory availability for the customer's interest
+    // Enhanced inventory checking with category awareness
     const inventoryCheck = await checkInventoryAvailability(cleanedVehicleInterest);
     
-    // Get available inventory for alternatives
-    const { data: availableInventory } = await supabase
-      .from('inventory')
-      .select('make, model, year, price')
-      .eq('status', 'available')
-      .limit(10);
+    // Get category-relevant alternatives
+    const availableAlternatives = inventoryCheck.requestedCategory ? 
+      await findCategoryRelevantAlternatives(inventoryCheck.requestedCategory) :
+      [];
 
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
@@ -134,7 +208,8 @@ export const generateIntelligentResponse = async (context: ConversationContext):
           hasRequestedVehicle: inventoryCheck.hasInventory,
           requestedMake: inventoryCheck.searchedMake,
           matchingVehicles: inventoryCheck.matchingVehicles,
-          availableAlternatives: availableInventory || []
+          availableAlternatives: availableAlternatives,
+          requestedCategory: inventoryCheck.requestedCategory
         }
       }
     });
@@ -154,7 +229,7 @@ export const generateIntelligentResponse = async (context: ConversationContext):
     return {
       message: data.message,
       confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'AI analysis of conversation context with inventory validation'
+      reasoning: data.reasoning || 'Enhanced AI analysis with category-aware inventory matching'
     };
 
   } catch (error) {
