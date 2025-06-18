@@ -1,7 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { scheduleEnhancedAIMessages } from './enhancedAIMessageService';
 
 export interface ToggleAIResult {
   success: boolean;
@@ -19,12 +18,12 @@ export const toggleFinnAI = async (leadId: string | number, currentState: boolea
       .update({ 
         ai_opt_in: newState,
         // Reset AI tracking when enabling
-        ai_stage: newState ? 'day_1_morning' : null,
+        ai_stage: newState ? 'ready_for_contact' : null,
         ai_messages_sent: newState ? 0 : null,
         ai_sequence_paused: newState ? false : true,
         ai_pause_reason: newState ? null : 'manually_disabled',
         ai_resume_at: null,
-        // Set next AI send time if enabling AI (immediate for aggressive start)
+        // Set immediate send time if enabling AI (ready for immediate contact)
         next_ai_send_at: newState ? new Date().toISOString() : null
       })
       .eq('id', String(leadId));
@@ -39,16 +38,11 @@ export const toggleFinnAI = async (leadId: string | number, currentState: boolea
       return { success: false, newState: currentState, error: error.message };
     }
 
-    // If enabling AI, schedule the aggressive message sequence
-    if (newState) {
-      await scheduleEnhancedAIMessages(String(leadId));
-    }
-
     // Show success toast
     toast({
       title: newState ? "Finn AI Enabled" : "Finn AI Disabled",
       description: newState 
-        ? "Finn will now send an aggressive sequence of automated follow-ups for this lead" 
+        ? "Finn is ready to start the conversation! Use the 'Send First Message Now' button to begin immediately." 
         : "Finn will no longer send automated messages for this lead",
       variant: "default"
     });

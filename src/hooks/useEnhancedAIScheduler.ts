@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { centralizedAI } from '@/services/centralizedAIService';
+import { processProactiveMessages } from '@/services/proactiveAIService';
 import { sendMessage } from '@/services/messagesService';
 import { useAuth } from '@/components/auth/AuthProvider';
 
@@ -11,15 +12,25 @@ export const useEnhancedAIScheduler = () => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { profile } = useAuth();
 
-  // Process AI responses for conversations that need them
+  // Enhanced AI processing that includes both reactive and proactive messaging
   const processAIResponses = async () => {
     if (processing || !profile) return;
 
     setProcessing(true);
-    console.log('🤖 Processing AI responses...');
+    console.log('🤖 Processing enhanced AI responses (reactive + proactive)...');
 
     try {
-      // Get leads that have unresponded messages and AI enabled
+      // 1. Process proactive messages first (new leads needing first contact)
+      console.log('📬 Processing proactive messages...');
+      const proactiveResults = await processProactiveMessages(profile);
+      
+      if (proactiveResults.length > 0) {
+        const successCount = proactiveResults.filter(r => r.success).length;
+        console.log(`✅ Sent ${successCount} proactive messages out of ${proactiveResults.length} attempts`);
+      }
+
+      // 2. Process reactive messages (responses to incoming messages)
+      console.log('💬 Processing reactive responses...');
       const { data: leadsWithUnresponded } = await supabase
         .from('conversations')
         .select(`
@@ -38,67 +49,58 @@ export const useEnhancedAIScheduler = () => {
         .order('sent_at', { ascending: false })
         .limit(10);
 
-      if (!leadsWithUnresponded || leadsWithUnresponded.length === 0) {
-        console.log('🤖 No leads need AI responses');
-        setLastProcessedAt(new Date());
-        return;
-      }
+      if (leadsWithUnresponded && leadsWithUnresponded.length > 0) {
+        const uniqueLeadIds = [...new Set(leadsWithUnresponded.map(item => item.lead_id))];
+        console.log(`🤖 Found ${uniqueLeadIds.length} leads that might need reactive responses`);
 
-      // Get unique lead IDs
-      const uniqueLeadIds = [...new Set(leadsWithUnresponded.map(item => item.lead_id))];
-      console.log(`🤖 Found ${uniqueLeadIds.length} leads that might need responses`);
+        for (const leadId of uniqueLeadIds) {
+          try {
+            const shouldRespond = await centralizedAI.shouldGenerateResponse(leadId);
+            if (!shouldRespond) {
+              console.log(`⏭️ Skipping lead ${leadId} - no response needed`);
+              continue;
+            }
 
-      for (const leadId of uniqueLeadIds) {
-        try {
-          // Check if this lead should get a response
-          const shouldRespond = await centralizedAI.shouldGenerateResponse(leadId);
-          if (!shouldRespond) {
-            console.log(`⏭️ Skipping lead ${leadId} - no response needed`);
-            continue;
+            const aiMessage = await centralizedAI.generateResponse(leadId);
+            if (!aiMessage) {
+              console.log(`❌ No AI message generated for lead ${leadId}`);
+              continue;
+            }
+
+            console.log(`📤 Sending AI response to lead ${leadId}: ${aiMessage}`);
+            await sendMessage(leadId, aiMessage, profile, true);
+
+            centralizedAI.markResponseProcessed(leadId, aiMessage);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+          } catch (error) {
+            console.error(`❌ Error processing AI response for lead ${leadId}:`, error);
           }
-
-          // Generate intelligent response
-          const aiMessage = await centralizedAI.generateResponse(leadId);
-          if (!aiMessage) {
-            console.log(`❌ No AI message generated for lead ${leadId}`);
-            continue;
-          }
-
-          // Send the message
-          console.log(`📤 Sending AI response to lead ${leadId}: ${aiMessage}`);
-          await sendMessage(leadId, aiMessage, profile, true);
-
-          // Mark as processed
-          centralizedAI.markResponseProcessed(leadId, aiMessage);
-
-          // Add small delay between messages to avoid overwhelming
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-        } catch (error) {
-          console.error(`❌ Error processing AI response for lead ${leadId}:`, error);
         }
+      } else {
+        console.log('🤖 No leads need reactive responses');
       }
 
       setLastProcessedAt(new Date());
-      console.log('✅ AI response processing complete');
+      console.log('✅ Enhanced AI processing complete');
 
     } catch (error) {
-      console.error('❌ Error in AI response processing:', error);
+      console.error('❌ Error in enhanced AI processing:', error);
     } finally {
       setProcessing(false);
     }
   };
 
-  // Start the scheduler
+  // Start the enhanced scheduler
   useEffect(() => {
     if (!profile) return;
 
-    console.log('🤖 Starting enhanced AI scheduler');
+    console.log('🤖 Starting enhanced AI scheduler (proactive + reactive)');
     
     // Process immediately
     processAIResponses();
 
-    // Set up interval (every 2 minutes)
+    // Set up interval (every 2 minutes for more responsive proactive messaging)
     intervalRef.current = setInterval(processAIResponses, 2 * 60 * 1000);
 
     return () => {

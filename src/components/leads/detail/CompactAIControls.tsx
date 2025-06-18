@@ -1,11 +1,12 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Play, Pause, RefreshCw, AlertTriangle, Loader2, Clock } from "lucide-react";
+import { Bot, Play, Pause, RefreshCw, AlertTriangle, Loader2, Clock, MessageSquare } from "lucide-react";
 import { fixLeadAIStage } from '@/services/aiStageFixService';
+import { triggerImmediateMessage } from '@/services/proactiveAIService';
+import { useAuth } from '@/components/auth/AuthProvider';
 import CountdownBadge from '../../inbox/CountdownBadge';
 
 interface CompactAIControlsProps {
@@ -35,6 +36,8 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
 }) => {
   const [isToggling, setIsToggling] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const { profile } = useAuth();
 
   // Debug log for countdown display
   React.useEffect(() => {
@@ -70,6 +73,21 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
     }
   };
 
+  const handleSendFirstMessage = async () => {
+    if (!profile || isSendingMessage) return;
+    
+    setIsSendingMessage(true);
+    try {
+      await triggerImmediateMessage(leadId, profile);
+      // Refresh the page to show updated status
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      console.error('Failed to send first message:', error);
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
   const getStatusColor = () => {
     if (!aiOptIn) return 'bg-gray-100 text-gray-800';
     if (pendingHumanResponse) return 'bg-blue-100 text-blue-800';
@@ -98,6 +116,9 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
 
   // Show countdown when AI is active and has a scheduled send time
   const showCountdown = aiOptIn && !aiSequencePaused && !pendingHumanResponse && nextAiSendAt;
+
+  // Check if this lead needs first contact
+  const needsFirstContact = aiOptIn && (!aiStage || aiStage === 'day_1_morning' || aiStage === 'scheduled');
 
   return (
     <Card>
@@ -134,6 +155,38 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
 
         {aiOptIn && (
           <>
+            {/* Send First Message Button */}
+            {needsFirstContact && (
+              <div className="p-3 border rounded-lg bg-blue-50 border-blue-200">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <div className="font-medium text-sm text-blue-900">Ready to Start</div>
+                    <div className="text-xs text-blue-700">
+                      Send the first AI message to begin the conversation
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleSendFirstMessage}
+                  disabled={isSendingMessage}
+                  className="w-full text-xs h-8 bg-blue-600 hover:bg-blue-700"
+                >
+                  {isSendingMessage ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="w-3 h-3 mr-1" />
+                      Send First Message Now
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
             {/* Next Message Countdown - Enhanced */}
             {showCountdown && (
               <div className="p-3 border rounded-lg bg-green-50 border-green-200">

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -18,12 +17,99 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('Starting enhanced Finn AI automation job...')
+    console.log('Starting enhanced Finn AI automation (proactive + reactive)...')
 
-    // Resume any paused sequences that should resume
+    // 1. Process proactive messaging first - leads that need initial contact
+    console.log('📬 Processing proactive messaging...')
+    const { data: proactiveLeads, error: proactiveError } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('ai_opt_in', true)
+      .eq('ai_sequence_paused', false)
+      .or('ai_messages_sent.is.null,ai_messages_sent.eq.0')
+      .not('next_ai_send_at', 'is', null)
+      .lte('next_ai_send_at', new Date().toISOString())
+      .limit(10)
+
+    if (proactiveError) {
+      console.error('Error fetching proactive leads:', proactiveError)
+    } else {
+      console.log(`Found ${proactiveLeads?.length || 0} leads needing proactive contact`)
+
+      for (const lead of proactiveLeads || []) {
+        try {
+          console.log(`🚀 Sending initial message to ${lead.first_name} ${lead.last_name}`)
+          
+          // Generate initial message
+          const message = await generateInitialMessage(lead)
+          
+          if (message) {
+            // Get lead's phone number
+            const { data: phoneData } = await supabase
+              .from('phone_numbers')
+              .select('number')
+              .eq('lead_id', lead.id)
+              .eq('is_primary', true)
+              .single()
+
+            if (phoneData?.number) {
+              // Send via Twilio
+              const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${Deno.env.get('TWILIO_ACCOUNT_SID')}/Messages.json`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Basic ${btoa(`${Deno.env.get('TWILIO_ACCOUNT_SID')}:${Deno.env.get('TWILIO_AUTH_TOKEN')}`)}`,
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                  From: Deno.env.get('TWILIO_PHONE_NUMBER') || '',
+                  To: phoneData.number,
+                  Body: message
+                })
+              })
+
+              if (twilioResponse.ok) {
+                const twilioData = await twilioResponse.json()
+                
+                // Save message to database
+                await supabase
+                  .from('conversations')
+                  .insert({
+                    lead_id: lead.id,
+                    body: message,
+                    direction: 'out',
+                    sent_at: new Date().toISOString(),
+                    ai_generated: true,
+                    twilio_message_id: twilioData.sid,
+                    sms_status: 'sent'
+                  })
+
+                // Update lead status
+                await supabase
+                  .from('leads')
+                  .update({
+                    ai_messages_sent: 1,
+                    ai_stage: 'initial_contact_sent',
+                    next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Next in 24h
+                  })
+                  .eq('id', lead.id)
+
+                console.log(`✅ Initial message sent to ${lead.first_name}: ${twilioData.sid}`)
+              } else {
+                console.error(`❌ Failed to send message to ${lead.first_name}:`, await twilioResponse.text())
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Error processing proactive message for lead ${lead.id}:`, error)
+        }
+      }
+    }
+
+    // 2. Resume any paused sequences that should resume
     await resumePausedSequences(supabase)
 
-    // Get leads ready for AI messages using the enhanced system
+    // 3. Process reactive messaging - existing logic for scheduled follow-ups
+    console.log('💬 Processing reactive messaging...')
     const { data: readyLeads, error: leadsError } = await supabase
       .from('leads')
       .select('*')
@@ -31,107 +117,105 @@ serve(async (req) => {
       .eq('ai_sequence_paused', false)
       .not('next_ai_send_at', 'is', null)
       .lte('next_ai_send_at', new Date().toISOString())
+      .gt('ai_messages_sent', 0) // Only leads that have already been contacted
       .limit(10)
 
     if (leadsError) {
-      console.error('Error fetching ready leads:', leadsError)
-      throw leadsError
-    }
+      console.error('Error fetching reactive leads:', leadsError)
+    } else {
+      console.log(`Found ${readyLeads?.length || 0} leads ready for reactive messages`)
 
-    console.log(`Found ${readyLeads?.length || 0} leads ready for enhanced AI messages`)
-
-    // Process each lead with enhanced AI
-    for (const lead of readyLeads || []) {
-      try {
-        const message = await generateEnhancedAIMessage(supabase, lead.id)
-        
-        if (message) {
-          // Send the AI-generated message via Twilio
-          const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${Deno.env.get('TWILIO_ACCOUNT_SID')}/Messages.json`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${btoa(`${Deno.env.get('TWILIO_ACCOUNT_SID')}:${Deno.env.get('TWILIO_AUTH_TOKEN')}`)}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              From: Deno.env.get('TWILIO_PHONE_NUMBER') || '',
-              To: lead.phone,
-              Body: message
+      // Process each lead with enhanced AI
+      for (const lead of readyLeads || []) {
+        try {
+          const message = await generateEnhancedAIMessage(supabase, lead.id)
+          
+          if (message) {
+            // Send the AI-generated message via Twilio
+            const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${Deno.env.get('TWILIO_ACCOUNT_SID')}/Messages.json`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Basic ${btoa(`${Deno.env.get('TWILIO_ACCOUNT_SID')}:${Deno.env.get('TWILIO_AUTH_TOKEN')}`)}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                From: Deno.env.get('TWILIO_PHONE_NUMBER') || '',
+                To: lead.phone,
+                Body: message
+              })
             })
-          })
 
-          if (!twilioResponse.ok) {
-            console.error(`Twilio error for lead ${lead.id}:`, await twilioResponse.text())
-            continue
+            if (!twilioResponse.ok) {
+              console.error(`Twilio error for lead ${lead.id}:`, await twilioResponse.text())
+              continue
+            }
+
+            const twilioData = await twilioResponse.json()
+            console.log(`Sent enhanced AI SMS to ${lead.first_name}: ${twilioData.sid}`)
+
+            // Save the message to the database
+            const { error: messageError } = await supabase
+              .from('conversations')
+              .insert({
+                lead_id: lead.id,
+                body: message,
+                direction: 'out',
+                sent_at: new Date().toISOString(),
+                ai_generated: true,
+                twilio_message_id: twilioData.sid,
+                sms_status: 'sent'
+              })
+
+            if (messageError) {
+              console.error('Error saving message:', messageError)
+            }
+
+            // Update message count and schedule next message
+            const currentCount = lead.ai_messages_sent || 0
+            await supabase
+              .from('leads')
+              .update({
+                ai_messages_sent: currentCount + 1
+              })
+              .eq('id', lead.id)
+
+            // Schedule next message using enhanced logic
+            await scheduleNextEnhancedMessage(supabase, lead.id)
+
+            console.log(`Successfully processed enhanced message for ${lead.first_name} ${lead.last_name}`)
+
+          } else {
+            // No more messages, pause sequence
+            await supabase
+              .from('leads')
+              .update({
+                next_ai_send_at: null,
+                ai_sequence_paused: true,
+                ai_pause_reason: 'sequence_completed'
+              })
+              .eq('id', lead.id)
           }
 
-          const twilioData = await twilioResponse.json()
-          console.log(`Sent enhanced AI SMS to ${lead.first_name}: ${twilioData.sid}`)
-
-          // Save the message to the database
-          const { error: messageError } = await supabase
-            .from('conversations')
-            .insert({
-              lead_id: lead.id,
-              body: message,
-              direction: 'out',
-              sent_at: new Date().toISOString(),
-              ai_generated: true,
-              twilio_message_id: twilioData.sid,
-              sms_status: 'sent'
-            })
-
-          if (messageError) {
-            console.error('Error saving message:', messageError)
-          }
-
-          // Update message count and schedule next message
-          const currentCount = lead.ai_messages_sent || 0
-          await supabase
-            .from('leads')
-            .update({
-              ai_messages_sent: currentCount + 1
-            })
-            .eq('id', lead.id)
-
-          // Schedule next message using enhanced logic
-          await scheduleNextEnhancedMessage(supabase, lead.id)
-
-          console.log(`Successfully processed enhanced message for ${lead.first_name} ${lead.last_name}`)
-
-        } else {
-          // No more messages, pause sequence
-          await supabase
-            .from('leads')
-            .update({
-              next_ai_send_at: null,
-              ai_sequence_paused: true,
-              ai_pause_reason: 'sequence_completed'
-            })
-            .eq('id', lead.id)
+        } catch (error) {
+          console.error(`Error processing enhanced message for lead ${lead.id}:`, error)
         }
-
-      } catch (error) {
-        console.error(`Error processing enhanced message for lead ${lead.id}:`, error)
       }
     }
 
-    // Check for behavioral triggers
-    await processBehavioralTriggers(supabase)
-
-    // Update inventory-based triggers
-    await processInventoryTriggers(supabase)
-
-    // Update daily KPIs
+    // 4. Update daily KPIs
     const { error: kpiError } = await supabase.rpc('update_daily_kpis')
     if (kpiError) {
       console.error('Error updating KPIs:', kpiError)
     }
 
+    const totalProcessed = (proactiveLeads?.length || 0) + (readyLeads?.length || 0)
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        processed: readyLeads?.length || 0,
+        proactiveProcessed: proactiveLeads?.length || 0,
+        reactiveProcessed: readyLeads?.length || 0,
+        totalProcessed,
         message: 'Enhanced Finn AI automation completed successfully'
       }),
       { 
@@ -154,6 +238,27 @@ serve(async (req) => {
     )
   }
 })
+
+// Generate compelling initial outreach messages
+async function generateInitialMessage(lead: any): Promise<string | null> {
+  try {
+    // Template-based initial messages for immediate deployment
+    const templates = [
+      `Hi ${lead.first_name}! I see you're interested in ${lead.vehicle_interest}. I'd love to help you find the perfect vehicle. Any questions I can answer?`,
+      `Hello ${lead.first_name}! Thanks for your interest in ${lead.vehicle_interest}. I have some great options that might be perfect for you. When would be a good time to chat?`,
+      `Hi ${lead.first_name}! I noticed you're looking for ${lead.vehicle_interest}. I specialize in helping customers find exactly what they need. What features are most important to you?`,
+      `${lead.first_name}, I wanted to reach out about ${lead.vehicle_interest}. We have some excellent vehicles that match your interests. Would you like to see what's available?`,
+      `Hi ${lead.first_name}! I'm here to help with your ${lead.vehicle_interest} search. What's the most important factor for you - price, features, or reliability?`
+    ];
+
+    // Select random template for variety
+    const template = templates[Math.floor(Math.random() * templates.length)];
+    return template;
+  } catch (error) {
+    console.error('Error generating initial message:', error)
+    return null
+  }
+}
 
 // Enhanced AI message generation using advanced templates and personalization
 async function generateEnhancedAIMessage(supabase: any, leadId: string): Promise<string | null> {
@@ -592,7 +697,7 @@ async function resumePausedSequences(supabase: any) {
         })
         .eq('id', lead.id)
 
-      await scheduleNextEnhancedMessage(supabase, lead.id)
+      console.log(`Resumed AI sequence for lead ${lead.id}`)
     }
   } catch (error) {
     console.error('Error resuming paused sequences:', error)
