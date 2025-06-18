@@ -22,43 +22,56 @@ serve(async (req) => {
     }
 
     const { 
+      leadId,
       leadName, 
       vehicleInterest, 
       lastCustomerMessage, 
       conversationHistory, 
       leadInfo,
       conversationLength,
-      inventoryStatus 
+      inventoryStatus,
+      context = {}
     } = await req.json();
 
-    console.log(`🤖 Processing enhanced intelligent AI request with appointment and trade detection for: ${leadName}`);
+    console.log(`🤖 Processing ENHANCED intelligent AI request with STRICT inventory validation for: ${leadName}`);
     console.log(`🚗 Vehicle interest: ${vehicleInterest}`);
     console.log(`💬 Last message: ${lastCustomerMessage}`);
+    console.log(`📦 Strict mode:`, context.strictInventoryMode || false);
 
-    // Enhanced validation pipeline
+    // ENHANCED validation pipeline with lead-specific context
     const [inventoryValidation, businessHours, conversationMemory] = await Promise.all([
-      validateInventoryAccuracy(vehicleInterest || ''),
+      validateInventoryAccuracy(vehicleInterest || '', leadId),
       getBusinessHoursStatus(),
       Promise.resolve(analyzeConversationMemory(conversationHistory || ''))
     ]);
 
-    console.log('📊 Inventory validation:', inventoryValidation.hasRealInventory ? 'PASS' : 'FAIL', inventoryValidation.warning || '');
+    console.log('📊 STRICT Inventory validation:', {
+      hasInventory: inventoryValidation.hasRealInventory,
+      validatedCount: inventoryValidation.validatedCount,
+      totalChecked: inventoryValidation.totalChecked,
+      strictMode: inventoryValidation.strictMode,
+      warning: inventoryValidation.warning || 'none'
+    });
+    
     console.log('🕒 Business hours:', businessHours.isOpen ? 'OPEN' : 'CLOSED');
     console.log('🧠 Conversation memory:', conversationMemory.conversationLength, 'messages');
 
-    // Generate context-aware guidance
+    // Generate context-aware guidance with STRICT inventory rules
     const conversationGuidance = generateConversationGuidance(conversationMemory, inventoryValidation, businessHours);
 
-    // Enhanced inventory status with real validation
+    // Enhanced inventory status with STRICT validation results
     const enhancedInventoryStatus = {
       ...inventoryStatus,
       hasActualInventory: inventoryValidation.hasRealInventory,
       actualVehicles: inventoryValidation.actualVehicles,
+      validatedCount: inventoryValidation.validatedCount,
       inventoryWarning: inventoryValidation.warning,
-      realInventoryCount: inventoryValidation.actualVehicles.length
+      realInventoryCount: inventoryValidation.actualVehicles.length,
+      strictMode: true, // Always use strict mode
+      mustNotClaim: !inventoryValidation.hasRealInventory // Flag to prevent claims
     };
 
-    // Build enhanced prompts with appointment and trade detection
+    // Build enhanced prompts with STRICT inventory awareness
     const { systemPrompt, appointmentIntent, appointmentFollowUp, tradeIntent, tradeFollowUp, requestedCategory } = buildEnhancedSystemPrompt(
       leadName,
       vehicleInterest,
@@ -82,14 +95,8 @@ serve(async (req) => {
     );
 
     console.log('🎯 Appointment intent detected:', appointmentIntent?.hasAppointmentIntent ? 'YES' : 'NO');
-    if (appointmentIntent?.hasAppointmentIntent) {
-      console.log(`📅 Confidence: ${(appointmentIntent.confidence * 100).toFixed(0)}%, Type: ${appointmentIntent.suggestedAppointmentType}, Urgency: ${appointmentIntent.urgency}`);
-    }
-
     console.log('🚗 Trade intent detected:', tradeIntent?.hasTradeIntent ? 'YES' : 'NO');
-    if (tradeIntent?.hasTradeIntent) {
-      console.log(`💰 Confidence: ${(tradeIntent.confidence * 100).toFixed(0)}%, Type: ${tradeIntent.tradeType}, Urgency: ${tradeIntent.urgency}`);
-    }
+    console.log('⚠️ Inventory safety mode:', !inventoryValidation.hasRealInventory ? 'ACTIVE' : 'NORMAL');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -111,20 +118,25 @@ serve(async (req) => {
     const aiResponse = await response.json();
     const generatedMessage = aiResponse.choices[0].message.content;
 
-    console.log(`✅ Generated enhanced response with appointment and trade awareness: ${generatedMessage}`);
+    console.log(`✅ Generated ENHANCED response with STRICT inventory validation: ${generatedMessage}`);
 
     return new Response(JSON.stringify({ 
       message: generatedMessage,
       confidence: 0.95,
-      reasoning: `Enhanced context-aware response with appointment detection (${appointmentIntent?.hasAppointmentIntent ? 'Intent detected' : 'No intent'}), trade detection (${tradeIntent?.hasTradeIntent ? 'Intent detected' : 'No intent'}), inventory validation (${inventoryValidation.actualVehicles.length} actual vehicles), business hours (${businessHours.isOpen ? 'open' : 'closed'}), and conversation memory (${conversationMemory.conversationLength} messages) for ${requestedCategory.category} vehicle inquiry`,
+      reasoning: `ENHANCED context-aware response with STRICT inventory validation (${inventoryValidation.validatedCount} verified vehicles), appointment detection (${appointmentIntent?.hasAppointmentIntent ? 'Intent detected' : 'No intent'}), trade detection (${tradeIntent?.hasTradeIntent ? 'Intent detected' : 'No intent'}), business hours (${businessHours.isOpen ? 'open' : 'closed'}), and conversation memory (${conversationMemory.conversationLength} messages) for ${requestedCategory.category} vehicle inquiry`,
       appointmentIntent: appointmentIntent || null,
-      tradeIntent: tradeIntent || null
+      tradeIntent: tradeIntent || null,
+      inventoryValidation: {
+        hasRealInventory: inventoryValidation.hasRealInventory,
+        validatedCount: inventoryValidation.validatedCount,
+        strictMode: true
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('❌ Error in enhanced intelligent conversation AI with appointment and trade detection:', error);
+    console.error('❌ Error in ENHANCED intelligent conversation AI with STRICT inventory validation:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

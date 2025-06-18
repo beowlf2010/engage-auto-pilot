@@ -2,7 +2,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 // Enhanced inventory validation to prevent AI from claiming non-existent vehicles
-export const validateInventoryAccuracy = async (vehicleInterest: string) => {
+export const validateInventoryAccuracy = async (vehicleInterest: string, leadId?: string) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   
@@ -15,82 +15,102 @@ export const validateInventoryAccuracy = async (vehicleInterest: string) => {
 
   try {
     const cleanInterest = vehicleInterest.toLowerCase().trim();
-    console.log('🔍 Validating inventory for:', cleanInterest);
+    console.log('🔍 STRICT inventory validation for:', cleanInterest);
 
-    // Check for electric/hybrid vehicles specifically
-    const isEVRequest = /\b(electric|ev|hybrid|tesla|bolt|leaf|prius|model|plug-in)\b/i.test(cleanInterest);
-    
-    if (isEVRequest) {
-      // Get actual electric/hybrid vehicles in inventory
-      const { data: evInventory, error } = await supabase
-        .from('inventory')
-        .select('id, make, model, year, fuel_type, condition, price, status')
-        .eq('status', 'available')
-        .or('fuel_type.eq.Electric,fuel_type.eq.Hybrid,fuel_type.eq.Plug-in Hybrid')
-        .limit(10);
-
-      if (error) {
-        console.error('Error checking EV inventory:', error);
-        return { hasRealInventory: false, actualVehicles: [], warning: 'inventory_check_failed' };
-      }
-
-      console.log('📊 Found EV/Hybrid inventory:', evInventory?.length || 0, 'vehicles');
+    // Get lead's specific vehicle preferences if leadId provided
+    let leadPreferences = null;
+    if (leadId) {
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('vehicle_make, vehicle_model, vehicle_year, preferred_price_min, preferred_price_max')
+        .eq('id', leadId)
+        .single();
       
-      return {
-        hasRealInventory: evInventory && evInventory.length > 0,
-        actualVehicles: evInventory || [],
-        isEVRequest: true,
-        warning: evInventory && evInventory.length === 0 ? 'no_evs_available' : null
-      };
+      if (lead) {
+        leadPreferences = lead;
+        console.log('🎯 Lead preferences:', leadPreferences);
+      }
     }
 
-    // For non-EV requests, check for specific makes
-    const makeMatch = cleanInterest.match(/\b(chevrolet|chevy|ford|toyota|honda|bmw|mercedes|audi|nissan|hyundai)\b/i);
-    
-    if (makeMatch) {
-      const make = makeMatch[1].toLowerCase();
-      const { data: inventory, error } = await supabase
-        .from('inventory')
-        .select('id, make, model, year, fuel_type, condition, price, status')
-        .eq('status', 'available')
-        .ilike('make', `%${make}%`)
-        .limit(10);
-
-      if (error) {
-        console.error('Error checking inventory for make:', make, error);
-        return { hasRealInventory: false, actualVehicles: [], warning: 'inventory_check_failed' };
-      }
-
-      console.log(`📊 Found ${make} inventory:`, inventory?.length || 0, 'vehicles');
-      
-      return {
-        hasRealInventory: inventory && inventory.length > 0,
-        actualVehicles: inventory || [],
-        requestedMake: make,
-        warning: inventory && inventory.length === 0 ? 'no_make_available' : null
-      };
-    }
-
-    // General inventory check
-    const { data: generalInventory, error } = await supabase
+    // Build strict inventory query
+    let query = supabase
       .from('inventory')
-      .select('id, make, model, year, fuel_type, condition, price, status')
+      .select('id, make, model, year, fuel_type, condition, price, status, stock_number, vin, trim')
       .eq('status', 'available')
+      .not('model', 'eq', 'Unknown') // STRICT: Only vehicles with known models
+      .not('model', 'is', null)
       .limit(20);
 
+    // Apply lead-specific filters if available
+    if (leadPreferences) {
+      if (leadPreferences.vehicle_make) {
+        query = query.ilike('make', `%${leadPreferences.vehicle_make}%`);
+      }
+      if (leadPreferences.vehicle_model) {
+        query = query.ilike('model', `%${leadPreferences.vehicle_model}%`);
+      }
+      if (leadPreferences.vehicle_year) {
+        const year = parseInt(leadPreferences.vehicle_year);
+        if (!isNaN(year)) {
+          query = query.eq('year', year);
+        }
+      }
+      if (leadPreferences.preferred_price_min) {
+        query = query.gte('price', leadPreferences.preferred_price_min);
+      }
+      if (leadPreferences.preferred_price_max) {
+        query = query.lte('price', leadPreferences.preferred_price_max);
+      }
+    } else {
+      // Fallback to parsing vehicle interest
+      const makeMatch = cleanInterest.match(/\b(chevrolet|chevy|gmc|buick|cadillac|ford|toyota|honda|bmw|mercedes|audi|nissan|hyundai)\b/i);
+      if (makeMatch) {
+        const make = makeMatch[1].toLowerCase();
+        if (make === 'chevy') {
+          query = query.ilike('make', '%chevrolet%');
+        } else {
+          query = query.ilike('make', `%${make}%`);
+        }
+      }
+    }
+
+    const { data: inventory, error } = await query;
+
     if (error) {
-      console.error('Error checking general inventory:', error);
+      console.error('❌ Error in strict inventory check:', error);
       return { hasRealInventory: false, actualVehicles: [], warning: 'inventory_check_failed' };
     }
 
+    // STRICT validation: Only count vehicles with complete, accurate data
+    const validatedVehicles = (inventory || []).filter(vehicle => {
+      return vehicle.make && 
+             vehicle.model && 
+             vehicle.model !== 'Unknown' && 
+             vehicle.year && 
+             vehicle.year > 1990 && 
+             vehicle.year <= new Date().getFullYear() + 2;
+    });
+
+    console.log(`📊 STRICT validation results:`, {
+      totalFound: inventory?.length || 0,
+      validatedCount: validatedVehicles.length,
+      leadId: leadId || 'none',
+      hasPreferences: !!leadPreferences
+    });
+
+    // Return comprehensive validation result
     return {
-      hasRealInventory: generalInventory && generalInventory.length > 0,
-      actualVehicles: generalInventory || [],
-      warning: generalInventory && generalInventory.length === 0 ? 'no_inventory_available' : null
+      hasRealInventory: validatedVehicles.length > 0,
+      actualVehicles: validatedVehicles,
+      totalChecked: inventory?.length || 0,
+      validatedCount: validatedVehicles.length,
+      searchCriteria: leadPreferences || { rawInterest: cleanInterest },
+      strictMode: true,
+      warning: validatedVehicles.length === 0 ? 'no_validated_inventory' : null
     };
 
   } catch (error) {
-    console.error('Error in inventory validation:', error);
+    console.error('❌ Error in strict inventory validation:', error);
     return { hasRealInventory: false, actualVehicles: [], warning: 'inventory_check_failed' };
   }
 };
@@ -107,17 +127,8 @@ export const getBusinessHoursStatus = async () => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // @ts-expect-error business_hours table might not be in types yet
-    const { data: businessHours } = await (supabase.from('business_hours') as any)
-      .select('weekday_start, weekday_end, timezone')
-      .limit(1)
-      .single();
-
-    const hours = businessHours ? {
-      start: businessHours.weekday_start || '08:00',
-      end: businessHours.weekday_end || '19:00',
-      timezone: businessHours.timezone || 'America/New_York'
-    } : { start: '08:00', end: '19:00', timezone: 'America/New_York' };
+    // Default hours if no business_hours table
+    const hours = { start: '08:00', end: '19:00', timezone: 'America/New_York' };
 
     // Check if currently within business hours
     const now = new Date();
