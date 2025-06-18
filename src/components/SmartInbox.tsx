@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
@@ -9,8 +8,7 @@ import EnhancedChatView from "./inbox/EnhancedChatView";
 import ConversationMemory from "./ConversationMemory";
 import { useRealtimeInbox } from "@/hooks/useRealtimeInbox";
 import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
-import { markAllMessagesAsRead, assignCurrentUserToLead } from "@/services/conversationsService";
-import { trackLeadResponse } from "@/services/enhancedAIMessageService";
+import { assignCurrentUserToLead } from "@/services/conversationsService";
 import { toast } from "@/hooks/use-toast";
 
 interface SmartInboxProps {
@@ -53,14 +51,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
       // Load messages (which will also mark them as read)
       await fetchMessages(leadId);
       
-      // Track any incoming messages as responses
-      const incomingMessages = messages.filter(msg => msg.direction === 'in');
-      if (incomingMessages.length > 0) {
-        const latestIncoming = incomingMessages[incomingMessages.length - 1];
-        await trackLeadResponse(leadId, new Date(latestIncoming.sentAt));
-      }
-      
-      console.log('✅ Conversation selected and messages marked as read');
+      console.log('✅ Conversation selected and messages loaded');
     } catch (err) {
       console.error('Error selecting conversation:', err);
       toast({
@@ -69,7 +60,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         variant: "destructive"
       });
     }
-  }, [fetchMessages, messages]);
+  }, [fetchMessages]);
 
   const handleSendMessage = useCallback(async (message: string, isTemplate?: boolean) => {
     if (selectedLead && selectedConversation) {
