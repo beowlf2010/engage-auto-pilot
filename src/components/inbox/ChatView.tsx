@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Phone, Car, Brain, Send, User, MessageSquare, Plus, Loader2 } from "lucide-react";
+import { Phone, Car, Brain, Send, User, MessageSquare, Plus, Loader2, ArrowDown } from "lucide-react";
 import MessageBubble from "./MessageBubble";
 import { toggleFinnAI } from "@/services/finnAIService";
 
@@ -49,11 +49,45 @@ const ChatView = ({
   const [sending, setSending] = useState(false);
   const [togglingAI, setTogglingAI] = useState(false);
   const [localAiOptIn, setLocalAiOptIn] = useState(selectedConversation?.aiOptIn || false);
+  const [userScrolled, setUserScrolled] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Update local state when conversation changes
   useEffect(() => {
     setLocalAiOptIn(selectedConversation?.aiOptIn || false);
   }, [selectedConversation?.aiOptIn]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0 && !userScrolled) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [messages.length, userScrolled]);
+
+  // Initial scroll to bottom when conversation loads
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, 200);
+    }
+  }, [selectedConversation?.leadId]);
+
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    setUserScrolled(!isAtBottom);
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setUserScrolled(false);
+  };
 
   const handleSendMessage = async () => {
     if (newMessage.trim() && selectedConversation && canReply(selectedConversation)) {
@@ -166,7 +200,11 @@ const ChatView = ({
       </CardHeader>
 
       {/* Messages */}
-      <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+      <CardContent 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 relative"
+        onScroll={handleScroll}
+      >
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-slate-500">
             <div className="text-center">
@@ -176,9 +214,25 @@ const ChatView = ({
             </div>
           </div>
         ) : (
-          messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))
+          <>
+            {messages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
+            ))}
+            <div ref={messagesEndRef} />
+          </>
+        )}
+
+        {/* Scroll to bottom button */}
+        {userScrolled && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="fixed bottom-32 right-8 rounded-full shadow-lg bg-white hover:bg-slate-50 z-10"
+            onClick={scrollToBottom}
+          >
+            <ArrowDown className="h-4 w-4 mr-1" />
+            New messages
+          </Button>
         )}
       </CardContent>
 

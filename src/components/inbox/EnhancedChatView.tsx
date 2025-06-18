@@ -8,6 +8,7 @@ import ChatMessageInput from './ChatMessageInput';
 import ChatAnalysisPanel from './ChatAnalysisPanel';
 import LeadContextPanel from './LeadContextPanel';
 import AIMessageGenerator from './AIMessageGenerator';
+import IntelligentAIPanel from './IntelligentAIPanel';
 import { useConversationAnalysis } from '@/hooks/useConversationAnalysis';
 
 interface EnhancedChatViewProps {
@@ -129,8 +130,6 @@ const EnhancedChatView = ({
     !selectedConversation.salespersonId
   );
 
-  const averageSentiment = getAverageSentiment();
-
   if (!selectedConversation) {
     return (
       <Card className="h-full flex items-center justify-center">
@@ -155,6 +154,16 @@ const EnhancedChatView = ({
             canReply={canReply}
             onSummaryUpdate={updateSummary}
             onSelectSuggestion={handleSelectSuggestion}
+          />
+        )}
+
+        {/* Intelligent AI Panel */}
+        {canReply && (
+          <IntelligentAIPanel
+            conversation={selectedConversation}
+            messages={messages}
+            onSendMessage={handleAIGeneratedMessage}
+            canReply={canReply}
           />
         )}
 

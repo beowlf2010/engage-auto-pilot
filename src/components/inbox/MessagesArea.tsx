@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, ArrowDown } from 'lucide-react';
@@ -23,23 +23,49 @@ const MessagesArea = ({
 }: MessagesAreaProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [userScrolled, setUserScrolled] = useState(false);
 
   const scrollToBottom = (smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    setUserScrolled(false);
   };
 
-  // Auto-scroll to bottom when messages change
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    
+    setShouldAutoScroll(isAtBottom);
+    setUserScrolled(!isAtBottom);
+    onScroll();
+  };
+
+  // Auto-scroll to bottom when new messages arrive (only if user hasn't scrolled up)
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && shouldAutoScroll) {
       setTimeout(() => scrollToBottom(true), 100);
     }
-  }, [messages.length]);
+  }, [messages.length, shouldAutoScroll]);
+
+  // Initial scroll to bottom when messages first load
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => scrollToBottom(false), 200);
+    }
+  }, [messages.length === 1]); // Only on first message load
+
+  const handleScrollToBottomClick = () => {
+    scrollToBottom(true);
+    onScrollToBottom();
+  };
 
   return (
     <CardContent 
       ref={messagesContainerRef}
       className="flex-1 overflow-y-auto p-4 space-y-4 relative"
-      onScroll={onScroll}
+      onScroll={handleScroll}
     >
       {messages.length === 0 ? (
         <div className="text-center text-slate-500 py-8">
@@ -83,15 +109,16 @@ const MessagesArea = ({
         </>
       )}
       
-      {/* Scroll to bottom button */}
-      {showScrollButton && (
+      {/* Scroll to bottom button - show when user has scrolled up */}
+      {userScrolled && (
         <Button
           variant="outline"
           size="sm"
-          className="fixed bottom-32 right-8 rounded-full shadow-lg bg-white hover:bg-slate-50 z-10"
-          onClick={onScrollToBottom}
+          className="fixed bottom-32 right-8 rounded-full shadow-lg bg-white hover:bg-slate-50 z-10 border-2"
+          onClick={handleScrollToBottomClick}
         >
-          <ArrowDown className="h-4 w-4" />
+          <ArrowDown className="h-4 w-4 mr-1" />
+          New messages
         </Button>
       )}
     </CardContent>
