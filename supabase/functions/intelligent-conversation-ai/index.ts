@@ -31,7 +31,7 @@ serve(async (req) => {
       inventoryStatus 
     } = await req.json();
 
-    console.log(`🤖 Processing enhanced intelligent AI request with appointment detection for: ${leadName}`);
+    console.log(`🤖 Processing enhanced intelligent AI request with appointment and trade detection for: ${leadName}`);
     console.log(`🚗 Vehicle interest: ${vehicleInterest}`);
     console.log(`💬 Last message: ${lastCustomerMessage}`);
 
@@ -58,8 +58,8 @@ serve(async (req) => {
       realInventoryCount: inventoryValidation.actualVehicles.length
     };
 
-    // Build enhanced prompts with appointment detection
-    const { systemPrompt, appointmentIntent, appointmentFollowUp, requestedCategory } = buildEnhancedSystemPrompt(
+    // Build enhanced prompts with appointment and trade detection
+    const { systemPrompt, appointmentIntent, appointmentFollowUp, tradeIntent, tradeFollowUp, requestedCategory } = buildEnhancedSystemPrompt(
       leadName,
       vehicleInterest,
       conversationLength,
@@ -77,12 +77,18 @@ serve(async (req) => {
       { isEstablishedConversation: conversationLength > 2 },
       conversationMemory,
       conversationGuidance,
-      appointmentIntent
+      appointmentIntent,
+      tradeIntent
     );
 
     console.log('🎯 Appointment intent detected:', appointmentIntent?.hasAppointmentIntent ? 'YES' : 'NO');
     if (appointmentIntent?.hasAppointmentIntent) {
       console.log(`📅 Confidence: ${(appointmentIntent.confidence * 100).toFixed(0)}%, Type: ${appointmentIntent.suggestedAppointmentType}, Urgency: ${appointmentIntent.urgency}`);
+    }
+
+    console.log('🚗 Trade intent detected:', tradeIntent?.hasTradeIntent ? 'YES' : 'NO');
+    if (tradeIntent?.hasTradeIntent) {
+      console.log(`💰 Confidence: ${(tradeIntent.confidence * 100).toFixed(0)}%, Type: ${tradeIntent.tradeType}, Urgency: ${tradeIntent.urgency}`);
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -105,19 +111,20 @@ serve(async (req) => {
     const aiResponse = await response.json();
     const generatedMessage = aiResponse.choices[0].message.content;
 
-    console.log(`✅ Generated enhanced response with appointment awareness: ${generatedMessage}`);
+    console.log(`✅ Generated enhanced response with appointment and trade awareness: ${generatedMessage}`);
 
     return new Response(JSON.stringify({ 
       message: generatedMessage,
       confidence: 0.95,
-      reasoning: `Enhanced context-aware response with appointment detection (${appointmentIntent?.hasAppointmentIntent ? 'Intent detected' : 'No intent'}), inventory validation (${inventoryValidation.actualVehicles.length} actual vehicles), business hours (${businessHours.isOpen ? 'open' : 'closed'}), and conversation memory (${conversationMemory.conversationLength} messages) for ${requestedCategory.category} vehicle inquiry`,
-      appointmentIntent: appointmentIntent || null
+      reasoning: `Enhanced context-aware response with appointment detection (${appointmentIntent?.hasAppointmentIntent ? 'Intent detected' : 'No intent'}), trade detection (${tradeIntent?.hasTradeIntent ? 'Intent detected' : 'No intent'}), inventory validation (${inventoryValidation.actualVehicles.length} actual vehicles), business hours (${businessHours.isOpen ? 'open' : 'closed'}), and conversation memory (${conversationMemory.conversationLength} messages) for ${requestedCategory.category} vehicle inquiry`,
+      appointmentIntent: appointmentIntent || null,
+      tradeIntent: tradeIntent || null
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('❌ Error in enhanced intelligent conversation AI with appointment detection:', error);
+    console.error('❌ Error in enhanced intelligent conversation AI with appointment and trade detection:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

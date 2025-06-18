@@ -2036,6 +2036,7 @@ export type Database = {
           email_sequence_stage: string | null
           financing_needed: boolean | null
           first_name: string
+          has_trade_vehicle: boolean | null
           human_response_deadline: string | null
           id: string
           last_name: string
@@ -2057,7 +2058,11 @@ export type Database = {
           state: string | null
           status: string
           temperature_score: number | null
+          trade_decision_timeline: string | null
+          trade_financing_bank: string | null
           trade_in_vehicle: string | null
+          trade_motivation: string | null
+          trade_payoff_amount: number | null
           updated_at: string
           vehicle_interest: string
           vehicle_make: string | null
@@ -2089,6 +2094,7 @@ export type Database = {
           email_sequence_stage?: string | null
           financing_needed?: boolean | null
           first_name: string
+          has_trade_vehicle?: boolean | null
           human_response_deadline?: string | null
           id?: string
           last_name: string
@@ -2110,7 +2116,11 @@ export type Database = {
           state?: string | null
           status?: string
           temperature_score?: number | null
+          trade_decision_timeline?: string | null
+          trade_financing_bank?: string | null
           trade_in_vehicle?: string | null
+          trade_motivation?: string | null
+          trade_payoff_amount?: number | null
           updated_at?: string
           vehicle_interest: string
           vehicle_make?: string | null
@@ -2142,6 +2152,7 @@ export type Database = {
           email_sequence_stage?: string | null
           financing_needed?: boolean | null
           first_name?: string
+          has_trade_vehicle?: boolean | null
           human_response_deadline?: string | null
           id?: string
           last_name?: string
@@ -2163,7 +2174,11 @@ export type Database = {
           state?: string | null
           status?: string
           temperature_score?: number | null
+          trade_decision_timeline?: string | null
+          trade_financing_bank?: string | null
           trade_in_vehicle?: string | null
+          trade_motivation?: string | null
+          trade_payoff_amount?: number | null
           updated_at?: string
           vehicle_interest?: string
           vehicle_make?: string | null
@@ -2977,6 +2992,231 @@ export type Database = {
           value?: string
         }
         Relationships: []
+      }
+      trade_appraisal_appointments: {
+        Row: {
+          appointment_id: string | null
+          appraisal_result: Json | null
+          appraisal_status: string
+          appraisal_type: string
+          appraiser_id: string | null
+          completed_at: string | null
+          created_at: string
+          estimated_duration: number | null
+          id: string
+          special_instructions: string | null
+          trade_vehicle_id: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          appraisal_result?: Json | null
+          appraisal_status?: string
+          appraisal_type?: string
+          appraiser_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          estimated_duration?: number | null
+          id?: string
+          special_instructions?: string | null
+          trade_vehicle_id: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          appraisal_result?: Json | null
+          appraisal_status?: string
+          appraisal_type?: string
+          appraiser_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          estimated_duration?: number | null
+          id?: string
+          special_instructions?: string | null
+          trade_vehicle_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_appraisal_appointments_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_appraisal_appointments_appraiser_id_fkey"
+            columns: ["appraiser_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_appraisal_appointments_trade_vehicle_id_fkey"
+            columns: ["trade_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "trade_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_valuations: {
+        Row: {
+          appraised_by: string | null
+          created_at: string
+          depreciation_factors: Json | null
+          estimated_value: number | null
+          expires_at: string | null
+          id: string
+          is_final_offer: boolean | null
+          market_conditions: string | null
+          private_party_value: number | null
+          retail_value: number | null
+          trade_in_value: number | null
+          trade_vehicle_id: string
+          valuation_date: string
+          valuation_notes: string | null
+          valuation_source: string
+          wholesale_value: number | null
+        }
+        Insert: {
+          appraised_by?: string | null
+          created_at?: string
+          depreciation_factors?: Json | null
+          estimated_value?: number | null
+          expires_at?: string | null
+          id?: string
+          is_final_offer?: boolean | null
+          market_conditions?: string | null
+          private_party_value?: number | null
+          retail_value?: number | null
+          trade_in_value?: number | null
+          trade_vehicle_id: string
+          valuation_date?: string
+          valuation_notes?: string | null
+          valuation_source: string
+          wholesale_value?: number | null
+        }
+        Update: {
+          appraised_by?: string | null
+          created_at?: string
+          depreciation_factors?: Json | null
+          estimated_value?: number | null
+          expires_at?: string | null
+          id?: string
+          is_final_offer?: boolean | null
+          market_conditions?: string | null
+          private_party_value?: number | null
+          retail_value?: number | null
+          trade_in_value?: number | null
+          trade_vehicle_id?: string
+          valuation_date?: string
+          valuation_notes?: string | null
+          valuation_source?: string
+          wholesale_value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_valuations_appraised_by_fkey"
+            columns: ["appraised_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_valuations_trade_vehicle_id_fkey"
+            columns: ["trade_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "trade_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_vehicles: {
+        Row: {
+          accident_history: boolean | null
+          additional_notes: string | null
+          condition: string | null
+          created_at: string
+          drivetrain: string | null
+          exterior_color: string | null
+          fuel_type: string | null
+          id: string
+          interior_color: string | null
+          lead_id: string
+          liens_outstanding: boolean | null
+          make: string | null
+          mileage: number | null
+          model: string | null
+          modifications: string | null
+          photos: Json | null
+          service_records: boolean | null
+          title_type: string | null
+          transmission: string | null
+          trim: string | null
+          updated_at: string
+          vin: string | null
+          year: number | null
+        }
+        Insert: {
+          accident_history?: boolean | null
+          additional_notes?: string | null
+          condition?: string | null
+          created_at?: string
+          drivetrain?: string | null
+          exterior_color?: string | null
+          fuel_type?: string | null
+          id?: string
+          interior_color?: string | null
+          lead_id: string
+          liens_outstanding?: boolean | null
+          make?: string | null
+          mileage?: number | null
+          model?: string | null
+          modifications?: string | null
+          photos?: Json | null
+          service_records?: boolean | null
+          title_type?: string | null
+          transmission?: string | null
+          trim?: string | null
+          updated_at?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Update: {
+          accident_history?: boolean | null
+          additional_notes?: string | null
+          condition?: string | null
+          created_at?: string
+          drivetrain?: string | null
+          exterior_color?: string | null
+          fuel_type?: string | null
+          id?: string
+          interior_color?: string | null
+          lead_id?: string
+          liens_outstanding?: boolean | null
+          make?: string | null
+          mileage?: number | null
+          model?: string | null
+          modifications?: string | null
+          photos?: Json | null
+          service_records?: boolean | null
+          title_type?: string | null
+          transmission?: string | null
+          trim?: string | null
+          updated_at?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_vehicles_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       training_recommendations: {
         Row: {
