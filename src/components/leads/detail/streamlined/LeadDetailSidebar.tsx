@@ -1,9 +1,9 @@
 
 import React from "react";
 import CompactAIControls from "../CompactAIControls";
-import CustomerDetailsCard from "../enhanced/CustomerDetailsCard";
-import ConversationMetricsCard from "../enhanced/ConversationMetricsCard";
 import UnifiedAIPanel from "./UnifiedAIPanel";
+import CompactCustomerCard from "./CompactCustomerCard";
+import CompactMetricsCard from "./CompactMetricsCard";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
 interface LeadDetailSidebarProps {
@@ -20,18 +20,18 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   onMessageSent
 }) => {
   return (
-    <div className="w-80 flex-shrink-0 space-y-4 max-h-screen overflow-y-auto">
-      {/* Unified AI Assistant Panel - combines AI Message Preview, Finn AI, Inventory Status, and Vehicle Interest */}
+    <div className="w-80 flex-shrink-0 space-y-3 max-h-screen overflow-y-auto">
+      {/* Unified AI Assistant Panel - Always visible and compact */}
       <UnifiedAIPanel
         lead={lead}
         onMessageSent={onMessageSent}
       />
       
-      {/* Enhanced Customer Details */}
-      <CustomerDetailsCard lead={lead} />
+      {/* Compact Customer Details */}
+      <CompactCustomerCard lead={lead} />
       
-      {/* Conversation Metrics */}
-      <ConversationMetricsCard lead={lead} />
+      {/* Compact Conversation Metrics */}
+      <CompactMetricsCard lead={lead} />
 
       {/* AI Controls */}
       <CompactAIControls
