@@ -66,8 +66,8 @@ export const scheduleEnhancedAIMessages = async (leadId: string): Promise<boolea
     }
 
     // Calculate next optimal send time based on response patterns
-    const responsePattern = lead.lead_response_patterns?.[0];
-    const personality = lead.lead_personalities?.[0];
+    const responsePattern = Array.isArray(lead.lead_response_patterns) ? lead.lead_response_patterns[0] : null;
+    const personality = Array.isArray(lead.lead_personalities) ? lead.lead_personalities[0] : null;
     
     let nextSendTime = new Date();
     nextSendTime.setHours(nextSendTime.getHours() + 24); // Default to 24 hours
@@ -88,7 +88,7 @@ export const scheduleEnhancedAIMessages = async (leadId: string): Promise<boolea
       .from('leads')
       .update({
         next_ai_send_at: nextSendTime.toISOString(),
-        ai_stage: getNextAIStage(lead.ai_stage, lead.conversations?.length || 0)
+        ai_stage: getNextAIStage(lead.ai_stage, Array.isArray(lead.conversations) ? lead.conversations.length : 0)
       })
       .eq('id', leadId);
 
