@@ -76,6 +76,13 @@ export const navigationConfig: NavConfig[] = [
     priority: 'primary'
   },
   {
+    title: "AI Monitor",
+    href: "/ai-monitor",
+    icon: Eye,
+    roles: ["admin", "manager"],
+    priority: 'primary'
+  },
+  {
     title: "Financial Dashboard",
     href: "/financial-dashboard",
     icon: DollarSign,
@@ -104,13 +111,6 @@ export const navigationConfig: NavConfig[] = [
     icon: Upload,
     roles: ["admin", "manager"],
     badge: "New",
-    priority: 'secondary'
-  },
-  {
-    title: "AI Monitor",
-    href: "/ai-monitor",
-    icon: Eye,
-    roles: ["admin", "manager"],
     priority: 'secondary'
   },
   {
