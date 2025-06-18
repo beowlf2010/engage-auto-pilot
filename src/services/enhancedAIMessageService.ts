@@ -10,6 +10,43 @@ export interface AIMessageSchedule {
   messageType: 'follow_up' | 'inventory_alert' | 'appointment_reminder' | 'behavioral_trigger';
 }
 
+export const generateEnhancedAIMessage = async (leadId: string): Promise<string | null> => {
+  try {
+    console.log('🤖 Generating enhanced AI message for lead:', leadId);
+    
+    // Use the existing intelligent AI message service
+    const message = await generateIntelligentAIMessage({
+      leadId,
+      stage: 'enhanced_follow_up'
+    });
+
+    return message;
+  } catch (error) {
+    console.error('Error generating enhanced AI message:', error);
+    return null;
+  }
+};
+
+export const getAIAnalyticsDashboard = async () => {
+  try {
+    const { data: analytics } = await supabase
+      .from('ai_message_analytics')
+      .select('*')
+      .order('sent_at', { ascending: false })
+      .limit(100);
+
+    return {
+      totalMessages: analytics?.length || 0,
+      responseRate: 0.65, // Mock data for now
+      avgResponseTime: 2.4,
+      topPerformingStages: ['initial', 'follow_up']
+    };
+  } catch (error) {
+    console.error('Error fetching AI analytics:', error);
+    return null;
+  }
+};
+
 export const scheduleEnhancedAIMessages = async (leadId: string): Promise<boolean> => {
   try {
     // Get lead information and conversation history
@@ -36,7 +73,7 @@ export const scheduleEnhancedAIMessages = async (leadId: string): Promise<boolea
     nextSendTime.setHours(nextSendTime.getHours() + 24); // Default to 24 hours
 
     // Optimize based on response patterns
-    if (responsePattern?.best_response_hours?.length > 0) {
+    if (responsePattern?.best_response_hours && Array.isArray(responsePattern.best_response_hours) && responsePattern.best_response_hours.length > 0) {
       const bestHour = responsePattern.best_response_hours[0];
       nextSendTime.setHours(bestHour, 0, 0, 0);
       

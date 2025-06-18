@@ -17,6 +17,69 @@ export interface TrainingRecommendation {
   updatedAt: string;
 }
 
+export const generateTrainingRecommendations = async (salespersonId: string): Promise<TrainingRecommendation[]> => {
+  try {
+    // For now, return mock recommendations - this would be enhanced with AI analysis
+    const mockRecommendations: Omit<TrainingRecommendation, 'id' | 'createdAt' | 'updatedAt'>[] = [
+      {
+        salespersonId,
+        recommendationType: 'communication_improvement',
+        title: 'Improve Response Time',
+        description: 'Focus on responding to leads within 2 hours during business hours',
+        priority: 'high',
+        skillsFocus: ['time_management', 'customer_service'],
+        conversationExamples: ['Quick acknowledgment messages', 'Setting expectations'],
+        completionStatus: 'pending',
+        createdBy: 'system'
+      }
+    ];
+
+    // Create recommendations in database
+    const createdRecommendations: TrainingRecommendation[] = [];
+    
+    for (const rec of mockRecommendations) {
+      const created = await createTrainingRecommendation(rec);
+      if (created) {
+        // Fetch the created recommendation
+        const { data } = await supabase
+          .from('training_recommendations')
+          .select('*')
+          .eq('salesperson_id', salespersonId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (data) {
+          createdRecommendations.push({
+            id: data.id,
+            salespersonId: data.salesperson_id,
+            recommendationType: data.recommendation_type,
+            title: data.title,
+            description: data.description,
+            priority: data.priority as 'low' | 'medium' | 'high',
+            skillsFocus: Array.isArray(data.skills_focus) 
+              ? data.skills_focus.filter((skill): skill is string => typeof skill === 'string')
+              : [],
+            conversationExamples: Array.isArray(data.conversation_examples) 
+              ? data.conversation_examples.filter((example): example is string => typeof example === 'string')
+              : [],
+            completionStatus: data.completion_status as 'pending' | 'in_progress' | 'completed',
+            dueDate: data.due_date,
+            createdBy: data.created_by,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at
+          });
+        }
+      }
+    }
+
+    return createdRecommendations;
+  } catch (error) {
+    console.error('Error generating training recommendations:', error);
+    return [];
+  }
+};
+
 export const getTrainingRecommendations = async (): Promise<TrainingRecommendation[]> => {
   try {
     const { data, error } = await supabase
