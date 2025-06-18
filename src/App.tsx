@@ -29,7 +29,7 @@ function App() {
             <div className="min-h-screen bg-gray-50">
               <Routes>
                 <Route path="/" element={<Index />} />
-                <Route path="/lead/:id" element={<LeadDetailPage />} />
+                <Route path="/lead/:leadId" element={<LeadDetailPage />} />
               </Routes>
             </div>
           </AuthProvider>
