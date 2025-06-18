@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 export const useInboxNotifications = () => {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { profile } = useAuth();
   const channelRef = useRef<any>(null);
   const notificationPermission = useRef<NotificationPermission>('default');
@@ -24,9 +24,21 @@ export const useInboxNotifications = () => {
   useEffect(() => {
     if (!profile) return;
 
-    // Setup realtime channel for email conversations
+    // Clean up existing channel
+    if (channelRef.current) {
+      try {
+        console.log('Removing existing inbox notifications channel');
+        supabase.removeChannel(channelRef.current);
+      } catch (error) {
+        console.error('Error removing existing inbox notifications channel:', error);
+      }
+      channelRef.current = null;
+    }
+
+    // Setup realtime channel for email conversations with unique name
+    const channelName = `inbox-notifications-${profile.id}-${Date.now()}`;
     const channel = supabase
-      .channel(`email-notifications-${profile.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -55,7 +67,7 @@ export const useInboxNotifications = () => {
                                      profile.role === 'manager' || 
                                      profile.role === 'admin';
 
-              if (isForCurrentUser) {
+              if (isForCurrentUser && toast) {
                 // Show toast notification
                 toast({
                   title: `📧 New email from ${leadName}`,
@@ -86,14 +98,30 @@ export const useInboxNotifications = () => {
             console.error('Error handling email notification:', error);
           }
         }
-      )
-      .subscribe();
+      );
 
-    channelRef.current = channel;
+    channel.subscribe((status) => {
+      console.log('Inbox notifications channel status:', status);
+      if (status === 'SUBSCRIBED') {
+        channelRef.current = channel;
+        console.log('Inbox notifications channel subscribed successfully');
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('Inbox notifications channel error');
+        channelRef.current = null;
+      } else if (status === 'CLOSED') {
+        console.log('Inbox notifications channel closed');
+        channelRef.current = null;
+      }
+    });
 
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        try {
+          console.log('Cleaning up inbox notifications channel');
+          supabase.removeChannel(channelRef.current);
+        } catch (error) {
+          console.error('Error removing inbox notifications channel:', error);
+        }
       }
     };
   }, [profile, toast]);

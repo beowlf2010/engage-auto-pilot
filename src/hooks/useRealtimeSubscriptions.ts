@@ -68,17 +68,18 @@ export const useRealtimeSubscriptions = ({
   useEffect(() => {
     if (!profile) return;
 
+    // Clean up existing channel
     if (channelRef.current) {
       try {
-        console.log('Removing existing unified channel');
+        console.log('Removing existing realtime subscriptions channel');
         supabase.removeChannel(channelRef.current);
       } catch (error) {
-        console.error('Error removing existing unified channel:', error);
+        console.error('Error removing existing realtime subscriptions channel:', error);
       }
       channelRef.current = null;
     }
 
-    const channelName = `unified-inbox-${profile.id}-${Date.now()}`;
+    const channelName = `realtime-subscriptions-${profile.id}-${Date.now()}`;
     
     const channel = supabase
       .channel(channelName)
@@ -102,15 +103,15 @@ export const useRealtimeSubscriptions = ({
       );
 
     channel.subscribe((status) => {
-      console.log('Unified inbox channel status:', status);
+      console.log('Realtime subscriptions channel status:', status);
       if (status === 'SUBSCRIBED') {
         channelRef.current = channel;
-        console.log('Unified inbox channel subscribed successfully');
+        console.log('Realtime subscriptions channel subscribed successfully');
       } else if (status === 'CHANNEL_ERROR') {
-        console.error('Unified inbox channel error');
+        console.error('Realtime subscriptions channel error');
         channelRef.current = null;
       } else if (status === 'CLOSED') {
-        console.log('Unified inbox channel closed');
+        console.log('Realtime subscriptions channel closed');
         channelRef.current = null;
       }
     });
@@ -118,10 +119,10 @@ export const useRealtimeSubscriptions = ({
     return () => {
       if (channelRef.current) {
         try {
-          console.log('Cleaning up unified inbox channel');
+          console.log('Cleaning up realtime subscriptions channel');
           supabase.removeChannel(channelRef.current);
         } catch (error) {
-          console.error('Error removing unified inbox channel:', error);
+          console.error('Error removing realtime subscriptions channel:', error);
         }
       }
     };
