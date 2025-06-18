@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import LeadContextCard from './LeadContextCard';
 import ConversationHistory from './ConversationHistory';
 import MessageEditor from './MessageEditor';
 import { getMessageQualityScore, formatTime } from './messageUtils';
+import EnhancedMessagePreview from './EnhancedMessagePreview';
 
 interface MessagePreviewModalProps {
   open: boolean;
@@ -249,6 +249,21 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
               generating={generating}
               qualityScore={qualityScore}
             />
+
+            {/* Enhanced Message Preview with Learning */}
+            {generatedMessage && leadContext && (
+              <EnhancedMessagePreview
+                leadId={leadId}
+                leadName={`${leadContext.firstName} ${leadContext.lastName}`}
+                messageContent={editedMessage || generatedMessage}
+                onMessageSent={() => {
+                  handleApprove();
+                }}
+                onFeedbackSubmitted={() => {
+                  // Optionally refresh or show feedback confirmation
+                }}
+              />
+            )}
 
             {/* Regeneration History */}
             {regenerationHistory.length > 1 && (
