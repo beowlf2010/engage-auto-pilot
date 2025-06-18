@@ -262,11 +262,11 @@ export const generateEnhancedIntelligentResponse = async (
       return null;
     }
 
-    // Add conversation note about the AI response
+    // Add conversation note about the AI response - FIX: Use correct note type
     await addAIConversationNote(
       context.leadId,
       lastCustomerMessage.id,
-      inventoryCheck.hasInventory ? 'vehicle_shown' : 'honest_inventory_discussion',
+      inventoryCheck.hasInventory ? 'vehicle_shown' : 'inventory_discussion',
       `QUESTION-FIRST AI Response: ${data.message.substring(0, 200)}${data.message.length > 200 ? '...' : ''}`,
       inventoryCheck.matchingVehicles || []
     );
