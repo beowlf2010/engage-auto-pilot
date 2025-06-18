@@ -1,3 +1,4 @@
+
 import { PhoneNumber } from '@/types/lead';
 
 // Format phone number for Twilio E.164 compatibility
@@ -49,8 +50,8 @@ export const formatPhoneNumber = (phone: string): string => {
 
 export const isValidPhoneNumber = (phone: string): boolean => {
   const digits = phone.replace(/\D/g, '');
-  // More flexible - accept 10, 11, or already formatted numbers
-  return digits.length >= 10 && digits.length <= 15;
+  // Accept 10 or 11 digit numbers (more flexible)
+  return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
 };
 
 // Validate E.164 format specifically for Twilio
@@ -67,6 +68,8 @@ export const createPhoneNumbers = (
   const phones: PhoneNumber[] = [];
   const seen = new Set<string>();
 
+  console.log('Creating phone numbers from:', { cellphone, dayphone, evephone });
+
   // Priority order: cell (1), day (2), eve (3)
   if (cellphone && isValidPhoneNumber(cellphone)) {
     const formatted = formatPhoneForTwilio(cellphone);
@@ -80,7 +83,10 @@ export const createPhoneNumbers = (
         isPrimary: true
       });
       seen.add(formatted);
+      console.log(`Added cell phone: ${formatted}`);
     }
+  } else if (cellphone) {
+    console.log(`Invalid cell phone: ${cellphone}`);
   }
 
   if (dayphone && isValidPhoneNumber(dayphone)) {
@@ -95,7 +101,10 @@ export const createPhoneNumbers = (
         isPrimary: phones.length === 0
       });
       seen.add(formatted);
+      console.log(`Added day phone: ${formatted}`);
     }
+  } else if (dayphone) {
+    console.log(`Invalid day phone: ${dayphone}`);
   }
 
   if (evephone && isValidPhoneNumber(evephone)) {
@@ -110,9 +119,13 @@ export const createPhoneNumbers = (
         isPrimary: phones.length === 0
       });
       seen.add(formatted);
+      console.log(`Added eve phone: ${formatted}`);
     }
+  } else if (evephone) {
+    console.log(`Invalid eve phone: ${evephone}`);
   }
 
+  console.log(`Created ${phones.length} valid phone numbers`);
   return phones.sort((a, b) => a.priority - b.priority);
 };
 

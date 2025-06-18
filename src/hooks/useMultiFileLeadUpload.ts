@@ -69,6 +69,55 @@ export const useMultiFileLeadUpload = () => {
     ));
   };
 
+  // Create flexible field mapping based on common CSV headers
+  const createFlexibleMapping = (headers: string[]) => {
+    console.log('Available CSV headers:', headers);
+    
+    const findHeader = (possibleNames: string[]): string => {
+      for (const name of possibleNames) {
+        const found = headers.find(h => 
+          h.toLowerCase().trim() === name.toLowerCase() ||
+          h.toLowerCase().replace(/[^a-z]/g, '') === name.toLowerCase().replace(/[^a-z]/g, '')
+        );
+        if (found) {
+          console.log(`Mapped ${possibleNames[0]} to "${found}"`);
+          return found;
+        }
+      }
+      console.log(`No mapping found for ${possibleNames[0]}`);
+      return '';
+    };
+
+    const mapping = {
+      firstName: findHeader(['firstname', 'first_name', 'fname', 'FirstName']),
+      lastName: findHeader(['lastname', 'last_name', 'lname', 'LastName']),
+      middleName: findHeader(['middlename', 'middle_name', 'mname', 'MiddleName']),
+      email: findHeader(['email', 'emailaddress', 'email_address', 'Email']),
+      emailAlt: findHeader(['email_alt', 'emailalt', 'alternate_email', 'Email2']),
+      cellphone: findHeader(['cellphone', 'cell_phone', 'mobile', 'cell', 'CellPhone']),
+      dayphone: findHeader(['dayphone', 'day_phone', 'homephone', 'home_phone', 'DayPhone']),
+      evephone: findHeader(['evephone', 'evening_phone', 'eveningphone', 'EvePhone']),
+      address: findHeader(['address', 'street', 'Address', 'StreetAddress']),
+      city: findHeader(['city', 'City']),
+      state: findHeader(['state', 'State']),
+      postalCode: findHeader(['postalcode', 'postal_code', 'zip', 'zipcode', 'PostalCode']),
+      vehicleYear: findHeader(['vehicleyear', 'vehicle_year', 'year', 'Year']),
+      vehicleMake: findHeader(['vehiclemake', 'vehicle_make', 'make', 'Make']),
+      vehicleModel: findHeader(['vehiclemodel', 'vehicle_model', 'model', 'Model']),
+      vehicleVIN: findHeader(['vin', 'VIN', 'vehicle_vin']),
+      source: findHeader(['source', 'Source', 'lead_source']),
+      salesPersonFirstName: findHeader(['salespersonfirstname', 'salesperson_first_name', 'SalesPersonFirstName', 'sales_person_first_name']),
+      salesPersonLastName: findHeader(['salespersonlastname', 'salesperson_last_name', 'SalesPersonLastName', 'sales_person_last_name']),
+      doNotCall: findHeader(['donotcall', 'do_not_call', 'DoNotCall']),
+      doNotEmail: findHeader(['donotemail', 'do_not_email', 'DoNotEmail']),
+      doNotMail: findHeader(['donotmail', 'do_not_mail', 'DoNotMail']),
+      status: findHeader(['status', 'Status', 'lead_status', 'LeadStatus'])
+    };
+
+    console.log('Created mapping:', mapping);
+    return mapping;
+  };
+
   const processFile = async (queuedFile: QueuedLeadFile): Promise<void> => {
     try {
       updateFileStatus(queuedFile.id, 'processing');
@@ -82,49 +131,38 @@ export const useMultiFileLeadUpload = () => {
       
       // Parse the file
       const parsed = await parseEnhancedInventoryFile(queuedFile.file);
-      console.log(`Parsed lead file with ${parsed.rows.length} rows`);
+      console.log(`Parsed lead file with ${parsed.rows.length} rows and headers:`, parsed.headers);
       
-      // Create a basic field mapping for lead processing
-      const basicMapping = {
-        firstName: 'first_name',
-        lastName: 'last_name',
-        middleName: 'middle_name',
-        email: 'email',
-        emailAlt: 'email_alt',
-        cellphone: 'phone',
-        dayphone: 'day_phone',
-        evephone: 'evening_phone',
-        address: 'address',
-        city: 'city',
-        state: 'state',
-        postalCode: 'postal_code',
-        vehicleYear: 'vehicle_year',
-        vehicleMake: 'vehicle_make',
-        vehicleModel: 'vehicle_model',
-        vehicleVIN: 'vin',
-        source: 'source',
-        salesPersonFirstName: 'salesperson_first_name',
-        salesPersonLastName: 'salesperson_last_name',
-        doNotCall: 'do_not_call',
-        doNotEmail: 'do_not_email',
-        doNotMail: 'do_not_mail',
-        status: 'status'
-      };
+      if (parsed.rows.length === 0) {
+        throw new Error('No data rows found in file');
+      }
+
+      // Create flexible field mapping
+      const flexibleMapping = createFlexibleMapping(parsed.headers);
       
       // Process leads with enhanced data preservation
       const processingResult = await processLeadsEnhanced(
         parsed, 
-        basicMapping,
+        flexibleMapping,
         queuedFile.file.name,
         queuedFile.file.size,
         queuedFile.file.type
       );
+      
+      console.log(`Processing result: ${processingResult.validLeads.length} valid leads, ${processingResult.errors.length} errors, ${processingResult.duplicates.length} duplicates`);
+      
+      if (processingResult.validLeads.length === 0) {
+        console.error('Processing errors:', processingResult.errors);
+        throw new Error(`No valid leads could be processed. Common issues: ${processingResult.errors.slice(0, 3).map(e => e.error).join(', ')}`);
+      }
       
       // Insert leads to database with upload history tracking
       const insertResult = await insertLeadsToDatabase(
         processingResult.validLeads,
         processingResult.uploadHistoryId
       );
+      
+      console.log(`Insert result: ${insertResult.successfulInserts} successful, ${insertResult.errors.length} errors`);
       
       updateFileStatus(queuedFile.id, 'completed', undefined, {
         totalRows: parsed.rows.length,
