@@ -4,11 +4,32 @@ import { Lead } from '@/types/lead';
 import { useLeads } from '@/hooks/useLeads';
 import { FilterOptions } from '@/components/leads/AdvancedFilters';
 
+export interface SearchFilters {
+  searchTerm: string;
+  status?: string;
+  source?: string;
+  aiOptIn?: boolean;
+  dateRange?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  salesperson?: string;
+  contactStatus?: string;
+}
+
+export interface SavedPreset {
+  id: string;
+  name: string;
+  filters: SearchFilters;
+  createdAt: string;
+}
+
 export const useAdvancedLeads = () => {
   const { leads, loading, refetch } = useLeads();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
   const [savedPresets, setSavedPresets] = useState<Array<{ name: string; filters: FilterOptions }>>([]);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({ searchTerm: '' });
   
   const defaultFilters: FilterOptions = {
     status: [],
@@ -47,26 +68,53 @@ export const useAdvancedLeads = () => {
     return Math.min(score, 100);
   };
 
-  // Filter leads based on current filters
+  // Filter leads based on current filters and status
   const filteredLeads = useMemo(() => {
     let filtered = [...leads];
 
-    // Status filter
+    // Search term filter
+    if (searchFilters.searchTerm) {
+      const searchTerm = searchFilters.searchTerm.toLowerCase();
+      filtered = filtered.filter(lead => 
+        lead.firstName.toLowerCase().includes(searchTerm) ||
+        lead.lastName.toLowerCase().includes(searchTerm) ||
+        lead.email?.toLowerCase().includes(searchTerm) ||
+        lead.primaryPhone?.includes(searchTerm) ||
+        lead.vehicleInterest.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Status filter from tabs
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(lead => lead.status === statusFilter);
+    }
+
+    // Search filters
+    if (searchFilters.status && searchFilters.status !== statusFilter) {
+      filtered = filtered.filter(lead => lead.status === searchFilters.status);
+    }
+
+    if (searchFilters.source) {
+      filtered = filtered.filter(lead => lead.source === searchFilters.source);
+    }
+
+    if (searchFilters.aiOptIn !== undefined) {
+      filtered = filtered.filter(lead => lead.aiOptIn === searchFilters.aiOptIn);
+    }
+
+    // Advanced filters
     if (filters.status.length > 0) {
       filtered = filtered.filter(lead => filters.status.includes(lead.status));
     }
 
-    // Contact status filter
     if (filters.contactStatus.length > 0) {
       filtered = filtered.filter(lead => filters.contactStatus.includes(lead.contactStatus));
     }
 
-    // AI opt-in filter
     if (filters.aiOptIn !== null) {
       filtered = filtered.filter(lead => lead.aiOptIn === filters.aiOptIn);
     }
 
-    // Date range filter
     if (filters.dateRange.from) {
       filtered = filtered.filter(lead => 
         new Date(lead.createdAt) >= filters.dateRange.from!
@@ -78,28 +126,24 @@ export const useAdvancedLeads = () => {
       );
     }
 
-    // Vehicle interest filter
     if (filters.vehicleInterest) {
       filtered = filtered.filter(lead => 
         lead.vehicleInterest?.toLowerCase().includes(filters.vehicleInterest.toLowerCase())
       );
     }
 
-    // City filter
     if (filters.city) {
       filtered = filtered.filter(lead => 
         lead.city?.toLowerCase().includes(filters.city.toLowerCase())
       );
     }
 
-    // State filter
     if (filters.state) {
       filtered = filtered.filter(lead => 
         lead.state?.toLowerCase().includes(filters.state.toLowerCase())
       );
     }
 
-    // Engagement score filter
     if (filters.engagementScore.min !== null || filters.engagementScore.max !== null) {
       filtered = filtered.filter(lead => {
         const score = getEngagementScore(lead);
@@ -110,7 +154,7 @@ export const useAdvancedLeads = () => {
     }
 
     return filtered;
-  }, [leads, filters]);
+  }, [leads, filters, statusFilter, searchFilters]);
 
   const savePreset = (name: string, filterOptions: FilterOptions) => {
     const newPresets = [...savedPresets, { name, filters: filterOptions }];
@@ -124,6 +168,7 @@ export const useAdvancedLeads = () => {
 
   const clearFilters = () => {
     setFilters(defaultFilters);
+    setSearchFilters({ searchTerm: '' });
     setSelectedLeads([]);
   };
 
@@ -159,9 +204,13 @@ export const useAdvancedLeads = () => {
     quickViewLead,
     savedPresets,
     filters,
+    statusFilter,
+    searchFilters,
     
     // Actions
     setFilters,
+    setStatusFilter,
+    setSearchFilters,
     savePreset,
     loadPreset,
     clearFilters,

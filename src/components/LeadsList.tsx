@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import LeadsTable from './LeadsTable';
 import LeadQuickView from './leads/LeadQuickView';
 import BulkActionsPanel from './leads/BulkActionsPanel';
-import EnhancedLeadSearch, { SearchFilters, SavedPreset } from './leads/EnhancedLeadSearch';
+import EnhancedLeadSearch from './leads/EnhancedLeadSearch';
 import VINImportModal from './leads/VINImportModal';
 import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
 import { Lead } from '@/types/lead';
@@ -26,8 +26,12 @@ const LeadsList = () => {
     loading,
     selectedLeads,
     quickViewLead,
+    statusFilter,
+    searchFilters,
     refetch,
     getEngagementScore,
+    setStatusFilter,
+    setSearchFilters,
     selectAllFiltered,
     clearSelection,
     toggleLeadSelection,
@@ -36,46 +40,10 @@ const LeadsList = () => {
   } = useAdvancedLeads();
 
   const { profile } = useAuth();
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({ searchTerm: '' });
-  const [savedPresets] = useState<SavedPreset[]>([]);
   const [isVINImportModalOpen, setIsVINImportModalOpen] = useState(false);
 
   const canEdit = profile?.role === 'manager' || profile?.role === 'admin';
   const canImport = profile?.role === 'manager' || profile?.role === 'admin';
-
-  // Simple filter implementation
-  const filteredLeads = leads.filter(lead => {
-    // Search term filter
-    if (searchFilters.searchTerm) {
-      const searchTerm = searchFilters.searchTerm.toLowerCase();
-      const matchesSearch = 
-        lead.firstName.toLowerCase().includes(searchTerm) ||
-        lead.lastName.toLowerCase().includes(searchTerm) ||
-        lead.email?.toLowerCase().includes(searchTerm) ||
-        lead.primaryPhone?.includes(searchTerm) ||
-        lead.vehicleInterest.toLowerCase().includes(searchTerm);
-      
-      if (!matchesSearch) return false;
-    }
-
-    // Status filter
-    if (searchFilters.status && lead.status !== searchFilters.status) {
-      return false;
-    }
-
-    // Source filter
-    if (searchFilters.source && lead.source !== searchFilters.source) {
-      return false;
-    }
-
-    // AI Opt-in filter
-    if (searchFilters.aiOptIn !== undefined && lead.aiOptIn !== searchFilters.aiOptIn) {
-      return false;
-    }
-
-    return true;
-  });
 
   const handleAiOptInChange = async (leadId: string, value: boolean) => {
     try {
@@ -102,11 +70,7 @@ const LeadsList = () => {
     }
   };
 
-  // Apply status filter to the filtered leads from search
-  const finalFilteredLeads = filteredLeads.filter(lead => {
-    return statusFilter === 'all' || lead.status === statusFilter;
-  });
-
+  // Calculate stats from all leads (not filtered)
   const stats = {
     total: leads.length,
     noContact: leads.filter(l => l.contactStatus === 'no_contact').length,
@@ -115,13 +79,13 @@ const LeadsList = () => {
     aiEnabled: leads.filter(l => l.aiOptIn).length
   };
 
-  // Mock functions for the enhanced search
-  const handleSavePreset = async (name: string, filters: SearchFilters) => {
+  // Mock functions for the enhanced search (these will be connected later)
+  const handleSavePreset = async (name: string, filters: any) => {
     console.log('Saving preset:', name, filters);
   };
 
-  const handleLoadPreset = (preset: SavedPreset) => {
-    setSearchFilters(preset.filters);
+  const handleLoadPreset = (preset: any) => {
+    console.log('Loading preset:', preset);
   };
 
   // Bulk action handlers
@@ -355,10 +319,10 @@ const LeadsList = () => {
       {/* Enhanced Search & Filters */}
       <EnhancedLeadSearch
         onFiltersChange={setSearchFilters}
-        savedPresets={savedPresets}
+        savedPresets={[]}
         onSavePreset={handleSavePreset}
         onLoadPreset={handleLoadPreset}
-        totalResults={finalFilteredLeads.length}
+        totalResults={leads.length}
         isLoading={loading}
       />
 
@@ -377,7 +341,7 @@ const LeadsList = () => {
       <LeadsStatusTabs
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
-        finalFilteredLeads={finalFilteredLeads}
+        finalFilteredLeads={leads}
         loading={loading}
         selectedLeads={selectedLeads}
         selectAllFiltered={selectAllFiltered}
