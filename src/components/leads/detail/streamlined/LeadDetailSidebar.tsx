@@ -1,13 +1,9 @@
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Bot } from "lucide-react";
+import React from "react";
 import CompactAIControls from "../CompactAIControls";
 import CustomerDetailsCard from "../enhanced/CustomerDetailsCard";
-import VehicleInterestCard from "../enhanced/VehicleInterestCard";
 import ConversationMetricsCard from "../enhanced/ConversationMetricsCard";
-import InventoryValidationPanel from "../enhanced/InventoryValidationPanel";
-import EnhancedAIMessagePreview from "../enhanced/EnhancedAIMessagePreview";
+import UnifiedAIPanel from "./UnifiedAIPanel";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
 interface LeadDetailSidebarProps {
@@ -23,21 +19,19 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   onAITakeoverChange,
   onMessageSent
 }) => {
-  const [showAIPreview, setShowAIPreview] = useState(false);
-
   return (
     <div className="w-80 flex-shrink-0 space-y-4 max-h-screen overflow-y-auto">
+      {/* Unified AI Assistant Panel - combines AI Message Preview, Finn AI, Inventory Status, and Vehicle Interest */}
+      <UnifiedAIPanel
+        lead={lead}
+        onMessageSent={onMessageSent}
+      />
+      
       {/* Enhanced Customer Details */}
       <CustomerDetailsCard lead={lead} />
       
-      {/* Vehicle Interest */}
-      <VehicleInterestCard lead={lead} />
-      
       {/* Conversation Metrics */}
       <ConversationMetricsCard lead={lead} />
-      
-      {/* Inventory Validation */}
-      <InventoryValidationPanel lead={lead} />
 
       {/* AI Controls */}
       <CompactAIControls
@@ -55,31 +49,6 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
         vehicleInterest={lead.vehicleInterest}
         onMessageSent={onMessageSent}
       />
-
-      {/* Enhanced AI Message Preview */}
-      {!showAIPreview && (
-        <Button 
-          onClick={() => setShowAIPreview(true)}
-          className="w-full"
-          variant="outline"
-        >
-          <Bot className="w-4 h-4 mr-2" />
-          Preview AI Message
-        </Button>
-      )}
-      
-      {showAIPreview && (
-        <EnhancedAIMessagePreview
-          leadId={lead.id}
-          leadName={`${lead.firstName} ${lead.lastName}`}
-          vehicleInterest={lead.vehicleInterest}
-          onMessageSent={() => {
-            setShowAIPreview(false);
-            onMessageSent?.();
-          }}
-          onClose={() => setShowAIPreview(false)}
-        />
-      )}
     </div>
   );
 };
