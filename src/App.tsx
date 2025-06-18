@@ -15,6 +15,7 @@ import FinancialDashboardPage from './pages/FinancialDashboardPage';
 import PredictiveAnalyticsPage from './pages/PredictiveAnalyticsPage';
 import MessageExportPage from './pages/MessageExportPage';
 import SettingsPage from './pages/SettingsPage';
+import AuthPage from './pages/AuthPage';
 import { useGlobalAIScheduler } from './hooks/useGlobalAIScheduler';
 
 const queryClient = new QueryClient();
@@ -26,6 +27,8 @@ const GlobalAIScheduler = () => {
 };
 
 function App() {
+  console.log('App component rendering');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -37,6 +40,7 @@ function App() {
             <div className="min-h-screen bg-gray-50">
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<AuthPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/streamlined-leads" element={<StreamlinedLeadsPage />} />
                 <Route path="/smart-inbox" element={<SmartInboxPage />} />

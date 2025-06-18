@@ -29,25 +29,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
+  console.log('AuthProvider - current state:', { user: !!user, session: !!session, profile: !!profile, loading });
+
   useEffect(() => {
+    console.log('AuthProvider - setting up auth listener');
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('AuthProvider - auth state change:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
           // Fetch user profile
           setTimeout(async () => {
+            console.log('AuthProvider - fetching profile for user:', session.user.id);
             const { data: profile } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
               .single();
+            console.log('AuthProvider - profile fetched:', profile);
             setProfile(profile);
             setLoading(false);
           }, 0);
         } else {
+          console.log('AuthProvider - no session, clearing profile');
           setProfile(null);
           setLoading(false);
         }
@@ -55,15 +63,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     // Check for existing session
+    console.log('AuthProvider - checking for existing session');
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('AuthProvider - existing session:', session?.user?.id);
       setSession(session);
       setUser(session?.user ?? null);
       if (!session) {
+        console.log('AuthProvider - no existing session, setting loading to false');
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('AuthProvider - cleaning up auth listener');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

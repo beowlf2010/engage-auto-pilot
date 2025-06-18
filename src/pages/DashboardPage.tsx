@@ -7,7 +7,11 @@ import { Navigate } from "react-router-dom";
 const DashboardPage = () => {
   const { profile, loading } = useAuth();
 
+  console.log('DashboardPage - profile:', profile);
+  console.log('DashboardPage - loading:', loading);
+
   if (loading) {
+    console.log('DashboardPage - showing loading state');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
         <div className="text-center">
@@ -19,8 +23,11 @@ const DashboardPage = () => {
   }
 
   if (!profile) {
+    console.log('DashboardPage - no profile, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
+
+  console.log('DashboardPage - rendering dashboard for user:', profile);
 
   const user = {
     id: profile.id,
