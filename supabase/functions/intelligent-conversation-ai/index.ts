@@ -33,12 +33,12 @@ serve(async (req) => {
       context = {}
     } = await req.json();
 
-    console.log(`🤖 Processing ENHANCED intelligent AI request with STRICT inventory validation for: ${leadName}`);
+    console.log(`🤖 Processing ENHANCED intelligent AI request with QUESTION-FIRST priority for: ${leadName}`);
     console.log(`🚗 Vehicle interest: ${vehicleInterest}`);
     console.log(`💬 Last message: ${lastCustomerMessage}`);
     console.log(`📦 Strict mode:`, context.strictInventoryMode || false);
 
-    // ENHANCED validation pipeline with lead-specific context
+    // ENHANCED validation pipeline with lead-specific context and question analysis
     const [inventoryValidation, businessHours, conversationMemory] = await Promise.all([
       validateInventoryAccuracy(vehicleInterest || '', leadId),
       getBusinessHoursStatus(),
@@ -71,8 +71,17 @@ serve(async (req) => {
       mustNotClaim: !inventoryValidation.hasRealInventory // Flag to prevent claims
     };
 
-    // Build enhanced prompts with STRICT inventory awareness
-    const { systemPrompt, appointmentIntent, appointmentFollowUp, tradeIntent, tradeFollowUp, requestedCategory } = buildEnhancedSystemPrompt(
+    // Build enhanced prompts with QUESTION-FIRST priority and STRICT inventory awareness
+    const { 
+      systemPrompt, 
+      customerIntent, 
+      answerGuidance, 
+      appointmentIntent, 
+      appointmentFollowUp, 
+      tradeIntent, 
+      tradeFollowUp, 
+      requestedCategory 
+    } = buildEnhancedSystemPrompt(
       leadName,
       vehicleInterest,
       conversationLength,
@@ -90,13 +99,18 @@ serve(async (req) => {
       { isEstablishedConversation: conversationLength > 2 },
       conversationMemory,
       conversationGuidance,
+      customerIntent,
+      answerGuidance,
       appointmentIntent,
       tradeIntent
     );
 
+    console.log('🎯 Customer question detected:', customerIntent?.requiresDirectAnswer ? 'YES' : 'NO');
+    console.log('❓ Question type:', customerIntent?.primaryQuestionType || 'none');
     console.log('🎯 Appointment intent detected:', appointmentIntent?.hasAppointmentIntent ? 'YES' : 'NO');
     console.log('🚗 Trade intent detected:', tradeIntent?.hasTradeIntent ? 'YES' : 'NO');
     console.log('⚠️ Inventory safety mode:', !inventoryValidation.hasRealInventory ? 'ACTIVE' : 'NORMAL');
+    console.log('🔧 Conversation repair needed:', customerIntent?.conversationContext?.hasBeenIgnored ? 'YES' : 'NO');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -118,12 +132,14 @@ serve(async (req) => {
     const aiResponse = await response.json();
     const generatedMessage = aiResponse.choices[0].message.content;
 
-    console.log(`✅ Generated ENHANCED response with STRICT inventory validation: ${generatedMessage}`);
+    console.log(`✅ Generated QUESTION-FIRST response with STRICT inventory validation: ${generatedMessage}`);
 
     return new Response(JSON.stringify({ 
       message: generatedMessage,
       confidence: 0.95,
-      reasoning: `ENHANCED context-aware response with STRICT inventory validation (${inventoryValidation.validatedCount} verified vehicles), appointment detection (${appointmentIntent?.hasAppointmentIntent ? 'Intent detected' : 'No intent'}), trade detection (${tradeIntent?.hasTradeIntent ? 'Intent detected' : 'No intent'}), business hours (${businessHours.isOpen ? 'open' : 'closed'}), and conversation memory (${conversationMemory.conversationLength} messages) for ${requestedCategory.category} vehicle inquiry`,
+      reasoning: `QUESTION-FIRST response with enhanced intent analysis (${customerIntent?.requiresDirectAnswer ? 'Direct question detected' : 'No direct question'}), STRICT inventory validation (${inventoryValidation.validatedCount} verified vehicles), appointment detection (${appointmentIntent?.hasAppointmentIntent ? 'Intent detected' : 'No intent'}), trade detection (${tradeIntent?.hasTradeIntent ? 'Intent detected' : 'No intent'}), business hours (${businessHours.isOpen ? 'open' : 'closed'}), and conversation memory (${conversationMemory.conversationLength} messages) for ${requestedCategory.category} vehicle inquiry`,
+      customerIntent: customerIntent || null,
+      answerGuidance: answerGuidance || null,
       appointmentIntent: appointmentIntent || null,
       tradeIntent: tradeIntent || null,
       inventoryValidation: {
@@ -136,7 +152,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('❌ Error in ENHANCED intelligent conversation AI with STRICT inventory validation:', error);
+    console.error('❌ Error in QUESTION-FIRST intelligent conversation AI with STRICT inventory validation:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

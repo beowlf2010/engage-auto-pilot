@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConversationContext {
@@ -22,6 +23,8 @@ export interface AIResponse {
   message: string;
   confidence: number;
   reasoning: string;
+  customerIntent?: any;
+  answerGuidance?: any;
 }
 
 // Clean and validate vehicle interest data
@@ -83,7 +86,7 @@ const categorizeVehicle = (vehicleText: string) => {
   };
 };
 
-// Enhanced inventory availability check with strict validation - DO NOT HALLUCINATE
+// Enhanced inventory availability check with strict validation
 const checkInventoryAvailability = async (vehicleInterest: string) => {
   try {
     const cleanInterest = cleanVehicleInterest(vehicleInterest);
@@ -269,9 +272,9 @@ const findCategoryRelevantAlternatives = async (requestedCategory: any) => {
   }
 };
 
-export const generateIntelligentResponse = async (context: ConversationContext): Promise<AIResponse | null> => {
+export const generateEnhancedIntelligentResponse = async (context: ConversationContext): Promise<AIResponse | null> => {
   try {
-    console.log('🤖 Generating intelligent AI response for lead:', context.leadId);
+    console.log('🤖 Generating QUESTION-FIRST intelligent AI response for lead:', context.leadId);
 
     // Clean the vehicle interest data
     const cleanedVehicleInterest = cleanVehicleInterest(context.vehicleInterest);
@@ -312,6 +315,7 @@ export const generateIntelligentResponse = async (context: ConversationContext):
 
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
+        leadId: context.leadId,
         leadName: context.leadName,
         vehicleInterest: cleanedVehicleInterest,
         lastCustomerMessage: lastCustomerMessage.body,
@@ -323,7 +327,14 @@ export const generateIntelligentResponse = async (context: ConversationContext):
           requestedMake: inventoryCheck.searchedMake,
           matchingVehicles: inventoryCheck.matchingVehicles,
           availableAlternatives: availableAlternatives,
-          requestedCategory: inventoryCheck.requestedCategory
+          requestedCategory: inventoryCheck.requestedCategory,
+          hasActualInventory: inventoryCheck.hasInventory,
+          actualVehicles: inventoryCheck.matchingVehicles || [],
+          validatedCount: inventoryCheck.matchingVehicles?.length || 0,
+          inventoryWarning: inventoryCheck.warning,
+          realInventoryCount: inventoryCheck.matchingVehicles?.length || 0,
+          strictMode: true,
+          mustNotClaim: !inventoryCheck.hasInventory
         }
       }
     });
@@ -338,16 +349,18 @@ export const generateIntelligentResponse = async (context: ConversationContext):
       return null;
     }
 
-    console.log('✅ Generated intelligent response:', data.message);
+    console.log('✅ Generated QUESTION-FIRST intelligent response:', data.message);
     
     return {
       message: data.message,
       confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'Enhanced AI analysis with Tesla new/used awareness and category-aware inventory matching'
+      reasoning: data.reasoning || 'Enhanced QUESTION-FIRST AI analysis with strict inventory validation and customer intent detection',
+      customerIntent: data.customerIntent || null,
+      answerGuidance: data.answerGuidance || null
     };
 
   } catch (error) {
-    console.error('❌ Error generating intelligent response:', error);
+    console.error('❌ Error generating QUESTION-FIRST intelligent response:', error);
     return null;
   }
 };

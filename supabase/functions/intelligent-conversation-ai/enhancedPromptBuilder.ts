@@ -1,8 +1,9 @@
 
 import { analyzeAppointmentIntent, generateAppointmentFollowUp } from './appointmentIntentAnalysis.ts';
 import { analyzeTradeIntent, generateTradeFollowUp } from './tradeIntentAnalysis.ts';
+import { analyzeCustomerIntent, generateAnswerGuidance, needsConversationRepair } from './enhancedIntentAnalysis.ts';
 
-// Enhanced prompt builder that includes appointment and trade intent analysis
+// Enhanced prompt builder that prioritizes answering customer questions
 export const buildEnhancedSystemPrompt = (
   leadName: string,
   vehicleInterest: string,
@@ -13,6 +14,11 @@ export const buildEnhancedSystemPrompt = (
   conversationGuidance: any,
   lastCustomerMessage: string
 ) => {
+  // Analyze customer intent and questions
+  const customerIntent = analyzeCustomerIntent(conversationHistory, lastCustomerMessage);
+  const answerGuidance = generateAnswerGuidance(customerIntent, inventoryStatus);
+  const needsRepair = needsConversationRepair(customerIntent);
+  
   // Analyze appointment intent
   const appointmentIntent = analyzeAppointmentIntent(conversationHistory, lastCustomerMessage);
   const appointmentFollowUp = generateAppointmentFollowUp(appointmentIntent, { name: leadName });
@@ -33,7 +39,27 @@ CONVERSATION CONTEXT:
 INVENTORY STATUS:
 - Has Requested Vehicle: ${inventoryStatus.hasActualInventory ? 'YES' : 'NO'}
 - Available Vehicles: ${inventoryStatus.realInventoryCount || 0}
-${inventoryStatus.inventoryWarning ? `⚠️ ${inventoryStatus.inventoryWarning}` : ''}
+${inventoryStatus.inventoryWarning ? `⚠️ ${inventoryStatus.inventoryWarning}` : ''}`;
+
+  // Add critical customer question analysis
+  if (customerIntent.requiresDirectAnswer) {
+    systemPrompt += `
+
+🚨 CUSTOMER QUESTION ANALYSIS:
+- Direct Question Detected: ${customerIntent.isDirectQuestion ? 'YES' : 'NO'}
+- Question Types: ${customerIntent.questionTypes.join(', ')}
+- Question Topic: ${customerIntent.questionTopic || 'general'}
+- Customer Frustrated: ${customerIntent.showingFrustration ? 'YES' : 'NO'}
+- Previous Response Off-Topic: ${customerIntent.salesWasOffTopic ? 'YES' : 'NO'}
+
+🎯 CRITICAL RESPONSE REQUIREMENTS:
+${answerGuidance ? `- MUST ANSWER FIRST: ${answerGuidance.specificGuidance}` : ''}
+${needsRepair ? '- CONVERSATION REPAIR NEEDED: Acknowledge their question was missed' : ''}
+- Response Structure: ANSWER QUESTION → Add Value → Call to Action
+- DO NOT mention other vehicles until their question is answered`;
+  }
+
+  systemPrompt += `
 
 APPOINTMENT INTENT ANALYSIS:
 - Intent Detected: ${appointmentIntent.hasAppointmentIntent ? 'YES' : 'NO'}
@@ -50,6 +76,22 @@ TRADE INTENT ANALYSIS:
 - Urgency: ${tradeIntent.urgency}
 - Should Offer Appraisal: ${tradeIntent.shouldOfferAppraisal ? 'YES' : 'NO'}
 ${Object.keys(tradeIntent.detectedVehicleInfo).length > 0 ? `- Detected Vehicle: ${JSON.stringify(tradeIntent.detectedVehicleInfo)}` : ''}`;
+
+  // Add answer-specific guidance
+  if (answerGuidance) {
+    systemPrompt += `
+
+🔥 ANSWER GUIDANCE (${answerGuidance.urgencyLevel.toUpperCase()} PRIORITY):
+${answerGuidance.specificGuidance}
+
+RESPONSE STRUCTURE REQUIREMENT:
+1. FIRST: Directly answer their ${answerGuidance.answerType} question
+2. SECOND: Provide helpful additional context 
+3. THIRD: Natural transition to sales opportunity
+4. FOURTH: Clear call to action
+
+${answerGuidance.urgencyLevel === 'high' ? '⚠️ HIGH PRIORITY: Customer is frustrated - acknowledge and fix immediately' : ''}`;
+  }
 
   // Add appointment-specific guidance
   if (appointmentIntent.hasAppointmentIntent && appointmentFollowUp) {
@@ -79,13 +121,24 @@ ${tradeFollowUp.suggestions.map(s => `- ${s.message}`).join('\n')}`;
 
   systemPrompt += `
 
-RESPONSE GUIDELINES:
+CORE RESPONSE GUIDELINES:
 1. Keep responses under 150 characters for SMS
-2. Be conversational and helpful, not pushy
+2. ${customerIntent.requiresDirectAnswer ? '🚨 ANSWER THEIR QUESTION FIRST - Do not talk about other topics until answered' : 'Be conversational and helpful, not pushy'}
 3. ${appointmentIntent.hasAppointmentIntent ? 'PRIORITIZE appointment scheduling opportunities' : 'Focus on building rapport and understanding needs'}
 4. ${tradeIntent.hasTradeIntent ? 'ACKNOWLEDGE trade interest and offer assistance' : 'Listen for trade opportunities'}
 5. ${businessHours.isOpen ? 'Offer immediate assistance and scheduling' : 'Acknowledge after-hours contact and offer next-day follow-up'}
 6. Always provide value in every message
+7. ${inventoryStatus.hasActualInventory ? 'Reference actual available inventory only' : 'Be honest about inventory limitations'}
+
+${customerIntent.requiresDirectAnswer ? `
+🔥 QUESTION ANSWERING PRIORITY!
+The customer asked a ${customerIntent.primaryQuestionType} question about ${customerIntent.questionTopic || 'vehicles'}.
+- You MUST answer this specific question first
+- Do NOT mention other vehicles until their question is answered
+- Do NOT pivot to sales topics until you've addressed their concern
+- Structure: Answer → Context → Sales Transition → Action
+${needsRepair ? '- Acknowledge that their previous question may have been missed' : ''}
+` : ''}
 
 ${appointmentIntent.hasAppointmentIntent ? `
 🔥 APPOINTMENT OPPORTUNITY DETECTED!
@@ -103,10 +156,12 @@ ${tradeIntent.hasTradeIntent ? `
 - ${tradeIntent.urgency === 'high' ? 'Address urgency with immediate assistance' : 'Explore their timeline and needs'}
 ` : ''}
 
-CONVERSATION STYLE: Professional yet friendly, focus on customer needs, natural flow.`;
+CONVERSATION STYLE: Professional yet friendly, focus on customer needs, natural flow, answer questions directly.`;
 
   return {
     systemPrompt,
+    customerIntent,
+    answerGuidance,
     appointmentIntent,
     appointmentFollowUp,
     tradeIntent,
@@ -115,7 +170,7 @@ CONVERSATION STYLE: Professional yet friendly, focus on customer needs, natural 
   };
 };
 
-// Enhanced user prompt that considers appointment and trade context
+// Enhanced user prompt that emphasizes answering customer questions
 export const buildEnhancedUserPrompt = (
   lastCustomerMessage: string,
   conversationHistory: string,
@@ -123,6 +178,8 @@ export const buildEnhancedUserPrompt = (
   conversationContext: any,
   conversationMemory: any,
   conversationGuidance: any,
+  customerIntent?: any,
+  answerGuidance?: any,
   appointmentIntent?: any,
   tradeIntent?: any
 ) => {
@@ -136,6 +193,20 @@ CONTEXT:
 - Messages in Conversation: ${conversationMemory.conversationLength}
 - Established Conversation: ${conversationContext.isEstablishedConversation ? 'YES' : 'NO'}`;
 
+  // Add critical question answering context
+  if (customerIntent?.requiresDirectAnswer && answerGuidance) {
+    userPrompt += `
+
+🚨 QUESTION ANSWERING PRIORITY:
+- Question Type: ${customerIntent.primaryQuestionType}
+- Question Topic: ${customerIntent.questionTopic || 'general'}
+- Must Answer First: ${answerGuidance.specificGuidance}
+- Customer Frustrated: ${customerIntent.showingFrustration ? 'YES' : 'NO'}
+- Conversation Repair Needed: ${customerIntent.conversationContext?.hasBeenIgnored ? 'YES' : 'NO'}
+
+CRITICAL: Address their specific ${customerIntent.primaryQuestionType} question about ${customerIntent.questionTopic || 'vehicles'} before any sales content.`;
+  }
+
   if (appointmentIntent?.hasAppointmentIntent) {
     userPrompt += `
 
@@ -145,7 +216,7 @@ CONTEXT:
 - Customer Urgency: ${appointmentIntent.urgency}
 - Should Suggest Scheduling: ${appointmentIntent.shouldSuggestScheduling ? 'YES' : 'NO'}
 
-PRIORITY: Address the appointment interest naturally while providing helpful information.`;
+${customerIntent?.requiresDirectAnswer ? 'PRIORITY: Answer their question first, then address appointment interest.' : 'PRIORITY: Address the appointment interest naturally while providing helpful information.'}`;
   }
 
   if (tradeIntent?.hasTradeIntent) {
@@ -158,12 +229,12 @@ PRIORITY: Address the appointment interest naturally while providing helpful inf
 - Should Offer Appraisal: ${tradeIntent.shouldOfferAppraisal ? 'YES' : 'NO'}
 ${Object.keys(tradeIntent.detectedVehicleInfo).length > 0 ? `- Vehicle Details: ${JSON.stringify(tradeIntent.detectedVehicleInfo)}` : ''}
 
-PRIORITY: Acknowledge trade interest and offer valuable assistance.`;
+${customerIntent?.requiresDirectAnswer ? 'PRIORITY: Answer their question first, then acknowledge trade interest.' : 'PRIORITY: Acknowledge trade interest and offer valuable assistance.'}`;
   }
 
   userPrompt += `
 
-Generate a helpful response that moves the conversation forward naturally.`;
+Generate a helpful response that ${customerIntent?.requiresDirectAnswer ? 'FIRST answers their specific question, then' : ''} moves the conversation forward naturally.`;
 
   return userPrompt;
 };

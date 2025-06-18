@@ -41,7 +41,7 @@ class CentralizedAIService {
 
   async generateResponse(leadId: string): Promise<string | null> {
     try {
-      // Get lead data - removed 'phone' from select since it doesn't exist
+      // Get lead data
       const { data: lead } = await supabase
         .from('leads')
         .select('first_name, last_name, vehicle_interest')
@@ -83,7 +83,7 @@ class CentralizedAIService {
         aiGenerated: msg.ai_generated
       }));
 
-      // Create enhanced context
+      // Create enhanced context with question-first priority
       const context = {
         leadId,
         leadName: `${lead.first_name} ${lead.last_name}`,
@@ -96,25 +96,28 @@ class CentralizedAIService {
         }
       };
 
-      // Generate enhanced response
+      // Generate enhanced response with question-first priority
       const aiResponse = await generateEnhancedIntelligentResponse(context);
 
       if (aiResponse?.message) {
         // Mark this message as processed
         this.processedMessages.add(lastCustomerMessage.id);
-        console.log(`🤖 Generated enhanced AI response for lead ${leadId}:`, aiResponse.message);
+        console.log(`🤖 Generated QUESTION-FIRST AI response for lead ${leadId}:`, aiResponse.message);
+        console.log(`🎯 Customer intent detected:`, aiResponse.customerIntent?.requiresDirectAnswer ? 'YES' : 'NO');
+        console.log(`❓ Question type:`, aiResponse.customerIntent?.primaryQuestionType || 'none');
+        
         return aiResponse.message;
       }
 
       return null;
     } catch (error) {
-      console.error('Error generating AI response:', error);
+      console.error('Error generating QUESTION-FIRST AI response:', error);
       return null;
     }
   }
 
   markResponseProcessed(leadId: string, message: string): void {
-    console.log(`✅ Marked AI response as processed for lead ${leadId}`);
+    console.log(`✅ Marked QUESTION-FIRST AI response as processed for lead ${leadId}`);
   }
 
   // Process incoming message for vehicle mentions
