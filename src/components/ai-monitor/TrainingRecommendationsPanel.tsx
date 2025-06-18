@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,8 +38,12 @@ const TrainingRecommendationsPanel = () => {
         title: item.title,
         description: item.description,
         priority: item.priority as 'low' | 'medium' | 'high',
-        skillsFocus: Array.isArray(item.skills_focus) ? item.skills_focus : [],
-        conversationExamples: Array.isArray(item.conversation_examples) ? item.conversation_examples : [],
+        skillsFocus: Array.isArray(item.skills_focus) 
+          ? item.skills_focus.filter((skill): skill is string => typeof skill === 'string')
+          : [],
+        conversationExamples: Array.isArray(item.conversation_examples) 
+          ? item.conversation_examples.filter((example): example is string => typeof example === 'string')
+          : [],
         completionStatus: item.completion_status as 'pending' | 'in_progress' | 'completed',
         dueDate: item.due_date,
         createdBy: item.created_by,
