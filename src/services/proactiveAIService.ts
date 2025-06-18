@@ -51,17 +51,21 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
     }
 
     // Send the message - handle potential void return
-    const messageResult = await sendMessage(leadId, message, profile, true);
-    const messageId = messageResult && typeof messageResult === 'object' && 'id' in messageResult ? messageResult.id : null;
+    try {
+      const messageResult = await sendMessage(leadId, message, profile, true);
+      const messageId = messageResult && typeof messageResult === 'object' && 'id' in messageResult ? messageResult.id : null;
 
-    // Add AI conversation note about initial contact
-    await addAIConversationNote(
-      leadId,
-      messageId,
-      'inventory_discussion',
-      `Initial AI contact: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
-      []
-    );
+      // Add AI conversation note about initial contact
+      await addAIConversationNote(
+        leadId,
+        messageId,
+        'inventory_discussion',
+        `Initial AI contact: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
+        []
+      );
+    } catch (error) {
+      console.error('Error sending message or adding note:', error);
+    }
 
     // Update lead status
     await supabase
