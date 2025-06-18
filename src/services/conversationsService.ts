@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { ConversationData, MessageData } from '@/types/conversation';
 
@@ -117,7 +118,7 @@ export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
       id: msg.id,
       leadId: msg.lead_id,
       body: msg.body,
-      direction: msg.direction,
+      direction: msg.direction as 'in' | 'out',
       sentAt: msg.sent_at,
       readAt: msg.read_at,
       smsStatus: msg.sms_status,
