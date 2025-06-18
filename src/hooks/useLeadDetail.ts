@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,7 +5,7 @@ import { fetchLeadDetail, LeadDetailData } from '@/services/leadDetailService';
 import { PhoneNumber } from '@/types/lead';
 
 export const useLeadDetail = () => {
-  const { leadId } = useParams<{ leadId: string }>();
+  const { id: leadId } = useParams<{ id: string }>();
   const [showMessageComposer, setShowMessageComposer] = useState(false);
   const queryClient = useQueryClient();
 
