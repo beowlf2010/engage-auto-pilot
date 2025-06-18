@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
@@ -189,7 +188,8 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   return (
     <div className="h-[calc(100vh-8rem)] flex space-x-6">
-      <div className="relative">
+      {/* Fixed width conversations list */}
+      <div className="w-80 flex-shrink-0 relative">
         <ConversationsList
           conversations={filteredConversations}
           selectedLead={selectedLead}
@@ -205,14 +205,17 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         )}
       </div>
 
-      <EnhancedChatView
-        selectedConversation={selectedConversation}
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        showTemplates={showTemplates}
-        onToggleTemplates={handleToggleTemplates}
-        user={user}
-      />
+      {/* Chat area takes remaining width */}
+      <div className="flex-1 min-w-0">
+        <EnhancedChatView
+          selectedConversation={selectedConversation}
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          showTemplates={showTemplates}
+          onToggleTemplates={handleToggleTemplates}
+          user={user}
+        />
+      </div>
 
       {showMemory && selectedLead && (
         <ConversationMemory leadId={parseInt(selectedLead)} />

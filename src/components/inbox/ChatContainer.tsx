@@ -49,7 +49,7 @@ const ChatContainer = ({
   onScrollToBottom
 }: ChatContainerProps) => {
   return (
-    <Card className="flex flex-col h-full">
+    <Card className="flex flex-col h-[500px]">
       <ChatHeader
         selectedConversation={selectedConversation}
         showAnalysis={showAnalysis}

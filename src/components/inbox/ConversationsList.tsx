@@ -31,22 +31,20 @@ const ConversationsList = ({
   canReply 
 }: ConversationsListProps) => {
   return (
-    <div className="h-full flex flex-col">
-      <div className="bg-white border-b-2 border-slate-300 rounded-t-xl">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center space-x-3 text-lg">
-            <div className="bg-blue-600 p-1.5 rounded-md">
-              <MessageSquare className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-slate-800">Conversations</span>
-            <Badge variant="secondary" className="bg-slate-200 text-slate-700 font-bold px-2">
-              {conversations.length}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-      </div>
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-3 flex-shrink-0">
+        <CardTitle className="flex items-center space-x-3 text-lg">
+          <div className="bg-blue-600 p-1.5 rounded-md">
+            <MessageSquare className="w-4 h-4 text-white" />
+          </div>
+          <span className="font-bold text-slate-800">Conversations</span>
+          <Badge variant="secondary" className="bg-slate-200 text-slate-700 font-bold px-2">
+            {conversations.length}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
       
-      <div className="flex-1 overflow-hidden">
+      <CardContent className="flex-1 overflow-hidden p-0">
         <div className="h-full overflow-y-auto">
           {conversations.map((conv, index) => (
             <div
@@ -125,8 +123,8 @@ const ConversationsList = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 
