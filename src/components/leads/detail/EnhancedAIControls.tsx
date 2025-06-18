@@ -18,7 +18,9 @@ import {
   Settings,
   Clock,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Users,
+  Timer
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { toast } from "@/hooks/use-toast";
@@ -32,11 +34,16 @@ interface AIControlsProps {
   aiPauseReason?: string;
   aiResumeAt?: string;
   nextAiSendAt?: string;
+  aiTakeoverEnabled?: boolean;
+  aiTakeoverDelayMinutes?: number;
+  pendingHumanResponse?: boolean;
+  humanResponseDeadline?: string;
   onAIOptInChange: (enabled: boolean) => Promise<void>;
   onAIStageChange?: (stage: string) => Promise<void>;
   onPauseAI?: (reason: string, resumeAt?: string) => Promise<void>;
   onResumeAI?: () => Promise<void>;
   onResetAI?: () => Promise<void>;
+  onAITakeoverChange?: (enabled: boolean, delayMinutes: number) => Promise<void>;
 }
 
 const AI_STAGES = [
@@ -45,6 +52,12 @@ const AI_STAGES = [
   { value: 'inventory', label: 'Inventory Matching', description: 'Show relevant vehicles' },
   { value: 'closing', label: 'Closing Sequence', description: 'Drive appointment and close' },
   { value: 'followup', label: 'Follow-up', description: 'Post-interaction follow-up' }
+];
+
+const TAKEOVER_DELAY_OPTIONS = [
+  { value: 5, label: '5 minutes' },
+  { value: 7, label: '7 minutes' },
+  { value: 10, label: '10 minutes' }
 ];
 
 const getStageProgress = (stage?: string, messagesSent: number = 0) => {
@@ -57,16 +70,25 @@ const getStageProgress = (stage?: string, messagesSent: number = 0) => {
   return Math.min(baseProgress + messageProgress, 100);
 };
 
-const getStatusColor = (aiOptIn: boolean, aiSequencePaused?: boolean) => {
+const getStatusColor = (aiOptIn: boolean, aiSequencePaused?: boolean, pendingHumanResponse?: boolean) => {
   if (!aiOptIn) return 'bg-gray-100 text-gray-800';
+  if (pendingHumanResponse) return 'bg-blue-100 text-blue-800';
   if (aiSequencePaused) return 'bg-yellow-100 text-yellow-800';
   return 'bg-green-100 text-green-800';
 };
 
-const getStatusIcon = (aiOptIn: boolean, aiSequencePaused?: boolean) => {
+const getStatusIcon = (aiOptIn: boolean, aiSequencePaused?: boolean, pendingHumanResponse?: boolean) => {
   if (!aiOptIn) return <Bot className="w-3 h-3 text-gray-500" />;
+  if (pendingHumanResponse) return <Users className="w-3 h-3 text-blue-500" />;
   if (aiSequencePaused) return <Pause className="w-3 h-3 text-yellow-500" />;
   return <Play className="w-3 h-3 text-green-500" />;
+};
+
+const getStatusText = (aiOptIn: boolean, aiSequencePaused?: boolean, pendingHumanResponse?: boolean) => {
+  if (!aiOptIn) return 'Disabled';
+  if (pendingHumanResponse) return 'Waiting for Human';
+  if (aiSequencePaused) return 'Paused';
+  return 'Active';
 };
 
 const EnhancedAIControls: React.FC<AIControlsProps> = ({
@@ -78,15 +100,21 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
   aiPauseReason,
   aiResumeAt,
   nextAiSendAt,
+  aiTakeoverEnabled = false,
+  aiTakeoverDelayMinutes = 7,
+  pendingHumanResponse = false,
+  humanResponseDeadline,
   onAIOptInChange,
   onAIStageChange,
   onPauseAI,
   onResumeAI,
-  onResetAI
+  onResetAI,
+  onAITakeoverChange
 }) => {
   const [pauseReason, setPauseReason] = useState('');
   const [resumeDate, setResumeDate] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [takeoverDelay, setTakeoverDelay] = useState(aiTakeoverDelayMinutes);
 
   const currentStage = AI_STAGES.find(stage => stage.value === aiStage);
   const progress = getStageProgress(aiStage, aiMessagesSent);
@@ -150,6 +178,43 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
     }
   };
 
+  const handleTakeoverToggle = async (enabled: boolean) => {
+    try {
+      await onAITakeoverChange?.(enabled, takeoverDelay);
+      toast({
+        title: enabled ? "AI Takeover enabled" : "AI Takeover disabled",
+        description: enabled 
+          ? `AI will take over conversations after ${takeoverDelay} minutes of no human response`
+          : "AI will wait for manual intervention when leads reply",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update AI takeover setting",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelayChange = async (newDelay: number) => {
+    setTakeoverDelay(newDelay);
+    if (aiTakeoverEnabled) {
+      try {
+        await onAITakeoverChange?.(true, newDelay);
+        toast({
+          title: "Delay updated",
+          description: `AI will now take over after ${newDelay} minutes`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update delay",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -158,11 +223,11 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
             <Bot className="w-4 h-4" />
             <span>Finn AI Automation</span>
           </span>
-          <Badge className={getStatusColor(aiOptIn, aiSequencePaused)}>
+          <Badge className={getStatusColor(aiOptIn, aiSequencePaused, pendingHumanResponse)}>
             <span className="flex items-center space-x-1">
-              {getStatusIcon(aiOptIn, aiSequencePaused)}
+              {getStatusIcon(aiOptIn, aiSequencePaused, pendingHumanResponse)}
               <span>
-                {!aiOptIn ? 'Disabled' : aiSequencePaused ? 'Paused' : 'Active'}
+                {getStatusText(aiOptIn, aiSequencePaused, pendingHumanResponse)}
               </span>
             </span>
           </Badge>
@@ -186,6 +251,56 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
 
         {aiOptIn && (
           <>
+            {/* AI Takeover Toggle */}
+            <div className="p-3 border rounded-lg bg-blue-50">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <Timer className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <div className="font-medium text-blue-900">AI Takeover</div>
+                    <div className="text-sm text-blue-700">
+                      AI responds automatically if you don't reply in time
+                    </div>
+                  </div>
+                </div>
+                <Switch
+                  checked={aiTakeoverEnabled}
+                  onCheckedChange={handleTakeoverToggle}
+                />
+              </div>
+              
+              {aiTakeoverEnabled && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-blue-900">Takeover Delay</div>
+                  <Select value={takeoverDelay.toString()} onValueChange={(value) => handleDelayChange(parseInt(value))}>
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TAKEOVER_DELAY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value.toString()}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            {/* Pending Human Response Status */}
+            {pendingHumanResponse && humanResponseDeadline && (
+              <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Users className="w-4 h-4 text-blue-600" />
+                <div className="text-sm">
+                  <span className="font-medium text-blue-900">Waiting for your response</span>
+                  <div className="text-blue-700">
+                    AI takes over: {format(new Date(humanResponseDeadline), 'h:mm a')}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Current Stage & Progress */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -215,7 +330,7 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
             </div>
 
             {/* Next Message Schedule */}
-            {nextAiSendAt && !aiSequencePaused && (
+            {nextAiSendAt && !aiSequencePaused && !pendingHumanResponse && (
               <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
                 <Calendar className="w-4 h-4 text-green-600" />
                 <div className="text-sm">
@@ -235,7 +350,8 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
                   <span className="font-medium text-yellow-900">Sequence Paused</span>
                 </div>
                 {aiPauseReason && (
-                  <p className="text-sm text-yellow-700 mb-2">Reason: {aiPauseReason}</p>
+                  <p className="text-sm text-yellow-700 mb-2">Reason: {aiPause
+Reason}</p>
                 )}
                 {aiResumeAt && (
                   <p className="text-sm text-yellow-700">

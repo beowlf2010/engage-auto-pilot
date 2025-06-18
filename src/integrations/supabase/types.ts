@@ -1927,6 +1927,8 @@ export type Database = {
           ai_resume_at: string | null
           ai_sequence_paused: boolean | null
           ai_stage: string | null
+          ai_takeover_delay_minutes: number | null
+          ai_takeover_enabled: boolean | null
           city: string | null
           conversion_probability: number | null
           created_at: string
@@ -1940,6 +1942,7 @@ export type Database = {
           email_sequence_stage: string | null
           financing_needed: boolean | null
           first_name: string
+          human_response_deadline: string | null
           id: string
           last_name: string
           last_prediction_update: string | null
@@ -1947,6 +1950,7 @@ export type Database = {
           middle_name: string | null
           next_ai_send_at: string | null
           next_email_send_at: string | null
+          pending_human_response: boolean | null
           postal_code: string | null
           predicted_close_date: string | null
           preferred_mileage_max: number | null
@@ -1976,6 +1980,8 @@ export type Database = {
           ai_resume_at?: string | null
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
+          ai_takeover_delay_minutes?: number | null
+          ai_takeover_enabled?: boolean | null
           city?: string | null
           conversion_probability?: number | null
           created_at?: string
@@ -1989,6 +1995,7 @@ export type Database = {
           email_sequence_stage?: string | null
           financing_needed?: boolean | null
           first_name: string
+          human_response_deadline?: string | null
           id?: string
           last_name: string
           last_prediction_update?: string | null
@@ -1996,6 +2003,7 @@ export type Database = {
           middle_name?: string | null
           next_ai_send_at?: string | null
           next_email_send_at?: string | null
+          pending_human_response?: boolean | null
           postal_code?: string | null
           predicted_close_date?: string | null
           preferred_mileage_max?: number | null
@@ -2025,6 +2033,8 @@ export type Database = {
           ai_resume_at?: string | null
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
+          ai_takeover_delay_minutes?: number | null
+          ai_takeover_enabled?: boolean | null
           city?: string | null
           conversion_probability?: number | null
           created_at?: string
@@ -2038,6 +2048,7 @@ export type Database = {
           email_sequence_stage?: string | null
           financing_needed?: boolean | null
           first_name?: string
+          human_response_deadline?: string | null
           id?: string
           last_name?: string
           last_prediction_update?: string | null
@@ -2045,6 +2056,7 @@ export type Database = {
           middle_name?: string | null
           next_ai_send_at?: string | null
           next_email_send_at?: string | null
+          pending_human_response?: boolean | null
           postal_code?: string | null
           predicted_close_date?: string | null
           preferred_mileage_max?: number | null

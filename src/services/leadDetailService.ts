@@ -28,6 +28,11 @@ export interface LeadDetailData {
   doNotCall: boolean;
   doNotEmail: boolean;
   doNotMail: boolean;
+  // AI Takeover fields
+  aiTakeoverEnabled?: boolean;
+  aiTakeoverDelayMinutes?: number;
+  pendingHumanResponse?: boolean;
+  humanResponseDeadline?: string;
   phoneNumbers: Array<{
     id: string;
     number: string;
@@ -57,7 +62,7 @@ export interface LeadDetailData {
 
 export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | null> => {
   try {
-    // Fetch lead basic information
+    // Fetch lead basic information including AI takeover fields
     const { data: leadData, error: leadError } = await supabase
       .from('leads')
       .select(`
@@ -154,6 +159,11 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
       doNotCall: leadData.do_not_call,
       doNotEmail: leadData.do_not_email,
       doNotMail: leadData.do_not_mail,
+      // AI Takeover fields
+      aiTakeoverEnabled: leadData.ai_takeover_enabled || false,
+      aiTakeoverDelayMinutes: leadData.ai_takeover_delay_minutes || 7,
+      pendingHumanResponse: leadData.pending_human_response || false,
+      humanResponseDeadline: leadData.human_response_deadline,
       phoneNumbers: phoneNumbers?.map(phone => ({
         id: phone.id,
         number: phone.number,

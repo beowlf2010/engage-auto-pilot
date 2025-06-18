@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,141 +13,140 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    console.log('=== TWILIO WEBHOOK START ===');
+    
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    // Parse Twilio webhook form data
     const formData = await req.formData()
-    const from = formData.get('From') as string
-    const body = formData.get('Body') as string
-    const messageId = formData.get('MessageSid') as string
+    const from = formData.get('From')?.toString()
+    const body = formData.get('Body')?.toString()
+    const messageSid = formData.get('MessageSid')?.toString()
+    
+    console.log('📱 Incoming SMS:', { from, body: body?.substring(0, 50) + '...', messageSid });
 
     if (!from || !body) {
-      return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-      })
+      console.error('❌ Missing required fields:', { from: !!from, body: !!body });
+      return new Response('Missing required fields', { status: 400, headers: corsHeaders })
     }
 
-    // Normalize the phone number
-    const normalizedPhone = from.replace(/[^\d\+]/g, '')
-    const formattedPhone =
-      normalizedPhone.length === 10 ? `+1${normalizedPhone}` :
-      normalizedPhone.startsWith('+') ? normalizedPhone :
-      `+${normalizedPhone}`
-
-    // Find the lead by phone number
+    // Find lead by phone number
+    console.log('🔍 Looking up lead by phone number:', from);
     const { data: phoneData, error: phoneError } = await supabase
       .from('phone_numbers')
-      .select('lead_id')
-      .eq('number', formattedPhone)
+      .select(`
+        lead_id,
+        leads (
+          id,
+          first_name,
+          last_name,
+          ai_takeover_enabled,
+          ai_takeover_delay_minutes
+        )
+      `)
+      .eq('number', from)
       .single()
 
     if (phoneError || !phoneData) {
-      console.log('No lead found for phone number:', formattedPhone)
-      return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-      })
+      console.error('❌ Lead not found for phone:', from, phoneError);
+      return new Response('Lead not found', { status: 404, headers: corsHeaders })
     }
 
-    // Store the incoming message
-    const { error: msgError } = await supabase
+    const lead = phoneData.leads
+    console.log('✅ Lead found:', lead.first_name, lead.last_name, 'ID:', lead.id);
+
+    // Insert the incoming message
+    const { data: messageData, error: messageError } = await supabase
       .from('conversations')
       .insert({
-        lead_id: phoneData.lead_id,
+        lead_id: lead.id,
         direction: 'in',
         body: body,
-        sent_at: new Date().toISOString(),
-        twilio_message_id: messageId
+        twilio_message_id: messageSid,
+        sms_status: 'delivered'
       })
+      .select()
+      .single()
 
-    if (msgError) {
-      console.error('Error storing message:', msgError)
-      return new Response('Error', { status: 500, headers: corsHeaders })
+    if (messageError) {
+      console.error('❌ Error inserting message:', messageError);
+      return new Response('Error saving message', { status: 500, headers: corsHeaders })
     }
 
-    // Extract and store memory from the incoming message
-    await extractAndStoreMemory(phoneData.lead_id, body, 'in')
+    console.log('💾 Message saved with ID:', messageData.id);
 
-    console.log('Message stored successfully via Twilio webhook')
+    // Handle AI takeover logic for incoming messages
+    if (lead.ai_takeover_enabled) {
+      const delayMinutes = lead.ai_takeover_delay_minutes || 7;
+      const deadlineTime = new Date(Date.now() + delayMinutes * 60 * 1000);
+      
+      console.log(`⏰ Setting AI takeover deadline: ${delayMinutes} minutes from now (${deadlineTime.toISOString()})`);
+      
+      // Set pending human response with deadline
+      const { error: updateError } = await supabase
+        .from('leads')
+        .update({
+          pending_human_response: true,
+          human_response_deadline: deadlineTime.toISOString(),
+          last_reply_at: new Date().toISOString()
+        })
+        .eq('id', lead.id);
 
-    return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
-      headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-    })
+      if (updateError) {
+        console.error('❌ Error setting AI takeover deadline:', updateError);
+      } else {
+        console.log('✅ AI takeover deadline set successfully');
+      }
+    } else {
+      // Traditional behavior - pause AI sequence for 24 hours
+      const { error: updateError } = await supabase
+        .from('leads')
+        .update({
+          last_reply_at: new Date().toISOString(),
+          ai_sequence_paused: true,
+          ai_pause_reason: 'lead_responded',
+          ai_resume_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        })
+        .eq('id', lead.id);
+
+      if (updateError) {
+        console.error('❌ Error updating lead reply status:', updateError);
+      } else {
+        console.log('✅ Lead reply status updated - AI paused for 24 hours');
+      }
+    }
+
+    // Update conversation memory with the incoming message
+    try {
+      const { error: memoryError } = await supabase
+        .from('conversation_memory')
+        .upsert({
+          lead_id: lead.id,
+          memory_type: 'recent_interaction',
+          content: `Lead replied: "${body}"`,
+          confidence: 1.0
+        });
+
+      if (memoryError) {
+        console.warn('⚠️ Failed to update conversation memory:', memoryError);
+      } else {
+        console.log('🧠 Conversation memory updated');
+      }
+    } catch (error) {
+      console.warn('⚠️ Error updating conversation memory:', error);
+    }
+
+    console.log('✅ Webhook processed successfully');
+    return new Response('OK', { status: 200, headers: corsHeaders })
 
   } catch (error) {
-    console.error('Error processing webhook:', error)
-    return new Response('Error', { status: 500, headers: corsHeaders })
+    console.error('💥 CRITICAL ERROR in webhook:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    return new Response('Internal error', { status: 500, headers: corsHeaders })
   }
 })
-
-// Enhanced memory extraction function with inventory awareness
-async function extractAndStoreMemory(leadId: string, messageBody: string, direction: 'in' | 'out') {
-  if (direction !== 'in') return;
-
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    const memories = [];
-    const lowerMessage = messageBody.toLowerCase();
-
-    // Extract preferences
-    if (lowerMessage.includes('budget') || lowerMessage.includes('price') || lowerMessage.includes('afford')) {
-      memories.push({
-        lead_id: leadId,
-        content: `Budget concerns mentioned in: "${messageBody}"`,
-        memory_type: 'preference',
-        confidence: 0.7
-      });
-    }
-
-    if (lowerMessage.includes('financing') || lowerMessage.includes('payment') || lowerMessage.includes('loan')) {
-      memories.push({
-        lead_id: leadId,
-        content: 'Interested in financing options',
-        memory_type: 'preference',
-        confidence: 0.8
-      });
-    }
-
-    if (lowerMessage.includes('test drive') || lowerMessage.includes('see the car') || lowerMessage.includes('visit')) {
-      memories.push({
-        lead_id: leadId,
-        content: 'Interested in test driving',
-        memory_type: 'preference',
-        confidence: 0.9
-      });
-    }
-
-    // Extract vehicle preferences
-    if (lowerMessage.includes('color') || lowerMessage.includes('mileage') || lowerMessage.includes('year')) {
-      memories.push({
-        lead_id: leadId,
-        content: `Specific vehicle requirements mentioned: "${messageBody}"`,
-        memory_type: 'preference',
-        confidence: 0.8
-      });
-    }
-
-    // Extract trade-in interest
-    if (lowerMessage.includes('trade') || lowerMessage.includes('current car') || lowerMessage.includes('my car')) {
-      memories.push({
-        lead_id: leadId,
-        content: 'Has trade-in vehicle',
-        memory_type: 'preference',
-        confidence: 0.9
-      });
-    }
-
-    // Store memories
-    for (const memory of memories) {
-      await supabase
-        .from('conversation_memory')
-        .insert(memory);
-    }
-  } catch (error) {
-    console.error('Error storing conversation memory:', error);
-  }
-}

@@ -1,6 +1,7 @@
 
 import React, { useEffect } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
+import { supabase } from '@/integrations/supabase/client';
 import LeadDetailPageHeader from "./LeadDetailPageHeader";
 import LeadDetailGrid from "./LeadDetailGrid";
 import type { Lead } from "@/types/lead";
@@ -51,8 +52,31 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
 
   const handleAIOptInChange = async (enabled: boolean): Promise<void> => {
     console.log("AI opt-in changed:", enabled);
-    // TODO: Implementation would update the lead's AI opt-in status
-    // This should be implemented to update the actual lead data
+    try {
+      await supabase
+        .from('leads')
+        .update({ ai_opt_in: enabled })
+        .eq('id', lead.id);
+    } catch (error) {
+      console.error("Failed to update AI opt-in:", error);
+      throw error;
+    }
+  };
+
+  const handleAITakeoverChange = async (enabled: boolean, delayMinutes: number): Promise<void> => {
+    console.log("AI takeover changed:", enabled, delayMinutes);
+    try {
+      await supabase
+        .from('leads')
+        .update({ 
+          ai_takeover_enabled: enabled,
+          ai_takeover_delay_minutes: delayMinutes
+        })
+        .eq('id', lead.id);
+    } catch (error) {
+      console.error("Failed to update AI takeover:", error);
+      throw error;
+    }
   };
 
   // Use the messages from the conversation hook if available, otherwise use lead conversations
@@ -64,6 +88,7 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
         lead={transformedLead}
         onSendMessage={() => setShowMessageComposer(true)}
         onAIOptInChange={handleAIOptInChange}
+        onAITakeoverChange={handleAITakeoverChange}
       />
       
       <LeadDetailGrid
