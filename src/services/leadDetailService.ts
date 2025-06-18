@@ -24,11 +24,19 @@ export interface LeadDetailData {
   aiSequencePaused?: boolean;
   nextAiSendAt?: string;
   createdAt: string;
+  lastReplyAt?: string;
   salespersonId?: string;
   salespersonName?: string;
   doNotCall: boolean;
   doNotEmail: boolean;
   doNotMail: boolean;
+  // Price preferences
+  preferredPriceMin?: number;
+  preferredPriceMax?: number;
+  // Trade information
+  hasTradeVehicle?: boolean;
+  tradeInVehicle?: string;
+  tradePayoffAmount?: number;
   // AI Takeover fields
   aiTakeoverEnabled?: boolean;
   aiTakeoverDelayMinutes?: number;
@@ -50,7 +58,7 @@ export interface LeadDetailData {
     sentAt: string;
     aiGenerated: boolean;
     smsStatus?: string;
-    leadId: string; // Added missing leadId property
+    leadId: string;
   }>;
   activityTimeline: Array<{
     id: string;
@@ -154,6 +162,7 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
       aiSequencePaused: leadData.ai_sequence_paused || false,
       nextAiSendAt: leadData.next_ai_send_at,
       createdAt: leadData.created_at,
+      lastReplyAt: leadData.last_reply_at,
       salespersonId: leadData.salesperson_id,
       salespersonName: leadData.profiles 
         ? `${leadData.profiles.first_name} ${leadData.profiles.last_name}`
@@ -161,6 +170,13 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
       doNotCall: leadData.do_not_call,
       doNotEmail: leadData.do_not_email,
       doNotMail: leadData.do_not_mail,
+      // Price preferences
+      preferredPriceMin: leadData.preferred_price_min,
+      preferredPriceMax: leadData.preferred_price_max,
+      // Trade information
+      hasTradeVehicle: leadData.has_trade_vehicle,
+      tradeInVehicle: leadData.trade_in_vehicle,
+      tradePayoffAmount: leadData.trade_payoff_amount,
       // AI Takeover fields
       aiTakeoverEnabled: leadData.ai_takeover_enabled || false,
       aiTakeoverDelayMinutes: leadData.ai_takeover_delay_minutes || 7,
@@ -182,7 +198,7 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
         sentAt: conv.sent_at,
         aiGenerated: conv.ai_generated || false,
         smsStatus: conv.sms_status,
-        leadId: conv.lead_id // Added leadId to match MessageData interface
+        leadId: conv.lead_id
       })) || [],
       activityTimeline
     };

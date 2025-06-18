@@ -50,7 +50,7 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       return { success: false, leadId, error: 'Failed to generate message' };
     }
 
-    // Send the message
+    // Send the message - this should return the message object
     const messageResult = await sendMessage(leadId, message, profile, true);
 
     // Add AI conversation note about initial contact

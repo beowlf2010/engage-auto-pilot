@@ -41,10 +41,10 @@ class CentralizedAIService {
 
   async generateResponse(leadId: string): Promise<string | null> {
     try {
-      // Get lead data
+      // Get lead data - removed 'phone' from select since it doesn't exist
       const { data: lead } = await supabase
         .from('leads')
-        .select('first_name, last_name, vehicle_interest, phone')
+        .select('first_name, last_name, vehicle_interest')
         .eq('id', leadId)
         .single();
 
@@ -90,7 +90,7 @@ class CentralizedAIService {
         vehicleInterest: lead.vehicle_interest || '',
         messages: formattedMessages,
         leadInfo: {
-          phone: lead.phone || '',
+          phone: '', // Will be populated from phone_numbers table if needed
           status: 'active',
           lastReplyAt: lastCustomerMessage.sent_at
         }
