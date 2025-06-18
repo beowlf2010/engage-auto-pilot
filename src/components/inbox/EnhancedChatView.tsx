@@ -6,9 +6,12 @@ import ChatContainer from './ChatContainer';
 import ChatAIPanelsContainer from './ChatAIPanelsContainer';
 import LeadContextPanel from './LeadContextPanel';
 import AppointmentScheduler from '../appointments/AppointmentScheduler';
+import AppointmentInterestBanner from './AppointmentInterestBanner';
 import { useChatState } from './hooks/useChatState';
 import { useChatHandlers } from './hooks/useChatHandlers';
 import { useConversationAnalysis } from '@/hooks/useConversationAnalysis';
+import { analyzeAppointmentIntent, logAppointmentIntent } from '@/services/appointmentIntentService';
+import type { AppointmentIntent } from '@/services/appointmentIntentService';
 
 interface EnhancedChatViewProps {
   selectedConversation: any;
@@ -31,6 +34,8 @@ const EnhancedChatView = ({
   user 
 }: EnhancedChatViewProps) => {
   const [showAppointmentScheduler, setShowAppointmentScheduler] = useState(false);
+  const [appointmentIntent, setAppointmentIntent] = useState<AppointmentIntent | null>(null);
+  const [showAppointmentBanner, setShowAppointmentBanner] = useState(false);
   
   const chatState = useChatState();
   const {
@@ -85,6 +90,25 @@ const EnhancedChatView = ({
     handleSelectSuggestion
   } = chatHandlers;
 
+  // Analyze appointment intent when messages change
+  useEffect(() => {
+    if (messages.length > 0 && selectedConversation?.leadId) {
+      const intent = analyzeAppointmentIntent(messages);
+      setAppointmentIntent(intent);
+      
+      // Show banner if appointment intent detected and not already showing scheduler
+      if (intent.hasAppointmentIntent && !showAppointmentScheduler) {
+        setShowAppointmentBanner(true);
+        
+        // Log the intent detection
+        const lastMessage = messages.filter(msg => msg.direction === 'in').slice(-1)[0];
+        if (lastMessage) {
+          logAppointmentIntent(selectedConversation.leadId, intent, lastMessage.id);
+        }
+      }
+    }
+  }, [messages, selectedConversation?.leadId, showAppointmentScheduler]);
+
   // Load analysis data when conversation changes
   useEffect(() => {
     if (selectedConversation?.leadId) {
@@ -105,6 +129,11 @@ const EnhancedChatView = ({
 
   const handleScheduleAppointment = () => {
     setShowAppointmentScheduler(true);
+    setShowAppointmentBanner(false);
+  };
+
+  const handleDismissAppointmentBanner = () => {
+    setShowAppointmentBanner(false);
   };
 
   if (!selectedConversation) {
@@ -126,6 +155,19 @@ const EnhancedChatView = ({
       <div className="grid grid-cols-12 gap-4 h-full">
         {/* Main Chat Area - Fixed Height */}
         <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col space-y-2`}>
+          {/* Appointment Interest Banner */}
+          {appointmentIntent && (
+            <AppointmentInterestBanner
+              isVisible={showAppointmentBanner}
+              confidence={appointmentIntent.confidence}
+              appointmentType={appointmentIntent.appointmentType}
+              urgency={appointmentIntent.urgency}
+              timePreferences={appointmentIntent.timePreferences}
+              onScheduleAppointment={handleScheduleAppointment}
+              onDismiss={handleDismissAppointmentBanner}
+            />
+          )}
+
           <ChatAIPanelsContainer
             showAnalysis={showAnalysis}
             showAIPanel={showAIPanel}
