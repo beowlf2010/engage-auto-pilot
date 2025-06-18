@@ -1,7 +1,7 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import StreamlinedNavigation from "@/components/StreamlinedNavigation";
-import EnhancedDashboard from "@/components/enhanced/EnhancedDashboard";
+import Dashboard from "@/components/Dashboard";
 import { Navigate } from "react-router-dom";
 
 const DashboardPage = () => {
@@ -31,18 +31,18 @@ const DashboardPage = () => {
 
   const user = {
     id: profile.id,
-    email: profile.email,
     role: profile.role,
     firstName: profile.first_name,
     lastName: profile.last_name,
+    email: profile.email,
     phone: profile.phone
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
       <StreamlinedNavigation />
-      <main className="flex-1">
-        <EnhancedDashboard user={user} />
+      <main className="flex-1 container mx-auto px-6 py-8">
+        <Dashboard user={user} />
       </main>
     </div>
   );
