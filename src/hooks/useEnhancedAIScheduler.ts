@@ -12,15 +12,19 @@ export const useEnhancedAIScheduler = () => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { profile } = useAuth();
 
-  // Enhanced AI processing that includes both reactive and proactive messaging
+  // Enhanced AI processing that includes reactive, proactive, and scheduled follow-up messaging
   const processAIResponses = async () => {
     if (processing || !profile) return;
 
     setProcessing(true);
-    console.log('🤖 Processing enhanced AI responses (reactive + proactive)...');
+    console.log('🤖 Processing enhanced AI responses (reactive + proactive + scheduled)...');
 
     try {
-      // 1. Process proactive messages first (new leads needing first contact)
+      // 1. Process scheduled follow-up messages (past due messages)
+      console.log('⏰ Processing scheduled follow-up messages...');
+      await processScheduledFollowUps();
+
+      // 2. Process proactive messages (new leads needing first contact)
       console.log('📬 Processing proactive messages...');
       const proactiveResults = await processProactiveMessages(profile);
       
@@ -29,7 +33,7 @@ export const useEnhancedAIScheduler = () => {
         console.log(`✅ Sent ${successCount} proactive messages out of ${proactiveResults.length} attempts`);
       }
 
-      // 2. Process reactive messages (responses to incoming messages)
+      // 3. Process reactive messages (responses to incoming messages)
       console.log('💬 Processing reactive responses...');
       const { data: leadsWithUnresponded } = await supabase
         .from('conversations')
@@ -91,16 +95,142 @@ export const useEnhancedAIScheduler = () => {
     }
   };
 
+  // Process scheduled follow-up messages for leads with past-due next_ai_send_at
+  const processScheduledFollowUps = async () => {
+    try {
+      const now = new Date().toISOString();
+      
+      // Get leads with past-due scheduled messages
+      const { data: scheduledLeads, error } = await supabase
+        .from('leads')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          ai_stage,
+          ai_messages_sent,
+          next_ai_send_at,
+          vehicle_interest
+        `)
+        .eq('ai_opt_in', true)
+        .eq('ai_sequence_paused', false)
+        .not('next_ai_send_at', 'is', null)
+        .lt('next_ai_send_at', now)
+        .limit(20);
+
+      if (error) {
+        console.error('Error fetching scheduled leads:', error);
+        return;
+      }
+
+      if (!scheduledLeads || scheduledLeads.length === 0) {
+        console.log('⏰ No scheduled follow-up messages due');
+        return;
+      }
+
+      console.log(`⏰ Found ${scheduledLeads.length} leads with past-due scheduled messages`);
+
+      for (const lead of scheduledLeads) {
+        try {
+          console.log(`⏰ Processing scheduled follow-up for ${lead.first_name} ${lead.last_name} (${lead.vehicle_interest})`);
+          
+          // Generate follow-up message using the current AI stage
+          const currentStage = lead.ai_stage || 'follow_up';
+          const aiMessage = await centralizedAI.generateResponse(lead.id);
+          
+          if (!aiMessage) {
+            console.log(`❌ No AI message generated for scheduled follow-up: ${lead.id}`);
+            continue;
+          }
+
+          // Send the message
+          console.log(`📤 Sending scheduled follow-up to ${lead.first_name}: ${aiMessage}`);
+          await sendMessage(lead.id, aiMessage, profile, true);
+
+          // Update the lead's AI tracking and schedule next message
+          await updateLeadAfterScheduledMessage(lead.id, currentStage, lead.ai_messages_sent || 0);
+
+          // Mark as processed
+          centralizedAI.markResponseProcessed(lead.id, aiMessage);
+
+          // Add delay between messages
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+        } catch (error) {
+          console.error(`❌ Error processing scheduled follow-up for lead ${lead.id}:`, error);
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Error in processScheduledFollowUps:', error);
+    }
+  };
+
+  // Update lead tracking after sending a scheduled message
+  const updateLeadAfterScheduledMessage = async (
+    leadId: string, 
+    currentStage: string, 
+    currentMessagesSent: number
+  ) => {
+    try {
+      const messagesSent = currentMessagesSent + 1;
+      const nextStage = getNextAIStage(currentStage, messagesSent);
+      
+      // Calculate next send time (24-48 hours based on stage)
+      const nextSendAt = new Date();
+      const hoursToAdd = nextStage === 'follow_up' ? 24 : 
+                        nextStage === 'engagement' ? 36 : 48;
+      nextSendAt.setHours(nextSendAt.getHours() + hoursToAdd);
+
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          ai_messages_sent: messagesSent,
+          ai_stage: nextStage,
+          next_ai_send_at: nextSendAt.toISOString(),
+          ai_last_message_stage: currentStage
+        })
+        .eq('id', leadId);
+
+      if (error) {
+        console.error(`Error updating lead ${leadId} after scheduled message:`, error);
+      } else {
+        console.log(`✅ Updated lead ${leadId}: stage=${nextStage}, next_send=${nextSendAt.toISOString()}`);
+      }
+
+    } catch (error) {
+      console.error(`Error in updateLeadAfterScheduledMessage for lead ${leadId}:`, error);
+    }
+  };
+
+  // Determine next AI stage based on current stage and message count
+  const getNextAIStage = (currentStage: string, messageCount: number): string => {
+    switch (currentStage) {
+      case 'initial':
+        return messageCount < 3 ? 'follow_up' : 'engagement';
+      case 'follow_up':
+        return messageCount < 5 ? 'engagement' : 'nurture';
+      case 'engagement':
+        return messageCount < 8 ? 'nurture' : 'closing';
+      case 'nurture':
+        return messageCount < 12 ? 'closing' : 'long_term_follow_up';
+      case 'closing':
+        return 'long_term_follow_up';
+      default:
+        return 'follow_up';
+    }
+  };
+
   // Start the enhanced scheduler
   useEffect(() => {
     if (!profile) return;
 
-    console.log('🤖 Starting enhanced AI scheduler (proactive + reactive)');
+    console.log('🤖 Starting enhanced AI scheduler (proactive + reactive + scheduled)');
     
     // Process immediately
     processAIResponses();
 
-    // Set up interval (every 2 minutes for more responsive proactive messaging)
+    // Set up interval (every 2 minutes for more responsive processing)
     intervalRef.current = setInterval(processAIResponses, 2 * 60 * 1000);
 
     return () => {
