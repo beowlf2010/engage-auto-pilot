@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,10 +6,11 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Clock, MessageSquare, User, Car, Play, Pause, Eye, Filter, Search, CheckSquare, AlertTriangle, Zap } from 'lucide-react';
+import { Clock, MessageSquare, User, Car, Play, Pause, Eye, Filter, Search, CheckSquare, AlertTriangle, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import MessagePreviewModal from './MessagePreviewModal';
+import MessagePreviewInline from './MessagePreviewInline';
 import { sendMessage } from '@/services/messagesService';
 import { useAuth } from '@/components/auth/AuthProvider';
 
@@ -34,6 +34,7 @@ const EnhancedAIQueueTab = () => {
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
   const [filteredMessages, setFilteredMessages] = useState<QueuedMessage[]>([]);
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
+  const [expandedPreviews, setExpandedPreviews] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -203,6 +204,16 @@ const EnhancedAIQueueTab = () => {
     } else {
       setSelectedMessages(new Set());
     }
+  };
+
+  const togglePreviewExpanded = (messageId: string) => {
+    const newExpanded = new Set(expandedPreviews);
+    if (newExpanded.has(messageId)) {
+      newExpanded.delete(messageId);
+    } else {
+      newExpanded.add(messageId);
+    }
+    setExpandedPreviews(newExpanded);
   };
 
   const handleBatchOperation = async (operation: 'approve' | 'pause' | 'skip') => {
@@ -527,7 +538,7 @@ const EnhancedAIQueueTab = () => {
 
             {filteredMessages.map((message) => (
               <Card key={message.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
+                <CardContent className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Checkbox
@@ -598,14 +609,54 @@ const EnhancedAIQueueTab = () => {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => togglePreviewExpanded(message.id)}
+                        className="flex items-center gap-1"
+                      >
+                        {expandedPreviews.has(message.id) ? (
+                          <>
+                            <ChevronUp className="h-4 w-4" />
+                            Hide Preview
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            Show Preview
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handlePreviewMessage(message.id)}
                         className="flex items-center gap-1"
                       >
                         <Eye className="h-4 w-4" />
-                        Preview
+                        Full Preview
                       </Button>
                     </div>
                   </div>
+
+                  {/* Inline Message Preview */}
+                  {expandedPreviews.has(message.id) && (
+                    <div className="mt-3 pt-3 border-t">
+                      <MessagePreviewInline
+                        leadId={message.id}
+                        leadName={`${message.firstName} ${message.lastName}`}
+                        vehicleInterest={message.vehicleInterest}
+                        aiStage={message.aiStage}
+                        onMessageSent={() => {
+                          fetchQueuedMessages();
+                          setExpandedPreviews(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(message.id);
+                            return newSet;
+                          });
+                        }}
+                        onPreviewFull={() => handlePreviewMessage(message.id)}
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}

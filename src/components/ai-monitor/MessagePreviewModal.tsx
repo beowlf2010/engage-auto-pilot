@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { MessageSquare } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MessageSquare, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import LeadContextCard from './LeadContextCard';
 import ConversationHistory from './ConversationHistory';
@@ -34,16 +35,35 @@ interface LeadContext {
   }>;
 }
 
+interface IssueType {
+  value: string;
+  label: string;
+  description: string;
+}
+
+const issueTypes: IssueType[] = [
+  { value: 'vehicle_inventory', label: 'Vehicle/Inventory Issue', description: 'Wrong vehicle mentioned or inventory mismatch' },
+  { value: 'tone_style', label: 'Tone/Style Issue', description: 'Message tone or style needs adjustment' },
+  { value: 'compliance', label: 'Compliance Issue', description: 'Potential compliance or legal concerns' },
+  { value: 'content_accuracy', label: 'Content Accuracy', description: 'Factual errors or incorrect information' },
+  { value: 'personalization', label: 'Personalization Issue', description: 'Message lacks personalization or context' },
+  { value: 'call_to_action', label: 'Call-to-Action Issue', description: 'Weak or missing call-to-action' },
+  { value: 'other', label: 'Other Issue', description: 'Other concerns not listed above' }
+];
+
 const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: MessagePreviewModalProps) => {
   const [generatedMessage, setGeneratedMessage] = useState('');
   const [editedMessage, setEditedMessage] = useState('');
   const [leadContext, setLeadContext] = useState<LeadContext | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<string>('');
+  const [regenerationHistory, setRegenerationHistory] = useState<Array<{message: string, timestamp: Date, issueContext?: string}>>([]);
 
   useEffect(() => {
     if (open && leadId) {
       loadLeadContext();
       generatePreviewMessage();
+      setRegenerationHistory([]);
     }
   }, [open, leadId]);
 
@@ -99,29 +119,53 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
     }
   };
 
-  const generatePreviewMessage = async () => {
+  const generatePreviewMessage = async (issueContext?: string) => {
     setGenerating(true);
     try {
+      const issueType = issueContext ? issueTypes.find(type => type.value === issueContext) : null;
+      const contextMessage = issueType ? `Previous message had ${issueType.label}: ${issueType.description}. Please address this concern.` : undefined;
+
       const { data, error } = await supabase.functions.invoke('generate-ai-message', {
         body: {
           leadId,
           stage: leadContext?.aiStage || 'follow_up',
-          context: { preview: true }
+          context: { 
+            preview: true,
+            issueContext: contextMessage,
+            vehicleInterest: leadContext?.vehicleInterest,
+            regeneration: !!issueContext
+          }
         }
       });
 
       if (error) throw error;
 
-      const message = data?.message || '';
+      const message = data?.message || 'Unable to generate preview message';
       setGeneratedMessage(message);
       setEditedMessage(message);
+
+      // Add to regeneration history
+      setRegenerationHistory(prev => [...prev, {
+        message,
+        timestamp: new Date(),
+        issueContext: issueType?.label
+      }]);
+
     } catch (error) {
       console.error('Error generating preview message:', error);
-      setGeneratedMessage('Unable to generate preview message');
-      setEditedMessage('');
+      const errorMessage = 'Unable to generate preview message';
+      setGeneratedMessage(errorMessage);
+      setEditedMessage(errorMessage);
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handleRegenerateWithIssue = async () => {
+    if (!selectedIssue) return;
+    
+    await generatePreviewMessage(selectedIssue);
+    setSelectedIssue('');
   };
 
   const handleApprove = () => {
@@ -133,15 +177,15 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
-            AI Message Preview
+            Enhanced AI Message Preview
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Lead Context */}
           <div className="space-y-4">
             <LeadContextCard leadContext={leadContext} formatTime={formatTime} />
@@ -152,7 +196,52 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
           </div>
 
           {/* Message Preview & Editing */}
-          <div className="space-y-4">
+          <div className="lg:col-span-2 space-y-4">
+            {/* Issue Flagging Section */}
+            <div className="bg-muted p-4 rounded-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <span className="font-medium text-sm">Issue Flagging & Regeneration</span>
+              </div>
+              
+              <div className="flex gap-2">
+                <Select value={selectedIssue} onValueChange={setSelectedIssue}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select issue type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {issueTypes.map((issue) => (
+                      <SelectItem key={issue.value} value={issue.value}>
+                        <div className="text-left">
+                          <div className="font-medium">{issue.label}</div>
+                          <div className="text-xs text-muted-foreground">{issue.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Button
+                  onClick={handleRegenerateWithIssue}
+                  disabled={!selectedIssue || generating}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCcw className="w-4 h-4 mr-1" />
+                  {generating ? 'Regenerating...' : 'Fix Issue'}
+                </Button>
+              </div>
+
+              {regenerationHistory.length > 1 && (
+                <div className="text-xs text-muted-foreground">
+                  Regenerated {regenerationHistory.length - 1} time(s)
+                  {regenerationHistory.slice(-1)[0]?.issueContext && 
+                    ` (last: ${regenerationHistory.slice(-1)[0].issueContext})`
+                  }
+                </div>
+              )}
+            </div>
+
             <MessageEditor
               generatedMessage={generatedMessage}
               editedMessage={editedMessage}
@@ -160,6 +249,24 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
               generating={generating}
               qualityScore={qualityScore}
             />
+
+            {/* Regeneration History */}
+            {regenerationHistory.length > 1 && (
+              <div className="bg-muted p-3 rounded space-y-2">
+                <div className="text-sm font-medium">Previous Versions:</div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {regenerationHistory.slice(0, -1).reverse().map((item, index) => (
+                    <div key={index} className="text-xs p-2 bg-background rounded">
+                      <div className="font-medium text-muted-foreground">
+                        {formatTime(item.timestamp.toISOString())}
+                        {item.issueContext && ` - Fixed: ${item.issueContext}`}
+                      </div>
+                      <div className="truncate">{item.message.substring(0, 100)}...</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -167,8 +274,13 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
           <Button variant="outline" onClick={onReject}>
             Skip This Lead
           </Button>
-          <Button variant="outline" onClick={generatePreviewMessage} disabled={generating}>
-            Regenerate
+          <Button 
+            variant="outline" 
+            onClick={() => generatePreviewMessage()} 
+            disabled={generating}
+          >
+            <RefreshCcw className="w-4 h-4 mr-1" />
+            Simple Regenerate
           </Button>
           <Button onClick={handleApprove} disabled={generating || !generatedMessage}>
             Approve & Send
