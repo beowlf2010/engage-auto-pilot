@@ -82,6 +82,10 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
               if (cb.onMessageUpdate && payload.new.lead_id) {
                 cb.onMessageUpdate(payload.new.lead_id);
               }
+              
+              if (cb.onUnreadCountUpdate) {
+                cb.onUnreadCountUpdate();
+              }
             });
           }
         )
@@ -109,7 +113,9 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
             globalChannel = channel;
             isSubscribing = false;
             isSubscribed = true;
+            console.log('✅ Centralized realtime subscribed successfully');
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+            console.error('❌ Centralized realtime error or closed:', status);
             globalChannel = null;
             isSubscribing = false;
             isSubscribed = false;

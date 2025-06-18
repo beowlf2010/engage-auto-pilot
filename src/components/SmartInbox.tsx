@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
@@ -65,6 +66,8 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const handleSendMessage = useCallback(async (message: string, isTemplate?: boolean) => {
     if (selectedLead && selectedConversation) {
       try {
+        console.log('📤 Sending message from SmartInbox:', message);
+        
         // Auto-assign lead if it's unassigned and user can reply
         if (!selectedConversation.salespersonId && canReply(selectedConversation)) {
           console.log(`🎯 Auto-assigning lead ${selectedLead} to user ${user.id}`);
@@ -87,12 +90,10 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           setShowTemplates(false);
         }
         
-        // Immediately refresh messages for the current conversation to show the new message
-        setTimeout(async () => {
-          await fetchMessages(selectedLead);
-          // Also refresh conversations list to update last message and clear unread badges
-          refetch();
-        }, 500);
+        console.log('✅ Message sent successfully from SmartInbox');
+        
+        // The real-time system will handle the refresh automatically
+        // No need for manual delays or forced refreshes
         
       } catch (err) {
         console.error('Error sending message:', err);
@@ -103,7 +104,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         });
       }
     }
-  }, [selectedLead, selectedConversation, canReply, sendMessage, user.id, fetchMessages, refetch]);
+  }, [selectedLead, selectedConversation, canReply, sendMessage, user.id]);
 
   const handleToggleMemory = useCallback(() => {
     setShowMemory(prev => !prev);
