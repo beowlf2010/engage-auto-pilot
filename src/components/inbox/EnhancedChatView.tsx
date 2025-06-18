@@ -35,6 +35,7 @@ const EnhancedChatView = ({
   const [showLeadContext, setShowLeadContext] = useState(true);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
@@ -53,8 +54,6 @@ const EnhancedChatView = ({
   } = useConversationAnalysis(selectedConversation?.leadId || '');
 
   const handleScroll = () => {
-    // Implementation for scroll handling would go here
-    // This is a simplified version
     setShowScrollButton(Math.random() > 0.7); // Placeholder logic
   };
 
@@ -144,9 +143,9 @@ const EnhancedChatView = ({
 
   return (
     <div className="grid grid-cols-12 gap-4 h-full">
-      {/* Main Chat Area */}
-      <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col space-y-4`}>
-        {/* Analysis Panels */}
+      {/* Main Chat Area - Fixed Height */}
+      <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col space-y-2`}>
+        {/* Compact AI Panels - Only show when needed */}
         {showAnalysis && (
           <ChatAnalysisPanel
             leadId={selectedConversation.leadId}
@@ -157,13 +156,15 @@ const EnhancedChatView = ({
           />
         )}
 
-        {/* Intelligent AI Panel */}
+        {/* Collapsible Intelligent AI Panel */}
         {canReply && (
           <IntelligentAIPanel
             conversation={selectedConversation}
             messages={messages}
             onSendMessage={handleAIGeneratedMessage}
             canReply={canReply}
+            isCollapsed={!showAIPanel}
+            onToggleCollapse={() => setShowAIPanel(!showAIPanel)}
           />
         )}
 
@@ -176,7 +177,8 @@ const EnhancedChatView = ({
           />
         )}
 
-        <Card className="flex-1 flex flex-col">
+        {/* Fixed Height Chat Card */}
+        <Card className="flex flex-col h-[600px]">
           <ChatHeader
             selectedConversation={selectedConversation}
             showAnalysis={showAnalysis}

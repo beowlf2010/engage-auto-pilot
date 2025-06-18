@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Brain, Loader2, Send, Sparkles } from 'lucide-react';
+import { Brain, Loader2, Send, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { generateIntelligentResponse, shouldGenerateResponse, type ConversationContext } from '@/services/intelligentConversationAI';
 import { toast } from '@/hooks/use-toast';
 
@@ -12,13 +12,17 @@ interface IntelligentAIPanelProps {
   messages: any[];
   onSendMessage: (message: string) => Promise<void>;
   canReply: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const IntelligentAIPanel = ({ 
   conversation, 
   messages, 
   onSendMessage, 
-  canReply 
+  canReply,
+  isCollapsed = false,
+  onToggleCollapse
 }: IntelligentAIPanelProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastAIResponse, setLastAIResponse] = useState<string | null>(null);
@@ -93,16 +97,55 @@ const IntelligentAIPanel = ({
     }
   };
 
+  // If collapsed, show compact header only
+  if (isCollapsed) {
+    return (
+      <Card className="border-purple-200 bg-purple-50">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium">Finn AI Assistant</span>
+              {shouldGenerate && (
+                <Badge variant="outline" className="bg-orange-100 text-orange-700 text-xs">
+                  Ready to help
+                </Badge>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleCollapse}
+              className="h-6 w-6 p-0"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <Card className="border-purple-200 bg-purple-50">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Brain className="h-4 w-4 text-purple-600" />
-          Finn AI Assistant
-          <Badge variant="outline" className="bg-purple-100 text-purple-700">
-            Intelligent
-          </Badge>
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Brain className="h-4 w-4 text-purple-600" />
+            Finn AI Assistant
+            <Badge variant="outline" className="bg-purple-100 text-purple-700">
+              Intelligent
+            </Badge>
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleCollapse}
+            className="h-6 w-6 p-0"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
       
       <CardContent className="space-y-3">
