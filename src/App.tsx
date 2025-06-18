@@ -13,6 +13,7 @@ import StreamlinedLeadsPage from "@/pages/StreamlinedLeadsPage";
 import LeadDetailPage from "@/pages/LeadDetailPage";
 import AdvancedAnalyticsPage from "@/pages/AdvancedAnalyticsPage";
 import InventoryDashboardPage from "@/pages/InventoryDashboardPage";
+import InventoryUploadPage from "@/pages/InventoryUploadPage";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,14 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <InventoryDashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/upload-inventory"
+                  element={
+                    <ProtectedRoute>
+                      <InventoryUploadPage />
                     </ProtectedRoute>
                   }
                 />

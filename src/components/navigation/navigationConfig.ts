@@ -79,6 +79,13 @@ export const navigationConfig: NavConfig[] = [
   
   // Secondary navigation items (for dropdown)
   {
+    title: "Upload Inventory",
+    href: "/upload-inventory",
+    icon: Upload,
+    roles: ["admin", "manager"],
+    priority: 'secondary'
+  },
+  {
     title: "Predictive Analytics",
     href: "/predictive-analytics",
     icon: Brain,
