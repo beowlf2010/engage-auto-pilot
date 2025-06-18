@@ -200,9 +200,9 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         />
         
         {aiProcessing && (
-          <div className="absolute top-2 right-2 bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs flex items-center space-x-1">
+          <div className="absolute top-2 right-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs flex items-center space-x-2">
             <Loader2 className="w-3 h-3 animate-spin" />
-            <span>Finn is working...</span>
+            <span>Finn is analyzing conversations...</span>
           </div>
         )}
       </div>
