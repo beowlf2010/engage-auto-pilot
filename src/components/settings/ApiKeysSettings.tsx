@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApiKeysState } from "./api-keys/useApiKeysState";
 import { useApiKeysActions } from "./api-keys/useApiKeysActions";
 import ApiKeyField from "./api-keys/ApiKeyField";
-import TelnyxProfileField from "./api-keys/TelnyxProfileField";
+import TwilioAccountSidField from "./api-keys/TwilioAccountSidField";
 import TestSMSCard from "./api-keys/TestSMSCard";
 import AccessDeniedView from "./api-keys/AccessDeniedView";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -63,24 +63,35 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
               onUpdate={() => handleApiKeyUpdate('OPENAI_API_KEY', apiKeys.openaiKey, 'openaiKey')}
             />
             
-            <ApiKeyField
-              id="telnyx_key"
-              label="Telnyx API Key"
-              placeholder="KEY..."
-              value={apiKeys.telnyxApiKey}
-              description="Your Telnyx API v2 key for SMS services"
-              isLoading={loadingStates.telnyxKey}
-              onChange={(value) => setApiKeys(prev => ({ ...prev, telnyxApiKey: value }))}
-              onUpdate={() => handleApiKeyUpdate('TELNYX_API_KEY', apiKeys.telnyxApiKey, 'telnyxApiKey')}
+            <TwilioAccountSidField
+              value={apiKeys.twilioAccountSid}
+              isLoading={loadingStates.twilioAccountSid}
+              isTesting={isTesting}
+              onChange={(value) => setApiKeys(prev => ({ ...prev, twilioAccountSid: value }))}
+              onUpdate={() => handleApiKeyUpdate('TWILIO_ACCOUNT_SID', apiKeys.twilioAccountSid, 'twilioAccountSid')}
+              onTest={handleTestConnection}
             />
             
-            <TelnyxProfileField
-              value={apiKeys.telnyxProfileId}
-              isLoading={loadingStates.telnyxProfile}
-              isTesting={isTesting}
-              onChange={(value) => setApiKeys(prev => ({ ...prev, telnyxProfileId: value }))}
-              onUpdate={() => handleApiKeyUpdate('TELNYX_MESSAGING_PROFILE_ID', apiKeys.telnyxProfileId, 'telnyxProfileId')}
-              onTest={handleTestConnection}
+            <ApiKeyField
+              id="twilio_auth_token"
+              label="Twilio Auth Token"
+              placeholder="auth_token..."
+              value={apiKeys.twilioAuthToken}
+              description="Your Twilio Auth Token for SMS services"
+              isLoading={loadingStates.twilioAuthToken}
+              onChange={(value) => setApiKeys(prev => ({ ...prev, twilioAuthToken: value }))}
+              onUpdate={() => handleApiKeyUpdate('TWILIO_AUTH_TOKEN', apiKeys.twilioAuthToken, 'twilioAuthToken')}
+            />
+
+            <ApiKeyField
+              id="twilio_phone_number"
+              label="Twilio Phone Number"
+              placeholder="+1234567890"
+              value={apiKeys.twilioPhoneNumber}
+              description="Your Twilio phone number for sending SMS (in E.164 format)"
+              isLoading={loadingStates.twilioPhoneNumber}
+              onChange={(value) => setApiKeys(prev => ({ ...prev, twilioPhoneNumber: value }))}
+              onUpdate={() => handleApiKeyUpdate('TWILIO_PHONE_NUMBER', apiKeys.twilioPhoneNumber, 'twilioPhoneNumber')}
             />
           </div>
         </CardContent>
@@ -88,12 +99,13 @@ const ApiKeysSettings = ({ userRole }: ApiKeysSettingsProps) => {
 
       <Alert>
         <Info className="h-4 w-4" />
-        <AlertTitle>Having trouble connecting Telnyx?</AlertTitle>
+        <AlertTitle>Having trouble connecting Twilio?</AlertTitle>
         <AlertDescription>
           <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
-            <li>Ensure your <strong>Telnyx API Key</strong> starts with <code>KEY...</code> and is from a V2 API credential.</li>
-            <li>Your <strong>Telnyx Messaging Profile ID</strong> is a UUID (e.g., <code>123e4567-e89b-12d3-a456-426614174000</code>) found under "Messaging" in your Telnyx dashboard.</li>
-            <li>Use the "Test" button next to the Profile ID to verify your credentials. If it fails, the error message will provide details.</li>
+            <li>Ensure your <strong>Twilio Account SID</strong> starts with <code>AC</code> and is found in your Twilio Console dashboard.</li>
+            <li>Your <strong>Twilio Auth Token</strong> is the secret token from your Twilio Console (not the test token).</li>
+            <li>Your <strong>Twilio Phone Number</strong> must be in E.164 format (e.g., <code>+15551234567</code>) and purchased from Twilio.</li>
+            <li>Use the "Test" button next to the Account SID to verify your credentials. If it fails, the error message will provide details.</li>
             <li>Make sure the phone number you are testing with is in E.164 format (e.g., <code>+15551234567</code>).</li>
           </ul>
         </AlertDescription>

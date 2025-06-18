@@ -1,7 +1,6 @@
-
 import { PhoneNumber } from '@/types/lead';
 
-// Format phone number for Telnyx E.164 compatibility
+// Format phone number for Twilio E.164 compatibility
 export const formatPhoneForTwilio = (phone: string): string => {
   // Remove all non-digits
   const digits = phone.replace(/\D/g, '');
@@ -43,7 +42,7 @@ export const formatPhoneForDisplay = (phone: string): string => {
   return phone; // Return original if can't format
 };
 
-// Legacy function - now uses Telnyx format internally
+// Legacy function - now uses Twilio format internally
 export const formatPhoneNumber = (phone: string): string => {
   return formatPhoneForTwilio(phone);
 };
@@ -54,7 +53,7 @@ export const isValidPhoneNumber = (phone: string): boolean => {
   return digits.length >= 10 && digits.length <= 15;
 };
 
-// Validate E.164 format specifically for Telnyx (more flexible)
+// Validate E.164 format specifically for Twilio
 export const isValidE164Format = (phone: string): boolean => {
   const e164Regex = /^\+[1-9]\d{1,14}$/;
   return e164Regex.test(phone);
@@ -121,4 +120,3 @@ export const getPrimaryPhone = (phoneNumbers: PhoneNumber[]): string => {
   const activePhones = phoneNumbers.filter(p => p.status === 'active');
   return activePhones.length > 0 ? activePhones[0].number : '';
 };
-

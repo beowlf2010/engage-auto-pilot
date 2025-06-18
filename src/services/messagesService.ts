@@ -147,7 +147,7 @@ export const sendMessage = async (
 
     console.log('Created conversation record:', conversation.id);
 
-    // Try to send SMS via Telnyx
+    // Try to send SMS via Twilio
     console.log('Calling send-sms function...');
     try {
       const { data, error } = await supabase.functions.invoke('send-sms', {
@@ -187,7 +187,7 @@ export const sendMessage = async (
         .from('conversations')
         .update({
           sms_status: 'sent',
-          twilio_message_id: data?.telnyxMessageId || data?.messageSid
+          twilio_message_id: data?.messageSid
         })
         .eq('id', conversation.id);
 
@@ -208,7 +208,7 @@ export const sendMessage = async (
       // Show warning but don't throw - message is saved locally
       toast({
         title: "Message Saved Locally",
-        description: "SMS sending failed but your message has been saved. Please check your Telnyx configuration in settings.",
+        description: "SMS sending failed but your message has been saved. Please check your Twilio configuration in settings.",
         variant: "default"
       });
       

@@ -1,8 +1,8 @@
 
 import { useToast } from "@/hooks/use-toast";
 import { 
-  updateTelnyxSettings, 
-  testTelnyxConnection, 
+  updateTwilioSettings, 
+  testTwilioConnection, 
   validatePhoneNumber, 
   formatPhoneNumber,
   sendTestSMS
@@ -11,8 +11,9 @@ import {
 interface UseApiKeysActionsProps {
   apiKeys: {
     openaiKey: string;
-    telnyxApiKey: string;
-    telnyxProfileId: string;
+    twilioAccountSid: string;
+    twilioAuthToken: string;
+    twilioPhoneNumber: string;
   };
   testPhoneNumber: string;
   setTestPhoneNumber: (value: string) => void;
@@ -60,18 +61,21 @@ export const useApiKeysActions = ({
     if (!value.trim()) {
       toast({
         title: "Invalid Input",
-        description: "Please enter a valid API key or profile ID",
+        description: "Please enter a valid API key or credential",
         variant: "destructive"
       });
       return;
     }
 
-    const loadingKey = keyType === 'openaiKey' ? 'openai' : keyType === 'telnyxApiKey' ? 'telnyxKey' : 'telnyxProfile';
+    const loadingKey = keyType === 'openaiKey' ? 'openai' : 
+                     keyType === 'twilioAccountSid' ? 'twilioAccountSid' : 
+                     keyType === 'twilioAuthToken' ? 'twilioAuthToken' : 'twilioPhoneNumber';
+                     
     setLoadingStates((prev: any) => ({ ...prev, [loadingKey]: true }));
     
     try {
       console.log(`Updating ${settingType} with value:`, value.substring(0, 10) + '...');
-      const result = await updateTelnyxSettings(settingType, value);
+      const result = await updateTwilioSettings(settingType, value);
       console.log('Update result:', result);
       
       if (result && result.success) {
@@ -100,10 +104,10 @@ export const useApiKeysActions = ({
   };
 
   const handleTestConnection = async () => {
-    if (!apiKeys.telnyxApiKey || !apiKeys.telnyxProfileId) {
+    if (!apiKeys.twilioAccountSid || !apiKeys.twilioAuthToken) {
       toast({
         title: "Missing Credentials",
-        description: "Please enter both Telnyx API Key and Messaging Profile ID before testing",
+        description: "Please enter both Twilio Account SID and Auth Token before testing",
         variant: "destructive"
       });
       return;
@@ -111,8 +115,8 @@ export const useApiKeysActions = ({
 
     setIsTesting(true);
     try {
-      console.log('Testing Telnyx connection...');
-      const result = await testTelnyxConnection(apiKeys.telnyxApiKey, apiKeys.telnyxProfileId);
+      console.log('Testing Twilio connection...');
+      const result = await testTwilioConnection(apiKeys.twilioAccountSid, apiKeys.twilioAuthToken);
       toast({
         title: "Connection Test",
         description: result.message,
@@ -164,7 +168,7 @@ export const useApiKeysActions = ({
         });
         setTestPhoneNumber("");
       } else {
-        const errorMsg = result?.error || result?.telnyxError?.errors?.[0]?.detail || "SMS sending failed";
+        const errorMsg = result?.error || result?.twilioError?.message || "SMS sending failed";
         toast({
           title: "Test SMS Failed",
           description: errorMsg,

@@ -7,13 +7,15 @@ export const useApiKeysState = () => {
   const [testPhoneNumber, setTestPhoneNumber] = useState("");
   const [loadingStates, setLoadingStates] = useState({
     openai: false,
-    telnyxKey: false,
-    telnyxProfile: false
+    twilioAccountSid: false,
+    twilioAuthToken: false,
+    twilioPhoneNumber: false
   });
   const [apiKeys, setApiKeys] = useState({
     openaiKey: "",
-    telnyxApiKey: "",
-    telnyxProfileId: ""
+    twilioAccountSid: "",
+    twilioAuthToken: "",
+    twilioPhoneNumber: ""
   });
 
   return {

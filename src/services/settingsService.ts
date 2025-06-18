@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -6,7 +7,7 @@ export interface SettingsUpdateRequest {
   value: string;
 }
 
-export const updateTelnyxSettings = async (settingType: string, value: string) => {
+export const updateTwilioSettings = async (settingType: string, value: string) => {
   try {
     const { data, error } = await supabase.functions.invoke('update-settings', {
       body: { settingType, value }
@@ -23,31 +24,30 @@ export const updateTelnyxSettings = async (settingType: string, value: string) =
   }
 };
 
-export const testTelnyxConnection = async (apiKey: string, messagingProfileId: string) => {
+export const testTwilioConnection = async (accountSid: string, authToken: string) => {
   try {
-    // Test the Telnyx connection by making a simple API call
-    const response = await fetch('https://api.telnyx.com/v2/messaging_profiles', {
+    // Test the Twilio connection by making a simple API call
+    const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
       }
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.errors?.[0]?.detail || 'Invalid Telnyx credentials');
+      throw new Error(errorData.message || 'Invalid Twilio credentials');
     }
 
     const data = await response.json();
-    const profileExists = data.data?.some((profile: any) => profile.id === messagingProfileId);
     
-    if (!profileExists) {
-      throw new Error('Messaging Profile ID not found in your Telnyx account');
+    if (data.status !== 'active') {
+      throw new Error('Twilio account is not active');
     }
 
-    return { success: true, message: 'Telnyx connection test successful' };
+    return { success: true, message: 'Twilio connection test successful' };
   } catch (error) {
-    console.error('Error testing Telnyx connection:', error);
+    console.error('Error testing Twilio connection:', error);
     throw error;
   }
 };

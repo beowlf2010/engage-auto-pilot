@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 
@@ -6,12 +7,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Utility to get Telnyx API credentials
-async function getTelnyxSecrets() {
-  const apiKey = Deno.env.get('TELNYX_API_KEY')
-  const messagingProfileId = Deno.env.get('TELNYX_MESSAGING_PROFILE_ID')
+// Utility to get Twilio API credentials
+async function getTwilioSecrets() {
+  const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
+  const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
+  const phoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
 
-  if (!apiKey || !messagingProfileId) {
+  if (!accountSid || !authToken || !phoneNumber) {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -20,7 +22,7 @@ async function getTelnyxSecrets() {
     const { data: settings } = await supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['TELNYX_API_KEY', 'TELNYX_MESSAGING_PROFILE_ID'])
+      .in('key', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER'])
 
     const settingsMap = {}
     settings?.forEach(setting => {
@@ -28,12 +30,13 @@ async function getTelnyxSecrets() {
     })
 
     return {
-      apiKey: apiKey || settingsMap['TELNYX_API_KEY'],
-      messagingProfileId: messagingProfileId || settingsMap['TELNYX_MESSAGING_PROFILE_ID']
+      accountSid: accountSid || settingsMap['TWILIO_ACCOUNT_SID'],
+      authToken: authToken || settingsMap['TWILIO_AUTH_TOKEN'],
+      phoneNumber: phoneNumber || settingsMap['TWILIO_PHONE_NUMBER']
     }
   }
 
-  return { apiKey, messagingProfileId }
+  return { accountSid, authToken, phoneNumber }
 }
 
 serve(async (req) => {
@@ -47,45 +50,49 @@ serve(async (req) => {
     const { to, body, conversationId } = await req.json()
     console.log(`Received request to send to ${to} for conversation ${conversationId}`);
 
-    // Get Telnyx credentials
-    console.log('Fetching Telnyx secrets...');
-    const { apiKey, messagingProfileId } = await getTelnyxSecrets()
+    // Get Twilio credentials
+    console.log('Fetching Twilio secrets...');
+    const { accountSid, authToken, phoneNumber } = await getTwilioSecrets()
 
-    if (!apiKey || !messagingProfileId) {
-      console.error('Missing Telnyx API credentials.', { hasApiKey: !!apiKey, hasProfile: !!messagingProfileId });
-      throw new Error('Missing Telnyx API credentials')
+    if (!accountSid || !authToken || !phoneNumber) {
+      console.error('Missing Twilio API credentials.', { 
+        hasAccountSid: !!accountSid, 
+        hasAuthToken: !!authToken, 
+        hasPhoneNumber: !!phoneNumber 
+      });
+      throw new Error('Missing Twilio API credentials')
     }
-    console.log('Telnyx secrets fetched successfully.');
+    console.log('Twilio secrets fetched successfully.');
 
-    // Compose the Telnyx API request - don't include 'from' field if we want to use profile default
-    const payload = {
-      to,
-      text: body,
-      messaging_profile_id: messagingProfileId
-    }
+    // Compose the Twilio API request
+    const payload = new URLSearchParams({
+      To: to,
+      From: phoneNumber,
+      Body: body
+    })
 
-    console.log('Sending SMS with payload:', JSON.stringify(payload))
+    console.log('Sending SMS with payload:', { to, from: phoneNumber, body })
 
-    const telnyxUrl = "https://api.telnyx.com/v2/messages"
-    const response = await fetch(telnyxUrl, {
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+    const response = await fetch(twilioUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: JSON.stringify(payload)
+      body: payload
     })
-    console.log('Telnyx API response status:', response.status);
+    console.log('Twilio API response status:', response.status);
 
     const result = await response.json()
-    console.log('Telnyx API response body:', JSON.stringify(result));
+    console.log('Twilio API response body:', JSON.stringify(result));
     
     if (!response.ok) {
-      console.error('Telnyx API error:', result)
+      console.error('Twilio API error:', result)
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: result.errors ? result.errors[0]?.detail : result.message || 'Failed to send SMS',
+          error: result.message || 'Failed to send SMS',
           conversationId 
         }),
         { 
@@ -95,14 +102,14 @@ serve(async (req) => {
       )
     }
 
-    const messageId = result.data?.id || 'unknown'
-    console.log('Telnyx SMS sent successfully:', messageId)
+    const messageId = result.sid || 'unknown'
+    console.log('Twilio SMS sent successfully:', messageId)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        telnyxMessageId: messageId,
-        status: result.data?.record_type || 'submitted',
+        messageSid: messageId,
+        status: result.status || 'queued',
         conversationId
       }),
       { 

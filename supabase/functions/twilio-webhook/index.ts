@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Accept both Telnyx (JSON) and Twilio (form) webhooks
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -18,31 +17,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Detect payload type (JSON → Telnyx, form → Twilio)
-    let from: string | null = null
-    let body: string | null = null
-    let messageId: string | null = null
-
-    let telnyxPayload: any = null
-    let isTelnyx = false
-
-    // Try parse as JSON first
-    try {
-      telnyxPayload = await req.json()
-      // Telnyx inbound message webhook payload
-      if (telnyxPayload && telnyxPayload.data && telnyxPayload.data.record_type === 'message') {
-        isTelnyx = true
-        from = telnyxPayload.data.payload.from
-        body = telnyxPayload.data.payload.text
-        messageId = telnyxPayload.data.id
-      }
-    } catch (e) {
-      // Not JSON, fall back to form (Twilio)
-      const formData = await req.formData()
-      from = formData.get('From') as string
-      body = formData.get('Body') as string
-      messageId = formData.get('MessageSid') as string
-    }
+    // Parse Twilio webhook form data
+    const formData = await req.formData()
+    const from = formData.get('From') as string
+    const body = formData.get('Body') as string
+    const messageId = formData.get('MessageSid') as string
 
     if (!from || !body) {
       return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
@@ -79,7 +58,7 @@ serve(async (req) => {
         direction: 'in',
         body: body,
         sent_at: new Date().toISOString(),
-        twilio_message_id: messageId // for Telnyx, this will be the messageId still
+        twilio_message_id: messageId
       })
 
     if (msgError) {
@@ -90,9 +69,8 @@ serve(async (req) => {
     // Extract and store memory from the incoming message
     await extractAndStoreMemory(phoneData.lead_id, body, 'in')
 
-    console.log('Message stored successfully (via', isTelnyx ? 'Telnyx' : 'Twilio', ')')
+    console.log('Message stored successfully via Twilio webhook')
 
-    // Telnyx expects 200; Twilio expects XML
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
     })
