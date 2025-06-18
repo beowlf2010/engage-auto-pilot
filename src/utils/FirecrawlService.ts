@@ -97,9 +97,10 @@ export class FirecrawlService {
           throw new Error(`Status check error: ${statusError.message || 'Unknown error'}`);
         }
 
-        if (!statusData?.success) {
-          console.error('Status check failed:', statusData);
-          throw new Error(statusData?.error || 'Failed to check crawl status');
+        // Fix: Check for presence of status field instead of success field
+        if (!statusData || !statusData.status) {
+          console.error('Invalid status response:', statusData);
+          throw new Error('Invalid status response from crawl service');
         }
 
         console.log(`Crawl status: ${statusData.status}, completed: ${statusData.completed}/${statusData.total}`);

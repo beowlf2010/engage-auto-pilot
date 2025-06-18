@@ -143,9 +143,10 @@ serve(async (req) => {
         },
       });
 
-      const statusData = await statusResponse.json() as FirecrawlStatusResponse;
-      console.log('Crawl status:', statusData);
+      const statusData = await statusResponse.json();
+      console.log('Crawl status response:', statusData);
 
+      // Return the raw status data - Firecrawl includes status field directly
       return new Response(
         JSON.stringify(statusData),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
