@@ -2,11 +2,10 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Globe, Car, Download, Settings, AlertCircle, Database } from 'lucide-react';
+import { Globe, Car, Database, CheckCircle, AlertCircle } from 'lucide-react';
 import { FirecrawlService } from '@/utils/FirecrawlService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -19,9 +18,8 @@ interface VehicleScraperProps {
 const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [apiKey, setApiKey] = useState(FirecrawlService.getApiKey() || '');
-  const [isTestingKey, setIsTestingKey] = useState(false);
-  const [keyValid, setKeyValid] = useState<boolean | null>(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
   const [isScraping, setIsScraping] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -30,44 +28,34 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
   
   const dealershipUrl = 'https://www.jasonpilgerchevrolet.com/';
 
-  const handleSaveApiKey = async () => {
-    if (!apiKey.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid API key",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsTestingKey(true);
+  const handleTestConnection = async () => {
+    setIsTestingConnection(true);
     try {
-      const isValid = await FirecrawlService.testApiKey(apiKey);
+      const isValid = await FirecrawlService.testApiKey();
       if (isValid) {
-        FirecrawlService.saveApiKey(apiKey);
-        setKeyValid(true);
+        setConnectionStatus('connected');
         toast({
-          title: "Success",
-          description: "Firecrawl API key saved and validated successfully"
+          title: "Connection successful",
+          description: "Firecrawl API is properly configured and working"
         });
       } else {
-        setKeyValid(false);
+        setConnectionStatus('error');
         toast({
-          title: "Error",
-          description: "Invalid API key. Please check and try again.",
+          title: "Connection failed",
+          description: "Unable to connect to Firecrawl API. Please check your configuration.",
           variant: "destructive"
         });
       }
     } catch (error) {
-      console.error('Error testing API key:', error);
-      setKeyValid(false);
+      console.error('Error testing connection:', error);
+      setConnectionStatus('error');
       toast({
-        title: "Error",
-        description: "Failed to validate API key",
+        title: "Connection failed",
+        description: "Failed to test Firecrawl API connection",
         variant: "destructive"
       });
     } finally {
-      setIsTestingKey(false);
+      setIsTestingConnection(false);
     }
   };
 
@@ -90,8 +78,8 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
       // Step 1: Scrape the website
       console.log('🌐 Starting website scraping...');
       const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 5, 45));
-      }, 500);
+        setProgress(prev => Math.min(prev + 2, 45));
+      }, 2000);
 
       const scrapingResponse = await FirecrawlService.scrapeVehicleInventory(dealershipUrl);
       clearInterval(progressInterval);
@@ -152,44 +140,51 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
 
   return (
     <div className="space-y-6">
-      {/* API Key Configuration */}
+      {/* Connection Status */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Firecrawl API Configuration
+            <Globe className="w-5 h-5" />
+            Firecrawl API Status
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <AlertCircle className="w-4 h-4" />
-            <span>You need a Firecrawl API key to scrape your website. Get one at <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">firecrawl.dev</a></span>
-          </div>
-          
-          <div className="flex gap-2">
-            <Input
-              type="password"
-              placeholder="Enter your Firecrawl API key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="flex-1"
-            />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {connectionStatus === 'connected' && (
+                <>
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <Badge variant="default">Connected</Badge>
+                </>
+              )}
+              {connectionStatus === 'error' && (
+                <>
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                  <Badge variant="destructive">Connection Failed</Badge>
+                </>
+              )}
+              {connectionStatus === 'unknown' && (
+                <>
+                  <AlertCircle className="w-4 h-4 text-gray-600" />
+                  <Badge variant="outline">Not Tested</Badge>
+                </>
+              )}
+            </div>
+            
             <Button 
-              onClick={handleSaveApiKey}
-              disabled={isTestingKey || !apiKey.trim()}
+              onClick={handleTestConnection}
+              disabled={isTestingConnection}
               variant="outline"
+              size="sm"
             >
-              {isTestingKey ? 'Testing...' : 'Save & Test'}
+              {isTestingConnection ? 'Testing...' : 'Test Connection'}
             </Button>
           </div>
 
-          {keyValid !== null && (
-            <div className="flex items-center gap-2">
-              <Badge variant={keyValid ? "default" : "destructive"}>
-                {keyValid ? "✓ API Key Valid" : "✗ Invalid API Key"}
-              </Badge>
-            </div>
-          )}
+          <div className="text-sm text-gray-600">
+            <p>Firecrawl API is configured via Supabase Edge Function secrets.</p>
+            <p>Contact your administrator if the connection test fails.</p>
+          </div>
         </CardContent>
       </Card>
 
@@ -228,12 +223,18 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
 
           <Button
             onClick={handleScrapeAndProcess}
-            disabled={isScraping || isProcessing || !keyValid}
+            disabled={isScraping || isProcessing || connectionStatus === 'error'}
             className="w-full"
           >
             <Database className="w-4 h-4 mr-2" />
             {isScraping || isProcessing ? 'Processing...' : 'Scrape & Import Vehicle Inventory'}
           </Button>
+
+          {connectionStatus === 'error' && (
+            <div className="bg-red-50 p-3 rounded text-red-700 text-sm">
+              Please test the connection first to ensure Firecrawl API is properly configured.
+            </div>
+          )}
 
           {scrapingResult && (
             <>

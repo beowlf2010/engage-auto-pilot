@@ -1,5 +1,4 @@
-
-import FirecrawlApp from '@mendable/firecrawl-js';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ErrorResponse {
   success: false;
@@ -19,28 +18,32 @@ interface CrawlStatusResponse {
 type CrawlResponse = CrawlStatusResponse | ErrorResponse;
 
 export class FirecrawlService {
+  // Keep these methods for backward compatibility but they won't be used
   private static API_KEY_STORAGE_KEY = 'firecrawl_api_key';
-  private static firecrawlApp: FirecrawlApp | null = null;
 
   static saveApiKey(apiKey: string): void {
     localStorage.setItem(this.API_KEY_STORAGE_KEY, apiKey);
-    this.firecrawlApp = new FirecrawlApp({ apiKey });
-    console.log('Firecrawl API key saved successfully');
+    console.log('API key saved to localStorage (note: edge function uses Supabase secrets)');
   }
 
   static getApiKey(): string | null {
     return localStorage.getItem(this.API_KEY_STORAGE_KEY);
   }
 
-  static async testApiKey(apiKey: string): Promise<boolean> {
+  static async testApiKey(apiKey?: string): Promise<boolean> {
     try {
-      console.log('Testing Firecrawl API key');
-      this.firecrawlApp = new FirecrawlApp({ apiKey });
-      // Simple test crawl to verify the API key
-      const testResponse = await this.firecrawlApp.crawlUrl('https://example.com', {
-        limit: 1
+      console.log('Testing Firecrawl API key via edge function');
+      
+      const { data, error } = await supabase.functions.invoke('firecrawl-scraper', {
+        body: { action: 'test' }
       });
-      return testResponse.success;
+
+      if (error) {
+        console.error('Error testing API key:', error);
+        return false;
+      }
+
+      return data?.success || false;
     } catch (error) {
       console.error('Error testing Firecrawl API key:', error);
       return false;
@@ -48,45 +51,74 @@ export class FirecrawlService {
   }
 
   static async scrapeVehicleInventory(dealershipUrl: string): Promise<{ success: boolean; error?: string; data?: any }> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      return { success: false, error: 'Firecrawl API key not found' };
-    }
-
     try {
-      console.log('Scraping vehicle inventory from:', dealershipUrl);
-      if (!this.firecrawlApp) {
-        this.firecrawlApp = new FirecrawlApp({ apiKey });
-      }
-
-      const crawlResponse = await this.firecrawlApp.crawlUrl(dealershipUrl, {
-        limit: 100,
-        scrapeOptions: {
-          formats: ['markdown', 'html'],
-          onlyMainContent: true,
-          includeTags: ['inventory', 'vehicles', 'new', 'used'],
-          excludeTags: ['nav', 'header', 'footer', 'service', 'parts', 'contact']
+      console.log('Starting vehicle inventory scrape via edge function:', dealershipUrl);
+      
+      // Step 1: Start the crawl
+      const { data: crawlData, error: crawlError } = await supabase.functions.invoke('firecrawl-scraper', {
+        body: { 
+          action: 'crawl',
+          url: dealershipUrl
         }
-      }) as CrawlResponse;
+      });
 
-      if (!crawlResponse.success) {
-        console.error('Vehicle inventory scrape failed:', (crawlResponse as ErrorResponse).error);
-        return { 
-          success: false, 
-          error: (crawlResponse as ErrorResponse).error || 'Failed to scrape vehicle inventory' 
-        };
+      if (crawlError) {
+        throw new Error(crawlError.message);
       }
 
-      console.log('Vehicle inventory scrape successful:', crawlResponse);
-      return { 
-        success: true,
-        data: crawlResponse 
-      };
+      if (!crawlData?.success) {
+        throw new Error(crawlData?.error || 'Failed to start crawl');
+      }
+
+      const jobId = crawlData.jobId;
+      console.log('Crawl started with job ID:', jobId);
+
+      // Step 2: Poll for completion
+      let attempts = 0;
+      const maxAttempts = 60; // 5 minutes max
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        
+        const { data: statusData, error: statusError } = await supabase.functions.invoke('firecrawl-scraper', {
+          body: { 
+            action: 'status',
+            jobId: jobId
+          }
+        });
+
+        if (statusError) {
+          throw new Error(statusError.message);
+        }
+
+        if (!statusData?.success) {
+          throw new Error(statusData?.error || 'Failed to check crawl status');
+        }
+
+        console.log(`Crawl status: ${statusData.status}, completed: ${statusData.completed}/${statusData.total}`);
+
+        if (statusData.status === 'completed') {
+          console.log('Crawl completed successfully');
+          return { 
+            success: true,
+            data: statusData
+          };
+        }
+
+        if (statusData.status === 'failed') {
+          throw new Error('Crawl failed');
+        }
+
+        attempts++;
+      }
+
+      throw new Error('Crawl timed out');
+
     } catch (error) {
       console.error('Error during vehicle inventory scrape:', error);
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Failed to connect to Firecrawl API' 
+        error: error instanceof Error ? error.message : 'Failed to scrape website'
       };
     }
   }
