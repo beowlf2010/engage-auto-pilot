@@ -5,7 +5,7 @@ import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import ConversationsList from "./inbox/ConversationsList";
-import ChatView from "./inbox/ChatView";
+import EnhancedChatView from "./inbox/EnhancedChatView";
 import ConversationMemory from "./ConversationMemory";
 import { useRealtimeInbox } from "@/hooks/useRealtimeInbox";
 import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
@@ -24,6 +24,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const [searchParams] = useSearchParams();
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [showMemory, setShowMemory] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   
   const { conversations, messages, loading, fetchMessages, sendMessage, refetch, error } = useRealtimeInbox();
@@ -70,7 +71,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     }
   }, [fetchMessages, messages]);
 
-  const handleSendMessage = useCallback(async (message: string) => {
+  const handleSendMessage = useCallback(async (message: string, isTemplate?: boolean) => {
     if (selectedLead && selectedConversation) {
       try {
         // Auto-assign lead if it's unassigned and user can reply
@@ -91,6 +92,10 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         
         await sendMessage(selectedLead, message);
         
+        if (isTemplate) {
+          setShowTemplates(false);
+        }
+        
         // Refresh conversations to show updated assignment and clear unread badges
         setTimeout(() => {
           refetch();
@@ -108,6 +113,10 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   const handleToggleMemory = useCallback(() => {
     setShowMemory(prev => !prev);
+  }, []);
+
+  const handleToggleTemplates = useCallback(() => {
+    setShowTemplates(prev => !prev);
   }, []);
 
   // Handle pre-selection from URL parameter - only run once after conversations load
@@ -203,12 +212,13 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         )}
       </div>
 
-      <ChatView
+      <EnhancedChatView
         selectedConversation={selectedConversation}
         messages={messages}
-        canReply={canReply}
         onSendMessage={handleSendMessage}
-        onToggleMemory={handleToggleMemory}
+        showTemplates={showTemplates}
+        onToggleTemplates={handleToggleTemplates}
+        user={user}
       />
 
       {showMemory && selectedLead && (
