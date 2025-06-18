@@ -61,6 +61,7 @@ export const getInventory = async (filters?: InventoryFilters) => {
     let query = supabase
       .from('inventory')
       .select('*')
+      .order('source_report', { ascending: false }) // Prioritize website_scrape data
       .order('created_at', { ascending: false });
 
     if (filters?.make) {
@@ -132,7 +133,7 @@ export const findMatchingInventory = async (leadId: string) => {
   }
 };
 
-// New function to get inventory with proper model names for AI messaging
+// Enhanced function to get inventory with proper model names for AI messaging
 export const getInventoryForAIMessaging = async (leadId: string) => {
   try {
     // First get the lead's vehicle interest
@@ -144,22 +145,25 @@ export const getInventoryForAIMessaging = async (leadId: string) => {
     
     if (!lead) return [];
     
-    // Build a query to find relevant inventory with proper model names
+    // Build a query to find relevant inventory, prioritizing website scraped data
     let query = supabase
       .from('inventory')
-      .select('id, vin, year, make, model, trim, price, stock_number, condition')
+      .select('id, vin, year, make, model, trim, price, stock_number, condition, source_report, description, images')
       .eq('status', 'available')
-      .not('model', 'eq', 'Unknown') // Exclude vehicles with Unknown model
+      .order('source_report', { ascending: false }) // Prioritize website_scrape data first
       .order('created_at', { ascending: false })
       .limit(10);
+    
+    // Only exclude "Unknown" model if it's not from website scraping
+    query = query.or('source_report.eq.website_scrape,model.neq.Unknown');
     
     // Add filters based on lead's interest
     if (lead.vehicle_make) {
       query = query.ilike('make', `%${lead.vehicle_make}%`);
     }
     
-    if (lead.vehicle_model) {
-      query = query.ilike('model', `%${lead.vehicle_model}%`);
+    if (lead.vehicle_model && lead.vehicle_model !== 'Unknown') {
+      query = query.or(`model.ilike.%${lead.vehicle_model}%,trim.ilike.%${lead.vehicle_model}%`);
     }
     
     if (lead.vehicle_year) {
@@ -173,15 +177,20 @@ export const getInventoryForAIMessaging = async (leadId: string) => {
     
     if (error) throw error;
     
-    console.log('AI messaging inventory results:', {
+    console.log('Enhanced AI messaging inventory results:', {
       leadInterest: lead.vehicle_interest,
       foundCount: data?.length || 0,
-      sampleVehicles: data?.slice(0, 3).map(v => `${v.year} ${v.make} ${v.model}`) || []
+      websiteScrapedCount: data?.filter(v => v.source_report === 'website_scrape').length || 0,
+      sampleVehicles: data?.slice(0, 3).map(v => ({
+        description: `${v.year} ${v.make} ${v.model || v.trim}`,
+        source: v.source_report,
+        price: v.price
+      })) || []
     });
     
     return data || [];
   } catch (error) {
-    console.error('Error getting inventory for AI messaging:', error);
+    console.error('Error getting enhanced inventory for AI messaging:', error);
     return [];
   }
 };

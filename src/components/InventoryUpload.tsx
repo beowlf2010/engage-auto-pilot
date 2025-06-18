@@ -1,6 +1,7 @@
 
 import { Button } from "@/components/ui/button";
-import { History, Package, BarChart3, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { History, Package, BarChart3, Trash2, Globe } from "lucide-react";
 import { useInventoryUpload } from "@/hooks/useInventoryUpload";
 import { useMultiFileUpload } from "@/hooks/useMultiFileUpload";
 import { Link } from "react-router-dom";
@@ -12,6 +13,7 @@ import UploadHistoryViewer from "./inventory-upload/UploadHistoryViewer";
 import SheetSelector from "./inventory-upload/SheetSelector";
 import DragDropFileQueue from "./inventory-upload/DragDropFileQueue";
 import BatchUploadResult from "./inventory-upload/BatchUploadResult";
+import VehicleScraper from "./inventory-upload/VehicleScraper";
 import type { QueuedFile } from "./inventory-upload/DragDropFileQueue";
 
 interface InventoryUploadProps {
@@ -51,6 +53,14 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
     } catch (error) {
       console.error('Cleanup failed:', error);
     }
+  };
+
+  const handleScrapingComplete = (data: any) => {
+    console.log('Website scraping completed:', data);
+    toast({
+      title: "Scraping Complete",
+      description: `Successfully scraped ${data.completed || 0} pages from your website`,
+    });
   };
 
   if (showHistory) {
@@ -114,9 +124,9 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Upload Inventory</h2>
+          <h2 className="text-2xl font-bold text-slate-800">Inventory Management</h2>
           <p className="text-slate-600 mt-1">
-            Import multiple vehicle inventory files with drag & drop functionality
+            Upload files or scrape your website to import vehicle inventory
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -147,22 +157,48 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <DragDropFileQueue 
-            onFilesProcessed={handleFilesProcessed}
-            onFileProcess={handleSingleFileProcess}
-            processing={processing}
-          />
-        </div>
-        <div>
-          <UploadInfoCards />
-        </div>
-      </div>
+      <Tabs defaultValue="file-upload" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="file-upload" className="flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            File Upload
+          </TabsTrigger>
+          <TabsTrigger value="website-scraping" className="flex items-center gap-2">
+            <Globe className="w-4 h-4" />
+            Website Scraping
+          </TabsTrigger>
+        </TabsList>
 
-      {batchResult && (
-        <BatchUploadResult result={batchResult} />
-      )}
+        <TabsContent value="file-upload" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <DragDropFileQueue 
+                onFilesProcessed={handleFilesProcessed}
+                onFileProcess={handleSingleFileProcess}
+                processing={processing}
+              />
+            </div>
+            <div>
+              <UploadInfoCards />
+            </div>
+          </div>
+
+          {batchResult && (
+            <BatchUploadResult result={batchResult} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="website-scraping" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <VehicleScraper onScrapingComplete={handleScrapingComplete} />
+            </div>
+            <div>
+              <UploadInfoCards />
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
