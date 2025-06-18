@@ -24,36 +24,54 @@ serve(async (req) => {
       lastCustomerMessage, 
       conversationHistory, 
       leadInfo,
-      conversationLength 
+      conversationLength,
+      inventoryStatus 
     } = await req.json();
 
-    console.log('🤖 Processing intelligent AI request for:', leadName);
+    console.log(`🤖 Processing intelligent AI request for: ${leadName}`);
 
     // Build context-aware system prompt
-    const systemPrompt = `You are Finn, an intelligent automotive sales AI assistant. You help customers who are interested in purchasing vehicles.
+    let systemPrompt = `You are a professional automotive sales assistant named Finn. Your goal is to be helpful, honest, and guide customers toward visiting the dealership.
 
-IMPORTANT GUIDELINES:
-- Always be helpful, professional, and conversational
-- Address the customer's specific question or concern directly
-- Keep responses under 160 characters for SMS compatibility
-- Be personable and use the customer's name when appropriate
-- Focus on being helpful rather than pushy
-- If asked about technical details, pricing, or availability, acknowledge the question and suggest speaking with a human expert
-- Never make up specific prices, availability, or technical details
-- Always aim to move the conversation toward a dealership visit or phone call
+IMPORTANT RULES:
+- Keep messages under 160 characters for SMS
+- Be conversational and personable, not salesy
+- Always be honest about inventory - never promise vehicles you don't have
+- Focus on building relationships and providing value
+- End with a clear call to action when appropriate
 
-CUSTOMER CONTEXT:
+Customer Information:
 - Name: ${leadName}
-- Vehicle Interest: ${vehicleInterest}
+- Original Interest: ${vehicleInterest}
 - Conversation Length: ${conversationLength} messages
-- Status: ${leadInfo?.status || 'Active prospect'}
 
-CONVERSATION HISTORY:
+INVENTORY STATUS:`;
+
+    if (inventoryStatus.hasRequestedVehicle) {
+      systemPrompt += `\n✅ WE HAVE ${inventoryStatus.requestedMake.toUpperCase()} VEHICLES IN STOCK:
+${inventoryStatus.matchingVehicles.map(v => `- ${v.year} ${v.make} ${v.model} - $${v.price?.toLocaleString()}`).join('\n')}`;
+    } else if (inventoryStatus.requestedMake) {
+      systemPrompt += `\n❌ WE DO NOT HAVE ${inventoryStatus.requestedMake.toUpperCase()} VEHICLES IN STOCK.`;
+      
+      if (inventoryStatus.availableAlternatives.length > 0) {
+        systemPrompt += `\n\nAVAILABLE ALTERNATIVES:
+${inventoryStatus.availableAlternatives.slice(0, 3).map(v => `- ${v.year} ${v.make} ${v.model} - $${v.price?.toLocaleString()}`).join('\n')}`;
+      }
+    }
+
+    systemPrompt += `\n\nGenerate a helpful, honest response that addresses their question directly.`;
+
+    const userPrompt = `Customer's latest message: "${lastCustomerMessage}"
+
+Recent conversation context:
 ${conversationHistory}
 
-CUSTOMER'S LATEST MESSAGE: "${lastCustomerMessage}"
-
-Generate a helpful, contextual response that directly addresses what the customer asked or said. Be natural and conversational.`;
+Generate a response that:
+1. Directly answers their question
+2. Is honest about what inventory we have/don't have
+3. If we don't have what they want, suggest alternatives or next steps
+4. Keeps it conversational and under 160 characters
+5. Provides value and builds trust`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -65,7 +83,7 @@ Generate a helpful, contextual response that directly addresses what the custome
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Please respond to the customer's message: "${lastCustomerMessage}"` }
+          { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
         max_tokens: 150,
@@ -73,34 +91,21 @@ Generate a helpful, contextual response that directly addresses what the custome
     });
 
     const aiResponse = await response.json();
-    
-    if (!aiResponse.choices?.[0]?.message?.content) {
-      throw new Error('Invalid response from OpenAI');
-    }
+    const generatedMessage = aiResponse.choices[0].message.content;
 
-    const message = aiResponse.choices[0].message.content.trim();
-    
-    // Simple quality check
-    if (message.length > 160) {
-      console.warn('⚠️ Generated message too long, truncating');
-    }
+    console.log(`✅ Generated intelligent response: ${generatedMessage}`);
 
-    console.log('✅ Generated intelligent response:', message);
-
-    return new Response(JSON.stringify({
-      message: message.slice(0, 160), // Ensure SMS compatibility
-      confidence: 0.8,
-      reasoning: 'AI analysis of conversation context and customer inquiry'
+    return new Response(JSON.stringify({ 
+      message: generatedMessage,
+      confidence: 0.9,
+      reasoning: 'Context-aware response with inventory validation'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('❌ Error in intelligent conversation AI:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      message: null 
-    }), {
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

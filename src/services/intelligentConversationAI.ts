@@ -25,10 +25,67 @@ export interface AIResponse {
   reasoning: string;
 }
 
+// Clean and validate vehicle interest data
+const cleanVehicleInterest = (vehicleInterest: string): string => {
+  if (!vehicleInterest) return '';
+  
+  // Remove malformed quotes and clean up the string
+  return vehicleInterest
+    .replace(/"/g, '') // Remove all quotes
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+};
+
+// Check if we have matching inventory for the vehicle interest
+const checkInventoryAvailability = async (vehicleInterest: string) => {
+  try {
+    const cleanInterest = cleanVehicleInterest(vehicleInterest);
+    if (!cleanInterest) return { hasInventory: false, matchingVehicles: [] };
+
+    // Extract make/model from vehicle interest
+    const words = cleanInterest.toLowerCase().split(' ');
+    let make = '';
+    let model = '';
+    
+    // Common vehicle makes to check for
+    const knownMakes = ['tesla', 'ford', 'chevrolet', 'honda', 'toyota', 'bmw', 'mercedes', 'audi', 'nissan', 'hyundai'];
+    
+    for (const word of words) {
+      if (knownMakes.includes(word)) {
+        make = word;
+        break;
+      }
+    }
+
+    if (make) {
+      const { data: inventory } = await supabase
+        .from('inventory')
+        .select('id, make, model, year, price')
+        .eq('status', 'available')
+        .ilike('make', `%${make}%`)
+        .limit(5);
+
+      return {
+        hasInventory: inventory && inventory.length > 0,
+        matchingVehicles: inventory || [],
+        searchedMake: make
+      };
+    }
+
+    return { hasInventory: false, matchingVehicles: [], searchedMake: make };
+  } catch (error) {
+    console.error('Error checking inventory:', error);
+    return { hasInventory: false, matchingVehicles: [] };
+  }
+};
+
 export const generateIntelligentResponse = async (context: ConversationContext): Promise<AIResponse | null> => {
   try {
     console.log('🤖 Generating intelligent AI response for lead:', context.leadId);
 
+    // Clean the vehicle interest data
+    const cleanedVehicleInterest = cleanVehicleInterest(context.vehicleInterest);
+    
     // Get recent conversation history (last 10 messages)
     const recentMessages = context.messages
       .slice(-10)
@@ -55,14 +112,30 @@ export const generateIntelligentResponse = async (context: ConversationContext):
       return null;
     }
 
+    // Check inventory availability for the customer's interest
+    const inventoryCheck = await checkInventoryAvailability(cleanedVehicleInterest);
+    
+    // Get available inventory for alternatives
+    const { data: availableInventory } = await supabase
+      .from('inventory')
+      .select('make, model, year, price')
+      .eq('status', 'available')
+      .limit(10);
+
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadName: context.leadName,
-        vehicleInterest: context.vehicleInterest,
+        vehicleInterest: cleanedVehicleInterest,
         lastCustomerMessage: lastCustomerMessage.body,
         conversationHistory: recentMessages,
         leadInfo: context.leadInfo,
-        conversationLength: context.messages.length
+        conversationLength: context.messages.length,
+        inventoryStatus: {
+          hasRequestedVehicle: inventoryCheck.hasInventory,
+          requestedMake: inventoryCheck.searchedMake,
+          matchingVehicles: inventoryCheck.matchingVehicles,
+          availableAlternatives: availableInventory || []
+        }
       }
     });
 
@@ -81,7 +154,7 @@ export const generateIntelligentResponse = async (context: ConversationContext):
     return {
       message: data.message,
       confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'AI analysis of conversation context'
+      reasoning: data.reasoning || 'AI analysis of conversation context with inventory validation'
     };
 
   } catch (error) {

@@ -87,10 +87,13 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           setShowTemplates(false);
         }
         
-        // Refresh conversations to show updated assignment and clear unread badges
-        setTimeout(() => {
+        // Immediately refresh messages for the current conversation to show the new message
+        setTimeout(async () => {
+          await fetchMessages(selectedLead);
+          // Also refresh conversations list to update last message and clear unread badges
           refetch();
-        }, 1000);
+        }, 500);
+        
       } catch (err) {
         console.error('Error sending message:', err);
         toast({
@@ -100,7 +103,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         });
       }
     }
-  }, [selectedLead, selectedConversation, canReply, sendMessage, user.id, refetch]);
+  }, [selectedLead, selectedConversation, canReply, sendMessage, user.id, fetchMessages, refetch]);
 
   const handleToggleMemory = useCallback(() => {
     setShowMemory(prev => !prev);
