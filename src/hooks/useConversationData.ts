@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { MessageData } from '@/types/conversation';
@@ -9,12 +9,16 @@ export const useConversationData = () => {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const currentLeadIdRef = useRef<string | null>(null);
+  const realtimeChannelRef = useRef<any>(null);
 
   const loadMessages = useCallback(async (leadId: string) => {
     if (!leadId) return;
     
     setMessagesLoading(true);
     setMessagesError(null);
+    currentLeadIdRef.current = leadId;
+    
     try {
       const { data, error } = await supabase
         .from('conversations')
@@ -39,6 +43,16 @@ export const useConversationData = () => {
       }));
 
       setMessages(transformedMessages);
+      
+      // Mark incoming messages as read
+      const unreadIncoming = data.filter(msg => msg.direction === 'in' && !msg.read_at);
+      if (unreadIncoming.length > 0) {
+        await supabase
+          .from('conversations')
+          .update({ read_at: new Date().toISOString() })
+          .in('id', unreadIncoming.map(msg => msg.id));
+      }
+      
     } catch (error) {
       console.error('Error loading messages:', error);
       setMessagesError(error instanceof Error ? error.message : 'Unknown error');
@@ -46,6 +60,62 @@ export const useConversationData = () => {
       setMessagesLoading(false);
     }
   }, []);
+
+  // Set up real-time subscription for conversation updates
+  useEffect(() => {
+    // Clean up existing channel
+    if (realtimeChannelRef.current) {
+      supabase.removeChannel(realtimeChannelRef.current);
+    }
+
+    // Set up new channel for conversation updates
+    const channel = supabase
+      .channel('conversation-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          console.log('📨 New message received via realtime:', payload);
+          
+          // Only refresh if this message is for the currently viewed lead
+          if (currentLeadIdRef.current && payload.new.lead_id === currentLeadIdRef.current) {
+            console.log('🔄 Refreshing messages for current lead');
+            loadMessages(currentLeadIdRef.current);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          console.log('📝 Message updated via realtime:', payload);
+          
+          // Only refresh if this message is for the currently viewed lead
+          if (currentLeadIdRef.current && payload.new.lead_id === currentLeadIdRef.current) {
+            console.log('🔄 Refreshing messages for current lead');
+            loadMessages(currentLeadIdRef.current);
+          }
+        }
+      )
+      .subscribe();
+
+    realtimeChannelRef.current = channel;
+
+    return () => {
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current);
+        realtimeChannelRef.current = null;
+      }
+    };
+  }, [loadMessages]);
 
   const sendMessage = useCallback(async (leadId: string, messageBody: string) => {
     if (!leadId || !messageBody.trim()) {

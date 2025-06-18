@@ -1,57 +1,109 @@
 
 import { useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useRealtimeChannelManager } from './useRealtimeChannelManager';
-import { useRealtimeNotificationHandlers } from './useRealtimeNotificationHandlers';
 import type { RealtimeCallbacks } from '@/types/realtime';
 
-export const useCentralizedRealtime = (callbacks: RealtimeCallbacks) => {
+export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
   const { profile } = useAuth();
+  const channelRef = useRef<any>(null);
   const callbacksRef = useRef(callbacks);
-  const {
-    addCallbacks,
-    removeCallbacks,
-    createChannel,
-    cleanupChannel,
-    getCallbacks
-  } = useRealtimeChannelManager();
-
-  const {
-    handleIncomingMessage,
-    handleIncomingEmail,
-    requestNotificationPermission
-  } = useRealtimeNotificationHandlers(getCallbacks());
-
+  
   // Update callbacks ref when they change
-  callbacksRef.current = callbacks;
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  }, [callbacks]);
 
   useEffect(() => {
     if (!profile) return;
 
-    console.log('🔌 Setting up centralized realtime subscription');
-    
-    // Request notification permission
-    requestNotificationPermission();
+    console.log('🔗 Setting up centralized realtime subscriptions');
 
-    // Add callbacks to global state
-    addCallbacks(callbacks);
+    // Clean up existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
 
-    // Create or get existing channel
-    createChannel(profile, handleIncomingMessage, handleIncomingEmail);
+    // Set up unified channel for all realtime updates
+    const channel = supabase
+      .channel('unified-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          console.log('📨 New conversation via realtime:', payload);
+          
+          // Call conversation update callback
+          if (callbacksRef.current.onConversationUpdate) {
+            callbacksRef.current.onConversationUpdate();
+          }
+          
+          // Call message update callback with lead ID
+          if (callbacksRef.current.onMessageUpdate && payload.new.lead_id) {
+            callbacksRef.current.onMessageUpdate(payload.new.lead_id);
+          }
+          
+          // Call unread count update
+          if (callbacksRef.current.onUnreadCountUpdate) {
+            callbacksRef.current.onUnreadCountUpdate();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          console.log('📝 Updated conversation via realtime:', payload);
+          
+          // Call conversation update callback
+          if (callbacksRef.current.onConversationUpdate) {
+            callbacksRef.current.onConversationUpdate();
+          }
+          
+          // Call message update callback with lead ID
+          if (callbacksRef.current.onMessageUpdate && payload.new.lead_id) {
+            callbacksRef.current.onMessageUpdate(payload.new.lead_id);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'leads'
+        },
+        (payload) => {
+          console.log('👤 Lead updated via realtime:', payload);
+          
+          // Call conversation update callback for lead changes
+          if (callbacksRef.current.onConversationUpdate) {
+            callbacksRef.current.onConversationUpdate();
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Centralized realtime status:', status);
+      });
+
+    channelRef.current = channel;
 
     return () => {
-      console.log('🔌 Cleaning up centralized realtime subscription');
-      removeCallbacks(callbacks);
-      cleanupChannel();
+      console.log('🔌 Cleaning up centralized realtime subscriptions');
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [profile, addCallbacks, removeCallbacks, createChannel, cleanupChannel, handleIncomingMessage, handleIncomingEmail, requestNotificationPermission]);
+  }, [profile]);
 
-  // Update callbacks when they change
-  useEffect(() => {
-    const currentCallbacks = getCallbacks();
-    const index = currentCallbacks.findIndex(cb => cb === callbacks);
-    if (index > -1) {
-      currentCallbacks[index] = callbacks;
-    }
-  }, [callbacks, getCallbacks]);
+  return null;
 };

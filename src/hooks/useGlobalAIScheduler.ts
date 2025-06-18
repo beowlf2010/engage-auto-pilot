@@ -8,6 +8,7 @@ import { sendMessage } from '@/services/messagesService';
 export const useGlobalAIScheduler = () => {
   const { profile } = useAuth();
   const processingRef = useRef(false);
+  const processingLeadsRef = useRef(new Set<string>());
 
   const processScheduledMessages = async () => {
     if (!profile || processingRef.current) return;
@@ -35,9 +36,29 @@ export const useGlobalAIScheduler = () => {
       console.log(`📨 Found ${leadsWithMessagesDue?.length || 0} leads with messages due`);
 
       for (const lead of leadsWithMessagesDue || []) {
+        // Skip if already processing this lead
+        if (processingLeadsRef.current.has(lead.id)) {
+          console.log(`⏭️ Skipping ${lead.first_name} - already processing`);
+          continue;
+        }
+
+        // Add to processing set
+        processingLeadsRef.current.add(lead.id);
+
         try {
           console.log(`🎯 Processing message for ${lead.first_name} ${lead.last_name} (Stage: ${lead.ai_stage})`);
           
+          // Immediately clear the next_ai_send_at to prevent duplicate processing
+          const { error: clearError } = await supabase
+            .from('leads')
+            .update({ next_ai_send_at: null })
+            .eq('id', lead.id);
+
+          if (clearError) {
+            console.error(`❌ Error clearing schedule for ${lead.first_name}:`, clearError);
+            continue;
+          }
+
           // Generate AI message
           const message = await generateEnhancedAIMessage(lead.id);
           
@@ -62,11 +83,10 @@ export const useGlobalAIScheduler = () => {
           } else {
             console.log(`❌ No message generated for ${lead.first_name} ${lead.last_name}`);
             
-            // Clear schedule if no message generated
+            // Pause sequence if no message generated
             await supabase
               .from('leads')
               .update({ 
-                next_ai_send_at: null,
                 ai_sequence_paused: true,
                 ai_pause_reason: 'no_message_generated'
               })
@@ -74,6 +94,21 @@ export const useGlobalAIScheduler = () => {
           }
         } catch (error) {
           console.error(`Error processing message for lead ${lead.id}:`, error);
+          
+          // Rollback - reschedule for later if there was an error
+          const nextRetry = new Date();
+          nextRetry.setMinutes(nextRetry.getMinutes() + 5); // Retry in 5 minutes
+          
+          await supabase
+            .from('leads')
+            .update({ 
+              next_ai_send_at: nextRetry.toISOString(),
+              ai_pause_reason: 'processing_error'
+            })
+            .eq('id', lead.id);
+        } finally {
+          // Remove from processing set
+          processingLeadsRef.current.delete(lead.id);
         }
       }
 
@@ -105,6 +140,15 @@ export const useGlobalAIScheduler = () => {
       console.log(`🤖 Found ${takeoverLeads?.length || 0} leads needing AI takeover`);
 
       for (const lead of takeoverLeads || []) {
+        // Skip if already processing this lead
+        if (processingLeadsRef.current.has(lead.id)) {
+          console.log(`⏭️ Skipping takeover for ${lead.first_name} - already processing`);
+          continue;
+        }
+
+        // Add to processing set
+        processingLeadsRef.current.add(lead.id);
+
         try {
           // Generate contextual takeover message
           const message = `Hi ${lead.first_name}! Thanks for your message. I'm here to help you with ${lead.vehicle_interest}. What questions can I answer for you?`;
@@ -130,6 +174,9 @@ export const useGlobalAIScheduler = () => {
           console.log(`🤖 AI took over conversation for ${lead.first_name}: "${message.substring(0, 50)}..."`);
         } catch (error) {
           console.error(`Error in AI takeover for lead ${lead.id}:`, error);
+        } finally {
+          // Remove from processing set
+          processingLeadsRef.current.delete(lead.id);
         }
       }
     } catch (error) {
@@ -152,6 +199,8 @@ export const useGlobalAIScheduler = () => {
     return () => {
       console.log('🛑 Stopping global AI scheduler');
       clearInterval(interval);
+      // Clear processing sets on cleanup
+      processingLeadsRef.current.clear();
     };
   }, [profile]);
 
