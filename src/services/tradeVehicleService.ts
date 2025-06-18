@@ -14,7 +14,31 @@ export const getTradeVehiclesByLeadId = async (leadId: string): Promise<TradeVeh
     throw error;
   }
 
-  return data || [];
+  return (data || []).map(vehicle => ({
+    id: vehicle.id,
+    leadId: vehicle.lead_id,
+    year: vehicle.year,
+    make: vehicle.make,
+    model: vehicle.model,
+    trim: vehicle.trim,
+    mileage: vehicle.mileage,
+    condition: vehicle.condition,
+    vin: vehicle.vin,
+    exteriorColor: vehicle.exterior_color,
+    interiorColor: vehicle.interior_color,
+    transmission: vehicle.transmission,
+    drivetrain: vehicle.drivetrain,
+    fuelType: vehicle.fuel_type,
+    accidentHistory: vehicle.accident_history,
+    serviceRecords: vehicle.service_records,
+    titleType: vehicle.title_type,
+    liensOutstanding: vehicle.liens_outstanding,
+    modifications: vehicle.modifications,
+    additionalNotes: vehicle.additional_notes,
+    photos: vehicle.photos || [],
+    createdAt: vehicle.created_at,
+    updatedAt: vehicle.updated_at
+  }));
 };
 
 export const createTradeVehicle = async (tradeVehicle: Omit<TradeVehicle, 'id' | 'createdAt' | 'updatedAt'>): Promise<TradeVehicle> => {
@@ -50,7 +74,31 @@ export const createTradeVehicle = async (tradeVehicle: Omit<TradeVehicle, 'id' |
     throw error;
   }
 
-  return data;
+  return {
+    id: data.id,
+    leadId: data.lead_id,
+    year: data.year,
+    make: data.make,
+    model: data.model,
+    trim: data.trim,
+    mileage: data.mileage,
+    condition: data.condition,
+    vin: data.vin,
+    exteriorColor: data.exterior_color,
+    interiorColor: data.interior_color,
+    transmission: data.transmission,
+    drivetrain: data.drivetrain,
+    fuelType: data.fuel_type,
+    accidentHistory: data.accident_history,
+    serviceRecords: data.service_records,
+    titleType: data.title_type,
+    liensOutstanding: data.liens_outstanding,
+    modifications: data.modifications,
+    additionalNotes: data.additional_notes,
+    photos: data.photos || [],
+    createdAt: data.created_at,
+    updatedAt: data.updated_at
+  };
 };
 
 export const updateTradeVehicle = async (id: string, updates: Partial<TradeVehicle>): Promise<TradeVehicle> => {
@@ -87,7 +135,31 @@ export const updateTradeVehicle = async (id: string, updates: Partial<TradeVehic
     throw error;
   }
 
-  return data;
+  return {
+    id: data.id,
+    leadId: data.lead_id,
+    year: data.year,
+    make: data.make,
+    model: data.model,
+    trim: data.trim,
+    mileage: data.mileage,
+    condition: data.condition,
+    vin: data.vin,
+    exteriorColor: data.exterior_color,
+    interiorColor: data.interior_color,
+    transmission: data.transmission,
+    drivetrain: data.drivetrain,
+    fuelType: data.fuel_type,
+    accidentHistory: data.accident_history,
+    serviceRecords: data.service_records,
+    titleType: data.title_type,
+    liensOutstanding: data.liens_outstanding,
+    modifications: data.modifications,
+    additionalNotes: data.additional_notes,
+    photos: data.photos || [],
+    createdAt: data.created_at,
+    updatedAt: data.updated_at
+  };
 };
 
 export const deleteTradeVehicle = async (id: string): Promise<void> => {
@@ -114,7 +186,24 @@ export const getTradeValuations = async (tradeVehicleId: string): Promise<TradeV
     throw error;
   }
 
-  return data || [];
+  return (data || []).map(valuation => ({
+    id: valuation.id,
+    tradeVehicleId: valuation.trade_vehicle_id,
+    valuationSource: valuation.valuation_source,
+    tradeInValue: valuation.trade_in_value,
+    privatePartyValue: valuation.private_party_value,
+    retailValue: valuation.retail_value,
+    wholesaleValue: valuation.wholesale_value,
+    estimatedValue: valuation.estimated_value,
+    valuationDate: valuation.valuation_date,
+    marketConditions: valuation.market_conditions,
+    depreciationFactors: valuation.depreciation_factors,
+    valuationNotes: valuation.valuation_notes,
+    appraisedBy: valuation.appraised_by,
+    isFinalOffer: valuation.is_final_offer,
+    expiresAt: valuation.expires_at,
+    createdAt: valuation.created_at
+  }));
 };
 
 export const createTradeValuation = async (valuation: Omit<TradeValuation, 'id' | 'createdAt'>): Promise<TradeValuation> => {
@@ -144,7 +233,24 @@ export const createTradeValuation = async (valuation: Omit<TradeValuation, 'id' 
     throw error;
   }
 
-  return data;
+  return {
+    id: data.id,
+    tradeVehicleId: data.trade_vehicle_id,
+    valuationSource: data.valuation_source,
+    tradeInValue: data.trade_in_value,
+    privatePartyValue: data.private_party_value,
+    retailValue: data.retail_value,
+    wholesaleValue: data.wholesale_value,
+    estimatedValue: data.estimated_value,
+    valuationDate: data.valuation_date,
+    marketConditions: data.market_conditions,
+    depreciationFactors: data.depreciation_factors,
+    valuationNotes: data.valuation_notes,
+    appraisedBy: data.appraised_by,
+    isFinalOffer: data.is_final_offer,
+    expiresAt: data.expires_at,
+    createdAt: data.created_at
+  };
 };
 
 export const updateLeadTradeInfo = async (leadId: string, tradeInfo: {
