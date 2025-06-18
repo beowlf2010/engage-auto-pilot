@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface UploadHistoryRecord {
   id: string;
-  file_size: number;
-  file_type: string;
+  original_filename: string;
+  stored_filename?: string;
+  upload_type: string;
   uploaded_by?: string;
   upload_started_at: string;
   upload_completed_at?: string;
@@ -17,6 +18,9 @@ export interface UploadHistoryRecord {
   upload_status: 'processing' | 'completed' | 'failed';
   created_at: string;
   user_id: string;
+  error_details?: string;
+  inventory_condition?: string;
+  duplicate_count: number;
 }
 
 export const createUploadHistory = async (
@@ -28,9 +32,10 @@ export const createUploadHistory = async (
   const { data, error } = await supabase
     .from('upload_history')
     .insert({
-      file_size: fileSize,
-      file_type: fileType,
-      field_mapping: fieldMapping,
+      original_filename: fileName,
+      stored_filename: fileName,
+      upload_type: 'leads',
+      field_mapping: fieldMapping as any,
       total_rows: 0,
       successful_imports: 0,
       failed_imports: 0,
@@ -100,6 +105,8 @@ export const getUploadHistory = async (): Promise<UploadHistoryRecord[]> => {
   return (data || []).map(record => ({
     ...record,
     duplicate_imports: record.duplicate_count || 0,
-    upload_started_at: record.created_at
-  }));
+    upload_started_at: record.created_at,
+    field_mapping: (record.field_mapping as any) || {},
+    processing_errors: (record.processing_errors as any) || []
+  })) as UploadHistoryRecord[];
 };
