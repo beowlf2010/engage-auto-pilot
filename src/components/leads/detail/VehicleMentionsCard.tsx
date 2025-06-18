@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Car, Calendar, MessageSquare, Search, CheckCircle, XCircle } from "lucide-react";
-import { getLeadVehicleMentions, getLeadAIConversationNotes, VehicleMention, AIConversationNote } from '@/services/vehicleMentionService';
+import { getLeadVehicleMentions, getLeadAIConversationNotes, VehicleMention, AIConversationNote } from '@/services/vehicleMention';
 
 interface VehicleMentionsCardProps {
   leadId: string;

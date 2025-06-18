@@ -5,7 +5,7 @@ import {
   updateLeadVehicleInterest, 
   addAIConversationNote,
   extractVehicleFromText 
-} from './vehicleMentionService';
+} from './vehicleMention';
 
 export interface EnhancedConversationContext {
   leadId: string;
