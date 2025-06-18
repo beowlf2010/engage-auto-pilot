@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Globe, Car, Database, CheckCircle, AlertCircle } from 'lucide-react';
+import { Globe, Car, Database, CheckCircle, AlertCircle, Target, Clock } from 'lucide-react';
 import { FirecrawlService } from '@/utils/FirecrawlService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +25,7 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
   const [progress, setProgress] = useState(0);
   const [scrapingResult, setScrapingResult] = useState<any>(null);
   const [processedResult, setProcessedResult] = useState<any>(null);
+  const [currentStep, setCurrentStep] = useState<string>('');
   
   const dealershipUrl = 'https://www.jasonpilgerchevrolet.com/';
 
@@ -73,10 +74,13 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
     setProgress(0);
     setScrapingResult(null);
     setProcessedResult(null);
+    setCurrentStep('Initializing optimized crawl...');
 
     try {
-      // Step 1: Scrape the website
-      console.log('🌐 Starting website scraping...');
+      // Step 1: Scrape the website with optimized settings
+      console.log('🎯 Starting optimized website scraping for inventory pages...');
+      setCurrentStep('Starting optimized crawl (targeting new/used inventory pages)...');
+      
       const progressInterval = setInterval(() => {
         setProgress(prev => Math.min(prev + 2, 45));
       }, 2000);
@@ -90,10 +94,12 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
       }
 
       setScrapingResult(scrapingResponse.data);
-      console.log('✅ Website scraping completed');
+      setCurrentStep('Website scraping completed successfully!');
+      console.log('✅ Optimized website scraping completed');
 
       // Step 2: Process the scraped data
       console.log('🔄 Processing scraped vehicle data...');
+      setCurrentStep('Processing vehicle data and importing to database...');
       setIsProcessing(true);
       setProgress(60);
 
@@ -110,12 +116,13 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
 
       setProgress(100);
       setProcessedResult(processedData);
+      setCurrentStep('Processing completed successfully!');
       
       console.log('✅ Vehicle data processing completed:', processedData);
 
       toast({
         title: "Success",
-        description: `Successfully processed ${processedData.processedCount} vehicles from your website`
+        description: `Successfully processed ${processedData.processedCount} vehicles from your optimized website crawl`
       });
 
       onScrapingComplete?.({
@@ -126,6 +133,7 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
 
     } catch (error) {
       console.error('Error in scrape and process:', error);
+      setCurrentStep('Error occurred during processing');
       toast({
         title: "Error",
         description: error.message || "Failed to scrape and process vehicle inventory",
@@ -135,6 +143,7 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
       setIsScraping(false);
       setIsProcessing(false);
       setProgress(0);
+      setCurrentStep('');
     }
   };
 
@@ -188,31 +197,45 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
         </CardContent>
       </Card>
 
-      {/* Website Scraping */}
+      {/* Optimized Website Scraping */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Globe className="w-5 h-5" />
-            Website Inventory Scraper
+            <Target className="w-5 h-5" />
+            Optimized Inventory Scraper
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="flex items-center gap-2 text-blue-800 mb-2">
-              <Car className="w-4 h-4" />
-              <span className="font-medium">Target Website</span>
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <div className="flex items-center gap-2 text-green-800 mb-2">
+              <Target className="w-4 h-4" />
+              <span className="font-medium">Optimized Configuration</span>
             </div>
-            <p className="text-blue-700 text-sm">{dealershipUrl}</p>
-            <p className="text-blue-600 text-xs mt-1">
-              This will extract all vehicle listings from your dealership website and add them to your inventory
+            <p className="text-green-700 text-sm mb-2">{dealershipUrl}</p>
+            <div className="grid grid-cols-2 gap-4 text-xs text-green-600">
+              <div>
+                <span className="font-medium">Target Pages:</span> 25 max
+              </div>
+              <div>
+                <span className="font-medium">Focus:</span> new-inventory, used-inventory
+              </div>
+            </div>
+            <p className="text-green-600 text-xs mt-2">
+              🎯 Optimized to specifically target your new and used vehicle inventory pages while excluding non-vehicle content to save credits
             </p>
           </div>
 
           {(isScraping || isProcessing) && (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {currentStep && (
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <Clock className="w-4 h-4" />
+                  <span>{currentStep}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span>
-                  {isScraping && !isProcessing && 'Scraping website...'}
+                  {isScraping && !isProcessing && 'Scraping inventory pages...'}
                   {isProcessing && 'Processing vehicle data...'}
                 </span>
                 <span>{progress}%</span>
@@ -227,7 +250,7 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
             className="w-full"
           >
             <Database className="w-4 h-4 mr-2" />
-            {isScraping || isProcessing ? 'Processing...' : 'Scrape & Import Vehicle Inventory'}
+            {isScraping || isProcessing ? 'Processing...' : 'Start Optimized Inventory Scrape'}
           </Button>
 
           {connectionStatus === 'error' && (
@@ -240,7 +263,10 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
             <>
               <Separator />
               <div className="space-y-3">
-                <h4 className="font-medium">Scraping Results</h4>
+                <h4 className="font-medium flex items-center gap-2">
+                  <Target className="w-4 h-4" />
+                  Optimized Scraping Results
+                </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="bg-green-50 p-3 rounded">
                     <div className="font-medium text-green-800">Pages Scraped</div>
@@ -249,6 +275,11 @@ const VehicleScraper: React.FC<VehicleScraperProps> = ({ onScrapingComplete }) =
                   <div className="bg-blue-50 p-3 rounded">
                     <div className="font-medium text-blue-800">Credits Used</div>
                     <div className="text-blue-600">{scrapingResult.creditsUsed || 0}</div>
+                  </div>
+                </div>
+                <div className="bg-amber-50 p-3 rounded">
+                  <div className="text-amber-800 text-sm">
+                    💡 Credits saved by targeting only inventory pages instead of crawling entire website
                   </div>
                 </div>
               </div>
