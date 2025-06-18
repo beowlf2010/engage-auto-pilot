@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,32 +23,43 @@ interface FirecrawlStatusResponse {
   error?: string;
 }
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
 const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
 
 serve(async (req) => {
+  console.log('Firecrawl scraper function called with method:', req.method);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, url, jobId } = await req.json();
-
     if (!FIRECRAWL_API_KEY) {
+      console.error('FIRECRAWL_API_KEY not found in environment');
       return new Response(
         JSON.stringify({ success: false, error: 'Firecrawl API key not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('Request body parsed:', requestBody);
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { action, url, jobId } = requestBody;
     console.log(`Firecrawl action: ${action}`, { url, jobId });
 
     if (action === 'test') {
+      console.log('Testing Firecrawl API key');
       // Test the API key with a simple crawl
       const testResponse = await fetch('https://api.firecrawl.dev/v0/crawl', {
         method: 'POST',
@@ -74,6 +84,7 @@ serve(async (req) => {
       );
 
     } else if (action === 'crawl') {
+      console.log('Starting crawl for URL:', url);
       // Start crawling the website
       const crawlResponse = await fetch('https://api.firecrawl.dev/v0/crawl', {
         method: 'POST',
@@ -116,6 +127,7 @@ serve(async (req) => {
       );
 
     } else if (action === 'status') {
+      console.log('Checking crawl status for job:', jobId);
       // Check crawl status
       const statusResponse = await fetch(`https://api.firecrawl.dev/v0/crawl/status/${jobId}`, {
         method: 'GET',
@@ -134,8 +146,9 @@ serve(async (req) => {
       );
 
     } else {
+      console.error('Invalid action provided:', action);
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid action' }),
+        JSON.stringify({ success: false, error: 'Invalid action. Supported actions: test, crawl, status' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -145,7 +158,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Internal server error' 
+        error: error instanceof Error ? error.message : 'Internal server error' 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

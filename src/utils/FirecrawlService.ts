@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface ErrorResponse {
@@ -43,6 +44,7 @@ export class FirecrawlService {
         return false;
       }
 
+      console.log('Test API key response:', data);
       return data?.success || false;
     } catch (error) {
       console.error('Error testing Firecrawl API key:', error);
@@ -63,10 +65,12 @@ export class FirecrawlService {
       });
 
       if (crawlError) {
-        throw new Error(crawlError.message);
+        console.error('Edge function error during crawl:', crawlError);
+        throw new Error(`Edge function error: ${crawlError.message || 'Unknown error'}`);
       }
 
       if (!crawlData?.success) {
+        console.error('Crawl failed:', crawlData);
         throw new Error(crawlData?.error || 'Failed to start crawl');
       }
 
@@ -88,10 +92,12 @@ export class FirecrawlService {
         });
 
         if (statusError) {
-          throw new Error(statusError.message);
+          console.error('Edge function error during status check:', statusError);
+          throw new Error(`Status check error: ${statusError.message || 'Unknown error'}`);
         }
 
         if (!statusData?.success) {
+          console.error('Status check failed:', statusData);
           throw new Error(statusData?.error || 'Failed to check crawl status');
         }
 

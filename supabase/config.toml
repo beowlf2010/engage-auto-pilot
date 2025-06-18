@@ -1,6 +1,9 @@
 
 project_id = "tevtajmaofvnffzcsiuu"
 
+[functions.firecrawl-scraper]
+verify_jwt = false
+
 [functions.inbound-email-webhook]
 verify_jwt = false
 
