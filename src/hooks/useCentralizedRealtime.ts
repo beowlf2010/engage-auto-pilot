@@ -40,16 +40,32 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
   }, []);
 
   const handleIncomingMessage = useCallback(async (payload: any) => {
-    const newMessage = payload.new;
-    console.log('🔔 New incoming message detected:', newMessage);
+    console.log('🔔 Raw payload received:', payload);
+    
+    // Handle different payload structures safely
+    const newMessage = payload.new || payload;
+    
+    if (!newMessage) {
+      console.warn('⚠️ No message data in payload:', payload);
+      return;
+    }
+
+    console.log('🔔 Processing message:', {
+      id: newMessage.id,
+      direction: newMessage.direction,
+      leadId: newMessage.lead_id,
+      body: newMessage.body?.substring(0, 50) + '...'
+    });
 
     try {
-      // Call all registered callbacks immediately
-      globalCallbacks.forEach(cb => {
+      // Call all registered callbacks immediately for any conversation change
+      console.log('📞 Calling callbacks for', globalCallbacks.length, 'subscribers');
+      globalCallbacks.forEach((cb, index) => {
+        console.log(`📞 Calling callback ${index + 1}`);
         if (cb.onConversationUpdate) {
           cb.onConversationUpdate();
         }
-        if (cb.onMessageUpdate) {
+        if (cb.onMessageUpdate && newMessage.lead_id) {
           cb.onMessageUpdate(newMessage.lead_id);
         }
         if (cb.onUnreadCountUpdate) {
@@ -78,14 +94,14 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
           if (isForCurrentUser) {
             toast({
               title: `📱 New message from ${leadName}`,
-              description: newMessage.body.substring(0, 100) + (newMessage.body.length > 100 ? '...' : ''),
+              description: newMessage.body?.substring(0, 100) + (newMessage.body?.length > 100 ? '...' : ''),
               duration: 5000,
             });
 
             // Browser notification
             if (notificationPermission.current === 'granted') {
               const notification = new Notification(`New message from ${leadName}`, {
-                body: newMessage.body.substring(0, 200) + (newMessage.body.length > 200 ? '...' : ''),
+                body: newMessage.body?.substring(0, 200) + (newMessage.body?.length > 200 ? '...' : ''),
                 icon: '/favicon.ico',
                 tag: `message-${newMessage.id}`,
               });
@@ -170,6 +186,7 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
 
     // Add callbacks to global registry
     globalCallbacks.push(callbacksRef.current);
+    console.log('✅ Added callbacks, total subscribers:', globalCallbacks.length);
 
     // Only create subscription if none exists and not currently subscribing
     if (!globalChannel && !isSubscribing) {
@@ -186,7 +203,12 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
           schema: 'public',
           table: 'conversations'
         }, (payload) => {
-          console.log('🔄 Conversation change detected:', payload.eventType, payload.new?.direction);
+          console.log('🔄 Conversation database change:', {
+            event: payload.eventType,
+            table: payload.table,
+            hasNew: !!payload.new,
+            hasOld: !!payload.old
+          });
           handleIncomingMessage(payload);
         })
         // Email conversations
@@ -213,6 +235,8 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
           isSubscribing = false;
         }
       });
+    } else if (globalChannel) {
+      console.log('🔌 Using existing centralized realtime channel');
     }
 
     return () => {
@@ -222,6 +246,7 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
       const index = globalCallbacks.findIndex(cb => cb === callbacksRef.current);
       if (index > -1) {
         globalCallbacks.splice(index, 1);
+        console.log('🗑️ Removed callbacks, remaining subscribers:', globalCallbacks.length);
       }
 
       // Clean up channel only if no more callbacks are registered
