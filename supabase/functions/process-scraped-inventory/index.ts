@@ -35,7 +35,7 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-// Enhanced vehicle parsing with better regex patterns
+// Enhanced vehicle parsing optimized for Jason Pilger Chevrolet format
 function parseVehicleFromContent(data: ScrapedData): VehicleData | null {
   try {
     const content = data.markdown || data.content;
@@ -44,136 +44,129 @@ function parseVehicleFromContent(data: ScrapedData): VehicleData | null {
     console.log('Parsing vehicle from URL:', url);
     console.log('Content preview:', content.slice(0, 500));
     
-    // Enhanced make detection - look for Chevrolet specifically and common variations
-    const makePatterns = [
-      /(?:Make|Brand):\s*([A-Za-z]+)/i,
-      /\b(Chevrolet|Chevy|GMC|Buick|Cadillac)\b/i,
-      /Jason Pilger (Chevrolet)/i
-    ];
+    // Enhanced vehicle detection for this specific dealer format
+    // Look for "Used YYYY Make Model" or "New YYYY Make Model" patterns
+    const vehicleHeaderPattern = /(?:Used|New)\s+(\d{4})\s+([A-Za-z]+)\s*([A-Za-z\s]+?)(?:\s|$)/i;
+    const headerMatch = content.match(vehicleHeaderPattern);
     
-    let makeMatch = null;
-    for (const pattern of makePatterns) {
-      makeMatch = content.match(pattern);
-      if (makeMatch) break;
+    let year, make, model;
+    if (headerMatch) {
+      year = parseInt(headerMatch[1]);
+      make = headerMatch[2];
+      model = headerMatch[3].trim();
+      console.log('Found vehicle header:', { year, make, model });
     }
     
-    // Enhanced model detection with more specific patterns
-    const modelPatterns = [
-      /(?:Model|Vehicle):\s*([A-Za-z0-9\s]+)/i,
-      /\b(Silverado|Tahoe|Suburban|Equinox|Traverse|Malibu|Camaro|Corvette|Trailblazer|Colorado|Blazer|Express)\b/i,
-      /(?:New|Used)\s+([A-Za-z0-9\s]+)\s+(?:for sale|available)/i
-    ];
-    
-    let modelMatch = null;
-    for (const pattern of modelPatterns) {
-      modelMatch = content.match(pattern);
-      if (modelMatch) break;
-    }
-    
-    // Enhanced year detection
-    const yearPatterns = [
-      /(?:Year|Model Year):\s*(\d{4})/i,
-      /\b(20\d{2})\b/g, // Get all 4-digit years
-      /(?:New|Used)\s+(\d{4})/i
-    ];
-    
-    let yearMatch = null;
-    for (const pattern of yearPatterns) {
-      const matches = content.match(pattern);
-      if (matches) {
-        // Find the most recent reasonable year
-        const years = matches.map(m => parseInt(m.match(/\d{4}/)?.[0] || '0'))
-          .filter(y => y >= 2020 && y <= 2025);
-        if (years.length > 0) {
-          yearMatch = [years[0].toString()];
-          break;
-        }
-      }
-    }
-    
-    // Enhanced price detection
+    // Enhanced price detection for this dealer's format
     const pricePatterns = [
-      /\$[\d,]+(?:\.\d{2})?/g,
-      /Price:\s*\$?([\d,]+)/i,
-      /MSRP:\s*\$?([\d,]+)/i
+      /\$[\d,]+/g,
+      /Price[:\s]*\$?([\d,]+)/i,
+      /MSRP[:\s]*\$?([\d,]+)/i
     ];
     
-    let priceMatch = null;
+    let price = null;
     for (const pattern of pricePatterns) {
       const matches = content.match(pattern);
       if (matches) {
-        // Find the highest reasonable price (likely the main price)
         const prices = matches.map(m => {
           const numStr = m.replace(/[$,]/g, '');
           return parseInt(numStr);
-        }).filter(p => p >= 15000 && p <= 200000); // Reasonable car price range
+        }).filter(p => p >= 5000 && p <= 200000); // Reasonable car price range
         
         if (prices.length > 0) {
-          priceMatch = ['$' + Math.max(...prices).toLocaleString()];
+          price = Math.max(...prices); // Take the highest reasonable price
           break;
         }
       }
     }
     
     // Enhanced VIN detection
-    const vinMatch = content.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i);
+    const vinPattern = /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i;
+    const vinMatch = content.match(vinPattern);
+    const vin = vinMatch ? vinMatch[1] : null;
     
-    // Enhanced stock number detection
+    // Enhanced stock number detection for this dealer's format
     const stockPatterns = [
-      /(?:Stock|Stk)[#\s]*([A-Za-z0-9]+)/i,
-      /Stock Number:\s*([A-Za-z0-9]+)/i
+      /Stock\s*Number[:\s]*([A-Za-z0-9]+)/i,
+      /Stock[:\s#]*([A-Za-z0-9]+)/i,
+      /Stk[:\s#]*([A-Za-z0-9]+)/i
     ];
     
-    let stockMatch = null;
+    let stockNumber = null;
     for (const pattern of stockPatterns) {
-      stockMatch = content.match(pattern);
-      if (stockMatch) break;
+      const stockMatch = content.match(pattern);
+      if (stockMatch) {
+        stockNumber = stockMatch[1];
+        break;
+      }
     }
     
     // Enhanced mileage detection
     const mileagePatterns = [
-      /(\d+(?:,\d+)?)\s*(?:miles?|mi)/i,
-      /Mileage:\s*(\d+(?:,\d+)?)/i
+      /Odometer[:\s]*(\d+(?:,\d+)?)\s*miles?/i,
+      /(\d+(?:,\d+)?)\s*miles?/i
     ];
     
-    let mileageMatch = null;
+    let mileage = null;
     for (const pattern of mileagePatterns) {
-      mileageMatch = content.match(pattern);
-      if (mileageMatch) break;
+      const mileageMatch = content.match(pattern);
+      if (mileageMatch) {
+        const miles = parseInt(mileageMatch[1].replace(/,/g, ''));
+        if (miles >= 0 && miles <= 500000) { // Reasonable mileage range
+          mileage = miles;
+          break;
+        }
+      }
     }
     
-    // Determine condition with better logic
-    const isNew = /\bnew\b/i.test(content) || 
-                  /\b0\s*miles?\b/i.test(content) ||
-                  url.includes('new-inventory') ||
-                  (mileageMatch && parseInt(mileageMatch[1].replace(/,/g, '')) < 100);
+    // Enhanced exterior color detection
+    const colorPatterns = [
+      /Exterior Color[:\s]*([A-Za-z\s]+?)(?:\n|Interior|$)/i,
+      /Color[:\s]*([A-Za-z\s]+?)(?:\n|Interior|$)/i
+    ];
     
-    const isUsed = /\bused\b/i.test(content) || 
-                   /\bpre-owned\b/i.test(content) ||
-                   url.includes('used-inventory');
+    let exteriorColor = null;
+    for (const pattern of colorPatterns) {
+      const colorMatch = content.match(pattern);
+      if (colorMatch) {
+        exteriorColor = colorMatch[1].trim();
+        break;
+      }
+    }
+    
+    // Determine condition based on URL and content
+    const isUsed = url.includes('/used/') || /\bused\b/i.test(content);
+    const isNew = url.includes('/new/') || /\bnew\b/i.test(content);
+    const condition = isUsed ? 'used' : isNew ? 'new' : 'used';
+    
+    // Extract features from the content
+    const features = extractDealerFeatures(content);
+    
+    // Extract images
+    const images = extractImageUrls(content);
     
     const vehicle: VehicleData = {
-      make: makeMatch ? (Array.isArray(makeMatch) ? makeMatch[1] || makeMatch[0] : makeMatch[1] || makeMatch[0]) : 'Chevrolet',
-      model: modelMatch ? (Array.isArray(modelMatch) ? modelMatch[1] || modelMatch[0] : modelMatch[1] || modelMatch[0]) : undefined,
-      year: yearMatch ? parseInt(yearMatch[0]) : undefined,
-      price: priceMatch ? parseFloat(priceMatch[0].replace(/[$,]/g, '')) : undefined,
-      vin: vinMatch ? vinMatch[1] : undefined,
-      stock_number: stockMatch ? stockMatch[1] : undefined,
-      mileage: mileageMatch ? parseInt(mileageMatch[1].replace(/,/g, '')) : undefined,
-      condition: isNew ? 'new' : isUsed ? 'used' : 'new',
-      description: content.slice(0, 500), // First 500 characters as description
-      features: extractFeatures(content),
-      images: extractImageUrls(content)
+      make: make || 'Unknown',
+      model: model || 'Unknown',
+      year: year || null,
+      price: price || null,
+      vin: vin,
+      stock_number: stockNumber,
+      mileage: mileage,
+      color_exterior: exteriorColor,
+      condition: condition,
+      description: content.slice(0, 1000), // First 1000 characters as description
+      features: features,
+      images: images
     };
     
-    // Enhanced validation - require at least make and one other identifying field
-    const hasBasicInfo = vehicle.make && (
-      vehicle.model || 
-      vehicle.year || 
-      vehicle.vin || 
-      vehicle.stock_number ||
-      vehicle.price
-    );
+    // Enhanced validation - require at least basic vehicle info
+    const hasBasicInfo = (vehicle.make && vehicle.make !== 'Unknown') || 
+                         (vehicle.model && vehicle.model !== 'Unknown') || 
+                         vehicle.year || 
+                         vehicle.vin || 
+                         vehicle.stock_number ||
+                         vehicle.price;
     
     if (hasBasicInfo) {
       console.log('✅ Successfully parsed vehicle:', {
@@ -182,6 +175,8 @@ function parseVehicleFromContent(data: ScrapedData): VehicleData | null {
         year: vehicle.year,
         price: vehicle.price,
         condition: vehicle.condition,
+        stock_number: vehicle.stock_number,
+        vin: vehicle.vin,
         url: url
       });
       return vehicle;
@@ -201,21 +196,33 @@ function parseVehicleFromContent(data: ScrapedData): VehicleData | null {
   }
 }
 
-function extractFeatures(content: string): string[] {
+function extractDealerFeatures(content: string): string[] {
   const features: string[] = [];
   const featurePatterns = [
-    /4WD|AWD|FWD|RWD/gi,
-    /automatic|manual|transmission/gi,
-    /leather|cloth|heated seats/gi,
-    /sunroof|moonroof/gi,
-    /navigation|GPS/gi,
-    /bluetooth|hands-free/gi,
-    /backup camera|rear camera|rearview camera/gi,
-    /cruise control/gi,
-    /air conditioning|A\/C|climate control/gi,
-    /power windows|power locks/gi,
-    /remote start/gi,
-    /keyless entry/gi
+    // Drivetrain and transmission
+    /4WD|AWD|FWD|RWD|Front-wheel Drive|All-wheel Drive|Four-wheel Drive/gi,
+    /Automatic|Manual|CVT|Transmission/gi,
+    
+    // Interior features
+    /Leather|Cloth|Heated Seats|Cooled Seats|Memory Seat|Power Seat/gi,
+    /Sunroof|Moonroof|Panoramic/gi,
+    /Navigation|GPS|IntelliLink/gi,
+    /Bluetooth|Hands-free/gi,
+    /Air Conditioning|Climate Control|Dual Zone/gi,
+    
+    // Safety and convenience
+    /Backup Camera|Rear Camera|Rearview Camera|Side Blind Zone Alert/gi,
+    /Cruise Control|Adaptive Cruise/gi,
+    /Power Windows|Power Locks|Keyless Entry|Remote Start/gi,
+    /Forward Collision Alert|Lane Departure Warning|Cross Traffic Alert/gi,
+    
+    // Audio and entertainment
+    /Bose|Premium Audio|AM\/FM|Satellite Radio|SiriusXM|MP3/gi,
+    /USB|Audio System|Speakers/gi,
+    
+    // Exterior features
+    /Alloy Wheels|Power Liftgate|Trailer Hitch|Running Boards/gi,
+    /LED|HID|Articulating Headlights|Fog Lights/gi
   ];
   
   featurePatterns.forEach(pattern => {
@@ -225,13 +232,13 @@ function extractFeatures(content: string): string[] {
     }
   });
   
-  return [...new Set(features)].slice(0, 20); // Limit to 20 features, remove duplicates
+  return [...new Set(features)].slice(0, 25); // Limit to 25 features, remove duplicates
 }
 
 function extractImageUrls(content: string): string[] {
   const imagePatterns = [
-    /https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp)/gi,
-    /src="([^"]+\.(?:jpg|jpeg|png|gif|webp))"/gi
+    /https?:\/\/pictures\.dealer\.com[^\s"']+\.jpg[^?\s"']*/gi,
+    /https?:\/\/[^\s"']+\.(?:jpg|jpeg|png|gif|webp)/gi
   ];
   
   const images: string[] = [];
@@ -242,7 +249,7 @@ function extractImageUrls(content: string): string[] {
     }
   });
   
-  return [...new Set(images)].slice(0, 10); // Limit to 10 images, remove duplicates
+  return [...new Set(images)].slice(0, 15); // Limit to 15 images, remove duplicates
 }
 
 serve(async (req) => {
@@ -273,7 +280,8 @@ serve(async (req) => {
         file_size: JSON.stringify(scrapedData).length,
         source_type: 'website_scrape',
         processing_status: 'processing',
-        upload_type: 'inventory'
+        upload_type: 'inventory',
+        stored_filename: `scrape_${Date.now()}.json`
       })
       .select()
       .single();
@@ -323,7 +331,8 @@ serve(async (req) => {
           make: vehicleRecord.make,
           model: vehicleRecord.model,
           year: vehicleRecord.year,
-          price: vehicleRecord.price
+          price: vehicleRecord.price,
+          stock_number: vehicleRecord.stock_number
         });
       } else {
         skippedCount++;
@@ -362,8 +371,8 @@ serve(async (req) => {
       .update({
         processing_status: 'completed',
         total_records: processedCount,
-        successful_records: processedCount,
-        failed_records: skippedCount
+        successful_imports: processedCount,
+        failed_imports: skippedCount
       })
       .eq('id', uploadHistory.id);
 

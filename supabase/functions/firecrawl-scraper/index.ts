@@ -93,40 +93,47 @@ serve(async (req) => {
       let crawlerOptions;
       
       if (diagnosticMode) {
-        // Diagnostic crawl: minimal restrictions, broad discovery
+        // Diagnostic crawl: broader discovery with focus on vehicle pages
         crawlerOptions = {
-          limit: 15, // Keep low to save credits
-          includes: [], // No restrictions - see what's available
-          excludes: [
-            // Only exclude clearly non-content pages
-            'javascript:', 'mailto:', 'tel:', '#'
-          ]
-        };
-        console.log('🔍 Using DIAGNOSTIC mode - broad crawl with minimal restrictions');
-      } else {
-        // Production crawl: optimized for inventory
-        crawlerOptions = {
-          limit: 25,
+          limit: 15,
           includes: [
-            'new-inventory',
-            'used-inventory', 
-            'index.htm',
+            '/used/',
+            '/new/',
             'inventory',
             'vehicles'
           ],
           excludes: [
-            'nav', 'header', 'footer', 'search', 'compare',
-            'service', 'parts', 'contact', 'about', 'financing', 
-            'specials', 'offers', 'coupons', 'maintenance',
-            'careers', 'reviews', 'testimonials', 'directions',
-            'hours', 'staff', 'management', 'history',
-            'warranty', 'recall', 'accessories', 'body-shop'
+            // Only exclude clearly non-vehicle pages
+            'javascript:', 'mailto:', 'tel:', '#',
+            'contact', 'about', 'financing', 'service', 'parts',
+            'careers', 'directions', 'hours', 'reviews'
           ]
         };
-        console.log('🎯 Using PRODUCTION mode - optimized for inventory');
+        console.log('🔍 Using DIAGNOSTIC mode - focused on vehicle pages');
+      } else {
+        // Production crawl: optimized for vehicle detail pages
+        crawlerOptions = {
+          limit: 50, // Increased to capture more vehicle pages
+          includes: [
+            '/used/', // Individual used vehicle detail pages
+            '/new/',  // Individual new vehicle detail pages
+            '/vehicles/',
+            'inventory',
+            '.htm' // Many vehicle pages end in .htm
+          ],
+          excludes: [
+            // Exclude non-vehicle content but be less restrictive
+            'javascript:', 'mailto:', 'tel:', '#',
+            'contact', 'about', 'financing', 'service', 'parts',
+            'careers', 'directions', 'hours', 'reviews', 'testimonials',
+            'warranty', 'recall', 'accessories', 'body-shop', 'employment',
+            'specials', 'offers', 'coupons', 'maintenance', 'blog'
+          ]
+        };
+        console.log('🎯 Using PRODUCTION mode - optimized for vehicle detail pages');
       }
 
-      console.log('Crawler options:', crawlerOptions);
+      console.log('Updated crawler options:', crawlerOptions);
       
       // Start crawling the website
       const crawlResponse = await fetch('https://api.firecrawl.dev/v0/crawl', {
@@ -142,7 +149,7 @@ serve(async (req) => {
             onlyMainContent: true,
             includeHtml: false, // Reduce data size
             includeRawHtml: false,
-            waitFor: 2000 // Wait 2 seconds for JS to load
+            waitFor: 3000 // Increased wait time for JS to load vehicle data
           }
         }),
       });
@@ -199,14 +206,28 @@ serve(async (req) => {
           console.log(`💳 Credits used so far: ${statusData.creditsUsed}`);
         }
 
-        // Log discovered URLs for diagnostic purposes
+        // Enhanced logging for vehicle page discovery
         if (statusData.data && statusData.data.length > 0) {
-          console.log(`📄 Found ${statusData.data.length} pages:`);
-          statusData.data.slice(0, 5).forEach((item, index) => {
-            console.log(`  ${index + 1}. ${item.url || 'URL not available'} (${item.content ? Math.round(item.content.length/1000) + 'k chars' : 'no content'})`);
+          console.log(`🚗 Found ${statusData.data.length} pages:`);
+          let vehiclePageCount = 0;
+          
+          statusData.data.slice(0, 10).forEach((item, index) => {
+            const isVehiclePage = item.url && (
+              item.url.includes('/used/') || 
+              item.url.includes('/new/') || 
+              item.url.toLowerCase().includes('vehicle')
+            );
+            
+            if (isVehiclePage) vehiclePageCount++;
+            
+            const pageType = isVehiclePage ? '🚗 VEHICLE' : '📄 OTHER';
+            console.log(`  ${index + 1}. ${pageType}: ${item.url || 'URL not available'} (${item.content ? Math.round(item.content.length/1000) + 'k chars' : 'no content'})`);
           });
-          if (statusData.data.length > 5) {
-            console.log(`  ... and ${statusData.data.length - 5} more pages`);
+          
+          console.log(`🎯 Vehicle pages found: ${vehiclePageCount}/${statusData.data.length}`);
+          
+          if (statusData.data.length > 10) {
+            console.log(`  ... and ${statusData.data.length - 10} more pages`);
           }
         } else if (statusData.status === 'completed') {
           console.log('⚠️ DIAGNOSTIC: Crawl completed but NO PAGES FOUND - possible causes:');
@@ -217,15 +238,21 @@ serve(async (req) => {
         }
       }
 
+      // Enhanced diagnostic info with vehicle page analysis
+      const diagnostic = {
+        foundPages: statusData.data?.length || 0,
+        sampleUrls: statusData.data?.slice(0, 3).map(item => item.url) || [],
+        hasContent: statusData.data?.some(item => item.content && item.content.length > 100) || false,
+        vehiclePages: statusData.data?.filter(item => 
+          item.url && (item.url.includes('/used/') || item.url.includes('/new/'))
+        ).length || 0
+      };
+
       // Return the raw status data with enhanced diagnostic info
       return new Response(
         JSON.stringify({
           ...statusData,
-          diagnostic: {
-            foundPages: statusData.data?.length || 0,
-            sampleUrls: statusData.data?.slice(0, 3).map(item => item.url) || [],
-            hasContent: statusData.data?.some(item => item.content && item.content.length > 100) || false
-          }
+          diagnostic
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
