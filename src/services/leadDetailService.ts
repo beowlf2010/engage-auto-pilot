@@ -21,6 +21,7 @@ export interface LeadDetailData {
   source: string;
   aiOptIn: boolean;
   aiStage?: string;
+  aiSequencePaused?: boolean;
   nextAiSendAt?: string;
   createdAt: string;
   salespersonId?: string;
@@ -150,6 +151,7 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
       source: leadData.source,
       aiOptIn: leadData.ai_opt_in || false,
       aiStage: leadData.ai_stage,
+      aiSequencePaused: leadData.ai_sequence_paused || false,
       nextAiSendAt: leadData.next_ai_send_at,
       createdAt: leadData.created_at,
       salespersonId: leadData.salesperson_id,

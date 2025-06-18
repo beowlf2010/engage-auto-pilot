@@ -100,10 +100,10 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
               leadId={lead.id}
               aiOptIn={lead.aiOptIn || false}
               aiStage={lead.aiStage}
-              aiSequencePaused={lead.aiSequencePaused}
-              aiTakeoverEnabled={(lead as any).aiTakeoverEnabled}
-              aiTakeoverDelayMinutes={(lead as any).aiTakeoverDelayMinutes}
-              pendingHumanResponse={(lead as any).pendingHumanResponse}
+              aiSequencePaused={lead.aiSequencePaused || false}
+              aiTakeoverEnabled={lead.aiTakeoverEnabled || false}
+              aiTakeoverDelayMinutes={lead.aiTakeoverDelayMinutes || 7}
+              pendingHumanResponse={lead.pendingHumanResponse || false}
               onAIOptInChange={handleAIOptInChange}
               onAITakeoverChange={handleAITakeoverChange}
             />
