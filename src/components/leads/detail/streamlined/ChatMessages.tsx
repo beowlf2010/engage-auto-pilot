@@ -6,6 +6,15 @@ interface ChatMessagesProps {
 }
 
 const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
+  const formatTime = (timestamp: string) => {
+    try {
+      return new Date(timestamp).toLocaleTimeString();
+    } catch (error) {
+      console.error('Error formatting timestamp:', timestamp, error);
+      return 'Invalid time';
+    }
+  };
+
   return (
     <div className="space-y-4">
       {messages.map((message: any, index: number) => (
@@ -22,7 +31,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
           >
             <div className="text-sm">{message.body}</div>
             <div className="text-xs opacity-75 mt-1">
-              {new Date(message.createdAt || message.created_at).toLocaleTimeString()}
+              {formatTime(message.sentAt)}
             </div>
           </div>
         </div>

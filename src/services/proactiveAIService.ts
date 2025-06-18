@@ -1,9 +1,9 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { generateIntelligentAIMessage } from './intelligentAIMessageService';
 import { sendMessage } from './messagesService';
 import { toast } from '@/hooks/use-toast';
 import { addAIConversationNote } from './vehicleMention/aiConversationNotes';
+import { processAITakeovers } from './aiTakeoverService';
 
 export interface ProactiveMessageResult {
   success: boolean;
@@ -139,6 +139,9 @@ const generateInitialMessage = async (lead: any): Promise<string | null> => {
 export const processProactiveMessages = async (profile: any): Promise<ProactiveMessageResult[]> => {
   try {
     console.log('🔍 Processing leads for proactive messaging...');
+
+    // First, process any AI takeovers that are due
+    await processAITakeovers();
 
     // Get leads that have AI enabled but no outgoing messages yet
     const { data: leadsNeedingContact } = await supabase
