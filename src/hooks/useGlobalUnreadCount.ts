@@ -1,11 +1,12 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 export const useGlobalUnreadCount = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { profile } = useAuth();
+  const channelsRef = useRef<any[]>([]);
 
   const fetchUnreadCount = async () => {
     if (!profile) return;
@@ -46,40 +47,56 @@ export const useGlobalUnreadCount = () => {
     }
   };
 
+  const cleanupChannels = () => {
+    channelsRef.current.forEach(channel => {
+      try {
+        supabase.removeChannel(channel);
+      } catch (error) {
+        console.error('Error removing channel:', error);
+      }
+    });
+    channelsRef.current = [];
+  };
+
   useEffect(() => {
-    if (profile) {
-      fetchUnreadCount();
+    if (!profile) return;
 
-      // Subscribe to real-time updates for conversations
-      const smsChannel = supabase
-        .channel('conversations-unread')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'conversations'
-        }, () => {
-          fetchUnreadCount();
-        })
-        .subscribe();
+    // Clean up any existing channels first
+    cleanupChannels();
 
-      // Subscribe to real-time updates for email conversations
-      const emailChannel = supabase
-        .channel('email-conversations-unread')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'email_conversations'
-        }, () => {
-          fetchUnreadCount();
-        })
-        .subscribe();
+    fetchUnreadCount();
 
-      return () => {
-        supabase.removeChannel(smsChannel);
-        supabase.removeChannel(emailChannel);
-      };
-    }
-  }, [profile]);
+    // Subscribe to real-time updates for conversations
+    const smsChannel = supabase
+      .channel(`conversations-unread-${profile.id}-${Date.now()}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'conversations'
+      }, () => {
+        fetchUnreadCount();
+      })
+      .subscribe();
+
+    // Subscribe to real-time updates for email conversations
+    const emailChannel = supabase
+      .channel(`email-conversations-unread-${profile.id}-${Date.now()}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'email_conversations'
+      }, () => {
+        fetchUnreadCount();
+      })
+      .subscribe();
+
+    // Store channels for cleanup
+    channelsRef.current = [smsChannel, emailChannel];
+
+    return () => {
+      cleanupChannels();
+    };
+  }, [profile?.id]); // Only depend on profile.id to avoid unnecessary re-subscriptions
 
   return { unreadCount, refreshUnreadCount: fetchUnreadCount };
 };
