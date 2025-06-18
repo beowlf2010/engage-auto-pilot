@@ -84,16 +84,14 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           }
         }
         
+        // Use the enhanced send message function that includes immediate refresh
         await sendMessage(selectedLead, message);
         
         if (isTemplate) {
           setShowTemplates(false);
         }
         
-        console.log('✅ Message sent successfully from SmartInbox');
-        
-        // The real-time system will handle the refresh automatically
-        // No need for manual delays or forced refreshes
+        console.log('✅ Message sent successfully from SmartInbox with immediate refresh');
         
       } catch (err) {
         console.error('Error sending message:', err);

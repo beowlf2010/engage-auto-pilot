@@ -21,10 +21,11 @@ interface ConversationMessage {
   aiGenerated?: boolean;
 }
 
-// Central AI service to coordinate all AI message generation
+// Central AI service to coordinate all AI message generation with duplicate prevention
 export class CentralizedAIService {
   private static instance: CentralizedAIService;
   private isGenerating = new Set<string>();
+  private recentlyProcessed = new Map<string, number>(); // leadId -> timestamp
 
   static getInstance(): CentralizedAIService {
     if (!CentralizedAIService.instance) {
@@ -33,10 +34,18 @@ export class CentralizedAIService {
     return CentralizedAIService.instance;
   }
 
-  // Check if we should generate a response for this lead
+  // Enhanced duplicate prevention - check if we should generate a response
   async shouldGenerateResponse(leadId: string): Promise<boolean> {
     if (this.isGenerating.has(leadId)) {
       console.log(`🔒 AI already generating for lead ${leadId}`);
+      return false;
+    }
+
+    // Check if we recently processed this lead (within last 30 seconds)
+    const lastProcessed = this.recentlyProcessed.get(leadId);
+    const now = Date.now();
+    if (lastProcessed && (now - lastProcessed) < 30000) {
+      console.log(`⏱️ Recently processed lead ${leadId}, skipping to prevent duplicates`);
       return false;
     }
 
@@ -57,10 +66,18 @@ export class CentralizedAIService {
       msg.direction === 'out'
     );
 
-    return messagesAfterCustomer.length === 0;
+    const shouldGenerate = messagesAfterCustomer.length === 0;
+    
+    if (shouldGenerate) {
+      console.log(`✅ Should generate response for lead ${leadId} - unresponded customer message found`);
+    } else {
+      console.log(`⏭️ Skipping lead ${leadId} - already responded to latest customer message`);
+    }
+
+    return shouldGenerate;
   }
 
-  // Generate intelligent response using our enhanced system
+  // Generate intelligent response using our enhanced system with duplicate prevention
   async generateResponse(leadId: string): Promise<string | null> {
     if (this.isGenerating.has(leadId)) {
       console.log(`🔒 Already generating response for lead ${leadId}`);
@@ -78,11 +95,23 @@ export class CentralizedAIService {
         return null;
       }
 
-      // Use our intelligent conversation AI service
+      // Use our intelligent conversation AI service (Tesla-aware)
       const response = await generateIntelligentResponse(context);
       
       if (response) {
-        console.log(`✅ Generated response: ${response.message}`);
+        console.log(`✅ Generated intelligent response: ${response.message}`);
+        
+        // Mark as recently processed to prevent duplicates
+        this.recentlyProcessed.set(leadId, Date.now());
+        
+        // Clean up old entries (older than 5 minutes)
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+        for (const [id, timestamp] of this.recentlyProcessed.entries()) {
+          if (timestamp < fiveMinutesAgo) {
+            this.recentlyProcessed.delete(id);
+          }
+        }
+        
         return response.message;
       }
 
@@ -160,7 +189,7 @@ export class CentralizedAIService {
   // Mark an AI response as processed to prevent duplicates
   markResponseProcessed(leadId: string, messageContent: string): void {
     console.log(`✅ Marked response processed for lead ${leadId}`);
-    // Could store this in a cache or database if needed
+    this.recentlyProcessed.set(leadId, Date.now());
   }
 }
 
