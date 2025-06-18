@@ -25,6 +25,7 @@ interface ChatContainerProps {
   onToggleTemplates: () => void;
   onScroll: () => void;
   onScrollToBottom: () => void;
+  onScheduleAppointment?: () => void;
 }
 
 const ChatContainer = ({
@@ -46,7 +47,8 @@ const ChatContainer = ({
   onToggleAI,
   onToggleTemplates,
   onScroll,
-  onScrollToBottom
+  onScrollToBottom,
+  onScheduleAppointment
 }: ChatContainerProps) => {
   return (
     <Card className="flex flex-col h-[700px]">
@@ -76,6 +78,7 @@ const ChatContainer = ({
         onKeyPress={onKeyPress}
         onToggleAI={onToggleAI}
         onToggleTemplates={onToggleTemplates}
+        onScheduleAppointment={onScheduleAppointment}
       />
     </Card>
   );

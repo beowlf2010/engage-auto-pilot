@@ -267,6 +267,100 @@ export type Database = {
           },
         ]
       }
+      appointments: {
+        Row: {
+          appointment_type: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          confirmed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          duration_minutes: number
+          follow_up_required: boolean | null
+          id: string
+          lead_id: string
+          location: string | null
+          no_show_at: string | null
+          notes: string | null
+          reminder_sent_at: string | null
+          salesperson_id: string | null
+          scheduled_at: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_type?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          duration_minutes?: number
+          follow_up_required?: boolean | null
+          id?: string
+          lead_id: string
+          location?: string | null
+          no_show_at?: string | null
+          notes?: string | null
+          reminder_sent_at?: string | null
+          salesperson_id?: string | null
+          scheduled_at: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_type?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          duration_minutes?: number
+          follow_up_required?: boolean | null
+          id?: string
+          lead_id?: string
+          location?: string | null
+          no_show_at?: string | null
+          notes?: string | null
+          reminder_sent_at?: string | null
+          salesperson_id?: string | null
+          scheduled_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitive_analysis: {
         Row: {
           analysis_date: string

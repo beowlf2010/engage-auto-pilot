@@ -3,7 +3,7 @@ import React from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Send, Sparkles } from 'lucide-react';
+import { Send, Sparkles, Calendar } from 'lucide-react';
 
 interface ChatMessageInputProps {
   newMessage: string;
@@ -14,6 +14,7 @@ interface ChatMessageInputProps {
   onKeyPress: (e: React.KeyboardEvent) => void;
   onToggleAI: () => void;
   onToggleTemplates: () => void;
+  onScheduleAppointment?: () => void;
 }
 
 const ChatMessageInput = ({
@@ -24,7 +25,8 @@ const ChatMessageInput = ({
   onSend,
   onKeyPress,
   onToggleAI,
-  onToggleTemplates
+  onToggleTemplates,
+  onScheduleAppointment
 }: ChatMessageInputProps) => {
   if (!canReply) {
     return (
@@ -56,6 +58,18 @@ const ChatMessageInput = ({
                 {newMessage.length}/160 characters
               </div>
               <div className="flex items-center gap-2">
+                {onScheduleAppointment && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onScheduleAppointment}
+                    className="border-green-300 text-green-700 hover:bg-green-50"
+                    disabled={isSending}
+                  >
+                    <Calendar className="h-4 w-4 mr-1" />
+                    Schedule
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"

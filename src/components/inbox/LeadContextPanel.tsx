@@ -1,187 +1,168 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   User, 
   Phone, 
   Mail, 
-  MapPin, 
   Car, 
-  Calendar, 
-  Star,
-  TrendingUp,
-  Bot,
+  MapPin, 
+  DollarSign, 
+  Calendar,
+  Clock,
   MessageSquare,
-  Clock
+  TrendingUp,
+  Star
 } from 'lucide-react';
+import AppointmentsList from '../appointments/AppointmentsList';
 
 interface LeadContextPanelProps {
-  conversation: {
-    leadId: string;
-    leadName: string;
-    leadPhone: string;
-    vehicleInterest: string;
-    status: string;
-    salespersonName?: string;
-    aiOptIn: boolean;
-    unreadCount: number;
-    lastMessage: string;
-    lastMessageTime: string;
-  };
+  conversation: any;
+  onScheduleAppointment?: () => void;
 }
 
-const LeadContextPanel = ({ conversation }: LeadContextPanelProps) => {
-  // Mock engagement score calculation
-  const getEngagementScore = () => {
-    let score = 0;
-    if (conversation.unreadCount > 0) score += 40;
-    if (conversation.aiOptIn) score += 30;
-    if (conversation.status === 'engaged') score += 30;
-    return Math.min(score, 100);
-  };
+const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPanelProps) => {
+  const [activeTab, setActiveTab] = useState('overview');
 
-  const engagementScore = getEngagementScore();
-  
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const getScoreBadgeVariant = (score: number) => {
-    if (score >= 80) return 'default';
-    if (score >= 60) return 'secondary';
-    return 'destructive';
-  };
+  if (!conversation) {
+    return (
+      <Card className="h-full">
+        <CardContent className="p-6 text-center">
+          <User className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">No conversation selected</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <User className="h-5 w-5" />
-          Lead Details
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center space-x-2">
+          <User className="h-5 w-5 text-blue-600" />
+          <span>Lead Details</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Lead Info */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium">{conversation.leadName}</h3>
-            <Badge variant={conversation.status === 'engaged' ? 'default' : 'secondary'}>
-              {conversation.status}
-            </Badge>
-          </div>
-          
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <Phone className="h-3 w-3 text-slate-500" />
-              <span>{conversation.leadPhone}</span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Car className="h-3 w-3 text-slate-500" />
-              <span>{conversation.vehicleInterest}</span>
-            </div>
-            
-            {conversation.salespersonName && (
-              <div className="flex items-center gap-2">
-                <User className="h-3 w-3 text-slate-500" />
-                <span>Assigned to: {conversation.salespersonName}</span>
+
+      <CardContent className="p-0 h-[calc(100%-5rem)] overflow-hidden">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+          <TabsList className="grid w-full grid-cols-3 mx-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="appointments">Appointments</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
+
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <TabsContent value="overview" className="mt-4 space-y-4">
+              {/* Lead Information */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-lg">{conversation.leadName}</h3>
+                  <Badge variant={conversation.status === 'new' ? 'default' : 'secondary'}>
+                    {conversation.status}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2">
+                  {conversation.leadPhone && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <Phone className="h-4 w-4 text-gray-400" />
+                      <span>{conversation.leadPhone}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center space-x-2 text-sm">
+                    <Car className="h-4 w-4 text-gray-400" />
+                    <span>{conversation.vehicleInterest || 'No vehicle specified'}</span>
+                  </div>
+
+                  <div className="flex items-center space-x-2 text-sm">
+                    <Clock className="h-4 w-4 text-gray-400" />
+                    <span>Last message: {conversation.lastMessageTime}</span>
+                  </div>
+                </div>
+
+                {conversation.unreadCount > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <MessageSquare className="h-4 w-4 text-red-500" />
+                    <span className="text-sm font-medium text-red-600">
+                      {conversation.unreadCount} unread message{conversation.unreadCount > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
 
-        <Separator />
+              <Separator />
 
-        {/* Engagement Score */}
-        <div className="space-y-3">
-          <h4 className="font-medium flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Engagement Score
-          </h4>
-          <div className="flex items-center justify-between">
-            <div className="flex">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star 
-                  key={star} 
-                  className={`h-4 w-4 ${engagementScore >= star * 20 ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                />
-              ))}
-            </div>
-            <Badge variant={getScoreBadgeVariant(engagementScore)}>
-              {engagementScore}/100
-            </Badge>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* AI Status */}
-        <div className="space-y-3">
-          <h4 className="font-medium flex items-center gap-2">
-            <Bot className="h-4 w-4" />
-            AI Assistant
-          </h4>
-          <div className="flex items-center justify-between">
-            <span className="text-sm">Finn AI Status</span>
-            <Badge variant={conversation.aiOptIn ? 'default' : 'secondary'}>
-              {conversation.aiOptIn ? 'Active' : 'Inactive'}
-            </Badge>
-          </div>
-          {conversation.aiOptIn && (
-            <div className="text-xs text-slate-600 bg-purple-50 p-2 rounded">
-              AI is actively monitoring and may send automated responses
-            </div>
-          )}
-        </div>
-
-        <Separator />
-
-        {/* Recent Activity */}
-        <div className="space-y-3">
-          <h4 className="font-medium flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Recent Activity
-          </h4>
-          <div className="space-y-2">
-            <div className="text-xs text-slate-600">
-              Last message: {conversation.lastMessageTime}
-            </div>
-            {conversation.unreadCount > 0 && (
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-3 w-3 text-red-500" />
-                <span className="text-xs text-red-600">
-                  {conversation.unreadCount} unread message{conversation.unreadCount > 1 ? 's' : ''}
-                </span>
+              {/* Quick Actions */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-gray-700">Quick Actions</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {onScheduleAppointment && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={onScheduleAppointment}
+                      className="flex items-center space-x-1"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      <span>Schedule</span>
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="flex items-center space-x-1">
+                    <Phone className="h-4 w-4" />
+                    <span>Call</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex items-center space-x-1">
+                    <Mail className="h-4 w-4" />
+                    <span>Email</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex items-center space-x-1">
+                    <Car className="h-4 w-4" />
+                    <span>Show Cars</span>
+                  </Button>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        <Separator />
+              <Separator />
 
-        {/* Quick Actions */}
-        <div className="space-y-3">
-          <h4 className="font-medium">Quick Actions</h4>
-          <div className="grid grid-cols-1 gap-2">
-            <Button variant="outline" size="sm" className="justify-start">
-              <Phone className="h-3 w-3 mr-2" />
-              Call Lead
-            </Button>
-            <Button variant="outline" size="sm" className="justify-start">
-              <Calendar className="h-3 w-3 mr-2" />
-              Schedule Follow-up
-            </Button>
-            <Button variant="outline" size="sm" className="justify-start">
-              <Car className="h-3 w-3 mr-2" />
-              View Inventory Match
-            </Button>
+              {/* AI Status */}
+              {conversation.aiOptIn && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-gray-700">AI Status</h4>
+                  <div className="bg-purple-50 p-3 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <span className="text-sm font-medium text-purple-800">Finn AI Active</span>
+                    </div>
+                    <p className="text-xs text-purple-600">
+                      AI assistant is helping with this lead
+                    </p>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="appointments" className="mt-4">
+              <AppointmentsList
+                leadId={conversation.leadId}
+                onScheduleNew={onScheduleAppointment}
+                maxHeight="500px"
+              />
+            </TabsContent>
+
+            <TabsContent value="activity" className="mt-4 space-y-4">
+              <div className="text-center py-8">
+                <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">Activity tracking coming soon</p>
+              </div>
+            </TabsContent>
           </div>
-        </div>
+        </Tabs>
       </CardContent>
     </Card>
   );
