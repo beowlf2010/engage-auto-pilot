@@ -8,7 +8,9 @@ export const buildSystemPrompt = (
   vehicleInterest: string,
   conversationLength: number,
   conversationHistory: string,
-  inventoryStatus: any
+  inventoryStatus: any,
+  businessHours?: any,
+  conversationGuidance?: string[]
 ) => {
   // Classify the customer's vehicle interest with new/used awareness
   const requestedCategory = classifyVehicle(vehicleInterest || '');
@@ -44,9 +46,38 @@ CONVERSATION CONTEXT ANALYSIS:
 ${conversationPattern.hasRepetitiveGreeting ? 
   'WARNING: Avoid repetitive greetings! This customer has already been greeted multiple times.' : 
   ''
-}
+}`;
 
-INVENTORY ANALYSIS:`;
+  // Add business hours constraints
+  if (businessHours && !businessHours.isOpen) {
+    systemPrompt += `\n\n🚨 BUSINESS HOURS CONSTRAINT:
+- WE ARE CURRENTLY CLOSED (Hours: ${businessHours.hours.start} - ${businessHours.hours.end} ${businessHours.hours.timezone})
+- DO NOT schedule appointments outside business hours
+- Suggest times within our operating hours only
+- Be transparent about our operating schedule`;
+  }
+
+  // Add conversation guidance
+  if (conversationGuidance && conversationGuidance.length > 0) {
+    systemPrompt += `\n\n🎯 CONVERSATION GUIDANCE:
+${conversationGuidance.join('\n')}`;
+  }
+
+  // Enhanced inventory analysis with real validation
+  systemPrompt += `\n\nREAL INVENTORY ANALYSIS:`;
+
+  if (inventoryStatus?.inventoryWarning === 'no_evs_available') {
+    systemPrompt += `\n❌ CRITICAL: NO ELECTRIC VEHICLES IN INVENTORY
+- We have ZERO electric or hybrid vehicles available
+- Do NOT mention having Bolt, Equinox EV, or any electric vehicles
+- Be completely honest about this limitation
+- Offer to watch for electric vehicles that come in`;
+  } else if (inventoryStatus?.actualVehicles && inventoryStatus.actualVehicles.length > 0) {
+    systemPrompt += `\n✅ ACTUAL AVAILABLE VEHICLES (${inventoryStatus.actualVehicles.length} total):
+${inventoryStatus.actualVehicles.slice(0, 5).map(v => `- ${v.year} ${v.make} ${v.model} ${v.fuel_type ? `(${v.fuel_type})` : ''} - $${v.price?.toLocaleString() || 'Price TBD'}`).join('\n')}
+- ONLY mention vehicles from this verified list
+- Do NOT make up or assume we have other vehicles`;
+  }
 
   // Enhanced Tesla-specific handling with new/used logic
   if (requestedCategory.isTesla) {
@@ -57,36 +88,19 @@ INVENTORY ANALYSIS:`;
 - Be honest about this limitation
 - Offer to help with other new electric vehicles if they're interested in EVs`;
     } else if (requestedCategory.condition === 'used') {
-      if (inventoryStatus?.hasRequestedVehicle) {
+      const teslaInInventory = inventoryStatus?.actualVehicles?.filter(v => 
+        v.make.toLowerCase().includes('tesla')
+      ) || [];
+      
+      if (teslaInInventory.length > 0) {
         systemPrompt += `\n✅ WE HAVE USED TESLA VEHICLES:
-${inventoryStatus.matchingVehicles?.map(v => `- ${v.year} ${v.make} ${v.model} - $${v.price?.toLocaleString()}`).join('\n') || ''}`;
+${teslaInInventory.map(v => `- ${v.year} ${v.make} ${v.model} - $${v.price?.toLocaleString()}`).join('\n')}`;
       } else {
         systemPrompt += `\n❌ WE DO NOT CURRENTLY HAVE USED TESLA VEHICLES IN STOCK.
 - We can sell used Teslas when we get them as trade-ins
 - I'd be happy to keep an eye out for Tesla trade-ins for you
 - Would you like me to notify you when we get used Teslas in?`;
-        
-        if (inventoryStatus?.availableAlternatives?.length > 0) {
-          systemPrompt += `\n\nRELEVANT ALTERNATIVES (luxury/electric vehicles):
-${inventoryStatus.availableAlternatives.map(v => `- ${v.year} ${v.make} ${v.model} - $${v.price?.toLocaleString()}`).join('\n')}`;
-        }
       }
-    } else {
-      // Unknown condition - ask for clarification
-      systemPrompt += `\n❓ TESLA INQUIRY NEEDS CLARIFICATION:
-- For NEW Teslas: Tesla sells direct (we can't help)
-- For USED Teslas: We can help if we have inventory or get trade-ins
-- Ask customer to clarify if they want new or used`;
-    }
-  } else if (inventoryStatus?.hasRequestedVehicle) {
-    systemPrompt += `\n✅ WE HAVE MATCHING ${inventoryStatus.requestedMake?.toUpperCase()} VEHICLES:
-${inventoryStatus.matchingVehicles?.map(v => `- ${v.year} ${v.make} ${v.model} - $${v.price?.toLocaleString()}`).join('\n') || ''}`;
-  } else if (inventoryStatus?.requestedMake) {
-    systemPrompt += `\n❌ WE DO NOT HAVE ${inventoryStatus.requestedMake.toUpperCase()} VEHICLES IN STOCK.`;
-    
-    if (inventoryStatus.availableAlternatives?.length > 0) {
-      systemPrompt += `\n\nRELEVANT ALTERNATIVES (same category):
-${inventoryStatus.availableAlternatives.map(v => `- ${v.year} ${v.make} ${v.model} - $${v.price?.toLocaleString()}`).join('\n')}`;
     }
   }
 
@@ -106,7 +120,9 @@ export const buildUserPrompt = (
   lastCustomerMessage: string,
   conversationHistory: string,
   requestedCategory: any,
-  conversationPattern: any
+  conversationPattern: any,
+  conversationMemory?: any,
+  conversationGuidance?: string[]
 ) => {
   // Analyze customer intent to understand what they're asking for
   const intentAnalysis = analyzeCustomerIntent(conversationHistory, lastCustomerMessage);
@@ -124,6 +140,21 @@ INTENT ANALYSIS RESULTS:
 - Requested Topic: ${intentAnalysis.requestedTopic || 'none'}
 - Is Affirmative Response: ${intentAnalysis.isAffirmativeResponse}
 - Should Provide Information: ${intentAnalysis.shouldProvideInformation}`;
+
+  // Add conversation memory insights
+  if (conversationMemory) {
+    promptInstructions += `\n\nCONVERSATION MEMORY:
+- Previously offered: ${conversationMemory.offeredItems.join(', ') || 'nothing'}
+- Customer requested: ${conversationMemory.customerRequests.join(', ') || 'nothing'}
+- Customer agreed to: ${conversationMemory.customerAgreements.join(', ') || 'nothing'}
+- Topics discussed: ${conversationMemory.discussedTopics.join(', ') || 'none'}`;
+  }
+
+  // Add specific guidance warnings
+  if (conversationGuidance && conversationGuidance.length > 0) {
+    promptInstructions += `\n\n🚨 CRITICAL GUIDANCE:
+${conversationGuidance.join('\n')}`;
+  }
 
   // Add specific instructions based on intent analysis
   if (intentAnalysis.primaryIntent === 'direct_request') {
@@ -156,22 +187,15 @@ INTENT ANALYSIS RESULTS:
      'Provides the specific information requested or agreed upon' : 
      'Directly and honestly addresses their question'
    }
-3. ${requestedCategory.isTesla ? 
-     (requestedCategory.condition === 'new' ? 
-       'Explains we cannot help with NEW Tesla vehicles (Tesla direct sales only)' :
-       requestedCategory.condition === 'used' ?
-         'Addresses used Tesla availability honestly' :
-         'Clarifies whether they want new or used Tesla'
-     ) : 
-     'Provides accurate inventory information'
-   }
-4. ${intentAnalysis.shouldProvideInformation ? 
+3. ONLY mentions vehicles that actually exist in our verified inventory
+4. Respects business hours when scheduling appointments
+5. ${intentAnalysis.shouldProvideInformation ? 
      'Moves to next logical step after providing information' : 
      'Offers genuinely helpful next steps'
    }
-5. Is conversational and under 160 characters
-6. Builds trust through transparency
-7. NEVER repeats questions already asked or offers already made
+6. Is conversational and under 160 characters
+7. Builds trust through transparency
+8. NEVER repeats questions already asked or offers already made
 
 ${intentAnalysis.primaryIntent === 'direct_request' ? 
   `DIRECT REQUEST DETECTED: Customer asked for "${intentAnalysis.requestedTopic}". Provide this information immediately without asking if they want it.` : 

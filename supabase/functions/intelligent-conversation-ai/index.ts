@@ -2,6 +2,8 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { buildSystemPrompt, buildUserPrompt } from './promptBuilder.ts';
+import { validateInventoryAccuracy, getBusinessHoursStatus } from './inventoryValidation.ts';
+import { analyzeConversationMemory, generateConversationGuidance } from './conversationMemory.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,24 +31,51 @@ serve(async (req) => {
       inventoryStatus 
     } = await req.json();
 
-    console.log(`🤖 Processing intelligent AI request for: ${leadName}`);
+    console.log(`🤖 Processing enhanced intelligent AI request for: ${leadName}`);
     console.log(`🚗 Vehicle interest: ${vehicleInterest}`);
     console.log(`💬 Last message: ${lastCustomerMessage}`);
 
-    // Build system and user prompts using the enhanced modules with intent analysis
+    // Enhanced validation pipeline
+    const [inventoryValidation, businessHours, conversationMemory] = await Promise.all([
+      validateInventoryAccuracy(vehicleInterest || ''),
+      getBusinessHoursStatus(),
+      Promise.resolve(analyzeConversationMemory(conversationHistory || ''))
+    ]);
+
+    console.log('📊 Inventory validation:', inventoryValidation.hasRealInventory ? 'PASS' : 'FAIL', inventoryValidation.warning || '');
+    console.log('🕒 Business hours:', businessHours.isOpen ? 'OPEN' : 'CLOSED');
+    console.log('🧠 Conversation memory:', conversationMemory.conversationLength, 'messages');
+
+    // Generate context-aware guidance
+    const conversationGuidance = generateConversationGuidance(conversationMemory, inventoryValidation, businessHours);
+
+    // Enhanced inventory status with real validation
+    const enhancedInventoryStatus = {
+      ...inventoryStatus,
+      hasActualInventory: inventoryValidation.hasRealInventory,
+      actualVehicles: inventoryValidation.actualVehicles,
+      inventoryWarning: inventoryValidation.warning,
+      realInventoryCount: inventoryValidation.actualVehicles.length
+    };
+
+    // Build enhanced prompts with validation data
     const { systemPrompt, requestedCategory } = buildSystemPrompt(
       leadName,
       vehicleInterest,
       conversationLength,
       conversationHistory,
-      inventoryStatus
+      enhancedInventoryStatus,
+      businessHours,
+      conversationGuidance
     );
 
     const userPrompt = buildUserPrompt(
       lastCustomerMessage,
       conversationHistory,
       requestedCategory,
-      { isEstablishedConversation: conversationLength > 2 }
+      { isEstablishedConversation: conversationLength > 2 },
+      conversationMemory,
+      conversationGuidance
     );
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -69,18 +98,18 @@ serve(async (req) => {
     const aiResponse = await response.json();
     const generatedMessage = aiResponse.choices[0].message.content;
 
-    console.log(`✅ Generated intelligent response: ${generatedMessage}`);
+    console.log(`✅ Generated enhanced response: ${generatedMessage}`);
 
     return new Response(JSON.stringify({ 
       message: generatedMessage,
-      confidence: 0.9,
-      reasoning: `Enhanced context-aware response with intent analysis for ${requestedCategory.category} vehicle inquiry (${requestedCategory.condition}) with conversation flow tracking${requestedCategory.isTesla ? ' (Tesla new/used logic applied)' : ''}`
+      confidence: 0.95,
+      reasoning: `Enhanced context-aware response with inventory validation (${inventoryValidation.actualVehicles.length} actual vehicles), business hours (${businessHours.isOpen ? 'open' : 'closed'}), and conversation memory (${conversationMemory.conversationLength} messages) for ${requestedCategory.category} vehicle inquiry`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('❌ Error in intelligent conversation AI:', error);
+    console.error('❌ Error in enhanced intelligent conversation AI:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

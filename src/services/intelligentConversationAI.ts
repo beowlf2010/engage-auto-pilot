@@ -35,7 +35,7 @@ const cleanVehicleInterest = (vehicleInterest: string): string => {
     .trim();
 };
 
-// Enhanced vehicle categorization with new/used awareness
+// Enhanced vehicle categorization with strict inventory validation
 const categorizeVehicle = (vehicleText: string) => {
   const text = vehicleText.toLowerCase();
   
@@ -83,7 +83,7 @@ const categorizeVehicle = (vehicleText: string) => {
   };
 };
 
-// Enhanced inventory availability check with Tesla new/used logic
+// Enhanced inventory availability check with strict validation - DO NOT HALLUCINATE
 const checkInventoryAvailability = async (vehicleInterest: string) => {
   try {
     const cleanInterest = cleanVehicleInterest(vehicleInterest);
@@ -91,51 +91,116 @@ const checkInventoryAvailability = async (vehicleInterest: string) => {
 
     const requestedCategory = categorizeVehicle(cleanInterest);
     
-    // Extract make/model from vehicle interest
+    console.log('🔍 STRICT inventory check for:', cleanInterest, 'Category:', requestedCategory.category);
+    
+    // Get ALL available inventory first for strict validation
+    const { data: allInventory, error } = await supabase
+      .from('inventory')
+      .select('id, make, model, year, price, fuel_type, condition, status')
+      .eq('status', 'available');
+
+    if (error) {
+      console.error('❌ Error checking inventory:', error);
+      return { hasInventory: false, matchingVehicles: [], requestedCategory };
+    }
+
+    console.log(`📊 Total available inventory: ${allInventory?.length || 0} vehicles`);
+    
+    if (!allInventory || allInventory.length === 0) {
+      console.log('⚠️ NO INVENTORY AVAILABLE AT ALL');
+      return { 
+        hasInventory: false, 
+        matchingVehicles: [], 
+        requestedCategory,
+        warning: 'no_inventory_available'
+      };
+    }
+
+    // Strict EV/Hybrid filtering - only actual electric/hybrid vehicles
+    if (requestedCategory.isEV) {
+      const evInventory = allInventory.filter(vehicle => {
+        const fuelType = (vehicle.fuel_type || '').toLowerCase();
+        const make = (vehicle.make || '').toLowerCase();
+        
+        return fuelType.includes('electric') || 
+               fuelType.includes('hybrid') || 
+               fuelType.includes('plug') ||
+               make.includes('tesla');
+      });
+
+      console.log(`⚡ Found ${evInventory.length} actual electric/hybrid vehicles`);
+      
+      if (evInventory.length === 0) {
+        console.log('❌ NO ELECTRIC VEHICLES IN INVENTORY - DO NOT CLAIM TO HAVE BOLT OR EQUINOX EV');
+        return {
+          hasInventory: false,
+          matchingVehicles: [],
+          requestedCategory,
+          warning: 'no_evs_available'
+        };
+      }
+
+      return {
+        hasInventory: true,
+        matchingVehicles: evInventory.slice(0, 5),
+        requestedCategory,
+        actualEVCount: evInventory.length
+      };
+    }
+
+    // Extract make/model from vehicle interest for non-EV searches
     const words = cleanInterest.toLowerCase().split(' ');
     let make = '';
     
-    // Common vehicle makes to check for
-    const knownMakes = ['tesla', 'ford', 'chevrolet', 'honda', 'toyota', 'bmw', 'mercedes', 'audi', 'nissan', 'hyundai', 'lexus', 'cadillac'];
+    const knownMakes = ['tesla', 'ford', 'chevrolet', 'chevy', 'honda', 'toyota', 'bmw', 'mercedes', 'audi', 'nissan', 'hyundai', 'lexus', 'cadillac'];
     
     for (const word of words) {
       if (knownMakes.includes(word)) {
-        make = word;
+        make = word === 'chevy' ? 'chevrolet' : word;
         break;
       }
     }
 
     if (make) {
-      let query = supabase
-        .from('inventory')
-        .select('id, make, model, year, price, fuel_type, condition')
-        .eq('status', 'available')
-        .ilike('make', `%${make}%`);
+      const makeInventory = allInventory.filter(vehicle => 
+        (vehicle.make || '').toLowerCase().includes(make)
+      );
 
-      // For Tesla, filter by condition if we know it
+      console.log(`🚗 Found ${makeInventory.length} ${make} vehicles`);
+
+      // For Tesla, apply condition filtering
       if (make === 'tesla' && requestedCategory.condition !== 'unknown') {
-        query = query.eq('condition', requestedCategory.condition);
+        const conditionFiltered = makeInventory.filter(vehicle => 
+          (vehicle.condition || '').toLowerCase() === requestedCategory.condition
+        );
+        
+        return {
+          hasInventory: conditionFiltered.length > 0,
+          matchingVehicles: conditionFiltered.slice(0, 5),
+          searchedMake: make,
+          requestedCategory
+        };
       }
 
-      const { data: inventory } = await query.limit(5);
-
       return {
-        hasInventory: inventory && inventory.length > 0,
-        matchingVehicles: inventory || [],
+        hasInventory: makeInventory.length > 0,
+        matchingVehicles: makeInventory.slice(0, 5),
         searchedMake: make,
         requestedCategory
       };
     }
 
+    // General inventory fallback
     return { 
-      hasInventory: false, 
-      matchingVehicles: [], 
-      searchedMake: make,
+      hasInventory: true, 
+      matchingVehicles: allInventory.slice(0, 10), 
+      searchedMake: '',
       requestedCategory 
     };
+
   } catch (error) {
-    console.error('Error checking inventory:', error);
-    return { hasInventory: false, matchingVehicles: [], requestedCategory: null };
+    console.error('❌ Error in strict inventory check:', error);
+    return { hasInventory: false, matchingVehicles: [], requestedCategory: null, warning: 'inventory_check_failed' };
   }
 };
 
