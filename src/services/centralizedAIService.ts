@@ -83,7 +83,7 @@ class CentralizedAIService {
         aiGenerated: msg.ai_generated
       }));
 
-      // Create enhanced context with question-first priority
+      // Create enhanced context with QUESTION-FIRST priority
       const context = {
         leadId,
         leadName: `${lead.first_name} ${lead.last_name}`,
@@ -96,7 +96,7 @@ class CentralizedAIService {
         }
       };
 
-      // Generate enhanced response with question-first priority
+      // Generate enhanced response with QUESTION-FIRST priority
       const aiResponse = await generateEnhancedIntelligentResponse(context);
 
       if (aiResponse?.message) {

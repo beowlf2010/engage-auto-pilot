@@ -11,6 +11,7 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
   
   // Detect question types in the last customer message
   const questionPatterns = {
+    inventory_availability: /\b(see|available|online|have|stock|inventory|find|look|show|get|any|don't see|can't find|where|2026)\b/,
     pricing: /\b(price|cost|how much|payment|monthly|finance|financing|afford)\b/,
     availability: /\b(have|available|in stock|do you|get|find|look for)\b/,
     features: /\b(features|options|specs|specifications|tell me about|what does|include)\b/,
@@ -28,23 +29,24 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
     }
   }
 
-  // Determine if this is a direct question requiring an answer
+  // CRITICAL: Detect inventory availability questions specifically
+  const isInventoryQuestion = questionPatterns.inventory_availability.test(lastMessage);
   const isDirectQuestion = detectedQuestions.length > 0 || 
     lastMessage.includes('?') ||
-    /^(what|how|when|where|why|can|could|would|do|does|is|are)\b/.test(lastMessage);
+    /^(what|how|when|where|why|can|could|would|do|does|is|are|don't|can't)\b/.test(lastMessage);
 
   // Extract the specific topic they're asking about
   let questionTopic = null;
   if (isDirectQuestion) {
     // Try to extract vehicle mentions
-    const vehicleMatch = lastMessage.match(/\b(tesla|model [sy3x]|chevy|chevrolet|bolt|equinox|honda|toyota|ford|bmw|mercedes|audi)\b/i);
+    const vehicleMatch = lastMessage.match(/\b(tesla|model [sy3x]|chevy|chevrolet|bolt|equinox|honda|toyota|ford|bmw|mercedes|audi|2026|2025|2024)\b/i);
     if (vehicleMatch) {
       questionTopic = vehicleMatch[0];
     }
     
     // Extract general topics
     if (!questionTopic) {
-      const topicMatch = lastMessage.match(/\b(electric|ev|hybrid|suv|sedan|truck|car|vehicle)\b/i);
+      const topicMatch = lastMessage.match(/\b(electric|ev|hybrid|suv|sedan|truck|car|vehicle|online|website|available)\b/i);
       if (topicMatch) {
         questionTopic = topicMatch[0];
       }
@@ -52,8 +54,8 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
   }
 
   // Check if customer is showing frustration or being ignored
-  const frustrationIndicators = /\b(but|however|still|again|told you|said|asked|my question|answer)\b/;
-  const showingFrustration = frustrationIndicators.test(lastMessage);
+  const frustrationIndicators = /\b(but|however|still|again|told you|said|asked|my question|answer|don't see|can't find)\b/;
+  const showingFrustration = frustrationIndicators.test(lastMessage) || isInventoryQuestion;
 
   // Analyze if previous sales messages were off-topic
   const lastSalesMessage = salesMessages[salesMessages.length - 1] || '';
@@ -62,6 +64,7 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
   const salesWasOffTopic = isDirectQuestion && lastSalesContent && 
     !detectedQuestions.some(qType => {
       switch (qType) {
+        case 'inventory_availability': return /available|stock|have|inventory|online|see|show/.test(lastSalesContent);
         case 'pricing': return /price|cost|payment|finance/.test(lastSalesContent);
         case 'availability': return /available|stock|have|inventory/.test(lastSalesContent);
         case 'features': return /features|specs|options/.test(lastSalesContent);
@@ -72,12 +75,13 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
 
   return {
     isDirectQuestion,
+    isInventoryQuestion,
     questionTypes: detectedQuestions,
     questionTopic,
     showingFrustration,
     salesWasOffTopic,
-    requiresDirectAnswer: isDirectQuestion || showingFrustration,
-    primaryQuestionType: detectedQuestions[0] || 'general_inquiry',
+    requiresDirectAnswer: isDirectQuestion || showingFrustration || isInventoryQuestion,
+    primaryQuestionType: detectedQuestions[0] || (isInventoryQuestion ? 'inventory_availability' : 'general_inquiry'),
     conversationContext: {
       lastSalesMessage: lastSalesContent,
       customerMessageCount: customerMessages.length,
@@ -89,7 +93,7 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
 
 // Generate specific answer guidance based on question type
 export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any) => {
-  const { questionTypes, questionTopic, primaryQuestionType, showingFrustration } = intentAnalysis;
+  const { questionTypes, questionTopic, primaryQuestionType, showingFrustration, isInventoryQuestion } = intentAnalysis;
   
   if (!intentAnalysis.requiresDirectAnswer) {
     return null;
@@ -104,6 +108,12 @@ export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any
   };
 
   switch (primaryQuestionType) {
+    case 'inventory_availability':
+      guidance.specificGuidance = inventoryStatus.hasActualInventory ?
+        `Customer is asking about inventory availability. Show them ONLY the ${inventoryStatus.validatedCount} vehicles we actually have in stock.` :
+        `Customer is asking about availability but we have NO matching inventory. Be HONEST - acknowledge we don't currently have what they're looking for and offer alternatives or future options.`;
+      break;
+      
     case 'pricing':
       guidance.specificGuidance = questionTopic ? 
         `Provide specific pricing information for ${questionTopic}. If not available, explain clearly and offer alternatives.` :
@@ -132,8 +142,8 @@ export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any
       guidance.specificGuidance = 'Answer their question directly and completely before moving to sales topics.';
   }
 
-  if (showingFrustration) {
-    guidance.specificGuidance = `CUSTOMER IS FRUSTRATED - ${guidance.specificGuidance} Acknowledge their question was missed.`;
+  if (showingFrustration || isInventoryQuestion) {
+    guidance.specificGuidance = `CUSTOMER NEEDS DIRECT ANSWER - ${guidance.specificGuidance} ${showingFrustration ? 'Acknowledge their question was missed.' : ''}`;
   }
 
   return guidance;
@@ -143,5 +153,6 @@ export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any
 export const needsConversationRepair = (intentAnalysis: any) => {
   return intentAnalysis.showingFrustration || 
          intentAnalysis.salesWasOffTopic || 
-         intentAnalysis.conversationContext.hasBeenIgnored;
+         intentAnalysis.conversationContext.hasBeenIgnored ||
+         intentAnalysis.isInventoryQuestion;
 };

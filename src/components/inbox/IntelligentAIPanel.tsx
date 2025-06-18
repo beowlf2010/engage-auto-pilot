@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Brain, Loader2, Send, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
-import { generateIntelligentResponse, shouldGenerateResponse, type ConversationContext } from '@/services/intelligentConversationAI';
+import { generateEnhancedIntelligentResponse, shouldGenerateResponse, type ConversationContext } from '@/services/intelligentConversationAI';
 import { toast } from '@/hooks/use-toast';
 
 interface IntelligentAIPanelProps {
@@ -50,14 +50,14 @@ const IntelligentAIPanel = ({
     setIsGenerating(true);
     
     try {
-      console.log('🤖 Generating intelligent AI response...');
-      const response = await generateIntelligentResponse(context);
+      console.log('🤖 Generating QUESTION-FIRST intelligent AI response...');
+      const response = await generateEnhancedIntelligentResponse(context);
       
       if (response) {
         setLastAIResponse(response.message);
         toast({
           title: "AI Response Generated",
-          description: "Finn has analyzed the conversation and generated a response",
+          description: "Finn has analyzed the conversation and generated a QUESTION-FIRST response",
         });
       } else {
         toast({
@@ -67,7 +67,7 @@ const IntelligentAIPanel = ({
         });
       }
     } catch (error) {
-      console.error('❌ Error generating AI response:', error);
+      console.error('❌ Error generating QUESTION-FIRST AI response:', error);
       toast({
         title: "Error",
         description: "Failed to generate AI response",
@@ -85,7 +85,7 @@ const IntelligentAIPanel = ({
         setLastAIResponse(null);
         toast({
           title: "AI Response Sent",
-          description: "Finn's response has been sent to the customer",
+          description: "Finn's QUESTION-FIRST response has been sent to the customer",
         });
       } catch (error) {
         toast({
@@ -134,7 +134,7 @@ const IntelligentAIPanel = ({
             <Brain className="h-4 w-4 text-purple-600" />
             Finn AI Assistant
             <Badge variant="outline" className="bg-purple-100 text-purple-700">
-              Intelligent
+              Question-First
             </Badge>
           </CardTitle>
           <Button
@@ -207,7 +207,7 @@ const IntelligentAIPanel = ({
 
         {!shouldGenerate && !lastAIResponse && (
           <p className="text-xs text-slate-500 text-center">
-            Finn is monitoring the conversation...
+            Finn is monitoring for questions to answer...
           </p>
         )}
       </CardContent>

@@ -32,6 +32,8 @@ export interface EnhancedAIResponse {
   vehiclesMentioned?: string[];
   inventoryShown?: any[];
   followUpScheduled?: boolean;
+  customerIntent?: any;
+  answerGuidance?: any;
 }
 
 // Process customer message for vehicle mentions and update lead data
@@ -73,13 +75,13 @@ export const processCustomerVehicleMentions = async (
   }
 };
 
-// Enhanced inventory check with detailed tracking
+// Enhanced inventory check with honest validation - NO FALSE CLAIMS
 const enhancedInventoryCheck = async (vehicleInterest: string) => {
   try {
     const cleanInterest = vehicleInterest.replace(/"/g, '').replace(/\s+/g, ' ').trim();
     if (!cleanInterest) return { hasInventory: false, matchingVehicles: [], requestedCategory: null };
 
-    console.log('🔍 Enhanced inventory check for:', cleanInterest);
+    console.log('🔍 STRICT Enhanced inventory check for:', cleanInterest);
     
     // Get ALL available inventory first
     const { data: allInventory, error } = await supabase
@@ -93,6 +95,7 @@ const enhancedInventoryCheck = async (vehicleInterest: string) => {
     }
 
     if (!allInventory || allInventory.length === 0) {
+      console.log('⚠️ NO INVENTORY AVAILABLE - MUST BE HONEST');
       return { 
         hasInventory: false, 
         matchingVehicles: [], 
@@ -107,7 +110,7 @@ const enhancedInventoryCheck = async (vehicleInterest: string) => {
     if (extracted.length > 0) {
       const requestedVehicle = extracted[0];
       
-      // Find exact matches first
+      // Find exact matches first - BE STRICT
       let matches = allInventory.filter(vehicle => {
         const makeMatch = (vehicle.make || '').toLowerCase() === requestedVehicle.make.toLowerCase();
         const modelMatch = (vehicle.model || '').toLowerCase().includes(requestedVehicle.model.toLowerCase());
@@ -116,41 +119,48 @@ const enhancedInventoryCheck = async (vehicleInterest: string) => {
         return makeMatch && modelMatch && yearMatch;
       });
 
-      // If no exact matches, try broader search
+      console.log(`🔍 Found ${matches.length} EXACT matches for ${requestedVehicle.fullText}`);
+
+      // If no exact matches, try broader search but still be strict
       if (matches.length === 0) {
         matches = allInventory.filter(vehicle => {
           const makeMatch = (vehicle.make || '').toLowerCase() === requestedVehicle.make.toLowerCase();
           return makeMatch;
         });
+        console.log(`🔍 Found ${matches.length} MAKE matches for ${requestedVehicle.make}`);
       }
 
+      // CRITICAL: Only return true if we have ACTUAL matches
       return {
         hasInventory: matches.length > 0,
         matchingVehicles: matches.slice(0, 5),
         requestedCategory: requestedVehicle,
-        searchedVehicle: requestedVehicle.fullText
+        searchedVehicle: requestedVehicle.fullText,
+        actualCount: matches.length
       };
     }
 
-    // Fallback to general search
+    // Fallback to general search - but be honest about what we have
+    console.log(`📦 Fallback: ${allInventory.length} total vehicles available`);
     return { 
       hasInventory: true, 
       matchingVehicles: allInventory.slice(0, 10), 
-      requestedCategory: null 
+      requestedCategory: null,
+      actualCount: allInventory.length
     };
 
   } catch (error) {
-    console.error('❌ Error in enhanced inventory check:', error);
+    console.error('❌ Error in STRICT enhanced inventory check:', error);
     return { hasInventory: false, matchingVehicles: [], requestedCategory: null };
   }
 };
 
-// Generate enhanced AI response with vehicle tracking
+// Generate enhanced AI response with QUESTION-FIRST priority and HONEST inventory
 export const generateEnhancedIntelligentResponse = async (
   context: EnhancedConversationContext
 ): Promise<EnhancedAIResponse | null> => {
   try {
-    console.log('🤖 Generating enhanced intelligent AI response for lead:', context.leadId);
+    console.log('🤖 Generating QUESTION-FIRST enhanced intelligent AI response for lead:', context.leadId);
 
     // Get recent conversation history
     const recentMessages = context.messages
@@ -158,7 +168,7 @@ export const generateEnhancedIntelligentResponse = async (
       .map(msg => `${msg.direction === 'in' ? 'Customer' : 'Sales'}: ${msg.body}`)
       .join('\n');
 
-    // Get the last customer message
+    // Get the last customer message - THIS IS CRITICAL TO ANSWER
     const lastCustomerMessage = context.messages
       .filter(msg => msg.direction === 'in')
       .slice(-1)[0];
@@ -168,6 +178,12 @@ export const generateEnhancedIntelligentResponse = async (
       return null;
     }
 
+    console.log('📝 Customer message to address:', lastCustomerMessage.body);
+
+    // Check if customer is asking about inventory availability
+    const isInventoryQuestion = /\b(see|available|online|have|stock|inventory|find|look|show|get)\b/i.test(lastCustomerMessage.body);
+    console.log('❓ Is inventory question:', isInventoryQuestion);
+
     // Process vehicle mentions from customer message
     const vehiclesMentioned = await processCustomerVehicleMentions(
       context.leadId,
@@ -175,8 +191,13 @@ export const generateEnhancedIntelligentResponse = async (
       lastCustomerMessage.body
     );
 
-    // Enhanced inventory checking
+    // STRICT inventory checking - NO FALSE CLAIMS
     const inventoryCheck = await enhancedInventoryCheck(context.vehicleInterest);
+    console.log('📦 Inventory check result:', {
+      hasInventory: inventoryCheck.hasInventory,
+      actualCount: inventoryCheck.actualCount || 0,
+      matchingVehicles: inventoryCheck.matchingVehicles?.length || 0
+    });
     
     // Track AI response with inventory information
     if (inventoryCheck.hasInventory && inventoryCheck.matchingVehicles.length > 0) {
@@ -185,7 +206,7 @@ export const generateEnhancedIntelligentResponse = async (
         lastCustomerMessage.id,
         inventoryCheck.searchedVehicle || context.vehicleInterest,
         'showed_inventory',
-        `AI showed ${inventoryCheck.matchingVehicles.length} matching vehicles`,
+        `AI showed ${inventoryCheck.matchingVehicles.length} ACTUAL matching vehicles`,
         true
       );
     } else if (inventoryCheck.searchedVehicle) {
@@ -194,14 +215,15 @@ export const generateEnhancedIntelligentResponse = async (
         lastCustomerMessage.id,
         inventoryCheck.searchedVehicle,
         'no_inventory',
-        'AI confirmed no matching inventory available',
+        'AI honestly confirmed no matching inventory available',
         false
       );
     }
 
-    // Generate AI response using edge function
+    // Generate AI response using edge function with QUESTION-FIRST priority
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
+        leadId: context.leadId,
         leadName: context.leadName,
         vehicleInterest: context.vehicleInterest,
         lastCustomerMessage: lastCustomerMessage.body,
@@ -212,13 +234,26 @@ export const generateEnhancedIntelligentResponse = async (
           hasRequestedVehicle: inventoryCheck.hasInventory,
           matchingVehicles: inventoryCheck.matchingVehicles,
           requestedCategory: inventoryCheck.requestedCategory,
-          searchedVehicle: inventoryCheck.searchedVehicle
+          searchedVehicle: inventoryCheck.searchedVehicle,
+          hasActualInventory: inventoryCheck.hasInventory,
+          actualVehicles: inventoryCheck.matchingVehicles || [],
+          validatedCount: inventoryCheck.matchingVehicles?.length || 0,
+          inventoryWarning: inventoryCheck.warning,
+          realInventoryCount: inventoryCheck.matchingVehicles?.length || 0,
+          strictMode: true,
+          mustNotClaim: !inventoryCheck.hasInventory,
+          isInventoryQuestion: isInventoryQuestion
+        },
+        context: {
+          questionFirst: true,
+          answerCustomerQuestion: true,
+          inventoryHonesty: true
         }
       }
     });
 
     if (error) {
-      console.error('❌ Error from enhanced AI function:', error);
+      console.error('❌ Error from QUESTION-FIRST enhanced AI function:', error);
       return null;
     }
 
@@ -231,24 +266,26 @@ export const generateEnhancedIntelligentResponse = async (
     await addAIConversationNote(
       context.leadId,
       lastCustomerMessage.id,
-      inventoryCheck.hasInventory ? 'vehicle_shown' : 'inventory_discussion',
-      `AI Response: ${data.message.substring(0, 200)}${data.message.length > 200 ? '...' : ''}`,
+      inventoryCheck.hasInventory ? 'vehicle_shown' : 'honest_inventory_discussion',
+      `QUESTION-FIRST AI Response: ${data.message.substring(0, 200)}${data.message.length > 200 ? '...' : ''}`,
       inventoryCheck.matchingVehicles || []
     );
 
-    console.log('✅ Generated enhanced intelligent response with tracking');
+    console.log('✅ Generated QUESTION-FIRST enhanced intelligent response with honest inventory');
     
     return {
       message: data.message,
       confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'Enhanced AI with vehicle tracking and inventory awareness',
+      reasoning: data.reasoning || 'QUESTION-FIRST Enhanced AI with vehicle tracking and HONEST inventory awareness',
       vehiclesMentioned: vehiclesMentioned.map(v => v.fullText),
       inventoryShown: inventoryCheck.matchingVehicles,
-      followUpScheduled: false
+      followUpScheduled: false,
+      customerIntent: data.customerIntent || null,
+      answerGuidance: data.answerGuidance || null
     };
 
   } catch (error) {
-    console.error('❌ Error generating enhanced intelligent response:', error);
+    console.error('❌ Error generating QUESTION-FIRST enhanced intelligent response:', error);
     return null;
   }
 };
