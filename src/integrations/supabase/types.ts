@@ -2119,10 +2119,12 @@ export type Database = {
       leads: {
         Row: {
           address: string | null
+          ai_contact_enabled: boolean | null
           ai_last_message_stage: string | null
           ai_messages_sent: number | null
           ai_opt_in: boolean
           ai_pause_reason: string | null
+          ai_replies_enabled: boolean | null
           ai_resume_at: string | null
           ai_sequence_paused: boolean | null
           ai_stage: string | null
@@ -2185,10 +2187,12 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_contact_enabled?: boolean | null
           ai_last_message_stage?: string | null
           ai_messages_sent?: number | null
           ai_opt_in?: boolean
           ai_pause_reason?: string | null
+          ai_replies_enabled?: boolean | null
           ai_resume_at?: string | null
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
@@ -2251,10 +2255,12 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_contact_enabled?: boolean | null
           ai_last_message_stage?: string | null
           ai_messages_sent?: number | null
           ai_opt_in?: boolean
           ai_pause_reason?: string | null
+          ai_replies_enabled?: boolean | null
           ai_resume_at?: string | null
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null

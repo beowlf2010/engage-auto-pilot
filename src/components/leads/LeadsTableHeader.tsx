@@ -1,104 +1,138 @@
 
-import React from "react";
-import { TableRow, TableHead } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import React from 'react';
+import { TableHead, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
-type SortField = 'name' | 'status' | 'contactStatus' | 'createdAt' | 'lastMessage' | 'engagementScore';
-type SortDirection = 'asc' | 'desc';
+type SortField = 'name' | 'vehicle' | 'status' | 'salesperson' | 'engagement' | 'messages' | 'lastMessage';
+type SortDirection = 'asc' | 'desc' | null;
 
 interface LeadsTableHeaderProps {
   leadsCount: number;
   selectedLeadsCount: number;
   searchTerm: string;
-  sortField: SortField;
+  sortField: SortField | null;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
-  onSelectAll: (checked: boolean) => void;
+  onSelectAll: () => void;
 }
 
-const SortIcon = ({ active, direction }: { active: boolean; direction: SortDirection }) => {
-  if (!active) return <ArrowUpDown className="w-4 h-4" />;
-  return direction === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />;
-};
-
-const LeadsTableHeader: React.FC<LeadsTableHeaderProps> = ({
+const LeadsTableHeader = ({
   leadsCount,
   selectedLeadsCount,
+  searchTerm,
   sortField,
   sortDirection,
   onSort,
-  onSelectAll,
-}) => (
-  <TableRow>
-    <TableHead className="w-12">
-      <Checkbox
-        checked={selectedLeadsCount === leadsCount && leadsCount > 0}
-        onCheckedChange={onSelectAll}
-      />
-    </TableHead>
-    <TableHead>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onSort('name')}
-        className="h-auto p-0 font-medium"
-      >
-        Name{" "}
-        <SortIcon active={sortField === 'name'} direction={sortDirection} />
-      </Button>
-    </TableHead>
-    <TableHead>Phone</TableHead>
-    <TableHead>Email</TableHead>
-    <TableHead>Vehicle Interest</TableHead>
-    <TableHead>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onSort('status')}
-        className="h-auto p-0 font-medium"
-      >
-        Status{" "}
-        <SortIcon active={sortField === 'status'} direction={sortDirection} />
-      </Button>
-    </TableHead>
-    <TableHead>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onSort('contactStatus')}
-        className="h-auto p-0 font-medium"
-      >
-        Contact{" "}
-        <SortIcon active={sortField === 'contactStatus'} direction={sortDirection} />
-      </Button>
-    </TableHead>
-    <TableHead>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onSort('engagementScore')}
-        className="h-auto p-0 font-medium"
-      >
-        Score{" "}
-        <SortIcon active={sortField === 'engagementScore'} direction={sortDirection} />
-      </Button>
-    </TableHead>
-    <TableHead>Finn AI</TableHead>
-    <TableHead>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onSort('lastMessage')}
-        className="h-auto p-0 font-medium"
-      >
-        Last Contact{" "}
-        <SortIcon active={sortField === 'lastMessage'} direction={sortDirection} />
-      </Button>
-    </TableHead>
-    <TableHead className="w-24">Actions</TableHead>
-  </TableRow>
-);
+  onSelectAll
+}: LeadsTableHeaderProps) => {
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 ml-1" />;
+    }
+    return sortDirection === 'asc' ? 
+      <ArrowUp className="w-4 h-4 ml-1" /> : 
+      <ArrowDown className="w-4 h-4 ml-1" />;
+  };
+
+  const isAllSelected = selectedLeadsCount > 0 && selectedLeadsCount === leadsCount;
+  const isIndeterminate = selectedLeadsCount > 0 && selectedLeadsCount < leadsCount;
+
+  return (
+    <TableRow>
+      <TableHead className="w-12">
+        <Checkbox
+          checked={isAllSelected}
+          ref={(el) => {
+            if (el) el.indeterminate = isIndeterminate;
+          }}
+          onCheckedChange={onSelectAll}
+        />
+      </TableHead>
+      
+      <TableHead>
+        <Button 
+          variant="ghost" 
+          className="font-semibold p-0 h-auto hover:bg-transparent"
+          onClick={() => onSort('name')}
+        >
+          Lead Information
+          {getSortIcon('name')}
+        </Button>
+      </TableHead>
+      
+      <TableHead>
+        <Button 
+          variant="ghost" 
+          className="font-semibold p-0 h-auto hover:bg-transparent"
+          onClick={() => onSort('vehicle')}
+        >
+          Vehicle Interest
+          {getSortIcon('vehicle')}
+        </Button>
+      </TableHead>
+      
+      <TableHead>
+        <Button 
+          variant="ghost" 
+          className="font-semibold p-0 h-auto hover:bg-transparent"
+          onClick={() => onSort('status')}
+        >
+          Status
+          {getSortIcon('status')}
+        </Button>
+      </TableHead>
+      
+      <TableHead>
+        <Button 
+          variant="ghost" 
+          className="font-semibold p-0 h-auto hover:bg-transparent"
+          onClick={() => onSort('salesperson')}
+        >
+          Salesperson
+          {getSortIcon('salesperson')}
+        </Button>
+      </TableHead>
+      
+      <TableHead>
+        <Button 
+          variant="ghost" 
+          className="font-semibold p-0 h-auto hover:bg-transparent"
+          onClick={() => onSort('engagement')}
+        >
+          Engagement
+          {getSortIcon('engagement')}
+        </Button>
+      </TableHead>
+      
+      <TableHead>AI Status</TableHead>
+      
+      <TableHead>
+        <Button 
+          variant="ghost" 
+          className="font-semibold p-0 h-auto hover:bg-transparent"
+          onClick={() => onSort('messages')}
+        >
+          Messages
+          {getSortIcon('messages')}
+        </Button>
+      </TableHead>
+      
+      <TableHead>
+        <Button 
+          variant="ghost" 
+          className="font-semibold p-0 h-auto hover:bg-transparent"
+          onClick={() => onSort('lastMessage')}
+        >
+          Last Message
+          {getSortIcon('lastMessage')}
+        </Button>
+      </TableHead>
+      
+      <TableHead>Actions</TableHead>
+    </TableRow>
+  );
+};
 
 export default LeadsTableHeader;

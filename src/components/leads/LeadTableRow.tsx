@@ -1,30 +1,16 @@
-import React from "react";
-import { TableRow, TableCell } from "@/components/ui/table";
+
+import React from 'react';
+import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import {
-  Eye,
-  MessageSquare,
-  Edit,
-  MoreHorizontal,
-  Phone,
-  Mail,
-  Star,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { formatPhoneForDisplay } from "@/utils/phoneUtils";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { MessageSquare, Phone, Eye, Calendar } from "lucide-react";
 import { Lead } from "@/types/lead";
 import LeadStatusBadge from "./LeadStatusBadge";
 import LeadContactStatusBadge from "./LeadContactStatusBadge";
 import LeadEngagementScore from "./LeadEngagementScore";
-import LeadActionsDropdown from "./LeadActionsDropdown";
+import AIStatusBadges from "./AIStatusBadges";
 
 interface LeadTableRowProps {
   lead: Lead;
@@ -38,7 +24,7 @@ interface LeadTableRowProps {
   getEngagementScore: (lead: Lead) => number;
 }
 
-const LeadTableRow: React.FC<LeadTableRowProps> = ({
+const LeadTableRow = ({
   lead,
   selected,
   onSelect,
@@ -47,120 +33,118 @@ const LeadTableRow: React.FC<LeadTableRowProps> = ({
   onQuickView,
   handleMessageClick,
   handleLeadClick,
-  getEngagementScore,
-}) => {
-  const getStatusBadge = (status: string) => {
-    const statusColors = {
-      'new': 'bg-blue-100 text-blue-800',
-      'engaged': 'bg-green-100 text-green-800',
-      'paused': 'bg-yellow-100 text-yellow-800',
-      'closed': 'bg-gray-100 text-gray-800',
-      'lost': 'bg-red-100 text-red-800'
-    };
-    return statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getContactStatusBadge = (contactStatus: string) => {
-    const contactColors = {
-      'no_contact': 'bg-gray-100 text-gray-800',
-      'contact_attempted': 'bg-yellow-100 text-yellow-800',
-      'response_received': 'bg-green-100 text-green-800'
-    };
-    return contactColors[contactStatus as keyof typeof contactColors] || 'bg-gray-100 text-gray-800';
-  };
-
-  const formatContactStatus = (status: string) => {
-    return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const engagementScore = getEngagementScore(lead);
-
+  getEngagementScore
+}: LeadTableRowProps) => {
   return (
-    <TableRow key={lead.id}>
-      <TableCell>
+    <TableRow 
+      className={`hover:bg-gray-50 cursor-pointer ${selected ? 'bg-blue-50' : ''}`}
+      onClick={() => handleLeadClick(lead.id)}
+    >
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <Checkbox
           checked={selected}
           onCheckedChange={() => onSelect(lead.id.toString())}
         />
       </TableCell>
+      
       <TableCell className="font-medium">
-        <div
-          className="cursor-pointer hover:text-blue-600 transition-colors"
-          onClick={() => handleLeadClick(lead.id)}
-        >
-          <div className="font-medium">{lead.firstName} {lead.lastName}</div>
-          {lead.middleName && (
-            <div className="text-xs text-muted-foreground">{lead.middleName}</div>
+        <div className="space-y-1">
+          <div>{lead.firstName} {lead.lastName}</div>
+          <div className="text-xs text-gray-500">{lead.primaryPhone}</div>
+          <div className="text-xs text-gray-500">{lead.email}</div>
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <div className="space-y-1">
+          <div className="font-medium">{lead.vehicleInterest}</div>
+          <div className="text-xs text-gray-500">{lead.source}</div>
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <div className="space-y-1">
+          <LeadStatusBadge status={lead.status} />
+          <LeadContactStatusBadge status={lead.contactStatus} />
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <div className="text-center">
+          <div className="font-medium">{lead.salesperson}</div>
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <LeadEngagementScore score={getEngagementScore(lead)} />
+      </TableCell>
+
+      <TableCell>
+        <div className="space-y-1">
+          <AIStatusBadges 
+            aiContactEnabled={lead.aiContactEnabled}
+            aiRepliesEnabled={lead.aiRepliesEnabled}
+          />
+          {canEdit && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <Switch
+                checked={lead.aiOptIn}
+                onCheckedChange={(value) => onAiOptInChange(lead.id, value)}
+                size="sm"
+              />
+            </div>
           )}
         </div>
       </TableCell>
+
       <TableCell>
-        <div className="flex items-center space-x-2">
-          <Phone className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm">
-            {lead.primaryPhone ? formatPhoneForDisplay(lead.primaryPhone) : 'No phone'}
-          </span>
-          {lead.phoneNumbers?.length > 1 && (
-            <Badge variant="secondary" className="text-xs">
-              +{lead.phoneNumbers.length - 1}
-            </Badge>
-          )}
-        </div>
-      </TableCell>
-      <TableCell>
-        {lead.email ? (
-          <div className="flex items-center space-x-2">
-            <Mail className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm truncate max-w-[200px]">{lead.email}</span>
-          </div>
-        ) : (
-          <span className="text-muted-foreground text-sm">No email</span>
-        )}
-      </TableCell>
-      <TableCell>
-        <span className="text-sm">{lead.vehicleInterest || 'Not specified'}</span>
-      </TableCell>
-      <TableCell>
-        <LeadStatusBadge status={lead.status} />
-      </TableCell>
-      <TableCell>
-        <div className="flex flex-col space-y-1">
-          <LeadContactStatusBadge contactStatus={lead.contactStatus} />
+        <div className="text-center">
+          <div className="font-medium">{lead.messageCount || 0}</div>
           {lead.unreadCount > 0 && (
             <Badge variant="destructive" className="text-xs">
-              {lead.unreadCount} unread
+              {lead.unreadCount} new
             </Badge>
           )}
         </div>
       </TableCell>
+
       <TableCell>
-        <LeadEngagementScore score={engagementScore} />
-      </TableCell>
-      <TableCell>
-        <Switch
-          checked={lead.aiOptIn}
-          onCheckedChange={(value) => onAiOptInChange(lead.id.toString(), value)}
-          disabled={!canEdit || lead.doNotCall}
-        />
-      </TableCell>
-      <TableCell>
-        <div className="text-xs text-muted-foreground">
-          {lead.lastMessageTime || 'Never'}
+        <div className="text-sm text-gray-600">
+          {lead.lastMessage ? (
+            <div>
+              <div className="truncate max-w-32">{lead.lastMessage}</div>
+              <div className="text-xs text-gray-500">{lead.lastMessageTime}</div>
+            </div>
+          ) : (
+            <span className="text-gray-400">No messages</span>
+          )}
         </div>
       </TableCell>
-      <TableCell>
-        <LeadActionsDropdown
-          lead={lead}
-          canEdit={canEdit}
-          onQuickView={onQuickView}
-          handleMessageClick={handleMessageClick}
-        />
+
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <div className="flex space-x-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleMessageClick(lead)}
+          >
+            <MessageSquare className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.open(`tel:${lead.primaryPhone}`)}
+          >
+            <Phone className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onQuickView(lead)}
+          >
+            <Eye className="w-4 h-4" />
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   );

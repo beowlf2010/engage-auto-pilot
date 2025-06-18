@@ -1,5 +1,4 @@
 
-
 export interface PhoneNumber {
   id: string;
   number: string;
@@ -29,6 +28,8 @@ export interface Lead {
   salesperson: string;
   salespersonId: string;
   aiOptIn: boolean;
+  aiContactEnabled?: boolean; // New field for proactive contact AI
+  aiRepliesEnabled?: boolean; // New field for auto-reply AI
   aiStage?: string;
   nextAiSendAt?: string;
   createdAt: string;
@@ -58,4 +59,3 @@ export interface Lead {
   last_name: string;
   created_at: string;
 }
-

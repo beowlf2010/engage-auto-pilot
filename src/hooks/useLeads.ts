@@ -128,6 +128,8 @@ export const useLeads = () => {
           salesperson: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : 'Unassigned',
           salespersonId: lead.salesperson_id,
           aiOptIn: lead.ai_opt_in || false,
+          aiContactEnabled: lead.ai_contact_enabled || false,
+          aiRepliesEnabled: lead.ai_replies_enabled || false,
           aiStage: lead.ai_stage,
           nextAiSendAt: lead.next_ai_send_at,
           createdAt: lead.created_at,
@@ -147,7 +149,11 @@ export const useLeads = () => {
           aiLastMessageStage: lead.ai_last_message_stage,
           aiSequencePaused: lead.ai_sequence_paused || false,
           aiPauseReason: lead.ai_pause_reason,
-          aiResumeAt: lead.ai_resume_at
+          aiResumeAt: lead.ai_resume_at,
+          // Required properties for compatibility
+          first_name: lead.first_name,
+          last_name: lead.last_name,
+          created_at: lead.created_at
         };
       }) || [];
 
