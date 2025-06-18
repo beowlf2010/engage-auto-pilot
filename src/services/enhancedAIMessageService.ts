@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -143,9 +142,11 @@ export const trackLeadResponse = async (leadId: string, responseData: any) => {
   }
 };
 
-export const scheduleEnhancedAIMessages = async () => {
+export const scheduleEnhancedAIMessages = async (leadId?: string) => {
   try {
-    const { data, error } = await supabase.functions.invoke('ai-automation');
+    const { data, error } = await supabase.functions.invoke('ai-automation', {
+      body: leadId ? { leadId } : {}
+    });
     if (error) throw error;
     return data;
   } catch (error) {
