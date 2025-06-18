@@ -3,6 +3,18 @@ import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RealtimeCallbacks } from '@/types/realtime';
 
+// Define types for payload data
+interface ConversationPayload {
+  lead_id?: string;
+  [key: string]: any;
+}
+
+interface RealtimePayload {
+  eventType: string;
+  new?: ConversationPayload;
+  old?: ConversationPayload;
+}
+
 export const useCentralizedRealtime = (callbacks: RealtimeCallbacks) => {
   const channelRef = useRef<any>(null);
   const callbacksRef = useRef(callbacks);
@@ -35,16 +47,16 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks) => {
           schema: 'public',
           table: 'conversations'
         },
-        (payload) => {
-          console.log('📬 Realtime: Conversation change detected', payload.eventType, payload.new?.lead_id || payload.old?.lead_id);
+        (payload: RealtimePayload) => {
+          const leadId = payload.new?.lead_id || payload.old?.lead_id;
+          console.log('📬 Realtime: Conversation change detected', payload.eventType, leadId);
           
           // Immediate callback execution for instant UI updates
           if (callbacksRef.current.onConversationUpdate) {
             setTimeout(() => callbacksRef.current.onConversationUpdate?.(), 0);
           }
           
-          if (callbacksRef.current.onMessageUpdate && (payload.new?.lead_id || payload.old?.lead_id)) {
-            const leadId = payload.new?.lead_id || payload.old?.lead_id;
+          if (callbacksRef.current.onMessageUpdate && leadId) {
             setTimeout(() => callbacksRef.current.onMessageUpdate?.(leadId), 0);
           }
         }
@@ -58,8 +70,9 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks) => {
           schema: 'public',
           table: 'leads'
         },
-        (payload) => {
-          console.log('👤 Realtime: Lead update detected', payload.new?.id);
+        (payload: RealtimePayload) => {
+          const leadId = payload.new?.id;
+          console.log('👤 Realtime: Lead update detected', leadId);
           
           // Immediate unread count refresh
           if (callbacksRef.current.onUnreadCountUpdate) {
