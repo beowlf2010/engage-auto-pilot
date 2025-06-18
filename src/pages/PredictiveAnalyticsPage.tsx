@@ -1,7 +1,7 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import StreamlinedNavigation from "@/components/StreamlinedNavigation";
-import { PredictiveAnalyticsOverview } from "@/components/predictive/PredictiveAnalyticsOverview";
+import PredictiveAnalyticsOverview from "@/components/predictive/PredictiveAnalyticsOverview";
 import { Navigate } from "react-router-dom";
 
 const PredictiveAnalyticsPage = () => {

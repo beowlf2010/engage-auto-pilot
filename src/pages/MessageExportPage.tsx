@@ -1,7 +1,7 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import StreamlinedNavigation from "@/components/StreamlinedNavigation";
-import { MessageExportImport } from "@/components/messaging/MessageExportImport";
+import MessageExportImport from "@/components/messaging/MessageExportImport";
 import { Navigate } from "react-router-dom";
 
 const MessageExportPage = () => {
