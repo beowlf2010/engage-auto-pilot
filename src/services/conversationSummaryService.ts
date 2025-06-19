@@ -29,6 +29,8 @@ const parseJsonArray = (jsonValue: Json | null | undefined): string[] => {
 // Generate conversation summary using AI
 export const generateConversationSummary = async (leadId: string): Promise<ConversationSummary | null> => {
   try {
+    console.log(`📊 [CONVERSATION SUMMARY] Generating summary for lead ${leadId}`);
+
     // Get all messages for the lead
     const { data: messages, error } = await supabase
       .from('conversations')
@@ -37,9 +39,11 @@ export const generateConversationSummary = async (leadId: string): Promise<Conve
       .order('sent_at', { ascending: true });
 
     if (error || !messages || messages.length === 0) {
-      console.error('Error fetching messages:', error);
+      console.error('❌ [CONVERSATION SUMMARY] Error fetching messages:', error);
       return null;
     }
+
+    console.log(`📝 [CONVERSATION SUMMARY] Found ${messages.length} messages to analyze`);
 
     // Call AI service to generate summary
     const { data: aiResponse, error: aiError } = await supabase.functions.invoke('analyze-conversation', {
@@ -54,45 +58,79 @@ export const generateConversationSummary = async (leadId: string): Promise<Conve
     });
 
     if (aiError) {
-      console.error('Error generating summary:', aiError);
+      console.error('❌ [CONVERSATION SUMMARY] Error generating summary:', aiError);
       return null;
     }
 
     const { summary, keyPoints } = aiResponse;
+    console.log(`✨ [CONVERSATION SUMMARY] AI generated summary: "${summary?.substring(0, 50)}..."`);
 
-    // Store or update summary in database
-    const { data: summaryData, error: summaryError } = await supabase
+    // Check if summary already exists for this lead
+    const { data: existingSummary } = await supabase
       .from('conversation_summaries')
-      .upsert({
-        lead_id: leadId,
-        summary_text: summary,
-        key_points: keyPoints,
-        message_count: messages.length,
-        last_message_at: messages[messages.length - 1].sent_at,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'lead_id'
-      })
-      .select()
+      .select('*')
+      .eq('lead_id', leadId)
       .single();
 
-    if (summaryError) {
-      console.error('Error storing summary:', summaryError);
-      return null;
+    const summaryData = {
+      lead_id: leadId,
+      summary_text: summary,
+      key_points: keyPoints,
+      message_count: messages.length,
+      last_message_at: messages[messages.length - 1].sent_at,
+      updated_at: new Date().toISOString()
+    };
+
+    let result;
+
+    if (existingSummary) {
+      // Update existing summary
+      console.log(`🔄 [CONVERSATION SUMMARY] Updating existing summary for lead ${leadId}`);
+      const { data, error: updateError } = await supabase
+        .from('conversation_summaries')
+        .update(summaryData)
+        .eq('lead_id', leadId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('❌ [CONVERSATION SUMMARY] Error updating summary:', updateError);
+        return null;
+      }
+      result = data;
+    } else {
+      // Create new summary
+      console.log(`✨ [CONVERSATION SUMMARY] Creating new summary for lead ${leadId}`);
+      const { data, error: insertError } = await supabase
+        .from('conversation_summaries')
+        .insert({
+          ...summaryData,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('❌ [CONVERSATION SUMMARY] Error creating summary:', insertError);
+        return null;
+      }
+      result = data;
     }
 
+    console.log(`✅ [CONVERSATION SUMMARY] Successfully saved summary for lead ${leadId}`);
+
     return {
-      id: summaryData.id,
-      leadId: summaryData.lead_id,
-      summaryText: summaryData.summary_text,
-      keyPoints: parseJsonArray(summaryData.key_points),
-      messageCount: summaryData.message_count,
-      lastMessageAt: summaryData.last_message_at,
-      createdAt: summaryData.created_at,
-      updatedAt: summaryData.updated_at
+      id: result.id,
+      leadId: result.lead_id,
+      summaryText: result.summary_text,
+      keyPoints: parseJsonArray(result.key_points),
+      messageCount: result.message_count,
+      lastMessageAt: result.last_message_at,
+      createdAt: result.created_at,
+      updatedAt: result.updated_at
     };
   } catch (error) {
-    console.error('Error in generateConversationSummary:', error);
+    console.error('❌ [CONVERSATION SUMMARY] Error in generateConversationSummary:', error);
     return null;
   }
 };
@@ -100,6 +138,8 @@ export const generateConversationSummary = async (leadId: string): Promise<Conve
 // Get existing conversation summary
 export const getConversationSummary = async (leadId: string): Promise<ConversationSummary | null> => {
   try {
+    console.log(`📖 [CONVERSATION SUMMARY] Getting existing summary for lead ${leadId}`);
+
     const { data, error } = await supabase
       .from('conversation_summaries')
       .select('*')
@@ -107,8 +147,11 @@ export const getConversationSummary = async (leadId: string): Promise<Conversati
       .single();
 
     if (error || !data) {
+      console.log(`ℹ️ [CONVERSATION SUMMARY] No existing summary found for lead ${leadId}`);
       return null;
     }
+
+    console.log(`✅ [CONVERSATION SUMMARY] Found existing summary for lead ${leadId}`);
 
     return {
       id: data.id,
@@ -121,7 +164,7 @@ export const getConversationSummary = async (leadId: string): Promise<Conversati
       updatedAt: data.updated_at
     };
   } catch (error) {
-    console.error('Error getting conversation summary:', error);
+    console.error('❌ [CONVERSATION SUMMARY] Error getting conversation summary:', error);
     return null;
   }
 };
