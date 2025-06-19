@@ -121,19 +121,13 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       // Detect duplicates
       const duplicateResult = await vehicleHistoryService.detectDuplicates(uploadRecord.id);
 
-      // Update upload history with enhanced results
+      // Update upload history with enhanced results (without metadata field)
       await updateUploadHistory(uploadRecord.id, {
         total_rows: parsed.rows.length,
         successful_imports: validationResult.successCount,
         failed_imports: validationResult.errorCount,
         processing_status: 'completed',
-        error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined,
-        metadata: {
-          reportType: detection.reportType,
-          confidence: detection.confidence,
-          duplicatesDetected: duplicateResult.duplicateCount,
-          vehicleHistoryEntries: inventoryItems.length
-        }
+        error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
       });
 
       // Trigger sync for actual inventory (not preliminary data)

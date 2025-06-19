@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, AlertTriangle, Timeline, Database } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, Clock, Database } from "lucide-react";
 import type { EnhancedBatchUploadResult } from "@/hooks/useEnhancedMultiFileUpload";
 
 interface EnhancedBatchUploadResultProps {
@@ -67,7 +67,7 @@ const EnhancedBatchUploadResult = ({ result }: EnhancedBatchUploadResultProps) =
         {/* File Results */}
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-800 flex items-center space-x-2">
-            <Timeline className="w-4 h-4" />
+            <Clock className="w-4 h-4" />
             <span>File Processing Details</span>
           </h3>
           

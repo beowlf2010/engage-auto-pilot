@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { History, Package, BarChart3, Trash2, Globe, Timeline } from "lucide-react";
+import { History, Package, BarChart3, Trash2, Globe, Clock } from "lucide-react";
 import { useInventoryUpload } from "@/hooks/useInventoryUpload";
 import { useEnhancedMultiFileUpload } from "@/hooks/useEnhancedMultiFileUpload";
 import { Link } from "react-router-dom";
@@ -151,7 +151,7 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
             </Button>
           </Link>
           <Button onClick={() => setShowHistory(true)} variant="outline" className="flex items-center space-x-2">
-            <Timeline className="w-4 h-4" />
+            <Clock className="w-4 h-4" />
             <span>Vehicle History</span>
           </Button>
         </div>

@@ -62,7 +62,7 @@ export class VehicleHistoryService {
       status: vehicle.status,
       history_type: this.determineHistoryType(sourceReport),
       source_report: sourceReport,
-      source_data: vehicle,
+      source_data: JSON.parse(JSON.stringify(vehicle)), // Convert to plain object
       upload_history_id: uploadHistoryId
     }));
 
@@ -104,7 +104,7 @@ export class VehicleHistoryService {
             p_year: vehicle.year,
             p_status: vehicle.status,
             p_source_report: sourceReport,
-            p_data: vehicle
+            p_data: JSON.parse(JSON.stringify(vehicle)) // Convert to plain object
           });
 
         if (error) {
@@ -178,7 +178,11 @@ export class VehicleHistoryService {
       throw error;
     }
 
-    return data || [];
+    // Transform the data to match our interface with proper type casting
+    return (data || []).map(item => ({
+      ...item,
+      history_type: item.history_type as 'order' | 'inventory' | 'sale' | 'update'
+    }));
   }
 
   async getVehicleMasterRecord(vehicleId: string): Promise<VehicleMasterRecord | null> {
