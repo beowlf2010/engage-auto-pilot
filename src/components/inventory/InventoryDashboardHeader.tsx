@@ -51,7 +51,7 @@ const InventoryDashboardHeader = () => {
               <Package className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-sm font-medium text-blue-700">Total Inventory</p>
+              <p className="text-sm font-medium text-blue-700">Total Active Vehicles</p>
               <p className="text-2xl font-bold text-blue-900">
                 {isLoading ? "..." : formatNumber(stats?.totalVehicles)}
               </p>
@@ -65,10 +65,11 @@ const InventoryDashboardHeader = () => {
               <TrendingUp className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-sm font-medium text-green-700">Available</p>
+              <p className="text-sm font-medium text-green-700">GM Global Orders</p>
               <p className="text-2xl font-bold text-green-900">
-                {isLoading ? "..." : formatNumber(stats?.availableVehicles)}
+                {isLoading ? "..." : formatNumber(stats?.newVehicles.total)}
               </p>
+              <p className="text-xs text-green-600">All new vehicles</p>
             </div>
           </div>
         </Card>
@@ -79,9 +80,9 @@ const InventoryDashboardHeader = () => {
               <AlertCircle className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-sm font-medium text-yellow-700">Aging (60+ days)</p>
+              <p className="text-sm font-medium text-yellow-700">Used Available</p>
               <p className="text-2xl font-bold text-yellow-900">
-                {isLoading ? "..." : Math.round((stats?.averageDaysInStock || 0) > 60 ? (stats?.availableVehicles || 0) * 0.15 : 0)}
+                {isLoading ? "..." : formatNumber(stats?.usedVehicles.available)}
               </p>
             </div>
           </div>

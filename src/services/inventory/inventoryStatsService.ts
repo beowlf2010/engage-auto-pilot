@@ -16,7 +16,7 @@ export interface InventoryStats {
       inProduction: number; // 2500-3799
       placed: number; // 2000-2499
     };
-    regularNew: number;
+    regularNew: number; // Should always be 0 now
   };
   // Used vehicle stats
   usedVehicles: {
@@ -49,7 +49,7 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
     // Log detailed breakdown for debugging
     await logDetailedInventoryBreakdown();
 
-    // Get vehicle counts
+    // Get vehicle counts (now corrected to avoid double counting)
     const vehicleCounts = await getVehicleCounts();
 
     // Get GM Global order counts
@@ -60,19 +60,25 @@ export const getInventoryStats = async (): Promise<InventoryStats> => {
     const usedVehicleStats = await getUsedVehiclePricing();
     const overallStats = getCombinedPricing(newVehicleStats, usedVehicleStats);
 
-    // Calculate totals
-    const totalNewAvailable = vehicleCounts.regularNewAvailable + gmGlobalByStatus.available;
-    const totalNewVehicles = vehicleCounts.regularNewTotal + gmGlobalData.length;
+    // CORRECTED: All new vehicles are GM Global orders, no double counting
+    const totalNewVehicles = gmGlobalData.length; // This is the correct count
+    const totalNewAvailable = gmGlobalByStatus.available;
     const totalAvailable = totalNewAvailable + vehicleCounts.usedAvailable;
     const totalInProductionTransit = gmGlobalByStatus.inProduction + gmGlobalByStatus.inTransit + gmGlobalByStatus.placed;
 
+    console.log('=== CORRECTED INVENTORY STATS ===');
+    console.log('Total GM Global orders (all new vehicles):', totalNewVehicles);
+    console.log('Total available new vehicles:', totalNewAvailable);
+    console.log('Total available used vehicles:', vehicleCounts.usedAvailable);
+    console.log('CORRECTED total vehicles:', vehicleCounts.totalVehicles);
+
     return {
-      totalVehicles: vehicleCounts.totalVehicles,
+      totalVehicles: vehicleCounts.totalVehicles, // This is now correct
       newVehicles: {
         total: totalNewVehicles,
         available: totalNewAvailable,
         gmGlobalByStatus,
-        regularNew: vehicleCounts.regularNewAvailable,
+        regularNew: 0, // Always 0 since all new vehicles are GM Global
       },
       usedVehicles: {
         total: vehicleCounts.usedTotal,
