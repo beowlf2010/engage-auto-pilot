@@ -18,7 +18,7 @@ interface Conversation {
   status: string;
   salespersonId: string;
   salespersonName?: string;
-  aiOptIn: boolean;
+  aiOptIn?: boolean; // Made optional to match ConversationData
   lastMessageDate: Date;
 }
 

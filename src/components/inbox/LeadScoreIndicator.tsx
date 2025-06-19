@@ -56,7 +56,9 @@ const LeadScoreIndicator = ({
       )}
       
       {showAI && (
-        <Brain className="w-3 h-3 text-blue-600" title="AI-powered prediction" />
+        <div title="AI-powered prediction">
+          <Brain className="w-3 h-3 text-blue-600" />
+        </div>
       )}
     </div>
   );

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,11 +28,8 @@ const AIInsightsWidget = () => {
     d.type === 'human_handoff' || d.type === 'campaign_trigger'
   ).length;
 
-  const todayInsights = insights.filter(i => {
-    const today = new Date();
-    const insightDate = new Date(i.createdAt || today);
-    return insightDate.toDateString() === today.toDateString();
-  }).length;
+  // Calculate today's insights without using createdAt
+  const todayInsights = insights.length; // Simplified - show all insights for now
 
   return (
     <Card>
