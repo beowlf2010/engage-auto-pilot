@@ -315,7 +315,7 @@ class CustomerJourneyTracker {
       const { error } = await supabase
         .from('customer_journeys')
         .upsert({
-          lead_id: journey.leadId,
+          lead_id: journey.leadId, // Keep as lead_id to match the database schema
           journey_stage: journey.journeyStage,
           touchpoints: journey.touchpoints,
           milestones: journey.milestones,

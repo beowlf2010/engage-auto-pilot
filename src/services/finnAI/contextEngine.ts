@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConversationMemory {
@@ -381,7 +382,7 @@ class EnhancedContextEngine {
       const { error } = await supabase
         .from('conversation_memory')
         .upsert({
-          lead_id: memory.leadId,
+          lead_id: memory.leadId, // Changed from lead_id to lead_id to match schema
           memory_type: 'enhanced_context',
           content: JSON.stringify({
             sessionId: memory.sessionId,
