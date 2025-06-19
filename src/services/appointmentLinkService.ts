@@ -39,19 +39,88 @@ export const appointmentLinkService = {
     }
   },
 
-  // Generate appointment message templates with booking links
-  generateAppointmentMessage(appointmentLink: string, leadName: string, vehicleInterest?: string): string {
-    const templates = [
-      `Hi ${leadName}! I'd love to help you with ${vehicleInterest || 'your vehicle search'}. Would you like to schedule a time to meet? You can book an appointment here: ${appointmentLink}`,
+  // ENHANCED: Context-aware appointment message generation
+  generateContextualAppointmentMessage(
+    appointmentLink: string, 
+    leadName: string, 
+    vehicleInterest?: string, 
+    intentType: string = 'general',
+    confidence: number = 0.5
+  ): string {
+    const vehicle = vehicleInterest || 'the vehicle you\'re interested in';
+    
+    // More assertive templates based on context
+    const assertiveTemplates = {
+      conversation_ending: [
+        `Perfect! Let's lock in a time for you to see ${vehicle} in person. I have openings this week - book your preferred time here: ${appointmentLink}`,
+        `Great! Since you're ready to move forward, let's schedule your visit. Pick a time that works for you: ${appointmentLink}`,
+        `Excellent! Let's get you behind the wheel of ${vehicle}. Choose your appointment time here: ${appointmentLink}`
+      ],
       
-      `${leadName}, I can answer any questions about ${vehicleInterest || 'our vehicles'} in person! Feel free to schedule a convenient time: ${appointmentLink}`,
+      interested_but_stalling: [
+        `I can tell you're interested in ${vehicle}! Let's schedule a test drive so you can experience it firsthand. Book here: ${appointmentLink}`,
+        `Since you like what you're hearing about ${vehicle}, let's set up a time to see it. Schedule your visit: ${appointmentLink}`,
+        `You seem excited about ${vehicle}! Let's turn that interest into action - book your test drive: ${appointmentLink}`
+      ],
       
-      `Great to hear from you, ${leadName}! Let's set up a time to discuss ${vehicleInterest || 'your vehicle needs'} in detail. Book here: ${appointmentLink}`,
+      conversation_stalling: [
+        `${leadName}, let's take the next step! I'd love to show you ${vehicle} in person. Book your appointment here: ${appointmentLink}`,
+        `Ready to see ${vehicle} up close? Let's schedule your visit this week: ${appointmentLink}`,
+        `Time to move forward! Let's get you scheduled to see ${vehicle}. Pick your time: ${appointmentLink}`
+      ],
       
-      `${leadName}, I'm here to help with ${vehicleInterest || 'finding the right vehicle'}! When would be a good time to meet? Schedule here: ${appointmentLink}`
+      test_drive: [
+        `Absolutely! Let's get you scheduled for that test drive of ${vehicle}. Choose your time here: ${appointmentLink}`,
+        `Perfect timing for a test drive! Book your appointment to experience ${vehicle}: ${appointmentLink}`,
+        `Let's make it happen! Schedule your test drive of ${vehicle} here: ${appointmentLink}`
+      ],
+      
+      consultation: [
+        `Great idea! Let's schedule that consultation about ${vehicle}. Book your appointment: ${appointmentLink}`,
+        `Perfect! Let's set up your consultation. Choose a convenient time: ${appointmentLink}`,
+        `Excellent! Book your consultation time here: ${appointmentLink}`
+      ],
+      
+      visit: [
+        `Wonderful! Let's get you scheduled to visit and see ${vehicle}. Book here: ${appointmentLink}`,
+        `Perfect! Schedule your visit to see ${vehicle} in person: ${appointmentLink}`,
+        `Great! Let's set up your visit. Choose your time: ${appointmentLink}`
+      ]
+    };
+
+    // Fallback assertive templates for high confidence scenarios
+    const highConfidenceTemplates = [
+      `${leadName}, you're clearly interested in ${vehicle}! Let's schedule your test drive this week: ${appointmentLink}`,
+      `Time to take action on ${vehicle}! Book your appointment and let's make this happen: ${appointmentLink}`,
+      `Ready to move forward with ${vehicle}? Let's get you scheduled: ${appointmentLink}`,
+      `Don't wait - let's get you in to see ${vehicle}! Schedule here: ${appointmentLink}`
     ];
+
+    // Medium confidence templates 
+    const mediumConfidenceTemplates = [
+      `I'd love to show you ${vehicle} in person, ${leadName}. When works best for you? Book here: ${appointmentLink}`,
+      `Let's schedule a time for you to see ${vehicle}. Choose your preferred appointment: ${appointmentLink}`,
+      `Ready to take the next step with ${vehicle}? Schedule your visit: ${appointmentLink}`,
+      `Let's get you in to experience ${vehicle}! Book your appointment: ${appointmentLink}`
+    ];
+
+    // Select appropriate template based on context and confidence
+    let templates;
+    
+    if (assertiveTemplates[intentType as keyof typeof assertiveTemplates]) {
+      templates = assertiveTemplates[intentType as keyof typeof assertiveTemplates];
+    } else if (confidence > 0.6) {
+      templates = highConfidenceTemplates;
+    } else {
+      templates = mediumConfidenceTemplates;
+    }
 
     // Return a random template for variety
     return templates[Math.floor(Math.random() * templates.length)];
+  },
+
+  // Generate appointment message templates with booking links
+  generateAppointmentMessage(appointmentLink: string, leadName: string, vehicleInterest?: string): string {
+    return this.generateContextualAppointmentMessage(appointmentLink, leadName, vehicleInterest, 'general', 0.5);
   }
 };
