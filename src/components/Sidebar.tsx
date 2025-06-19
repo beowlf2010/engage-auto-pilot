@@ -1,18 +1,29 @@
+
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/components/auth/AuthProvider";
+import AutoVantageLogo from "@/components/navigation/AutoVantageLogo";
 import { 
-  MessageSquare, 
-  Users, 
-  Settings, 
-  BarChart3, 
-  Upload,
+  LayoutDashboard,
+  Users,
+  Mail,
   Package,
   Car,
   DollarSign,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Upload,
+  Brain,
+  Eye,
+  BarChart3,
+  TrendingUp,
+  Settings,
+  Shield,
+  MessageSquare,
+  Palette,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,16 +44,24 @@ interface SidebarProps {
 
 const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [inventoryExpanded, setInventoryExpanded] = useState(true);
-  const [financialExpanded, setFinancialExpanded] = useState(true);
+  const [analyticsExpanded, setAnalyticsExpanded] = useState(true);
+  const [toolsExpanded, setToolsExpanded] = useState(false);
 
   const isManagerOrAdmin = ["manager", "admin"].includes(user.role);
 
-  const navigationItems = [
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
+  const primaryNavigationItems = [
     {
       id: "dashboard",
       label: "Dashboard",
-      icon: BarChart3,
+      icon: LayoutDashboard,
       href: "/dashboard",
       badge: null
     },
@@ -55,36 +74,26 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
     },
     {
       id: "inbox",
-      label: "Inbox",
-      icon: MessageSquare,
-      href: "/inbox",
+      label: "Smart Inbox",
+      icon: Mail,
+      href: "/smart-inbox",
       badge: unreadCount > 0 ? unreadCount : null
-    }
-  ];
-
-  const managerItems = [
-    {
-      id: "upload-leads",
-      label: "Upload Leads",
-      icon: Upload,
-      href: "/upload-leads",
-      badge: null
     }
   ];
 
   const inventoryItems = [
     {
       id: "inventory-dashboard",
-      label: "Dashboard",
+      label: "Inventory Dashboard",
       icon: BarChart3,
       href: "/inventory-dashboard",
       badge: null
     },
     {
-      id: "inventory-upload",
+      id: "upload-inventory",
       label: "Upload Inventory",
       icon: Upload,
-      href: "/inventory-upload",
+      href: "/upload-inventory",
       badge: null,
       managerOnly: true
     },
@@ -97,7 +106,7 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
     }
   ];
 
-  const financialItems = [
+  const analyticsItems = [
     {
       id: "financial-dashboard",
       label: "Financial Dashboard",
@@ -105,13 +114,83 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
       href: "/financial-dashboard",
       badge: null,
       managerOnly: true
+    },
+    {
+      id: "ai-monitor",
+      label: "AI Monitor",
+      icon: Eye,
+      href: "/ai-monitor",
+      badge: null,
+      managerOnly: true
+    },
+    {
+      id: "sales-dashboard",
+      label: "Sales Dashboard",
+      icon: TrendingUp,
+      href: "/sales-dashboard",
+      badge: null
+    },
+    {
+      id: "analytics",
+      label: "Analytics",
+      icon: BarChart3,
+      href: "/analytics",
+      badge: null,
+      managerOnly: true
     }
   ];
 
+  const toolsItems = [
+    {
+      id: "predictive-analytics",
+      label: "Predictive Analytics",
+      icon: Brain,
+      href: "/predictive-analytics",
+      badge: null,
+      managerOnly: true
+    },
+    {
+      id: "message-export",
+      label: "Message Export",
+      icon: Upload,
+      href: "/message-export",
+      badge: "New",
+      managerOnly: true
+    },
+    {
+      id: "personalization",
+      label: "Personalization",
+      icon: Palette,
+      href: "/personalization",
+      badge: null,
+      managerOnly: true
+    }
+  ];
+
+  const adminItems = isManagerOrAdmin ? [
+    {
+      id: "admin-dashboard",
+      label: "Admin Dashboard",
+      icon: Shield,
+      href: "/admin-dashboard",
+      badge: null,
+      adminOnly: true
+    },
+    {
+      id: "manager-dashboard",
+      label: "Manager Dashboard",
+      icon: BarChart3,
+      href: "/manager-dashboard",
+      badge: null
+    }
+  ] : [];
+
   const renderNavItem = (item: any, isSubItem = false) => {
     if (item.managerOnly && !isManagerOrAdmin) return null;
+    if (item.adminOnly && user.role !== 'admin') return null;
 
-    const isActive = location.pathname === item.href;
+    const isActive = location.pathname === item.href || 
+      (item.href === '/inventory-dashboard' && location.pathname.startsWith('/inventory'));
     
     return (
       <Link
@@ -131,7 +210,9 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
           <span>{item.label}</span>
         </div>
         {item.badge && (
-          <Badge variant="secondary" className="bg-red-100 text-red-700">
+          <Badge variant="secondary" className={cn(
+            item.badge === "New" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+          )}>
             {item.badge}
           </Badge>
         )}
@@ -139,72 +220,69 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
     );
   };
 
+  const renderSection = (title: string, items: any[], expanded: boolean, onToggle: () => void, icon: any) => {
+    const Icon = icon;
+    return (
+      <div className="pt-4">
+        <Button
+          variant="ghost"
+          className="w-full justify-between px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+          onClick={onToggle}
+        >
+          <div className="flex items-center space-x-3">
+            <Icon className="w-4 h-4" />
+            <span>{title}</span>
+          </div>
+          {expanded ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+        </Button>
+        {expanded && (
+          <div className="mt-1 space-y-1">
+            {items.map(item => renderNavItem(item, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen">
       {/* Header */}
       <div className="p-6 border-b border-slate-200">
-        <h2 className="text-xl font-bold text-slate-800">CRM Dashboard</h2>
-        <p className="text-sm text-slate-600 mt-1">
-          {user.firstName} {user.lastName}
-        </p>
-        <p className="text-xs text-slate-500 capitalize">{user.role}</p>
+        <AutoVantageLogo />
+        <div className="mt-4">
+          <p className="text-sm font-medium text-slate-800">
+            {user.firstName} {user.lastName}
+          </p>
+          <p className="text-xs text-slate-500 capitalize">{user.role}</p>
+        </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {/* Main Navigation */}
+        {/* Primary Navigation */}
         <div className="space-y-1">
-          {navigationItems.map(item => renderNavItem(item))}
-          {isManagerOrAdmin && managerItems.map(item => renderNavItem(item))}
+          {primaryNavigationItems.map(item => renderNavItem(item))}
         </div>
 
         {/* Inventory Section */}
-        <div className="pt-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-between px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-            onClick={() => setInventoryExpanded(!inventoryExpanded)}
-          >
-            <div className="flex items-center space-x-3">
-              <Package className="w-4 h-4" />
-              <span>Inventory</span>
-            </div>
-            {inventoryExpanded ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-          </Button>
-          {inventoryExpanded && (
-            <div className="mt-1 space-y-1">
-              {inventoryItems.map(item => renderNavItem(item, true))}
-            </div>
-          )}
-        </div>
+        {renderSection("Inventory", inventoryItems, inventoryExpanded, () => setInventoryExpanded(!inventoryExpanded), Package)}
 
-        {/* Financial Section - Manager/Admin Only */}
-        {isManagerOrAdmin && (
-          <div className="pt-4">
-            <Button
-              variant="ghost"
-              className="w-full justify-between px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-              onClick={() => setFinancialExpanded(!financialExpanded)}
-            >
-              <div className="flex items-center space-x-3">
-                <DollarSign className="w-4 h-4" />
-                <span>Financial</span>
-              </div>
-              {financialExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-            </Button>
-            {financialExpanded && (
-              <div className="mt-1 space-y-1">
-                {financialItems.map(item => renderNavItem(item, true))}
-              </div>
-            )}
+        {/* Analytics Section */}
+        {renderSection("Analytics", analyticsItems, analyticsExpanded, () => setAnalyticsExpanded(!analyticsExpanded), BarChart3)}
+
+        {/* Tools Section - Manager/Admin Only */}
+        {isManagerOrAdmin && renderSection("Tools", toolsItems, toolsExpanded, () => setToolsExpanded(!toolsExpanded), Brain)}
+
+        {/* Admin Items */}
+        {adminItems.length > 0 && (
+          <div className="pt-4 border-t border-slate-200">
+            <div className="space-y-1">
+              {adminItems.map(item => renderNavItem(item))}
+            </div>
           </div>
         )}
 
@@ -224,6 +302,18 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
           </Link>
         </div>
       </nav>
+
+      {/* Sign Out */}
+      <div className="p-4 border-t border-slate-200">
+        <Button
+          variant="ghost"
+          onClick={handleSignOut}
+          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+        >
+          <LogOut className="w-4 h-4 mr-3" />
+          Sign Out
+        </Button>
+      </div>
     </div>
   );
 };
