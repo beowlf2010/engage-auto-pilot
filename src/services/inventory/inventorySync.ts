@@ -18,7 +18,7 @@ export const syncInventoryData = async (uploadId: string) => {
     // Check if this is a GM Global upload (should not trigger cleanup)
     const { data: uploadInfo, error: uploadError } = await supabase
       .from('upload_history')
-      .select('file_name, file_type')
+      .select('original_filename, upload_type')
       .eq('id', uploadId)
       .single();
 
@@ -26,12 +26,12 @@ export const syncInventoryData = async (uploadId: string) => {
       console.warn('Could not fetch upload info:', uploadError);
     }
 
-    const isGMGlobalUpload = uploadInfo?.file_name?.toLowerCase().includes('gm') || 
-                            uploadInfo?.file_name?.toLowerCase().includes('global') ||
-                            uploadInfo?.file_name?.toLowerCase().includes('order');
+    const isGMGlobalUpload = uploadInfo?.original_filename?.toLowerCase().includes('gm') || 
+                            uploadInfo?.original_filename?.toLowerCase().includes('global') ||
+                            uploadInfo?.original_filename?.toLowerCase().includes('order');
 
-    const isPreliminaryData = uploadInfo?.file_name?.toLowerCase().includes('preliminary') || 
-                              uploadInfo?.file_name?.toLowerCase().includes('prelim');
+    const isPreliminaryData = uploadInfo?.original_filename?.toLowerCase().includes('preliminary') || 
+                              uploadInfo?.original_filename?.toLowerCase().includes('prelim');
 
     // Update leads count and other metadata
     await updateInventoryLeadsCount();
