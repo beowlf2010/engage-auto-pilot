@@ -91,11 +91,15 @@ export const startAggressiveSequence = async (leadId: string, profile: any) => {
 
 export const scheduleAggressiveMessages = async (leadId: string) => {
   try {
-    // Clear existing scheduled messages
-    await supabase
-      .from('aggressive_message_schedule')
+    // Clear existing scheduled messages using explicit typing
+    const { error: deleteError } = await supabase
+      .from('aggressive_message_schedule' as any)
       .delete()
       .eq('lead_id', leadId);
+
+    if (deleteError) {
+      console.error('Error clearing existing schedules:', deleteError);
+    }
 
     const scheduleEntries = [];
     
@@ -114,7 +118,7 @@ export const scheduleAggressiveMessages = async (leadId: string) => {
       }
     }
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('aggressive_message_schedule')
       .insert(scheduleEntries);
 
@@ -152,8 +156,8 @@ export const processAggressiveMessages = async (profile: any) => {
   try {
     const now = new Date().toISOString();
     
-    // Get messages due to be sent
-    const { data: dueMessages, error } = await supabase
+    // Get messages due to be sent using explicit typing
+    const { data: dueMessages, error } = await (supabase as any)
       .from('aggressive_message_schedule')
       .select(`
         *,
@@ -162,7 +166,8 @@ export const processAggressiveMessages = async (profile: any) => {
           first_name,
           last_name,
           vehicle_interest,
-          ai_sequence_paused
+          ai_sequence_paused,
+          ai_messages_sent
         )
       `)
       .eq('is_sent', false)
@@ -211,7 +216,7 @@ export const processAggressiveMessages = async (profile: any) => {
         }
 
         // Generate message based on strategy
-        const messageTemplates = AGGRESSIVE_MESSAGE_TEMPLATES[messageSchedule.message_strategy] || AGGRESSIVE_MESSAGE_TEMPLATES.features_benefits;
+        const messageTemplates = AGGRESSIVE_MESSAGE_TEMPLATES[messageSchedule.message_strategy as keyof typeof AGGRESSIVE_MESSAGE_TEMPLATES] || AGGRESSIVE_MESSAGE_TEMPLATES.features_benefits;
         const templateIndex = messageSchedule.message_index % messageTemplates.length;
         let message = messageTemplates[templateIndex];
 
@@ -225,7 +230,7 @@ export const processAggressiveMessages = async (profile: any) => {
         await sendMessage(lead.id, message, profile, true);
 
         // Mark as sent
-        await supabase
+        await (supabase as any)
           .from('aggressive_message_schedule')
           .update({ is_sent: true, sent_at: new Date().toISOString() })
           .eq('id', messageSchedule.id);

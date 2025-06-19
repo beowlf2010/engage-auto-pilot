@@ -9,6 +9,53 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      aggressive_message_schedule: {
+        Row: {
+          created_at: string
+          day: number
+          id: string
+          is_sent: boolean
+          lead_id: string
+          message_index: number
+          message_strategy: string
+          scheduled_at: string
+          sent_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day: number
+          id?: string
+          is_sent?: boolean
+          lead_id: string
+          message_index: number
+          message_strategy: string
+          scheduled_at: string
+          sent_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day?: number
+          id?: string
+          is_sent?: boolean
+          lead_id?: string
+          message_index?: number
+          message_strategy?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aggressive_message_schedule_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_context_learning: {
         Row: {
           confidence_score: number
