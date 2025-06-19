@@ -43,8 +43,8 @@ export const generateEnhancedIntelligentResponse = async (context: any): Promise
           totalVehicles: 20
         },
         isInitialContact: context.isInitialContact || false,
-        salespersonName: context.salespersonName || 'Finn',
-        dealershipName: context.dealershipName || 'our dealership',
+        salespersonName: 'Finn', // Always force Finn
+        dealershipName: 'Jason Pilger Chevrolet', // Always use correct dealership
         context: context
       }
     });

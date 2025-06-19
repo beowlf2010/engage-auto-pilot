@@ -96,8 +96,8 @@ const MessagePreviewInline = ({
             totalVehicles: 20
           },
           isInitialContact: isInitialContact,
-          salespersonName: 'Finn',
-          dealershipName: 'our dealership',
+          salespersonName: 'Finn', // Always force Finn
+          dealershipName: 'Jason Pilger Chevrolet', // Always use correct dealership
           context: {
             preview: true,
             issueContext: issueContext || undefined,
