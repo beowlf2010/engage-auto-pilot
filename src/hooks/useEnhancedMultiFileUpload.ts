@@ -291,6 +291,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         failedRecords: 0,
         duplicatesDetected: 0,
         vehicleHistoryEntries: 0,
+        validationWarnings: 0,
         results: []
       };
     }
@@ -304,6 +305,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       failedRecords: 0,
       duplicatesDetected: 0,
       vehicleHistoryEntries: 0,
+      validationWarnings: 0,
       results: []
     };
 
@@ -319,6 +321,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
     let failedFiles = 0;
     let totalDuplicates = 0;
     let totalHistoryEntries = 0;
+    let totalValidationWarnings = 0;
 
     try {
       for (const file of files) {
@@ -364,6 +367,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         failedRecords,
         duplicatesDetected: totalDuplicates,
         vehicleHistoryEntries: totalHistoryEntries,
+        validationWarnings: totalValidationWarnings,
         results
       };
 
