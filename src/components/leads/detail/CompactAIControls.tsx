@@ -14,7 +14,7 @@ import AIMessagePreviewPanel from "./compact-ai/AIMessagePreviewPanel";
 interface CompactAIControlsProps {
   leadId: string;
   aiOptIn: boolean;
-  aiStage?: string;
+  messageIntensity?: string;
   aiSequencePaused: boolean;
   aiTakeoverEnabled: boolean;
   aiTakeoverDelayMinutes: number;
@@ -31,7 +31,7 @@ interface CompactAIControlsProps {
 const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   leadId,
   aiOptIn,
-  aiStage,
+  messageIntensity,
   aiSequencePaused,
   aiTakeoverEnabled,
   aiTakeoverDelayMinutes,
@@ -97,7 +97,7 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
             aiOptIn={aiOptIn}
             pendingHumanResponse={pendingHumanResponse}
             aiSequencePaused={aiSequencePaused}
-            aiStage={aiStage}
+            messageIntensity={messageIntensity}
           />
         </div>
 
