@@ -380,25 +380,23 @@ class EnhancedContextEngine {
       // Save to the enhanced conversation_memory table - fix upsert operation
       const { error } = await supabase
         .from('conversation_memory')
-        .upsert(
-          {
-            lead_id: memory.leadId,
-            memory_type: 'enhanced_context',
-            content: JSON.stringify({
-              sessionId: memory.sessionId,
-              conversationHistory: memory.conversationHistory,
-              customerProfile: memory.customerProfile,
-              behavioralPatterns: memory.behavioralPatterns,
-              emotionalContext: memory.emotionalContext
-            }),
-            current_session_id: memory.sessionId,
-            conversation_history: memory.conversationHistory,
-            customer_profile: memory.customerProfile,
-            behavioral_patterns: memory.behavioralPatterns,
-            emotional_context: memory.emotionalContext,
-            updated_at: new Date().toISOString()
-          }
-        );
+        .upsert({
+          lead_id: memory.leadId,
+          memory_type: 'enhanced_context',
+          content: JSON.stringify({
+            sessionId: memory.sessionId,
+            conversationHistory: memory.conversationHistory,
+            customerProfile: memory.customerProfile,
+            behavioralPatterns: memory.behavioralPatterns,
+            emotionalContext: memory.emotionalContext
+          }),
+          current_session_id: memory.sessionId,
+          conversation_history: memory.conversationHistory,
+          customer_profile: memory.customerProfile,
+          behavioral_patterns: memory.behavioralPatterns,
+          emotional_context: memory.emotionalContext,
+          updated_at: new Date().toISOString()
+        });
 
       if (error) {
         console.error('Error saving conversation memory:', error);
