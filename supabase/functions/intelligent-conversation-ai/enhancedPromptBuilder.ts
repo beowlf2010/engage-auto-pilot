@@ -1,3 +1,4 @@
+
 import { analyzeCustomerIntent, generateAnswerGuidance, needsConversationRepair } from './enhancedIntentAnalysis.ts';
 
 // Enhanced prompt builder to create context-rich prompts for the OpenAI API
@@ -18,8 +19,13 @@ export const buildEnhancedUserPrompt = (
 ) => {
   let userPrompt = `The customer sent this message: "${lastCustomerMessage}"`;
 
-  // Add conversation context
-  if (conversationContext.isEstablishedConversation) {
+  // ENHANCED: Add conversation continuity context
+  if (conversationContext.isEstablishedConversation && conversationMemory?.hasIntroduced) {
+    userPrompt += `
+
+IMPORTANT: This is an ongoing conversation where you have already introduced yourself as Finn from Jason Pilger Chevrolet. 
+Continue naturally without re-introducing yourself. Build on the existing conversation flow.`;
+  } else if (conversationContext.isEstablishedConversation) {
     userPrompt += `
 
 This is an ongoing conversation. Use the conversation history to provide relevant and helpful responses.`;
@@ -51,10 +57,10 @@ The customer is interested in trading in their current vehicle. Ask for details 
   }
 
   // Add conversation memory analysis
-  if (conversationMemory?.topics?.length > 0) {
+  if (conversationMemory?.discussedTopics?.length > 0) {
     userPrompt += `
 
-The customer has shown interest in these topics: ${conversationMemory.topics.join(', ')}.`;
+The customer has shown interest in these topics: ${conversationMemory.discussedTopics.join(', ')}.`;
   }
 
   // Add conversation guidance
@@ -81,7 +87,7 @@ export const buildEnhancedSystemPrompt = (
   const answerGuidance = generateAnswerGuidance(customerIntent, inventoryStatus);
   const needsRepair = needsConversationRepair(customerIntent);
 
-  // Enhanced system prompt with refined conversation repair logic
+  // Enhanced system prompt with conversation continuity focus
   let systemPrompt = `You are Finn, a professional automotive sales assistant at Jason Pilger Chevrolet. You help customers find the right vehicle through genuine, helpful conversations.
 
 CORE GUIDELINES:
@@ -89,13 +95,34 @@ CORE GUIDELINES:
 - Always be honest about inventory and availability
 - Focus on understanding customer needs
 - Provide accurate information about vehicles and services
+- Maintain natural conversation flow without redundant introductions
 
 CURRENT CONTEXT:
 - Customer: ${leadName}
 - Business Hours: ${businessHours.isOpen ? 'OPEN' : 'CLOSED'}
 - Inventory Available: ${inventoryStatus.hasActualInventory ? 'YES' : 'LIMITED'}
+- Conversation Stage: ${conversationLength > 0 ? 'Ongoing conversation' : 'Initial contact'}`;
 
-CONVERSATION STAGE: ${conversationLength > 0 ? 'Ongoing conversation' : 'Initial contact'}`;
+  // ENHANCED: Add conversation continuity guidance
+  if (conversationLength > 0) {
+    systemPrompt += `
+
+CONVERSATION CONTINUITY RULES:
+- This is NOT the first message in this conversation
+- Do NOT introduce yourself again if you already have
+- Reference previous conversation naturally
+- Build on what has already been discussed
+- Avoid starting with "Hi [Name]! I'm Finn..." if already introduced
+- Continue the conversation flow naturally`;
+  }
+
+  // Add specific conversation guidance from memory analysis
+  if (conversationGuidance && conversationGuidance.length > 0) {
+    systemPrompt += `
+
+CRITICAL GUIDANCE:
+${conversationGuidance.join('\n')}`;
+  }
 
   // Only add conversation repair guidance when there's actual evidence of being ignored
   if (needsRepair && answerGuidance?.needsApology) {
@@ -140,12 +167,16 @@ RESPONSE REQUIREMENTS:
 - Keep responses under 160 characters for SMS
 - Be conversational and natural
 - Ask follow-up questions to understand their needs
-- Suggest next steps when appropriate`;
+- Suggest next steps when appropriate
+- Maintain conversation continuity and avoid redundant information`;
 
   return {
     systemPrompt,
     customerIntent,
     answerGuidance,
     needsRepair,
+    appointmentIntent: null, // Will be added if needed
+    tradeIntent: null, // Will be added if needed
+    requestedCategory: null // Will be added if needed
   };
 };

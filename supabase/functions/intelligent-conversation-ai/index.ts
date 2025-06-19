@@ -44,9 +44,15 @@ serve(async (req) => {
     console.log(`👤 UNIFIED AI: Using salesperson: ${salespersonName}`);
     console.log(`🚗 Vehicle interest: ${vehicleInterest}`);
     console.log(`💬 Message type: ${messageType || (isInitialContact ? 'warm_introduction' : 'follow_up')}`);
+    console.log(`📊 Conversation length: ${conversationLength}`);
+    console.log(`💬 Last customer message: "${lastCustomerMessage}"`);
 
-    // Auto-detect if this should be initial contact based on conversation length
-    const actualIsInitialContact = isInitialContact || conversationLength === 0 || !conversationHistory || conversationHistory.trim() === '';
+    // IMPROVED: More accurate initial contact detection
+    const actualIsInitialContact = isInitialContact || 
+      conversationLength === 0 || 
+      !conversationHistory || 
+      conversationHistory.trim() === '' ||
+      conversationHistory.split('\n').filter(line => line.trim()).length === 0;
     
     if (actualIsInitialContact) {
       console.log(`🎯 UNIFIED AI: Generating WARM INTRODUCTION from ${salespersonName} at ${dealershipName}`);
@@ -116,6 +122,12 @@ serve(async (req) => {
       validatedCount: inventoryValidation.validatedCount
     });
 
+    console.log('🧠 UNIFIED AI: Conversation memory:', {
+      hasIntroduced: conversationMemory.hasIntroduced,
+      isEstablished: conversationMemory.isEstablishedConversation,
+      lastMessageType: conversationMemory.lastSalesMessageType
+    });
+
     // Generate context-aware guidance
     const conversationGuidance = generateConversationGuidance(conversationMemory, inventoryValidation, businessHours);
 
@@ -131,16 +143,14 @@ serve(async (req) => {
       mustNotClaim: !inventoryValidation.hasRealInventory
     };
 
-    // Build enhanced prompts with refined conversation repair logic
+    // Build enhanced prompts with conversation continuity
     const { 
       systemPrompt, 
       customerIntent, 
       answerGuidance, 
       needsRepair,
       appointmentIntent, 
-      appointmentFollowUp, 
       tradeIntent, 
-      tradeFollowUp, 
       requestedCategory 
     } = buildEnhancedSystemPrompt(
       leadName,
@@ -157,7 +167,7 @@ serve(async (req) => {
       lastCustomerMessage,
       conversationHistory,
       requestedCategory,
-      { isEstablishedConversation: (conversationLength || 0) > 2 },
+      { isEstablishedConversation: conversationMemory.isEstablishedConversation },
       conversationMemory,
       conversationGuidance,
       customerIntent,
@@ -168,7 +178,8 @@ serve(async (req) => {
 
     console.log('🎯 UNIFIED AI: Customer question detected:', customerIntent?.requiresDirectAnswer ? 'YES' : 'NO');
     console.log('🎯 UNIFIED AI: Needs conversation repair:', needsRepair ? 'YES' : 'NO');
-    console.log('🎯 UNIFIED AI: Appointment intent:', appointmentIntent?.hasAppointmentIntent ? 'YES' : 'NO');
+    console.log('🎯 UNIFIED AI: Established conversation:', conversationMemory.isEstablishedConversation ? 'YES' : 'NO');
+    console.log('🎯 UNIFIED AI: Has introduced before:', conversationMemory.hasIntroduced ? 'YES' : 'NO');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -195,12 +206,17 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       message: generatedMessage,
       confidence: 0.95,
-      reasoning: `Unified AI enhanced follow-up with refined conversation repair detection`,
+      reasoning: `Unified AI enhanced follow-up with conversation continuity detection`,
       customerIntent: customerIntent || null,
       answerGuidance: answerGuidance || null,
       needsRepair: needsRepair,
       appointmentIntent: appointmentIntent || null,
       tradeIntent: tradeIntent || null,
+      conversationContext: {
+        hasIntroduced: conversationMemory.hasIntroduced,
+        isEstablished: conversationMemory.isEstablishedConversation,
+        lastMessageType: conversationMemory.lastSalesMessageType
+      },
       messageType: 'follow_up',
       isInitialContact: false
     }), {

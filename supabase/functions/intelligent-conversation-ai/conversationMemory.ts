@@ -1,8 +1,8 @@
 
-// Enhanced conversation memory to prevent redundancy
+// Enhanced conversation memory to prevent redundancy and track introductions
 export const analyzeConversationMemory = (conversationHistory: string) => {
   const lines = conversationHistory.split('\n').filter(line => line.trim());
-  const salesMessages = lines.filter(line => line.startsWith('Sales:'));
+  const salesMessages = lines.filter(line => line.startsWith('Sales:') || line.startsWith('You:'));
   const customerMessages = lines.filter(line => line.startsWith('Customer:'));
   
   // Track what has been offered/discussed
@@ -11,9 +11,37 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
   const customerRequests = new Set<string>();
   const customerAgreements = new Set<string>();
   
-  // Analyze sales messages for offers
-  salesMessages.forEach(msg => {
-    const content = msg.replace('Sales:', '').trim().toLowerCase();
+  // IMPROVED: Track conversation state and introductions
+  let hasIntroduced = false;
+  let hasEstablishedRapport = false;
+  let lastSalesMessageType = 'unknown';
+  
+  // Analyze sales messages for offers and introductions
+  salesMessages.forEach((msg, index) => {
+    const content = msg.replace(/^(Sales:|You:)/, '').trim().toLowerCase();
+    
+    // Check for introductions
+    if (content.includes("i'm finn") || content.includes("finn from") || content.includes("finn with")) {
+      hasIntroduced = true;
+    }
+    
+    // Check for established rapport
+    if (index > 0 && (content.includes('thanks for') || content.includes('great to hear') || content.includes('sounds like'))) {
+      hasEstablishedRapport = true;
+    }
+    
+    // Track the type of last sales message
+    if (index === salesMessages.length - 1) {
+      if (content.includes('schedule') || content.includes('come in') || content.includes('visit')) {
+        lastSalesMessageType = 'scheduling';
+      } else if (content.includes('have') && content.includes('stock')) {
+        lastSalesMessageType = 'inventory';
+      } else if (content.includes("i'm finn") || content.includes('from jason pilger')) {
+        lastSalesMessageType = 'introduction';
+      } else {
+        lastSalesMessageType = 'follow_up';
+      }
+    }
     
     // Track vehicle offers
     if (content.includes('chevy') && (content.includes('bolt') || content.includes('equinox'))) {
@@ -70,13 +98,28 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
     salesMessageCount: salesMessages.length,
     customerMessageCount: customerMessages.length,
     lastSalesMessage: salesMessages[salesMessages.length - 1] || '',
-    lastCustomerMessage: customerMessages[customerMessages.length - 1] || ''
+    lastCustomerMessage: customerMessages[customerMessages.length - 1] || '',
+    // NEW: Conversation state tracking
+    hasIntroduced,
+    hasEstablishedRapport,
+    lastSalesMessageType,
+    isEstablishedConversation: hasIntroduced && salesMessages.length > 1,
+    needsIntroduction: !hasIntroduced && salesMessages.length === 0
   };
 };
 
-// Generate context-aware guidance
+// ENHANCED: Generate context-aware guidance that prevents redundant introductions
 export const generateConversationGuidance = (memory: any, inventoryValidation: any, businessHours: any) => {
   const guidance = [];
+  
+  // CRITICAL: Prevent redundant introductions
+  if (memory.hasIntroduced && memory.isEstablishedConversation) {
+    guidance.push('ESTABLISHED CONVERSATION - Do NOT introduce yourself again. Continue naturally from previous conversation.');
+  }
+  
+  if (memory.lastSalesMessageType === 'introduction') {
+    guidance.push('PREVIOUS MESSAGE WAS INTRODUCTION - Follow up naturally, do not re-introduce.');
+  }
   
   // Prevent redundant offers
   if (memory.offeredItems.includes('chevy_evs') && memory.customerRequests.includes('chevy_details')) {
@@ -93,13 +136,13 @@ export const generateConversationGuidance = (memory: any, inventoryValidation: a
   }
   
   // Inventory accuracy guidance
-  if (inventoryValidation.warning === 'no_evs_available') {
-    guidance.push('NO ELECTRIC VEHICLES IN INVENTORY - Do not claim to have Bolt, Equinox EV, or other electric vehicles. Be honest about availability.');
+  if (inventoryValidation.warning === 'no_validated_inventory') {
+    guidance.push('LIMITED INVENTORY - Be honest about current availability and offer alternatives.');
   }
   
-  if (inventoryValidation.isEVRequest && inventoryValidation.actualVehicles.length > 0) {
-    const actualEVs = inventoryValidation.actualVehicles.map(v => `${v.year} ${v.make} ${v.model}`).join(', ');
-    guidance.push(`ACTUAL EV INVENTORY: ${actualEVs} - Only mention vehicles that actually exist.`);
+  if (inventoryValidation.hasRealInventory && inventoryValidation.actualVehicles.length > 0) {
+    const actualVehicles = inventoryValidation.actualVehicles.slice(0, 3).map(v => `${v.year} ${v.make} ${v.model}`).join(', ');
+    guidance.push(`ACTUAL INVENTORY AVAILABLE: ${actualVehicles} and ${inventoryValidation.validatedCount - 3} more vehicles - Reference specific vehicles when relevant.`);
   }
   
   return guidance;
