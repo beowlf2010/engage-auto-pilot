@@ -923,27 +923,42 @@ export type Database = {
       }
       conversation_memory: {
         Row: {
+          behavioral_patterns: Json | null
           confidence: number | null
           content: string
+          conversation_history: Json | null
           created_at: string
+          current_session_id: string | null
+          customer_profile: Json | null
+          emotional_context: Json | null
           id: string
           lead_id: string
           memory_type: string
           updated_at: string
         }
         Insert: {
+          behavioral_patterns?: Json | null
           confidence?: number | null
           content: string
+          conversation_history?: Json | null
           created_at?: string
+          current_session_id?: string | null
+          customer_profile?: Json | null
+          emotional_context?: Json | null
           id?: string
           lead_id: string
           memory_type: string
           updated_at?: string
         }
         Update: {
+          behavioral_patterns?: Json | null
           confidence?: number | null
           content?: string
+          conversation_history?: Json | null
           created_at?: string
+          current_session_id?: string | null
+          customer_profile?: Json | null
+          emotional_context?: Json | null
           id?: string
           lead_id?: string
           memory_type?: string
@@ -1118,6 +1133,53 @@ export type Database = {
             foreignKeyName: "conversations_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_journeys: {
+        Row: {
+          conversion_probability: number | null
+          created_at: string | null
+          estimated_time_to_decision: number | null
+          id: string
+          journey_stage: string
+          lead_id: string
+          milestones: Json | null
+          next_best_action: string | null
+          touchpoints: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          conversion_probability?: number | null
+          created_at?: string | null
+          estimated_time_to_decision?: number | null
+          id?: string
+          journey_stage?: string
+          lead_id: string
+          milestones?: Json | null
+          next_best_action?: string | null
+          touchpoints?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          conversion_probability?: number | null
+          created_at?: string | null
+          estimated_time_to_decision?: number | null
+          id?: string
+          journey_stage?: string
+          lead_id?: string
+          milestones?: Json | null
+          next_best_action?: string | null
+          touchpoints?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_journeys_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
             referencedRelation: "leads"
             referencedColumns: ["id"]
           },

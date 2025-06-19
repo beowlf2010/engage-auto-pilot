@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConversationMemory {
@@ -309,24 +310,28 @@ class EnhancedContextEngine {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Load memory from database
+  // Load memory from database - working with existing conversation_memory table
   private async loadMemoryFromDatabase(leadId: string): Promise<ConversationMemory> {
     try {
-      const { data: memory } = await supabase
+      // Query the updated conversation_memory table
+      const { data: memories } = await supabase
         .from('conversation_memory')
         .select('*')
         .eq('lead_id', leadId)
-        .single();
+        .order('updated_at', { ascending: false });
 
-      if (memory) {
+      if (memories && memories.length > 0) {
+        // Find the enhanced memory record or use the first available
+        const enhancedMemory = memories.find(m => m.current_session_id) || memories[0];
+        
         return {
           leadId,
-          sessionId: memory.current_session_id || this.generateSessionId(),
-          conversationHistory: memory.conversation_history || [],
-          customerProfile: memory.customer_profile || this.createDefaultProfile(leadId),
-          behavioralPatterns: memory.behavioral_patterns || [],
-          emotionalContext: memory.emotional_context || this.createDefaultEmotionalContext(),
-          lastUpdated: new Date(memory.updated_at)
+          sessionId: enhancedMemory.current_session_id || this.generateSessionId(),
+          conversationHistory: enhancedMemory.conversation_history || [],
+          customerProfile: enhancedMemory.customer_profile || this.createDefaultProfile(leadId),
+          behavioralPatterns: enhancedMemory.behavioral_patterns || [],
+          emotionalContext: enhancedMemory.emotional_context || this.createDefaultEmotionalContext(),
+          lastUpdated: new Date(enhancedMemory.updated_at)
         };
       }
     } catch (error) {
@@ -345,19 +350,30 @@ class EnhancedContextEngine {
     };
   }
 
-  // Save memory to database
+  // Save memory to database - working with existing conversation_memory table structure
   private async saveMemoryToDatabase(memory: ConversationMemory): Promise<void> {
     try {
+      // Save to the enhanced conversation_memory table
       await supabase
         .from('conversation_memory')
         .upsert({
           lead_id: memory.leadId,
+          memory_type: 'enhanced_context',
+          content: JSON.stringify({
+            sessionId: memory.sessionId,
+            conversationHistory: memory.conversationHistory,
+            customerProfile: memory.customerProfile,
+            behavioralPatterns: memory.behavioralPatterns,
+            emotionalContext: memory.emotionalContext
+          }),
           current_session_id: memory.sessionId,
           conversation_history: memory.conversationHistory,
           customer_profile: memory.customerProfile,
           behavioral_patterns: memory.behavioralPatterns,
           emotional_context: memory.emotionalContext,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'lead_id,memory_type'
         });
     } catch (error) {
       console.error('Error saving conversation memory:', error);

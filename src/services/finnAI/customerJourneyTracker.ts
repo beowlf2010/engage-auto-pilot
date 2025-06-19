@@ -94,7 +94,7 @@ class CustomerJourneyTracker {
     await this.saveJourney(journey);
   }
 
-  // Get customer journey
+  // Get customer journey - using the new customer_journeys table
   async getCustomerJourney(leadId: string): Promise<CustomerJourney> {
     try {
       const { data: journey } = await supabase
@@ -106,7 +106,7 @@ class CustomerJourneyTracker {
       if (journey) {
         return {
           leadId,
-          journeyStage: journey.journey_stage,
+          journeyStage: journey.journey_stage as CustomerJourney['journeyStage'],
           touchpoints: journey.touchpoints || [],
           milestones: journey.milestones || [],
           nextBestAction: journey.next_best_action || '',
@@ -300,7 +300,7 @@ class CustomerJourneyTracker {
     }
   }
 
-  // Save journey to database
+  // Save journey to database - using the new customer_journeys table
   private async saveJourney(journey: CustomerJourney): Promise<void> {
     try {
       await supabase
