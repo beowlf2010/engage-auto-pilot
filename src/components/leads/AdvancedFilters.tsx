@@ -181,16 +181,16 @@ const AdvancedFilters = ({
             <div>
               <label className="text-sm font-medium mb-2 block">AI Status</label>
               <Select
-                value={filters.aiOptIn === null ? 'all' : filters.aiOptIn.toString()}
+                value={filters.aiOptIn === null ? 'all_ai_status' : filters.aiOptIn.toString()}
                 onValueChange={(value) => 
-                  updateFilter('aiOptIn', value === 'all' ? null : value === 'true')
+                  updateFilter('aiOptIn', value === 'all_ai_status' ? null : value === 'true')
                 }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="all_ai_status">All</SelectItem>
                   <SelectItem value="true">Enabled</SelectItem>
                   <SelectItem value="false">Disabled</SelectItem>
                 </SelectContent>
@@ -209,7 +209,7 @@ const AdvancedFilters = ({
                     {filters.dateRange.from ? format(filters.dateRange.from, "PPP") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
                     selected={filters.dateRange.from || undefined}
@@ -229,7 +229,7 @@ const AdvancedFilters = ({
                     {filters.dateRange.to ? format(filters.dateRange.to, "PPP") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
                     selected={filters.dateRange.to || undefined}

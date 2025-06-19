@@ -135,14 +135,14 @@ const InventoryFiltersCard = ({ filters, setFilters, searchTerm, setSearchTerm }
         {/* Source Report */}
         <div>
           <Select 
-            value={filters.sourceReport || ''} 
-            onValueChange={(value) => setFilters({ ...filters, sourceReport: value as any || undefined })}
+            value={filters.sourceReport || 'all_sources'} 
+            onValueChange={(value) => setFilters({ ...filters, sourceReport: value === 'all_sources' ? undefined : value as any })}
           >
             <SelectTrigger className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500">
               <SelectValue placeholder="Source" />
             </SelectTrigger>
             <SelectContent className="bg-white border-slate-200 shadow-lg">
-              <SelectItem value="">All Sources</SelectItem>
+              <SelectItem value="all_sources">All Sources</SelectItem>
               <SelectItem value="new_car_main_view">New Car Main</SelectItem>
               <SelectItem value="merch_inv_view">Merch Inventory</SelectItem>
               <SelectItem value="orders_all">GM Global Orders</SelectItem>
