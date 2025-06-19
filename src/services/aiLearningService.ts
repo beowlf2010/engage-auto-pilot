@@ -224,7 +224,7 @@ export const aiLearningService = {
       const topIssue = issueEntries
         .sort(([,a], [,b]) => (b as number) - (a as number))[0];
       
-      if (topIssue && topIssue[1] > 0) {
+      if (topIssue && typeof topIssue[1] === 'number' && topIssue[1] > 0) {
         recommendations.push(`Address ${topIssue[0]} issues - most common problem`);
       }
     }
