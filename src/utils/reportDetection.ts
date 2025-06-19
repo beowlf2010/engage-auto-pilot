@@ -1,124 +1,137 @@
 
-export type ReportType = 'new_car_main_view' | 'gm_global' | 'merch_inv_view' | 'sales_report' | 'unknown';
-
-export interface ReportDetectionResult {
-  reportType: ReportType;
+export interface ReportDetection {
+  reportType: 'gm_global' | 'new_car_main_view' | 'merch_inv_view' | 'sales_report' | 'unknown';
   confidence: number;
-  sourceReport: string;
-  detectedColumns: string[];
   recommendedCondition: 'new' | 'used' | 'gm_global';
+  sourceReport: string;
+  indicators: string[];
 }
 
-export const detectReportType = (
-  filename: string, 
-  headers: string[]
-): ReportDetectionResult => {
-  const normalizedFilename = filename.toLowerCase();
-  const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
+export const detectReportType = (fileName: string, headers: string[]): ReportDetection => {
+  const fileNameLower = fileName.toLowerCase();
+  const headerSet = new Set(headers.map(h => h.toLowerCase()));
   
-  console.log('Detecting report type for:', { filename, headers: headers.slice(0, 10) });
+  // Strong indicators for GM Global orders
+  const gmGlobalIndicators = [
+    'gm_order_number',
+    'customer_name',
+    'estimated_delivery_date',
+    'dealer_order_code',
+    'build_week',
+    'production_sequence',
+    'order_date',
+    'plant_code',
+    'allocation_code'
+  ];
   
-  // NEW CAR MAIN VIEW detection
-  if (
-    normalizedFilename.includes('new car main view') ||
-    normalizedFilename.includes('newcarmainview') ||
-    normalizedFilename.includes('new_car_main') ||
-    (normalizedHeaders.includes('vehicle') && normalizedHeaders.includes('stock #'))
-  ) {
-    return {
-      reportType: 'new_car_main_view',
-      confidence: 0.95,
-      sourceReport: 'new_car_main_view',
-      detectedColumns: headers.filter(h => 
-        ['vehicle', 'stock #', 'price', 'msrp', 'vin', 'ext color'].includes(h.toLowerCase())
-      ),
-      recommendedCondition: 'new'
-    };
-  }
+  // Strong indicators for regular inventory
+  const regularInventoryIndicators = [
+    'days_in_inventory',
+    'acquisition_date',
+    'wholesale_cost',
+    'reconditioning_cost',
+    'book_value',
+    'trade_value'
+  ];
   
-  // GM Global detection (enhanced)
-  if (
-    normalizedFilename.includes('gm global') ||
-    normalizedFilename.includes('gmglobal') ||
-    normalizedFilename.includes('orders') ||
-    normalizedHeaders.some(h => h.includes('order number')) ||
-    normalizedHeaders.some(h => h.includes('customer name')) ||
-    normalizedHeaders.some(h => h.includes('delivery date'))
-  ) {
+  // Sales report indicators
+  const salesReportIndicators = [
+    'sale_amount',
+    'gross_profit',
+    'buyer_name',
+    'fi_profit',
+    'total_profit'
+  ];
+  
+  const foundIndicators: string[] = [];
+  let confidence = 0;
+  
+  // Check for GM Global patterns
+  const gmGlobalMatches = gmGlobalIndicators.filter(indicator => {
+    const found = headerSet.has(indicator) || 
+                  headers.some(h => h.toLowerCase().includes(indicator.replace('_', ' ')));
+    if (found) foundIndicators.push(indicator);
+    return found;
+  });
+  
+  // Check filename patterns for GM Global
+  const gmFilePatterns = ['gm', 'global', 'order', 'allocation', 'pipeline'];
+  const hasGmFilePattern = gmFilePatterns.some(pattern => fileNameLower.includes(pattern));
+  
+  if (gmGlobalMatches.length >= 3 || (gmGlobalMatches.length >= 2 && hasGmFilePattern)) {
+    confidence = Math.min(95, 60 + (gmGlobalMatches.length * 10) + (hasGmFilePattern ? 15 : 0));
     return {
       reportType: 'gm_global',
-      confidence: 0.9,
+      confidence,
+      recommendedCondition: 'gm_global',
       sourceReport: 'orders_all',
-      detectedColumns: headers.filter(h => 
-        h.toLowerCase().includes('order') || 
-        h.toLowerCase().includes('customer') || 
-        h.toLowerCase().includes('delivery')
-      ),
-      recommendedCondition: 'gm_global'
+      indicators: foundIndicators
     };
   }
   
-  // Sales/Financial report detection
-  if (
-    normalizedFilename.includes('sales') ||
-    normalizedFilename.includes('financial') ||
-    normalizedFilename.includes('deals') ||
-    normalizedFilename.includes('profit') ||
-    normalizedHeaders.some(h => h.includes('gross profit')) ||
-    normalizedHeaders.some(h => h.includes('sale amount'))
-  ) {
+  // Check for sales reports
+  const salesMatches = salesReportIndicators.filter(indicator => {
+    const found = headerSet.has(indicator);
+    if (found) foundIndicators.push(indicator);
+    return found;
+  });
+  
+  if (salesMatches.length >= 2) {
+    confidence = Math.min(90, 50 + (salesMatches.length * 15));
     return {
       reportType: 'sales_report',
-      confidence: 0.85,
+      confidence,
+      recommendedCondition: 'used', // Most sales are used vehicles
       sourceReport: 'sales_report',
-      detectedColumns: headers.filter(h => 
-        h.toLowerCase().includes('profit') || 
-        h.toLowerCase().includes('sale') || 
-        h.toLowerCase().includes('deal')
-      ),
-      recommendedCondition: 'used'
+      indicators: foundIndicators
     };
   }
   
-  // Merch Inventory View (used cars)
-  if (
-    normalizedFilename.includes('merch') ||
-    normalizedFilename.includes('inventory') ||
-    normalizedFilename.includes('used') ||
-    normalizedHeaders.includes('make') && normalizedHeaders.includes('model')
-  ) {
+  // Check for regular inventory indicators
+  const inventoryMatches = regularInventoryIndicators.filter(indicator => {
+    const found = headerSet.has(indicator);
+    if (found) foundIndicators.push(indicator);
+    return found;
+  });
+  
+  // Check filename patterns for inventory type
+  if (fileNameLower.includes('new') || fileNameLower.includes('factory')) {
+    confidence = Math.min(85, 60 + (inventoryMatches.length * 10));
+    return {
+      reportType: 'new_car_main_view',
+      confidence,
+      recommendedCondition: 'new',
+      sourceReport: 'new_car_main_view',
+      indicators: foundIndicators
+    };
+  } else if (fileNameLower.includes('used') || fileNameLower.includes('merch')) {
+    confidence = Math.min(85, 60 + (inventoryMatches.length * 10));
     return {
       reportType: 'merch_inv_view',
-      confidence: 0.8,
+      confidence,
+      recommendedCondition: 'used',
       sourceReport: 'merch_inv_view',
-      detectedColumns: headers.filter(h => 
-        ['make', 'model', 'year', 'vin', 'stock', 'price'].includes(h.toLowerCase())
-      ),
-      recommendedCondition: 'used'
+      indicators: foundIndicators
     };
   }
   
-  // Default fallback
+  // Default fallback based on available data
+  if (inventoryMatches.length > 0) {
+    return {
+      reportType: 'merch_inv_view',
+      confidence: Math.min(70, 40 + (inventoryMatches.length * 10)),
+      recommendedCondition: 'used',
+      sourceReport: 'merch_inv_view',
+      indicators: foundIndicators
+    };
+  }
+  
+  // Ultimate fallback
   return {
     reportType: 'unknown',
-    confidence: 0.1,
-    sourceReport: 'unknown',
-    detectedColumns: [],
-    recommendedCondition: 'used'
+    confidence: 20,
+    recommendedCondition: 'used',
+    sourceReport: 'merch_inv_view',
+    indicators: foundIndicators
   };
-};
-
-export const getRecommendedParser = (reportType: ReportType) => {
-  switch (reportType) {
-    case 'new_car_main_view':
-      return 'parseNewCarMainView';
-    case 'gm_global':
-      return 'extractGMGlobalFields';
-    case 'merch_inv_view':
-      return 'extractVehicleFields';
-    case 'sales_report':
-      return 'parseSalesReport';
-    default:
-      return 'extractVehicleFields';
-  }
 };

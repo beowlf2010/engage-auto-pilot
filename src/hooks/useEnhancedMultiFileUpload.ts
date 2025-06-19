@@ -9,6 +9,7 @@ import { handleFileSelection } from "@/utils/fileUploadHandlers";
 import { syncInventoryData } from "@/services/inventoryService";
 import { vehicleHistoryService } from "@/services/inventory/vehicleHistoryService";
 import { detectReportType } from "@/utils/reportDetection";
+import { validateInventoryItem } from "@/services/inventory/core/gmGlobalValidationService";
 import type { QueuedFile } from "@/components/inventory-upload/DragDropFileQueue";
 
 interface UseEnhancedMultiFileUploadProps {
@@ -24,12 +25,14 @@ export interface EnhancedBatchUploadResult {
   failedRecords: number;
   duplicatesDetected: number;
   vehicleHistoryEntries: number;
+  validationWarnings: number;
   results: Array<{
     fileName: string;
     status: 'success' | 'error';
     records?: number;
     reportType?: string;
     duplicates?: number;
+    warnings?: number;
     error?: string;
   }>;
 }
@@ -123,11 +126,16 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       const parsed = await parseEnhancedInventoryFile(queuedFile.file);
       console.log(`Parsed ${parsed.fileType} file with ${parsed.rows.length} rows`);
       
-      // Detect report type
+      // Enhanced report detection
       const detection = detectReportType(queuedFile.file.name, parsed.headers);
-      console.log('Detected report type:', detection);
+      console.log('Enhanced report detection:', detection);
       
-      // Store the file
+      // Validate detection confidence
+      if (detection.confidence < 50) {
+        console.warn('Low confidence in report type detection:', detection);
+      }
+      
+      // Store the file with detected information
       try {
         uploadRecord = await storeUploadedFile(
           queuedFile.file, 
@@ -147,31 +155,56 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         console.log('Upload history created without storage, ID:', uploadRecord.id);
       }
       
-      // Enhanced validation and processing
-      const validationResult = await validateAndProcessInventoryRows(
-        parsed.rows,
-        detection.recommendedCondition,
-        uploadRecord.id,
-        (row, condition, uploadId) => mapRowToInventoryItemEnhanced(
-          row, 
-          condition, 
-          uploadId, 
-          queuedFile.file.name, 
-          parsed.headers
-        ).item
-      );
+      // Enhanced validation and processing with GM Global protection
+      let validationWarnings = 0;
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      
+      const inventoryItems = parsed.rows.map((row, index) => {
+        try {
+          const mappingResult = mapRowToInventoryItemEnhanced(
+            row, 
+            detection.recommendedCondition, 
+            uploadRecord!.id, 
+            queuedFile.file.name, 
+            parsed.headers,
+            detection
+          );
+          
+          // Additional validation for the mapped item
+          const validation = validateInventoryItem(mappingResult.item, detection.reportType);
+          
+          if (!validation.isValid) {
+            errors.push(`Row ${index + 1}: ${validation.errors.join(', ')}`);
+            errorCount++;
+            return null;
+          }
+          
+          if (validation.warnings.length > 0) {
+            console.warn(`Row ${index + 1} warnings:`, validation.warnings);
+            validationWarnings++;
+          }
+          
+          if (mappingResult.warnings.length > 0) {
+            console.warn(`Row ${index + 1} mapping warnings:`, mappingResult.warnings);
+            validationWarnings++;
+          }
+          
+          successCount++;
+          return validation.correctedData || mappingResult.item;
+          
+        } catch (error) {
+          console.error(`Error processing row ${index + 1}:`, error);
+          errors.push(`Row ${index + 1}: Processing failed - ${error instanceof Error ? error.message : 'Unknown error'}`);
+          errorCount++;
+          return null;
+        }
+      }).filter(item => item !== null);
 
-      // Process vehicle history using the new batch method
-      const inventoryItems = parsed.rows
-        .map(row => mapRowToInventoryItemEnhanced(
-          row, 
-          detection.recommendedCondition, 
-          uploadRecord!.id, 
-          queuedFile.file.name, 
-          parsed.headers
-        ).item)
-        .filter(item => item.make !== 'Unknown' || item.vin || item.stock_number);
+      console.log(`Processing complete: ${successCount} successful, ${errorCount} errors, ${validationWarnings} warnings`);
 
+      // Process vehicle history using the enhanced batch method
       let batchResult = {
         historyRecorded: 0,
         masterRecordsUpserted: 0,
@@ -196,18 +229,18 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       if (mountedRef.current) {
         await updateUploadHistory(uploadRecord.id, {
           total_rows: parsed.rows.length,
-          successful_imports: validationResult.successCount,
-          failed_imports: validationResult.errorCount,
+          successful_imports: successCount,
+          failed_imports: errorCount,
           processing_status: 'completed',
-          error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
+          error_details: errors.length > 0 ? errors.slice(0, 20).join('\n') : undefined
         });
       }
 
-      // Trigger sync for actual inventory (not preliminary data)
+      // Trigger sync for actual inventory (not preliminary data or GM Global orders)
       const isPreliminaryData = detection.reportType === 'gm_global' || 
                                 queuedFile.file.name.toLowerCase().includes('preliminary');
       
-      if (!isPreliminaryData && validationResult.successCount > 0 && mountedRef.current) {
+      if (!isPreliminaryData && successCount > 0 && mountedRef.current) {
         try {
           console.log(`Triggering automatic inventory sync for ${queuedFile.file.name}...`);
           await syncInventoryData(uploadRecord.id);
@@ -216,15 +249,19 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         }
       }
 
-      // Success notification
+      // Success notification with enhanced information
       if (mountedRef.current) {
         const duplicateMsg = batchResult.duplicatesDetected > 0 
           ? `, ${batchResult.duplicatesDetected} duplicates detected`
           : '';
         
+        const warningMsg = validationWarnings > 0 
+          ? `, ${validationWarnings} warnings`
+          : '';
+        
         toast({
           title: `${queuedFile.file.name} processed successfully`,
-          description: `${validationResult.successCount} records imported (${detection.reportType})${duplicateMsg}`,
+          description: `${successCount} records imported (${detection.reportType}, ${Math.round(detection.confidence)}% confidence)${duplicateMsg}${warningMsg}`,
         });
       }
 

@@ -4266,6 +4266,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_gm_global_status_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          status_code: string
+          status_count: number
+          status_description: string
+        }[]
+      }
       get_gm_orders_by_delivery_timeline: {
         Args: { p_start_date?: string; p_end_date?: string }
         Returns: {

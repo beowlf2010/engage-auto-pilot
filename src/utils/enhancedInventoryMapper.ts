@@ -3,94 +3,123 @@ import { extractVehicleFields } from './field-extraction';
 import { extractVINField } from './field-extraction';
 import { extractOptionsFields } from './field-extraction';
 import { extractGMGlobalFields } from './field-extraction/gmGlobalEnhanced';
-import { parseNewCarMainView } from './field-extraction/newCarMainViewParser';
-import { detectReportType, type ReportType } from './reportDetection';
-import type { InventoryItem, UploadCondition } from './inventoryMapper';
+import { extractVautoFields } from './field-extraction';
+import type { InventoryItem } from './inventoryMapper';
+import type { ReportDetection } from './reportDetection';
 
 export interface EnhancedMappingResult {
   item: InventoryItem;
-  reportType: ReportType;
-  confidence: number;
+  warnings: string[];
   dataQualityScore: number;
 }
 
 export const mapRowToInventoryItemEnhanced = (
   row: any,
-  condition: UploadCondition,
+  condition: 'new' | 'used' | 'gm_global',
   uploadId: string,
-  filename: string,
-  allHeaders: string[]
+  fileName: string,
+  headers: string[],
+  detection?: ReportDetection
 ): EnhancedMappingResult => {
-  console.log('Enhanced mapping for row with condition:', condition);
-
-  // Detect the actual report type from filename and headers
-  const detection = detectReportType(filename, allHeaders);
-  console.log('Report detection result:', detection);
-
+  
+  const warnings: string[] = [];
+  let dataQualityScore = 100;
   let mappedData: any;
-  let dataQualityScore = 50; // Base score
 
   try {
-    // Use report-specific parsing
-    switch (detection.reportType) {
-      case 'new_car_main_view':
-        console.log('Using NEW CAR MAIN VIEW parser');
-        mappedData = parseNewCarMainView(row);
-        dataQualityScore += 20; // Bonus for structured format
-        break;
+    console.log('Enhanced mapping with detection:', { 
+      condition, 
+      reportType: detection?.reportType,
+      confidence: detection?.confidence 
+    });
 
-      case 'gm_global':
-        console.log('Using GM Global parser');
-        mappedData = extractGMGlobalFields(row);
-        mappedData.condition = 'new';
+    // Use detection results to guide mapping strategy
+    if (detection?.reportType === 'gm_global' || condition === 'gm_global') {
+      console.log('Using GM Global extraction for order data');
+      mappedData = extractGMGlobalFields(row);
+      
+      // Validate GM Global specific requirements
+      if (!mappedData.gm_order_number) {
+        warnings.push('GM Global order missing order number');
+        dataQualityScore -= 20;
+      }
+      
+      // Ensure GM Global orders never get marked as sold
+      if (mappedData.status === 'sold') {
+        warnings.push('GM Global order cannot be marked as sold - corrected to available');
         mappedData.status = 'available';
-        dataQualityScore += 25; // Bonus for comprehensive data
-        break;
+        mappedData.sold_at = null;
+      }
+      
+      // Set proper source report
+      mappedData.source_report = 'orders_all';
+      mappedData.condition = 'new'; // GM Global orders are always new vehicles
+      
+    } else if (detection?.reportType === 'sales_report') {
+      console.log('Processing sales report data');
+      mappedData = {
+        ...extractVehicleFields(row),
+        ...extractVINField(row),
+        condition: condition === 'new' ? 'new' : 'used',
+        status: 'sold', // Sales reports should mark vehicles as sold
+        source_report: 'sales_report'
+      };
+      
+    } else {
+      // Regular inventory processing
+      console.log('Processing regular inventory data');
+      mappedData = {
+        ...extractVehicleFields(row),
+        ...extractVINField(row),
+        ...extractOptionsFields(row),
+        condition: condition === 'new' ? 'new' : 'used',
+        status: 'available'
+      };
 
-      case 'merch_inv_view':
-        console.log('Using standard vehicle fields parser');
-        mappedData = {
-          ...extractVehicleFields(row),
-          ...extractVINField(row),
-          ...extractOptionsFields(row),
-          condition: condition === 'new' ? 'new' : 'used',
-          status: 'available'
-        };
-        dataQualityScore += 10;
-        break;
+      // Try Vauto-specific extraction if available
+      try {
+        const vautoData = extractVautoFields(row);
+        mappedData = { ...mappedData, ...vautoData };
+      } catch (error) {
+        console.warn('Vauto extraction failed:', error);
+      }
 
-      default:
-        console.log('Using fallback parser');
-        mappedData = {
-          make: row.make || row.Make || 'Unknown',
-          model: row.model || row.Model || 'Unknown',
-          condition: condition === 'new' ? 'new' : 'used',
-          status: 'available'
-        };
-        dataQualityScore -= 10; // Penalty for unknown format
-        break;
+      // Set appropriate source report
+      if (condition === 'new') {
+        mappedData.source_report = 'new_car_main_view';
+      } else {
+        mappedData.source_report = 'merch_inv_view';
+      }
     }
 
-    // Calculate data quality score based on completeness
-    if (mappedData.vin && mappedData.vin.length === 17) dataQualityScore += 15;
-    if (mappedData.stock_number) dataQualityScore += 10;
-    if (mappedData.make && mappedData.make !== 'Unknown') dataQualityScore += 10;
-    if (mappedData.model && mappedData.model !== 'Unknown') dataQualityScore += 10;
-    if (mappedData.year && mappedData.year > 1900) dataQualityScore += 5;
-    if (mappedData.price && mappedData.price > 0) dataQualityScore += 10;
+    // Data quality checks
+    if (!mappedData.make || mappedData.make === 'Unknown') {
+      warnings.push('Missing or unknown vehicle make');
+      dataQualityScore -= 15;
+    }
+    
+    if (!mappedData.model || mappedData.model === 'Unknown') {
+      warnings.push('Missing or unknown vehicle model');
+      dataQualityScore -= 15;
+    }
+    
+    if (!mappedData.vin && !mappedData.stock_number && !mappedData.gm_order_number) {
+      warnings.push('Missing all vehicle identifiers (VIN, Stock Number, GM Order Number)');
+      dataQualityScore -= 30;
+    }
 
-    // Ensure required fields have defaults
+    // Final data preparation
     const inventoryItem: InventoryItem = {
       make: mappedData.make || 'Unknown',
       model: mappedData.model || 'Unknown',
-      condition: mappedData.condition || (condition === 'gm_global' ? 'new' : condition),
+      condition: mappedData.condition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
-      source_report: detection.sourceReport as any,
+      source_report: mappedData.source_report,
       ...mappedData
     };
 
-    // Calculate delivery variance if we have both dates
+    // Calculate delivery variance for GM Global orders
     if (inventoryItem.actual_delivery_date && inventoryItem.estimated_delivery_date) {
       try {
         const actualDate = new Date(inventoryItem.actual_delivery_date);
@@ -99,31 +128,30 @@ export const mapRowToInventoryItemEnhanced = (
         inventoryItem.delivery_variance_days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       } catch (error) {
         console.error('Error calculating delivery variance:', error);
+        warnings.push('Failed to calculate delivery variance');
+        dataQualityScore -= 5;
       }
     }
 
-    // Ensure data quality score is within bounds
-    dataQualityScore = Math.max(0, Math.min(100, dataQualityScore));
-
     console.log('Enhanced mapping result:', {
-      reportType: detection.reportType,
-      confidence: detection.confidence,
-      dataQualityScore,
       make: inventoryItem.make,
       model: inventoryItem.model,
-      stock_number: inventoryItem.stock_number,
-      vin: inventoryItem.vin
+      condition: inventoryItem.condition,
+      source_report: inventoryItem.source_report,
+      status: inventoryItem.status,
+      dataQualityScore,
+      warnings: warnings.length
     });
 
     return {
       item: inventoryItem,
-      reportType: detection.reportType,
-      confidence: detection.confidence,
-      dataQualityScore
+      warnings,
+      dataQualityScore: Math.max(0, dataQualityScore)
     };
 
   } catch (error) {
     console.error('Critical error in enhanced mapping:', error);
+    warnings.push(`Mapping error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
     // Return minimal valid inventory item
     return {
@@ -131,13 +159,12 @@ export const mapRowToInventoryItemEnhanced = (
         make: row.make || row.Make || 'Unknown',
         model: row.model || row.Model || 'Unknown',
         condition: condition === 'gm_global' ? 'new' : (condition === 'new' ? 'new' : 'used'),
-        status: 'available',
+        status: condition === 'gm_global' ? 'available' : 'available',
         upload_history_id: uploadId,
-        source_report: detection.sourceReport as any
+        source_report: condition === 'gm_global' ? 'orders_all' : (condition === 'new' ? 'new_car_main_view' : 'merch_inv_view')
       },
-      reportType: 'unknown',
-      confidence: 0.1,
-      dataQualityScore: 0
+      warnings,
+      dataQualityScore: 20
     };
   }
 };
