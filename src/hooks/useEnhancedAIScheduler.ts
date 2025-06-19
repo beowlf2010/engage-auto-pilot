@@ -12,19 +12,24 @@ export const useEnhancedAIScheduler = () => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { profile } = useAuth();
 
-  // Enhanced AI processing that includes reactive, proactive, and scheduled follow-up messaging
+  // Enhanced AI processing that includes reactive, proactive, and aggressive messaging
   const processAIResponses = async () => {
     if (processing || !profile) return;
 
     setProcessing(true);
-    console.log('🤖 Processing enhanced AI responses (reactive + proactive + scheduled)...');
+    console.log('🤖 Processing enhanced AI responses (reactive + proactive + scheduled + aggressive)...');
 
     try {
-      // 1. Process scheduled follow-up messages (past due messages)
+      // 1. Process aggressive messages first (highest priority)
+      console.log('🔥 Processing aggressive messages...');
+      const { processAggressiveMessages } = await import('@/services/aggressiveMessagingService');
+      await processAggressiveMessages(profile);
+
+      // 2. Process scheduled follow-up messages
       console.log('⏰ Processing scheduled follow-up messages...');
       await processScheduledFollowUps();
 
-      // 2. Process proactive messages (new leads needing first contact)
+      // 3. Process proactive messages (new leads needing first contact)
       console.log('📬 Processing proactive messages...');
       const proactiveResults = await processProactiveMessages(profile);
       
@@ -33,7 +38,7 @@ export const useEnhancedAIScheduler = () => {
         console.log(`✅ Sent ${successCount} proactive messages out of ${proactiveResults.length} attempts`);
       }
 
-      // 3. Process reactive messages (responses to incoming messages)
+      // 4. Process reactive messages (responses to incoming messages)
       console.log('💬 Processing reactive responses...');
       const { data: leadsWithUnresponded } = await supabase
         .from('conversations')
@@ -43,13 +48,15 @@ export const useEnhancedAIScheduler = () => {
             first_name,
             last_name,
             ai_opt_in,
-            ai_sequence_paused
+            ai_sequence_paused,
+            ai_stage
           )
         `)
         .eq('direction', 'in')
         .is('read_at', null)
         .eq('leads.ai_opt_in', true)
         .eq('leads.ai_sequence_paused', false)
+        .neq('leads.ai_stage', 'aggressive_unresponsive') // Don't process reactive for aggressive leads
         .order('sent_at', { ascending: false })
         .limit(10);
 
@@ -225,13 +232,13 @@ export const useEnhancedAIScheduler = () => {
   useEffect(() => {
     if (!profile) return;
 
-    console.log('🤖 Starting enhanced AI scheduler (proactive + reactive + scheduled)');
+    console.log('🤖 Starting enhanced AI scheduler (proactive + reactive + scheduled + aggressive)');
     
     // Process immediately
     processAIResponses();
 
-    // Set up interval (every 2 minutes for more responsive processing)
-    intervalRef.current = setInterval(processAIResponses, 2 * 60 * 1000);
+    // Set up interval (every 1 minute for aggressive messaging responsiveness)
+    intervalRef.current = setInterval(processAIResponses, 1 * 60 * 1000);
 
     return () => {
       if (intervalRef.current) {
