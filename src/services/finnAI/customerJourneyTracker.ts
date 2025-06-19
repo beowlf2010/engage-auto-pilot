@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CustomerJourney {
@@ -309,7 +308,7 @@ class CustomerJourneyTracker {
     }
   }
 
-  // Save journey to database - using the new customer_journeys table
+  // Save journey to database - using the customer_journeys table
   private async saveJourney(journey: CustomerJourney): Promise<void> {
     try {
       const { error } = await supabase

@@ -378,7 +378,7 @@ class EnhancedContextEngine {
   // Save memory to database - working with existing conversation_memory table structure
   private async saveMemoryToDatabase(memory: ConversationMemory): Promise<void> {
     try {
-      // Save to the enhanced conversation_memory table - use the correct column names
+      // Save to the conversation_memory table with correct column mapping
       const { error } = await supabase
         .from('conversation_memory')
         .upsert({
