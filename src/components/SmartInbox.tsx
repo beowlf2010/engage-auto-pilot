@@ -51,6 +51,20 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     user.role === "manager" || user.role === "admin" || conv.salespersonId === user.id || !conv.salespersonId
   );
 
+  // Check if we should show status displays
+  const shouldShowStatus = error || loading || filteredConversations.length === 0;
+
+  if (shouldShowStatus) {
+    return (
+      <InboxStatusDisplay
+        loading={loading}
+        error={error}
+        conversationsCount={filteredConversations.length}
+        onRetry={manualRefresh}
+      />
+    );
+  }
+
   return (
     <InboxStateManager>
       {({
@@ -87,20 +101,6 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
             handleToggleTemplates();
           }
         };
-
-        // Show status displays for error, loading, or empty states
-        const statusDisplay = (
-          <InboxStatusDisplay
-            loading={loading}
-            error={error}
-            conversationsCount={filteredConversations.length}
-            onRetry={manualRefresh}
-          />
-        );
-
-        if (statusDisplay) {
-          return statusDisplay;
-        }
 
         // Main inbox layout
         return (

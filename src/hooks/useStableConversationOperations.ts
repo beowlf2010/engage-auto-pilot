@@ -11,20 +11,31 @@ export const useStableConversationOperations = () => {
   const { conversations, conversationsLoading, refetchConversations } = useConversationsList();
   const { selectedLeadId, messages, sendingMessage, loadMessages, sendMessage } = useMessagesOperations();
   
-  // Set up realtime subscriptions
+  // Set up realtime subscriptions with error handling
   useConversationRealtime(selectedLeadId, loadMessages);
 
-  // Manual refresh function
+  // Manual refresh function with better error handling
   const manualRefresh = useCallback(async () => {
     try {
+      console.log('🔄 [STABLE CONV] Manual refresh started');
       setError(null);
+      
+      // Refresh conversations
       await refetchConversations();
+      console.log('✅ [STABLE CONV] Conversations refreshed');
+      
+      // Refresh messages if a lead is selected
       if (selectedLeadId) {
         await loadMessages(selectedLeadId);
+        console.log('✅ [STABLE CONV] Messages refreshed for lead:', selectedLeadId);
       }
+      
     } catch (err) {
       console.error('❌ [STABLE CONV] Error during manual refresh:', err);
-      setError('Failed to refresh data');
+      // Don't set error for realtime connection issues, only for data loading issues
+      if (err instanceof Error && !err.message.includes('realtime') && !err.message.includes('timeout')) {
+        setError('Failed to refresh data. Please try again.');
+      }
     }
   }, [refetchConversations, selectedLeadId, loadMessages]);
 
