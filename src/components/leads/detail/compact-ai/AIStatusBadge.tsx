@@ -16,18 +16,18 @@ const AIStatusBadge: React.FC<AIStatusBadgeProps> = ({
   aiOptIn,
   pendingHumanResponse,
   aiSequencePaused,
-  messageIntensity,
+  messageIntensity = 'gentle',
   aiMessagesSent,
   incomingCount,
   outgoingCount
 }) => {
-  // Use the enhanced display component for consistency
   return (
     <EnhancedAIStatusDisplay
       aiOptIn={aiOptIn}
       messageIntensity={messageIntensity}
       aiMessagesSent={aiMessagesSent}
       aiSequencePaused={aiSequencePaused || pendingHumanResponse}
+      pendingHumanResponse={pendingHumanResponse}
       incomingCount={incomingCount}
       outgoingCount={outgoingCount}
       size="sm"

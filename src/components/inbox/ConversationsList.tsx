@@ -22,6 +22,7 @@ interface Conversation {
   aiStage?: string;
   aiMessagesSent?: number;
   aiSequencePaused?: boolean;
+  messageIntensity?: string;
   incomingCount?: number;
   outgoingCount?: number;
   lastMessageDate?: Date;
@@ -190,7 +191,7 @@ const ConversationsList = ({
                         <div className="flex items-center">
                           <EnhancedAIStatusDisplay
                             aiOptIn={conversation.aiOptIn}
-                            messageIntensity="gentle"
+                            messageIntensity={conversation.messageIntensity || 'gentle'}
                             aiMessagesSent={conversation.aiMessagesSent}
                             aiSequencePaused={conversation.aiSequencePaused}
                             incomingCount={conversation.incomingCount}

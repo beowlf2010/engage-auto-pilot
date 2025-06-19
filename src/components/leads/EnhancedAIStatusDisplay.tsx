@@ -28,16 +28,17 @@ const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
 }) => {
   const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-4 h-4';
   
-  // Calculate unreplied messages (outgoing messages sent without incoming responses)
+  // Calculate unreplied messages based on recent conversation flow
+  // This should ideally be calculated from actual message sequence, but for now
+  // we'll use a more conservative approach
   const unrepliedCount = Math.max(0, outgoingCount - incomingCount);
   
-  // Get message count color based on unreplied messages
-  const getMessageCountColor = () => {
-    if (unrepliedCount === 0) return 'bg-gray-100 text-gray-700 border-gray-200';
-    if (unrepliedCount <= 3) return 'bg-green-100 text-green-700 border-green-200';
-    if (unrepliedCount <= 6) return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-    return 'bg-red-100 text-red-700 border-red-200';
-  };
+  // Only show unreplied count if there are actually unreplied messages
+  const hasUnrepliedMessages = unrepliedCount > 0;
+  
+  // High count threshold - more reasonable than before
+  const highCountThreshold = 10;
+  const isHighCount = unrepliedCount >= highCountThreshold;
 
   if (!aiOptIn) {
     return (
@@ -52,7 +53,7 @@ const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      {/* AI Status with Intensity */}
+      {/* Main AI Status Badge */}
       <Badge 
         variant="default" 
         className={
@@ -74,34 +75,38 @@ const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
         
         {pendingHumanResponse ? 'Human Needed' :
          aiSequencePaused ? 'AI Paused' :
-         messageIntensity === 'aggressive' ? 'Aggressive' : 'Gentle'}
+         messageIntensity === 'aggressive' ? 'Aggressive' : 
+         messageIntensity === 'gentle' ? 'Gentle' : 'AI Active'}
       </Badge>
 
-      {/* Message Counter */}
-      {aiMessagesSent > 0 && (
-        <Badge variant="outline" className={getMessageCountColor()}>
+      {/* Unreplied Messages Badge - only show if there are unreplied messages */}
+      {hasUnrepliedMessages && (
+        <Badge 
+          variant="outline" 
+          className={
+            isHighCount ? 'bg-red-100 text-red-700 border-red-200' :
+            unrepliedCount > 5 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+            'bg-orange-100 text-orange-700 border-orange-200'
+          }
+        >
           <MessageCircle className={`${iconSize} mr-1`} />
-          {unrepliedCount > 0 ? (
-            <span>{unrepliedCount} unreplied</span>
-          ) : (
-            <span>{aiMessagesSent} sent</span>
-          )}
+          {unrepliedCount} unreplied
         </Badge>
       )}
 
-      {/* High unreplied count warning */}
-      {unrepliedCount >= 7 && (
+      {/* High Count Warning - only show for very high counts */}
+      {isHighCount && (
         <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
           <AlertTriangle className={`${iconSize} mr-1`} />
           High Count
         </Badge>
       )}
 
-      {/* Auto-switch indicator for uncontacted leads */}
-      {aiMessagesSent === 0 && messageIntensity === 'gentle' && (
+      {/* Auto-switch indicator - only for uncontacted leads with gentle setting */}
+      {aiMessagesSent === 0 && messageIntensity === 'gentle' && !pendingHumanResponse && !aiSequencePaused && (
         <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
           <Zap className={`${iconSize} mr-1`} />
-          Auto-Aggressive
+          Will Auto-Switch
         </Badge>
       )}
     </div>
