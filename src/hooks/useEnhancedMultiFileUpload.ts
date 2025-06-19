@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
 import { storeUploadedFile, createUploadHistoryWithoutStorage, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
@@ -39,28 +39,74 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
   const [batchResult, setBatchResult] = useState<EnhancedBatchUploadResult | null>(null);
   const { toast } = useToast();
   const processingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Prevent navigation during processing
+  // Safely update state only if component is still mounted
+  const safeSetProcessing = useCallback((value: boolean) => {
+    if (mountedRef.current) {
+      setProcessing(value);
+      processingRef.current = value;
+    }
+  }, []);
+
+  const safeSetBatchResult = useCallback((result: EnhancedBatchUploadResult | null) => {
+    if (mountedRef.current) {
+      setBatchResult(result);
+    }
+  }, []);
+
+  // Enhanced navigation prevention during processing
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (processingRef.current) {
+        const message = 'File processing is in progress. Are you sure you want to leave? This will interrupt the upload process.';
         e.preventDefault();
-        e.returnValue = 'File processing is in progress. Are you sure you want to leave?';
+        e.returnValue = message;
+        return message;
+      }
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (processingRef.current) {
+        e.preventDefault();
+        const shouldLeave = window.confirm('File processing is in progress. Leaving will interrupt the upload. Are you sure?');
+        if (!shouldLeave) {
+          // Push the current state back to prevent navigation
+          window.history.pushState(null, '', window.location.href);
+        } else {
+          // Cancel ongoing operations
+          if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+          }
+          processingRef.current = false;
+        }
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       processingRef.current = false;
     };
   }, []);
 
   const processFile = async (queuedFile: QueuedFile): Promise<void> => {
+    if (!mountedRef.current) return;
+    
     let uploadRecord: UploadHistoryRecord | null = null;
     
     try {
@@ -132,7 +178,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         duplicatesDetected: 0
       };
 
-      if (inventoryItems.length > 0) {
+      if (inventoryItems.length > 0 && mountedRef.current) {
         try {
           batchResult = await vehicleHistoryService.processBatch(
             inventoryItems,
@@ -147,19 +193,21 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       }
 
       // Update upload history with enhanced results
-      await updateUploadHistory(uploadRecord.id, {
-        total_rows: parsed.rows.length,
-        successful_imports: validationResult.successCount,
-        failed_imports: validationResult.errorCount,
-        processing_status: 'completed',
-        error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
-      });
+      if (mountedRef.current) {
+        await updateUploadHistory(uploadRecord.id, {
+          total_rows: parsed.rows.length,
+          successful_imports: validationResult.successCount,
+          failed_imports: validationResult.errorCount,
+          processing_status: 'completed',
+          error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
+        });
+      }
 
       // Trigger sync for actual inventory (not preliminary data)
       const isPreliminaryData = detection.reportType === 'gm_global' || 
                                 queuedFile.file.name.toLowerCase().includes('preliminary');
       
-      if (!isPreliminaryData && validationResult.successCount > 0) {
+      if (!isPreliminaryData && validationResult.successCount > 0 && mountedRef.current) {
         try {
           console.log(`Triggering automatic inventory sync for ${queuedFile.file.name}...`);
           await syncInventoryData(uploadRecord.id);
@@ -169,19 +217,21 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       }
 
       // Success notification
-      const duplicateMsg = batchResult.duplicatesDetected > 0 
-        ? `, ${batchResult.duplicatesDetected} duplicates detected`
-        : '';
-      
-      toast({
-        title: `${queuedFile.file.name} processed successfully`,
-        description: `${validationResult.successCount} records imported (${detection.reportType})${duplicateMsg}`,
-      });
+      if (mountedRef.current) {
+        const duplicateMsg = batchResult.duplicatesDetected > 0 
+          ? `, ${batchResult.duplicatesDetected} duplicates detected`
+          : '';
+        
+        toast({
+          title: `${queuedFile.file.name} processed successfully`,
+          description: `${validationResult.successCount} records imported (${detection.reportType})${duplicateMsg}`,
+        });
+      }
 
     } catch (error) {
       console.error(`Enhanced upload error for ${queuedFile.file.name}:`, error);
       
-      if (uploadRecord) {
+      if (uploadRecord && mountedRef.current) {
         await updateUploadHistory(uploadRecord.id, {
           processing_status: 'failed',
           error_details: error instanceof Error ? error.message : 'Unknown error'
@@ -208,8 +258,21 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       };
     }
 
-    setProcessing(true);
-    processingRef.current = true;
+    if (!mountedRef.current) return {
+      totalFiles: 0,
+      successfulFiles: 0,
+      failedFiles: 0,
+      totalRecords: 0,
+      successfulRecords: 0,
+      failedRecords: 0,
+      duplicatesDetected: 0,
+      vehicleHistoryEntries: 0,
+      results: []
+    };
+
+    // Create new abort controller for this batch
+    abortControllerRef.current = new AbortController();
+    safeSetProcessing(true);
     
     const results: EnhancedBatchUploadResult['results'] = [];
     let totalRecords = 0;
@@ -222,6 +285,12 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
 
     try {
       for (const file of files) {
+        // Check if operation was aborted
+        if (abortControllerRef.current?.signal.aborted || !mountedRef.current) {
+          console.log('Batch processing aborted');
+          break;
+        }
+
         try {
           await processFile(file);
           
@@ -249,7 +318,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         }
       }
 
-      const batchResult: EnhancedBatchUploadResult = {
+      const finalResult: EnhancedBatchUploadResult = {
         totalFiles: files.length,
         successfulFiles,
         failedFiles,
@@ -261,42 +330,46 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         results
       };
 
-      setBatchResult(batchResult);
+      safeSetBatchResult(finalResult);
 
-      if (failedFiles === 0) {
-        toast({
-          title: "Enhanced batch upload successful!",
-          description: `${successfulFiles} files processed with vehicle history tracking`,
-        });
-      } else {
-        toast({
-          title: "Batch upload completed with errors",
-          description: `${successfulFiles} files succeeded, ${failedFiles} files failed`,
-          variant: "default"
-        });
+      if (mountedRef.current) {
+        if (failedFiles === 0) {
+          toast({
+            title: "Enhanced batch upload successful!",
+            description: `${successfulFiles} files processed with vehicle history tracking`,
+          });
+        } else {
+          toast({
+            title: "Batch upload completed with errors",
+            description: `${successfulFiles} files succeeded, ${failedFiles} files failed`,
+            variant: "default"
+          });
+        }
       }
 
-      return batchResult;
+      return finalResult;
 
     } catch (error) {
       console.error('Batch processing error:', error);
-      toast({
-        title: "Batch processing failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive"
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Batch processing failed",
+          description: error instanceof Error ? error.message : "An unexpected error occurred",
+          variant: "destructive"
+        });
+      }
       
       throw error;
     } finally {
-      setProcessing(false);
-      processingRef.current = false;
+      safeSetProcessing(false);
+      abortControllerRef.current = null;
     }
   };
 
   return {
     processing,
     batchResult,
-    setBatchResult,
+    setBatchResult: safeSetBatchResult,
     processFile,
     processBatch
   };

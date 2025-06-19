@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,10 +36,25 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
   const [dragActive, setDragActive] = useState(false);
   const [fileQueue, setFileQueue] = useState<QueuedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef(false);
+
+  // Safe state updates that check for processing state
+  const safeUpdateFileQueue = useCallback((updateFn: (prev: QueuedFile[]) => QueuedFile[]) => {
+    if (!processingRef.current) {
+      setFileQueue(updateFn);
+    }
+  }, []);
+
+  // Update processing ref when processing prop changes
+  React.useEffect(() => {
+    processingRef.current = processing;
+  }, [processing]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (processing) return;
+    
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
@@ -52,18 +67,18 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
     e.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files) {
-      handleFiles(Array.from(e.dataTransfer.files));
-    }
+    if (processing || !e.dataTransfer.files) return;
+    handleFiles(Array.from(e.dataTransfer.files));
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      handleFiles(Array.from(e.target.files));
-    }
+    if (processing || !e.target.files) return;
+    handleFiles(Array.from(e.target.files));
   };
 
   const handleFiles = (files: File[]) => {
+    if (processing) return;
+    
     const validExtensions = ['.csv', '.xlsx', '.xls'];
     const newFiles: QueuedFile[] = [];
 
@@ -90,22 +105,27 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
       }
     });
 
-    setFileQueue(prev => [...prev, ...newFiles]);
+    safeUpdateFileQueue(prev => [...prev, ...newFiles]);
   };
 
   const removeFile = (id: string) => {
-    setFileQueue(prev => prev.filter(f => f.id !== id));
+    if (processing) return;
+    safeUpdateFileQueue(prev => prev.filter(f => f.id !== id));
   };
 
   const updateFileCondition = (id: string, condition: 'new' | 'used' | 'gm_global') => {
-    setFileQueue(prev => prev.map(f => f.id === id ? { ...f, condition } : f));
+    if (processing) return;
+    safeUpdateFileQueue(prev => prev.map(f => f.id === id ? { ...f, condition } : f));
   };
 
   const clearAll = () => {
+    if (processing) return;
     setFileQueue([]);
   };
 
   const processAllFiles = async () => {
+    if (processing) return;
+    
     const pendingFiles = fileQueue.filter(f => f.status === 'pending');
     
     for (const file of pendingFiles) {
@@ -165,15 +185,21 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
           <CardTitle className="flex items-center space-x-2">
             <Upload className="w-5 h-5" />
             <span>Upload Inventory Files</span>
+            {processing && (
+              <Badge variant="secondary" className="ml-2">
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Processing...
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
-              dragActive 
+              dragActive && !processing
                 ? 'border-blue-500 bg-blue-50 scale-105' 
                 : processing
-                ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                ? 'border-gray-300 bg-gray-50 cursor-not-allowed opacity-60'
                 : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
             }`}
             onDragEnter={handleDrag}
@@ -221,6 +247,11 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
                 <div>Supported: CSV, Excel (.xlsx, .xls)</div>
                 <div>Max size: 10MB per file</div>
                 <div>Multiple files supported</div>
+                {processing && (
+                  <div className="text-amber-600 font-medium">
+                    ⚠️ Do not navigate away during processing
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -268,12 +299,12 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {fileQueue.map((queuedFile) => {
                 const FileIcon = getFileIcon(queuedFile.file.name);
                 
                 return (
-                  <Card key={queuedFile.id} className="border border-slate-200">
+                  <Card key={queuedFile.id} className="border border-slate-200 shadow-sm">
                     <CardContent className="p-4">
                       <div className="space-y-3">
                         {/* File Info Row */}
@@ -297,7 +328,7 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
                                   onClick={() => removeFile(queuedFile.id)}
                                   variant="ghost"
                                   size="sm"
-                                  disabled={queuedFile.status === 'processing'}
+                                  disabled={queuedFile.status === 'processing' || processing}
                                   className="h-8 w-8 p-0"
                                 >
                                   <X className="w-4 h-4" />
@@ -316,7 +347,7 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
                               onValueChange={(value: 'new' | 'used' | 'gm_global') => 
                                 updateFileCondition(queuedFile.id, value)
                               }
-                              disabled={queuedFile.status !== 'pending'}
+                              disabled={queuedFile.status !== 'pending' || processing}
                             >
                               <SelectTrigger className="w-32 h-8">
                                 <SelectValue />
@@ -336,6 +367,13 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
                             {queuedFile.condition === 'gm_global' ? 'GM Global' : 
                              queuedFile.condition.charAt(0).toUpperCase() + queuedFile.condition.slice(1)}
                           </Badge>
+
+                          {queuedFile.status === 'processing' && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              Processing...
+                            </Badge>
+                          )}
                         </div>
 
                         {/* Progress Bar */}
@@ -351,8 +389,14 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
 
                         {/* Error Display */}
                         {queuedFile.error && (
-                          <div className="bg-red-50 border border-red-200 rounded-md p-2">
-                            <p className="text-xs text-red-700">{queuedFile.error}</p>
+                          <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-xs font-medium text-red-800">Processing Error</p>
+                                <p className="text-xs text-red-700 mt-1">{queuedFile.error}</p>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>

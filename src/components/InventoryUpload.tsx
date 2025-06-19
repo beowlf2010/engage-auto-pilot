@@ -24,6 +24,7 @@ interface InventoryUploadProps {
 }
 
 const InventoryUpload = ({ user }: InventoryUploadProps) => {
+  // Always call hooks first, before any early returns
   const {
     showHistory,
     setShowHistory,
@@ -42,7 +43,7 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
     processBatch
   } = useEnhancedMultiFileUpload({ userId: user.id });
 
-  // Check permissions
+  // Check permissions AFTER all hooks are called
   if (!["manager", "admin"].includes(user.role)) {
     return <AccessDenied />;
   }
@@ -122,7 +123,7 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
 
   return (
     <div className="relative space-y-6">
-      {/* Processing Overlay */}
+      {/* Enhanced Processing Overlay with Navigation Protection */}
       {processing && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 shadow-xl max-w-md mx-4">
@@ -131,7 +132,8 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
               <div>
                 <h3 className="text-lg font-semibold text-slate-800">Processing Files</h3>
                 <p className="text-slate-600">Please wait while your files are being processed...</p>
-                <p className="text-sm text-slate-500 mt-2">Do not navigate away from this page</p>
+                <p className="text-sm text-slate-500 mt-2">⚠️ Do not navigate away or refresh this page</p>
+                <p className="text-sm text-slate-400 mt-1">Processing will be interrupted if you leave</p>
               </div>
             </div>
           </div>
