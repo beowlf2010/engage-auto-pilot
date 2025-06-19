@@ -67,53 +67,91 @@ export const parseVINCSVFile = (fileContent: string): VINMessageExport => {
     console.log('Parsed CSV headers:', csvData.headers);
     console.log('Sample CSV row:', csvData.sample);
     
-    // Check if this looks like a VIN Solutions CSV export
-    const requiredHeaders = ['customer_name', 'phone', 'message_content', 'message_direction', 'timestamp'];
-    const hasRequiredHeaders = requiredHeaders.some(header => 
-      csvData.headers.some(h => h.toLowerCase().includes(header.toLowerCase()))
-    );
+    // Enhanced header mapping for VIN Solutions exports
+    const vinSolutionsHeaderMappings = {
+      customer: ['customer', 'customer_name', 'lead_name', 'name'],
+      phone: ['phone', 'contact_phone', 'phone_number', 'cell_phone'],
+      email: ['email', 'email_address'],
+      messageContent: ['message content', 'message_content', 'message_body', 'content', 'body'],
+      direction: ['direction', 'message_direction', 'type', 'comm type'],
+      timestamp: ['activity date', 'timestamp', 'sent_at', 'date', 'created_at'],
+      vehicleInterest: ['vehicle_interest', 'vehicle', 'interested_vehicle'],
+      leadSource: ['lead source', 'source', 'lead_source'],
+      commChannel: ['comm channel', 'channel', 'communication_channel']
+    };
     
-    if (!hasRequiredHeaders) {
-      // Try alternative header patterns
-      const altHeaders = ['lead_name', 'contact_phone', 'message_body', 'direction', 'sent_at'];
-      const hasAltHeaders = altHeaders.some(header => 
-        csvData.headers.some(h => h.toLowerCase().includes(header.toLowerCase()))
-      );
-      
-      if (!hasAltHeaders) {
-        throw new Error('CSV file does not appear to be a VIN Solutions message export. Expected headers like: customer_name, phone, message_content, message_direction, timestamp');
+    // Improved header matching function
+    const findHeaderMatch = (headerMappings: string[], actualHeaders: string[]): string | null => {
+      for (const mapping of headerMappings) {
+        const found = actualHeaders.find(header => {
+          const normalizedHeader = header.toLowerCase().trim();
+          const normalizedMapping = mapping.toLowerCase().trim();
+          return normalizedHeader === normalizedMapping || 
+                 normalizedHeader.replace(/[^a-z]/g, '') === normalizedMapping.replace(/[^a-z]/g, '');
+        });
+        if (found) return found;
       }
+      return null;
+    };
+    
+    // Map headers to our expected format
+    const headerMap = {
+      customer: findHeaderMatch(vinSolutionsHeaderMappings.customer, csvData.headers),
+      phone: findHeaderMatch(vinSolutionsHeaderMappings.phone, csvData.headers),
+      email: findHeaderMatch(vinSolutionsHeaderMappings.email, csvData.headers),
+      messageContent: findHeaderMatch(vinSolutionsHeaderMappings.messageContent, csvData.headers),
+      direction: findHeaderMatch(vinSolutionsHeaderMappings.direction, csvData.headers),
+      timestamp: findHeaderMatch(vinSolutionsHeaderMappings.timestamp, csvData.headers),
+      vehicleInterest: findHeaderMatch(vinSolutionsHeaderMappings.vehicleInterest, csvData.headers),
+      leadSource: findHeaderMatch(vinSolutionsHeaderMappings.leadSource, csvData.headers),
+      commChannel: findHeaderMatch(vinSolutionsHeaderMappings.commChannel, csvData.headers)
+    };
+    
+    console.log('Header mapping results:', headerMap);
+    
+    // Check if this looks like a VIN Solutions CSV export
+    if (!headerMap.customer || !headerMap.messageContent) {
+      console.error('Missing required headers. Found headers:', csvData.headers);
+      console.error('Header mapping:', headerMap);
+      throw new Error(`CSV file does not appear to be a VIN Solutions message export. 
+        Expected headers like: Customer, Message Content, Direction, Activity Date
+        Found headers: ${csvData.headers.join(', ')}`);
     }
     
-    // Map CSV headers to our expected format
-    const getHeaderValue = (row: Record<string, string>, possibleNames: string[]): string => {
-      for (const name of possibleNames) {
-        const header = csvData.headers.find(h => 
-          h.toLowerCase().includes(name.toLowerCase()) ||
-          h.toLowerCase().replace(/[^a-z]/g, '') === name.toLowerCase().replace(/[^a-z]/g, '')
-        );
-        if (header && row[header]) {
-          return row[header];
-        }
-      }
-      return '';
+    // Helper function to get header value
+    const getHeaderValue = (row: Record<string, string>, headerKey: keyof typeof headerMap): string => {
+      const header = headerMap[headerKey];
+      return header && row[header] ? row[header].trim() : '';
     };
     
     // Group messages by customer/lead
     const leadsMap = new Map<string, any>();
+    let processedRows = 0;
+    let skippedRows = 0;
     
     csvData.rows.forEach((row, index) => {
       try {
-        const customerName = getHeaderValue(row, ['customer_name', 'lead_name', 'name', 'customer']);
-        const phone = getHeaderValue(row, ['phone', 'contact_phone', 'phone_number', 'cell_phone']);
-        const email = getHeaderValue(row, ['email', 'email_address']);
-        const messageContent = getHeaderValue(row, ['message_content', 'message_body', 'content', 'body']);
-        const direction = getHeaderValue(row, ['message_direction', 'direction', 'type']);
-        const timestamp = getHeaderValue(row, ['timestamp', 'sent_at', 'date', 'created_at']);
-        const vehicleInterest = getHeaderValue(row, ['vehicle_interest', 'vehicle', 'interested_vehicle']);
+        const customerName = getHeaderValue(row, 'customer');
+        const phone = getHeaderValue(row, 'phone');
+        const email = getHeaderValue(row, 'email');
+        const messageContent = getHeaderValue(row, 'messageContent');
+        const direction = getHeaderValue(row, 'direction');
+        const timestamp = getHeaderValue(row, 'timestamp');
+        const vehicleInterest = getHeaderValue(row, 'vehicleInterest');
+        const leadSource = getHeaderValue(row, 'leadSource');
+        const commChannel = getHeaderValue(row, 'commChannel');
         
+        // Skip rows without customer name or message content
         if (!customerName || !messageContent) {
           console.warn(`Skipping row ${index + 1}: missing customer name or message content`);
+          skippedRows++;
+          return;
+        }
+        
+        // Skip non-SMS/text message rows if comm channel is specified
+        if (commChannel && !commChannel.toLowerCase().includes('sms') && !commChannel.toLowerCase().includes('text')) {
+          console.warn(`Skipping row ${index + 1}: non-SMS communication (${commChannel})`);
+          skippedRows++;
           return;
         }
         
@@ -127,25 +165,54 @@ export const parseVINCSVFile = (fileContent: string): VINMessageExport => {
             phone: phone || '',
             email: email || '',
             vehicle_interest: vehicleInterest || '',
+            lead_source: leadSource || 'VIN Solutions',
             messages: []
           });
         }
         
         const lead = leadsMap.get(leadKey);
+        
+        // Determine message direction
+        let messageDirection: "in" | "out" = "out";
+        if (direction) {
+          const dirLower = direction.toLowerCase();
+          if (dirLower.includes('in') || dirLower.includes('incoming') || dirLower.includes('received')) {
+            messageDirection = "in";
+          }
+        }
+        
         lead.messages.push({
           id: `msg_${index}`,
-          direction: direction.toLowerCase() === 'in' || direction.toLowerCase() === 'incoming' ? 'in' as const : 'out' as const,
+          direction: messageDirection,
           content: messageContent,
           sent_at: timestamp || new Date().toISOString(),
-          metadata: { csv_row: index + 1 }
+          metadata: { 
+            csv_row: index + 1,
+            lead_source: leadSource,
+            comm_channel: commChannel,
+            original_direction: direction
+          }
         });
+        
+        processedRows++;
       } catch (error) {
         console.warn(`Error processing row ${index + 1}:`, error);
+        skippedRows++;
       }
     });
     
     const leads = Array.from(leadsMap.values());
     const totalMessages = leads.reduce((sum, lead) => sum + lead.messages.length, 0);
+    
+    console.log(`VIN Solutions CSV processing complete:
+      - Total rows processed: ${processedRows}
+      - Rows skipped: ${skippedRows}
+      - Leads created: ${leads.length}
+      - Messages imported: ${totalMessages}`);
+    
+    if (leads.length === 0) {
+      throw new Error('No valid leads found in the CSV file. Please check that the file contains customer names and message content.');
+    }
     
     return {
       export_info: {
