@@ -9,20 +9,33 @@ export const getLatestUploads = async (count: number = 2) => {
       .select('upload_history_id, created_at')
       .not('upload_history_id', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(1000); // Get more records to find unique upload IDs
+      .limit(1000);
 
     if (error) throw error;
 
-    // Get unique upload history IDs
+    // Get unique upload history IDs from today first, then recent ones
+    const today = new Date().toISOString().split('T')[0];
     const uniqueUploadIds = [];
     const seenIds = new Set();
     
+    // Prioritize today's uploads
     for (const row of data || []) {
-      if (row.upload_history_id && !seenIds.has(row.upload_history_id)) {
+      const uploadDate = row.created_at.split('T')[0];
+      if (row.upload_history_id && !seenIds.has(row.upload_history_id) && uploadDate === today) {
         seenIds.add(row.upload_history_id);
         uniqueUploadIds.push(row.upload_history_id);
-        
-        if (uniqueUploadIds.length >= count) break;
+      }
+    }
+    
+    // If we don't have enough from today, add recent ones
+    if (uniqueUploadIds.length < count) {
+      for (const row of data || []) {
+        if (row.upload_history_id && !seenIds.has(row.upload_history_id)) {
+          seenIds.add(row.upload_history_id);
+          uniqueUploadIds.push(row.upload_history_id);
+          
+          if (uniqueUploadIds.length >= count) break;
+        }
       }
     }
 
@@ -35,9 +48,9 @@ export const getLatestUploads = async (count: number = 2) => {
 
 export const cleanupInventoryData = async () => {
   try {
-    console.log('Starting inventory cleanup...');
+    console.log('Starting enhanced inventory cleanup to maintain current inventory...');
     
-    // Get the 2 most recent upload IDs
+    // Get today's uploads first, then fall back to recent ones
     const recentUploadIds = await getLatestUploads(2);
     
     if (recentUploadIds.length === 0) {
@@ -45,10 +58,9 @@ export const cleanupInventoryData = async () => {
       return { success: true, message: 'No recent uploads found' };
     }
 
-    console.log('Recent upload IDs:', recentUploadIds);
+    console.log('Recent upload IDs to keep:', recentUploadIds);
 
-    // Instead of using a complex filter, we'll do this in smaller batches
-    // First, get all inventory IDs that should be kept (from recent uploads)
+    // Get vehicles that should be kept (from recent uploads)
     const { data: vehiclesToKeep, error: keepError } = await supabase
       .from('inventory')
       .select('id')
@@ -59,12 +71,13 @@ export const cleanupInventoryData = async () => {
     const keepIds = vehiclesToKeep.map(v => v.id);
     console.log(`Found ${keepIds.length} vehicles to keep from recent uploads`);
 
-    // Get vehicles that should be marked as sold (not in recent uploads and currently available)
+    // Get vehicles that should be marked as sold, excluding GM Global orders
     const { data: vehiclesToUpdate, error: fetchError } = await supabase
       .from('inventory')
-      .select('id, stock_number, make, model, year')
+      .select('id, stock_number, make, model, year, source_report, gm_order_number')
       .eq('status', 'available')
-      .limit(500); // Process in batches to avoid large queries
+      .neq('source_report', 'orders_all') // Don't mark GM Global orders as sold
+      .limit(500);
 
     if (fetchError) throw fetchError;
 
@@ -72,13 +85,13 @@ export const cleanupInventoryData = async () => {
     const vehiclesToMarkSold = vehiclesToUpdate.filter(v => !keepIds.includes(v.id));
     
     if (vehiclesToMarkSold.length === 0) {
-      console.log('No vehicles need to be marked as sold');
-      return { success: true, message: 'No cleanup needed' };
+      console.log('No vehicles need to be marked as sold - inventory is current');
+      return { success: true, message: 'Inventory is already current' };
     }
 
-    console.log(`Marking ${vehiclesToMarkSold.length} vehicles as sold`);
+    console.log(`Marking ${vehiclesToMarkSold.length} outdated vehicles as sold`);
 
-    // Update in smaller batches to avoid query size limits
+    // Update in smaller batches
     const batchSize = 100;
     let totalUpdated = 0;
 
@@ -105,16 +118,16 @@ export const cleanupInventoryData = async () => {
       console.log(`Updated batch ${Math.floor(i/batchSize) + 1}, ${updated?.length} vehicles marked as sold`);
     }
 
-    console.log(`Cleanup completed. Total vehicles marked as sold: ${totalUpdated}`);
+    console.log(`Enhanced cleanup completed. Current inventory maintained, ${totalUpdated} outdated vehicles marked as sold`);
     
     return {
       success: true,
-      message: `Cleanup completed: ${totalUpdated} vehicles marked as sold`,
+      message: `Inventory is now current: ${totalUpdated} outdated vehicles marked as sold`,
       totalProcessed: totalUpdated
     };
 
   } catch (error) {
-    console.error('Cleanup error:', error);
+    console.error('Enhanced cleanup error:', error);
     throw error;
   }
 };
@@ -123,10 +136,12 @@ export const performInventoryCleanup = async () => {
   try {
     const result = await cleanupInventoryData();
     
-    toast({
-      title: "Cleanup Complete",
-      description: result.message,
-    });
+    if (result.totalProcessed && result.totalProcessed > 0) {
+      toast({
+        title: "Inventory Updated",
+        description: result.message,
+      });
+    }
     
     return result;
   } catch (error) {

@@ -221,7 +221,6 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
           console.log('Vehicle history batch processing result:', batchResult);
         } catch (historyError) {
           console.error('Vehicle history processing failed, continuing with upload:', historyError);
-          // Don't fail the entire upload if history processing fails
         }
       }
 
@@ -236,17 +235,20 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         });
       }
 
-      // Trigger sync for actual inventory (not preliminary data or GM Global orders)
+      // Enhanced sync trigger - now includes automatic cleanup
       const isPreliminaryData = detection.reportType === 'gm_global' || 
                                 queuedFile.file.name.toLowerCase().includes('preliminary');
       
       if (!isPreliminaryData && successCount > 0 && mountedRef.current) {
         try {
-          console.log(`Triggering automatic inventory sync for ${queuedFile.file.name}...`);
+          console.log(`Triggering enhanced automatic inventory sync with cleanup for ${queuedFile.file.name}...`);
           await syncInventoryData(uploadRecord.id);
+          console.log('Enhanced sync with cleanup completed successfully');
         } catch (syncError) {
-          console.error('Automatic sync failed:', syncError);
+          console.error('Enhanced automatic sync failed:', syncError);
         }
+      } else if (isPreliminaryData) {
+        console.log(`Skipping sync/cleanup for preliminary data: ${queuedFile.file.name}`);
       }
 
       // Success notification with enhanced information
@@ -259,9 +261,13 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
           ? `, ${validationWarnings} warnings`
           : '';
         
+        const cleanupMsg = !isPreliminaryData 
+          ? ' (inventory cleaned up automatically)'
+          : '';
+        
         toast({
           title: `${queuedFile.file.name} processed successfully`,
-          description: `${successCount} records imported (${detection.reportType}, ${Math.round(detection.confidence)}% confidence)${duplicateMsg}${warningMsg}`,
+          description: `${successCount} records imported (${detection.reportType}, ${Math.round(detection.confidence)}% confidence)${duplicateMsg}${warningMsg}${cleanupMsg}`,
         });
       }
 

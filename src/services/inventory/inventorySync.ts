@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { updateInventoryLeadsCount } from './leadInteractionService';
+import { performInventoryCleanup } from './core/inventoryCleanupService';
 
 export const markMissingVehiclesSold = async (uploadId: string) => {
   // This function is deprecated - we no longer mark vehicles as sold from inventory uploads
@@ -12,16 +13,52 @@ export const markMissingVehiclesSold = async (uploadId: string) => {
 
 export const syncInventoryData = async (uploadId: string) => {
   try {
-    console.log('Starting inventory data sync for upload:', uploadId);
+    console.log('Starting enhanced inventory data sync for upload:', uploadId);
     
-    // Only update leads count and other metadata - DO NOT mark vehicles as sold
+    // Check if this is a GM Global upload (should not trigger cleanup)
+    const { data: uploadInfo, error: uploadError } = await supabase
+      .from('upload_history')
+      .select('file_name, file_type')
+      .eq('id', uploadId)
+      .single();
+
+    if (uploadError) {
+      console.warn('Could not fetch upload info:', uploadError);
+    }
+
+    const isGMGlobalUpload = uploadInfo?.file_name?.toLowerCase().includes('gm') || 
+                            uploadInfo?.file_name?.toLowerCase().includes('global') ||
+                            uploadInfo?.file_name?.toLowerCase().includes('order');
+
+    const isPreliminaryData = uploadInfo?.file_name?.toLowerCase().includes('preliminary') || 
+                              uploadInfo?.file_name?.toLowerCase().includes('prelim');
+
+    // Update leads count and other metadata
     await updateInventoryLeadsCount();
     
-    console.log('Inventory data sync completed successfully');
+    // Only run cleanup for actual inventory uploads (not GM Global orders or preliminary data)
+    if (!isGMGlobalUpload && !isPreliminaryData) {
+      console.log('Running automatic inventory cleanup to keep only current vehicles...');
+      try {
+        await performInventoryCleanup();
+        console.log('Automatic cleanup completed - only current inventory is now marked as available');
+      } catch (cleanupError) {
+        console.error('Automatic cleanup failed:', cleanupError);
+        toast({
+          title: "Cleanup Warning",
+          description: "Inventory uploaded successfully but automatic cleanup had issues",
+          variant: "default"
+        });
+      }
+    } else {
+      console.log('Skipping cleanup for GM Global/preliminary data upload');
+    }
+    
+    console.log('Enhanced inventory data sync completed successfully');
     
     toast({
       title: "Inventory synced",
-      description: "Inventory metadata has been updated successfully",
+      description: isGMGlobalUpload ? "GM Global orders updated" : "Current inventory updated and old vehicles marked as sold",
     });
   } catch (error) {
     console.error('Error syncing inventory data:', error);

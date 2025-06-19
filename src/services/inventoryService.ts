@@ -36,3 +36,10 @@ export {
   cleanupInventoryData,
   getLatestUploads
 } from './inventory/core/inventoryCleanupService';
+
+// Export current inventory service for AI
+export { 
+  getCurrentInventoryForAI,
+  getInventoryStats as getCurrentInventoryStats
+} from './inventory/core/currentInventoryService';
+export type { CurrentInventoryFilters } from './inventory/core/currentInventoryService';
