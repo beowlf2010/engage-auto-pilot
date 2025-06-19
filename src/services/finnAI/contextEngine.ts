@@ -66,6 +66,23 @@ export interface ResponsePattern {
   timestamp: Date;
 }
 
+// Type guard functions
+const isConversationSessionArray = (data: any): data is ConversationSession[] => {
+  return Array.isArray(data);
+};
+
+const isCustomerProfile = (data: any): data is CustomerProfile => {
+  return data && typeof data === 'object';
+};
+
+const isBehavioralPatternArray = (data: any): data is BehavioralPattern[] => {
+  return Array.isArray(data);
+};
+
+const isEmotionalContext = (data: any): data is EmotionalContext => {
+  return data && typeof data === 'object';
+};
+
 class EnhancedContextEngine {
   private memoryCache = new Map<string, ConversationMemory>();
 
@@ -327,10 +344,18 @@ class EnhancedContextEngine {
         return {
           leadId,
           sessionId: enhancedMemory.current_session_id || this.generateSessionId(),
-          conversationHistory: enhancedMemory.conversation_history || [],
-          customerProfile: enhancedMemory.customer_profile || this.createDefaultProfile(leadId),
-          behavioralPatterns: enhancedMemory.behavioral_patterns || [],
-          emotionalContext: enhancedMemory.emotional_context || this.createDefaultEmotionalContext(),
+          conversationHistory: isConversationSessionArray(enhancedMemory.conversation_history) 
+            ? enhancedMemory.conversation_history 
+            : [],
+          customerProfile: isCustomerProfile(enhancedMemory.customer_profile) 
+            ? enhancedMemory.customer_profile 
+            : this.createDefaultProfile(leadId),
+          behavioralPatterns: isBehavioralPatternArray(enhancedMemory.behavioral_patterns) 
+            ? enhancedMemory.behavioral_patterns 
+            : [],
+          emotionalContext: isEmotionalContext(enhancedMemory.emotional_context) 
+            ? enhancedMemory.emotional_context 
+            : this.createDefaultEmotionalContext(),
           lastUpdated: new Date(enhancedMemory.updated_at)
         };
       }
@@ -354,7 +379,7 @@ class EnhancedContextEngine {
   private async saveMemoryToDatabase(memory: ConversationMemory): Promise<void> {
     try {
       // Save to the enhanced conversation_memory table
-      await supabase
+      const { error } = await supabase
         .from('conversation_memory')
         .upsert({
           lead_id: memory.leadId,
@@ -375,6 +400,10 @@ class EnhancedContextEngine {
         }, {
           onConflict: 'lead_id,memory_type'
         });
+
+      if (error) {
+        console.error('Error saving conversation memory:', error);
+      }
     } catch (error) {
       console.error('Error saving conversation memory:', error);
     }

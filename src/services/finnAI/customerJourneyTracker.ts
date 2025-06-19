@@ -29,6 +29,15 @@ export interface Milestone {
   data: any;
 }
 
+// Type guard functions
+const isTouchpointArray = (data: any): data is Touchpoint[] => {
+  return Array.isArray(data);
+};
+
+const isMilestoneArray = (data: any): data is Milestone[] => {
+  return Array.isArray(data);
+};
+
 class CustomerJourneyTracker {
   // Track new touchpoint in customer journey
   async trackTouchpoint(
@@ -107,8 +116,8 @@ class CustomerJourneyTracker {
         return {
           leadId,
           journeyStage: journey.journey_stage as CustomerJourney['journeyStage'],
-          touchpoints: journey.touchpoints || [],
-          milestones: journey.milestones || [],
+          touchpoints: isTouchpointArray(journey.touchpoints) ? journey.touchpoints : [],
+          milestones: isMilestoneArray(journey.milestones) ? journey.milestones : [],
           nextBestAction: journey.next_best_action || '',
           estimatedTimeToDecision: journey.estimated_time_to_decision || 30,
           conversionProbability: journey.conversion_probability || 0.5,
@@ -303,7 +312,7 @@ class CustomerJourneyTracker {
   // Save journey to database - using the new customer_journeys table
   private async saveJourney(journey: CustomerJourney): Promise<void> {
     try {
-      await supabase
+      const { error } = await supabase
         .from('customer_journeys')
         .upsert({
           lead_id: journey.leadId,
@@ -315,6 +324,10 @@ class CustomerJourneyTracker {
           conversion_probability: journey.conversionProbability,
           updated_at: new Date().toISOString()
         });
+
+      if (error) {
+        console.error('Error saving customer journey:', error);
+      }
     } catch (error) {
       console.error('Error saving customer journey:', error);
     }
