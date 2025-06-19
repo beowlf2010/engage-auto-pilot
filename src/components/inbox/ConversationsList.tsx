@@ -1,7 +1,11 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Car, Plus, Brain, User } from "lucide-react";
+import React, { useState } from 'react';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Search, Filter, MessageSquare, Clock, User, Phone } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import LeadScoreIndicator from './LeadScoreIndicator';
 
 interface Conversation {
   leadId: string;
@@ -14,112 +18,210 @@ interface Conversation {
   status: string;
   salespersonId: string;
   salespersonName?: string;
-  aiOptIn?: boolean;
+  aiOptIn: boolean;
+  lastMessageDate: Date;
 }
 
 interface ConversationsListProps {
   conversations: Conversation[];
   selectedLead: string | null;
   onSelectConversation: (leadId: string) => void;
-  canReply: (conv: Conversation) => boolean;
+  canReply: (conversation: Conversation) => boolean;
 }
 
-const ConversationsList = ({ 
-  conversations, 
-  selectedLead, 
-  onSelectConversation, 
-  canReply 
+const ConversationsList = ({
+  conversations,
+  selectedLead,
+  onSelectConversation,
+  canReply
 }: ConversationsListProps) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Mock AI scoring function - in real app this would come from AI service
+  const getAIScore = (conversation: Conversation): number => {
+    // Mock scoring based on conversation characteristics
+    let score = 50;
+    if (conversation.unreadCount > 0) score += 20;
+    if (conversation.aiOptIn) score += 15;
+    if (conversation.status === 'engaged') score += 10;
+    if (conversation.vehicleInterest.toLowerCase().includes('luxury')) score += 5;
+    return Math.min(score, 100);
+  };
+
+  const getTrend = (conversation: Conversation): 'up' | 'down' | 'stable' => {
+    // Mock trend calculation
+    if (conversation.unreadCount > 2) return 'up';
+    if (conversation.unreadCount === 0) return 'down';
+    return 'stable';
+  };
+
+  // Filter conversations
+  const filteredConversations = conversations.filter(conv => {
+    const matchesSearch = conv.leadName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         conv.vehicleInterest.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || conv.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Sort by unread first, then by AI score
+  const sortedConversations = filteredConversations.sort((a, b) => {
+    // Unread messages first
+    if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+    if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+    
+    // Then by AI score
+    const scoreA = getAIScore(a);
+    const scoreB = getAIScore(b);
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    
+    // Finally by last message time
+    return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
+  });
+
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="pb-3 flex-shrink-0">
-        <CardTitle className="flex items-center space-x-3 text-lg">
-          <div className="bg-blue-600 p-1.5 rounded-md">
-            <MessageSquare className="w-4 h-4 text-white" />
+    <Card className="h-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" />
+            Conversations
+          </h3>
+          <Badge variant="outline">{conversations.length}</Badge>
+        </div>
+        
+        {/* Search and Filter */}
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+            <Input
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
           </div>
-          <span className="font-bold text-slate-800">Conversations</span>
-          <Badge variant="secondary" className="bg-slate-200 text-slate-700 font-bold px-2">
-            {conversations.length}
-          </Badge>
-        </CardTitle>
+          
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full p-2 border rounded-md text-sm"
+          >
+            <option value="all">All Status</option>
+            <option value="new">New</option>
+            <option value="engaged">Engaged</option>
+            <option value="paused">Paused</option>
+          </select>
+        </div>
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-hidden p-0">
-        <div className="h-full overflow-y-auto">
-          {conversations.map((conv, index) => (
-            <div
-              key={conv.leadId}
-              onClick={() => onSelectConversation(conv.leadId)}
-              className={`p-4 cursor-pointer transition-all duration-200 border-b border-slate-200 hover:bg-blue-50 hover:shadow-md ${
-                selectedLead === conv.leadId 
-                  ? 'bg-blue-100 border-l-4 border-l-blue-600 shadow-inner' 
-                  : index % 2 === 0 
-                    ? 'bg-white' 
-                    : 'bg-slate-25'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h4 className="font-bold text-slate-900 text-base truncate">{conv.leadName}</h4>
-                    {conv.unreadCount > 0 && (
-                      <Badge variant="destructive" className="text-xs font-bold shadow-sm px-2 py-1">
-                        {conv.unreadCount} new
-                      </Badge>
-                    )}
-                    {conv.aiOptIn && (
-                      <Badge variant="outline" className="text-xs flex items-center space-x-1 bg-purple-100 text-purple-800 border-purple-300 font-semibold px-2 py-1">
-                        <Brain className="w-3 h-3" />
-                        <span>Finn</span>
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 text-xs text-slate-600 mb-2 font-medium">
-                    <div className="bg-slate-100 p-1 rounded">
-                      <Car className="w-3 h-3" />
-                    </div>
-                    <span className="truncate">{conv.vehicleInterest}</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 mb-3">
-                    {!conv.salespersonId ? (
-                      <Badge variant="outline" className="text-xs flex items-center space-x-1 bg-orange-50 text-orange-700 border-orange-300 font-semibold">
-                        <Plus className="w-3 h-3" />
-                        <span>Unassigned</span>
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-xs flex items-center space-x-1 bg-green-100 text-green-800 border-green-300 font-semibold">
-                        <User className="w-3 h-3" />
-                        <span>{conv.salespersonName || 'Assigned'}</span>
-                      </Badge>
-                    )}
-                    
-                    {!canReply(conv) && (
-                      <Badge variant="outline" className="text-xs bg-slate-100 text-slate-600 border-slate-300 font-medium">
-                        View-only
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <p className="text-sm text-slate-700 font-medium truncate bg-slate-50 p-2 rounded border">
-                    {conv.lastMessage}
-                  </p>
-                </div>
-                
-                <div className="text-xs text-slate-500 ml-3 font-medium bg-slate-100 px-2 py-1 rounded whitespace-nowrap">
-                  {conv.lastMessageTime}
-                </div>
-              </div>
+      <CardContent className="p-0">
+        <div className="max-h-[calc(100vh-16rem)] overflow-y-auto">
+          {sortedConversations.length === 0 ? (
+            <div className="p-4 text-center text-muted-foreground">
+              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>No conversations found</p>
             </div>
-          ))}
-          
-          {conversations.length === 0 && (
-            <div className="flex items-center justify-center h-32 text-slate-500">
-              <div className="text-center">
-                <MessageSquare className="h-8 w-8 mx-auto mb-2 text-slate-300" />
-                <p className="font-medium">No conversations found</p>
-              </div>
+          ) : (
+            <div className="space-y-1">
+              {sortedConversations.map((conversation) => {
+                const isSelected = conversation.leadId === selectedLead;
+                const aiScore = getAIScore(conversation);
+                const trend = getTrend(conversation);
+                
+                return (
+                  <div
+                    key={conversation.leadId}
+                    className={`p-3 border-b cursor-pointer transition-colors ${
+                      isSelected 
+                        ? 'bg-blue-50 border-blue-200' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                    onClick={() => onSelectConversation(conversation.leadId)}
+                  >
+                    <div className="space-y-2">
+                      {/* Header with name and score */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-sm truncate">
+                            {conversation.leadName}
+                          </h4>
+                          {conversation.unreadCount > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {conversation.unreadCount}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {conversation.aiOptIn && (
+                          <LeadScoreIndicator 
+                            score={aiScore} 
+                            trend={trend}
+                            showAI={true}
+                            size="sm"
+                          />
+                        )}
+                      </div>
+
+                      {/* Vehicle interest and status */}
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="outline" className="text-xs">
+                          {conversation.vehicleInterest}
+                        </Badge>
+                        <Badge 
+                          variant="secondary"
+                          className={`text-xs ${
+                            conversation.status === 'engaged' ? 'bg-green-100 text-green-800' :
+                            conversation.status === 'new' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {conversation.status}
+                        </Badge>
+                      </div>
+
+                      {/* Last message */}
+                      <p className="text-xs text-muted-foreground truncate">
+                        {conversation.lastMessage}
+                      </p>
+
+                      {/* Footer with time and assignment */}
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {conversation.lastMessageTime}
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          {conversation.salespersonName ? (
+                            <>
+                              <User className="w-3 h-3" />
+                              <span className="truncate max-w-20">
+                                {conversation.salespersonName}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-orange-600">Unassigned</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* AI Insights Preview */}
+                      {conversation.aiOptIn && aiScore > 75 && (
+                        <div className="bg-blue-50 p-2 rounded text-xs">
+                          <div className="flex items-center gap-1 text-blue-700">
+                            <MessageSquare className="w-3 h-3" />
+                            <span className="font-medium">AI Insight:</span>
+                          </div>
+                          <p className="text-blue-600 mt-1">
+                            High engagement lead - consider priority follow-up
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
