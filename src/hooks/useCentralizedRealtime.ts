@@ -85,6 +85,23 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
     });
   }, []);
 
+  const forceRefresh = useCallback(() => {
+    console.log('🔄 [CENTRALIZED REALTIME] Force refresh triggered');
+    callbacksRef.current.forEach(cb => {
+      if (cb.onConversationUpdate) cb.onConversationUpdate();
+      if (cb.onUnreadCountUpdate) cb.onUnreadCountUpdate();
+    });
+  }, []);
+
+  const reconnect = useCallback(() => {
+    console.log('🔌 [CENTRALIZED REALTIME] Reconnection requested');
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    // The useEffect will recreate the channel
+  }, []);
+
   useEffect(() => {
     if (!profile) return;
 
@@ -133,6 +150,8 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
   }, [profile, handleIncomingMessage, handleEmailNotification]);
 
   return {
-    isConnected: !!channelRef.current
+    isConnected: !!channelRef.current,
+    forceRefresh,
+    reconnect
   };
 };
