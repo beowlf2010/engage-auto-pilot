@@ -9,6 +9,7 @@ interface ConversationListItem {
   leadId: string;
   leadName: string;
   primaryPhone: string;
+  leadPhone: string; // Add missing property
   lastMessage: string;
   lastMessageTime: string;
   lastMessageDirection: 'in' | 'out' | null;
@@ -16,6 +17,7 @@ interface ConversationListItem {
   messageCount: number;
   salespersonId: string | null;
   vehicleInterest: string;
+  status: string; // Add missing property
 }
 
 export const useStableConversationOperations = () => {
@@ -50,6 +52,7 @@ export const useStableConversationOperations = () => {
               last_name,
               vehicle_interest,
               salesperson_id,
+              status,
               phone_numbers!inner(
                 number,
                 is_primary
@@ -75,13 +78,15 @@ export const useStableConversationOperations = () => {
               leadId,
               leadName: `${lead.first_name} ${lead.last_name}`,
               primaryPhone,
+              leadPhone: primaryPhone, // Duplicate for compatibility
               lastMessage: conv.body,
               lastMessageTime: new Date(conv.sent_at).toLocaleString(),
               lastMessageDirection: conv.direction as 'in' | 'out',
               unreadCount: 0,
               messageCount: 0,
               salespersonId: lead.salesperson_id,
-              vehicleInterest: lead.vehicle_interest || ''
+              vehicleInterest: lead.vehicle_interest || '',
+              status: lead.status || 'new' // Add status field
             });
           }
 
@@ -275,8 +280,11 @@ export const useStableConversationOperations = () => {
             queryClient.invalidateQueries({ queryKey: ['stable-conversations'] });
             
             // If viewing messages for the affected lead, reload them
-            if (selectedLeadId && payload.new?.lead_id === selectedLeadId) {
-              loadMessages(selectedLeadId);
+            if (selectedLeadId && payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new) {
+              const newRecord = payload.new as { lead_id: string };
+              if (newRecord.lead_id === selectedLeadId) {
+                loadMessages(selectedLeadId);
+              }
             }
           }, 1000);
         }
