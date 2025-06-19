@@ -13,10 +13,10 @@ export interface ProactiveMessageResult {
   error?: string;
 }
 
-// Send immediate first message when AI is enabled - NOW USES ENHANCED AI
+// Send immediate first message when AI is enabled - NOW USES ENHANCED AI WITH WARM INTRODUCTION
 export const sendInitialMessage = async (leadId: string, profile: any): Promise<ProactiveMessageResult> => {
   try {
-    console.log(`🚀 Sending initial proactive message to lead ${leadId} using ENHANCED AI`);
+    console.log(`🚀 Sending warm initial proactive message to lead ${leadId} using ENHANCED AI`);
 
     // Get lead details
     const { data: lead, error: leadError } = await supabase
@@ -45,8 +45,8 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       return { success: false, leadId, error: 'Already contacted this lead' };
     }
 
-    // Generate initial message using ENHANCED AI
-    const message = await generateInitialEnhancedMessage(lead);
+    // Generate warm initial message using ENHANCED AI with introduction context
+    const message = await generateWarmInitialMessage(lead, profile);
     if (!message) {
       return { success: false, leadId, error: 'Failed to generate message' };
     }
@@ -72,7 +72,7 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
         leadId,
         messageId,
         'inventory_discussion',
-        `Enhanced AI initial contact: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
+        `Enhanced AI warm introduction: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
         []
       );
     } catch (error) {
@@ -90,11 +90,11 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       })
       .eq('id', leadId);
 
-    console.log(`✅ Enhanced AI initial message sent to ${lead.first_name}: ${message}`);
+    console.log(`✅ Enhanced AI warm introduction sent to ${lead.first_name}: ${message}`);
     
     return { success: true, leadId, message };
   } catch (error) {
-    console.error(`❌ Error sending enhanced AI initial message to lead ${leadId}:`, error);
+    console.error(`❌ Error sending enhanced AI warm introduction to lead ${leadId}:`, error);
     return { 
       success: false, 
       leadId, 
@@ -103,12 +103,12 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
   }
 };
 
-// Generate compelling initial outreach messages using ENHANCED AI
-const generateInitialEnhancedMessage = async (lead: any): Promise<string | null> => {
+// Generate warm, introductory initial outreach messages using ENHANCED AI
+const generateWarmInitialMessage = async (lead: any, profile: any): Promise<string | null> => {
   try {
-    console.log(`🤖 Generating enhanced AI initial message for ${lead.first_name}`);
+    console.log(`🤖 Generating warm AI introduction for ${lead.first_name}`);
     
-    // Use the enhanced AI service for initial contact
+    // Use the enhanced AI service for warm initial contact with introduction context
     const context = {
       leadId: lead.id,
       leadName: `${lead.first_name} ${lead.last_name}`,
@@ -118,27 +118,34 @@ const generateInitialEnhancedMessage = async (lead: any): Promise<string | null>
         phone: '',
         status: 'new',
         lastReplyAt: new Date().toISOString()
-      }
+      },
+      isInitialContact: true, // Flag for warm introduction
+      salespersonName: profile?.first_name || 'Your sales representative',
+      dealershipName: 'our dealership'
     };
 
     const aiResponse = await generateEnhancedIntelligentResponse(context);
     
     if (aiResponse?.message) {
-      console.log(`✅ Enhanced AI generated initial message: ${aiResponse.message}`);
+      console.log(`✅ Enhanced AI generated warm introduction: ${aiResponse.message}`);
       return aiResponse.message;
     }
 
-    // Fallback to template-based messages if enhanced AI fails
-    console.log('⚠️ Enhanced AI failed, using fallback templates');
-    const templates = [
-      `Hi ${lead.first_name}! I see you're interested in ${lead.vehicle_interest}. I'd love to help you find the perfect vehicle. Any questions I can answer?`,
-      `Hello ${lead.first_name}! Thanks for your interest in ${lead.vehicle_interest}. I have some great options that might be perfect for you. When would be a good time to chat?`,
-      `Hi ${lead.first_name}! I noticed you're looking for ${lead.vehicle_interest}. I specialize in helping customers find exactly what they need. What features are most important to you?`
+    // Improved fallback templates that are warm and conversational
+    console.log('⚠️ Enhanced AI failed, using warm fallback templates');
+    const warmTemplates = [
+      `Hi ${lead.first_name}! I'm ${profile?.first_name || 'your sales representative'} from the dealership. I noticed you were interested in ${lead.vehicle_interest || 'finding the right vehicle'}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at vehicles today?`,
+      
+      `Hello ${lead.first_name}! Thanks for your interest in ${lead.vehicle_interest || 'our vehicles'}. I'm ${profile?.first_name || 'here'} to help you find exactly what you're looking for. I know car shopping can feel overwhelming, so I'm here to make it as easy as possible. What's most important to you in your next vehicle?`,
+      
+      `Hi ${lead.first_name}! I hope you're having a great day. I'm ${profile?.first_name || 'your sales representative'} and I saw you were looking at ${lead.vehicle_interest || 'vehicles'}. I'd love to learn more about what you're hoping to find and see how I can help. Are you replacing a current vehicle or adding to the family fleet?`,
+      
+      `Hello ${lead.first_name}! I'm ${profile?.first_name || 'reaching out'} because I noticed your interest in ${lead.vehicle_interest || 'our inventory'}. I really enjoy helping people find the perfect vehicle for their needs. What's prompting your search for a new ride?`
     ];
 
-    return templates[Math.floor(Math.random() * templates.length)];
+    return warmTemplates[Math.floor(Math.random() * warmTemplates.length)];
   } catch (error) {
-    console.error('Error generating enhanced AI initial message:', error);
+    console.error('Error generating warm AI introduction:', error);
     return null;
   }
 };
@@ -202,7 +209,7 @@ export const triggerImmediateMessage = async (leadId: string, profile: any): Pro
   if (result.success) {
     toast({
       title: "Message Sent",
-      description: `Enhanced AI initial message sent successfully: ${result.message}`,
+      description: `Enhanced AI warm introduction sent successfully: ${result.message}`,
       variant: "default"
     });
   } else {

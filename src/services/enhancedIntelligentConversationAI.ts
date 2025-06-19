@@ -1,13 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  trackVehicleMention, 
-  updateLeadVehicleInterest, 
-  addAIConversationNote,
-  extractVehicleFromText 
-} from './vehicleMention';
 
-export interface EnhancedConversationContext {
+export interface ConversationContext {
   leadId: string;
   leadName: string;
   vehicleInterest: string;
@@ -23,152 +16,325 @@ export interface EnhancedConversationContext {
     status: string;
     lastReplyAt?: string;
   };
+  isInitialContact?: boolean; // New flag for warm introductions
+  salespersonName?: string;
+  dealershipName?: string;
 }
 
-export interface EnhancedAIResponse {
+export interface AIResponse {
   message: string;
   confidence: number;
   reasoning: string;
-  vehiclesMentioned?: string[];
-  inventoryShown?: any[];
-  followUpScheduled?: boolean;
   customerIntent?: any;
   answerGuidance?: any;
 }
 
-// Process customer message for vehicle mentions and update lead data
-export const processCustomerVehicleMentions = async (
-  leadId: string,
-  conversationId: string,
-  messageContent: string
-) => {
-  try {
-    const vehicleExtracts = extractVehicleFromText(messageContent);
-    
-    for (const vehicle of vehicleExtracts) {
-      // Track the mention
-      await trackVehicleMention(
-        leadId,
-        conversationId,
-        vehicle.fullText,
-        'inquiry',
-        `Customer mentioned: ${vehicle.fullText}`,
-        false
-      );
-      
-      // Update lead's primary vehicle interest with the most recent mention
-      await updateLeadVehicleInterest(
-        leadId,
-        vehicle.fullText,
-        vehicle.year,
-        vehicle.make,
-        vehicle.model
-      );
-      
-      console.log(`📝 Tracked vehicle mention: ${vehicle.fullText} for lead ${leadId}`);
-    }
-    
-    return vehicleExtracts;
-  } catch (error) {
-    console.error('Error processing customer vehicle mentions:', error);
-    return [];
-  }
+// Clean and validate vehicle interest data
+const cleanVehicleInterest = (vehicleInterest: string): string => {
+  if (!vehicleInterest) return '';
+  
+  // Remove malformed quotes and clean up the string
+  return vehicleInterest
+    .replace(/"/g, '') // Remove all quotes
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
 };
 
-// Enhanced inventory check with honest validation - NO FALSE CLAIMS
-const enhancedInventoryCheck = async (vehicleInterest: string) => {
+// Enhanced vehicle categorization with strict inventory validation
+const categorizeVehicle = (vehicleText: string) => {
+  const text = vehicleText.toLowerCase();
+  
+  // Determine if this is likely a new or used inquiry
+  const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+  const currentYear = new Date().getFullYear();
+  const isUsedByYear = yearMatch && parseInt(yearMatch[0]) < currentYear;
+  const hasUsedKeywords = /\b(used|pre-owned|certified|pre owned)\b/i.test(text);
+  const hasNewKeywords = /\b(new|brand new|latest|2024|2025)\b/i.test(text);
+  
+  // Determine condition
+  let condition = 'unknown';
+  if (hasUsedKeywords || isUsedByYear) {
+    condition = 'used';
+  } else if (hasNewKeywords || (!yearMatch && !hasUsedKeywords)) {
+    condition = 'new'; // Default to new if no clear indicators
+  }
+  
+  // Electric/Hybrid classification
+  const evIndicators = ['tesla', 'electric', 'ev', 'hybrid', 'plug-in', 'bolt', 'leaf', 'prius', 'model'];
+  const isEV = evIndicators.some(indicator => text.includes(indicator));
+  
+  // Luxury classification
+  const luxuryBrands = ['tesla', 'bmw', 'mercedes', 'audi', 'lexus', 'cadillac', 'lincoln', 'genesis', 'porsche'];
+  const isLuxury = luxuryBrands.some(brand => text.includes(brand));
+  
+  // Tesla specific
+  const isTesla = text.includes('tesla');
+  
+  // Price tier estimation
+  let estimatedPriceRange = { min: 0, max: 200000 };
+  if (isTesla) {
+    estimatedPriceRange = condition === 'used' ? { min: 15000, max: 80000 } : { min: 35000, max: 120000 };
+  } else if (isLuxury) {
+    estimatedPriceRange = { min: 30000, max: 100000 };
+  }
+  
+  return {
+    isEV,
+    isLuxury,
+    isTesla,
+    condition,
+    estimatedPriceRange,
+    category: isTesla ? 'tesla' : isEV ? 'electric' : isLuxury ? 'luxury' : 'standard'
+  };
+};
+
+// Enhanced inventory availability check with strict validation
+const checkInventoryAvailability = async (vehicleInterest: string) => {
   try {
-    const cleanInterest = vehicleInterest.replace(/"/g, '').replace(/\s+/g, ' ').trim();
+    const cleanInterest = cleanVehicleInterest(vehicleInterest);
     if (!cleanInterest) return { hasInventory: false, matchingVehicles: [], requestedCategory: null };
 
-    console.log('🔍 STRICT Enhanced inventory check for:', cleanInterest);
+    const requestedCategory = categorizeVehicle(cleanInterest);
     
-    // Get ALL available inventory first
+    console.log('🔍 STRICT inventory check for:', cleanInterest, 'Category:', requestedCategory.category);
+    
+    // Get ALL available inventory first for strict validation
     const { data: allInventory, error } = await supabase
       .from('inventory')
-      .select('id, make, model, year, price, fuel_type, condition, status, stock_number, vin')
+      .select('id, make, model, year, price, fuel_type, condition, status')
       .eq('status', 'available');
 
     if (error) {
       console.error('❌ Error checking inventory:', error);
-      return { hasInventory: false, matchingVehicles: [], requestedCategory: null };
+      return { hasInventory: false, matchingVehicles: [], requestedCategory };
     }
 
+    console.log(`📊 Total available inventory: ${allInventory?.length || 0} vehicles`);
+    
     if (!allInventory || allInventory.length === 0) {
-      console.log('⚠️ NO INVENTORY AVAILABLE - MUST BE HONEST');
+      console.log('⚠️ NO INVENTORY AVAILABLE AT ALL');
       return { 
         hasInventory: false, 
         matchingVehicles: [], 
-        requestedCategory: null,
+        requestedCategory,
         warning: 'no_inventory_available'
       };
     }
 
-    // Extract vehicle details from interest
-    const extracted = extractVehicleFromText(cleanInterest);
-    
-    if (extracted.length > 0) {
-      const requestedVehicle = extracted[0];
-      
-      // Find exact matches first - BE STRICT
-      let matches = allInventory.filter(vehicle => {
-        const makeMatch = (vehicle.make || '').toLowerCase() === requestedVehicle.make.toLowerCase();
-        const modelMatch = (vehicle.model || '').toLowerCase().includes(requestedVehicle.model.toLowerCase());
-        const yearMatch = !requestedVehicle.year || vehicle.year === requestedVehicle.year;
+    // Strict EV/Hybrid filtering - only actual electric/hybrid vehicles
+    if (requestedCategory.isEV) {
+      const evInventory = allInventory.filter(vehicle => {
+        const fuelType = (vehicle.fuel_type || '').toLowerCase();
+        const make = (vehicle.make || '').toLowerCase();
         
-        return makeMatch && modelMatch && yearMatch;
+        return fuelType.includes('electric') || 
+               fuelType.includes('hybrid') || 
+               fuelType.includes('plug') ||
+               make.includes('tesla');
       });
 
-      console.log(`🔍 Found ${matches.length} EXACT matches for ${requestedVehicle.fullText}`);
-
-      // If no exact matches, try broader search but still be strict
-      if (matches.length === 0) {
-        matches = allInventory.filter(vehicle => {
-          const makeMatch = (vehicle.make || '').toLowerCase() === requestedVehicle.make.toLowerCase();
-          return makeMatch;
-        });
-        console.log(`🔍 Found ${matches.length} MAKE matches for ${requestedVehicle.make}`);
+      console.log(`⚡ Found ${evInventory.length} actual electric/hybrid vehicles`);
+      
+      if (evInventory.length === 0) {
+        console.log('❌ NO ELECTRIC VEHICLES IN INVENTORY - DO NOT CLAIM TO HAVE BOLT OR EQUINOX EV');
+        return {
+          hasInventory: false,
+          matchingVehicles: [],
+          requestedCategory,
+          warning: 'no_evs_available'
+        };
       }
 
-      // CRITICAL: Only return true if we have ACTUAL matches
       return {
-        hasInventory: matches.length > 0,
-        matchingVehicles: matches.slice(0, 5),
-        requestedCategory: requestedVehicle,
-        searchedVehicle: requestedVehicle.fullText,
-        actualCount: matches.length
+        hasInventory: true,
+        matchingVehicles: evInventory.slice(0, 5),
+        requestedCategory,
+        actualEVCount: evInventory.length
       };
     }
 
-    // Fallback to general search - but be honest about what we have
-    console.log(`📦 Fallback: ${allInventory.length} total vehicles available`);
+    // Extract make/model from vehicle interest for non-EV searches
+    const words = cleanInterest.toLowerCase().split(' ');
+    let make = '';
+    
+    const knownMakes = ['tesla', 'ford', 'chevrolet', 'chevy', 'honda', 'toyota', 'bmw', 'mercedes', 'audi', 'nissan', 'hyundai', 'lexus', 'cadillac'];
+    
+    for (const word of words) {
+      if (knownMakes.includes(word)) {
+        make = word === 'chevy' ? 'chevrolet' : word;
+        break;
+      }
+    }
+
+    if (make) {
+      const makeInventory = allInventory.filter(vehicle => 
+        (vehicle.make || '').toLowerCase().includes(make)
+      );
+
+      console.log(`🚗 Found ${makeInventory.length} ${make} vehicles`);
+
+      // For Tesla, apply condition filtering
+      if (make === 'tesla' && requestedCategory.condition !== 'unknown') {
+        const conditionFiltered = makeInventory.filter(vehicle => 
+          (vehicle.condition || '').toLowerCase() === requestedCategory.condition
+        );
+        
+        return {
+          hasInventory: conditionFiltered.length > 0,
+          matchingVehicles: conditionFiltered.slice(0, 5),
+          searchedMake: make,
+          requestedCategory
+        };
+      }
+
+      return {
+        hasInventory: makeInventory.length > 0,
+        matchingVehicles: makeInventory.slice(0, 5),
+        searchedMake: make,
+        requestedCategory
+      };
+    }
+
+    // General inventory fallback
     return { 
       hasInventory: true, 
       matchingVehicles: allInventory.slice(0, 10), 
-      requestedCategory: null,
-      actualCount: allInventory.length
+      searchedMake: '',
+      requestedCategory 
     };
 
   } catch (error) {
-    console.error('❌ Error in STRICT enhanced inventory check:', error);
-    return { hasInventory: false, matchingVehicles: [], requestedCategory: null };
+    console.error('❌ Error in strict inventory check:', error);
+    return { hasInventory: false, matchingVehicles: [], requestedCategory: null, warning: 'inventory_check_failed' };
   }
 };
 
-// Generate enhanced AI response with QUESTION-FIRST priority and HONEST inventory
-export const generateEnhancedIntelligentResponse = async (
-  context: EnhancedConversationContext
-): Promise<EnhancedAIResponse | null> => {
+// Enhanced alternative finding with Tesla awareness
+const findCategoryRelevantAlternatives = async (requestedCategory: any) => {
   try {
-    console.log('🤖 Generating QUESTION-FIRST enhanced intelligent AI response for lead:', context.leadId);
+    let query = supabase
+      .from('inventory')
+      .select('make, model, year, price, fuel_type, condition')
+      .eq('status', 'available');
 
-    // Get recent conversation history
+    // If looking for Tesla, find alternatives based on condition
+    if (requestedCategory?.isTesla) {
+      if (requestedCategory.condition === 'used') {
+        // For used Tesla seekers, show luxury/EV alternatives
+        const { data: alternatives } = await query
+          .or('fuel_type.eq.Electric,fuel_type.eq.Hybrid,make.ilike.%bmw%,make.ilike.%mercedes%,make.ilike.%audi%,make.ilike.%lexus%')
+          .eq('condition', 'used')
+          .limit(5);
+        
+        if (alternatives && alternatives.length > 0) {
+          return alternatives;
+        }
+      } else if (requestedCategory.condition === 'new') {
+        // For new Tesla seekers, show new EVs/luxury alternatives
+        const { data: alternatives } = await query
+          .or('fuel_type.eq.Electric,fuel_type.eq.Hybrid')
+          .eq('condition', 'new')
+          .limit(5);
+        
+        if (alternatives && alternatives.length > 0) {
+          return alternatives;
+        }
+      }
+    }
+
+    // If looking for EVs, prioritize electric vehicles
+    if (requestedCategory?.isEV) {
+      const { data: evInventory } = await query
+        .or('fuel_type.eq.Electric,fuel_type.eq.Hybrid,make.ilike.%tesla%')
+        .limit(5);
+      
+      if (evInventory && evInventory.length > 0) {
+        return evInventory;
+      }
+    }
+
+    // If looking for luxury, filter by price range and luxury brands
+    if (requestedCategory?.isLuxury) {
+      const { data: luxuryInventory } = await query
+        .gte('price', 30000)
+        .or('make.ilike.%bmw%,make.ilike.%mercedes%,make.ilike.%audi%,make.ilike.%lexus%,make.ilike.%cadillac%')
+        .limit(5);
+      
+      if (luxuryInventory && luxuryInventory.length > 0) {
+        return luxuryInventory;
+      }
+    }
+
+    // Fallback to general inventory
+    const { data: generalInventory } = await query.limit(10);
+    return generalInventory || [];
+  } catch (error) {
+    console.error('Error finding alternatives:', error);
+    return [];
+  }
+};
+
+export const generateEnhancedIntelligentResponse = async (context: ConversationContext): Promise<AIResponse | null> => {
+  try {
+    console.log('🤖 Generating intelligent AI response for lead:', context.leadId);
+
+    // Clean the vehicle interest data
+    const cleanedVehicleInterest = cleanVehicleInterest(context.vehicleInterest);
+
+    // Handle initial contact vs. ongoing conversation differently
+    if (context.isInitialContact) {
+      console.log('🎯 Generating WARM INTRODUCTION message');
+      
+      const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
+        body: {
+          leadId: context.leadId,
+          leadName: context.leadName,
+          vehicleInterest: cleanedVehicleInterest,
+          lastCustomerMessage: '', // No customer message for initial contact
+          conversationHistory: '',
+          leadInfo: context.leadInfo,
+          conversationLength: 0,
+          inventoryStatus: { hasRequestedVehicle: false },
+          isInitialContact: true,
+          salespersonName: context.salespersonName,
+          dealershipName: context.dealershipName,
+          context: {
+            warmIntroduction: true,
+            breakTheIce: true,
+            establishRapport: true
+          }
+        }
+      });
+
+      if (error) {
+        console.error('❌ Error from intelligent AI function for introduction:', error);
+        return null;
+      }
+
+      if (!data?.message) {
+        console.error('❌ No message returned from AI function for introduction');
+        return null;
+      }
+
+      console.log('✅ Generated warm introduction response:', data.message);
+      
+      return {
+        message: data.message,
+        confidence: data.confidence || 0.9,
+        reasoning: 'Enhanced AI warm introduction with ice-breaking and rapport building',
+        customerIntent: null,
+        answerGuidance: null
+      };
+    }
+
+    
+    // Get recent conversation history (last 10 messages)
     const recentMessages = context.messages
       .slice(-10)
       .map(msg => `${msg.direction === 'in' ? 'Customer' : 'Sales'}: ${msg.body}`)
       .join('\n');
 
-    // Get the last customer message - THIS IS CRITICAL TO ANSWER
+    // Get the last customer message to understand what they're asking
     const lastCustomerMessage = context.messages
       .filter(msg => msg.direction === 'in')
       .slice(-1)[0];
@@ -178,82 +344,52 @@ export const generateEnhancedIntelligentResponse = async (
       return null;
     }
 
-    console.log('📝 Customer message to address:', lastCustomerMessage.body);
-
-    // Check if customer is asking about inventory availability
-    const isInventoryQuestion = /\b(see|available|online|have|stock|inventory|find|look|show|get)\b/i.test(lastCustomerMessage.body);
-    console.log('❓ Is inventory question:', isInventoryQuestion);
-
-    // Process vehicle mentions from customer message
-    const vehiclesMentioned = await processCustomerVehicleMentions(
-      context.leadId,
-      lastCustomerMessage.id,
-      lastCustomerMessage.body
+    // Check if we've already responded to this message
+    const messagesAfterCustomer = context.messages.filter(msg => 
+      new Date(msg.sentAt) > new Date(lastCustomerMessage.sentAt) && msg.direction === 'out'
     );
 
-    // STRICT inventory checking - NO FALSE CLAIMS
-    const inventoryCheck = await enhancedInventoryCheck(context.vehicleInterest);
-    console.log('📦 Inventory check result:', {
-      hasInventory: inventoryCheck.hasInventory,
-      actualCount: inventoryCheck.actualCount || 0,
-      matchingVehicles: inventoryCheck.matchingVehicles?.length || 0
-    });
-    
-    // Track AI response with inventory information
-    if (inventoryCheck.hasInventory && inventoryCheck.matchingVehicles.length > 0) {
-      await trackVehicleMention(
-        context.leadId,
-        lastCustomerMessage.id,
-        inventoryCheck.searchedVehicle || context.vehicleInterest,
-        'showed_inventory',
-        `AI showed ${inventoryCheck.matchingVehicles.length} ACTUAL matching vehicles`,
-        true
-      );
-    } else if (inventoryCheck.searchedVehicle) {
-      await trackVehicleMention(
-        context.leadId,
-        lastCustomerMessage.id,
-        inventoryCheck.searchedVehicle,
-        'no_inventory',
-        'AI honestly confirmed no matching inventory available',
-        false
-      );
+    if (messagesAfterCustomer.length > 0) {
+      console.log('✅ Already responded to latest customer message');
+      return null;
     }
 
-    // Generate AI response using edge function with QUESTION-FIRST priority
+    // Enhanced inventory checking with category awareness
+    const inventoryCheck = await checkInventoryAvailability(cleanedVehicleInterest);
+    
+    // Get category-relevant alternatives
+    const availableAlternatives = inventoryCheck.requestedCategory ? 
+      await findCategoryRelevantAlternatives(inventoryCheck.requestedCategory) :
+      [];
+
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: context.leadId,
         leadName: context.leadName,
-        vehicleInterest: context.vehicleInterest,
+        vehicleInterest: cleanedVehicleInterest,
         lastCustomerMessage: lastCustomerMessage.body,
         conversationHistory: recentMessages,
         leadInfo: context.leadInfo,
         conversationLength: context.messages.length,
         inventoryStatus: {
           hasRequestedVehicle: inventoryCheck.hasInventory,
+          requestedMake: inventoryCheck.searchedMake,
           matchingVehicles: inventoryCheck.matchingVehicles,
+          availableAlternatives: availableAlternatives,
           requestedCategory: inventoryCheck.requestedCategory,
-          searchedVehicle: inventoryCheck.searchedVehicle,
           hasActualInventory: inventoryCheck.hasInventory,
           actualVehicles: inventoryCheck.matchingVehicles || [],
           validatedCount: inventoryCheck.matchingVehicles?.length || 0,
           inventoryWarning: inventoryCheck.warning,
           realInventoryCount: inventoryCheck.matchingVehicles?.length || 0,
           strictMode: true,
-          mustNotClaim: !inventoryCheck.hasInventory,
-          isInventoryQuestion: isInventoryQuestion
-        },
-        context: {
-          questionFirst: true,
-          answerCustomerQuestion: true,
-          inventoryHonesty: true
+          mustNotClaim: !inventoryCheck.hasInventory
         }
       }
     });
 
     if (error) {
-      console.error('❌ Error from QUESTION-FIRST enhanced AI function:', error);
+      console.error('❌ Error from intelligent AI function:', error);
       return null;
     }
 
@@ -262,30 +398,34 @@ export const generateEnhancedIntelligentResponse = async (
       return null;
     }
 
-    // Add conversation note about the AI response - FIX: Use correct note type
-    await addAIConversationNote(
-      context.leadId,
-      lastCustomerMessage.id,
-      inventoryCheck.hasInventory ? 'vehicle_shown' : 'inventory_discussion',
-      `QUESTION-FIRST AI Response: ${data.message.substring(0, 200)}${data.message.length > 200 ? '...' : ''}`,
-      inventoryCheck.matchingVehicles || []
-    );
-
-    console.log('✅ Generated QUESTION-FIRST enhanced intelligent response with honest inventory');
+    console.log('✅ Generated intelligent response:', data.message);
     
     return {
       message: data.message,
       confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'QUESTION-FIRST Enhanced AI with vehicle tracking and HONEST inventory awareness',
-      vehiclesMentioned: vehiclesMentioned.map(v => v.fullText),
-      inventoryShown: inventoryCheck.matchingVehicles,
-      followUpScheduled: false,
+      reasoning: data.reasoning || 'Enhanced AI analysis with strict inventory validation and customer intent detection',
       customerIntent: data.customerIntent || null,
       answerGuidance: data.answerGuidance || null
     };
 
   } catch (error) {
-    console.error('❌ Error generating QUESTION-FIRST enhanced intelligent response:', error);
+    console.error('❌ Error generating intelligent response:', error);
     return null;
   }
+};
+
+export const shouldGenerateResponse = (context: ConversationContext): boolean => {
+  // Only generate if there's a recent customer message we haven't responded to
+  const lastCustomerMessage = context.messages
+    .filter(msg => msg.direction === 'in')
+    .slice(-1)[0];
+
+  if (!lastCustomerMessage) return false;
+
+  // Check if we've already responded
+  const messagesAfterCustomer = context.messages.filter(msg => 
+    new Date(msg.sentAt) > new Date(lastCustomerMessage.sentAt) && msg.direction === 'out'
+  );
+
+  return messagesAfterCustomer.length === 0;
 };
