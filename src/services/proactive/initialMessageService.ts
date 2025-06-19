@@ -12,15 +12,57 @@ export interface ProactiveMessageResult {
   messageSource?: string;
 }
 
+// Helper function to clean and validate profile data (same as in messagesService)
+const cleanProfileData = (profile: any) => {
+  if (!profile) {
+    console.warn('🔧 [INITIAL MESSAGE SERVICE] No profile provided');
+    return null;
+  }
+
+  // Handle malformed profile data where values are wrapped in objects
+  const cleanProfile = {
+    id: typeof profile.id === 'string' ? profile.id : profile.id?.value || null,
+    first_name: typeof profile.first_name === 'string' ? profile.first_name : 
+                 typeof profile.firstName === 'string' ? profile.firstName :
+                 profile.first_name?.value || profile.firstName?.value || 'User',
+    last_name: typeof profile.last_name === 'string' ? profile.last_name :
+               typeof profile.lastName === 'string' ? profile.lastName :
+               profile.last_name?.value || profile.lastName?.value || '',
+    email: typeof profile.email === 'string' ? profile.email : profile.email?.value || ''
+  };
+
+  console.log('🔧 [INITIAL MESSAGE SERVICE] Cleaned profile data:', {
+    originalProfile: profile,
+    cleanedProfile: cleanProfile
+  });
+
+  // Validate that we have a proper UUID for profile_id
+  if (!cleanProfile.id || typeof cleanProfile.id !== 'string' || cleanProfile.id.length !== 36) {
+    console.error('❌ [INITIAL MESSAGE SERVICE] Invalid profile ID:', cleanProfile.id);
+    return null;
+  }
+
+  return cleanProfile;
+};
+
 // Send immediate first message when AI is enabled - NOW USES ENHANCED AI WITH WARM INTRODUCTION
 export const sendInitialMessage = async (leadId: string, profile: any): Promise<ProactiveMessageResult> => {
   try {
     console.log(`🚀 [INITIAL MESSAGE SERVICE] Starting warm initial proactive message to lead ${leadId}`);
-    console.log(`👤 [INITIAL MESSAGE SERVICE] Profile data:`, { 
-      profileId: profile?.id, 
-      firstName: profile?.first_name,
-      hasProfile: !!profile 
-    });
+    console.log(`👤 [INITIAL MESSAGE SERVICE] Raw profile data:`, profile);
+
+    // Clean and validate profile data
+    const cleanedProfile = cleanProfileData(profile);
+    if (!cleanedProfile) {
+      return { 
+        success: false, 
+        leadId, 
+        error: 'Invalid or missing profile data',
+        messageSource: 'initial_message_service' 
+      };
+    }
+
+    console.log(`✅ [INITIAL MESSAGE SERVICE] Using cleaned profile:`, cleanedProfile);
 
     // Get lead details
     const { data: lead, error: leadError } = await supabase
@@ -64,7 +106,7 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
 
     // Generate warm initial message using ENHANCED AI with introduction context
     console.log(`🤖 [INITIAL MESSAGE SERVICE] Generating warm initial message...`);
-    const message = await generateWarmInitialMessage(lead, profile);
+    const message = await generateWarmInitialMessage(lead, cleanedProfile);
     
     if (!message) {
       console.error(`❌ [INITIAL MESSAGE SERVICE] Failed to generate warm initial message`);
@@ -73,10 +115,10 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
 
     console.log(`✨ [INITIAL MESSAGE SERVICE] Generated warm message: "${message}"`);
 
-    // Send the message
+    // Send the message using cleaned profile
     try {
       console.log(`📤 [INITIAL MESSAGE SERVICE] Sending message via messagesService...`);
-      await sendMessage(leadId, message, profile, true);
+      await sendMessage(leadId, message, cleanedProfile, true);
       console.log(`✅ [INITIAL MESSAGE SERVICE] Message sent successfully`);
       
       // Get the most recent conversation for this lead to get the message ID

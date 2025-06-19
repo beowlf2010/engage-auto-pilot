@@ -20,6 +20,39 @@ export const getMessages = async (leadId: string) => {
   }
 };
 
+// Helper function to clean and validate profile data
+const cleanProfileData = (profile: any) => {
+  if (!profile) {
+    console.warn('🔧 [MESSAGES SERVICE] No profile provided');
+    return null;
+  }
+
+  // Handle malformed profile data where values are wrapped in objects
+  const cleanProfile = {
+    id: typeof profile.id === 'string' ? profile.id : profile.id?.value || null,
+    first_name: typeof profile.first_name === 'string' ? profile.first_name : 
+                 typeof profile.firstName === 'string' ? profile.firstName :
+                 profile.first_name?.value || profile.firstName?.value || 'User',
+    last_name: typeof profile.last_name === 'string' ? profile.last_name :
+               typeof profile.lastName === 'string' ? profile.lastName :
+               profile.last_name?.value || profile.lastName?.value || '',
+    email: typeof profile.email === 'string' ? profile.email : profile.email?.value || ''
+  };
+
+  console.log('🔧 [MESSAGES SERVICE] Cleaned profile data:', {
+    originalProfile: profile,
+    cleanedProfile: cleanProfile
+  });
+
+  // Validate that we have a proper UUID for profile_id
+  if (!cleanProfile.id || typeof cleanProfile.id !== 'string' || cleanProfile.id.length !== 36) {
+    console.error('❌ [MESSAGES SERVICE] Invalid profile ID:', cleanProfile.id);
+    return null;
+  }
+
+  return cleanProfile;
+};
+
 export const sendMessage = async (
   leadId: string,
   messageBody: string,
@@ -30,9 +63,17 @@ export const sendMessage = async (
     console.log(`📤 [MESSAGES SERVICE] Sending message to lead ${leadId}`);
     console.log(`📝 [MESSAGES SERVICE] Message: "${messageBody.substring(0, 50)}..."`);
     console.log(`🤖 [MESSAGES SERVICE] AI Generated: ${isAIGenerated}`);
-    console.log(`👤 [MESSAGES SERVICE] Profile:`, {
-      id: profile?.id,
-      firstName: profile?.first_name
+    console.log(`👤 [MESSAGES SERVICE] Raw Profile:`, profile);
+
+    // Clean and validate profile data
+    const cleanedProfile = cleanProfileData(profile);
+    if (!cleanedProfile) {
+      throw new Error('Invalid or missing profile data');
+    }
+
+    console.log(`✅ [MESSAGES SERVICE] Using cleaned profile:`, {
+      id: cleanedProfile.id,
+      firstName: cleanedProfile.first_name
     });
 
     // Get lead data including phone number
@@ -65,22 +106,27 @@ export const sendMessage = async (
 
     console.log(`📱 [MESSAGES SERVICE] Sending to phone: ${primaryPhone}`);
 
-    // Create conversation record first with profile_id included
+    // Create conversation record with cleaned profile_id
+    const conversationData = {
+      lead_id: leadId,
+      profile_id: cleanedProfile.id,
+      body: messageBody,
+      direction: 'out',
+      sent_at: new Date().toISOString(),
+      ai_generated: isAIGenerated
+    };
+
+    console.log(`💾 [MESSAGES SERVICE] Inserting conversation with data:`, conversationData);
+
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
-      .insert({
-        lead_id: leadId,
-        profile_id: profile?.id || null, // Handle cases where profile might be null
-        body: messageBody,
-        direction: 'out',
-        sent_at: new Date().toISOString(),
-        ai_generated: isAIGenerated
-      })
+      .insert(conversationData)
       .select()
       .single();
 
     if (conversationError) {
       console.error('❌ [MESSAGES SERVICE] Error creating conversation:', conversationError);
+      console.error('❌ [MESSAGES SERVICE] Conversation data that failed:', conversationData);
       throw conversationError;
     }
 
