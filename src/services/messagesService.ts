@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export const getMessages = async (leadId: string) => {
@@ -41,7 +42,7 @@ export const sendMessage = async (
       .select(`
         *,
         phone_numbers (
-          phone_number,
+          number,
           is_primary
         )
       `)
@@ -55,8 +56,8 @@ export const sendMessage = async (
 
     // Get primary phone number
     const phoneNumbers = Array.isArray(lead.phone_numbers) ? lead.phone_numbers : [];
-    const primaryPhone = phoneNumbers.find((p: any) => p.is_primary)?.phone_number || 
-                        phoneNumbers[0]?.phone_number;
+    const primaryPhone = phoneNumbers.find((p: any) => p.is_primary)?.number || 
+                        phoneNumbers[0]?.number;
 
     if (!primaryPhone) {
       console.error('❌ [MESSAGES SERVICE] No phone number found for lead');
@@ -102,7 +103,7 @@ export const sendMessage = async (
         .from('conversations')
         .update({ 
           sms_status: 'failed',
-          error_message: smsError.message 
+          sms_error: smsError.message 
         })
         .eq('id', conversation.id);
       throw smsError;
@@ -114,7 +115,7 @@ export const sendMessage = async (
     await supabase
       .from('conversations')
       .update({
-        sms_sid: smsResult.sid,
+        twilio_message_id: smsResult.sid,
         sms_status: 'sent'
       })
       .eq('id', conversation.id);
@@ -134,7 +135,7 @@ export const updateMessageStatus = async (conversationId: string, status: string
       .from('conversations')
       .update({
         sms_status: status,
-        error_message: errorMessage,
+        sms_error: errorMessage,
       })
       .eq('id', conversationId);
 
@@ -151,7 +152,7 @@ export const markMessageAsRead = async (conversationId: string) => {
     const { error } = await supabase
       .from('conversations')
       .update({
-        is_read: true,
+        read_at: new Date().toISOString(),
       })
       .eq('id', conversationId);
 
