@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +24,7 @@ interface LearningProgress {
 }
 
 const AdvancedPerformanceMetrics = () => {
-  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter'>('month');
   const [selectedMetric, setSelectedMetric] = useState('overview');
   const [learningProgress, setLearningProgress] = useState<LearningProgress[]>([]);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetric[]>([]);
@@ -39,7 +38,7 @@ const AdvancedPerformanceMetrics = () => {
   }, [metrics, timeRange]);
 
   const generateLearningProgress = () => {
-    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+    const days = timeRange === 'week' ? 7 : timeRange === 'month' ? 30 : 90;
     const progress: LearningProgress[] = [];
 
     for (let i = days - 1; i >= 0; i--) {
@@ -155,14 +154,14 @@ const AdvancedPerformanceMetrics = () => {
             </SelectContent>
           </Select>
           
-          <Select value={timeRange} onValueChange={(value: '7d' | '30d' | '90d') => setTimeRange(value)}>
+          <Select value={timeRange} onValueChange={(value: 'week' | 'month' | 'quarter') => setTimeRange(value)}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="week">Last 7 days</SelectItem>
+              <SelectItem value="month">Last 30 days</SelectItem>
+              <SelectItem value="quarter">Last 90 days</SelectItem>
             </SelectContent>
           </Select>
         </div>
