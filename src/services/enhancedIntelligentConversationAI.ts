@@ -11,8 +11,8 @@ export interface EnhancedIntelligentResponse {
 
 export const generateEnhancedIntelligentResponse = async (context: any): Promise<EnhancedIntelligentResponse | null> => {
   try {
-    console.log(`🤖 [ENHANCED AI SERVICE] Starting enhanced intelligent response generation`);
-    console.log(`📋 [ENHANCED AI SERVICE] Context:`, {
+    console.log(`🤖 [UNIFIED SERVICE] Starting unified intelligent response generation`);
+    console.log(`📋 [UNIFIED SERVICE] Context:`, {
       leadId: context.leadId,
       leadName: context.leadName,
       vehicleInterest: context.vehicleInterest,
@@ -25,10 +25,10 @@ export const generateEnhancedIntelligentResponse = async (context: any): Promise
     // Extract the last customer message for regular conversations
     const lastCustomerMessage = context.messages?.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '';
     
-    console.log(`💬 [ENHANCED AI SERVICE] Last customer message: "${lastCustomerMessage}"`);
-    console.log(`🎯 [ENHANCED AI SERVICE] Is initial contact: ${context.isInitialContact}`);
+    console.log(`💬 [UNIFIED SERVICE] Last customer message: "${lastCustomerMessage}"`);
+    console.log(`🎯 [UNIFIED SERVICE] Is initial contact: ${context.isInitialContact}`);
 
-    // Call the intelligent conversation AI edge function
+    // Always call the unified intelligent conversation AI function
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: context.leadId,
@@ -43,23 +43,23 @@ export const generateEnhancedIntelligentResponse = async (context: any): Promise
           totalVehicles: 20
         },
         isInitialContact: context.isInitialContact || false,
-        salespersonName: context.salespersonName || 'Your sales representative',
+        salespersonName: context.salespersonName || 'Finn',
         dealershipName: context.dealershipName || 'our dealership',
         context: context
       }
     });
 
     if (error) {
-      console.error('❌ [ENHANCED AI SERVICE] Edge function error:', error);
+      console.error('❌ [UNIFIED SERVICE] Edge function error:', error);
       return null;
     }
 
     if (!data || !data.message) {
-      console.error('❌ [ENHANCED AI SERVICE] No message returned from edge function');
+      console.error('❌ [UNIFIED SERVICE] No message returned from edge function');
       return null;
     }
 
-    console.log(`✅ [ENHANCED AI SERVICE] Generated response:`, {
+    console.log(`✅ [UNIFIED SERVICE] Generated response:`, {
       message: data.message,
       confidence: data.confidence,
       messageType: data.messageType || 'standard'
@@ -68,13 +68,13 @@ export const generateEnhancedIntelligentResponse = async (context: any): Promise
     return {
       message: data.message,
       confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'Enhanced AI response',
+      reasoning: data.reasoning || 'Unified AI response',
       customerIntent: data.customerIntent,
       messageType: data.messageType || 'standard'
     };
 
   } catch (error) {
-    console.error('❌ [ENHANCED AI SERVICE] Error generating enhanced intelligent response:', error);
+    console.error('❌ [UNIFIED SERVICE] Error generating unified intelligent response:', error);
     return null;
   }
 };

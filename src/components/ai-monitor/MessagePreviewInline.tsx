@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,56 +75,41 @@ const MessagePreviewInline = ({
     try {
       const isInitialContact = conversationHistory.length === 0;
       
-      if (isInitialContact) {
-        // Use intelligent conversation AI for warm introductions
-        const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
-          body: {
-            leadId,
-            leadName,
-            vehicleInterest,
-            lastCustomerMessage: '',
-            conversationHistory: '',
-            leadInfo: {
-              phone: '',
-              status: 'new',
-              lastReplyAt: new Date().toISOString()
-            },
-            conversationLength: 0,
-            inventoryStatus: {
-              hasInventory: true,
-              totalVehicles: 20
-            },
-            isInitialContact: true,
-            salespersonName: 'Finn',
-            dealershipName: 'our dealership',
-            context: {
-              preview: true,
-              issueContext: issueContext || undefined,
-              regeneration: !!issueContext
-            }
+      console.log(`🔄 [UNIFIED PREVIEW] Generating preview for ${leadName} - ${isInitialContact ? 'INITIAL CONTACT' : 'FOLLOW-UP'}`);
+      
+      // Always use the unified intelligent-conversation-ai function
+      const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
+        body: {
+          leadId,
+          leadName,
+          vehicleInterest,
+          lastCustomerMessage: conversationHistory.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '',
+          conversationHistory: conversationHistory.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
+          leadInfo: {
+            phone: '',
+            status: 'new',
+            lastReplyAt: new Date().toISOString()
+          },
+          conversationLength: conversationHistory.length,
+          inventoryStatus: {
+            hasInventory: true,
+            totalVehicles: 20
+          },
+          isInitialContact: isInitialContact,
+          salespersonName: 'Finn',
+          dealershipName: 'our dealership',
+          context: {
+            preview: true,
+            issueContext: issueContext || undefined,
+            regeneration: !!issueContext
           }
-        });
+        }
+      });
 
-        if (error) throw error;
-        setMessage(data?.message || 'Unable to generate warm introduction');
-      } else {
-        // Use existing AI message generation for follow-ups
-        const { data, error } = await supabase.functions.invoke('generate-ai-message', {
-          body: {
-            leadId,
-            stage: aiStage,
-            context: { 
-              preview: true,
-              issueContext: issueContext || undefined,
-              vehicleInterest,
-              regeneration: !!issueContext
-            }
-          }
-        });
-
-        if (error) throw error;
-        setMessage(data?.message || 'Unable to generate preview');
-      }
+      if (error) throw error;
+      setMessage(data?.message || 'Unable to generate preview');
+      
+      console.log(`✅ [UNIFIED PREVIEW] Generated message: "${data?.message}"`);
     } catch (error) {
       console.error('Error generating preview:', error);
       setMessage('Error generating message preview');

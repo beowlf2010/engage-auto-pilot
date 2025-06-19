@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { buildEnhancedSystemPrompt, buildEnhancedUserPrompt } from './enhancedPromptBuilder.ts';
@@ -31,18 +32,23 @@ serve(async (req) => {
       conversationLength,
       inventoryStatus,
       isInitialContact = false,
-      salespersonName = 'Your sales representative',
+      salespersonName = 'Finn',
       dealershipName = 'our dealership',
-      context = {}
+      context = {},
+      // Legacy support for old API calls
+      stage,
+      messageType
     } = await req.json();
 
-    console.log(`🤖 Processing ${isInitialContact ? 'WARM INTRODUCTION' : 'ENHANCED'} intelligent AI request for: ${leadName}`);
+    console.log(`🤖 UNIFIED AI: Processing request for ${leadName} - ${isInitialContact ? 'INITIAL CONTACT' : 'FOLLOW-UP'}`);
     console.log(`🚗 Vehicle interest: ${vehicleInterest}`);
-    console.log(`💬 Initial contact: ${isInitialContact}`);
+    console.log(`💬 Message type: ${messageType || (isInitialContact ? 'warm_introduction' : 'follow_up')}`);
 
-    // Handle warm introduction for first contact
-    if (isInitialContact) {
-      console.log('🎯 Generating WARM INTRODUCTION message');
+    // Auto-detect if this should be initial contact based on conversation length
+    const actualIsInitialContact = isInitialContact || conversationLength === 0 || !conversationHistory || conversationHistory.trim() === '';
+    
+    if (actualIsInitialContact) {
+      console.log('🎯 UNIFIED AI: Generating WARM INTRODUCTION from Finn');
       
       const systemPrompt = buildWarmIntroductionPrompt(
         leadName,
@@ -69,48 +75,46 @@ serve(async (req) => {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
           ],
-          temperature: 0.8, // Higher temperature for more natural introductions
-          max_tokens: 120, // Shorter for introductions
+          temperature: 0.8,
+          max_tokens: 120,
         }),
       });
 
       const aiResponse = await response.json();
       const generatedMessage = aiResponse.choices[0].message.content;
 
-      console.log(`✅ Generated WARM INTRODUCTION: ${generatedMessage}`);
+      console.log(`✅ UNIFIED AI: Generated warm introduction: ${generatedMessage}`);
 
       return new Response(JSON.stringify({ 
         message: generatedMessage,
         confidence: 0.95,
-        reasoning: `Warm introduction message for first contact with personalized greeting and ice-breaking approach`,
-        messageType: 'warm_introduction'
+        reasoning: `Unified AI warm introduction from ${salespersonName} for first contact`,
+        messageType: 'warm_introduction',
+        isInitialContact: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ENHANCED validation pipeline with lead-specific context and question analysis
+    // Handle follow-up messages with enhanced AI
+    console.log('🎯 UNIFIED AI: Generating ENHANCED FOLLOW-UP message');
+
+    // Enhanced validation pipeline
     const [inventoryValidation, businessHours, conversationMemory] = await Promise.all([
       validateInventoryAccuracy(vehicleInterest || '', leadId),
       getBusinessHoursStatus(),
       Promise.resolve(analyzeConversationMemory(conversationHistory || ''))
     ]);
 
-    console.log('📊 STRICT Inventory validation:', {
+    console.log('📊 UNIFIED AI: Inventory validation:', {
       hasInventory: inventoryValidation.hasRealInventory,
-      validatedCount: inventoryValidation.validatedCount,
-      totalChecked: inventoryValidation.totalChecked,
-      strictMode: inventoryValidation.strictMode,
-      warning: inventoryValidation.warning || 'none'
+      validatedCount: inventoryValidation.validatedCount
     });
-    
-    console.log('🕒 Business hours:', businessHours.isOpen ? 'OPEN' : 'CLOSED');
-    console.log('🧠 Conversation memory:', conversationMemory.conversationLength, 'messages');
 
-    // Generate context-aware guidance with STRICT inventory rules
+    // Generate context-aware guidance
     const conversationGuidance = generateConversationGuidance(conversationMemory, inventoryValidation, businessHours);
 
-    // Enhanced inventory status with STRICT validation results
+    // Enhanced inventory status
     const enhancedInventoryStatus = {
       ...inventoryStatus,
       hasActualInventory: inventoryValidation.hasRealInventory,
@@ -118,11 +122,11 @@ serve(async (req) => {
       validatedCount: inventoryValidation.validatedCount,
       inventoryWarning: inventoryValidation.warning,
       realInventoryCount: inventoryValidation.actualVehicles.length,
-      strictMode: true, // Always use strict mode
-      mustNotClaim: !inventoryValidation.hasRealInventory // Flag to prevent claims
+      strictMode: true,
+      mustNotClaim: !inventoryValidation.hasRealInventory
     };
 
-    // Build enhanced prompts with QUESTION-FIRST priority and STRICT inventory awareness
+    // Build enhanced prompts
     const { 
       systemPrompt, 
       customerIntent, 
@@ -135,7 +139,7 @@ serve(async (req) => {
     } = buildEnhancedSystemPrompt(
       leadName,
       vehicleInterest,
-      conversationLength,
+      conversationLength || 0,
       conversationHistory,
       enhancedInventoryStatus,
       businessHours,
@@ -147,7 +151,7 @@ serve(async (req) => {
       lastCustomerMessage,
       conversationHistory,
       requestedCategory,
-      { isEstablishedConversation: conversationLength > 2 },
+      { isEstablishedConversation: (conversationLength || 0) > 2 },
       conversationMemory,
       conversationGuidance,
       customerIntent,
@@ -156,12 +160,8 @@ serve(async (req) => {
       tradeIntent
     );
 
-    console.log('🎯 Customer question detected:', customerIntent?.requiresDirectAnswer ? 'YES' : 'NO');
-    console.log('❓ Question type:', customerIntent?.primaryQuestionType || 'none');
-    console.log('🎯 Appointment intent detected:', appointmentIntent?.hasAppointmentIntent ? 'YES' : 'NO');
-    console.log('🚗 Trade intent detected:', tradeIntent?.hasTradeIntent ? 'YES' : 'NO');
-    console.log('⚠️ Inventory safety mode:', !inventoryValidation.hasRealInventory ? 'ACTIVE' : 'NORMAL');
-    console.log('🔧 Conversation repair needed:', customerIntent?.conversationContext?.hasBeenIgnored ? 'YES' : 'NO');
+    console.log('🎯 UNIFIED AI: Customer question detected:', customerIntent?.requiresDirectAnswer ? 'YES' : 'NO');
+    console.log('🎯 UNIFIED AI: Appointment intent:', appointmentIntent?.hasAppointmentIntent ? 'YES' : 'NO');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -183,27 +183,24 @@ serve(async (req) => {
     const aiResponse = await response.json();
     const generatedMessage = aiResponse.choices[0].message.content;
 
-    console.log(`✅ Generated QUESTION-FIRST response with STRICT inventory validation: ${generatedMessage}`);
+    console.log(`✅ UNIFIED AI: Generated follow-up response: ${generatedMessage}`);
 
     return new Response(JSON.stringify({ 
       message: generatedMessage,
       confidence: 0.95,
-      reasoning: `QUESTION-FIRST response with enhanced intent analysis (${customerIntent?.requiresDirectAnswer ? 'Direct question detected' : 'No direct question'}), STRICT inventory validation (${inventoryValidation.validatedCount} verified vehicles), appointment detection (${appointmentIntent?.hasAppointmentIntent ? 'Intent detected' : 'No intent'}), trade detection (${tradeIntent?.hasTradeIntent ? 'Intent detected' : 'No intent'}), business hours (${businessHours.isOpen ? 'open' : 'closed'}), and conversation memory (${conversationMemory.conversationLength} messages) for ${requestedCategory.category} vehicle inquiry`,
+      reasoning: `Unified AI enhanced follow-up with question analysis, inventory validation, and intent detection`,
       customerIntent: customerIntent || null,
       answerGuidance: answerGuidance || null,
       appointmentIntent: appointmentIntent || null,
       tradeIntent: tradeIntent || null,
-      inventoryValidation: {
-        hasRealInventory: inventoryValidation.hasRealInventory,
-        validatedCount: inventoryValidation.validatedCount,
-        strictMode: true
-      }
+      messageType: 'follow_up',
+      isInitialContact: false
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('❌ Error in intelligent conversation AI:', error);
+    console.error('❌ UNIFIED AI Error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
