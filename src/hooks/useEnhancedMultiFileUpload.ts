@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
 import { storeUploadedFile, createUploadHistoryWithoutStorage, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
@@ -38,6 +38,27 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
   const [processing, setProcessing] = useState(false);
   const [batchResult, setBatchResult] = useState<EnhancedBatchUploadResult | null>(null);
   const { toast } = useToast();
+  const processingRef = useRef(false);
+
+  // Prevent navigation during processing
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (processingRef.current) {
+        e.preventDefault();
+        e.returnValue = 'File processing is in progress. Are you sure you want to leave?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      processingRef.current = false;
+    };
+  }, []);
 
   const processFile = async (queuedFile: QueuedFile): Promise<void> => {
     let uploadRecord: UploadHistoryRecord | null = null;
@@ -172,7 +193,23 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
   };
 
   const processBatch = async (files: QueuedFile[]): Promise<EnhancedBatchUploadResult> => {
+    if (processingRef.current) {
+      console.warn('Batch processing already in progress');
+      return batchResult || {
+        totalFiles: 0,
+        successfulFiles: 0,
+        failedFiles: 0,
+        totalRecords: 0,
+        successfulRecords: 0,
+        failedRecords: 0,
+        duplicatesDetected: 0,
+        vehicleHistoryEntries: 0,
+        results: []
+      };
+    }
+
     setProcessing(true);
+    processingRef.current = true;
     
     const results: EnhancedBatchUploadResult['results'] = [];
     let totalRecords = 0;
@@ -241,8 +278,18 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
 
       return batchResult;
 
+    } catch (error) {
+      console.error('Batch processing error:', error);
+      toast({
+        title: "Batch processing failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive"
+      });
+      
+      throw error;
     } finally {
       setProcessing(false);
+      processingRef.current = false;
     }
   };
 

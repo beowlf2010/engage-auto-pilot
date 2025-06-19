@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { History, Package, BarChart3, Trash2, Globe, Clock } from "lucide-react";
+import { History, Package, BarChart3, Trash2, Globe, Clock, Loader2 } from "lucide-react";
 import { useInventoryUpload } from "@/hooks/useInventoryUpload";
 import { useEnhancedMultiFileUpload } from "@/hooks/useEnhancedMultiFileUpload";
 import { Link } from "react-router-dom";
@@ -121,7 +121,23 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
+      {/* Processing Overlay */}
+      {processing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 shadow-xl max-w-md mx-4">
+            <div className="flex items-center space-x-4">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">Processing Files</h3>
+                <p className="text-slate-600">Please wait while your files are being processed...</p>
+                <p className="text-sm text-slate-500 mt-2">Do not navigate away from this page</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Enhanced Inventory Management</h2>
@@ -134,23 +150,29 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
             onClick={handleCleanup}
             variant="outline"
             className="flex items-center space-x-2"
+            disabled={processing}
           >
             <Trash2 className="w-4 h-4" />
             <span>Cleanup Old Data</span>
           </Button>
           <Link to="/inventory-dashboard">
-            <Button variant="outline" className="flex items-center space-x-2">
+            <Button variant="outline" className="flex items-center space-x-2" disabled={processing}>
               <Package className="w-4 h-4" />
               <span>View Inventory</span>
             </Button>
           </Link>
           <Link to="/rpo-insights">
-            <Button variant="outline" className="flex items-center space-x-2">
+            <Button variant="outline" className="flex items-center space-x-2" disabled={processing}>
               <BarChart3 className="w-4 h-4" />
               <span>RPO Insights</span>
             </Button>
           </Link>
-          <Button onClick={() => setShowHistory(true)} variant="outline" className="flex items-center space-x-2">
+          <Button 
+            onClick={() => setShowHistory(true)} 
+            variant="outline" 
+            className="flex items-center space-x-2"
+            disabled={processing}
+          >
             <Clock className="w-4 h-4" />
             <span>Vehicle History</span>
           </Button>
@@ -159,11 +181,11 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
 
       <Tabs defaultValue="file-upload" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="file-upload" className="flex items-center gap-2">
+          <TabsTrigger value="file-upload" className="flex items-center gap-2" disabled={processing}>
             <Package className="w-4 h-4" />
             Smart File Upload
           </TabsTrigger>
-          <TabsTrigger value="website-scraping" className="flex items-center gap-2">
+          <TabsTrigger value="website-scraping" className="flex items-center gap-2" disabled={processing}>
             <Globe className="w-4 h-4" />
             Website Scraping
           </TabsTrigger>
@@ -180,8 +202,8 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
             </ul>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
               <DragDropFileQueue 
                 onFilesProcessed={handleFilesProcessed}
                 onFileProcess={handleSingleFileProcess}
@@ -199,8 +221,8 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
         </TabsContent>
 
         <TabsContent value="website-scraping" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
               <VehicleScraper onScrapingComplete={handleScrapingComplete} />
             </div>
             <div>

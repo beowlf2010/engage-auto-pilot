@@ -13,7 +13,8 @@ import {
   Trash2, 
   CheckCircle, 
   AlertCircle,
-  Play
+  Play,
+  Loader2
 } from "lucide-react";
 
 export interface QueuedFile {
@@ -149,10 +150,12 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
     switch (status) {
       case 'completed': return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'error': return <AlertCircle className="w-4 h-4 text-red-600" />;
-      case 'processing': return <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />;
+      case 'processing': return <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />;
       default: return null;
     }
   };
+
+  const pendingCount = fileQueue.filter(f => f.status === 'pending').length;
 
   return (
     <div className="space-y-6">
@@ -169,6 +172,8 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
               dragActive 
                 ? 'border-blue-500 bg-blue-50 scale-105' 
+                : processing
+                ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
                 : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
             }`}
             onDragEnter={handleDrag}
@@ -177,20 +182,27 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
             onDrop={handleDrop}
           >
             <div className="space-y-4">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                <FileSpreadsheet className="w-8 h-8 text-blue-600" />
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
+                processing ? 'bg-gray-100' : 'bg-blue-100'
+              }`}>
+                {processing ? (
+                  <Loader2 className="w-8 h-8 text-gray-600 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="w-8 h-8 text-blue-600" />
+                )}
               </div>
               
               <div>
                 <p className="text-lg font-medium text-slate-800 mb-2">
-                  Drop multiple files here
+                  {processing ? 'Processing files...' : 'Drop multiple files here'}
                 </p>
                 <p className="text-slate-600 mb-4">
-                  or click to browse and select files
+                  {processing ? 'Please wait while files are being processed' : 'or click to browse and select files'}
                 </p>
                 <Button 
                   onClick={() => fileInputRef.current?.click()}
                   disabled={processing}
+                  className={processing ? 'opacity-50 cursor-not-allowed' : ''}
                 >
                   Choose Files
                 </Button>
@@ -201,6 +213,7 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
                   onChange={handleFileSelect}
                   className="hidden"
                   multiple
+                  disabled={processing}
                 />
               </div>
 
@@ -218,84 +231,133 @@ const DragDropFileQueue = ({ onFilesProcessed, onFileProcess, processing }: Drag
       {fileQueue.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>File Queue ({fileQueue.length})</CardTitle>
-              <div className="flex items-center space-x-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardTitle className="text-lg">
+                File Queue ({fileQueue.length} files)
+                {pendingCount > 0 && (
+                  <span className="ml-2 text-sm font-normal text-slate-600">
+                    • {pendingCount} pending
+                  </span>
+                )}
+              </CardTitle>
+              <div className="flex items-center gap-2">
                 <Button
                   onClick={processAllFiles}
-                  disabled={processing || fileQueue.filter(f => f.status === 'pending').length === 0}
+                  disabled={processing || pendingCount === 0}
                   className="flex items-center space-x-2"
+                  size="sm"
                 >
-                  <Play className="w-4 h-4" />
-                  <span>Process All</span>
+                  {processing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  <span>Process All ({pendingCount})</span>
                 </Button>
-                <Button onClick={clearAll} variant="outline" size="sm">
+                <Button 
+                  onClick={clearAll} 
+                  variant="outline" 
+                  size="sm"
+                  disabled={processing}
+                  className="flex items-center space-x-1"
+                >
                   <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Clear</span>
                 </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="grid gap-4">
               {fileQueue.map((queuedFile) => {
                 const FileIcon = getFileIcon(queuedFile.file.name);
                 
                 return (
-                  <div key={queuedFile.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-3 flex-1">
-                      <FileIcon className="w-5 h-5 text-blue-600" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
-                          {queuedFile.file.name}
+                  <Card key={queuedFile.id} className="border border-slate-200">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        {/* File Info Row */}
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 mt-0.5">
+                            <FileIcon className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <h4 className="font-medium text-sm text-slate-900 truncate">
+                                  {queuedFile.file.name}
+                                </h4>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {(queuedFile.file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {getStatusIcon(queuedFile.status)}
+                                <Button
+                                  onClick={() => removeFile(queuedFile.id)}
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={queuedFile.status === 'processing'}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {(queuedFile.file.size / 1024 / 1024).toFixed(2)} MB
+
+                        {/* Condition and Status Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-600">Type:</span>
+                            <Select
+                              value={queuedFile.condition}
+                              onValueChange={(value: 'new' | 'used' | 'gm_global') => 
+                                updateFileCondition(queuedFile.id, value)
+                              }
+                              disabled={queuedFile.status !== 'pending'}
+                            >
+                              <SelectTrigger className="w-32 h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="new">New</SelectItem>
+                                <SelectItem value="used">Used</SelectItem>
+                                <SelectItem value="gm_global">GM Global</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <Badge 
+                            className={`${getConditionColor(queuedFile.condition)} text-xs`}
+                            variant="outline"
+                          >
+                            {queuedFile.condition === 'gm_global' ? 'GM Global' : 
+                             queuedFile.condition.charAt(0).toUpperCase() + queuedFile.condition.slice(1)}
+                          </Badge>
                         </div>
+
+                        {/* Progress Bar */}
                         {queuedFile.status === 'processing' && queuedFile.progress !== undefined && (
-                          <Progress value={queuedFile.progress} className="w-full mt-1" />
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-600">Processing...</span>
+                              <span className="text-slate-600">{queuedFile.progress}%</span>
+                            </div>
+                            <Progress value={queuedFile.progress} className="h-2" />
+                          </div>
                         )}
+
+                        {/* Error Display */}
                         {queuedFile.error && (
-                          <div className="text-xs text-red-600 mt-1">{queuedFile.error}</div>
+                          <div className="bg-red-50 border border-red-200 rounded-md p-2">
+                            <p className="text-xs text-red-700">{queuedFile.error}</p>
+                          </div>
                         )}
                       </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                      <Select
-                        value={queuedFile.condition}
-                        onValueChange={(value: 'new' | 'used' | 'gm_global') => 
-                          updateFileCondition(queuedFile.id, value)
-                        }
-                        disabled={queuedFile.status !== 'pending'}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="used">Used</SelectItem>
-                          <SelectItem value="gm_global">GM Global</SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      <Badge className={getConditionColor(queuedFile.condition)}>
-                        {queuedFile.condition === 'gm_global' ? 'GM Global' : 
-                         queuedFile.condition.charAt(0).toUpperCase() + queuedFile.condition.slice(1)}
-                      </Badge>
-
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(queuedFile.status)}
-                        <Button
-                          onClick={() => removeFile(queuedFile.id)}
-                          variant="ghost"
-                          size="sm"
-                          disabled={queuedFile.status === 'processing'}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
