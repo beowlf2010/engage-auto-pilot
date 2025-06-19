@@ -192,8 +192,8 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   return (
     <div className="h-[calc(100vh-8rem)] flex space-x-6">
-      {/* Fixed width conversations list */}
-      <div className="w-80 flex-shrink-0 relative">
+      {/* Increased width conversations list for better button visibility */}
+      <div className="w-96 flex-shrink-0 relative">
         <ConversationsList
           conversations={filteredConversations}
           selectedLead={selectedLead}
