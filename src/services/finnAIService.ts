@@ -45,6 +45,7 @@ const getCleanProfileData = async (userId: string) => {
 export const toggleFinnAI = async (leadId: string, currentOptIn: boolean): Promise<FinnAIResult> => {
   try {
     const newOptInState = !currentOptIn;
+    console.log(`🤖 [FINN AI SERVICE] === DEBUGGING CORRY BAGGETT ISSUE ===`);
     console.log(`🤖 [FINN AI SERVICE] Toggling AI for lead ${leadId}: ${currentOptIn} -> ${newOptInState}`);
 
     // Get current user session
@@ -54,9 +55,12 @@ export const toggleFinnAI = async (leadId: string, currentOptIn: boolean): Promi
       return { success: false, error: 'User not authenticated' };
     }
 
+    console.log(`👤 [FINN AI SERVICE] Authenticated user ID: ${session.user.id}`);
+
     // Get clean profile data
     const profile = await getCleanProfileData(session.user.id);
     if (!profile) {
+      console.error('❌ [FINN AI SERVICE] Failed to get clean profile data');
       return { success: false, error: 'Failed to load user profile' };
     }
 
@@ -80,20 +84,30 @@ export const toggleFinnAI = async (leadId: string, currentOptIn: boolean): Promi
 
     // If enabling AI, send initial message
     if (newOptInState) {
-      console.log(`🚀 [FINN AI SERVICE] AI enabled, sending initial message with profile:`, profile);
+      console.log(`🚀 [FINN AI SERVICE] === ENABLING AI - SENDING INITIAL MESSAGE ===`);
+      console.log(`🚀 [FINN AI SERVICE] Lead ID: ${leadId}`);
+      console.log(`🚀 [FINN AI SERVICE] Profile for initial message:`, {
+        id: profile.id,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        email: profile.email
+      });
       
       try {
+        console.log(`📞 [FINN AI SERVICE] Calling sendInitialMessage...`);
         const messageResult = await sendInitialMessage(leadId, profile);
+        console.log(`📬 [FINN AI SERVICE] sendInitialMessage result:`, messageResult);
         
         if (messageResult.success) {
-          console.log(`✅ [FINN AI SERVICE] Initial message sent successfully`);
+          console.log(`✅ [FINN AI SERVICE] === SUCCESS! Initial message sent ===`);
           return { 
             success: true, 
             message: 'Finn AI enabled and initial message sent',
             newState: newOptInState 
           };
         } else {
-          console.warn(`⚠️ [FINN AI SERVICE] AI enabled but initial message failed:`, messageResult.error);
+          console.error(`❌ [FINN AI SERVICE] === FAILURE! Initial message failed ===`);
+          console.error(`❌ [FINN AI SERVICE] Failure reason:`, messageResult.error);
           return { 
             success: true, 
             message: `Finn AI enabled but initial message failed: ${messageResult.error}`,
@@ -101,7 +115,9 @@ export const toggleFinnAI = async (leadId: string, currentOptIn: boolean): Promi
           };
         }
       } catch (messageError) {
-        console.error('❌ [FINN AI SERVICE] Error in sendInitialMessage:', messageError);
+        console.error('❌ [FINN AI SERVICE] === EXCEPTION in sendInitialMessage ===');
+        console.error('❌ [FINN AI SERVICE] Exception details:', messageError);
+        console.error('❌ [FINN AI SERVICE] Exception stack:', messageError instanceof Error ? messageError.stack : 'No stack trace');
         return { 
           success: true, 
           message: `Finn AI enabled but initial message failed: ${messageError instanceof Error ? messageError.message : 'Unknown error'}`,
@@ -117,7 +133,9 @@ export const toggleFinnAI = async (leadId: string, currentOptIn: boolean): Promi
       };
     }
   } catch (error) {
-    console.error('❌ [FINN AI SERVICE] Error in toggleFinnAI:', error);
+    console.error('❌ [FINN AI SERVICE] === CRITICAL ERROR in toggleFinnAI ===');
+    console.error('❌ [FINN AI SERVICE] Critical error details:', error);
+    console.error('❌ [FINN AI SERVICE] Critical error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 

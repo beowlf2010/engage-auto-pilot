@@ -5,7 +5,9 @@ import { generateEnhancedIntelligentResponse } from '../enhancedIntelligentConve
 // Generate warm, introductory initial outreach messages using UNIFIED AI
 export const generateWarmInitialMessage = async (lead: any, profile: any): Promise<string | null> => {
   try {
-    console.log(`🤖 [UNIFIED WARM INTRO] Generating warm AI introduction for ${lead.first_name}`);
+    console.log(`🤖 [UNIFIED WARM INTRO] === DEBUGGING CORRY BAGGETT - GENERATING WARM AI MESSAGE ===`);
+    console.log(`🤖 [UNIFIED WARM INTRO] Lead name: ${lead.first_name} ${lead.last_name}`);
+    console.log(`🤖 [UNIFIED WARM INTRO] Vehicle interest: ${lead.vehicle_interest || 'Not specified'}`);
     console.log(`👤 [UNIFIED WARM INTRO] Using profile:`, {
       profileFirstName: profile?.first_name,
       hasProfile: !!profile
@@ -27,7 +29,8 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
       dealershipName: 'Jason Pilger Chevrolet' // Always use correct dealership
     };
 
-    console.log(`🔄 [UNIFIED WARM INTRO] Calling unified AI with context:`, {
+    console.log(`🔄 [UNIFIED WARM INTRO] === CALLING UNIFIED AI ===`);
+    console.log(`🔄 [UNIFIED WARM INTRO] Context for AI:`, {
       leadName: context.leadName,
       vehicleInterest: context.vehicleInterest,
       isInitialContact: context.isInitialContact,
@@ -37,13 +40,21 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
 
     const aiResponse = await generateEnhancedIntelligentResponse(context);
     
+    console.log(`📬 [UNIFIED WARM INTRO] AI response received:`, {
+      hasResponse: !!aiResponse,
+      hasMessage: !!aiResponse?.message,
+      messageLength: aiResponse?.message?.length || 0,
+      messagePreview: aiResponse?.message?.substring(0, 50) || 'NO MESSAGE'
+    });
+    
     if (aiResponse?.message) {
-      console.log(`✅ [UNIFIED WARM INTRO] Unified AI generated warm introduction: ${aiResponse.message}`);
+      console.log(`✅ [UNIFIED WARM INTRO] === SUCCESS! Unified AI generated message ===`);
+      console.log(`✅ [UNIFIED WARM INTRO] Message: ${aiResponse.message}`);
       return aiResponse.message;
     }
 
     // Improved fallback templates that are warm and conversational
-    console.log('⚠️ [UNIFIED WARM INTRO] Unified AI failed, using warm fallback templates');
+    console.log('⚠️ [UNIFIED WARM INTRO] === AI FAILED - USING FALLBACK TEMPLATES ===');
     const warmTemplates = [
       `Hi ${lead.first_name}! I'm Finn with Jason Pilger Chevrolet. I noticed you were interested in ${lead.vehicle_interest || 'finding the right vehicle'}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at vehicles today?`,
       
@@ -55,10 +66,13 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
     ];
 
     const selectedTemplate = warmTemplates[Math.floor(Math.random() * warmTemplates.length)];
-    console.log(`📝 [UNIFIED WARM INTRO] Using fallback template: ${selectedTemplate}`);
+    console.log(`📝 [UNIFIED WARM INTRO] === FALLBACK TEMPLATE SELECTED ===`);
+    console.log(`📝 [UNIFIED WARM INTRO] Template: ${selectedTemplate}`);
     return selectedTemplate;
   } catch (error) {
+    console.error('❌ [UNIFIED WARM INTRO] === CRITICAL ERROR ===');
     console.error('❌ [UNIFIED WARM INTRO] Error generating warm AI introduction:', error);
+    console.error('❌ [UNIFIED WARM INTRO] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return null;
   }
 };

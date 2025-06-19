@@ -48,12 +48,14 @@ const cleanProfileData = (profile: any) => {
 // Send immediate first message when AI is enabled - NOW USES ENHANCED AI WITH WARM INTRODUCTION
 export const sendInitialMessage = async (leadId: string, profile: any): Promise<ProactiveMessageResult> => {
   try {
-    console.log(`🚀 [INITIAL MESSAGE SERVICE] Starting warm initial proactive message to lead ${leadId}`);
+    console.log(`🚀 [INITIAL MESSAGE SERVICE] === DEBUGGING CORRY BAGGETT - STARTING INITIAL MESSAGE ===`);
+    console.log(`🚀 [INITIAL MESSAGE SERVICE] Lead ID: ${leadId}`);
     console.log(`👤 [INITIAL MESSAGE SERVICE] Raw profile data:`, profile);
 
     // Clean and validate profile data
     const cleanedProfile = cleanProfileData(profile);
     if (!cleanedProfile) {
+      console.error('❌ [INITIAL MESSAGE SERVICE] === PROFILE VALIDATION FAILED ===');
       return { 
         success: false, 
         leadId, 
@@ -62,9 +64,9 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       };
     }
 
-    console.log(`✅ [INITIAL MESSAGE SERVICE] Using cleaned profile:`, cleanedProfile);
+    console.log(`✅ [INITIAL MESSAGE SERVICE] Profile validation passed:`, cleanedProfile);
 
-    console.log(`📋 [INITIAL MESSAGE SERVICE] Getting lead details for ${leadId}...`);
+    console.log(`📋 [INITIAL MESSAGE SERVICE] === FETCHING LEAD DETAILS ===`);
     // Get lead details
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -73,11 +75,11 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       .single();
 
     if (leadError || !lead) {
-      console.error(`❌ [INITIAL MESSAGE SERVICE] Lead not found:`, leadError);
+      console.error(`❌ [INITIAL MESSAGE SERVICE] === LEAD FETCH FAILED ===`, leadError);
       return { success: false, leadId, error: 'Lead not found', messageSource: 'initial_message_service' };
     }
 
-    console.log(`📋 [INITIAL MESSAGE SERVICE] Lead data:`, {
+    console.log(`📋 [INITIAL MESSAGE SERVICE] Lead data retrieved:`, {
       leadId: lead.id,
       firstName: lead.first_name,
       lastName: lead.last_name,
@@ -86,11 +88,11 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
     });
 
     if (!lead.ai_opt_in) {
-      console.warn(`⚠️ [INITIAL MESSAGE SERVICE] AI not enabled for lead ${leadId}`);
+      console.warn(`⚠️ [INITIAL MESSAGE SERVICE] === AI NOT ENABLED FOR LEAD ===`);
       return { success: false, leadId, error: 'AI not enabled for lead', messageSource: 'initial_message_service' };
     }
 
-    console.log(`🔍 [INITIAL MESSAGE SERVICE] Checking for existing messages...`);
+    console.log(`🔍 [INITIAL MESSAGE SERVICE] === CHECKING FOR EXISTING MESSAGES ===`);
     // Check if we've already sent a message
     const { data: existingMessages } = await supabase
       .from('conversations')
@@ -99,29 +101,43 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       .eq('direction', 'out')
       .limit(3);
 
+    console.log(`📊 [INITIAL MESSAGE SERVICE] Existing outbound messages:`, existingMessages?.length || 0);
+
     if (existingMessages && existingMessages.length > 0) {
-      console.warn(`⚠️ [INITIAL MESSAGE SERVICE] Already contacted this lead. Existing messages:`, 
+      console.warn(`⚠️ [INITIAL MESSAGE SERVICE] === ALREADY CONTACTED THIS LEAD ===`);
+      console.warn(`⚠️ [INITIAL MESSAGE SERVICE] Existing messages:`, 
         existingMessages.map(msg => ({ id: msg.id, body: msg.body?.substring(0, 50), aiGenerated: msg.ai_generated }))
       );
       return { success: false, leadId, error: 'Already contacted this lead', messageSource: 'initial_message_service' };
     }
 
     // Generate warm initial message using ENHANCED AI with introduction context
-    console.log(`🤖 [INITIAL MESSAGE SERVICE] Generating warm initial message...`);
+    console.log(`🤖 [INITIAL MESSAGE SERVICE] === GENERATING WARM INITIAL MESSAGE ===`);
+    console.log(`🤖 [INITIAL MESSAGE SERVICE] Calling generateWarmInitialMessage...`);
+    
     const message = await generateWarmInitialMessage(lead, cleanedProfile);
     
+    console.log(`📝 [INITIAL MESSAGE SERVICE] Message generation result:`, {
+      hasMessage: !!message,
+      messageLength: message?.length || 0,
+      messagePreview: message?.substring(0, 100) || 'NO MESSAGE'
+    });
+    
     if (!message) {
-      console.error(`❌ [INITIAL MESSAGE SERVICE] Failed to generate warm initial message`);
+      console.error(`❌ [INITIAL MESSAGE SERVICE] === MESSAGE GENERATION FAILED ===`);
       return { success: false, leadId, error: 'Failed to generate message', messageSource: 'initial_message_service' };
     }
 
-    console.log(`✨ [INITIAL MESSAGE SERVICE] Generated warm message: "${message}"`);
+    console.log(`✨ [INITIAL MESSAGE SERVICE] Generated message: "${message}"`);
 
     // Send the message using cleaned profile
     try {
-      console.log(`📤 [INITIAL MESSAGE SERVICE] Sending message via messagesService...`);
+      console.log(`📤 [INITIAL MESSAGE SERVICE] === SENDING MESSAGE VIA MESSAGES SERVICE ===`);
+      console.log(`📤 [INITIAL MESSAGE SERVICE] Message to send: "${message}"`);
+      console.log(`📤 [INITIAL MESSAGE SERVICE] Using profile:`, cleanedProfile);
+      
       await sendMessage(leadId, message, cleanedProfile, true);
-      console.log(`✅ [INITIAL MESSAGE SERVICE] Message sent successfully`);
+      console.log(`✅ [INITIAL MESSAGE SERVICE] === MESSAGE SENT SUCCESSFULLY ===`);
       
       // Get the most recent conversation for this lead to get the message ID
       const { data: recentMessage } = await supabase
@@ -150,13 +166,15 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
         console.warn(`⚠️ [INITIAL MESSAGE SERVICE] Failed to add conversation note:`, noteError);
         // Don't fail the whole operation for this
       }
-    } catch (error) {
-      console.error('❌ [INITIAL MESSAGE SERVICE] Error sending message:', error);
-      return { success: false, leadId, error: `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`, messageSource: 'initial_message_service' };
+    } catch (sendError) {
+      console.error('❌ [INITIAL MESSAGE SERVICE] === MESSAGE SENDING FAILED ===');
+      console.error('❌ [INITIAL MESSAGE SERVICE] Send error details:', sendError);
+      console.error('❌ [INITIAL MESSAGE SERVICE] Send error stack:', sendError instanceof Error ? sendError.stack : 'No stack trace');
+      return { success: false, leadId, error: `Failed to send message: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`, messageSource: 'initial_message_service' };
     }
 
     // Update lead status
-    console.log(`🔄 [INITIAL MESSAGE SERVICE] Updating lead status...`);
+    console.log(`🔄 [INITIAL MESSAGE SERVICE] === UPDATING LEAD STATUS ===`);
     try {
       await supabase
         .from('leads')
@@ -172,11 +190,14 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       // Don't fail the whole operation for this
     }
 
+    console.log(`✅ [INITIAL MESSAGE SERVICE] === COMPLETE SUCCESS! ===`);
     console.log(`✅ [INITIAL MESSAGE SERVICE] Successfully sent warm introduction to ${lead.first_name}: ${message}`);
     
     return { success: true, leadId, message, messageSource: 'initial_message_service' };
   } catch (error) {
-    console.error(`❌ [INITIAL MESSAGE SERVICE] Error sending warm introduction to lead ${leadId}:`, error);
+    console.error(`❌ [INITIAL MESSAGE SERVICE] === CRITICAL EXCEPTION ===`);
+    console.error(`❌ [INITIAL MESSAGE SERVICE] Exception in sendInitialMessage for lead ${leadId}:`, error);
+    console.error(`❌ [INITIAL MESSAGE SERVICE] Exception stack:`, error instanceof Error ? error.stack : 'No stack trace');
     return { 
       success: false, 
       leadId, 
