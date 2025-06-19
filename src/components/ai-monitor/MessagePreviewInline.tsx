@@ -44,29 +44,88 @@ const MessagePreviewInline = ({
   const [regenerating, setRegenerating] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string>('');
   const [showIssueSelector, setShowIssueSelector] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<any[]>([]);
 
   useEffect(() => {
-    generatePreview();
+    loadConversationHistory();
   }, [leadId]);
+
+  useEffect(() => {
+    if (conversationHistory !== null) {
+      generatePreview();
+    }
+  }, [conversationHistory]);
+
+  const loadConversationHistory = async () => {
+    try {
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: true });
+
+      setConversationHistory(conversations || []);
+    } catch (error) {
+      console.error('Error loading conversation history:', error);
+      setConversationHistory([]);
+    }
+  };
 
   const generatePreview = async (issueContext?: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-ai-message', {
-        body: {
-          leadId,
-          stage: aiStage,
-          context: { 
-            preview: true,
-            issueContext: issueContext || undefined,
+      const isInitialContact = conversationHistory.length === 0;
+      
+      if (isInitialContact) {
+        // Use intelligent conversation AI for warm introductions
+        const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
+          body: {
+            leadId,
+            leadName,
             vehicleInterest,
-            regeneration: !!issueContext
+            lastCustomerMessage: '',
+            conversationHistory: '',
+            leadInfo: {
+              phone: '',
+              status: 'new',
+              lastReplyAt: new Date().toISOString()
+            },
+            conversationLength: 0,
+            inventoryStatus: {
+              hasInventory: true,
+              totalVehicles: 20
+            },
+            isInitialContact: true,
+            salespersonName: 'Finn',
+            dealershipName: 'our dealership',
+            context: {
+              preview: true,
+              issueContext: issueContext || undefined,
+              regeneration: !!issueContext
+            }
           }
-        }
-      });
+        });
 
-      if (error) throw error;
-      setMessage(data?.message || 'Unable to generate preview');
+        if (error) throw error;
+        setMessage(data?.message || 'Unable to generate warm introduction');
+      } else {
+        // Use existing AI message generation for follow-ups
+        const { data, error } = await supabase.functions.invoke('generate-ai-message', {
+          body: {
+            leadId,
+            stage: aiStage,
+            context: { 
+              preview: true,
+              issueContext: issueContext || undefined,
+              vehicleInterest,
+              regeneration: !!issueContext
+            }
+          }
+        });
+
+        if (error) throw error;
+        setMessage(data?.message || 'Unable to generate preview');
+      }
     } catch (error) {
       console.error('Error generating preview:', error);
       setMessage('Error generating message preview');
@@ -80,11 +139,20 @@ const MessagePreviewInline = ({
     
     try {
       const { sendMessage } = await import('@/services/messagesService');
-      const { useAuth } = await import('@/components/auth/AuthProvider');
       
-      // We need to get the profile - in a real implementation, this would come from props
-      // For now, we'll assume it's available globally or passed down
-      await sendMessage(leadId, message, { id: 'current-user' }, true);
+      // Get current user profile
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (!profile) throw new Error('No user profile found');
+      
+      await sendMessage(leadId, message, profile, true);
       
       toast({
         title: "Message Sent",
@@ -126,12 +194,14 @@ const MessagePreviewInline = ({
     const hasVehicle = msg.toLowerCase().includes(vehicleInterest.toLowerCase());
     const goodLength = msg.length > 50 && msg.length < 300;
     const hasCall2Action = /\?|call|visit|appointment|interested|available/i.test(msg);
+    const hasFinnIntro = msg.toLowerCase().includes('finn') && conversationHistory.length === 0;
     
     let score = 5;
     if (hasPersonalization) score += 1;
     if (hasVehicle) score += 1;
     if (goodLength) score += 1;
     if (hasCall2Action) score += 2;
+    if (hasFinnIntro) score += 1; // Bonus for proper Finn introduction
     
     if (score >= 8) return { score, color: 'text-green-600' };
     if (score >= 6) return { score, color: 'text-yellow-600' };
@@ -139,6 +209,7 @@ const MessagePreviewInline = ({
   };
 
   const quality = getMessageQuality(message);
+  const isInitialContact = conversationHistory.length === 0;
 
   return (
     <Card className="border-l-4 border-l-blue-500">
@@ -146,7 +217,9 @@ const MessagePreviewInline = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-blue-600" />
-            <span className="font-medium text-sm">AI Message Preview</span>
+            <span className="font-medium text-sm">
+              {isInitialContact ? 'Finn Introduction Preview' : 'AI Follow-up Preview'}
+            </span>
             <Badge variant="outline" className="text-xs">
               Quality: <span className={quality.color}>{quality.score}/10</span>
             </Badge>
@@ -164,7 +237,9 @@ const MessagePreviewInline = ({
         </div>
 
         {loading ? (
-          <div className="text-sm text-muted-foreground italic">Generating message preview...</div>
+          <div className="text-sm text-muted-foreground italic">
+            {isInitialContact ? 'Generating warm introduction from Finn...' : 'Generating follow-up message...'}
+          </div>
         ) : (
           <div className="bg-muted p-3 rounded text-sm">
             {message.length > 150 ? `${message.substring(0, 150)}...` : message}
