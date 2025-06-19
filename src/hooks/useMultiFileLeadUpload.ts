@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
@@ -73,6 +72,20 @@ export const useMultiFileLeadUpload = () => {
   const createFlexibleMapping = (headers: string[]) => {
     console.log('Available CSV headers:', headers);
     
+    // Check if this looks like a VIN Solutions message export
+    const vinSolutionsIndicators = [
+      'message_content', 'message_direction', 'customer_name', 
+      'conversation_id', 'lead_name', 'message_body', 'timestamp'
+    ];
+    
+    const hasVinSolutionsHeaders = vinSolutionsIndicators.some(indicator => 
+      headers.some(header => header.toLowerCase().includes(indicator.toLowerCase()))
+    );
+    
+    if (hasVinSolutionsHeaders) {
+      throw new Error('This appears to be a VIN Solutions message export file. Please use the Message Import feature for VIN Solutions files.');
+    }
+    
     const findHeader = (possibleNames: string[]): string => {
       for (const name of possibleNames) {
         const found = headers.find(h => 
@@ -126,7 +139,7 @@ export const useMultiFileLeadUpload = () => {
       const fileSelectionResult = await handleFileSelection(queuedFile.file);
       
       if (fileSelectionResult.shouldShowSheetSelector) {
-        throw new Error('Multi-sheet Excel files require individual processing');
+        throw new Error('Multi-sheet Excel files require individual processing. Please save each sheet as a separate file or use the single-file upload with sheet selection.');
       }
       
       // Parse the file
@@ -137,7 +150,7 @@ export const useMultiFileLeadUpload = () => {
         throw new Error('No data rows found in file');
       }
 
-      // Create flexible field mapping
+      // Create flexible field mapping with VIN Solutions detection
       const flexibleMapping = createFlexibleMapping(parsed.headers);
       
       // Process leads with enhanced data preservation
@@ -173,7 +186,17 @@ export const useMultiFileLeadUpload = () => {
 
     } catch (error) {
       console.error(`Enhanced upload error for ${queuedFile.file.name}:`, error);
-      updateFileStatus(queuedFile.id, 'error', error instanceof Error ? error.message : 'Processing failed');
+      
+      let errorMessage = error instanceof Error ? error.message : 'Processing failed';
+      
+      // Provide more helpful error messages
+      if (errorMessage.includes('VIN Solutions')) {
+        errorMessage = 'VIN Solutions message files detected. Please use the Message Import feature instead of the lead upload.';
+      } else if (errorMessage.includes('Multi-sheet')) {
+        errorMessage = 'Multi-sheet Excel file detected. Please save each sheet separately or use single-file upload with sheet selection.';
+      }
+      
+      updateFileStatus(queuedFile.id, 'error', errorMessage);
     }
   };
 
@@ -234,11 +257,17 @@ export const useMultiFileLeadUpload = () => {
           title: "Batch upload successful!",
           description: `${successfulFiles} files processed, ${successfulLeads} leads imported`,
         });
+      } else if (successfulFiles > 0) {
+        toast({
+          title: "Batch upload completed with some errors",
+          description: `${successfulFiles} files succeeded, ${failedFiles} files failed. Check results for details.`,
+          variant: "default"
+        });
       } else {
         toast({
-          title: "Batch upload completed with errors",
-          description: `${successfulFiles} files succeeded, ${failedFiles} files failed`,
-          variant: "default"
+          title: "Batch upload failed",
+          description: "All files failed to process. Please check the file formats and try again.",
+          variant: "destructive"
         });
       }
 
