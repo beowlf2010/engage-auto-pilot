@@ -208,7 +208,7 @@ class RealtimeLearningService {
     // Update communication pattern with learned preferences
     if (patterns) {
       const updatedPreferences = {
-        ...patterns.content_preferences,
+        ...(patterns.content_preferences || {}),
         avoid_negative_triggers: true,
         preferred_tone: 'consultative',
         last_optimization: new Date().toISOString()

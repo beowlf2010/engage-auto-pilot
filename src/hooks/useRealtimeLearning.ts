@@ -18,12 +18,14 @@ export const useRealtimeLearning = (leadId?: string) => {
   const [learningInsights, setLearningInsights] = useState<any>(null);
   const [optimizationQueue, setOptimizationQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isLearning, setIsLearning] = useState(false);
 
   // Track message outcome in real-time
   const trackMessageOutcome = useCallback(async (messageContent: string, outcomeType: string) => {
     if (!leadId) return;
 
     try {
+      setIsLearning(true);
       await realtimeLearningService.processLearningEvent({
         type: 'message_sent',
         leadId,
@@ -39,6 +41,8 @@ export const useRealtimeLearning = (leadId?: string) => {
       setLearningInsights(insights);
     } catch (error) {
       console.error('Error tracking message outcome:', error);
+    } finally {
+      setIsLearning(false);
     }
   }, [leadId]);
 
@@ -75,6 +79,7 @@ export const useRealtimeLearning = (leadId?: string) => {
     if (!leadId) return;
 
     try {
+      setIsLearning(true);
       await realtimeLearningService.processLearningEvent({
         type: 'feedback_submitted',
         leadId,
@@ -92,6 +97,8 @@ export const useRealtimeLearning = (leadId?: string) => {
       setLearningInsights(insights);
     } catch (error) {
       console.error('Error submitting realtime feedback:', error);
+    } finally {
+      setIsLearning(false);
     }
   }, [leadId]);
 
@@ -127,6 +134,7 @@ export const useRealtimeLearning = (leadId?: string) => {
     learningInsights,
     optimizationQueue,
     loading,
+    isLearning,
     trackMessageOutcome,
     processOptimizationQueue,
     submitRealtimeFeedback,
