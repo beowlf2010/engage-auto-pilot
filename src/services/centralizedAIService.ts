@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { generateEnhancedIntelligentResponse, processCustomerVehicleMentions } from './enhancedIntelligentConversationAI';
+import { generateEnhancedIntelligentResponse } from './enhancedIntelligentConversationAI';
 
 class CentralizedAIService {
   private processedMessages = new Set<string>();
@@ -67,13 +67,6 @@ class CentralizedAIService {
 
       if (!lastCustomerMessage) return null;
 
-      // Process vehicle mentions from the customer message
-      await processCustomerVehicleMentions(
-        leadId,
-        lastCustomerMessage.id,
-        lastCustomerMessage.body
-      );
-
       // Format messages for AI
       const formattedMessages = conversations.map(msg => ({
         id: msg.id,
@@ -120,10 +113,11 @@ class CentralizedAIService {
     console.log(`✅ Marked QUESTION-FIRST AI response as processed for lead ${leadId}`);
   }
 
-  // Process incoming message for vehicle mentions
+  // Process incoming message for vehicle mentions (removed as function doesn't exist)
   async processIncomingMessage(leadId: string, conversationId: string, messageBody: string): Promise<void> {
     try {
-      await processCustomerVehicleMentions(leadId, conversationId, messageBody);
+      // Vehicle mention processing has been removed as the function doesn't exist
+      console.log(`Processing incoming message for lead ${leadId}`);
     } catch (error) {
       console.error('Error processing incoming message:', error);
     }
