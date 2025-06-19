@@ -1,46 +1,13 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { sendInitialMessage } from './proactiveAIService';
 
 export interface ToggleAIResult {
   success: boolean;
   newState: boolean;
   error?: string;
 }
-
-const sendInitialMessage = async (leadId: string) => {
-  try {
-    // Import the intelligent AI message service
-    const { generateIntelligentAIMessage } = await import('@/services/intelligentAIMessageService');
-    const { sendMessage } = await import('@/services/messagesService');
-    
-    // Generate an initial AI message
-    const message = await generateIntelligentAIMessage({ leadId });
-    
-    if (message) {
-      // Get the current user profile
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No authenticated user');
-      
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (!profile) throw new Error('No user profile found');
-      
-      // Send the message
-      await sendMessage(leadId, message, profile, true);
-      
-      console.log('Initial AI message sent successfully for lead:', leadId);
-      return true;
-    }
-  } catch (error) {
-    console.error('Error sending initial AI message:', error);
-    return false;
-  }
-};
 
 export const toggleFinnAI = async (leadId: string | number, currentState: boolean): Promise<ToggleAIResult> => {
   try {
@@ -72,20 +39,43 @@ export const toggleFinnAI = async (leadId: string | number, currentState: boolea
       return { success: false, newState: currentState, error: error.message };
     }
 
-    // If enabling AI, send initial message immediately
+    // If enabling AI, send warm introduction message immediately
     if (newState) {
-      const messageSent = await sendInitialMessage(String(leadId));
-      
-      if (messageSent) {
+      try {
+        // Get the current user profile
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('No authenticated user');
+        
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (!profile) throw new Error('No user profile found');
+        
+        // Send warm introduction using the enhanced proactive AI service
+        const result = await sendInitialMessage(String(leadId), profile);
+        
+        if (result.success) {
+          toast({
+            title: "Finn AI Enabled",
+            description: "Finn has been activated and sent a warm introduction to this lead!",
+            variant: "default"
+          });
+        } else {
+          console.warn('Failed to send initial message:', result.error);
+          toast({
+            title: "Finn AI Enabled",
+            description: "Finn is ready to start the conversation! The initial message will be sent shortly.",
+            variant: "default"
+          });
+        }
+      } catch (messageError) {
+        console.error('Error sending warm introduction:', messageError);
         toast({
           title: "Finn AI Enabled",
-          description: "Finn has been activated and sent the first message to this lead!",
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: "Finn AI Enabled",
-          description: "Finn is ready to start the conversation! The first message will be sent shortly.",
+          description: "Finn is ready to start the conversation! The initial message will be sent shortly.",
           variant: "default"
         });
       }
