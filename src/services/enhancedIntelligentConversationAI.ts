@@ -1,80 +1,119 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-export interface EnhancedIntelligentResponse {
+export interface ConversationContext {
+  leadId: string;
+  leadName: string;
+  vehicleInterest: string;
+  messages: Array<{
+    id: string;
+    body: string;
+    direction: 'in' | 'out';
+    sentAt: string;
+    aiGenerated?: boolean;
+  }>;
+  leadInfo?: {
+    phone: string;
+    status: string;
+    lastReplyAt?: string;
+  };
+}
+
+export interface AIResponse {
   message: string;
   confidence: number;
   reasoning: string;
   customerIntent?: any;
-  messageType?: string;
+  answerGuidance?: any;
 }
 
-export const generateEnhancedIntelligentResponse = async (context: any): Promise<EnhancedIntelligentResponse | null> => {
+// Enhanced AI service that ONLY uses the unified edge function
+export const generateEnhancedIntelligentResponse = async (context: ConversationContext): Promise<AIResponse | null> => {
   try {
-    console.log(`🤖 [UNIFIED SERVICE] Starting unified intelligent response generation`);
-    console.log(`📋 [UNIFIED SERVICE] Context:`, {
-      leadId: context.leadId,
-      leadName: context.leadName,
-      vehicleInterest: context.vehicleInterest,
-      isInitialContact: context.isInitialContact,
-      salespersonName: context.salespersonName,
-      dealershipName: context.dealershipName,
-      messageCount: context.messages?.length || 0
-    });
+    console.log('🤖 [ENHANCED AI] Generating response via UNIFIED edge function for lead:', context.leadId);
 
-    // Extract the last customer message for regular conversations
-    const lastCustomerMessage = context.messages?.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '';
-    
-    console.log(`💬 [UNIFIED SERVICE] Last customer message: "${lastCustomerMessage}"`);
-    console.log(`🎯 [UNIFIED SERVICE] Is initial contact: ${context.isInitialContact}`);
+    // Get recent conversation history (last 10 messages)
+    const recentMessages = context.messages
+      .slice(-10)
+      .map(msg => `${msg.direction === 'in' ? 'Customer' : 'Sales'}: ${msg.body}`)
+      .join('\n');
 
-    // Always call the unified intelligent conversation AI function
+    // Get the last customer message to understand what they're asking
+    const lastCustomerMessage = context.messages
+      .filter(msg => msg.direction === 'in')
+      .slice(-1)[0];
+
+    if (!lastCustomerMessage) {
+      console.log('❌ [ENHANCED AI] No customer message found to respond to');
+      return null;
+    }
+
+    // Check if we've already responded to this message
+    const messagesAfterCustomer = context.messages.filter(msg => 
+      new Date(msg.sentAt) > new Date(lastCustomerMessage.sentAt) && msg.direction === 'out'
+    );
+
+    if (messagesAfterCustomer.length > 0) {
+      console.log('✅ [ENHANCED AI] Already responded to latest customer message');
+      return null;
+    }
+
+    console.log('🔄 [ENHANCED AI] Calling UNIFIED intelligent-conversation-ai edge function');
+
+    // Call the UNIFIED edge function that has the fixed logic
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: context.leadId,
         leadName: context.leadName,
-        vehicleInterest: context.vehicleInterest,
-        lastCustomerMessage: lastCustomerMessage,
-        conversationHistory: context.messages?.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
+        vehicleInterest: context.vehicleInterest || '',
+        lastCustomerMessage: lastCustomerMessage.body,
+        conversationHistory: recentMessages,
         leadInfo: context.leadInfo,
-        conversationLength: context.messages?.length || 0,
-        inventoryStatus: {
-          hasInventory: true,
-          totalVehicles: 20
-        },
-        isInitialContact: context.isInitialContact || false,
-        salespersonName: 'Finn', // Always force Finn
-        dealershipName: 'Jason Pilger Chevrolet', // Always use correct dealership
-        context: context
+        conversationLength: context.messages.length,
+        isInitialContact: false, // This is for follow-up messages
+        salespersonName: 'Finn',
+        dealershipName: 'Jason Pilger Chevrolet'
       }
     });
 
     if (error) {
-      console.error('❌ [UNIFIED SERVICE] Edge function error:', error);
+      console.error('❌ [ENHANCED AI] Error from unified edge function:', error);
       return null;
     }
 
-    if (!data || !data.message) {
-      console.error('❌ [UNIFIED SERVICE] No message returned from edge function');
+    if (!data?.message) {
+      console.error('❌ [ENHANCED AI] No message returned from unified edge function');
       return null;
     }
 
-    console.log(`✅ [UNIFIED SERVICE] Generated response:`, {
-      message: data.message,
-      confidence: data.confidence,
-      messageType: data.messageType || 'standard'
-    });
-
+    console.log('✅ [ENHANCED AI] Generated response via unified edge function:', data.message);
+    
     return {
       message: data.message,
-      confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'Unified AI response',
-      customerIntent: data.customerIntent,
-      messageType: data.messageType || 'standard'
+      confidence: data.confidence || 0.9,
+      reasoning: data.reasoning || 'Enhanced AI via unified edge function with fixed conversation repair logic',
+      customerIntent: data.customerIntent || null,
+      answerGuidance: data.answerGuidance || null
     };
 
   } catch (error) {
-    console.error('❌ [UNIFIED SERVICE] Error generating unified intelligent response:', error);
+    console.error('❌ [ENHANCED AI] Error generating response via unified edge function:', error);
     return null;
   }
+};
+
+export const shouldGenerateResponse = (context: ConversationContext): boolean => {
+  // Only generate if there's a recent customer message we haven't responded to
+  const lastCustomerMessage = context.messages
+    .filter(msg => msg.direction === 'in')
+    .slice(-1)[0];
+
+  if (!lastCustomerMessage) return false;
+
+  // Check if we've already responded
+  const messagesAfterCustomer = context.messages.filter(msg => 
+    new Date(msg.sentAt) > new Date(lastCustomerMessage.sentAt) && msg.direction === 'out'
+  );
+
+  return messagesAfterCustomer.length === 0;
 };

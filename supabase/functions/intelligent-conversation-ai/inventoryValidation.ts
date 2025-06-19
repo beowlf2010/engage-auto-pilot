@@ -32,14 +32,14 @@ export const validateInventoryAccuracy = async (vehicleInterest: string, leadId?
       }
     }
 
-    // Build strict inventory query
+    // Build strict inventory query WITHOUT artificial limits
     let query = supabase
       .from('inventory')
       .select('id, make, model, year, fuel_type, condition, price, status, stock_number, vin, trim')
       .eq('status', 'available')
       .not('model', 'eq', 'Unknown') // STRICT: Only vehicles with known models
-      .not('model', 'is', null)
-      .limit(20);
+      .not('model', 'is', null);
+      // REMOVED: .limit(20) - NO MORE ARTIFICIAL LIMITS
 
     // Apply lead-specific filters if available
     if (leadPreferences) {
@@ -95,13 +95,14 @@ export const validateInventoryAccuracy = async (vehicleInterest: string, leadId?
       totalFound: inventory?.length || 0,
       validatedCount: validatedVehicles.length,
       leadId: leadId || 'none',
-      hasPreferences: !!leadPreferences
+      hasPreferences: !!leadPreferences,
+      removedArtificialLimit: true
     });
 
-    // Return comprehensive validation result
+    // Return comprehensive validation result with ACTUAL counts
     return {
       hasRealInventory: validatedVehicles.length > 0,
-      actualVehicles: validatedVehicles,
+      actualVehicles: validatedVehicles, // Return ALL matching vehicles, not limited to 20
       totalChecked: inventory?.length || 0,
       validatedCount: validatedVehicles.length,
       searchCriteria: leadPreferences || { rawInterest: cleanInterest },

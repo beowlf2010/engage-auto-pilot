@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface AIMessageRequest {
@@ -20,10 +21,10 @@ export interface AIMessageResponse {
   error?: string;
 }
 
-// Generate truly unique AI message using the unified intelligent-conversation-ai function
+// Generate AI message using ONLY the unified intelligent-conversation-ai function
 export const generateIntelligentAIMessage = async (request: AIMessageRequest): Promise<string | null> => {
   try {
-    console.log(`🤖 [INTELLIGENT AI] Generating message via unified function for lead ${request.leadId}`);
+    console.log(`🤖 [INTELLIGENT AI MSG] Generating message via UNIFIED function for lead ${request.leadId}`);
 
     // Get lead details to provide proper context
     const { data: lead, error: leadError } = await supabase
@@ -39,7 +40,7 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
       .single();
 
     if (leadError || !lead) {
-      console.error('❌ [INTELLIGENT AI] Lead not found:', leadError);
+      console.error('❌ [INTELLIGENT AI MSG] Lead not found:', leadError);
       return null;
     }
 
@@ -51,7 +52,7 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
       .order('sent_at', { ascending: true });
 
     if (convError) {
-      console.error('❌ [INTELLIGENT AI] Error loading conversations:', convError);
+      console.error('❌ [INTELLIGENT AI MSG] Error loading conversations:', convError);
       return null;
     }
 
@@ -59,11 +60,9 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
     const isInitialContact = conversationHistory.length === 0;
     const lastCustomerMessage = conversationHistory.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '';
 
-    console.log(`🎯 [INTELLIGENT AI] Lead: ${lead.first_name} ${lead.last_name}, Initial contact: ${isInitialContact}`);
-    console.log(`🏢 [INTELLIGENT AI] Using dealership: Jason Pilger Chevrolet`);
-    console.log(`👤 [INTELLIGENT AI] Using salesperson: Finn`);
+    console.log(`🎯 [INTELLIGENT AI MSG] Lead: ${lead.first_name} ${lead.last_name}, Initial contact: ${isInitialContact}`);
 
-    // Call the unified intelligent-conversation-ai function
+    // Call the unified intelligent-conversation-ai function with proper parameters
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: request.leadId,
@@ -79,30 +78,30 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
         conversationLength: conversationHistory.length,
         inventoryStatus: {
           hasInventory: true,
-          totalVehicles: 20
+          totalVehicles: request.context?.inventoryCount || 0
         },
         isInitialContact: isInitialContact,
-        salespersonName: 'Finn', // Always force Finn
+        salespersonName: 'Finn', // Always use Finn
         dealershipName: 'Jason Pilger Chevrolet', // Always use correct dealership
         context: request.context || {}
       }
     });
 
     if (error) {
-      console.error('❌ [INTELLIGENT AI] Edge function error:', error);
+      console.error('❌ [INTELLIGENT AI MSG] Edge function error:', error);
       return null;
     }
 
     if (!data || !data.message) {
-      console.error('❌ [INTELLIGENT AI] No message returned from unified function');
+      console.error('❌ [INTELLIGENT AI MSG] No message returned from unified function');
       return null;
     }
 
-    console.log(`✅ [INTELLIGENT AI] Generated message via unified function: ${data.message}`);
+    console.log(`✅ [INTELLIGENT AI MSG] Generated message via unified function: ${data.message}`);
     return data.message;
 
   } catch (error) {
-    console.error('❌ [INTELLIGENT AI] Error generating message via unified function:', error);
+    console.error('❌ [INTELLIGENT AI MSG] Error generating message via unified function:', error);
     return null;
   }
 };
@@ -199,42 +198,4 @@ export const getMessageUniquenessStats = async (leadId: string) => {
     console.error('Error getting message uniqueness stats:', error);
     return null;
   }
-};
-
-// Enhanced message generation with behavioral context
-export const generateContextualMessage = async (
-  leadId: string, 
-  behavioralTrigger?: {
-    trigger_type: string;
-    trigger_data: any;
-  }
-): Promise<string | null> => {
-  const context: any = {};
-
-  if (behavioralTrigger) {
-    context.behavioral_trigger = behavioralTrigger.trigger_type;
-    
-    switch (behavioralTrigger.trigger_type) {
-      case 'website_visit':
-        context.urgency_factor = 'browsing_activity';
-        break;
-      case 'price_drop':
-        context.urgency_factor = 'price_reduction';
-        context.inventory_mentioned = [behavioralTrigger.trigger_data];
-        break;
-      case 'new_inventory':
-        context.urgency_factor = 'new_arrival';
-        context.inventory_mentioned = [behavioralTrigger.trigger_data];
-        break;
-      case 'abandoned_quote':
-        context.urgency_factor = 'financing_interest';
-        break;
-    }
-  }
-
-  return generateIntelligentAIMessage({
-    leadId,
-    stage: behavioralTrigger ? 'behavioral_trigger' : 'follow_up',
-    context
-  });
 };

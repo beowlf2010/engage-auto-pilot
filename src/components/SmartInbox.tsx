@@ -8,8 +8,7 @@ import ConversationsList from "./inbox/ConversationsList";
 import EnhancedChatView from "./inbox/EnhancedChatView";
 import ConversationMemory from "./ConversationMemory";
 import { useRealtimeInbox } from "@/hooks/useRealtimeInbox";
-import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
-import { useEnhancedMessageProcessor } from "@/hooks/useEnhancedMessageProcessor";
+import { useFixedConversationOperations } from "@/hooks/useFixedConversationOperations";
 import { assignCurrentUserToLead } from "@/services/conversationsService";
 import { toast } from "@/hooks/use-toast";
 
@@ -27,11 +26,8 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   
-  const { conversations, messages, loading, fetchMessages, sendMessage, refetch, error } = useRealtimeInbox();
-  const { processing: aiProcessing } = useEnhancedAIScheduler();
-  
-  // Initialize enhanced message processor
-  useEnhancedMessageProcessor();
+  // Use the FIXED conversation operations instead of the old ones
+  const { conversations, messages, loading, loadMessages, sendMessage, manualRefresh, error } = useFixedConversationOperations();
 
   // Filter conversations based on user role
   const filteredConversations = conversations.filter(conv => 
@@ -50,13 +46,13 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   const handleSelectConversation = useCallback(async (leadId: string) => {
     try {
-      console.log('📱 Selecting conversation for lead:', leadId);
+      console.log('📱 [SMART INBOX] Selecting conversation for lead:', leadId);
       setSelectedLead(leadId);
       
-      // Load messages (which will also mark them as read)
-      await fetchMessages(leadId);
+      // Load messages using the FIXED operations
+      await loadMessages(leadId);
       
-      console.log('✅ Conversation selected and messages loaded');
+      console.log('✅ [SMART INBOX] Conversation selected and messages loaded');
     } catch (err) {
       console.error('Error selecting conversation:', err);
       toast({
@@ -65,16 +61,16 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         variant: "destructive"
       });
     }
-  }, [fetchMessages]);
+  }, [loadMessages]);
 
   const handleSendMessage = useCallback(async (message: string, isTemplate?: boolean) => {
     if (selectedLead && selectedConversation) {
       try {
-        console.log('📤 Sending message from SmartInbox:', message);
+        console.log('📤 [SMART INBOX] Sending message:', message);
         
         // Auto-assign lead if it's unassigned and user can reply
         if (!selectedConversation.salespersonId && canReply(selectedConversation)) {
-          console.log(`🎯 Auto-assigning lead ${selectedLead} to user ${user.id}`);
+          console.log(`🎯 [SMART INBOX] Auto-assigning lead ${selectedLead} to user ${user.id}`);
           
           const assigned = await assignCurrentUserToLead(selectedLead, user.id);
           if (assigned) {
@@ -88,17 +84,17 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           }
         }
         
-        // Use the enhanced send message function that includes immediate refresh
+        // Use the FIXED send message function
         await sendMessage(selectedLead, message);
         
         if (isTemplate) {
           setShowTemplates(false);
         }
         
-        console.log('✅ Message sent successfully from SmartInbox with enhanced processing');
+        console.log('✅ [SMART INBOX] Message sent successfully with fixed operations');
         
       } catch (err) {
-        console.error('Error sending message:', err);
+        console.error('❌ [SMART INBOX] Error sending message:', err);
         toast({
           title: "Error",
           description: "Failed to send message. Please try again.",
@@ -121,26 +117,26 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     if (loading || isInitialized || filteredConversations.length === 0) return;
 
     const leadIdFromUrl = searchParams.get('leadId');
-    console.log('🔗 URL leadId:', leadIdFromUrl);
-    console.log('📊 Available conversations:', filteredConversations.length);
+    console.log('🔗 [SMART INBOX] URL leadId:', leadIdFromUrl);
+    console.log('📊 [SMART INBOX] Available conversations:', filteredConversations.length);
 
     if (leadIdFromUrl) {
       // Check if the lead exists in conversations
       const conversation = filteredConversations.find(conv => conv.leadId === leadIdFromUrl);
       if (conversation) {
-        console.log('✅ Found conversation for URL leadId, selecting...');
+        console.log('✅ [SMART INBOX] Found conversation for URL leadId, selecting...');
         handleSelectConversation(leadIdFromUrl);
         setIsInitialized(true);
         return;
       } else {
-        console.log('❌ Lead from URL not found in conversations');
+        console.log('❌ [SMART INBOX] Lead from URL not found in conversations');
       }
     }
 
     // Default selection if no URL parameter or conversation not found
     if (filteredConversations.length > 0 && !selectedLead) {
       const firstConv = filteredConversations[0];
-      console.log('📌 Selecting first conversation:', firstConv.leadId);
+      console.log('📌 [SMART INBOX] Selecting first conversation:', firstConv.leadId);
       handleSelectConversation(firstConv.leadId);
     }
     
@@ -156,7 +152,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           <AlertDescription className="mb-4">
             {error}
           </AlertDescription>
-          <Button onClick={refetch} className="w-full">
+          <Button onClick={manualRefresh} className="w-full">
             <RefreshCw className="w-4 h-4 mr-2" />
             Retry
           </Button>
@@ -182,7 +178,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
       <div className="h-[calc(100vh-8rem)] flex items-center justify-center">
         <div className="text-center">
           <p className="text-slate-600 mb-4">No conversations found</p>
-          <Button onClick={refetch} variant="outline">
+          <Button onClick={manualRefresh} variant="outline">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
@@ -201,13 +197,6 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           onSelectConversation={handleSelectConversation}
           canReply={canReply}
         />
-        
-        {aiProcessing && (
-          <div className="absolute top-2 right-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs flex items-center space-x-2">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            <span>Finn is analyzing conversations...</span>
-          </div>
-        )}
       </div>
 
       {/* Chat area takes remaining width */}
