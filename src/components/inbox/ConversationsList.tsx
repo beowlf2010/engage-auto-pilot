@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +18,7 @@ interface Conversation {
   salespersonId: string;
   salespersonName?: string;
   aiOptIn?: boolean; // Made optional to match ConversationData
-  lastMessageDate: Date;
+  lastMessageDate?: Date; // Made optional to match ConversationData
 }
 
 interface ConversationsListProps {
