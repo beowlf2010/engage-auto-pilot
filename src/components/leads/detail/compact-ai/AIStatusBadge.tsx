@@ -6,7 +6,7 @@ interface AIStatusBadgeProps {
   aiOptIn: boolean;
   pendingHumanResponse: boolean;
   aiSequencePaused: boolean;
-  aiStage?: string;
+  messageIntensity?: string;
   aiMessagesSent?: number;
   incomingCount?: number;
   outgoingCount?: number;
@@ -16,7 +16,7 @@ const AIStatusBadge: React.FC<AIStatusBadgeProps> = ({
   aiOptIn,
   pendingHumanResponse,
   aiSequencePaused,
-  aiStage,
+  messageIntensity,
   aiMessagesSent,
   incomingCount,
   outgoingCount
@@ -25,7 +25,7 @@ const AIStatusBadge: React.FC<AIStatusBadgeProps> = ({
   return (
     <EnhancedAIStatusDisplay
       aiOptIn={aiOptIn}
-      aiStage={aiStage}
+      messageIntensity={messageIntensity}
       aiMessagesSent={aiMessagesSent}
       aiSequencePaused={aiSequencePaused || pendingHumanResponse}
       incomingCount={incomingCount}

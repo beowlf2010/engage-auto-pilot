@@ -28,7 +28,7 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
               <Phone className="w-4 h-4 text-muted-foreground" />
-              <span>{lead.primary_phone}</span>
+              <span>{lead.primaryPhone}</span>
             </div>
             {lead.email && (
               <div className="flex items-center gap-2 text-sm">
@@ -49,7 +49,7 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
               <Car className="w-4 h-4 text-muted-foreground" />
               <span className="font-medium">Vehicle Interest</span>
             </div>
-            <Badge variant="outline">{lead.vehicle_interest}</Badge>
+            <Badge variant="outline">{lead.vehicleInterest}</Badge>
           </div>
 
           <div className="pt-2 border-t">
@@ -66,7 +66,7 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
               <span className="font-medium">Created</span>
             </div>
             <span className="text-sm text-muted-foreground">
-              {new Date(lead.created_at).toLocaleDateString()}
+              {new Date(lead.createdAt).toLocaleDateString()}
             </span>
           </div>
         </CardContent>
@@ -75,13 +75,13 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
       {/* Unified AI Controls */}
       <UnifiedAIControls
         leadId={lead.id}
-        leadName={`${lead.first_name} ${lead.last_name}`}
-        aiOptIn={lead.ai_opt_in || false}
-        messageIntensity={lead.message_intensity}
-        aiMessagesSent={lead.ai_messages_sent}
-        aiSequencePaused={lead.ai_sequence_paused}
-        aiPauseReason={lead.ai_pause_reason}
-        pendingHumanResponse={lead.pending_human_response}
+        leadName={`${lead.firstName} ${lead.lastName}`}
+        aiOptIn={lead.aiOptIn || false}
+        messageIntensity={lead.messageIntensity}
+        aiMessagesSent={lead.aiMessagesSent}
+        aiSequencePaused={lead.aiSequencePaused}
+        aiPauseReason={lead.aiPauseReason}
+        pendingHumanResponse={lead.pendingHumanResponse}
         onUpdate={onMessageSent}
       />
     </div>

@@ -42,6 +42,11 @@ export interface LeadDetailData {
   aiTakeoverDelayMinutes?: number;
   pendingHumanResponse?: boolean;
   humanResponseDeadline?: string;
+  // Unified AI fields
+  messageIntensity?: string;
+  aiMessagesSent?: number;
+  aiPauseReason?: string;
+  primaryPhone?: string;
   phoneNumbers: Array<{
     id: string;
     number: string;
@@ -71,7 +76,7 @@ export interface LeadDetailData {
 
 export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | null> => {
   try {
-    // Fetch lead basic information including AI takeover fields
+    // Fetch lead basic information including unified AI fields
     const { data: leadData, error: leadError } = await supabase
       .from('leads')
       .select(`
@@ -139,6 +144,10 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
     // Sort timeline by timestamp
     activityTimeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+    // Get primary phone number
+    const primaryPhoneNumber = phoneNumbers?.find(phone => phone.is_primary)?.number || 
+                              phoneNumbers?.[0]?.number || '';
+
     return {
       id: leadData.id,
       firstName: leadData.first_name,
@@ -182,6 +191,11 @@ export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | 
       aiTakeoverDelayMinutes: leadData.ai_takeover_delay_minutes || 7,
       pendingHumanResponse: leadData.pending_human_response || false,
       humanResponseDeadline: leadData.human_response_deadline,
+      // Unified AI fields
+      messageIntensity: leadData.message_intensity || 'gentle',
+      aiMessagesSent: leadData.ai_messages_sent || 0,
+      aiPauseReason: leadData.ai_pause_reason,
+      primaryPhone: primaryPhoneNumber,
       phoneNumbers: phoneNumbers?.map(phone => ({
         id: phone.id,
         number: phone.number,

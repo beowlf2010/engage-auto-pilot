@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -191,7 +190,7 @@ const ConversationsList = ({
                         <div className="flex items-center">
                           <EnhancedAIStatusDisplay
                             aiOptIn={conversation.aiOptIn}
-                            aiStage={conversation.aiStage}
+                            messageIntensity="gentle"
                             aiMessagesSent={conversation.aiMessagesSent}
                             aiSequencePaused={conversation.aiSequencePaused}
                             incomingCount={conversation.incomingCount}

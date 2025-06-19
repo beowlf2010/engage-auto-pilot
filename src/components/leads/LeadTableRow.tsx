@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -84,7 +83,7 @@ const LeadTableRow = ({
           {lead.aiOptIn ? (
             <EnhancedAIStatusDisplay
               aiOptIn={lead.aiOptIn}
-              aiStage={lead.aiStage}
+              messageIntensity="gentle"
               aiMessagesSent={lead.aiMessagesSent}
               aiSequencePaused={lead.aiSequencePaused}
               incomingCount={lead.incomingCount}
