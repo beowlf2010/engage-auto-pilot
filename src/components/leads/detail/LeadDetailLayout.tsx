@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
 import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
@@ -160,7 +159,7 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
             <CompactAIControls
               leadId={lead.id}
               aiOptIn={lead.aiOptIn || false}
-              aiStage={lead.aiStage}
+              messageIntensity={lead.messageIntensity}
               aiSequencePaused={lead.aiSequencePaused || false}
               aiTakeoverEnabled={lead.aiTakeoverEnabled || false}
               aiTakeoverDelayMinutes={lead.aiTakeoverDelayMinutes || 7}
