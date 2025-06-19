@@ -181,9 +181,9 @@ const EnhancedChatView = ({
             onCloseAIGenerator={() => setShowAIGenerator(false)}
           />
 
-          {/* Simple Chat Display - replacing ChatContainer */}
-          <Card className="flex-1 flex flex-col min-h-0">
-            <div className="flex-1 p-4 overflow-y-auto">
+          {/* Fixed Height Chat Display */}
+          <Card className="flex-1 flex flex-col min-h-0 h-[500px]">
+            <div className="flex-1 p-4 overflow-y-auto max-h-[400px]">
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div
@@ -204,9 +204,9 @@ const EnhancedChatView = ({
               </div>
             </div>
             
-            {/* Message Input */}
+            {/* Fixed Position Message Input */}
             {canReply && (
-              <div className="border-t p-4">
+              <div className="border-t p-4 bg-white">
                 <div className="flex space-x-2">
                   <input
                     type="text"

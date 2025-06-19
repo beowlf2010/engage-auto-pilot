@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,10 +46,22 @@ export const useConversationData = () => {
       // Mark incoming messages as read
       const unreadIncoming = data.filter(msg => msg.direction === 'in' && !msg.read_at);
       if (unreadIncoming.length > 0) {
+        console.log('🔍 [UNREAD COUNT DEBUG] Marking', unreadIncoming.length, 'messages as read for lead:', leadId);
+        
         await supabase
           .from('conversations')
           .update({ read_at: new Date().toISOString() })
           .in('id', unreadIncoming.map(msg => msg.id));
+
+        console.log('✅ [UNREAD COUNT DEBUG] Messages marked as read, triggering unread count refresh');
+        
+        // Force refresh of unread count queries immediately
+        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+        queryClient.invalidateQueries({ queryKey: ['global-unread-count'] });
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        
+        // Additional manual trigger for global unread count refresh
+        window.dispatchEvent(new CustomEvent('unread-count-changed', { detail: { leadId } }));
       }
       
     } catch (error) {
@@ -59,7 +70,7 @@ export const useConversationData = () => {
     } finally {
       setMessagesLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   // Set up real-time subscription for conversation updates
   useEffect(() => {
@@ -209,6 +220,8 @@ export const useConversationData = () => {
       // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['lead'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['global-unread-count'] });
       
       return data;
     } catch (error) {

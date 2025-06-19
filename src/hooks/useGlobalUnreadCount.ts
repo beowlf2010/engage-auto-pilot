@@ -12,6 +12,8 @@ export const useGlobalUnreadCount = () => {
     if (!profile) return;
 
     try {
+      console.log('🔍 [GLOBAL UNREAD COUNT] Fetching unread count for profile:', profile.id);
+
       // Get unread SMS conversations
       const { data: smsConversations, error: smsError } = await supabase
         .from('conversations')
@@ -40,9 +42,12 @@ export const useGlobalUnreadCount = () => {
       ).length || 0;
 
       const totalUnread = smsUnread + emailUnread;
+      
+      console.log('📊 [GLOBAL UNREAD COUNT] SMS unread:', smsUnread, 'Email unread:', emailUnread, 'Total:', totalUnread);
+      
       setUnreadCount(totalUnread);
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      console.error('❌ [GLOBAL UNREAD COUNT] Error fetching unread count:', error);
       setUnreadCount(0);
     }
   }, [profile]);
@@ -51,6 +56,20 @@ export const useGlobalUnreadCount = () => {
   useCentralizedRealtime({
     onUnreadCountUpdate: fetchUnreadCount
   });
+
+  // Listen for manual unread count change events
+  useEffect(() => {
+    const handleUnreadCountChange = () => {
+      console.log('🔄 [GLOBAL UNREAD COUNT] Manual refresh triggered');
+      fetchUnreadCount();
+    };
+
+    window.addEventListener('unread-count-changed', handleUnreadCountChange);
+    
+    return () => {
+      window.removeEventListener('unread-count-changed', handleUnreadCountChange);
+    };
+  }, [fetchUnreadCount]);
 
   // Initial load
   useEffect(() => {
