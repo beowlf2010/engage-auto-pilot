@@ -252,7 +252,7 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
                   variant="outline"
                   size="sm"
                 >
-                  <RefreshCcw className="w-4 h-4 mr-1" />
+                  <RefreshCw className="w-4 h-4 mr-1" />
                   {generating ? 'Regenerating...' : 'Fix Issue'}
                 </Button>
               </div>
@@ -319,7 +319,7 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
             onClick={() => generatePreviewMessage()} 
             disabled={generating}
           >
-            <RefreshCcw className="w-4 h-4 mr-1" />
+            <RefreshCw className="w-4 h-4 mr-1" />
             Simple Regenerate
           </Button>
           <Button onClick={handleApprove} disabled={generating || !generatedMessage}>
