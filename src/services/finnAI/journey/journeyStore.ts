@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { CustomerJourney } from './types';
+import { CustomerJourney, Touchpoint, Milestone } from './types';
 
 export class JourneyStore {
   async getCustomerJourney(leadId: string): Promise<CustomerJourney> {
@@ -15,8 +15,8 @@ export class JourneyStore {
         return {
           leadId,
           journeyStage: journey.journey_stage as CustomerJourney['journeyStage'],
-          touchpoints: Array.isArray(journey.touchpoints) ? journey.touchpoints : [],
-          milestones: Array.isArray(journey.milestones) ? journey.milestones : [],
+          touchpoints: this.parseTouchpoints(journey.touchpoints),
+          milestones: this.parseMilestones(journey.milestones),
           nextBestAction: journey.next_best_action || '',
           estimatedTimeToDecision: journey.estimated_time_to_decision || 30,
           conversionProbability: journey.conversion_probability || 0.5,
@@ -60,5 +60,34 @@ export class JourneyStore {
     } catch (error) {
       console.error('Error saving customer journey:', error);
     }
+  }
+
+  private parseTouchpoints(data: any): Touchpoint[] {
+    if (!data || !Array.isArray(data)) return [];
+    
+    return data.filter(this.isTouchpoint);
+  }
+
+  private parseMilestones(data: any): Milestone[] {
+    if (!data || !Array.isArray(data)) return [];
+    
+    return data.filter(this.isMilestone);
+  }
+
+  private isTouchpoint(data: any): data is Touchpoint {
+    return data && 
+           typeof data === 'object' && 
+           typeof data.id === 'string' &&
+           typeof data.type === 'string' &&
+           typeof data.channel === 'string' &&
+           data.timestamp instanceof Date || typeof data.timestamp === 'string';
+  }
+
+  private isMilestone(data: any): data is Milestone {
+    return data && 
+           typeof data === 'object' && 
+           typeof data.id === 'string' &&
+           typeof data.type === 'string' &&
+           data.achievedAt instanceof Date || typeof data.achievedAt === 'string';
   }
 }

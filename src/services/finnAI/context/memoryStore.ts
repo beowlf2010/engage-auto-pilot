@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { ConversationMemory, CustomerProfile, EmotionalContext } from './types';
+import { ConversationMemory, CustomerProfile, EmotionalContext, ConversationSession, BehavioralPattern } from './types';
 
 export class MemoryStore {
   async loadMemoryFromDatabase(leadId: string): Promise<ConversationMemory> {
@@ -17,18 +17,10 @@ export class MemoryStore {
         return {
           leadId,
           sessionId: enhancedMemory.current_session_id || this.generateSessionId(),
-          conversationHistory: Array.isArray(enhancedMemory.conversation_history) 
-            ? enhancedMemory.conversation_history 
-            : [],
-          customerProfile: this.isCustomerProfile(enhancedMemory.customer_profile) 
-            ? enhancedMemory.customer_profile 
-            : this.createDefaultProfile(leadId),
-          behavioralPatterns: Array.isArray(enhancedMemory.behavioral_patterns) 
-            ? enhancedMemory.behavioral_patterns 
-            : [],
-          emotionalContext: this.isEmotionalContext(enhancedMemory.emotional_context) 
-            ? enhancedMemory.emotional_context 
-            : this.createDefaultEmotionalContext(),
+          conversationHistory: this.parseConversationHistory(enhancedMemory.conversation_history),
+          customerProfile: this.parseCustomerProfile(enhancedMemory.customer_profile) || this.createDefaultProfile(leadId),
+          behavioralPatterns: this.parseBehavioralPatterns(enhancedMemory.behavioral_patterns),
+          emotionalContext: this.parseEmotionalContext(enhancedMemory.emotional_context) || this.createDefaultEmotionalContext(),
           lastUpdated: new Date(enhancedMemory.updated_at)
         };
       }
@@ -77,16 +69,66 @@ export class MemoryStore {
     }
   }
 
+  private parseConversationHistory(data: any): ConversationSession[] {
+    if (!data || !Array.isArray(data)) return [];
+    
+    return data.filter(this.isConversationSession);
+  }
+
+  private parseBehavioralPatterns(data: any): BehavioralPattern[] {
+    if (!data || !Array.isArray(data)) return [];
+    
+    return data.filter(this.isBehavioralPattern);
+  }
+
+  private parseCustomerProfile(data: any): CustomerProfile | null {
+    if (!data || typeof data !== 'object') return null;
+    
+    if (this.isCustomerProfile(data)) {
+      return data;
+    }
+    
+    return null;
+  }
+
+  private parseEmotionalContext(data: any): EmotionalContext | null {
+    if (!data || typeof data !== 'object') return null;
+    
+    if (this.isEmotionalContext(data)) {
+      return data;
+    }
+    
+    return null;
+  }
+
   private generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  private isConversationSession(data: any): data is ConversationSession {
+    return data && 
+           typeof data === 'object' && 
+           typeof data.sessionId === 'string' &&
+           Array.isArray(data.messages);
+  }
+
+  private isBehavioralPattern(data: any): data is BehavioralPattern {
+    return data && 
+           typeof data === 'object' && 
+           typeof data.patternType === 'string' &&
+           typeof data.pattern === 'string';
+  }
+
   private isCustomerProfile(data: any): data is CustomerProfile {
-    return data && typeof data === 'object';
+    return data && 
+           typeof data === 'object' && 
+           typeof data.leadId === 'string';
   }
 
   private isEmotionalContext(data: any): data is EmotionalContext {
-    return data && typeof data === 'object';
+    return data && 
+           typeof data === 'object' && 
+           typeof data.currentMood === 'string';
   }
 
   private createDefaultProfile(leadId: string): CustomerProfile {
