@@ -94,7 +94,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         ).item
       );
 
-      // Record vehicle history
+      // Process vehicle history using the new batch method
       const inventoryItems = parsed.rows
         .map(row => mapRowToInventoryItemEnhanced(
           row, 
@@ -105,23 +105,27 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         ).item)
         .filter(item => item.make !== 'Unknown' || item.vin || item.stock_number);
 
-      if (inventoryItems.length > 0) {
-        await vehicleHistoryService.recordVehicleHistory(
-          inventoryItems,
-          uploadRecord.id,
-          detection.sourceReport
-        );
+      let batchResult = {
+        historyRecorded: 0,
+        masterRecordsUpserted: 0,
+        duplicatesDetected: 0
+      };
 
-        await vehicleHistoryService.upsertVehicleMasterRecords(
-          inventoryItems,
-          detection.sourceReport
-        );
+      if (inventoryItems.length > 0) {
+        try {
+          batchResult = await vehicleHistoryService.processBatch(
+            inventoryItems,
+            uploadRecord.id,
+            detection.sourceReport
+          );
+          console.log('Vehicle history batch processing result:', batchResult);
+        } catch (historyError) {
+          console.error('Vehicle history processing failed, continuing with upload:', historyError);
+          // Don't fail the entire upload if history processing fails
+        }
       }
 
-      // Detect duplicates
-      const duplicateResult = await vehicleHistoryService.detectDuplicates(uploadRecord.id);
-
-      // Update upload history with enhanced results (without metadata field)
+      // Update upload history with enhanced results
       await updateUploadHistory(uploadRecord.id, {
         total_rows: parsed.rows.length,
         successful_imports: validationResult.successCount,
@@ -144,8 +148,8 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       }
 
       // Success notification
-      const duplicateMsg = duplicateResult.duplicateCount > 0 
-        ? `, ${duplicateResult.duplicateCount} duplicates detected`
+      const duplicateMsg = batchResult.duplicatesDetected > 0 
+        ? `, ${batchResult.duplicatesDetected} duplicates detected`
         : '';
       
       toast({

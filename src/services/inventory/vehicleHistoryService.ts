@@ -52,36 +52,30 @@ export class VehicleHistoryService {
   ): Promise<void> {
     console.log(`Recording vehicle history for ${vehicles.length} vehicles from ${sourceReport}`);
     
-    const historyEntries: VehicleHistoryEntry[] = vehicles.map(vehicle => ({
-      vin: vehicle.vin,
-      stock_number: vehicle.stock_number,
-      gm_order_number: vehicle.gm_order_number,
-      make: vehicle.make,
-      model: vehicle.model,
-      year: vehicle.year,
-      status: vehicle.status,
-      history_type: this.determineHistoryType(sourceReport),
-      source_report: sourceReport,
-      source_data: JSON.parse(JSON.stringify(vehicle)), // Convert to plain object
-      upload_history_id: uploadHistoryId
-    }));
+    try {
+      const { data, error } = await supabase.functions.invoke('vehicle-history-processor', {
+        body: {
+          action: 'record_history',
+          vehicles,
+          uploadHistoryId,
+          sourceReport
+        }
+      });
 
-    // Insert history entries in batches
-    const batchSize = 100;
-    for (let i = 0; i < historyEntries.length; i += batchSize) {
-      const batch = historyEntries.slice(i, i + batchSize);
-      
-      const { error } = await supabase
-        .from('vehicle_history')
-        .insert(batch);
-      
       if (error) {
-        console.error('Error inserting vehicle history batch:', error);
+        console.error('Error calling vehicle-history-processor:', error);
         throw error;
       }
-    }
 
-    console.log(`Successfully recorded ${historyEntries.length} vehicle history entries`);
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to record vehicle history');
+      }
+
+      console.log(`Successfully recorded ${data.recorded} vehicle history entries`);
+    } catch (error) {
+      console.error('Error in recordVehicleHistory:', error);
+      throw error;
+    }
   }
 
   async upsertVehicleMasterRecords(
@@ -90,79 +84,107 @@ export class VehicleHistoryService {
   ): Promise<string[]> {
     console.log(`Upserting ${vehicles.length} vehicle master records from ${sourceReport}`);
     
-    const masterIds: string[] = [];
-    
-    for (const vehicle of vehicles) {
-      try {
-        const { data, error } = await supabase
-          .rpc('upsert_vehicle_master', {
-            p_vin: vehicle.vin,
-            p_stock_number: vehicle.stock_number,
-            p_gm_order_number: vehicle.gm_order_number,
-            p_make: vehicle.make,
-            p_model: vehicle.model,
-            p_year: vehicle.year,
-            p_status: vehicle.status,
-            p_source_report: sourceReport,
-            p_data: JSON.parse(JSON.stringify(vehicle)) // Convert to plain object
-          });
-
-        if (error) {
-          console.error('Error upserting vehicle master:', error);
-          continue;
+    try {
+      const { data, error } = await supabase.functions.invoke('vehicle-history-processor', {
+        body: {
+          action: 'upsert_masters',
+          vehicles,
+          uploadHistoryId: '', // Not needed for this action
+          sourceReport
         }
+      });
 
-        if (data) {
-          masterIds.push(data);
-        }
-      } catch (error) {
-        console.error('Error in upsert_vehicle_master:', error);
+      if (error) {
+        console.error('Error calling vehicle-history-processor:', error);
+        throw error;
       }
-    }
 
-    console.log(`Successfully upserted ${masterIds.length} vehicle master records`);
-    return masterIds;
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to upsert vehicle master records');
+      }
+
+      console.log(`Successfully upserted ${data.upserted} vehicle master records`);
+      return data.masterIds || [];
+    } catch (error) {
+      console.error('Error in upsertVehicleMasterRecords:', error);
+      return [];
+    }
   }
 
   async detectDuplicates(uploadHistoryId: string): Promise<DuplicateDetectionResult> {
     console.log(`Detecting duplicates for upload: ${uploadHistoryId}`);
     
     try {
-      const { data, error } = await supabase
-        .rpc('detect_vehicle_duplicates', {
-          p_upload_history_id: uploadHistoryId
-        });
+      const { data, error } = await supabase.functions.invoke('vehicle-history-processor', {
+        body: {
+          action: 'detect_duplicates',
+          uploadHistoryId
+        }
+      });
 
       if (error) {
-        console.error('Error detecting duplicates:', error);
+        console.error('Error calling vehicle-history-processor:', error);
         throw error;
       }
 
-      const duplicateCount = data || 0;
-
-      // Fetch the detected duplicates
-      const { data: duplicates, error: fetchError } = await supabase
-        .from('vehicle_duplicates')
-        .select('master_vehicle_id, duplicate_inventory_id, match_type, confidence_score')
-        .eq('resolved', false)
-        .in('duplicate_inventory_id', 
-          await this.getInventoryIdsByUpload(uploadHistoryId)
-        );
-
-      if (fetchError) {
-        console.error('Error fetching duplicates:', fetchError);
-        throw fetchError;
+      if (!data?.success) {
+        console.error('Duplicate detection failed:', data?.error);
+        return { duplicateCount: 0, duplicates: [] };
       }
 
-      console.log(`Detected ${duplicateCount} duplicates`);
+      console.log(`Detected ${data.duplicateCount} duplicates`);
       
       return {
-        duplicateCount,
-        duplicates: duplicates || []
+        duplicateCount: data.duplicateCount,
+        duplicates: data.duplicates || []
       };
     } catch (error) {
       console.error('Error in duplicate detection:', error);
       return { duplicateCount: 0, duplicates: [] };
+    }
+  }
+
+  // Batch process all operations in a single call for better performance
+  async processBatch(
+    vehicles: InventoryItem[],
+    uploadHistoryId: string,
+    sourceReport: string
+  ): Promise<{
+    historyRecorded: number;
+    masterRecordsUpserted: number;
+    duplicatesDetected: number;
+  }> {
+    console.log(`Starting batch processing for ${vehicles.length} vehicles`);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('vehicle-history-processor', {
+        body: {
+          action: 'batch_process',
+          vehicles,
+          uploadHistoryId,
+          sourceReport
+        }
+      });
+
+      if (error) {
+        console.error('Error calling vehicle-history-processor:', error);
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to process batch');
+      }
+
+      console.log(`Batch processing complete:`, data);
+      
+      return {
+        historyRecorded: data.historyRecorded || 0,
+        masterRecordsUpserted: data.masterRecordsUpserted || 0,
+        duplicatesDetected: data.duplicatesDetected || 0
+      };
+    } catch (error) {
+      console.error('Error in batch processing:', error);
+      throw error;
     }
   }
 
@@ -198,20 +220,6 @@ export class VehicleHistoryService {
     }
 
     return data;
-  }
-
-  private async getInventoryIdsByUpload(uploadHistoryId: string): Promise<string[]> {
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('id')
-      .eq('upload_history_id', uploadHistoryId);
-
-    if (error) {
-      console.error('Error fetching inventory IDs:', error);
-      return [];
-    }
-
-    return (data || []).map(item => item.id);
   }
 
   private determineHistoryType(sourceReport: string): 'order' | 'inventory' | 'sale' | 'update' {
