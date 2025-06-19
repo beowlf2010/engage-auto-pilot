@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConversationMemory {
@@ -377,10 +378,10 @@ class EnhancedContextEngine {
   // Save memory to database - working with existing conversation_memory table structure
   private async saveMemoryToDatabase(memory: ConversationMemory): Promise<void> {
     try {
-      // Save to the enhanced conversation_memory table - fix upsert operation
+      // Save to the enhanced conversation_memory table - pass object in array for upsert
       const { error } = await supabase
         .from('conversation_memory')
-        .upsert({
+        .upsert([{
           lead_id: memory.leadId,
           memory_type: 'enhanced_context',
           content: JSON.stringify({
@@ -396,7 +397,7 @@ class EnhancedContextEngine {
           behavioral_patterns: memory.behavioralPatterns,
           emotional_context: memory.emotionalContext,
           updated_at: new Date().toISOString()
-        });
+        }]);
 
       if (error) {
         console.error('Error saving conversation memory:', error);
