@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { MessageSquare, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import LeadContextCard from './LeadContextCard';
 import ConversationHistory from './ConversationHistory';
@@ -122,13 +123,32 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
   const generatePreviewMessage = async (issueContext?: string) => {
     setGenerating(true);
     try {
+      console.log(`🤖 [MODAL PREVIEW] Generating preview via unified function for ${leadContext?.firstName || 'lead'}`);
+      
       const issueType = issueContext ? issueTypes.find(type => type.value === issueContext) : null;
       const contextMessage = issueType ? `Previous message had ${issueType.label}: ${issueType.description}. Please address this concern.` : undefined;
 
-      const { data, error } = await supabase.functions.invoke('generate-ai-message', {
+      // Use the unified intelligent-conversation-ai function
+      const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
         body: {
           leadId,
-          stage: leadContext?.aiStage || 'follow_up',
+          leadName: leadContext ? `${leadContext.firstName} ${leadContext.lastName}` : 'Lead',
+          vehicleInterest: leadContext?.vehicleInterest || '',
+          lastCustomerMessage: leadContext?.lastResponse || '',
+          conversationHistory: leadContext?.conversationHistory?.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
+          leadInfo: {
+            phone: '',
+            status: 'new',
+            lastReplyAt: new Date().toISOString()
+          },
+          conversationLength: leadContext?.conversationHistory?.length || 0,
+          inventoryStatus: {
+            hasInventory: true,
+            totalVehicles: 20
+          },
+          isInitialContact: !leadContext?.conversationHistory?.length || leadContext.conversationHistory.length === 0,
+          salespersonName: 'Finn', // Always force Finn
+          dealershipName: 'Jason Pilger Chevrolet', // Always use correct dealership
           context: { 
             preview: true,
             issueContext: contextMessage,
@@ -138,11 +158,16 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ [MODAL PREVIEW] Unified function error:', error);
+        throw error;
+      }
 
       const message = data?.message || 'Unable to generate preview message';
       setGeneratedMessage(message);
       setEditedMessage(message);
+
+      console.log(`✅ [MODAL PREVIEW] Generated via unified function: ${message}`);
 
       // Add to regeneration history
       setRegenerationHistory(prev => [...prev, {
@@ -152,7 +177,7 @@ const MessagePreviewModal = ({ open, onClose, leadId, onApprove, onReject }: Mes
       }]);
 
     } catch (error) {
-      console.error('Error generating preview message:', error);
+      console.error('❌ [MODAL PREVIEW] Error generating preview message:', error);
       const errorMessage = 'Unable to generate preview message';
       setGeneratedMessage(errorMessage);
       setEditedMessage(errorMessage);

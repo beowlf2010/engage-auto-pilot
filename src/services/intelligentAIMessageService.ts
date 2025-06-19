@@ -20,33 +20,89 @@ export interface AIMessageResponse {
   error?: string;
 }
 
-// Generate truly unique AI message using OpenAI
+// Generate truly unique AI message using the unified intelligent-conversation-ai function
 export const generateIntelligentAIMessage = async (request: AIMessageRequest): Promise<string | null> => {
   try {
-    console.log(`Generating intelligent AI message for lead ${request.leadId}`);
+    console.log(`🤖 [INTELLIGENT AI] Generating message via unified function for lead ${request.leadId}`);
 
-    const { data, error } = await supabase.functions.invoke('generate-ai-message', {
+    // Get lead details to provide proper context
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select(`
+        id,
+        first_name,
+        last_name,
+        vehicle_interest,
+        created_at
+      `)
+      .eq('id', request.leadId)
+      .single();
+
+    if (leadError || !lead) {
+      console.error('❌ [INTELLIGENT AI] Lead not found:', leadError);
+      return null;
+    }
+
+    // Get conversation history
+    const { data: conversations, error: convError } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('lead_id', request.leadId)
+      .order('sent_at', { ascending: true });
+
+    if (convError) {
+      console.error('❌ [INTELLIGENT AI] Error loading conversations:', convError);
+      return null;
+    }
+
+    const conversationHistory = conversations || [];
+    const isInitialContact = conversationHistory.length === 0;
+    const lastCustomerMessage = conversationHistory.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '';
+
+    console.log(`🎯 [INTELLIGENT AI] Lead: ${lead.first_name} ${lead.last_name}, Initial contact: ${isInitialContact}`);
+    console.log(`🏢 [INTELLIGENT AI] Using dealership: Jason Pilger Chevrolet`);
+    console.log(`👤 [INTELLIGENT AI] Using salesperson: Finn`);
+
+    // Call the unified intelligent-conversation-ai function
+    const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: request.leadId,
-        stage: request.stage || 'follow_up',
+        leadName: `${lead.first_name} ${lead.last_name}`,
+        vehicleInterest: lead.vehicle_interest || '',
+        lastCustomerMessage: lastCustomerMessage,
+        conversationHistory: conversationHistory.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
+        leadInfo: {
+          phone: '',
+          status: 'new',
+          lastReplyAt: new Date().toISOString()
+        },
+        conversationLength: conversationHistory.length,
+        inventoryStatus: {
+          hasInventory: true,
+          totalVehicles: 20
+        },
+        isInitialContact: isInitialContact,
+        salespersonName: 'Finn', // Always force Finn
+        dealershipName: 'Jason Pilger Chevrolet', // Always use correct dealership
         context: request.context || {}
       }
     });
 
     if (error) {
-      console.error('Error invoking generate-ai-message function:', error);
+      console.error('❌ [INTELLIGENT AI] Edge function error:', error);
       return null;
     }
 
-    if (data?.error) {
-      console.error('Error from generate-ai-message function:', data.error);
+    if (!data || !data.message) {
+      console.error('❌ [INTELLIGENT AI] No message returned from unified function');
       return null;
     }
 
-    console.log(`Generated unique message for lead ${request.leadId}: ${data.message}`);
+    console.log(`✅ [INTELLIGENT AI] Generated message via unified function: ${data.message}`);
     return data.message;
+
   } catch (error) {
-    console.error('Error generating intelligent AI message:', error);
+    console.error('❌ [INTELLIGENT AI] Error generating message via unified function:', error);
     return null;
   }
 };
