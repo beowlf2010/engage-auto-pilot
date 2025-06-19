@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +17,9 @@ interface ConversationListItem {
   salespersonId: string | null;
   vehicleInterest: string;
   status: string; // Add missing property
+  lastMessageDate: Date; // Add missing property for sorting
+  salespersonName?: string; // Add optional property
+  aiOptIn?: boolean; // Add optional property
 }
 
 export const useStableConversationOperations = () => {
@@ -53,9 +55,14 @@ export const useStableConversationOperations = () => {
               vehicle_interest,
               salesperson_id,
               status,
+              ai_opt_in,
               phone_numbers!inner(
                 number,
                 is_primary
+              ),
+              profiles(
+                first_name,
+                last_name
               )
             )
           `)
@@ -82,11 +89,14 @@ export const useStableConversationOperations = () => {
               lastMessage: conv.body,
               lastMessageTime: new Date(conv.sent_at).toLocaleString(),
               lastMessageDirection: conv.direction as 'in' | 'out',
+              lastMessageDate: new Date(conv.sent_at), // Add the Date object for sorting
               unreadCount: 0,
               messageCount: 0,
               salespersonId: lead.salesperson_id,
               vehicleInterest: lead.vehicle_interest || '',
-              status: lead.status || 'new' // Add status field
+              status: lead.status || 'new', // Add status field
+              salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : undefined,
+              aiOptIn: lead.ai_opt_in || false
             });
           }
 
