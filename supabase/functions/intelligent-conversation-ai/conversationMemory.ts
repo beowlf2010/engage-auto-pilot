@@ -53,28 +53,27 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
     if (content.includes('visit') || content.includes('saturday') || content.includes('schedule')) {
       offeredItems.add('visit_scheduling');
     }
+  });
+  
+  // FIXED: Analyze customer messages for ACTUAL topics mentioned - be more precise
+  customerMessages.forEach(msg => {
+    const content = msg.replace('Customer:', '').trim().toLowerCase();
     
-    // Track discussed topics
-    if (content.includes('electric') || content.includes('ev')) {
+    // Track direct requests - only add topics explicitly mentioned by customer
+    if (content.includes('details on') || content.includes('tell me about') || content.includes('information about')) {
+      if (content.includes('chevy') || content.includes('chevrolet')) customerRequests.add('chevy_details');
+      if (content.includes('tesla')) customerRequests.add('tesla_details');
+    }
+    
+    // FIXED: Only add topics that are explicitly mentioned by the customer
+    if (content.includes('electric') || content.includes(' ev ') || content.includes('hybrid')) {
       discussedTopics.add('electric_vehicles');
     }
     if (content.includes('tesla')) {
       discussedTopics.add('tesla');
     }
-    if (content.includes('chevy') || content.includes('chevrolet')) {
+    if (content.includes('chevy') || content.includes('chevrolet') || content.includes('trailblazer')) {
       discussedTopics.add('chevrolet');
-    }
-  });
-  
-  // Analyze customer messages for requests and agreements
-  customerMessages.forEach(msg => {
-    const content = msg.replace('Customer:', '').trim().toLowerCase();
-    
-    // Track direct requests
-    if (content.includes('details on') || content.includes('tell me about') || content.includes('information about')) {
-      if (content.includes('chevy')) customerRequests.add('chevy_details');
-      if (content.includes('tesla')) customerRequests.add('tesla_details');
-      if (content.includes('electric') || content.includes('ev')) customerRequests.add('ev_details');
     }
     
     // Track agreements
@@ -108,7 +107,7 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
   };
 };
 
-// ENHANCED: Generate context-aware guidance that prevents redundant introductions
+// ENHANCED: Generate context-aware guidance that prevents redundant introductions and topic hallucinations
 export const generateConversationGuidance = (memory: any, inventoryValidation: any, businessHours: any) => {
   const guidance = [];
   
@@ -119,6 +118,15 @@ export const generateConversationGuidance = (memory: any, inventoryValidation: a
   
   if (memory.lastSalesMessageType === 'introduction') {
     guidance.push('PREVIOUS MESSAGE WAS INTRODUCTION - Follow up naturally, do not re-introduce.');
+  }
+  
+  // CRITICAL: Prevent topic hallucinations
+  if (memory.discussedTopics.length === 0) {
+    guidance.push('NO SPECIFIC VEHICLE TOPICS DISCUSSED - Do not suggest vehicle types not mentioned by customer. Focus on their actual request.');
+  }
+  
+  if (memory.discussedTopics.includes('chevrolet') && !memory.discussedTopics.includes('electric_vehicles')) {
+    guidance.push('CUSTOMER INTERESTED IN CHEVROLET - Do NOT mention electric vehicles unless customer specifically asked about them.');
   }
   
   // Prevent redundant offers

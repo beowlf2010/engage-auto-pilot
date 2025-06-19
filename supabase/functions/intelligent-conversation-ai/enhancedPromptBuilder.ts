@@ -56,7 +56,7 @@ The customer is interested in scheduling an appointment. Offer available times a
 The customer is interested in trading in their current vehicle. Ask for details about their vehicle.`;
   }
 
-  // Add conversation memory analysis
+  // FIXED: Only add discussed topics if they were actually mentioned by the customer
   if (conversationMemory?.discussedTopics?.length > 0) {
     userPrompt += `
 
@@ -96,6 +96,7 @@ CORE GUIDELINES:
 - Focus on understanding customer needs
 - Provide accurate information about vehicles and services
 - Maintain natural conversation flow without redundant introductions
+- NEVER mention vehicle types or categories not specifically mentioned by the customer
 
 CURRENT CONTEXT:
 - Customer: ${leadName}
@@ -115,6 +116,16 @@ CONVERSATION CONTINUITY RULES:
 - Avoid starting with "Hi [Name]! I'm Finn..." if already introduced
 - Continue the conversation flow naturally`;
   }
+
+  // CRITICAL: Add anti-hallucination guidance
+  systemPrompt += `
+
+CRITICAL - PREVENT TOPIC HALLUCINATION:
+- ONLY mention vehicle types or categories that the customer has specifically mentioned
+- Do NOT suggest electric vehicles, hybrids, or any vehicle type unless the customer asked about them
+- Do NOT expand the conversation to topics not brought up by the customer
+- Focus ONLY on what the customer actually said and requested
+- If customer mentions a specific vehicle (like Trailblazer), stick to that vehicle type`;
 
   // Add specific conversation guidance from memory analysis
   if (conversationGuidance && conversationGuidance.length > 0) {
@@ -168,7 +179,8 @@ RESPONSE REQUIREMENTS:
 - Be conversational and natural
 - Ask follow-up questions to understand their needs
 - Suggest next steps when appropriate
-- Maintain conversation continuity and avoid redundant information`;
+- Maintain conversation continuity and avoid redundant information
+- NEVER mention vehicle types not specifically requested by the customer`;
 
   return {
     systemPrompt,
