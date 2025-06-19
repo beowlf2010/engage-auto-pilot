@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CustomerJourney {
@@ -102,7 +103,7 @@ class CustomerJourneyTracker {
     await this.saveJourney(journey);
   }
 
-  // Get customer journey - using the new customer_journeys table
+  // Get customer journey - using the customer_journeys table
   async getCustomerJourney(leadId: string): Promise<CustomerJourney> {
     try {
       const { data: journey } = await supabase
