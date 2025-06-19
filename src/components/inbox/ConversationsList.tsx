@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Search, Filter, MessageSquare, Clock, User, Phone } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import LeadScoreIndicator from './LeadScoreIndicator';
+import EnhancedAIStatusDisplay from '../leads/EnhancedAIStatusDisplay';
 
 interface Conversation {
   leadId: string;
@@ -17,8 +19,13 @@ interface Conversation {
   status: string;
   salespersonId: string;
   salespersonName?: string;
-  aiOptIn?: boolean; // Made optional to match ConversationData
-  lastMessageDate?: Date; // Made optional to match ConversationData
+  aiOptIn?: boolean;
+  aiStage?: string;
+  aiMessagesSent?: number;
+  aiSequencePaused?: boolean;
+  incomingCount?: number;
+  outgoingCount?: number;
+  lastMessageDate?: Date;
 }
 
 interface ConversationsListProps {
@@ -75,7 +82,7 @@ const ConversationsList = ({
     if (scoreA !== scoreB) return scoreB - scoreA;
     
     // Finally by last message time
-    return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
+    return (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0);
   });
 
   return (
@@ -178,6 +185,21 @@ const ConversationsList = ({
                           {conversation.status}
                         </Badge>
                       </div>
+
+                      {/* Enhanced AI Status */}
+                      {conversation.aiOptIn && (
+                        <div className="flex items-center">
+                          <EnhancedAIStatusDisplay
+                            aiOptIn={conversation.aiOptIn}
+                            aiStage={conversation.aiStage}
+                            aiMessagesSent={conversation.aiMessagesSent}
+                            aiSequencePaused={conversation.aiSequencePaused}
+                            incomingCount={conversation.incomingCount}
+                            outgoingCount={conversation.outgoingCount}
+                            size="sm"
+                          />
+                        </div>
+                      )}
 
                       {/* Last message */}
                       <p className="text-xs text-muted-foreground truncate">

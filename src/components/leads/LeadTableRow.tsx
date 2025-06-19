@@ -9,7 +9,7 @@ import { Lead } from "@/types/lead";
 import LeadStatusBadge from "./LeadStatusBadge";
 import LeadContactStatusBadge from "./LeadContactStatusBadge";
 import LeadEngagementScore from "./LeadEngagementScore";
-import AIStatusBadges from "./AIStatusBadges";
+import EnhancedAIStatusDisplay from "./EnhancedAIStatusDisplay";
 import AIPreviewPopout from "./AIPreviewPopout";
 
 interface LeadTableRowProps {
@@ -82,9 +82,14 @@ const LeadTableRow = ({
       <TableCell onClick={(e) => e.stopPropagation()}>
         <div className="space-y-1">
           {lead.aiOptIn ? (
-            <AIStatusBadges 
-              aiContactEnabled={lead.aiContactEnabled}
-              aiRepliesEnabled={lead.aiRepliesEnabled}
+            <EnhancedAIStatusDisplay
+              aiOptIn={lead.aiOptIn}
+              aiStage={lead.aiStage}
+              aiMessagesSent={lead.aiMessagesSent}
+              aiSequencePaused={lead.aiSequencePaused}
+              incomingCount={lead.incomingCount}
+              outgoingCount={lead.outgoingCount}
+              size="sm"
             />
           ) : canEdit ? (
             <AIPreviewPopout
@@ -92,16 +97,16 @@ const LeadTableRow = ({
               onAIOptInChange={onAiOptInChange}
             >
               <div className="cursor-pointer">
-                <AIStatusBadges 
-                  aiContactEnabled={false}
-                  aiRepliesEnabled={false}
+                <EnhancedAIStatusDisplay
+                  aiOptIn={false}
+                  size="sm"
                 />
               </div>
             </AIPreviewPopout>
           ) : (
-            <AIStatusBadges 
-              aiContactEnabled={false}
-              aiRepliesEnabled={false}
+            <EnhancedAIStatusDisplay
+              aiOptIn={false}
+              size="sm"
             />
           )}
         </div>
