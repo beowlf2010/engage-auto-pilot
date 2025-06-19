@@ -6,16 +6,15 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
   
   // Parse conversation into structured messages
   const conversationLines = conversationHistory.split('\n').filter(line => line.trim());
-  const salesMessages = conversationLines.filter(line => line.startsWith('Sales:'));
+  const salesMessages = conversationLines.filter(line => line.startsWith('Sales:') || line.startsWith('You:'));
   const customerMessages = conversationLines.filter(line => line.startsWith('Customer:'));
   
   // Detect question types in the last customer message
   const questionPatterns = {
-    inventory_availability: /\b(see|available|online|have|stock|inventory|find|look|show|get|any|don't see|can't find|where|2026)\b/,
-    pricing: /\b(price|cost|how much|payment|monthly|finance|financing|afford)\b/,
-    availability: /\b(have|available|in stock|do you|get|find|look for)\b/,
-    features: /\b(features|options|specs|specifications|tell me about|what does|include)\b/,
-    scheduling: /\b(schedule|appointment|visit|come in|see|test drive|when|time)\b/,
+    inventory_availability: /\b(do you have|available|in stock|have any|show me|can you find|looking for|interested in|want to see)\b/,
+    pricing: /\b(price|cost|how much|payment|monthly|finance|financing|afford|payments)\b/,
+    features: /\b(features|options|specs|specifications|tell me about|what does|include|comes with)\b/,
+    scheduling: /\b(schedule|appointment|visit|come in|see|test drive|when|time|available)\b/,
     comparison: /\b(compare|versus|vs|difference|better|which)\b/,
     trade: /\b(trade|trade-in|worth|value|owe|payoff)\b/,
     general_inquiry: /\?|what|how|when|where|why|can you|could you|would you/
@@ -29,71 +28,76 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
     }
   }
 
-  // CRITICAL: Detect inventory availability questions specifically
-  const isInventoryQuestion = questionPatterns.inventory_availability.test(lastMessage);
   const isDirectQuestion = detectedQuestions.length > 0 || 
     lastMessage.includes('?') ||
-    /^(what|how|when|where|why|can|could|would|do|does|is|are|don't|can't)\b/.test(lastMessage);
+    /^(what|how|when|where|why|can|could|would|do|does|is|are)\b/.test(lastMessage);
 
   // Extract the specific topic they're asking about
   let questionTopic = null;
   if (isDirectQuestion) {
     // Try to extract vehicle mentions
-    const vehicleMatch = lastMessage.match(/\b(tesla|model [sy3x]|chevy|chevrolet|bolt|equinox|honda|toyota|ford|bmw|mercedes|audi|2026|2025|2024)\b/i);
+    const vehicleMatch = lastMessage.match(/\b(tesla|model [sy3x]|chevy|chevrolet|bolt|equinox|honda|toyota|ford|bmw|mercedes|audi|2026|2025|2024|sedan|suv|truck|trailblazer|silverado|tahoe|equinox)\b/i);
     if (vehicleMatch) {
       questionTopic = vehicleMatch[0];
     }
     
     // Extract general topics
     if (!questionTopic) {
-      const topicMatch = lastMessage.match(/\b(electric|ev|hybrid|suv|sedan|truck|car|vehicle|online|website|available)\b/i);
+      const topicMatch = lastMessage.match(/\b(electric|ev|hybrid|tow|towing|package|class 5|leather|seats|white|red|color)\b/i);
       if (topicMatch) {
         questionTopic = topicMatch[0];
       }
     }
   }
 
-  // Check if customer is showing frustration or being ignored
-  const frustrationIndicators = /\b(but|however|still|again|told you|said|asked|my question|answer|don't see|can't find)\b/;
-  const showingFrustration = frustrationIndicators.test(lastMessage) || isInventoryQuestion;
-
-  // Analyze if previous sales messages were off-topic
-  const lastSalesMessage = salesMessages[salesMessages.length - 1] || '';
-  const lastSalesContent = lastSalesMessage.replace('Sales:', '').trim().toLowerCase();
+  // IMPROVED: Only detect frustration with explicit indicators of being ignored
+  const explicitFrustrationIndicators = /\b(but you didn't answer|i asked you|you never responded|i told you|you ignored|my question was|why didn't you|you missed my|still waiting|i'm still asking|hello\?|are you there)\b/;
+  const repeatIndicators = /\b(again|i said|like i said|as i mentioned|i already|i repeat)\b/;
   
-  const salesWasOffTopic = isDirectQuestion && lastSalesContent && 
+  // REFINED: Only flag as frustration if there are explicit indicators
+  const showingFrustration = explicitFrustrationIndicators.test(lastMessage) || 
+    (repeatIndicators.test(lastMessage) && isDirectQuestion);
+
+  // IMPROVED: Check if previous sales message actually addressed their question
+  const lastSalesMessage = salesMessages[salesMessages.length - 1] || '';
+  const lastSalesContent = lastSalesMessage.replace(/^(Sales:|You:)/, '').trim().toLowerCase();
+  
+  // Only flag as off-topic if we have clear evidence the question was ignored
+  const salesWasOffTopic = showingFrustration && lastSalesContent && isDirectQuestion && 
     !detectedQuestions.some(qType => {
       switch (qType) {
-        case 'inventory_availability': return /available|stock|have|inventory|online|see|show/.test(lastSalesContent);
+        case 'inventory_availability': return /available|stock|have|inventory|find|show|check/.test(lastSalesContent);
         case 'pricing': return /price|cost|payment|finance/.test(lastSalesContent);
-        case 'availability': return /available|stock|have|inventory/.test(lastSalesContent);
-        case 'features': return /features|specs|options/.test(lastSalesContent);
-        case 'scheduling': return /schedule|visit|appointment/.test(lastSalesContent);
+        case 'features': return /features|specs|options|package|seats|color/.test(lastSalesContent);
+        case 'scheduling': return /schedule|visit|appointment|come|see/.test(lastSalesContent);
         default: return false;
       }
     });
 
+  // REFINED: Only require conversation repair if there's actual evidence of being ignored
+  const actuallyIgnored = showingFrustration && salesWasOffTopic;
+
   return {
     isDirectQuestion,
-    isInventoryQuestion,
     questionTypes: detectedQuestions,
     questionTopic,
     showingFrustration,
     salesWasOffTopic,
-    requiresDirectAnswer: isDirectQuestion || showingFrustration || isInventoryQuestion,
-    primaryQuestionType: detectedQuestions[0] || (isInventoryQuestion ? 'inventory_availability' : 'general_inquiry'),
+    requiresDirectAnswer: isDirectQuestion,
+    primaryQuestionType: detectedQuestions[0] || 'general_inquiry',
     conversationContext: {
       lastSalesMessage: lastSalesContent,
       customerMessageCount: customerMessages.length,
       salesMessageCount: salesMessages.length,
-      hasBeenIgnored: showingFrustration || salesWasOffTopic
+      hasBeenIgnored: actuallyIgnored,
+      needsApology: actuallyIgnored // Only apologize when actually ignored
     }
   };
 };
 
 // Generate specific answer guidance based on question type
 export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any) => {
-  const { questionTypes, questionTopic, primaryQuestionType, showingFrustration, isInventoryQuestion } = intentAnalysis;
+  const { questionTypes, questionTopic, primaryQuestionType, conversationContext } = intentAnalysis;
   
   if (!intentAnalysis.requiresDirectAnswer) {
     return null;
@@ -104,26 +108,21 @@ export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any
     answerType: primaryQuestionType,
     specificGuidance: '',
     inventoryContext: inventoryStatus,
-    urgencyLevel: showingFrustration ? 'high' : 'normal'
+    urgencyLevel: conversationContext.needsApology ? 'high' : 'normal',
+    needsApology: conversationContext.needsApology
   };
 
   switch (primaryQuestionType) {
     case 'inventory_availability':
       guidance.specificGuidance = inventoryStatus.hasActualInventory ?
-        `Customer is asking about inventory availability. Show them ONLY the ${inventoryStatus.validatedCount} vehicles we actually have in stock.` :
-        `Customer is asking about availability but we have NO matching inventory. Be HONEST - acknowledge we don't currently have what they're looking for and offer alternatives or future options.`;
+        `Customer is asking about inventory availability. Show them the ${inventoryStatus.validatedCount} vehicles we have in stock that match their request.` :
+        `Customer is asking about availability but we don't currently have what they're looking for. Be honest and offer alternatives.`;
       break;
       
     case 'pricing':
       guidance.specificGuidance = questionTopic ? 
-        `Provide specific pricing information for ${questionTopic}. If not available, explain clearly and offer alternatives.` :
-        'Answer their pricing question directly. Be transparent about costs and financing options.';
-      break;
-      
-    case 'availability':
-      guidance.specificGuidance = inventoryStatus.hasActualInventory ?
-        `Confirm availability of ${questionTopic || 'requested vehicles'}. Reference actual inventory.` :
-        `Be honest that ${questionTopic || 'the requested vehicle'} is not currently available. Offer similar alternatives.`;
+        `Provide pricing information for ${questionTopic}. Be transparent about costs.` :
+        'Answer their pricing question directly with available information.';
       break;
       
     case 'features':
@@ -131,28 +130,22 @@ export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any
       break;
       
     case 'scheduling':
-      guidance.specificGuidance = 'Help them schedule a visit or appointment. Be specific about availability and next steps.';
-      break;
-      
-    case 'trade':
-      guidance.specificGuidance = 'Address their trade-in question directly. Offer valuation assistance or process information.';
+      guidance.specificGuidance = 'Help them schedule a visit or appointment. Be specific about next steps.';
       break;
       
     default:
-      guidance.specificGuidance = 'Answer their question directly and completely before moving to sales topics.';
+      guidance.specificGuidance = 'Answer their question directly and completely.';
   }
 
-  if (showingFrustration || isInventoryQuestion) {
-    guidance.specificGuidance = `CUSTOMER NEEDS DIRECT ANSWER - ${guidance.specificGuidance} ${showingFrustration ? 'Acknowledge their question was missed.' : ''}`;
+  // Only add apology guidance when there's actual evidence of being ignored
+  if (conversationContext.needsApology) {
+    guidance.specificGuidance = `APOLOGIZE for missing their previous question, then ${guidance.specificGuidance}`;
   }
 
   return guidance;
 };
 
-// Check for conversation repair needs
+// REFINED: Check for conversation repair needs - only when actually needed
 export const needsConversationRepair = (intentAnalysis: any) => {
-  return intentAnalysis.showingFrustration || 
-         intentAnalysis.salesWasOffTopic || 
-         intentAnalysis.conversationContext.hasBeenIgnored ||
-         intentAnalysis.isInventoryQuestion;
+  return intentAnalysis.conversationContext.needsApology;
 };

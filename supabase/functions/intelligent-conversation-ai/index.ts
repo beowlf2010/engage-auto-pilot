@@ -131,11 +131,12 @@ serve(async (req) => {
       mustNotClaim: !inventoryValidation.hasRealInventory
     };
 
-    // Build enhanced prompts
+    // Build enhanced prompts with refined conversation repair logic
     const { 
       systemPrompt, 
       customerIntent, 
       answerGuidance, 
+      needsRepair,
       appointmentIntent, 
       appointmentFollowUp, 
       tradeIntent, 
@@ -166,6 +167,7 @@ serve(async (req) => {
     );
 
     console.log('🎯 UNIFIED AI: Customer question detected:', customerIntent?.requiresDirectAnswer ? 'YES' : 'NO');
+    console.log('🎯 UNIFIED AI: Needs conversation repair:', needsRepair ? 'YES' : 'NO');
     console.log('🎯 UNIFIED AI: Appointment intent:', appointmentIntent?.hasAppointmentIntent ? 'YES' : 'NO');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -193,9 +195,10 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       message: generatedMessage,
       confidence: 0.95,
-      reasoning: `Unified AI enhanced follow-up with question analysis, inventory validation, and intent detection`,
+      reasoning: `Unified AI enhanced follow-up with refined conversation repair detection`,
       customerIntent: customerIntent || null,
       answerGuidance: answerGuidance || null,
+      needsRepair: needsRepair,
       appointmentIntent: appointmentIntent || null,
       tradeIntent: tradeIntent || null,
       messageType: 'follow_up',
