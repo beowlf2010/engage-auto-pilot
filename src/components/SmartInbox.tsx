@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
@@ -191,9 +192,9 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex space-x-6">
-      {/* Increased width conversations list for better button visibility */}
-      <div className="w-96 flex-shrink-0 relative">
+    <div className="h-[calc(100vh-8rem)] flex space-x-4">
+      {/* Conversations list with reasonable width */}
+      <div className="w-80 flex-shrink-0 relative">
         <ConversationsList
           conversations={filteredConversations}
           selectedLead={selectedLead}

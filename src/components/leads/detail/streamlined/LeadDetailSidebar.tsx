@@ -20,7 +20,7 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   onMessageSent
 }) => {
   return (
-    <div className="w-80 flex-shrink-0 space-y-3 max-h-screen overflow-y-auto">
+    <div className="w-96 flex-shrink-0 space-y-3 max-h-screen overflow-y-auto">
       {/* Unified AI Assistant Panel - Always visible and compact */}
       <UnifiedAIPanel
         lead={lead}

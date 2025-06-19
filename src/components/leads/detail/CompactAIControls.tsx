@@ -85,7 +85,7 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
   };
 
   return (
-    <Card className="p-4 w-full min-w-[360px]">
+    <Card className="p-4 w-full">
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
