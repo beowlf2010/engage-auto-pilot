@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { parseCSVText } from '@/utils/csvParser';
 
 export interface VINMessageExport {
   export_info: {
@@ -61,9 +61,120 @@ export const parseVINExportFile = (fileContent: string): VINMessageExport => {
   }
 };
 
+export const parseVINCSVFile = (fileContent: string): VINMessageExport => {
+  try {
+    const csvData = parseCSVText(fileContent);
+    console.log('Parsed CSV headers:', csvData.headers);
+    console.log('Sample CSV row:', csvData.sample);
+    
+    // Check if this looks like a VIN Solutions CSV export
+    const requiredHeaders = ['customer_name', 'phone', 'message_content', 'message_direction', 'timestamp'];
+    const hasRequiredHeaders = requiredHeaders.some(header => 
+      csvData.headers.some(h => h.toLowerCase().includes(header.toLowerCase()))
+    );
+    
+    if (!hasRequiredHeaders) {
+      // Try alternative header patterns
+      const altHeaders = ['lead_name', 'contact_phone', 'message_body', 'direction', 'sent_at'];
+      const hasAltHeaders = altHeaders.some(header => 
+        csvData.headers.some(h => h.toLowerCase().includes(header.toLowerCase()))
+      );
+      
+      if (!hasAltHeaders) {
+        throw new Error('CSV file does not appear to be a VIN Solutions message export. Expected headers like: customer_name, phone, message_content, message_direction, timestamp');
+      }
+    }
+    
+    // Map CSV headers to our expected format
+    const getHeaderValue = (row: Record<string, string>, possibleNames: string[]): string => {
+      for (const name of possibleNames) {
+        const header = csvData.headers.find(h => 
+          h.toLowerCase().includes(name.toLowerCase()) ||
+          h.toLowerCase().replace(/[^a-z]/g, '') === name.toLowerCase().replace(/[^a-z]/g, '')
+        );
+        if (header && row[header]) {
+          return row[header];
+        }
+      }
+      return '';
+    };
+    
+    // Group messages by customer/lead
+    const leadsMap = new Map<string, any>();
+    
+    csvData.rows.forEach((row, index) => {
+      try {
+        const customerName = getHeaderValue(row, ['customer_name', 'lead_name', 'name', 'customer']);
+        const phone = getHeaderValue(row, ['phone', 'contact_phone', 'phone_number', 'cell_phone']);
+        const email = getHeaderValue(row, ['email', 'email_address']);
+        const messageContent = getHeaderValue(row, ['message_content', 'message_body', 'content', 'body']);
+        const direction = getHeaderValue(row, ['message_direction', 'direction', 'type']);
+        const timestamp = getHeaderValue(row, ['timestamp', 'sent_at', 'date', 'created_at']);
+        const vehicleInterest = getHeaderValue(row, ['vehicle_interest', 'vehicle', 'interested_vehicle']);
+        
+        if (!customerName || !messageContent) {
+          console.warn(`Skipping row ${index + 1}: missing customer name or message content`);
+          return;
+        }
+        
+        // Create a unique key for the lead (prefer phone, fallback to email, then name)
+        const leadKey = phone || email || customerName;
+        
+        if (!leadsMap.has(leadKey)) {
+          leadsMap.set(leadKey, {
+            id: leadKey,
+            name: customerName,
+            phone: phone || '',
+            email: email || '',
+            vehicle_interest: vehicleInterest || '',
+            messages: []
+          });
+        }
+        
+        const lead = leadsMap.get(leadKey);
+        lead.messages.push({
+          id: `msg_${index}`,
+          direction: direction.toLowerCase() === 'in' || direction.toLowerCase() === 'incoming' ? 'in' as const : 'out' as const,
+          content: messageContent,
+          sent_at: timestamp || new Date().toISOString(),
+          metadata: { csv_row: index + 1 }
+        });
+      } catch (error) {
+        console.warn(`Error processing row ${index + 1}:`, error);
+      }
+    });
+    
+    const leads = Array.from(leadsMap.values());
+    const totalMessages = leads.reduce((sum, lead) => sum + lead.messages.length, 0);
+    
+    return {
+      export_info: {
+        export_date: new Date().toISOString(),
+        total_leads: leads.length,
+        total_messages: totalMessages
+      },
+      leads
+    };
+  } catch (error) {
+    throw new Error(`Failed to parse VIN CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
 export const parseVINExcelFile = async (file: File): Promise<VINMessageExport> => {
-  // This would parse Excel files - for now, throw an error to indicate it's not implemented
-  throw new Error('Excel parsing not yet implemented. Please use JSON files.');
+  try {
+    // Read the file as text first to check if it's actually a CSV
+    const text = await file.text();
+    
+    // If it looks like CSV content, parse as CSV
+    if (text.includes(',') && !text.includes('<')) {
+      return parseVINCSVFile(text);
+    }
+    
+    // For actual Excel files, we'd need to implement XLSX parsing
+    throw new Error('Excel file parsing for VIN Solutions exports is not yet implemented. Please convert to CSV format.');
+  } catch (error) {
+    throw new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };
 
 export const createMessageExport = async (exportName: string, exportData: VINMessageExport) => {

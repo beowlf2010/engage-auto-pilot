@@ -73,7 +73,7 @@ const MessageExportImport = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Message Export & Import</h2>
-          <p className="text-gray-600">Import messages from VIN or export current system messages</p>
+          <p className="text-gray-600">Import messages from VIN Solutions or export current system messages</p>
         </div>
       </div>
 
@@ -81,7 +81,7 @@ const MessageExportImport = () => {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="import" className="flex items-center space-x-2">
             <Upload className="h-4 w-4" />
-            <span>Import from VIN</span>
+            <span>Import from VIN Solutions</span>
           </TabsTrigger>
           <TabsTrigger value="export" className="flex items-center space-x-2">
             <Download className="h-4 w-4" />
@@ -95,19 +95,22 @@ const MessageExportImport = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Upload className="h-5 w-5" />
-                <span>Upload VIN Message Export</span>
+                <span>Upload VIN Solutions Export</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="file-upload">Select VIN Export File (JSON)</Label>
+                <Label htmlFor="file-upload">Select VIN Solutions Export File</Label>
                 <Input
                   id="file-upload"
                   type="file"
-                  accept=".json"
+                  accept=".json,.csv,.xlsx,.xls"
                   onChange={handleFileSelect}
                   ref={fileInputRef}
                 />
+                <p className="text-sm text-gray-500">
+                  Supports JSON, CSV, and Excel files from VIN Solutions message exports
+                </p>
               </div>
 
               {selectedFile && (
@@ -128,7 +131,7 @@ const MessageExportImport = () => {
                 className="w-full"
               >
                 {isLoading ? (
-                  <LoadingSpinner size="sm" text="Uploading..." />
+                  <LoadingSpinner size="sm" text="Processing..." />
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
@@ -147,6 +150,20 @@ const MessageExportImport = () => {
                   </div>
                 </div>
               )}
+
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div className="text-sm text-green-800">
+                    <strong>Supported VIN Solutions Formats:</strong>
+                    <ul className="mt-1 list-disc list-inside space-y-1">
+                      <li>JSON export files from VIN Solutions</li>
+                      <li>CSV message exports with standard VIN Solutions headers</li>
+                      <li>Excel files (.xlsx, .xls) with message data</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

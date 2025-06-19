@@ -5,6 +5,7 @@ import {
   getMessageExports, 
   processMessageImport, 
   parseVINExportFile,
+  parseVINCSVFile,
   parseVINExcelFile,
   type VINMessageExport 
 } from '@/services/messageExportService';
@@ -43,18 +44,21 @@ export const useMessageExport = () => {
       if (fileExtension === 'json') {
         const fileContent = await file.text();
         parsedData = parseVINExportFile(fileContent);
+      } else if (fileExtension === 'csv') {
+        const fileContent = await file.text();
+        parsedData = parseVINCSVFile(fileContent);
       } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
         parsedData = await parseVINExcelFile(file);
       } else {
-        throw new Error('Unsupported file format. Please upload a JSON or Excel file.');
+        throw new Error('Unsupported file format. Please upload a JSON, CSV, or Excel file from VIN Solutions.');
       }
       
       // Create the export record
       const exportRecord = await createMessageExport(exportName, parsedData);
       
       toast({
-        title: "File Uploaded",
-        description: `Successfully uploaded ${parsedData.export_info.total_leads} leads with ${parsedData.export_info.total_messages} messages`,
+        title: "File Uploaded Successfully",
+        description: `Processed ${parsedData.export_info.total_leads} leads with ${parsedData.export_info.total_messages} messages from VIN Solutions export`,
       });
 
       // Refresh the exports list
@@ -65,7 +69,7 @@ export const useMessageExport = () => {
       console.error('Error importing file:', error);
       toast({
         title: "Import Error",
-        description: error instanceof Error ? error.message : "Failed to import file",
+        description: error instanceof Error ? error.message : "Failed to import VIN Solutions file",
         variant: "destructive"
       });
       throw error;
