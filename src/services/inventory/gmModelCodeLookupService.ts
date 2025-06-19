@@ -22,6 +22,9 @@ export const GM_MODEL_CODES: Record<string, string> = {
   '1MF26': 'Blazer',
   '1MF33': 'Blazer',
   '1LT26': 'Trailblazer',
+  '1TR26': 'Trax',
+  '1TR56': 'Trax',
+  '1TU56': 'Trailblazer',
   '1LS26': 'Trax',
   '1TT14': 'Spark',
   '1ZB69': 'Malibu',
@@ -101,7 +104,7 @@ export const translateGMModelCode = (modelCode: string): string => {
     }
   }
   
-  return modelCode; // Return original if no translation found
+  return 'Unknown'; // Return Unknown instead of the raw code
 };
 
 export const extractModelFromGMData = (row: Record<string, any>): string => {
@@ -117,7 +120,7 @@ export const extractModelFromGMData = (row: Record<string, any>): string => {
     const value = row[field];
     if (value && typeof value === 'string') {
       const translated = translateGMModelCode(value);
-      if (translated !== 'Unknown' && translated !== value) {
+      if (translated !== 'Unknown') {
         return translated;
       }
     }
@@ -138,7 +141,59 @@ export const extractModelFromGMData = (row: Record<string, any>): string => {
     if (allocationField.includes('SIERRA')) return 'Sierra';
     if (allocationField.includes('ACADIA')) return 'Acadia';
     if (allocationField.includes('YUKON')) return 'Yukon';
+    if (allocationField.includes('TRAILBLAZER')) return 'Trailblazer';
+    if (allocationField.includes('TRAX')) return 'Trax';
   }
   
   return 'Unknown';
+};
+
+// Safety validation function to check if a model name is customer-ready
+export const isCustomerReadyModel = (modelName: string): boolean => {
+  if (!modelName || modelName === 'Unknown') return false;
+  
+  // Check if it's a raw GM code pattern (alphanumeric codes like 1TU56, 1TR56, etc.)
+  const gmCodePattern = /^[0-9][A-Z0-9]{2,5}$/;
+  if (gmCodePattern.test(modelName)) return false;
+  
+  // Check for other problematic patterns
+  if (modelName.includes('/') || modelName.includes('-') || modelName.length < 3) return false;
+  
+  return true;
+};
+
+// Generate customer-safe vehicle description
+export const getCustomerSafeVehicleDescription = (vehicle: any): string => {
+  const year = vehicle.year ? String(vehicle.year) : '';
+  const make = vehicle.make || '';
+  const model = vehicle.model || '';
+  const trim = vehicle.trim || '';
+  
+  // First try to get a proper model name
+  let safeModel = model;
+  if (!isCustomerReadyModel(model)) {
+    // Try to extract from full_option_blob
+    if (vehicle.full_option_blob) {
+      const extractedModel = extractModelFromGMData(vehicle.full_option_blob);
+      if (isCustomerReadyModel(extractedModel)) {
+        safeModel = extractedModel;
+      } else {
+        // Can't resolve to a customer-safe name
+        return 'Contact dealer for vehicle details';
+      }
+    } else {
+      return 'Contact dealer for vehicle details';
+    }
+  }
+  
+  // Build customer-safe description
+  const parts = [year, make, safeModel, trim].filter(part => 
+    part && part !== 'Unknown' && part.trim() !== ''
+  );
+  
+  if (parts.length >= 2) {
+    return parts.join(' ');
+  }
+  
+  return 'Contact dealer for vehicle details';
 };
