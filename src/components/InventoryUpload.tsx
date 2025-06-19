@@ -1,9 +1,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { History, Package, BarChart3, Trash2, Globe } from "lucide-react";
+import { History, Package, BarChart3, Trash2, Globe, Timeline } from "lucide-react";
 import { useInventoryUpload } from "@/hooks/useInventoryUpload";
-import { useMultiFileUpload } from "@/hooks/useMultiFileUpload";
+import { useEnhancedMultiFileUpload } from "@/hooks/useEnhancedMultiFileUpload";
 import { Link } from "react-router-dom";
 import { performInventoryCleanup } from "@/services/inventory/core/inventoryCleanupService";
 import { toast } from "@/hooks/use-toast";
@@ -12,7 +12,7 @@ import UploadInfoCards from "./inventory-upload/UploadInfoCards";
 import UploadHistoryViewer from "./inventory-upload/UploadHistoryViewer";
 import SheetSelector from "./inventory-upload/SheetSelector";
 import DragDropFileQueue from "./inventory-upload/DragDropFileQueue";
-import BatchUploadResult from "./inventory-upload/BatchUploadResult";
+import EnhancedBatchUploadResult from "./inventory-upload/EnhancedBatchUploadResult";
 import VehicleScraper from "./inventory-upload/VehicleScraper";
 import type { QueuedFile } from "./inventory-upload/DragDropFileQueue";
 
@@ -40,7 +40,7 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
     setBatchResult,
     processFile,
     processBatch
-  } = useMultiFileUpload({ userId: user.id });
+  } = useEnhancedMultiFileUpload({ userId: user.id });
 
   // Check permissions
   if (!["manager", "admin"].includes(user.role)) {
@@ -68,8 +68,8 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Upload History</h2>
-            <p className="text-slate-600 mt-1">View and manage your inventory upload history</p>
+            <h2 className="text-2xl font-bold text-slate-800">Upload History & Vehicle Tracking</h2>
+            <p className="text-slate-600 mt-1">View upload history, vehicle timelines, and duplicate management</p>
           </div>
           <div className="flex items-center space-x-3">
             <Link to="/inventory-dashboard">
@@ -124,9 +124,9 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Inventory Management</h2>
+          <h2 className="text-2xl font-bold text-slate-800">Enhanced Inventory Management</h2>
           <p className="text-slate-600 mt-1">
-            Upload files or scrape your website to import vehicle inventory
+            Smart report detection, vehicle history tracking, and automated duplicate management
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -151,8 +151,8 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
             </Button>
           </Link>
           <Button onClick={() => setShowHistory(true)} variant="outline" className="flex items-center space-x-2">
-            <History className="w-4 h-4" />
-            <span>View History</span>
+            <Timeline className="w-4 h-4" />
+            <span>Vehicle History</span>
           </Button>
         </div>
       </div>
@@ -161,7 +161,7 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="file-upload" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
-            File Upload
+            Smart File Upload
           </TabsTrigger>
           <TabsTrigger value="website-scraping" className="flex items-center gap-2">
             <Globe className="w-4 h-4" />
@@ -170,6 +170,16 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
         </TabsList>
 
         <TabsContent value="file-upload" className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-blue-800 mb-2">Enhanced Processing Features</h3>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Automatic report type detection (NEW CAR MAIN VIEW, GM Global, Sales Reports)</li>
+              <li>• Vehicle history tracking across all uploads</li>
+              <li>• Smart duplicate detection and merging</li>
+              <li>• Data quality scoring and validation</li>
+            </ul>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <DragDropFileQueue 
@@ -184,7 +194,7 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
           </div>
 
           {batchResult && (
-            <BatchUploadResult result={batchResult} />
+            <EnhancedBatchUploadResult result={batchResult} />
           )}
         </TabsContent>
 

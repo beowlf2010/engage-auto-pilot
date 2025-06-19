@@ -3976,6 +3976,161 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_duplicates: {
+        Row: {
+          confidence_score: number
+          created_at: string
+          duplicate_inventory_id: string | null
+          id: string
+          master_vehicle_id: string | null
+          match_type: string
+          resolution_action: string | null
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          confidence_score?: number
+          created_at?: string
+          duplicate_inventory_id?: string | null
+          id?: string
+          master_vehicle_id?: string | null
+          match_type: string
+          resolution_action?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          confidence_score?: number
+          created_at?: string
+          duplicate_inventory_id?: string | null
+          id?: string
+          master_vehicle_id?: string | null
+          match_type?: string
+          resolution_action?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_duplicates_master_vehicle_id_fkey"
+            columns: ["master_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_master"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_history: {
+        Row: {
+          created_at: string
+          gm_order_number: string | null
+          history_type: string
+          id: string
+          make: string
+          model: string
+          source_data: Json
+          source_report: string
+          status: string
+          stock_number: string | null
+          updated_at: string
+          upload_history_id: string | null
+          vin: string | null
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          gm_order_number?: string | null
+          history_type: string
+          id?: string
+          make: string
+          model: string
+          source_data?: Json
+          source_report: string
+          status?: string
+          stock_number?: string | null
+          updated_at?: string
+          upload_history_id?: string | null
+          vin?: string | null
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          gm_order_number?: string | null
+          history_type?: string
+          id?: string
+          make?: string
+          model?: string
+          source_data?: Json
+          source_report?: string
+          status?: string
+          stock_number?: string | null
+          updated_at?: string
+          upload_history_id?: string | null
+          vin?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
+      vehicle_master: {
+        Row: {
+          created_at: string
+          current_status: string
+          data_quality_score: number | null
+          first_seen_at: string
+          gm_order_number: string | null
+          id: string
+          inventory_data: Json | null
+          last_updated_at: string
+          make: string
+          model: string
+          order_data: Json | null
+          sale_data: Json | null
+          stock_number: string | null
+          updated_at: string
+          vin: string | null
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          current_status?: string
+          data_quality_score?: number | null
+          first_seen_at?: string
+          gm_order_number?: string | null
+          id?: string
+          inventory_data?: Json | null
+          last_updated_at?: string
+          make: string
+          model: string
+          order_data?: Json | null
+          sale_data?: Json | null
+          stock_number?: string | null
+          updated_at?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          current_status?: string
+          data_quality_score?: number | null
+          first_seen_at?: string
+          gm_order_number?: string | null
+          id?: string
+          inventory_data?: Json | null
+          last_updated_at?: string
+          make?: string
+          model?: string
+          order_data?: Json | null
+          sale_data?: Json | null
+          stock_number?: string | null
+          updated_at?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       vehicle_velocity_tracking: {
         Row: {
           avg_days_to_sell: number
@@ -4090,6 +4245,10 @@ export type Database = {
       classify_deal_by_stock: {
         Args: { stock_number: string }
         Returns: string
+      }
+      detect_vehicle_duplicates: {
+        Args: { p_upload_history_id: string }
+        Returns: number
       }
       find_matching_inventory: {
         Args: { p_lead_id: string }
@@ -4213,6 +4372,20 @@ export type Database = {
           p_used_units: number
           p_used_gross: number
           p_upload_history_id: string
+        }
+        Returns: string
+      }
+      upsert_vehicle_master: {
+        Args: {
+          p_vin: string
+          p_stock_number: string
+          p_gm_order_number: string
+          p_make: string
+          p_model: string
+          p_year: number
+          p_status: string
+          p_source_report: string
+          p_data: Json
         }
         Returns: string
       }
