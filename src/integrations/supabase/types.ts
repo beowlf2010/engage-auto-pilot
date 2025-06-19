@@ -1096,6 +1096,7 @@ export type Database = {
           direction: string
           id: string
           lead_id: string
+          profile_id: string | null
           read_at: string | null
           sent_at: string
           sms_error: string | null
@@ -1109,6 +1110,7 @@ export type Database = {
           direction: string
           id?: string
           lead_id: string
+          profile_id?: string | null
           read_at?: string | null
           sent_at?: string
           sms_error?: string | null
@@ -1122,6 +1124,7 @@ export type Database = {
           direction?: string
           id?: string
           lead_id?: string
+          profile_id?: string | null
           read_at?: string | null
           sent_at?: string
           sms_error?: string | null
@@ -1134,6 +1137,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

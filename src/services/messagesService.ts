@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const getMessages = async (leadId: string) => {
@@ -66,12 +65,12 @@ export const sendMessage = async (
 
     console.log(`📱 [MESSAGES SERVICE] Sending to phone: ${primaryPhone}`);
 
-    // Create conversation record first
+    // Create conversation record first with profile_id included
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
       .insert({
         lead_id: leadId,
-        profile_id: profile?.id,
+        profile_id: profile?.id || null, // Handle cases where profile might be null
         body: messageBody,
         direction: 'out',
         sent_at: new Date().toISOString(),
