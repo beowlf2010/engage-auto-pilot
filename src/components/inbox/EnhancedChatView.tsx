@@ -22,6 +22,7 @@ interface EnhancedChatViewProps {
     role: string;
     id: string;
   };
+  isLoading?: boolean;
 }
 
 const EnhancedChatView = ({ 
@@ -30,7 +31,8 @@ const EnhancedChatView = ({
   onSendMessage, 
   showTemplates,
   onToggleTemplates,
-  user 
+  user,
+  isLoading = false
 }: EnhancedChatViewProps) => {
   const [showAppointmentScheduler, setShowAppointmentScheduler] = useState(false);
   const [appointmentIntent, setAppointmentIntent] = useState<AppointmentIntent | null>(null);
@@ -215,14 +217,14 @@ const EnhancedChatView = ({
                     onKeyPress={handleKeyPress}
                     placeholder="Type your message..."
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={isSending}
+                    disabled={isSending || isLoading}
                   />
                   <button
                     onClick={handleSend}
-                    disabled={isSending || !newMessage.trim()}
+                    disabled={isSending || isLoading || !newMessage.trim()}
                     className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSending ? 'Sending...' : 'Send'}
+                    {isSending || isLoading ? 'Sending...' : 'Send'}
                   </button>
                 </div>
               </div>
