@@ -38,11 +38,11 @@ const Settings = () => {
         </TabsList>
 
         <TabsContent value="api-keys" className="mt-6">
-          <ApiKeysSettings />
+          <ApiKeysSettings userRole="user" />
         </TabsContent>
 
         <TabsContent value="email" className="mt-6">
-          <EmailSettings />
+          <EmailSettings userRole="user" />
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-6">

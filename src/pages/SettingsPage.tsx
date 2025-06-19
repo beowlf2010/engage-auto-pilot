@@ -21,16 +21,7 @@ const SettingsPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  const user = {
-    id: profile.id,
-    email: profile.email,
-    role: profile.role,
-    firstName: profile.first_name,
-    lastName: profile.last_name,
-    phone: profile.phone
-  };
-
-  return <Settings user={user} />;
+  return <Settings />;
 };
 
 export default SettingsPage;

@@ -99,17 +99,7 @@ export class NotificationService {
         icon: '/favicon.ico',
         badge: '/favicon.ico',
         tag: `message-${data.conversationId}`,
-        requireInteraction: true,
-        actions: [
-          {
-            action: 'view',
-            title: 'View Message'
-          },
-          {
-            action: 'dismiss',
-            title: 'Dismiss'
-          }
-        ]
+        requireInteraction: true
       });
 
       notification.onclick = () => {
