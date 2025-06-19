@@ -41,25 +41,27 @@ export class MemoryStore {
 
   async saveMemoryToDatabase(memory: ConversationMemory): Promise<void> {
     try {
+      const insertData = {
+        lead_id: memory.leadId,
+        memory_type: 'enhanced_context',
+        content: JSON.stringify({
+          sessionId: memory.sessionId,
+          conversationHistory: memory.conversationHistory,
+          customerProfile: memory.customerProfile,
+          behavioralPatterns: memory.behavioralPatterns,
+          emotionalContext: memory.emotionalContext
+        }),
+        current_session_id: memory.sessionId,
+        conversation_history: memory.conversationHistory,
+        customer_profile: memory.customerProfile,
+        behavioral_patterns: memory.behavioralPatterns,
+        emotional_context: memory.emotionalContext,
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from('conversation_memory')
-        .upsert({
-          lead_id: memory.leadId,
-          memory_type: 'enhanced_context',
-          content: JSON.stringify({
-            sessionId: memory.sessionId,
-            conversationHistory: memory.conversationHistory,
-            customerProfile: memory.customerProfile,
-            behavioralPatterns: memory.behavioralPatterns,
-            emotionalContext: memory.emotionalContext
-          }),
-          current_session_id: memory.sessionId,
-          conversation_history: memory.conversationHistory,
-          customer_profile: memory.customerProfile,
-          behavioral_patterns: memory.behavioralPatterns,
-          emotional_context: memory.emotionalContext,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(insertData as any);
 
       if (error) {
         console.error('Error saving conversation memory:', error);
@@ -72,13 +74,13 @@ export class MemoryStore {
   private parseConversationHistory(data: any): ConversationSession[] {
     if (!data || !Array.isArray(data)) return [];
     
-    return data.filter(this.isConversationSession);
+    return (data as any[]).filter(this.isConversationSession);
   }
 
   private parseBehavioralPatterns(data: any): BehavioralPattern[] {
     if (!data || !Array.isArray(data)) return [];
     
-    return data.filter(this.isBehavioralPattern);
+    return (data as any[]).filter(this.isBehavioralPattern);
   }
 
   private parseCustomerProfile(data: any): CustomerProfile | null {

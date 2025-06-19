@@ -41,18 +41,20 @@ export class JourneyStore {
 
   async saveJourney(journey: CustomerJourney): Promise<void> {
     try {
+      const insertData = {
+        lead_id: journey.leadId,
+        journey_stage: journey.journeyStage,
+        touchpoints: journey.touchpoints,
+        milestones: journey.milestones,
+        next_best_action: journey.nextBestAction,
+        estimated_time_to_decision: journey.estimatedTimeToDecision,
+        conversion_probability: journey.conversionProbability,
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from('customer_journeys')
-        .upsert({
-          lead_id: journey.leadId,
-          journey_stage: journey.journeyStage,
-          touchpoints: journey.touchpoints,
-          milestones: journey.milestones,
-          next_best_action: journey.nextBestAction,
-          estimated_time_to_decision: journey.estimatedTimeToDecision,
-          conversion_probability: journey.conversionProbability,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(insertData as any);
 
       if (error) {
         console.error('Error saving customer journey:', error);
@@ -65,13 +67,13 @@ export class JourneyStore {
   private parseTouchpoints(data: any): Touchpoint[] {
     if (!data || !Array.isArray(data)) return [];
     
-    return data.filter(this.isTouchpoint);
+    return (data as any[]).filter(this.isTouchpoint);
   }
 
   private parseMilestones(data: any): Milestone[] {
     if (!data || !Array.isArray(data)) return [];
     
-    return data.filter(this.isMilestone);
+    return (data as any[]).filter(this.isMilestone);
   }
 
   private isTouchpoint(data: any): data is Touchpoint {
