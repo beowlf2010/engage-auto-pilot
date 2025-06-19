@@ -4,21 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Package, DollarSign, Brain, AlertTriangle } from 'lucide-react';
 import { usePredictiveAnalytics } from '@/hooks/usePredictiveAnalytics';
-import { useRealtimePredictiveUpdates } from '@/hooks/useRealtimePredictiveUpdates';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 const PredictiveAnalyticsOverview = () => {
-  const { salesForecasts, inventoryDemandPredictions, marketIntelligence, isLoading, error, refresh } = usePredictiveAnalytics();
+  const { insights, loading, lastUpdated, loadInsights } = usePredictiveAnalytics();
 
-  // Set up real-time updates
-  useRealtimePredictiveUpdates({
-    onSalesForecastUpdate: refresh,
-    onInventoryDemandUpdate: refresh,
-    onMarketIntelligenceUpdate: refresh
-  });
-
-  if (isLoading) {
+  if (loading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-64">
@@ -28,74 +20,42 @@ const PredictiveAnalyticsOverview = () => {
     );
   }
 
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center h-64 space-y-4">
-          <AlertTriangle className="h-8 w-8 text-red-500" />
-          <p className="text-sm text-gray-600">{error}</p>
-          <button 
-            onClick={refresh}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retry
-          </button>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Extract different types of insights
+  const conversionInsights = insights.filter(i => i.type === 'conversion_probability');
+  const churnInsights = insights.filter(i => i.type === 'churn_risk');
+  const contentInsights = insights.filter(i => i.type === 'content_recommendation');
+  const timingInsights = insights.filter(i => i.type === 'optimal_timing');
 
-  const currentForecast = salesForecasts[0];
-  const highDemandInventory = inventoryDemandPredictions.filter(p => p.demandScore > 70);
-  const currentIntelligence = marketIntelligence[0];
+  // Calculate summary metrics from insights
+  const highValueLeads = conversionInsights.filter(i => i.confidence > 0.7).length;
+  const churnRiskLeads = churnInsights.filter(i => i.confidence > 0.6).length;
+  const totalRecommendations = insights.reduce((total, insight) => total + insight.recommendedActions.length, 0);
 
   return (
     <ErrorBoundary>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue Forecast</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">High-Value Leads</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ${currentForecast ? (currentForecast.predictedRevenue / 1000).toFixed(0) : 0}K
-            </div>
-            {currentForecast && (
-              <p className="text-xs text-muted-foreground">
-                {(currentForecast.confidenceScore * 100).toFixed(0)}% confidence
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">High Demand Vehicles</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{highDemandInventory.length}</div>
+            <div className="text-2xl font-bold">{highValueLeads}</div>
             <p className="text-xs text-muted-foreground">
-              Demand score &gt; 70
+              High conversion probability
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Market Trend</CardTitle>
-            {currentIntelligence?.demandTrend === 'increasing' ? 
-              <TrendingUp className="h-4 w-4 text-green-500" /> : 
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            }
+            <CardTitle className="text-sm font-medium">At-Risk Leads</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold capitalize">
-              {currentIntelligence?.demandTrend || 'Stable'}
-            </div>
+            <div className="text-2xl font-bold">{churnRiskLeads}</div>
             <p className="text-xs text-muted-foreground">
-              Overall demand trend
+              High churn risk detected
             </p>
           </CardContent>
         </Card>
@@ -106,32 +66,85 @@ const PredictiveAnalyticsOverview = () => {
             <Brain className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {currentIntelligence?.recommendations?.length || 0}
-            </div>
+            <div className="text-2xl font-bold">{insights.length}</div>
             <p className="text-xs text-muted-foreground">
-              Active recommendations
+              Active predictions
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Recommendations</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalRecommendations}</div>
+            <p className="text-xs text-muted-foreground">
+              Actionable suggestions
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {currentIntelligence?.recommendations && currentIntelligence.recommendations.length > 0 && (
+      {insights.length > 0 && (
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Latest AI Recommendations</CardTitle>
+            <CardTitle>Latest AI Insights</CardTitle>
+            {lastUpdated && (
+              <p className="text-sm text-muted-foreground">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </p>
+            )}
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {currentIntelligence.recommendations.slice(0, 3).map((recommendation, index) => (
-                <div key={index} className="flex items-start space-x-2">
-                  <Badge variant="outline" className="mt-1">
-                    {index + 1}
-                  </Badge>
-                  <p className="text-sm">{recommendation}</p>
+            <div className="space-y-4">
+              {insights.slice(0, 5).map((insight, index) => (
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="outline" className="capitalize">
+                      {insight.type.replace('_', ' ')}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {(insight.confidence * 100).toFixed(0)}% confidence
+                    </Badge>
+                  </div>
+                  
+                  <p className="text-sm mb-2">{insight.expectedOutcome}</p>
+                  
+                  {insight.recommendedActions.length > 0 && (
+                    <div className="mt-3">
+                      <h5 className="text-xs font-medium text-muted-foreground mb-1">
+                        Recommended Actions:
+                      </h5>
+                      <ul className="text-xs space-y-1">
+                        {insight.recommendedActions.slice(0, 2).map((action, actionIndex) => (
+                          <li key={actionIndex} className="flex items-center gap-1">
+                            <span className="w-1 h-1 bg-blue-500 rounded-full" />
+                            {action}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+
+            {insights.length === 0 && (
+              <div className="text-center py-8">
+                <Brain className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  No predictive insights available yet
+                </p>
+                <button 
+                  onClick={loadInsights}
+                  className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                >
+                  Generate Insights
+                </button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
