@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { aiLearningService } from '@/services/aiLearningService';
 
@@ -207,8 +206,9 @@ class RealtimeLearningService {
 
     // Update communication pattern with learned preferences
     if (patterns) {
+      const currentPreferences = patterns.content_preferences;
       const updatedPreferences = {
-        ...(patterns.content_preferences || {}),
+        ...(typeof currentPreferences === 'object' && currentPreferences !== null ? currentPreferences : {}),
         avoid_negative_triggers: true,
         preferred_tone: 'consultative',
         last_optimization: new Date().toISOString()
