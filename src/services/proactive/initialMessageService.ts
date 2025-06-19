@@ -64,6 +64,7 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
 
     console.log(`✅ [INITIAL MESSAGE SERVICE] Using cleaned profile:`, cleanedProfile);
 
+    console.log(`📋 [INITIAL MESSAGE SERVICE] Getting lead details for ${leadId}...`);
     // Get lead details
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -89,6 +90,7 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       return { success: false, leadId, error: 'AI not enabled for lead', messageSource: 'initial_message_service' };
     }
 
+    console.log(`🔍 [INITIAL MESSAGE SERVICE] Checking for existing messages...`);
     // Check if we've already sent a message
     const { data: existingMessages } = await supabase
       .from('conversations')
@@ -135,29 +137,40 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       console.log(`📝 [INITIAL MESSAGE SERVICE] Recent message ID: ${messageId}`);
 
       // Add AI conversation note about initial contact
-      await addAIConversationNote(
-        leadId,
-        messageId,
-        'inventory_discussion',
-        `Enhanced AI warm introduction: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
-        []
-      );
-      console.log(`📋 [INITIAL MESSAGE SERVICE] Added conversation note`);
+      try {
+        await addAIConversationNote(
+          leadId,
+          messageId,
+          'inventory_discussion',
+          `Enhanced AI warm introduction: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
+          []
+        );
+        console.log(`📋 [INITIAL MESSAGE SERVICE] Added conversation note`);
+      } catch (noteError) {
+        console.warn(`⚠️ [INITIAL MESSAGE SERVICE] Failed to add conversation note:`, noteError);
+        // Don't fail the whole operation for this
+      }
     } catch (error) {
-      console.error('❌ [INITIAL MESSAGE SERVICE] Error sending message or adding note:', error);
-      return { success: false, leadId, error: 'Failed to send message', messageSource: 'initial_message_service' };
+      console.error('❌ [INITIAL MESSAGE SERVICE] Error sending message:', error);
+      return { success: false, leadId, error: `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`, messageSource: 'initial_message_service' };
     }
 
     // Update lead status
     console.log(`🔄 [INITIAL MESSAGE SERVICE] Updating lead status...`);
-    await supabase
-      .from('leads')
-      .update({
-        ai_messages_sent: 1,
-        ai_stage: 'initial_contact_sent',
-        next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      })
-      .eq('id', leadId);
+    try {
+      await supabase
+        .from('leads')
+        .update({
+          ai_messages_sent: 1,
+          ai_stage: 'initial_contact_sent',
+          next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .eq('id', leadId);
+      console.log(`✅ [INITIAL MESSAGE SERVICE] Lead status updated successfully`);
+    } catch (updateError) {
+      console.warn(`⚠️ [INITIAL MESSAGE SERVICE] Failed to update lead status:`, updateError);
+      // Don't fail the whole operation for this
+    }
 
     console.log(`✅ [INITIAL MESSAGE SERVICE] Successfully sent warm introduction to ${lead.first_name}: ${message}`);
     

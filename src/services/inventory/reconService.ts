@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export async function fetchReconServiceLines(inventoryId: string) {
@@ -53,22 +54,67 @@ export async function upsertReconApproval({ serviceLineId, userId, status, notes
   status: string;
   notes?: string;
 }) {
-  // Upsert for unique (service_line_id, user_id)
-  const { data, error } = await supabase
-    .from("recon_approvals")
-    .upsert(
-      [{
-        service_line_id: serviceLineId,
-        user_id: userId,
-        approval_status: status,
-        notes: notes ?? null,
-      }],
-      { onConflict: "service_line_id, user_id" }
-    )
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+  console.log(`📝 [RECON SERVICE] Upserting recon approval: service line ${serviceLineId}, user ${userId}, status ${status}`);
+  
+  try {
+    // Check if approval already exists
+    const { data: existing, error: checkError } = await supabase
+      .from("recon_approvals")
+      .select('id')
+      .eq('service_line_id', serviceLineId)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('❌ [RECON SERVICE] Error checking existing approval:', checkError);
+      throw checkError;
+    }
+
+    if (existing) {
+      // Update existing approval
+      console.log(`🔄 [RECON SERVICE] Updating existing approval ${existing.id}`);
+      const { data, error: updateError } = await supabase
+        .from("recon_approvals")
+        .update({
+          approval_status: status,
+          notes: notes ?? null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('❌ [RECON SERVICE] Error updating approval:', updateError);
+        throw updateError;
+      }
+      console.log(`✅ [RECON SERVICE] Updated approval successfully`);
+      return data;
+    } else {
+      // Insert new approval
+      console.log(`✨ [RECON SERVICE] Creating new approval`);
+      const { data, error: insertError } = await supabase
+        .from("recon_approvals")
+        .insert({
+          service_line_id: serviceLineId,
+          user_id: userId,
+          approval_status: status,
+          notes: notes ?? null,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('❌ [RECON SERVICE] Error inserting approval:', insertError);
+        throw insertError;
+      }
+      console.log(`✅ [RECON SERVICE] Created approval successfully`);
+      return data;
+    }
+  } catch (error) {
+    console.error('❌ [RECON SERVICE] Error in upsertReconApproval:', error);
+    throw error;
+  }
 }
 
 export async function fetchReconAttachments(serviceLineId: string) {

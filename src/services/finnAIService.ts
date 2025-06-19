@@ -12,6 +12,7 @@ export interface FinnAIResult {
 // Helper function to get clean profile data
 const getCleanProfileData = async (userId: string) => {
   try {
+    console.log(`🔍 [FINN AI SERVICE] Getting profile data for user: ${userId}`);
     const { data: profile, error } = await supabase
       .from('profiles')
       .select('id, email, first_name, last_name')
@@ -59,6 +60,7 @@ export const toggleFinnAI = async (leadId: string, currentOptIn: boolean): Promi
       return { success: false, error: 'Failed to load user profile' };
     }
 
+    console.log(`🔄 [FINN AI SERVICE] Updating lead AI settings...`);
     // Update the AI opt-in status
     const { error: updateError } = await supabase
       .from('leads')
@@ -80,20 +82,29 @@ export const toggleFinnAI = async (leadId: string, currentOptIn: boolean): Promi
     if (newOptInState) {
       console.log(`🚀 [FINN AI SERVICE] AI enabled, sending initial message with profile:`, profile);
       
-      const messageResult = await sendInitialMessage(leadId, profile);
-      
-      if (messageResult.success) {
-        console.log(`✅ [FINN AI SERVICE] Initial message sent successfully`);
+      try {
+        const messageResult = await sendInitialMessage(leadId, profile);
+        
+        if (messageResult.success) {
+          console.log(`✅ [FINN AI SERVICE] Initial message sent successfully`);
+          return { 
+            success: true, 
+            message: 'Finn AI enabled and initial message sent',
+            newState: newOptInState 
+          };
+        } else {
+          console.warn(`⚠️ [FINN AI SERVICE] AI enabled but initial message failed:`, messageResult.error);
+          return { 
+            success: true, 
+            message: `Finn AI enabled but initial message failed: ${messageResult.error}`,
+            newState: newOptInState 
+          };
+        }
+      } catch (messageError) {
+        console.error('❌ [FINN AI SERVICE] Error in sendInitialMessage:', messageError);
         return { 
           success: true, 
-          message: 'Finn AI enabled and initial message sent',
-          newState: newOptInState 
-        };
-      } else {
-        console.warn(`⚠️ [FINN AI SERVICE] AI enabled but initial message failed:`, messageResult.error);
-        return { 
-          success: true, 
-          message: `Finn AI enabled but initial message failed: ${messageResult.error}`,
+          message: `Finn AI enabled but initial message failed: ${messageError instanceof Error ? messageError.message : 'Unknown error'}`,
           newState: newOptInState 
         };
       }
