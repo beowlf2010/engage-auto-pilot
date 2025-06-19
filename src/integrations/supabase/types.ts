@@ -610,9 +610,44 @@ export type Database = {
           },
         ]
       }
+      appointment_slots: {
+        Row: {
+          created_at: string | null
+          current_bookings: number | null
+          date: string
+          id: string
+          is_available: boolean | null
+          max_appointments: number | null
+          time_slot: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_bookings?: number | null
+          date: string
+          id?: string
+          is_available?: boolean | null
+          max_appointments?: number | null
+          time_slot: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_bookings?: number | null
+          date?: string
+          id?: string
+          is_available?: boolean | null
+          max_appointments?: number | null
+          time_slot?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           appointment_type: string
+          booking_source: string | null
+          booking_token: string | null
           cancel_reason: string | null
           cancelled_at: string | null
           completed_at: string | null
@@ -636,6 +671,8 @@ export type Database = {
         }
         Insert: {
           appointment_type?: string
+          booking_source?: string | null
+          booking_token?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
           completed_at?: string | null
@@ -659,6 +696,8 @@ export type Database = {
         }
         Update: {
           appointment_type?: string
+          booking_source?: string | null
+          booking_token?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
           completed_at?: string | null
@@ -4352,6 +4391,10 @@ export type Database = {
       }
     }
     Functions: {
+      book_appointment_slot: {
+        Args: { p_date: string; p_time: string }
+        Returns: boolean
+      }
       calculate_delivery_variance: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -4382,6 +4425,18 @@ export type Database = {
           make: string
           model: string
           price: number
+        }[]
+      }
+      generate_booking_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_available_appointment_slots: {
+        Args: { start_date?: string; end_date?: string }
+        Returns: {
+          slot_date: string
+          slot_time: string
+          available_spots: number
         }[]
       }
       get_current_user_role: {

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { Appointment, CreateAppointmentData, UpdateAppointmentData } from '@/types/appointment';
 
@@ -53,7 +52,10 @@ export const appointmentService = {
   },
 
   // Create a new appointment
-  async createAppointment(appointmentData: CreateAppointmentData): Promise<Appointment> {
+  async createAppointment(appointmentData: CreateAppointmentData & { 
+    booking_source?: 'staff' | 'customer' | 'system';
+    booking_token?: string;
+  }): Promise<Appointment> {
     const { data, error } = await supabase
       .from('appointments')
       .insert({
@@ -68,6 +70,32 @@ export const appointmentService = {
       .single();
 
     if (error) throw error;
+
+    return {
+      ...data,
+      appointment_type: data.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
+      status: data.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
+      lead_name: `${data.leads.first_name} ${data.leads.last_name}`,
+      salesperson_name: data.salesperson 
+        ? `${data.salesperson.first_name} ${data.salesperson.last_name}`
+        : undefined
+    };
+  },
+
+  // Get appointment by booking token (for public access)
+  async getAppointmentByToken(token: string): Promise<Appointment | null> {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        leads!inner(first_name, last_name),
+        salesperson:profiles!salesperson_id(first_name, last_name)
+      `)
+      .eq('booking_token', token)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
 
     return {
       ...data,

@@ -1,4 +1,3 @@
-
 export interface Appointment {
   id: string;
   lead_id: string;
@@ -21,6 +20,8 @@ export interface Appointment {
   notes?: string;
   reminder_sent_at?: string;
   follow_up_required?: boolean;
+  booking_source?: 'staff' | 'customer' | 'system';
+  booking_token?: string;
   
   // Joined data
   lead_name?: string;
@@ -36,6 +37,8 @@ export interface CreateAppointmentData {
   description?: string;
   location?: string;
   salesperson_id?: string;
+  booking_source?: 'staff' | 'customer' | 'system';
+  booking_token?: string;
 }
 
 export interface UpdateAppointmentData {
