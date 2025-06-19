@@ -1,19 +1,18 @@
 
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { RealtimeChannelState } from '@/types/realtime';
+import type { RealtimeCallbacks } from '@/types/realtime';
 
 // Global state to prevent multiple subscriptions
-let globalChannelState: RealtimeChannelState = {
-  channel: null,
-  callbacks: [],
-  isSubscribing: false
+let globalChannelState = {
+  channel: null as any,
+  callbacks: [] as RealtimeCallbacks[],
+  isSubscribing: false,
+  isSubscribed: false
 };
 
-let isSubscribed = false;
-
 export const useRealtimeChannelManager = () => {
-  const addCallbacks = useCallback((callbacks: any) => {
+  const addCallbacks = useCallback((callbacks: RealtimeCallbacks) => {
     // Check if callbacks already exist to prevent duplicates
     const exists = globalChannelState.callbacks.find(cb => cb === callbacks);
     if (!exists) {
@@ -22,7 +21,7 @@ export const useRealtimeChannelManager = () => {
     }
   }, []);
 
-  const removeCallbacks = useCallback((callbacks: any) => {
+  const removeCallbacks = useCallback((callbacks: RealtimeCallbacks) => {
     const index = globalChannelState.callbacks.findIndex(cb => cb === callbacks);
     if (index > -1) {
       globalChannelState.callbacks.splice(index, 1);
@@ -31,19 +30,28 @@ export const useRealtimeChannelManager = () => {
   }, []);
 
   const createChannel = useCallback((profile: any, handleIncomingMessage: any, handleIncomingEmail: any) => {
-    if (globalChannelState.channel || globalChannelState.isSubscribing || isSubscribed) {
-      console.log('🔌 Channel already exists, is being created, or is subscribed');
+    if (globalChannelState.channel && globalChannelState.isSubscribed) {
+      console.log('🔌 Channel already exists and is subscribed');
+      return globalChannelState.channel;
+    }
+
+    if (globalChannelState.isSubscribing) {
+      console.log('🔌 Channel is already being created');
       return globalChannelState.channel;
     }
 
     globalChannelState.isSubscribing = true;
     
-    const channelName = `centralized-realtime-${profile.id}-${Date.now()}`;
+    const channelName = `centralized-realtime-${profile.id}`;
     console.log('🔌 Creating centralized realtime channel:', channelName);
+    
+    // Clean up any existing channel first
+    if (globalChannelState.channel) {
+      supabase.removeChannel(globalChannelState.channel);
+    }
     
     const channel = supabase
       .channel(channelName)
-      // SMS conversations - listen to all conversation changes
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -57,7 +65,6 @@ export const useRealtimeChannelManager = () => {
         });
         handleIncomingMessage(payload);
       })
-      // Email conversations
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -70,21 +77,22 @@ export const useRealtimeChannelManager = () => {
       if (status === 'SUBSCRIBED') {
         globalChannelState.channel = channel;
         globalChannelState.isSubscribing = false;
-        isSubscribed = true;
+        globalChannelState.isSubscribed = true;
         console.log('✅ Centralized realtime channel subscribed successfully');
       } else if (status === 'CHANNEL_ERROR') {
         console.error('❌ Centralized realtime channel error');
         globalChannelState.channel = null;
         globalChannelState.isSubscribing = false;
-        isSubscribed = false;
+        globalChannelState.isSubscribed = false;
       } else if (status === 'CLOSED') {
         console.log('🔌 Centralized realtime channel closed');
         globalChannelState.channel = null;
         globalChannelState.isSubscribing = false;
-        isSubscribed = false;
+        globalChannelState.isSubscribed = false;
       }
     });
 
+    globalChannelState.channel = channel;
     return channel;
   }, []);
 
@@ -95,7 +103,7 @@ export const useRealtimeChannelManager = () => {
         supabase.removeChannel(globalChannelState.channel);
         globalChannelState.channel = null;
         globalChannelState.isSubscribing = false;
-        isSubscribed = false;
+        globalChannelState.isSubscribed = false;
       } catch (error) {
         console.error('❌ Error removing centralized realtime channel:', error);
       }
@@ -109,6 +117,7 @@ export const useRealtimeChannelManager = () => {
     cleanupChannel,
     getCallbacks: () => globalChannelState.callbacks,
     getChannel: () => globalChannelState.channel,
-    isSubscribing: () => globalChannelState.isSubscribing
+    isSubscribing: () => globalChannelState.isSubscribing,
+    isSubscribed: () => globalChannelState.isSubscribed
   };
 };

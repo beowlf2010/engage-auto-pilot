@@ -4,24 +4,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
+import { useRealtimeChannelManager } from './useRealtimeChannelManager';
 import type { RealtimeCallbacks } from '@/types/realtime';
 
 export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
   const { profile } = useAuth();
   const { toast } = useToast();
-  const channelRef = useRef<any>(null);
-  const callbacksRef = useRef<RealtimeCallbacks[]>([]);
+  const callbacksRef = useRef<RealtimeCallbacks>(callbacks);
+  const { addCallbacks, removeCallbacks, createChannel, cleanupChannel, isSubscribed } = useRealtimeChannelManager();
 
-  // Store callbacks in ref to avoid subscription churn
+  // Update callbacks ref when callbacks change
   useEffect(() => {
-    callbacksRef.current.push(callbacks);
-    
-    return () => {
-      const index = callbacksRef.current.indexOf(callbacks);
-      if (index > -1) {
-        callbacksRef.current.splice(index, 1);
-      }
-    };
+    callbacksRef.current = callbacks;
   }, [callbacks]);
 
   const handleIncomingMessage = useCallback(async (payload: any) => {
@@ -66,91 +60,60 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
       }
     }
 
-    // Call all registered callbacks
-    callbacksRef.current.forEach(cb => {
-      if (cb.onConversationUpdate) cb.onConversationUpdate();
-      if (cb.onUnreadCountUpdate) cb.onUnreadCountUpdate();
-      if (payload.new?.lead_id && cb.onMessageUpdate) {
-        cb.onMessageUpdate(payload.new.lead_id);
-      }
-    });
+    // Call the current callbacks
+    const currentCallbacks = callbacksRef.current;
+    if (currentCallbacks.onConversationUpdate) currentCallbacks.onConversationUpdate();
+    if (currentCallbacks.onUnreadCountUpdate) currentCallbacks.onUnreadCountUpdate();
+    if (payload.new?.lead_id && currentCallbacks.onMessageUpdate) {
+      currentCallbacks.onMessageUpdate(payload.new.lead_id);
+    }
   }, [profile]);
 
   const handleEmailNotification = useCallback((payload: any) => {
     console.log('📧 [CENTRALIZED REALTIME] Email notification:', payload);
     
-    callbacksRef.current.forEach(cb => {
-      if (cb.onEmailNotification) cb.onEmailNotification(payload);
-      if (cb.onUnreadCountUpdate) cb.onUnreadCountUpdate();
-    });
+    const currentCallbacks = callbacksRef.current;
+    if (currentCallbacks.onEmailNotification) currentCallbacks.onEmailNotification(payload);
+    if (currentCallbacks.onUnreadCountUpdate) currentCallbacks.onUnreadCountUpdate();
   }, []);
 
   const forceRefresh = useCallback(() => {
     console.log('🔄 [CENTRALIZED REALTIME] Force refresh triggered');
-    callbacksRef.current.forEach(cb => {
-      if (cb.onConversationUpdate) cb.onConversationUpdate();
-      if (cb.onUnreadCountUpdate) cb.onUnreadCountUpdate();
-    });
+    const currentCallbacks = callbacksRef.current;
+    if (currentCallbacks.onConversationUpdate) currentCallbacks.onConversationUpdate();
+    if (currentCallbacks.onUnreadCountUpdate) currentCallbacks.onUnreadCountUpdate();
   }, []);
 
   const reconnect = useCallback(() => {
     console.log('🔌 [CENTRALIZED REALTIME] Reconnection requested');
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+    // Remove and recreate the channel
+    if (profile) {
+      createChannel(profile, handleIncomingMessage, handleEmailNotification);
     }
-    // The useEffect will recreate the channel
-  }, []);
+  }, [profile, handleIncomingMessage, handleEmailNotification, createChannel]);
 
   useEffect(() => {
     if (!profile) return;
 
     console.log('🔗 [CENTRALIZED REALTIME] Setting up realtime subscriptions for profile:', profile.id);
 
-    // Clean up existing channel
-    if (channelRef.current) {
-      console.log('🧹 [CENTRALIZED REALTIME] Cleaning up existing channel');
-      supabase.removeChannel(channelRef.current);
-    }
+    // Add our callbacks to the global manager
+    addCallbacks(callbacks);
 
-    // Create new channel
-    const channel = supabase
-      .channel('centralized-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversations'
-        },
-        handleIncomingMessage
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'email_conversations'
-        },
-        handleEmailNotification
-      )
-      .subscribe((status) => {
-        console.log('📡 [CENTRALIZED REALTIME] Subscription status:', status);
-      });
-
-    channelRef.current = channel;
+    // Create the channel if it doesn't exist
+    createChannel(profile, handleIncomingMessage, handleEmailNotification);
 
     return () => {
       console.log('🔌 [CENTRALIZED REALTIME] Cleaning up subscriptions');
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      // Remove our callbacks
+      removeCallbacks(callbacks);
+      // Clean up the channel if no more callbacks
+      cleanupChannel();
     };
-  }, [profile, handleIncomingMessage, handleEmailNotification]);
+  }, [profile, callbacks, addCallbacks, removeCallbacks, createChannel, cleanupChannel, handleIncomingMessage, handleEmailNotification]);
 
   return {
-    isConnected: !!channelRef.current,
+    isConnected: isSubscribed(),
     forceRefresh,
     reconnect
   };
