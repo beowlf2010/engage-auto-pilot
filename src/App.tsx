@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,10 +25,20 @@ import PersonalizationPage from "@/pages/PersonalizationPage";
 import RPOInsightsPage from "@/pages/RPOInsightsPage";
 import SalesDashboardPage from "@/pages/SalesDashboardPage";
 import VehicleDetailPage from "@/pages/VehicleDetailPage";
+import { notificationService } from '@/services/notificationService';
 
 const queryClient = new QueryClient();
 
 function App() {
+  useEffect(() => {
+    // Request notification permission on app start
+    notificationService.requestPermission().then(granted => {
+      if (granted) {
+        console.log('Notification permission granted');
+      }
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

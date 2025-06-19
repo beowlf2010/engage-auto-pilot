@@ -54,7 +54,8 @@ export const useGlobalUnreadCount = () => {
 
   // Use centralized realtime for updates
   useCentralizedRealtime({
-    onUnreadCountUpdate: fetchUnreadCount
+    onUnreadCountUpdate: fetchUnreadCount,
+    onConversationUpdate: fetchUnreadCount
   });
 
   // Listen for manual unread count change events

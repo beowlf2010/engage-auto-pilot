@@ -3021,6 +3021,57 @@ export type Database = {
           },
         ]
       }
+      notification_log: {
+        Row: {
+          content: string
+          conversation_id: string | null
+          id: string
+          lead_id: string | null
+          notification_type: string
+          sent_at: string
+          sent_to: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id?: string | null
+          id?: string
+          lead_id?: string | null
+          notification_type: string
+          sent_at?: string
+          sent_to: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string | null
+          id?: string
+          lead_id?: string | null
+          notification_type?: string
+          sent_at?: string
+          sent_to?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_log_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phone_numbers: {
         Row: {
           created_at: string
@@ -3185,6 +3236,8 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          notification_preferences_id: string | null
+          personal_phone: string | null
           phone: string | null
           role: string
           updated_at: string
@@ -3195,6 +3248,8 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          notification_preferences_id?: string | null
+          personal_phone?: string | null
           phone?: string | null
           role?: string
           updated_at?: string
@@ -3205,11 +3260,21 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          notification_preferences_id?: string | null
+          personal_phone?: string | null
           phone?: string | null
           role?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_notification_preferences_id_fkey"
+            columns: ["notification_preferences_id"]
+            isOneToOne: false
+            referencedRelation: "user_notification_preferences"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profit_snapshots: {
         Row: {
@@ -3961,6 +4026,48 @@ export type Database = {
           upload_status?: string | null
           upload_type?: string
           uploaded_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_notification_preferences: {
+        Row: {
+          browser_notifications_enabled: boolean
+          created_at: string
+          digest_enabled: boolean
+          digest_frequency: string
+          id: string
+          notification_hours_end: number
+          notification_hours_start: number
+          personal_phone: string | null
+          sms_notifications_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          browser_notifications_enabled?: boolean
+          created_at?: string
+          digest_enabled?: boolean
+          digest_frequency?: string
+          id?: string
+          notification_hours_end?: number
+          notification_hours_start?: number
+          personal_phone?: string | null
+          sms_notifications_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          browser_notifications_enabled?: boolean
+          created_at?: string
+          digest_enabled?: boolean
+          digest_frequency?: string
+          id?: string
+          notification_hours_end?: number
+          notification_hours_start?: number
+          personal_phone?: string | null
+          sms_notifications_enabled?: boolean
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
