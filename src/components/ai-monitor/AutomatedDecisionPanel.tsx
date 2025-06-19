@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { Zap, Settings, Play, Pause, CheckCircle, AlertTriangle, Clock, Users } from 'lucide-react';
+import { Zap, Play, CheckCircle, AlertTriangle, Clock, Users } from 'lucide-react';
 import { automatedDecisionService } from '@/services/automatedDecisionService';
 
 const AutomatedDecisionPanel = () => {
@@ -30,7 +30,7 @@ const AutomatedDecisionPanel = () => {
       type: 'human_handoff',
       name: 'Human Handoff',
       description: 'High-value leads requiring personal attention',
-      icon: <Users className="w-4 h-4" />,
+      icon: Users,
       color: 'text-orange-600',
       count: 3,
       enabled: true
@@ -39,7 +39,7 @@ const AutomatedDecisionPanel = () => {
       type: 'campaign_trigger',
       name: 'Campaign Triggers',
       description: 'Automated re-engagement campaigns',
-      icon: <Zap className="w-4 h-4" />,
+      icon: Zap,
       color: 'text-yellow-600',
       count: 7,
       enabled: true
@@ -48,7 +48,7 @@ const AutomatedDecisionPanel = () => {
       type: 'message_timing',
       name: 'Timing Optimization',
       description: 'Optimal message send time adjustments',
-      icon: <Clock className="w-4 h-4" />,
+      icon: Clock,
       color: 'text-blue-600',
       count: 12,
       enabled: true
@@ -57,7 +57,7 @@ const AutomatedDecisionPanel = () => {
       type: 'content_selection',
       name: 'Content Strategy',
       description: 'Message content and tone adjustments',
-      icon: <CheckCircle className="w-4 h-4" />,
+      icon: CheckCircle,
       color: 'text-green-600',
       count: 5,
       enabled: true
@@ -135,46 +135,49 @@ const AutomatedDecisionPanel = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {decisionTypes.map((type) => (
-              <div key={type.type} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={type.color}>
-                      {type.icon}
+            {decisionTypes.map((type) => {
+              const IconComponent = type.icon;
+              return (
+                <div key={type.type} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={type.color}>
+                        <IconComponent className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium">{type.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {type.description}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-medium">{type.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {type.description}
-                      </p>
+                    
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className="text-xs">
+                        {type.count} decisions
+                      </Badge>
+                      <Switch checked={type.enabled} disabled />
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="text-xs">
-                      {type.count} decisions
-                    </Badge>
-                    <Switch checked={type.enabled} disabled />
-                  </div>
-                </div>
 
-                {/* Decision Rules Preview */}
-                <div className="bg-muted p-3 rounded text-xs">
-                  {type.type === 'human_handoff' && (
-                    <div>Triggers when: Conversion probability > 80% OR predicted value > $50,000</div>
-                  )}
-                  {type.type === 'campaign_trigger' && (
-                    <div>Triggers when: Churn risk > 70% AND no contact for 7+ days</div>
-                  )}
-                  {type.type === 'message_timing' && (
-                    <div>Triggers when: Response patterns identified AND suboptimal current timing</div>
-                  )}
-                  {type.type === 'content_selection' && (
-                    <div>Triggers when: Response rate < 20% after 5+ messages</div>
-                  )}
+                  {/* Decision Rules Preview */}
+                  <div className="bg-muted p-3 rounded text-xs">
+                    {type.type === 'human_handoff' && (
+                      <div>Triggers when: Conversion probability &gt; 80% OR predicted value &gt; $50,000</div>
+                    )}
+                    {type.type === 'campaign_trigger' && (
+                      <div>Triggers when: Churn risk &gt; 70% AND no contact for 7+ days</div>
+                    )}
+                    {type.type === 'message_timing' && (
+                      <div>Triggers when: Response patterns identified AND suboptimal current timing</div>
+                    )}
+                    {type.type === 'content_selection' && (
+                      <div>Triggers when: Response rate &lt; 20% after 5+ messages</div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
