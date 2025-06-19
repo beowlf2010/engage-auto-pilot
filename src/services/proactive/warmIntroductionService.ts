@@ -5,7 +5,11 @@ import { generateEnhancedIntelligentResponse } from '../enhancedIntelligentConve
 // Generate warm, introductory initial outreach messages using ENHANCED AI
 export const generateWarmInitialMessage = async (lead: any, profile: any): Promise<string | null> => {
   try {
-    console.log(`🤖 Generating warm AI introduction for ${lead.first_name}`);
+    console.log(`🤖 [WARM INTRO SERVICE] Generating warm AI introduction for ${lead.first_name}`);
+    console.log(`👤 [WARM INTRO SERVICE] Using profile:`, {
+      profileFirstName: profile?.first_name,
+      hasProfile: !!profile
+    });
     
     // Use the enhanced AI service for warm initial contact with introduction context
     const context = {
@@ -23,15 +27,22 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
       dealershipName: 'our dealership'
     };
 
+    console.log(`🔄 [WARM INTRO SERVICE] Calling enhanced AI with context:`, {
+      leadName: context.leadName,
+      vehicleInterest: context.vehicleInterest,
+      isInitialContact: context.isInitialContact,
+      salespersonName: context.salespersonName
+    });
+
     const aiResponse = await generateEnhancedIntelligentResponse(context);
     
     if (aiResponse?.message) {
-      console.log(`✅ Enhanced AI generated warm introduction: ${aiResponse.message}`);
+      console.log(`✅ [WARM INTRO SERVICE] Enhanced AI generated warm introduction: ${aiResponse.message}`);
       return aiResponse.message;
     }
 
     // Improved fallback templates that are warm and conversational
-    console.log('⚠️ Enhanced AI failed, using warm fallback templates');
+    console.log('⚠️ [WARM INTRO SERVICE] Enhanced AI failed, using warm fallback templates');
     const warmTemplates = [
       `Hi ${lead.first_name}! I'm ${profile?.first_name || 'your sales representative'} from the dealership. I noticed you were interested in ${lead.vehicle_interest || 'finding the right vehicle'}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at vehicles today?`,
       
@@ -42,9 +53,11 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
       `Hello ${lead.first_name}! I'm ${profile?.first_name || 'reaching out'} because I noticed your interest in ${lead.vehicle_interest || 'our inventory'}. I really enjoy helping people find the perfect vehicle for their needs. What's prompting your search for a new ride?`
     ];
 
-    return warmTemplates[Math.floor(Math.random() * warmTemplates.length)];
+    const selectedTemplate = warmTemplates[Math.floor(Math.random() * warmTemplates.length)];
+    console.log(`📝 [WARM INTRO SERVICE] Using fallback template: ${selectedTemplate}`);
+    return selectedTemplate;
   } catch (error) {
-    console.error('Error generating warm AI introduction:', error);
+    console.error('❌ [WARM INTRO SERVICE] Error generating warm AI introduction:', error);
     return null;
   }
 };
