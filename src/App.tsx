@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AppLayout from "@/components/layout/AppLayout";
 import AuthPage from "@/pages/AuthPage";
 import SmartInboxPage from "@/pages/SmartInboxPage";
 import SettingsPage from "@/pages/SettingsPage";
@@ -42,7 +43,9 @@ function App() {
                   path="/"
                   element={
                     <ProtectedRoute>
-                      <DashboardPage />
+                      <AppLayout>
+                        <DashboardPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -50,7 +53,9 @@ function App() {
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <DashboardPage />
+                      <AppLayout>
+                        <DashboardPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -58,7 +63,9 @@ function App() {
                   path="/smart-inbox"
                   element={
                     <ProtectedRoute>
-                      <SmartInboxPage />
+                      <AppLayout>
+                        <SmartInboxPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -66,7 +73,9 @@ function App() {
                   path="/inventory-dashboard"
                   element={
                     <ProtectedRoute>
-                      <InventoryDashboardPage />
+                      <AppLayout>
+                        <InventoryDashboardPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -74,7 +83,9 @@ function App() {
                   path="/upload-inventory"
                   element={
                     <ProtectedRoute>
-                      <InventoryUploadPage />
+                      <AppLayout>
+                        <InventoryUploadPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -82,7 +93,9 @@ function App() {
                   path="/financial-dashboard"
                   element={
                     <ProtectedRoute>
-                      <FinancialDashboardPage />
+                      <AppLayout>
+                        <FinancialDashboardPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -90,7 +103,9 @@ function App() {
                   path="/predictive-analytics"
                   element={
                     <ProtectedRoute>
-                      <PredictiveAnalyticsPage />
+                      <AppLayout>
+                        <PredictiveAnalyticsPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -98,7 +113,9 @@ function App() {
                   path="/message-export"
                   element={
                     <ProtectedRoute>
-                      <MessageExportPage />
+                      <AppLayout>
+                        <MessageExportPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -106,7 +123,9 @@ function App() {
                   path="/ai-monitor"
                   element={
                     <ProtectedRoute>
-                      <AIMonitorPage />
+                      <AppLayout>
+                        <AIMonitorPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -114,7 +133,9 @@ function App() {
                   path="/admin-dashboard"
                   element={
                     <ProtectedRoute>
-                      <AdminDashboardPage />
+                      <AppLayout>
+                        <AdminDashboardPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -122,7 +143,9 @@ function App() {
                   path="/manager-dashboard"
                   element={
                     <ProtectedRoute>
-                      <ManagerDashboardPage />
+                      <AppLayout>
+                        <ManagerDashboardPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -130,7 +153,9 @@ function App() {
                   path="/personalization"
                   element={
                     <ProtectedRoute>
-                      <PersonalizationPage />
+                      <AppLayout>
+                        <PersonalizationPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -138,7 +163,9 @@ function App() {
                   path="/rpo-insights"
                   element={
                     <ProtectedRoute>
-                      <RPOInsightsPage />
+                      <AppLayout>
+                        <RPOInsightsPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -146,7 +173,9 @@ function App() {
                   path="/sales-dashboard"
                   element={
                     <ProtectedRoute>
-                      <SalesDashboardPage />
+                      <AppLayout>
+                        <SalesDashboardPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -154,7 +183,9 @@ function App() {
                   path="/vehicle/:id"
                   element={
                     <ProtectedRoute>
-                      <VehicleDetailPage />
+                      <AppLayout>
+                        <VehicleDetailPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -162,7 +193,9 @@ function App() {
                   path="/settings"
                   element={
                     <ProtectedRoute>
-                      <SettingsPage />
+                      <AppLayout>
+                        <SettingsPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -170,7 +203,9 @@ function App() {
                   path="/leads"
                   element={
                     <ProtectedRoute>
-                      <StreamlinedLeadsPage />
+                      <AppLayout>
+                        <StreamlinedLeadsPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -178,7 +213,9 @@ function App() {
                   path="/lead/:id"
                   element={
                     <ProtectedRoute>
-                      <LeadDetailPage />
+                      <AppLayout>
+                        <LeadDetailPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -186,7 +223,9 @@ function App() {
                   path="/analytics"
                   element={
                     <ProtectedRoute>
-                      <AdvancedAnalyticsPage />
+                      <AppLayout>
+                        <AdvancedAnalyticsPage />
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />
