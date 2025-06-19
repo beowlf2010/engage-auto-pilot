@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { enhancedConversationAI } from './enhancedConversationAI';
 
 export interface AIMessageRequest {
   leadId: string;
@@ -21,10 +21,10 @@ export interface AIMessageResponse {
   error?: string;
 }
 
-// Generate AI message using ONLY the unified intelligent-conversation-ai function
+// Enhanced version that uses the new appointment-aware AI
 export const generateIntelligentAIMessage = async (request: AIMessageRequest): Promise<string | null> => {
   try {
-    console.log(`🤖 [INTELLIGENT AI MSG] Generating message via UNIFIED function for lead ${request.leadId}`);
+    console.log(`🤖 [INTELLIGENT AI MSG] Generating message via ENHANCED function for lead ${request.leadId}`);
 
     // Get lead details to provide proper context
     const { data: lead, error: leadError } = await supabase
@@ -62,46 +62,30 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
 
     console.log(`🎯 [INTELLIGENT AI MSG] Lead: ${lead.first_name} ${lead.last_name}, Initial contact: ${isInitialContact}`);
 
-    // Call the unified intelligent-conversation-ai function with proper parameters
-    const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
-      body: {
-        leadId: request.leadId,
-        leadName: `${lead.first_name} ${lead.last_name}`,
-        vehicleInterest: lead.vehicle_interest || '',
-        lastCustomerMessage: lastCustomerMessage,
-        conversationHistory: conversationHistory.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
-        leadInfo: {
-          phone: '',
-          status: 'new',
-          lastReplyAt: new Date().toISOString()
-        },
-        conversationLength: conversationHistory.length,
-        inventoryStatus: {
-          hasInventory: true,
-          totalVehicles: request.context?.inventoryCount || 0
-        },
-        isInitialContact: isInitialContact,
-        salespersonName: 'Finn', // Always use Finn
-        dealershipName: 'Jason Pilger Chevrolet', // Always use correct dealership
-        context: request.context || {}
-      }
+    // Use enhanced conversation AI that includes appointment intent detection
+    const enhancedResponse = await enhancedConversationAI.generateEnhancedResponse({
+      leadId: request.leadId,
+      leadName: `${lead.first_name} ${lead.last_name}`,
+      vehicleInterest: lead.vehicle_interest || '',
+      lastCustomerMessage: lastCustomerMessage,
+      conversationHistory: conversationHistory.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
+      isInitialContact: isInitialContact
     });
 
-    if (error) {
-      console.error('❌ [INTELLIGENT AI MSG] Edge function error:', error);
+    if (!enhancedResponse || !enhancedResponse.message) {
+      console.error('❌ [INTELLIGENT AI MSG] No message returned from enhanced function');
       return null;
     }
 
-    if (!data || !data.message) {
-      console.error('❌ [INTELLIGENT AI MSG] No message returned from unified function');
-      return null;
+    if (enhancedResponse.includesAppointmentLink) {
+      console.log('📅 [INTELLIGENT AI MSG] Response includes appointment booking link');
     }
 
-    console.log(`✅ [INTELLIGENT AI MSG] Generated message via unified function: ${data.message}`);
-    return data.message;
+    console.log(`✅ [INTELLIGENT AI MSG] Generated message via enhanced function: ${enhancedResponse.message}`);
+    return enhancedResponse.message;
 
   } catch (error) {
-    console.error('❌ [INTELLIGENT AI MSG] Error generating message via unified function:', error);
+    console.error('❌ [INTELLIGENT AI MSG] Error generating message via enhanced function:', error);
     return null;
   }
 };

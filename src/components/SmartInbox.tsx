@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
@@ -7,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import ConversationsList from "./inbox/ConversationsList";
 import EnhancedChatView from "./inbox/EnhancedChatView";
 import ConversationMemory from "./ConversationMemory";
-import { useRealtimeInbox } from "@/hooks/useRealtimeInbox";
-import { useFixedConversationOperations } from "@/hooks/useFixedConversationOperations";
+import { useStableConversationOperations } from "@/hooks/useStableConversationOperations";
 import { assignCurrentUserToLead } from "@/services/conversationsService";
 import { toast } from "@/hooks/use-toast";
 
@@ -26,8 +24,18 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // Use the FIXED conversation operations instead of the old ones
-  const { conversations, messages, loading, loadMessages, sendMessage, manualRefresh, error } = useFixedConversationOperations();
+  // Use the stable conversation operations
+  const { 
+    conversations, 
+    messages, 
+    loading, 
+    error,
+    selectedLeadId,
+    loadMessages, 
+    sendMessage, 
+    manualRefresh,
+    setError
+  } = useStableConversationOperations();
 
   // Filter conversations based on user role
   const filteredConversations = conversations.filter(conv => 
@@ -48,8 +56,9 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     try {
       console.log('📱 [SMART INBOX] Selecting conversation for lead:', leadId);
       setSelectedLead(leadId);
+      setError(null); // Clear any previous errors
       
-      // Load messages using the FIXED operations
+      // Load messages using stable operations
       await loadMessages(leadId);
       
       console.log('✅ [SMART INBOX] Conversation selected and messages loaded');
@@ -61,7 +70,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
         variant: "destructive"
       });
     }
-  }, [loadMessages]);
+  }, [loadMessages, setError]);
 
   const handleSendMessage = useCallback(async (message: string, isTemplate?: boolean) => {
     if (selectedLead && selectedConversation) {
@@ -84,14 +93,14 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           }
         }
         
-        // Use the FIXED send message function
+        // Use stable send message function
         await sendMessage(selectedLead, message);
         
         if (isTemplate) {
           setShowTemplates(false);
         }
         
-        console.log('✅ [SMART INBOX] Message sent successfully with fixed operations');
+        console.log('✅ [SMART INBOX] Message sent successfully');
         
       } catch (err) {
         console.error('❌ [SMART INBOX] Error sending message:', err);
@@ -121,7 +130,6 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     console.log('📊 [SMART INBOX] Available conversations:', filteredConversations.length);
 
     if (leadIdFromUrl) {
-      // Check if the lead exists in conversations
       const conversation = filteredConversations.find(conv => conv.leadId === leadIdFromUrl);
       if (conversation) {
         console.log('✅ [SMART INBOX] Found conversation for URL leadId, selecting...');
@@ -143,7 +151,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     setIsInitialized(true);
   }, [loading, isInitialized, filteredConversations, searchParams, selectedLead, handleSelectConversation]);
 
-  // Show error state
+  // Show error state with retry option
   if (error) {
     return (
       <div className="h-[calc(100vh-8rem)] flex items-center justify-center">
