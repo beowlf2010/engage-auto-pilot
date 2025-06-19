@@ -76,8 +76,10 @@ const MessagePreviewInline = ({
       const isInitialContact = conversationHistory.length === 0;
       
       console.log(`🔄 [UNIFIED PREVIEW] Generating preview for ${leadName} - ${isInitialContact ? 'INITIAL CONTACT' : 'FOLLOW-UP'}`);
+      console.log(`🏢 [UNIFIED PREVIEW] Using dealership: Jason Pilger Chevrolet`);
+      console.log(`👤 [UNIFIED PREVIEW] Using salesperson: Finn`);
       
-      // Always use the unified intelligent-conversation-ai function
+      // Always use the unified intelligent-conversation-ai function with proper context
       const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
         body: {
           leadId,
@@ -106,12 +108,17 @@ const MessagePreviewInline = ({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ [UNIFIED PREVIEW] Edge function error:', error);
+        throw error;
+      }
+      
       setMessage(data?.message || 'Unable to generate preview');
       
       console.log(`✅ [UNIFIED PREVIEW] Generated message: "${data?.message}"`);
+      console.log(`🎯 [UNIFIED PREVIEW] Message type: ${data?.messageType || 'unknown'}`);
     } catch (error) {
-      console.error('Error generating preview:', error);
+      console.error('❌ [UNIFIED PREVIEW] Error generating preview:', error);
       setMessage('Error generating message preview');
     } finally {
       setLoading(false);
@@ -179,6 +186,7 @@ const MessagePreviewInline = ({
     const goodLength = msg.length > 50 && msg.length < 300;
     const hasCall2Action = /\?|call|visit|appointment|interested|available/i.test(msg);
     const hasFinnIntro = msg.toLowerCase().includes('finn') && conversationHistory.length === 0;
+    const hasJasonPilger = msg.toLowerCase().includes('jason pilger chevrolet');
     
     let score = 5;
     if (hasPersonalization) score += 1;
@@ -186,9 +194,10 @@ const MessagePreviewInline = ({
     if (goodLength) score += 1;
     if (hasCall2Action) score += 2;
     if (hasFinnIntro) score += 1; // Bonus for proper Finn introduction
+    if (hasJasonPilger) score += 1; // Bonus for proper dealership name
     
-    if (score >= 8) return { score, color: 'text-green-600' };
-    if (score >= 6) return { score, color: 'text-yellow-600' };
+    if (score >= 9) return { score, color: 'text-green-600' };
+    if (score >= 7) return { score, color: 'text-yellow-600' };
     return { score, color: 'text-red-600' };
   };
 
@@ -202,10 +211,10 @@ const MessagePreviewInline = ({
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-blue-600" />
             <span className="font-medium text-sm">
-              {isInitialContact ? 'Finn Introduction Preview' : 'AI Follow-up Preview'}
+              {isInitialContact ? 'Finn Introduction Preview (Jason Pilger Chevrolet)' : 'AI Follow-up Preview'}
             </span>
             <Badge variant="outline" className="text-xs">
-              Quality: <span className={quality.color}>{quality.score}/10</span>
+              Quality: <span className={quality.color}>{quality.score}/11</span>
             </Badge>
           </div>
           
@@ -222,7 +231,7 @@ const MessagePreviewInline = ({
 
         {loading ? (
           <div className="text-sm text-muted-foreground italic">
-            {isInitialContact ? 'Generating warm introduction from Finn...' : 'Generating follow-up message...'}
+            {isInitialContact ? 'Generating warm introduction from Finn at Jason Pilger Chevrolet...' : 'Generating follow-up message...'}
           </div>
         ) : (
           <div className="bg-muted p-3 rounded text-sm">
@@ -230,6 +239,7 @@ const MessagePreviewInline = ({
           </div>
         )}
 
+        {/* Issue selector panel */}
         {showIssueSelector && (
           <div className="space-y-2 p-3 bg-yellow-50 rounded border">
             <div className="flex items-center gap-2 text-sm font-medium">

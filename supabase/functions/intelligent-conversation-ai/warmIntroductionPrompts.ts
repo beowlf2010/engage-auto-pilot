@@ -35,14 +35,15 @@ AVOID:
 export const buildWarmIntroductionUserPrompt = (
   leadName: string,
   vehicleInterest: string,
-  salespersonName: string
+  salespersonName: string,
+  dealershipName: string
 ): string => {
   return `Generate a warm, friendly first contact message for ${leadName} who is interested in ${vehicleInterest || 'finding a vehicle'}. 
 
-You are ${salespersonName} with Jason Pilger Chevrolet making initial contact. This should feel like a genuine person reaching out to help, not a sales robot.
+You are ${salespersonName} with ${dealershipName} making initial contact. This should feel like a genuine person reaching out to help, not a sales robot.
 
 Focus on:
-- Warm personal introduction with dealership name
+- Warm personal introduction with dealership name "${dealershipName}"
 - Breaking the ice naturally
 - Showing genuine interest in their needs
 - Asking an engaging question about their vehicle search
