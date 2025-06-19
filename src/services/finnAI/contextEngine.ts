@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConversationMemory {
@@ -398,9 +397,6 @@ class EnhancedContextEngine {
             behavioral_patterns: memory.behavioralPatterns,
             emotional_context: memory.emotionalContext,
             updated_at: new Date().toISOString()
-          },
-          {
-            onConflict: 'lead_id'
           }
         );
 

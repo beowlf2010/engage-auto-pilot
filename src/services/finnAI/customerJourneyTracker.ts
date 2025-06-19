@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CustomerJourney {
@@ -267,7 +266,7 @@ class CustomerJourneyTracker {
     const avgEngagement = recentTouchpoints.length > 0 
       ? recentTouchpoints.reduce((sum, tp) => sum + tp.engagement_score, 0) / recentTouchpoints.length
       : 0.5;
-
+    
     if (avgEngagement > 0.7) estimatedDays *= 0.7; // Faster decision
     else if (avgEngagement < 0.3) estimatedDays *= 1.5; // Slower decision
 
@@ -324,9 +323,6 @@ class CustomerJourneyTracker {
             estimated_time_to_decision: journey.estimatedTimeToDecision,
             conversion_probability: journey.conversionProbability,
             updated_at: new Date().toISOString()
-          },
-          {
-            onConflict: 'lead_id'
           }
         );
 
