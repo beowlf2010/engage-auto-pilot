@@ -20,6 +20,7 @@ export const appointmentService = {
       ...appointment,
       appointment_type: appointment.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
       status: appointment.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
+      booking_source: appointment.booking_source as 'staff' | 'customer' | 'system' | undefined,
       lead_name: `${appointment.leads.first_name} ${appointment.leads.last_name}`,
       salesperson_name: appointment.salesperson 
         ? `${appointment.salesperson.first_name} ${appointment.salesperson.last_name}`
@@ -44,6 +45,7 @@ export const appointmentService = {
       ...appointment,
       appointment_type: appointment.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
       status: appointment.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
+      booking_source: appointment.booking_source as 'staff' | 'customer' | 'system' | undefined,
       lead_name: `${appointment.leads.first_name} ${appointment.leads.last_name}`,
       salesperson_name: appointment.salesperson 
         ? `${appointment.salesperson.first_name} ${appointment.salesperson.last_name}`
@@ -75,6 +77,7 @@ export const appointmentService = {
       ...data,
       appointment_type: data.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
       status: data.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
+      booking_source: data.booking_source as 'staff' | 'customer' | 'system' | undefined,
       lead_name: `${data.leads.first_name} ${data.leads.last_name}`,
       salesperson_name: data.salesperson 
         ? `${data.salesperson.first_name} ${data.salesperson.last_name}`
@@ -101,6 +104,7 @@ export const appointmentService = {
       ...data,
       appointment_type: data.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
       status: data.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
+      booking_source: data.booking_source as 'staff' | 'customer' | 'system' | undefined,
       lead_name: `${data.leads.first_name} ${data.leads.last_name}`,
       salesperson_name: data.salesperson 
         ? `${data.salesperson.first_name} ${data.salesperson.last_name}`
@@ -130,6 +134,7 @@ export const appointmentService = {
       ...data,
       appointment_type: data.appointment_type as 'consultation' | 'test_drive' | 'service' | 'delivery' | 'follow_up' | 'other',
       status: data.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
+      booking_source: data.booking_source as 'staff' | 'customer' | 'system' | undefined,
       lead_name: `${data.leads.first_name} ${data.leads.last_name}`,
       salesperson_name: data.salesperson 
         ? `${data.salesperson.first_name} ${data.salesperson.last_name}`
