@@ -1,8 +1,6 @@
 
 import React, { useEffect, useState } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
-import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
-import { useEnhancedMessageProcessor } from "@/hooks/useEnhancedMessageProcessor";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { toggleFinnAI } from '@/services/finnAIService';
@@ -34,13 +32,9 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
   onPhoneSelect
 }) => {
   const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
-  const { processing: aiProcessing } = useEnhancedAIScheduler();
   const [aiLoading, setAiLoading] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
-
-  // Initialize enhanced message processor
-  useEnhancedMessageProcessor();
 
   // Load messages when component mounts or lead changes
   useEffect(() => {
@@ -112,40 +106,6 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
     }
   };
 
-  const handleAITakeoverChange = async (enabled: boolean, delayMinutes: number): Promise<void> => {
-    try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ 
-          ai_takeover_enabled: enabled,
-          ai_takeover_delay_minutes: delayMinutes
-        })
-        .eq('id', lead.id);
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: "Failed to update AI takeover settings",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      toast({
-        title: "Success",
-        description: `AI takeover ${enabled ? 'enabled' : 'disabled'}`,
-        variant: "default"
-      });
-    } catch (error) {
-      console.error("Failed to update AI takeover:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update AI takeover settings",
-        variant: "destructive"
-      });
-    }
-  };
-
   // Use the messages from the conversation hook if available, otherwise use lead conversations
   const conversationMessages = messages.length > 0 ? messages : lead.conversations;
 
@@ -157,7 +117,7 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
           lead={lead}
           primaryPhone={primaryPhone}
           unreadCount={transformedLead.unreadCount}
-          aiProcessing={aiProcessing}
+          aiProcessing={false}
         />
 
         <ChatContainer
@@ -177,7 +137,6 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
       <LeadDetailSidebar
         lead={lead}
         onAIOptInChange={handleAIOptInChange}
-        onAITakeoverChange={handleAITakeoverChange}
         onMessageSent={() => loadMessages(lead.id)}
       />
     </div>

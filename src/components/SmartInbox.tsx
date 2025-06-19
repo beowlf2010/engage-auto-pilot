@@ -3,6 +3,7 @@ import React from "react";
 import { useStableConversationOperations } from "@/hooks/useStableConversationOperations";
 import { useInboxOperations } from "@/hooks/inbox/useInboxOperations";
 import { useConversationInitialization } from "@/hooks/inbox/useConversationInitialization";
+import { useUnifiedAIScheduler } from "@/hooks/useUnifiedAIScheduler";
 import InboxStateManager from "./inbox/InboxStateManager";
 import InboxStatusDisplay from "./inbox/InboxStatusDisplay";
 import InboxLayout from "./inbox/InboxLayout";
@@ -15,6 +16,9 @@ interface SmartInboxProps {
 }
 
 const SmartInbox = ({ user }: SmartInboxProps) => {
+  // Use the unified AI scheduler
+  useUnifiedAIScheduler();
+
   // Use the stable conversation operations
   const { 
     conversations, 

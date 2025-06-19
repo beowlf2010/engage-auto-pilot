@@ -1,13 +1,14 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Bot, MessageCircle, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { Bot, MessageCircle, CheckCircle2, Clock, AlertTriangle, Zap, Heart, Users } from 'lucide-react';
 
 interface EnhancedAIStatusDisplayProps {
   aiOptIn: boolean;
-  aiStage?: string;
+  messageIntensity?: string;
   aiMessagesSent?: number;
   aiSequencePaused?: boolean;
+  pendingHumanResponse?: boolean;
   incomingCount?: number;
   outgoingCount?: number;
   size?: 'sm' | 'default';
@@ -16,9 +17,10 @@ interface EnhancedAIStatusDisplayProps {
 
 const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
   aiOptIn,
-  aiStage,
+  messageIntensity = 'gentle',
   aiMessagesSent = 0,
   aiSequencePaused,
+  pendingHumanResponse,
   incomingCount = 0,
   outgoingCount = 0,
   size = 'default',
@@ -37,12 +39,6 @@ const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
     return 'bg-red-100 text-red-700 border-red-200';
   };
 
-  // Format AI stage for display
-  const formatStage = (stage?: string) => {
-    if (!stage) return 'Ready';
-    return stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
   if (!aiOptIn) {
     return (
       <div className="flex items-center gap-1">
@@ -56,25 +52,30 @@ const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      {/* AI Enabled Status */}
+      {/* AI Status with Intensity */}
       <Badge 
         variant="default" 
-        className={`${aiSequencePaused ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-green-100 text-green-700 border-green-200'}`}
+        className={
+          pendingHumanResponse ? 'bg-blue-100 text-blue-700 border-blue-200' :
+          aiSequencePaused ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 
+          messageIntensity === 'aggressive' ? 'bg-red-100 text-red-700 border-red-200' :
+          'bg-green-100 text-green-700 border-green-200'
+        }
       >
-        {aiSequencePaused ? (
+        {pendingHumanResponse ? (
+          <Users className={`${iconSize} mr-1`} />
+        ) : aiSequencePaused ? (
           <Clock className={`${iconSize} mr-1`} />
+        ) : messageIntensity === 'aggressive' ? (
+          <Zap className={`${iconSize} mr-1`} />
         ) : (
-          <CheckCircle2 className={`${iconSize} mr-1`} />
+          <Heart className={`${iconSize} mr-1`} />
         )}
-        AI {aiSequencePaused ? 'Paused' : 'Enabled'} ✓
+        
+        {pendingHumanResponse ? 'Human Needed' :
+         aiSequencePaused ? 'AI Paused' :
+         messageIntensity === 'aggressive' ? 'Aggressive' : 'Gentle'}
       </Badge>
-
-      {/* AI Stage (if detailed view) */}
-      {showDetailed && aiStage && (
-        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-          {formatStage(aiStage)}
-        </Badge>
-      )}
 
       {/* Message Counter */}
       {aiMessagesSent > 0 && (
@@ -93,6 +94,14 @@ const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
         <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
           <AlertTriangle className={`${iconSize} mr-1`} />
           High Count
+        </Badge>
+      )}
+
+      {/* Auto-switch indicator for uncontacted leads */}
+      {aiMessagesSent === 0 && messageIntensity === 'gentle' && (
+        <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
+          <Zap className={`${iconSize} mr-1`} />
+          Auto-Aggressive
         </Badge>
       )}
     </div>
