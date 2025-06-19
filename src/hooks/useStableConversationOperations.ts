@@ -8,7 +8,7 @@ interface ConversationListItem {
   leadId: string;
   leadName: string;
   primaryPhone: string;
-  leadPhone: string; // Add missing property
+  leadPhone: string;
   lastMessage: string;
   lastMessageTime: string;
   lastMessageDirection: 'in' | 'out' | null;
@@ -16,16 +16,17 @@ interface ConversationListItem {
   messageCount: number;
   salespersonId: string | null;
   vehicleInterest: string;
-  status: string; // Add missing property
-  lastMessageDate: Date; // Add missing property for sorting
-  salespersonName?: string; // Add optional property
-  aiOptIn?: boolean; // Add optional property
+  status: string;
+  lastMessageDate: Date;
+  salespersonName?: string;
+  aiOptIn?: boolean;
 }
 
 export const useStableConversationOperations = () => {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const realtimeChannelRef = useRef<any>(null);
@@ -173,14 +174,23 @@ export const useStableConversationOperations = () => {
     }
   }, [queryClient]);
 
-  // Send message with improved error handling
-  const sendMessage = useCallback(async (leadId: string, messageBody: string) => {
-    if (!leadId || !messageBody.trim()) {
-      throw new Error('Lead ID and message body are required');
+  // Enhanced send message with proper profile handling and retry logic
+  const sendMessage = useCallback(async (leadId: string, messageBody: string, retryCount: number = 0) => {
+    if (!leadId || !messageBody.trim() || !profile) {
+      throw new Error('Lead ID, message body, and profile are required');
     }
 
+    if (sendingMessage) {
+      console.log('⏳ [STABLE CONV] Message already sending, ignoring duplicate request');
+      return;
+    }
+
+    setSendingMessage(true);
+    setError(null);
+
     try {
-      console.log(`📤 [STABLE CONV] Sending message to lead: ${leadId}`);
+      console.log(`📤 [STABLE CONV] Sending message to lead: ${leadId} (attempt ${retryCount + 1})`);
+      console.log(`👤 [STABLE CONV] Using profile: ${profile.id}`);
 
       // Get the phone number for this lead
       const { data: phoneData, error: phoneError } = await supabase
@@ -194,11 +204,12 @@ export const useStableConversationOperations = () => {
         throw new Error('No primary phone number found for this lead');
       }
 
-      // Store the conversation record
+      // Store the conversation record with profile_id
       const { data: conversation, error: conversationError } = await supabase
         .from('conversations')
         .insert({
           lead_id: leadId,
+          profile_id: profile.id, // Include profile_id
           body: messageBody.trim(),
           direction: 'out',
           ai_generated: false,
@@ -209,8 +220,11 @@ export const useStableConversationOperations = () => {
         .single();
 
       if (conversationError) {
+        console.error('❌ [STABLE CONV] Conversation creation error:', conversationError);
         throw conversationError;
       }
+
+      console.log(`✅ [STABLE CONV] Created conversation record: ${conversation.id}`);
 
       // Send SMS
       const { data, error } = await supabase.functions.invoke('send-sms', {
@@ -222,18 +236,25 @@ export const useStableConversationOperations = () => {
       });
 
       if (error || !data?.success) {
+        // Update conversation with failure status
         await supabase
           .from('conversations')
-          .update({ sms_status: 'failed', sms_error: data?.error || 'Failed to send' })
+          .update({ 
+            sms_status: 'failed', 
+            sms_error: data?.error || error?.message || 'Failed to send' 
+          })
           .eq('id', conversation.id);
         
-        throw new Error(data?.error || 'Failed to send message');
+        throw new Error(data?.error || error?.message || 'Failed to send message');
       }
 
       // Update conversation with success
       await supabase
         .from('conversations')
-        .update({ sms_status: 'sent', twilio_message_id: data?.telnyxMessageId })
+        .update({ 
+          sms_status: 'sent', 
+          twilio_message_id: data?.telnyxMessageId || data?.messageSid 
+        })
         .eq('id', conversation.id);
 
       // Refresh data
@@ -248,9 +269,19 @@ export const useStableConversationOperations = () => {
 
     } catch (err) {
       console.error('❌ [STABLE CONV] Error sending message:', err);
+      
+      // Retry logic for network errors
+      if (retryCount < 2 && (err instanceof Error && err.message.includes('network'))) {
+        console.log(`🔄 [STABLE CONV] Retrying message send (attempt ${retryCount + 2})`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        return sendMessage(leadId, messageBody, retryCount + 1);
+      }
+      
       throw err;
+    } finally {
+      setSendingMessage(false);
     }
-  }, [queryClient, selectedLeadId, loadMessages]);
+  }, [profile, queryClient, selectedLeadId, loadMessages, sendingMessage]);
 
   // Manual refresh function
   const manualRefresh = useCallback(async () => {
@@ -317,6 +348,7 @@ export const useStableConversationOperations = () => {
     loading: conversationsLoading,
     error,
     selectedLeadId,
+    sendingMessage,
     loadMessages,
     sendMessage,
     manualRefresh,

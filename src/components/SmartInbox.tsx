@@ -31,6 +31,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     loading, 
     error,
     selectedLeadId,
+    sendingMessage, // Get the sending state
     loadMessages, 
     sendMessage, 
     manualRefresh,
@@ -77,6 +78,12 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
       try {
         console.log('📤 [SMART INBOX] Sending message:', message);
         
+        // Prevent multiple sends
+        if (sendingMessage) {
+          console.log('⏳ [SMART INBOX] Already sending, ignoring request');
+          return;
+        }
+        
         // Auto-assign lead if it's unassigned and user can reply
         if (!selectedConversation.salespersonId && canReply(selectedConversation)) {
           console.log(`🎯 [SMART INBOX] Auto-assigning lead ${selectedLead} to user ${user.id}`);
@@ -100,18 +107,23 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           setShowTemplates(false);
         }
         
+        toast({
+          title: "Message sent",
+          description: "Your message has been sent successfully.",
+        });
+        
         console.log('✅ [SMART INBOX] Message sent successfully');
         
       } catch (err) {
         console.error('❌ [SMART INBOX] Error sending message:', err);
         toast({
           title: "Error",
-          description: "Failed to send message. Please try again.",
+          description: err instanceof Error ? err.message : "Failed to send message. Please try again.",
           variant: "destructive"
         });
       }
     }
-  }, [selectedLead, selectedConversation, canReply, sendMessage, user.id]);
+  }, [selectedLead, selectedConversation, canReply, sendMessage, sendingMessage, user.id]);
 
   const handleToggleMemory = useCallback(() => {
     setShowMemory(prev => !prev);
@@ -216,6 +228,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           showTemplates={showTemplates}
           onToggleTemplates={handleToggleTemplates}
           user={user}
+          isLoading={sendingMessage} // Pass the sending state
         />
       </div>
 
