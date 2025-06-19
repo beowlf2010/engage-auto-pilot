@@ -314,8 +314,8 @@ class CustomerJourneyTracker {
     try {
       const { error } = await supabase
         .from('customer_journeys')
-        .upsert({
-          lead_id: journey.leadId, // Keep as lead_id to match the database schema
+        .upsert([{
+          lead_id: journey.leadId,
           journey_stage: journey.journeyStage,
           touchpoints: journey.touchpoints,
           milestones: journey.milestones,
@@ -323,7 +323,7 @@ class CustomerJourneyTracker {
           estimated_time_to_decision: journey.estimatedTimeToDecision,
           conversion_probability: journey.conversionProbability,
           updated_at: new Date().toISOString()
-        });
+        }]);
 
       if (error) {
         console.error('Error saving customer journey:', error);

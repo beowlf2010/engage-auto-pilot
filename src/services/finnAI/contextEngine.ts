@@ -381,8 +381,8 @@ class EnhancedContextEngine {
       // Save to the enhanced conversation_memory table
       const { error } = await supabase
         .from('conversation_memory')
-        .upsert({
-          lead_id: memory.leadId, // Changed from lead_id to lead_id to match schema
+        .upsert([{
+          lead_id: memory.leadId,
           memory_type: 'enhanced_context',
           content: JSON.stringify({
             sessionId: memory.sessionId,
@@ -397,7 +397,7 @@ class EnhancedContextEngine {
           behavioral_patterns: memory.behavioralPatterns,
           emotional_context: memory.emotionalContext,
           updated_at: new Date().toISOString()
-        });
+        }]);
 
       if (error) {
         console.error('Error saving conversation memory:', error);
