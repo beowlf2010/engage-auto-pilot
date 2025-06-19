@@ -1,11 +1,13 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Brain, TrendingUp, Zap, Target, Settings, BarChart3 } from 'lucide-react';
+import { Brain, TrendingUp, Zap, Target, Settings, BarChart3, Activity, MessageSquare } from 'lucide-react';
 import LearningAnalyticsSummary from './LearningAnalyticsSummary';
 import PredictiveInsightsPanel from './PredictiveInsightsPanel';
 import AutomatedOptimizationPanel from './AutomatedOptimizationPanel';
 import AdvancedPerformanceMetrics from './AdvancedPerformanceMetrics';
+import SmartAIQueueTab from './SmartAIQueueTab';
+import RealtimeLearningDashboard from './RealtimeLearningDashboard';
 
 const AILearningDashboard = () => {
   const [activeTab, setActiveTab] = useState('summary');
@@ -25,10 +27,18 @@ const AILearningDashboard = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="summary" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
             Learning Summary
+          </TabsTrigger>
+          <TabsTrigger value="realtime" className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            Real-time
+          </TabsTrigger>
+          <TabsTrigger value="queue" className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" />
+            Smart Queue
           </TabsTrigger>
           <TabsTrigger value="insights" className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
@@ -46,6 +56,14 @@ const AILearningDashboard = () => {
 
         <TabsContent value="summary" className="mt-6">
           <LearningAnalyticsSummary />
+        </TabsContent>
+
+        <TabsContent value="realtime" className="mt-6">
+          <RealtimeLearningDashboard />
+        </TabsContent>
+
+        <TabsContent value="queue" className="mt-6">
+          <SmartAIQueueTab />
         </TabsContent>
 
         <TabsContent value="insights" className="mt-6">
