@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import StreamlinedNavigation from '@/components/StreamlinedNavigation';
+import EnhancedNavigation from '@/components/enhanced/EnhancedNavigation';
 import Breadcrumb from './Breadcrumb';
 
 interface AppLayoutProps {
@@ -16,8 +16,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <StreamlinedNavigation />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+      <EnhancedNavigation />
       <main className="flex-1">
         <div className="container mx-auto px-4 py-6">
           <Breadcrumb />

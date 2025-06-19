@@ -1,6 +1,5 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import StreamlinedNavigation from "@/components/StreamlinedNavigation";
 import InventoryDashboard from "@/components/InventoryDashboard";
 import { Navigate } from "react-router-dom";
 
@@ -22,14 +21,7 @@ const InventoryDashboardPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
-      <main className="flex-1">
-        <InventoryDashboard />
-      </main>
-    </div>
-  );
+  return <InventoryDashboard />;
 };
 
 export default InventoryDashboardPage;

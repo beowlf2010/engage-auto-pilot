@@ -1,6 +1,5 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import StreamlinedNavigation from "@/components/StreamlinedNavigation";
 import SmartInbox from "@/components/SmartInbox";
 import { Navigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -44,14 +43,7 @@ const SmartInboxPage = () => {
     phone: profile.phone
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
-      <main className="flex-1">
-        <SmartInbox user={user} />
-      </main>
-    </div>
-  );
+  return <SmartInbox user={user} />;
 };
 
 export default SmartInboxPage;

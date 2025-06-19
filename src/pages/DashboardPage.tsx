@@ -1,6 +1,5 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import StreamlinedNavigation from "@/components/StreamlinedNavigation";
 import Dashboard from "@/components/Dashboard";
 import { Navigate } from "react-router-dom";
 
@@ -38,14 +37,7 @@ const DashboardPage = () => {
     phone: profile.phone
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
-      <main className="flex-1 container mx-auto px-6 py-8">
-        <Dashboard user={user} />
-      </main>
-    </div>
-  );
+  return <Dashboard user={user} />;
 };
 
 export default DashboardPage;

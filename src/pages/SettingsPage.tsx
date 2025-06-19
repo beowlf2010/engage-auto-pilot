@@ -1,6 +1,5 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import StreamlinedNavigation from "@/components/StreamlinedNavigation";
 import Settings from "@/components/Settings";
 import { Navigate } from "react-router-dom";
 
@@ -31,14 +30,7 @@ const SettingsPage = () => {
     phone: profile.phone
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
-      <main className="flex-1 p-6">
-        <Settings user={user} />
-      </main>
-    </div>
-  );
+  return <Settings user={user} />;
 };
 
 export default SettingsPage;

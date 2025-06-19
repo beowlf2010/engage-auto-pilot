@@ -1,6 +1,5 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import StreamlinedNavigation from "@/components/StreamlinedNavigation";
 import MessageExportImport from "@/components/messaging/MessageExportImport";
 import { Navigate } from "react-router-dom";
 
@@ -28,14 +27,9 @@ const MessageExportPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
-      <main className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-slate-800 mb-6">Message Export</h1>
-          <MessageExportImport />
-        </div>
-      </main>
+    <div className="max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold text-slate-800 mb-6">Message Export</h1>
+      <MessageExportImport />
     </div>
   );
 };

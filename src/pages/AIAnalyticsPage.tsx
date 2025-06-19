@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import StreamlinedNavigation from '@/components/StreamlinedNavigation';
 import AdvancedAnalyticsDashboard from '@/components/ai-monitor/AdvancedAnalyticsDashboard';
 import { Navigate } from 'react-router-dom';
 
@@ -28,14 +27,7 @@ const AIAnalyticsPage = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
-      <main className="flex-1 p-6">
-        <AdvancedAnalyticsDashboard />
-      </main>
-    </div>
-  );
+  return <AdvancedAnalyticsDashboard />;
 };
 
 export default AIAnalyticsPage;

@@ -1,6 +1,5 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import StreamlinedNavigation from "@/components/StreamlinedNavigation";
 import FinancialDashboard from "@/components/financial/FinancialDashboard";
 import { Navigate } from "react-router-dom";
 
@@ -36,14 +35,7 @@ const FinancialDashboardPage = () => {
     phone: profile.phone
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
-      <main className="flex-1">
-        <FinancialDashboard user={user} />
-      </main>
-    </div>
-  );
+  return <FinancialDashboard user={user} />;
 };
 
 export default FinancialDashboardPage;
