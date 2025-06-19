@@ -50,6 +50,7 @@ export const useLeads = () => {
       const unreadCountMap = new Map();
       const outgoingCountMap = new Map();
       const incomingCountMap = new Map();
+      const lastMessageDirectionMap = new Map();
 
       conversationsData?.forEach(conv => {
         const leadId = conv.lead_id;
@@ -57,6 +58,8 @@ export const useLeads = () => {
         // Track latest conversation
         if (!conversationMap.has(leadId)) {
           conversationMap.set(leadId, conv);
+          // Track direction of the latest message
+          lastMessageDirectionMap.set(leadId, conv.direction);
         }
 
         // Count total messages
@@ -89,6 +92,7 @@ export const useLeads = () => {
         const outgoingCount = outgoingCountMap.get(lead.id) || 0;
         const incomingCount = incomingCountMap.get(lead.id) || 0;
         const unreadCount = unreadCountMap.get(lead.id) || 0;
+        const lastMessageDirection = lastMessageDirectionMap.get(lead.id) || null;
         
         // Determine contact status
         let contactStatus = 'no_contact';
@@ -135,6 +139,7 @@ export const useLeads = () => {
           createdAt: lead.created_at,
           lastMessage: latestConv?.body || null,
           lastMessageTime: latestConv ? new Date(latestConv.sent_at).toLocaleString() : null,
+          lastMessageDirection: lastMessageDirection,
           unreadCount: unreadCount,
           messageCount: messageCount,
           outgoingCount: outgoingCount,

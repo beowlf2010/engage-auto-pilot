@@ -35,6 +35,7 @@ export interface Lead {
   createdAt: string;
   lastMessage?: string;
   lastMessageTime?: string;
+  lastMessageDirection?: 'in' | 'out' | null; // New field for message direction
   unreadCount: number;
   doNotCall: boolean;
   doNotEmail: boolean;

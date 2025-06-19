@@ -3,14 +3,14 @@ import React from 'react';
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Phone, Eye, Calendar } from "lucide-react";
+import { MessageSquare, Phone, Eye, Calendar, ArrowDown, ArrowUp } from "lucide-react";
 import { Lead } from "@/types/lead";
 import LeadStatusBadge from "./LeadStatusBadge";
 import LeadContactStatusBadge from "./LeadContactStatusBadge";
 import LeadEngagementScore from "./LeadEngagementScore";
 import AIStatusBadges from "./AIStatusBadges";
+import AIPreviewPopout from "./AIPreviewPopout";
 
 interface LeadTableRowProps {
   lead: Lead;
@@ -79,19 +79,30 @@ const LeadTableRow = ({
         <LeadEngagementScore score={getEngagementScore(lead)} />
       </TableCell>
 
-      <TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <div className="space-y-1">
-          <AIStatusBadges 
-            aiContactEnabled={lead.aiContactEnabled}
-            aiRepliesEnabled={lead.aiRepliesEnabled}
-          />
-          {canEdit && (
-            <div onClick={(e) => e.stopPropagation()}>
-              <Switch
-                checked={lead.aiOptIn}
-                onCheckedChange={(value) => onAiOptInChange(lead.id, value)}
-              />
-            </div>
+          {lead.aiOptIn ? (
+            <AIStatusBadges 
+              aiContactEnabled={lead.aiContactEnabled}
+              aiRepliesEnabled={lead.aiRepliesEnabled}
+            />
+          ) : canEdit ? (
+            <AIPreviewPopout
+              lead={lead}
+              onAIOptInChange={onAiOptInChange}
+            >
+              <div className="cursor-pointer">
+                <AIStatusBadges 
+                  aiContactEnabled={false}
+                  aiRepliesEnabled={false}
+                />
+              </div>
+            </AIPreviewPopout>
+          ) : (
+            <AIStatusBadges 
+              aiContactEnabled={false}
+              aiRepliesEnabled={false}
+            />
           )}
         </div>
       </TableCell>
@@ -110,7 +121,26 @@ const LeadTableRow = ({
       <TableCell>
         <div className="text-sm text-gray-600">
           {lead.lastMessage ? (
-            <div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                {lead.lastMessageDirection && (
+                  <Badge 
+                    variant={lead.lastMessageDirection === 'in' ? 'default' : 'secondary'}
+                    className={`text-xs px-1 py-0 ${
+                      lead.lastMessageDirection === 'in' 
+                        ? 'bg-green-100 text-green-700 border-green-200' 
+                        : 'bg-blue-100 text-blue-700 border-blue-200'
+                    }`}
+                  >
+                    {lead.lastMessageDirection === 'in' ? (
+                      <ArrowDown className="w-3 h-3 mr-1" />
+                    ) : (
+                      <ArrowUp className="w-3 h-3 mr-1" />
+                    )}
+                    {lead.lastMessageDirection.toUpperCase()}
+                  </Badge>
+                )}
+              </div>
               <div className="truncate max-w-32">{lead.lastMessage}</div>
               <div className="text-xs text-gray-500">{lead.lastMessageTime}</div>
             </div>
