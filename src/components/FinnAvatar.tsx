@@ -21,7 +21,7 @@ const FinnAvatar = ({ size = "md" }: FinnAvatarProps) => {
 
   return (
     <Avatar className={sizeClasses[size]}>
-      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+      <AvatarFallback className="bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 text-white">
         <Bot className={iconSizes[size]} />
       </AvatarFallback>
     </Avatar>

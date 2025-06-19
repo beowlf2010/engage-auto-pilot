@@ -7,6 +7,7 @@ import GlassCard from '@/components/ui/glass-card';
 import { getNavigationItems } from '@/components/navigation/navigationConfig';
 import { cn } from '@/lib/utils';
 import { Menu, X, Bell, Search, Settings } from 'lucide-react';
+import AutoVantageLogo from '@/components/navigation/AutoVantageLogo';
 
 const EnhancedNavigation = () => {
   const { profile } = useAuth();
@@ -24,20 +25,7 @@ const EnhancedNavigation = () => {
       <GlassCard opacity="high" blur="xl" className="px-6 py-4 m-4 rounded-2xl">
         <div className="flex items-center justify-between">
           {/* Logo Section */}
-          <div 
-            className="flex items-center space-x-4 cursor-pointer group"
-            onClick={() => navigate('/')}
-          >
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-              <span className="text-white font-bold text-lg">A</span>
-            </div>
-            <div className="hidden md:block">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                AUTO-TEXT CRM
-              </h1>
-              <p className="text-xs text-gray-500">AI-Powered Dealership</p>
-            </div>
-          </div>
+          <AutoVantageLogo />
 
           {/* Desktop Navigation Items */}
           <div className="hidden md:flex items-center space-x-2">

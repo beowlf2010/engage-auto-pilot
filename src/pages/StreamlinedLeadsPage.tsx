@@ -1,6 +1,6 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import StreamlinedNavigation from "@/components/StreamlinedNavigation";
+import AppLayout from "@/components/layout/AppLayout";
 import LeadsList from "@/components/LeadsList";
 import { Navigate } from "react-router-dom";
 
@@ -23,12 +23,9 @@ const StreamlinedLeadsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
-      <main className="flex-1 p-6">
-        <LeadsList />
-      </main>
-    </div>
+    <AppLayout>
+      <LeadsList />
+    </AppLayout>
   );
 };
 
