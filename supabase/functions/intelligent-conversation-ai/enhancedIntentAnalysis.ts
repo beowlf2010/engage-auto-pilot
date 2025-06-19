@@ -1,5 +1,6 @@
-
 // Enhanced intent analysis to detect specific customer questions and requirements
+import { analyzeTowingRequest, validateTowingCapability, generateSafeTowingResponse } from './vehicleSpecifications.ts';
+
 export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerMessage: string) => {
   const history = conversationHistory.toLowerCase();
   const lastMessage = lastCustomerMessage.toLowerCase();
@@ -9,6 +10,9 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
   const salesMessages = conversationLines.filter(line => line.startsWith('Sales:') || line.startsWith('You:'));
   const customerMessages = conversationLines.filter(line => line.startsWith('Customer:'));
   
+  // ENHANCED: Analyze towing requests
+  const towingAnalysis = analyzeTowingRequest(lastCustomerMessage);
+  
   // Detect question types in the last customer message
   const questionPatterns = {
     inventory_availability: /\b(do you have|available|in stock|have any|show me|can you find|looking for|interested in|want to see)\b/,
@@ -17,6 +21,7 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
     scheduling: /\b(schedule|appointment|visit|come in|see|test drive|when|time|available)\b/,
     comparison: /\b(compare|versus|vs|difference|better|which)\b/,
     trade: /\b(trade|trade-in|worth|value|owe|payoff)\b/,
+    towing: /\b(tow|pull|haul|drag|trailer|hitch|capacity)\b/,
     general_inquiry: /\?|what|how|when|where|why|can you|could you|would you/
   };
 
@@ -70,6 +75,7 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
         case 'pricing': return /price|cost|payment|finance/.test(lastSalesContent);
         case 'features': return /features|specs|options|package|seats|color/.test(lastSalesContent);
         case 'scheduling': return /schedule|visit|appointment|come|see/.test(lastSalesContent);
+        case 'towing': return /tow|capacity|pull|haul/.test(lastSalesContent);
         default: return false;
       }
     });
@@ -85,6 +91,7 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
     salesWasOffTopic,
     requiresDirectAnswer: isDirectQuestion,
     primaryQuestionType: detectedQuestions[0] || 'general_inquiry',
+    towingAnalysis, // NEW: Include towing analysis
     conversationContext: {
       lastSalesMessage: lastSalesContent,
       customerMessageCount: customerMessages.length,
@@ -97,7 +104,7 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
 
 // Generate specific answer guidance based on question type
 export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any) => {
-  const { questionTypes, questionTopic, primaryQuestionType, conversationContext } = intentAnalysis;
+  const { questionTypes, questionTopic, primaryQuestionType, conversationContext, towingAnalysis } = intentAnalysis;
   
   if (!intentAnalysis.requiresDirectAnswer) {
     return null;
@@ -109,36 +116,60 @@ export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any
     specificGuidance: '',
     inventoryContext: inventoryStatus,
     urgencyLevel: conversationContext.needsApology ? 'high' : 'normal',
-    needsApology: conversationContext.needsApology
+    needsApology: conversationContext.needsApology,
+    towingValidation: null as any
   };
 
-  switch (primaryQuestionType) {
-    case 'inventory_availability':
-      guidance.specificGuidance = inventoryStatus.hasActualInventory ?
-        `Customer is asking about inventory availability. Show them the ${inventoryStatus.validatedCount} vehicles we have in stock that match their request.` :
-        `Customer is asking about availability but we don't currently have what they're looking for. Be honest and offer alternatives.`;
-      break;
+  // ENHANCED: Handle towing questions with validation
+  if (primaryQuestionType === 'towing' && towingAnalysis?.hasTowingRequest) {
+    if (towingAnalysis.equipmentMentioned && towingAnalysis.vehicleMentioned) {
+      // Extract vehicle details for validation
+      const vehicleParts = towingAnalysis.vehicleMentioned.split(' ');
+      const make = vehicleParts[0];
+      const model = vehicleParts.slice(1).join(' ');
       
-    case 'pricing':
-      guidance.specificGuidance = questionTopic ? 
-        `Provide pricing information for ${questionTopic}. Be transparent about costs.` :
-        'Answer their pricing question directly with available information.';
-      break;
+      // Perform towing validation
+      guidance.towingValidation = validateTowingCapability(
+        make, 
+        model, 
+        2023, // Default to current model year
+        towingAnalysis.equipmentMentioned
+      );
       
-    case 'features':
-      guidance.specificGuidance = `Provide specific feature information about ${questionTopic || 'the vehicle'}. Be detailed and helpful.`;
-      break;
-      
-    case 'scheduling':
-      guidance.specificGuidance = 'Help them schedule a visit or appointment. Be specific about next steps.';
-      break;
-      
-    default:
-      guidance.specificGuidance = 'Answer their question directly and completely.';
+      guidance.specificGuidance = `CRITICAL: Validate towing claim. ${guidance.towingValidation.reason}. Use this exact response: "${generateSafeTowingResponse(guidance.towingValidation, intentAnalysis)}"`;
+    } else {
+      guidance.specificGuidance = 'Customer asking about towing. Ask for specific vehicle and equipment details before making any towing capacity claims.';
+    }
+  } else {
+    // Existing guidance logic
+    switch (primaryQuestionType) {
+      case 'inventory_availability':
+        guidance.specificGuidance = inventoryStatus.hasActualInventory ?
+          `Customer is asking about inventory availability. Show them the ${inventoryStatus.validatedCount} vehicles we have in stock that match their request.` :
+          `Customer is asking about availability but we don't currently have what they're looking for. Be honest and offer alternatives.`;
+        break;
+        
+      case 'pricing':
+        guidance.specificGuidance = questionTopic ? 
+          `Provide pricing information for ${questionTopic}. Be transparent about costs.` :
+          'Answer their pricing question directly with available information.';
+        break;
+        
+      case 'features':
+        guidance.specificGuidance = `Provide specific feature information about ${questionTopic || 'the vehicle'}. Be detailed and helpful.`;
+        break;
+        
+      case 'scheduling':
+        guidance.specificGuidance = 'Help them schedule a visit or appointment. Be specific about next steps.';
+        break;
+        
+      default:
+        guidance.specificGuidance = 'Answer their question directly and completely.';
+    }
   }
 
   // Only add apology guidance when there's actual evidence of being ignored
-  if (conversationContext.needsApology) {
+  if (conversationContext.needsApology && primaryQuestionType !== 'towing') {
     guidance.specificGuidance = `APOLOGIZE for missing their previous question, then ${guidance.specificGuidance}`;
   }
 

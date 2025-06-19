@@ -127,12 +127,35 @@ CRITICAL - PREVENT TOPIC HALLUCINATION:
 - Focus ONLY on what the customer actually said and requested
 - If customer mentions a specific vehicle (like Trailblazer), stick to that vehicle type`;
 
+  // ENHANCED: Add towing safety guidelines
+  systemPrompt += `
+
+CRITICAL TOWING SAFETY RULES:
+- NEVER make claims about towing capacity without verification
+- NEVER suggest a vehicle can tow something unless you have confirmed specifications
+- If customer asks about towing heavy equipment (like excavators, bulldozers), explain these require commercial transportation
+- Always ask for specific weight and trailer requirements before making towing recommendations
+- When in doubt about towing, say "I'd need to verify the specific towing requirements and vehicle capabilities"
+- Heavy construction equipment requires specialized commercial transport, not passenger vehicles`;
+
   // Add specific conversation guidance from memory analysis
   if (conversationGuidance && conversationGuidance.length > 0) {
     systemPrompt += `
 
 CRITICAL GUIDANCE:
 ${conversationGuidance.join('\n')}`;
+  }
+
+  // ENHANCED: Add towing validation guidance
+  if (answerGuidance?.towingValidation) {
+    systemPrompt += `
+
+⚠️ TOWING VALIDATION REQUIRED:
+- Customer is asking about towing capability
+- Validation Result: ${answerGuidance.towingValidation.canTow ? 'SAFE' : 'UNSAFE/IMPOSSIBLE'}
+- Reason: ${answerGuidance.towingValidation.reason}
+- You MUST use this exact response: "${answerGuidance.specificGuidance}"
+- Do NOT deviate from this validated response`;
   }
 
   // Only add conversation repair guidance when there's actual evidence of being ignored
@@ -180,7 +203,8 @@ RESPONSE REQUIREMENTS:
 - Ask follow-up questions to understand their needs
 - Suggest next steps when appropriate
 - Maintain conversation continuity and avoid redundant information
-- NEVER mention vehicle types not specifically requested by the customer`;
+- NEVER mention vehicle types not specifically requested by the customer
+- NEVER make unverified claims about towing capacity or vehicle capabilities`;
 
   return {
     systemPrompt,
