@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Brain, TrendingUp, Zap, Target, Settings, BarChart3, Activity, MessageSquare } from 'lucide-react';
+import { Brain, TrendingUp, Zap, Target, Settings, BarChart3, Activity, MessageSquare, Sparkles } from 'lucide-react';
 import LearningAnalyticsSummary from './LearningAnalyticsSummary';
 import PredictiveInsightsPanel from './PredictiveInsightsPanel';
 import AutomatedOptimizationPanel from './AutomatedOptimizationPanel';
 import AdvancedPerformanceMetrics from './AdvancedPerformanceMetrics';
 import SmartAIQueueTab from './SmartAIQueueTab';
 import RealtimeLearningDashboard from './RealtimeLearningDashboard';
+import AdvancedLearningDashboard from './AdvancedLearningDashboard';
 
 const AILearningDashboard = () => {
   const [activeTab, setActiveTab] = useState('summary');
@@ -27,7 +28,7 @@ const AILearningDashboard = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="summary" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
             Learning Summary
@@ -39,6 +40,10 @@ const AILearningDashboard = () => {
           <TabsTrigger value="queue" className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4" />
             Smart Queue
+          </TabsTrigger>
+          <TabsTrigger value="advanced" className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />
+            Advanced Analytics
           </TabsTrigger>
           <TabsTrigger value="insights" className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
@@ -64,6 +69,10 @@ const AILearningDashboard = () => {
 
         <TabsContent value="queue" className="mt-6">
           <SmartAIQueueTab />
+        </TabsContent>
+
+        <TabsContent value="advanced" className="mt-6">
+          <AdvancedLearningDashboard />
         </TabsContent>
 
         <TabsContent value="insights" className="mt-6">

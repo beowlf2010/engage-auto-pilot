@@ -1,82 +1,70 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  getSalesForecasts,
-  type SalesForecast
-} from '@/services/predictive/salesForecastingService';
-import { 
-  getInventoryDemandPredictions,
-  type InventoryDemandPrediction
-} from '@/services/predictive/inventoryDemandService';
-import { 
-  getMarketIntelligence,
-  type MarketIntelligence
-} from '@/services/predictive/marketIntelligenceService';
-
-interface PredictiveAnalyticsData {
-  salesForecasts: SalesForecast[];
-  inventoryDemandPredictions: InventoryDemandPrediction[];
-  marketIntelligence: MarketIntelligence[];
-  isLoading: boolean;
-  error: string | null;
-}
+import { predictiveAnalyticsService, PredictiveInsight, LeadPrediction } from '@/services/predictiveAnalyticsService';
+import { automatedDecisionService, AutomatedDecision } from '@/services/automatedDecisionService';
 
 export const usePredictiveAnalytics = () => {
-  const { toast } = useToast();
-  const [data, setData] = useState<PredictiveAnalyticsData>({
-    salesForecasts: [],
-    inventoryDemandPredictions: [],
-    marketIntelligence: [],
-    isLoading: true,
-    error: null
-  });
+  const [insights, setInsights] = useState<PredictiveInsight[]>([]);
+  const [decisions, setDecisions] = useState<AutomatedDecision[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const loadData = useCallback(async () => {
+  // Load predictive insights
+  const loadInsights = useCallback(async () => {
+    setLoading(true);
     try {
-      setData(prev => ({ ...prev, isLoading: true, error: null }));
-      
-      const [forecasts, demandPredictions, intelligence] = await Promise.allSettled([
-        getSalesForecasts('monthly').catch(() => []),
-        getInventoryDemandPredictions().catch(() => []),
-        getMarketIntelligence().catch(() => [])
-      ]);
-
-      setData({
-        salesForecasts: forecasts.status === 'fulfilled' ? forecasts.value : [],
-        inventoryDemandPredictions: demandPredictions.status === 'fulfilled' ? demandPredictions.value : [],
-        marketIntelligence: intelligence.status === 'fulfilled' ? intelligence.value : [],
-        isLoading: false,
-        error: null
-      });
+      const predictiveInsights = await predictiveAnalyticsService.generatePredictiveInsights();
+      setInsights(predictiveInsights);
+      setLastUpdated(new Date());
     } catch (error) {
-      console.error('Error loading predictive analytics data:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load analytics data';
-      
-      setData(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage
-      }));
-
-      toast({
-        title: "Error",
-        description: "Failed to load predictive analytics data",
-        variant: "destructive"
-      });
+      console.error('Error loading predictive insights:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [toast]);
+  }, []);
 
+  // Process automated decisions
+  const processDecisions = useCallback(async () => {
+    try {
+      const automatedDecisions = await automatedDecisionService.processAutomatedDecisions();
+      setDecisions(prev => [...prev, ...automatedDecisions]);
+      return automatedDecisions;
+    } catch (error) {
+      console.error('Error processing automated decisions:', error);
+      return [];
+    }
+  }, []);
+
+  // Get lead prediction
+  const getLeadPrediction = useCallback(async (leadId: string): Promise<LeadPrediction | null> => {
+    try {
+      return await predictiveAnalyticsService.predictLeadConversion(leadId);
+    } catch (error) {
+      console.error('Error getting lead prediction:', error);
+      return null;
+    }
+  }, []);
+
+  // Auto-refresh insights
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadInsights();
+    const interval = setInterval(loadInsights, 5 * 60 * 1000); // Every 5 minutes
+    return () => clearInterval(interval);
+  }, [loadInsights]);
 
-  const refresh = useCallback(() => {
-    loadData();
-  }, [loadData]);
+  // Auto-process decisions
+  useEffect(() => {
+    const processInterval = setInterval(processDecisions, 10 * 60 * 1000); // Every 10 minutes
+    return () => clearInterval(processInterval);
+  }, [processDecisions]);
 
   return {
-    ...data,
-    refresh
+    insights,
+    decisions,
+    loading,
+    lastUpdated,
+    loadInsights,
+    processDecisions,
+    getLeadPrediction
   };
 };
