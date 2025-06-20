@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Download, Calendar as CalendarIcon, FileText, BarChart3, TrendingUp, Mail } from 'lucide-react';
+import { Download, Calendar as CalendarIcon, FileText, BarChart3, TrendingUp, Mail, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import ExecutiveReportGenerator from './ExecutiveReportGenerator';
 
 interface ReportConfig {
   type: 'performance' | 'quality' | 'compliance' | 'conversion' | 'training';
@@ -212,10 +212,13 @@ const ReportsExportPanel = () => {
         <h2 className="text-xl font-bold">Reports & Export</h2>
       </div>
 
+      {/* Executive Report - Featured at top */}
+      <ExecutiveReportGenerator />
+
       {/* Report Generation */}
       <Card>
         <CardHeader>
-          <CardTitle>Generate Report</CardTitle>
+          <CardTitle>Generate Detailed Report</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
