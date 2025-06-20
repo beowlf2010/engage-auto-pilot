@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import ExecutiveReportGenerator from './ExecutiveReportGenerator';
+import ScheduleRepairPanel from './ScheduleRepairPanel';
+import EnhancedMessageExport from '@/components/messaging/EnhancedMessageExport';
 
 interface ReportConfig {
   type: 'performance' | 'quality' | 'compliance' | 'conversion' | 'training';
@@ -212,8 +214,14 @@ const ReportsExportPanel = () => {
         <h2 className="text-xl font-bold">Reports & Export</h2>
       </div>
 
+      {/* AI Schedule Repair - Featured at top */}
+      <ScheduleRepairPanel />
+
       {/* Executive Report - Featured at top */}
       <ExecutiveReportGenerator />
+
+      {/* Enhanced Message Export */}
+      <EnhancedMessageExport />
 
       {/* Report Generation */}
       <Card>

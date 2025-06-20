@@ -10,9 +10,10 @@ import { useMessageExport } from '@/hooks/useMessageExport';
 import { Upload, Download, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatDistanceToNow } from 'date-fns';
+import EnhancedMessageExport from './EnhancedMessageExport';
 
 const MessageExportImport = () => {
-  const { exports, isLoading, loadExports, importFromFile, processImport, exportCurrentMessages } = useMessageExport();
+  const { exports, isLoading, loadExports, importFromFile, processImport } = useMessageExport();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [exportName, setExportName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,17 +78,21 @@ const MessageExportImport = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="import" className="w-full">
+      <Tabs defaultValue="export" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="import" className="flex items-center space-x-2">
-            <Upload className="h-4 w-4" />
-            <span>Import from VIN Solutions</span>
-          </TabsTrigger>
           <TabsTrigger value="export" className="flex items-center space-x-2">
             <Download className="h-4 w-4" />
             <span>Export Messages</span>
           </TabsTrigger>
+          <TabsTrigger value="import" className="flex items-center space-x-2">
+            <Upload className="h-4 w-4" />
+            <span>Import from VIN Solutions</span>
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="export" className="space-y-6">
+          <EnhancedMessageExport />
+        </TabsContent>
 
         <TabsContent value="import" className="space-y-6">
           {/* File Upload Section */}
@@ -212,47 +217,6 @@ const MessageExportImport = () => {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="export" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Download className="h-5 w-5" />
-                <span>Export Current Messages</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-gray-600">
-                Export all current system messages and lead data for backup or analysis.
-              </p>
-              
-              <Button 
-                onClick={exportCurrentMessages}
-                disabled={isLoading}
-                className="w-full"
-              >
-                {isLoading ? (
-                  <LoadingSpinner size="sm" text="Exporting..." />
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export All Messages
-                  </>
-                )}
-              </Button>
-
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-start space-x-2">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                  <div className="text-sm text-yellow-800">
-                    <strong>Note:</strong> The export will include all messages, lead data, and conversation history. 
-                    This may take some time for large datasets.
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
