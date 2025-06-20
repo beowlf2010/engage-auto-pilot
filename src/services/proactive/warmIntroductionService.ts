@@ -1,103 +1,94 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from '../enhancedIntelligentConversationAI';
 import { formatProperName } from '@/utils/nameFormatter';
-import { validatePersonalName, detectLeadSource, generateContextualGreeting } from '../nameValidationService';
+import { validatePersonalName, detectLeadSource } from '../nameValidationService';
+import { assessLeadDataQuality, generateDataQualityAwareGreeting } from '../unifiedDataQualityService';
 
-// Generate warm, introductory initial outreach messages using UNIFIED AI with smart name validation
+// Generate warm, introductory initial outreach messages using UNIFIED AI with comprehensive data quality validation
 export const generateWarmInitialMessage = async (lead: any, profile: any): Promise<string | null> => {
   try {
-    console.log(`🤖 [SMART WARM INTRO] === STARTING INTELLIGENT MESSAGE GENERATION ===`);
-    console.log(`🤖 [SMART WARM INTRO] Lead data:`, {
+    console.log(`🤖 [ENHANCED WARM INTRO] === STARTING COMPREHENSIVE DATA QUALITY VALIDATION ===`);
+    console.log(`🤖 [ENHANCED WARM INTRO] Lead data:`, {
       firstName: lead.first_name,
       lastName: lead.last_name,
       vehicleInterest: lead.vehicle_interest || 'Not specified'
     });
 
-    // Validate the lead's name using smart validation
-    const nameValidation = validatePersonalName(lead.first_name);
-    const leadSource = detectLeadSource(lead);
+    // Comprehensive data quality assessment
+    const dataQuality = assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
     
-    console.log(`🧠 [SMART WARM INTRO] Name validation result:`, {
-      isValidPersonalName: nameValidation.isValidPersonalName,
-      confidence: nameValidation.confidence,
-      detectedType: nameValidation.detectedType,
-      leadSource: leadSource
+    console.log(`🧠 [ENHANCED WARM INTRO] Comprehensive data quality assessment:`, {
+      overallScore: dataQuality.overallQualityScore,
+      messageStrategy: dataQuality.messageStrategy,
+      nameValid: dataQuality.nameValidation.isValidPersonalName,
+      vehicleValid: dataQuality.vehicleValidation.isValidVehicleInterest,
+      usePersonalGreeting: dataQuality.recommendations.usePersonalGreeting,
+      useSpecificVehicle: dataQuality.recommendations.useSpecificVehicle
     });
 
-    // Determine the appropriate name to use
-    let formattedName = '';
-    let usePersonalGreeting = false;
-    
-    if (nameValidation.isValidPersonalName && nameValidation.confidence > 0.7) {
-      // High confidence personal name
-      formattedName = formatProperName(lead.first_name);
-      usePersonalGreeting = true;
-      console.log(`✅ [SMART WARM INTRO] Using personal greeting with name: ${formattedName}`);
-    } else {
-      // Use generic greeting
-      usePersonalGreeting = false;
-      console.log(`🔄 [SMART WARM INTRO] Using generic greeting due to: ${nameValidation.detectedType} (confidence: ${nameValidation.confidence})`);
-    }
-
-    // Generate contextual greeting
-    const contextualGreeting = generateContextualGreeting(lead, nameValidation, leadSource);
-    
-    // Prepare context for unified AI with enhanced data quality information
-    const context = {
-      leadId: lead.id,
-      leadName: usePersonalGreeting ? formattedName : 'there',
-      vehicleInterest: lead.vehicle_interest || '',
-      messages: [], // No previous messages for initial contact
-      leadInfo: {
-        phone: '',
-        status: 'new',
-        lastReplyAt: new Date().toISOString(),
-        dataQuality: {
-          nameValidation: nameValidation,
-          leadSource: leadSource,
-          usePersonalGreeting: usePersonalGreeting
-        }
-      },
-      isInitialContact: true,
-      salespersonName: 'Finn',
-      dealershipName: 'Jason Pilger Chevrolet',
-      contextualGreeting: contextualGreeting
-    };
-
-    console.log(`🔄 [SMART WARM INTRO] Context prepared:`, {
-      usePersonalGreeting: usePersonalGreeting,
-      leadName: context.leadName,
-      detectedType: nameValidation.detectedType,
-      contextualGreeting: contextualGreeting
-    });
-
-    // If we have low confidence or detected non-personal data, use fallback logic
-    if (nameValidation.suggestions.useGenericGreeting || !usePersonalGreeting) {
-      console.log(`📝 [SMART WARM INTRO] Using smart fallback template`);
+    // For high-quality data, use AI generation; for poor quality data, use smart templates
+    if (dataQuality.overallQualityScore > 0.7 && dataQuality.messageStrategy === 'personal_with_vehicle') {
+      console.log(`🔄 [ENHANCED WARM INTRO] High data quality detected - using AI generation`);
       
-      const smartTemplate = generateSmartFallbackTemplate(lead, nameValidation, leadSource);
-      console.log(`✅ [SMART WARM INTRO] Smart fallback generated: ${smartTemplate}`);
-      return smartTemplate;
+      // Legacy validation for AI context
+      const nameValidation = validatePersonalName(lead.first_name);
+      const leadSource = detectLeadSource(lead);
+      
+      const formattedName = formatProperName(lead.first_name);
+      
+      // Prepare context for unified AI with enhanced data quality information
+      const context = {
+        leadId: lead.id,
+        leadName: formattedName,
+        vehicleInterest: lead.vehicle_interest,
+        messages: [],
+        leadInfo: {
+          phone: '',
+          status: 'new',
+          lastReplyAt: new Date().toISOString(),
+          dataQuality: {
+            nameValidation: nameValidation,
+            vehicleValidation: dataQuality.vehicleValidation,
+            overallQuality: dataQuality,
+            leadSource: leadSource,
+            usePersonalGreeting: dataQuality.recommendations.usePersonalGreeting,
+            useSpecificVehicle: dataQuality.recommendations.useSpecificVehicle
+          }
+        },
+        isInitialContact: true,
+        salespersonName: 'Finn',
+        dealershipName: 'Jason Pilger Chevrolet'
+      };
+
+      console.log(`🔄 [ENHANCED WARM INTRO] AI context prepared with data quality insights`);
+      
+      try {
+        const aiResponse = await generateEnhancedIntelligentResponse(context);
+        
+        if (aiResponse?.message) {
+          console.log(`✅ [ENHANCED WARM INTRO] AI generated high-quality message: ${aiResponse.message}`);
+          return aiResponse.message;
+        }
+      } catch (aiError) {
+        console.warn(`⚠️ [ENHANCED WARM INTRO] AI generation failed, falling back to template`);
+      }
     }
 
-    // For high-confidence personal names, use the unified AI
-    console.log(`🔄 [SMART WARM INTRO] Using unified AI for personal greeting`);
-    const aiResponse = await generateEnhancedIntelligentResponse(context);
+    // Use data-quality-aware template generation
+    console.log(`📝 [ENHANCED WARM INTRO] Using data-quality-aware template generation`);
     
-    if (aiResponse?.message) {
-      console.log(`✅ [SMART WARM INTRO] Unified AI generated: ${aiResponse.message}`);
-      return aiResponse.message;
-    }
-
-    // Final fallback with personal name if AI fails
-    console.log(`⚠️ [SMART WARM INTRO] AI failed, using personal fallback template`);
-    const personalFallback = generatePersonalFallbackTemplate(formattedName, lead.vehicle_interest);
-    console.log(`✅ [SMART WARM INTRO] Personal fallback: ${personalFallback}`);
-    return personalFallback;
+    const smartMessage = generateDataQualityAwareGreeting(
+      lead.first_name,
+      lead.vehicle_interest,
+      'Finn',
+      'Jason Pilger Chevrolet'
+    );
+    
+    console.log(`✅ [ENHANCED WARM INTRO] Generated data-quality-aware message: ${smartMessage}`);
+    return smartMessage;
 
   } catch (error) {
-    console.error('❌ [SMART WARM INTRO] Critical error:', error);
+    console.error('❌ [ENHANCED WARM INTRO] Critical error:', error);
     return generateEmergencyFallback(lead);
   }
 };
@@ -163,12 +154,5 @@ const generatePersonalFallbackTemplate = (formattedName: string, vehicleInterest
 };
 
 const generateEmergencyFallback = (lead: any): string => {
-  const vehicleInterest = lead.vehicle_interest;
-  const hasVehicleInterest = vehicleInterest && vehicleInterest !== 'Not specified';
-  
-  if (hasVehicleInterest) {
-    return `Hello! Thanks for your interest in the ${vehicleInterest}. I'm Finn with Jason Pilger Chevrolet and I'd love to help you find exactly what you're looking for. What questions can I answer for you?`;
-  } else {
-    return `Hello! Thanks for your interest in finding the right vehicle. I'm Finn with Jason Pilger Chevrolet and I'm here to make your car shopping experience as smooth as possible. What type of vehicle are you looking for?`;
-  }
+  return `Hello! Thanks for your interest in finding the right vehicle. I'm Finn with Jason Pilger Chevrolet and I'm here to make your car shopping experience as smooth as possible. What type of vehicle are you looking for?`;
 };

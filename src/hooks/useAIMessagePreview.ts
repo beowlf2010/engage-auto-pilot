@@ -1,11 +1,10 @@
-
 import { useState } from 'react';
 import { generateWarmInitialMessage } from '@/services/proactive/warmIntroductionService';
 import { sendMessage } from '@/services/messagesService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { validatePersonalName, detectLeadSource } from '@/services/nameValidationService';
+import { assessLeadDataQuality } from '@/services/unifiedDataQualityService';
 
 interface UseAIMessagePreviewProps {
   leadId: string;
@@ -49,34 +48,35 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         vehicleInterest: lead.vehicle_interest
       });
 
-      // Perform name validation for debugging
-      const nameValidation = validatePersonalName(lead.first_name);
-      const leadSource = detectLeadSource(lead);
+      // Comprehensive data quality assessment
+      const dataQuality = assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
       
-      console.log('🧠 [AI PREVIEW] Smart validation results:', {
-        nameValidation,
-        leadSource
+      console.log('🧠 [AI PREVIEW] Comprehensive data quality results:', {
+        overallScore: dataQuality.overallQualityScore,
+        messageStrategy: dataQuality.messageStrategy,
+        nameValid: dataQuality.nameValidation.isValidPersonalName,
+        vehicleValid: dataQuality.vehicleValidation.isValidVehicleInterest
       });
 
-      // Store debug info for UI display
+      // Store comprehensive debug info for UI display
       setDebugInfo({
-        nameValidation,
-        leadSource,
+        dataQuality,
         originalFirstName: lead.first_name,
-        originalLastName: lead.last_name
+        originalLastName: lead.last_name,
+        originalVehicleInterest: lead.vehicle_interest
       });
 
-      // Generate preview message with enhanced logic
+      // Generate preview message with enhanced data quality logic
       const message = await generateWarmInitialMessage(lead, profile);
       
       if (message) {
         setGeneratedMessage(message);
         setShowPreview(true);
         
-        // Show success message with debug info
+        // Show success message with comprehensive debug info
         toast({
           title: "Message Generated",
-          description: `Name validation: ${nameValidation.detectedType} (${(nameValidation.confidence * 100).toFixed(0)}% confidence)`,
+          description: `Data Quality: ${Math.round(dataQuality.overallQualityScore * 100)}% | Strategy: ${dataQuality.messageStrategy}`,
         });
       } else {
         throw new Error('Failed to generate message');

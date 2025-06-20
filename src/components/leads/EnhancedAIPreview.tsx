@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bot, MessageSquare, Clock, Send, X, Loader2 } from 'lucide-react';
+import { Bot, MessageSquare, Clock, Send, X, Loader2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { useAIMessagePreview } from '@/hooks/useAIMessagePreview';
 
 interface EnhancedAIPreviewProps {
@@ -63,9 +63,37 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
   const nextMessageTime = new Date();
   nextMessageTime.setTime(nextMessageTime.getTime() + (24 * 60 * 60 * 1000));
 
+  const getQualityScoreColor = (score: number) => {
+    if (score >= 0.8) return 'text-green-600';
+    if (score >= 0.6) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getQualityScoreLabel = (score: number) => {
+    if (score >= 0.8) return 'Excellent';
+    if (score >= 0.6) return 'Good';
+    if (score >= 0.4) return 'Fair';
+    return 'Poor';
+  };
+
+  const getStrategyDescription = (strategy: string) => {
+    switch (strategy) {
+      case 'personal_with_vehicle':
+        return 'Personal greeting with specific vehicle';
+      case 'personal_generic_vehicle':
+        return 'Personal greeting with generic vehicle message';
+      case 'generic_with_vehicle':
+        return 'Generic greeting with specific vehicle';
+      case 'fully_generic':
+        return 'Fully generic greeting (data quality issues detected)';
+      default:
+        return strategy;
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bot className="w-5 h-5 text-blue-600" />
@@ -78,33 +106,79 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600 mb-2" />
-                <div className="text-sm text-gray-600">Generating personalized message...</div>
+                <div className="text-sm text-gray-600">Analyzing data quality & generating message...</div>
               </div>
             </div>
           )}
 
           {!isGenerating && generatedMessage && (
             <>
-              {/* Debug Information */}
-              {debugInfo && (
+              {/* Comprehensive Data Quality Information */}
+              {debugInfo?.dataQuality && (
                 <Card className="bg-gray-50 border-gray-200">
                   <CardContent className="p-3">
-                    <div className="text-xs space-y-1">
-                      <div className="font-medium text-gray-700">Smart Validation Results:</div>
-                      <div className="text-gray-600">
-                        Name "{debugInfo.originalFirstName}" detected as: <span className="font-medium">{debugInfo.nameValidation.detectedType}</span>
+                    <div className="text-xs space-y-2">
+                      <div className="font-medium text-gray-700 flex items-center gap-2">
+                        <Bot className="w-3 h-3" />
+                        Comprehensive Data Quality Analysis
                       </div>
-                      <div className="text-gray-600">
-                        Confidence: <span className="font-medium">{(debugInfo.nameValidation.confidence * 100).toFixed(0)}%</span>
+                      
+                      {/* Overall Quality Score */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Overall Quality Score:</span>
+                        <Badge 
+                          variant="outline" 
+                          className={getQualityScoreColor(debugInfo.dataQuality.overallQualityScore)}
+                        >
+                          {Math.round(debugInfo.dataQuality.overallQualityScore * 100)}% - {getQualityScoreLabel(debugInfo.dataQuality.overallQualityScore)}
+                        </Badge>
                       </div>
-                      <div className="text-gray-600">
-                        Lead source: <span className="font-medium">{debugInfo.leadSource}</span>
+
+                      {/* Message Strategy */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Message Strategy:</span>
+                        <span className="font-medium text-blue-600 text-xs">
+                          {getStrategyDescription(debugInfo.dataQuality.messageStrategy)}
+                        </span>
                       </div>
-                      {debugInfo.nameValidation.detectedType !== 'personal' && (
-                        <div className="text-orange-600 font-medium">
-                          ℹ️ Using generic greeting (name not recognized as personal)
+
+                      {/* Name Validation */}
+                      <div className="border-t pt-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          {debugInfo.dataQuality.nameValidation.isValidPersonalName ? (
+                            <CheckCircle className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <XCircle className="w-3 h-3 text-red-600" />
+                          )}
+                          <span className="font-medium text-gray-700 text-xs">Name Analysis</span>
                         </div>
-                      )}
+                        <div className="text-gray-600 pl-5">
+                          "{debugInfo.originalFirstName}" detected as: <span className="font-medium">{debugInfo.dataQuality.nameValidation.detectedType}</span>
+                          {' '}({Math.round(debugInfo.dataQuality.nameValidation.confidence * 100)}% confidence)
+                        </div>
+                      </div>
+
+                      {/* Vehicle Interest Validation */}
+                      <div className="border-t pt-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          {debugInfo.dataQuality.vehicleValidation.isValidVehicleInterest ? (
+                            <CheckCircle className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <XCircle className="w-3 h-3 text-red-600" />
+                          )}
+                          <span className="font-medium text-gray-700 text-xs">Vehicle Interest Analysis</span>
+                        </div>
+                        <div className="text-gray-600 pl-5">
+                          "{debugInfo.originalVehicleInterest || 'Not specified'}" - {debugInfo.dataQuality.vehicleValidation.detectedIssue}
+                          {' '}({Math.round(debugInfo.dataQuality.vehicleValidation.confidence * 100)}% confidence)
+                        </div>
+                        {debugInfo.dataQuality.vehicleValidation.detectedIssue === 'corruption' && (
+                          <div className="text-orange-600 font-medium pl-5 mt-1 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            Corrupted vehicle data detected - using fallback message
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -179,7 +253,7 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
             <>
               {/* Introduction */}
               <div className="text-sm text-gray-600">
-                Finn AI will send a personalized initial message to {leadName} 
+                Finn AI will analyze data quality and send a personalized initial message to {leadName} 
                 {vehicleInterest && ` about their interest in ${vehicleInterest}`}.
               </div>
 
