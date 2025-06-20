@@ -51,7 +51,7 @@ export const transformLeadData = (
     state: lead.state,
     postalCode: lead.postal_code,
     vehicleInterest: lead.vehicle_interest,
-    vehicleYear: lead.vehicle_year,
+    vehicleYear: lead.vehicle_year ? parseInt(lead.vehicle_year) : undefined, // Convert string to number
     vehicleMake: lead.vehicle_make,
     vehicleModel: lead.vehicle_model,
     vehicleVIN: lead.vehicle_vin,

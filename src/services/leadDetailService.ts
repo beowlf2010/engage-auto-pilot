@@ -142,8 +142,7 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
           model,
           vin,
           mileage,
-          condition,
-          description
+          condition
         ),
         profiles!salesperson_id (
           first_name,
@@ -220,13 +219,13 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       vehicleInterest: lead.vehicle_interest,
       vehicleMake: lead.vehicle_make,
       vehicleModel: lead.vehicle_model,
-      vehicleYear: lead.vehicle_year,
+      vehicleYear: lead.vehicle_year ? parseInt(lead.vehicle_year) : undefined, // Convert string to number
       vehicleVin: lead.vehicle_vin,
       createdAt: lead.created_at,
       lastReplyAt: lead.last_reply_at,
       preferredPriceMin: lead.preferred_price_min,
       preferredPriceMax: lead.preferred_price_max,
-      notes: lead.notes || '',
+      notes: '', // Default empty string since notes column doesn't exist
       phoneNumbers: (lead.phone_numbers || []).map((phone: any) => ({
         id: phone.id,
         number: phone.number,
@@ -244,7 +243,7 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
         condition: trade.condition,
         estimatedValue: 0, // Default value since column doesn't exist
         owedAmount: 0, // Default value since column doesn't exist
-        description: trade.description
+        description: '' // Default empty string since description column doesn't exist
       })),
       conversations: (conversations || []).map((conv: any) => ({
         id: conv.id,
@@ -307,10 +306,8 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       // AI takeover settings
       aiTakeoverEnabled: lead.ai_takeover_enabled || false,
       aiTakeoverDelayMinutes: lead.ai_takeover_delay_minutes,
-      // Additional trade fields - derive from trade vehicles
-      tradeInVehicle: lead.trade_vehicles?.[0] ? 
-        `${lead.trade_vehicles[0].year || ''} ${lead.trade_vehicles[0].make || ''} ${lead.trade_vehicles[0].model || ''}`.trim() : 
-        undefined,
+      // Additional trade fields - provide safe defaults
+      tradeInVehicle: undefined, // Will be computed from trade vehicles if they exist
       tradePayoffAmount: 0 // Default since owed_amount doesn't exist
     };
 
