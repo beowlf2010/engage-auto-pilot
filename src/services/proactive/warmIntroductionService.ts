@@ -2,85 +2,173 @@
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from '../enhancedIntelligentConversationAI';
 import { formatProperName } from '@/utils/nameFormatter';
+import { validatePersonalName, detectLeadSource, generateContextualGreeting } from '../nameValidationService';
 
-// Generate warm, introductory initial outreach messages using UNIFIED AI
+// Generate warm, introductory initial outreach messages using UNIFIED AI with smart name validation
 export const generateWarmInitialMessage = async (lead: any, profile: any): Promise<string | null> => {
   try {
-    // Format the lead name properly (convert from ALL CAPS to Proper Case)
-    const formattedFirstName = formatProperName(lead.first_name);
-    const formattedLastName = formatProperName(lead.last_name);
-    const formattedFullName = formattedFirstName && formattedLastName ? 
-      `${formattedFirstName} ${formattedLastName}` : 
-      formattedFirstName || formattedLastName || 'there';
-
-    console.log(`🤖 [UNIFIED WARM INTRO] === DEBUGGING - GENERATING WARM AI MESSAGE ===`);
-    console.log(`🤖 [UNIFIED WARM INTRO] Lead name: ${formattedFullName} (formatted from: ${lead.first_name} ${lead.last_name})`);
-    console.log(`🤖 [UNIFIED WARM INTRO] Vehicle interest: ${lead.vehicle_interest || 'Not specified'}`);
-    console.log(`👤 [UNIFIED WARM INTRO] Using profile:`, {
-      profileFirstName: profile?.first_name,
-      hasProfile: !!profile
+    console.log(`🤖 [SMART WARM INTRO] === STARTING INTELLIGENT MESSAGE GENERATION ===`);
+    console.log(`🤖 [SMART WARM INTRO] Lead data:`, {
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      vehicleInterest: lead.vehicle_interest || 'Not specified'
     });
+
+    // Validate the lead's name using smart validation
+    const nameValidation = validatePersonalName(lead.first_name);
+    const leadSource = detectLeadSource(lead);
     
-    // Use the unified AI service for warm initial contact
+    console.log(`🧠 [SMART WARM INTRO] Name validation result:`, {
+      isValidPersonalName: nameValidation.isValidPersonalName,
+      confidence: nameValidation.confidence,
+      detectedType: nameValidation.detectedType,
+      leadSource: leadSource
+    });
+
+    // Determine the appropriate name to use
+    let formattedName = '';
+    let usePersonalGreeting = false;
+    
+    if (nameValidation.isValidPersonalName && nameValidation.confidence > 0.7) {
+      // High confidence personal name
+      formattedName = formatProperName(lead.first_name);
+      usePersonalGreeting = true;
+      console.log(`✅ [SMART WARM INTRO] Using personal greeting with name: ${formattedName}`);
+    } else {
+      // Use generic greeting
+      usePersonalGreeting = false;
+      console.log(`🔄 [SMART WARM INTRO] Using generic greeting due to: ${nameValidation.detectedType} (confidence: ${nameValidation.confidence})`);
+    }
+
+    // Generate contextual greeting
+    const contextualGreeting = generateContextualGreeting(lead, nameValidation, leadSource);
+    
+    // Prepare context for unified AI with enhanced data quality information
     const context = {
       leadId: lead.id,
-      leadName: formattedFullName,
+      leadName: usePersonalGreeting ? formattedName : 'there',
       vehicleInterest: lead.vehicle_interest || '',
       messages: [], // No previous messages for initial contact
       leadInfo: {
         phone: '',
         status: 'new',
-        lastReplyAt: new Date().toISOString()
+        lastReplyAt: new Date().toISOString(),
+        dataQuality: {
+          nameValidation: nameValidation,
+          leadSource: leadSource,
+          usePersonalGreeting: usePersonalGreeting
+        }
       },
-      isInitialContact: true, // Flag for warm introduction
-      salespersonName: 'Finn', // Always use Finn
-      dealershipName: 'Jason Pilger Chevrolet' // Always use correct dealership
+      isInitialContact: true,
+      salespersonName: 'Finn',
+      dealershipName: 'Jason Pilger Chevrolet',
+      contextualGreeting: contextualGreeting
     };
 
-    console.log(`🔄 [UNIFIED WARM INTRO] === CALLING UNIFIED AI ===`);
-    console.log(`🔄 [UNIFIED WARM INTRO] Context for AI:`, {
+    console.log(`🔄 [SMART WARM INTRO] Context prepared:`, {
+      usePersonalGreeting: usePersonalGreeting,
       leadName: context.leadName,
-      vehicleInterest: context.vehicleInterest,
-      isInitialContact: context.isInitialContact,
-      salespersonName: context.salespersonName,
-      dealershipName: context.dealershipName
+      detectedType: nameValidation.detectedType,
+      contextualGreeting: contextualGreeting
     });
 
+    // If we have low confidence or detected non-personal data, use fallback logic
+    if (nameValidation.suggestions.useGenericGreeting || !usePersonalGreeting) {
+      console.log(`📝 [SMART WARM INTRO] Using smart fallback template`);
+      
+      const smartTemplate = generateSmartFallbackTemplate(lead, nameValidation, leadSource);
+      console.log(`✅ [SMART WARM INTRO] Smart fallback generated: ${smartTemplate}`);
+      return smartTemplate;
+    }
+
+    // For high-confidence personal names, use the unified AI
+    console.log(`🔄 [SMART WARM INTRO] Using unified AI for personal greeting`);
     const aiResponse = await generateEnhancedIntelligentResponse(context);
     
-    console.log(`📬 [UNIFIED WARM INTRO] AI response received:`, {
-      hasResponse: !!aiResponse,
-      hasMessage: !!aiResponse?.message,
-      messageLength: aiResponse?.message?.length || 0,
-      messagePreview: aiResponse?.message?.substring(0, 50) || 'NO MESSAGE'
-    });
-    
     if (aiResponse?.message) {
-      console.log(`✅ [UNIFIED WARM INTRO] === SUCCESS! Unified AI generated message ===`);
-      console.log(`✅ [UNIFIED WARM INTRO] Message: ${aiResponse.message}`);
+      console.log(`✅ [SMART WARM INTRO] Unified AI generated: ${aiResponse.message}`);
       return aiResponse.message;
     }
 
-    // Improved fallback templates that are warm and conversational
-    console.log('⚠️ [UNIFIED WARM INTRO] === AI FAILED - USING FALLBACK TEMPLATES ===');
-    const warmTemplates = [
-      `Hi ${formattedFirstName}! I'm Finn with Jason Pilger Chevrolet. I noticed you were interested in ${lead.vehicle_interest || 'finding the right vehicle'}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at vehicles today?`,
-      
-      `Hello ${formattedFirstName}! Thanks for your interest in ${lead.vehicle_interest || 'our vehicles'}. I'm Finn with Jason Pilger Chevrolet and I'm here to help you find exactly what you're looking for. I know car shopping can feel overwhelming, so I'm here to make it as easy as possible. What's most important to you in your next vehicle?`,
-      
-      `Hi ${formattedFirstName}! I hope you're having a great day. I'm Finn with Jason Pilger Chevrolet and I saw you were looking at ${lead.vehicle_interest || 'vehicles'}. I'd love to learn more about what you're hoping to find and see how I can help. Are you replacing a current vehicle or adding to the family fleet?`,
-      
-      `Hello ${formattedFirstName}! I'm Finn with Jason Pilger Chevrolet and I noticed your interest in ${lead.vehicle_interest || 'our inventory'}. I really enjoy helping people find the perfect vehicle for their needs. What's prompting your search for a new ride?`
-    ];
+    // Final fallback with personal name if AI fails
+    console.log(`⚠️ [SMART WARM INTRO] AI failed, using personal fallback template`);
+    const personalFallback = generatePersonalFallbackTemplate(formattedName, lead.vehicle_interest);
+    console.log(`✅ [SMART WARM INTRO] Personal fallback: ${personalFallback}`);
+    return personalFallback;
 
-    const selectedTemplate = warmTemplates[Math.floor(Math.random() * warmTemplates.length)];
-    console.log(`📝 [UNIFIED WARM INTRO] === FALLBACK TEMPLATE SELECTED ===`);
-    console.log(`📝 [UNIFIED WARM INTRO] Template: ${selectedTemplate}`);
-    return selectedTemplate;
   } catch (error) {
-    console.error('❌ [UNIFIED WARM INTRO] === CRITICAL ERROR ===');
-    console.error('❌ [UNIFIED WARM INTRO] Error generating warm AI introduction:', error);
-    console.error('❌ [UNIFIED WARM INTRO] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    return null;
+    console.error('❌ [SMART WARM INTRO] Critical error:', error);
+    return generateEmergencyFallback(lead);
+  }
+};
+
+const generateSmartFallbackTemplate = (lead: any, nameValidation: any, leadSource: string): string => {
+  const vehicleInterest = lead.vehicle_interest;
+  const hasVehicleInterest = vehicleInterest && vehicleInterest !== 'Not specified';
+  
+  // Use validation-suggested greeting if available
+  if (nameValidation.suggestions.contextualGreeting) {
+    let message = nameValidation.suggestions.contextualGreeting;
+    
+    // Add dealership context
+    message += ` I'm Finn with Jason Pilger Chevrolet, and I'd love to help you find exactly what you're looking for.`;
+    
+    // Add appropriate question based on context
+    if (leadSource === 'phone_call') {
+      message += ` What brought you to call us today?`;
+    } else if (hasVehicleInterest) {
+      message += ` What's most important to you in your next vehicle?`;
+    } else {
+      message += ` What type of vehicle are you looking for?`;
+    }
+    
+    return message;
+  }
+  
+  // Default smart templates based on detected type
+  switch (nameValidation.detectedType) {
+    case 'city':
+    case 'state':
+      return `Hello! Thanks for calling from the ${formatProperName(lead.first_name)} area. I'm Finn with Jason Pilger Chevrolet and I'd love to help you find the perfect vehicle. What brought you to call us today?`;
+      
+    case 'business':
+      return `Hello! Thanks for your business inquiry. I'm Finn with Jason Pilger Chevrolet and I'd be happy to help with your vehicle needs. What type of vehicles are you looking for?`;
+      
+    case 'phone':
+      return `Hello! Thanks for calling Jason Pilger Chevrolet. I'm Finn and I'd love to help you find the right vehicle. What can I help you with today?`;
+      
+    default:
+      if (hasVehicleInterest) {
+        return `Hello! Thanks for your interest in the ${vehicleInterest}. I'm Finn with Jason Pilger Chevrolet and I'd love to help you explore your options. What's most important to you in your next vehicle?`;
+      } else {
+        return `Hello! Thanks for your interest in finding the right vehicle. I'm Finn with Jason Pilger Chevrolet and I'm here to help make your car shopping experience as easy as possible. What type of vehicle are you looking for?`;
+      }
+  }
+};
+
+const generatePersonalFallbackTemplate = (formattedName: string, vehicleInterest: string): string => {
+  const hasVehicleInterest = vehicleInterest && vehicleInterest !== 'Not specified';
+  
+  const personalTemplates = [
+    hasVehicleInterest 
+      ? `Hi ${formattedName}! I'm Finn with Jason Pilger Chevrolet. I noticed you were interested in ${vehicleInterest}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at this vehicle?`
+      : `Hi ${formattedName}! I'm Finn with Jason Pilger Chevrolet. I'd love to help you find exactly what you're looking for. What's most important to you in your next vehicle?`,
+      
+    hasVehicleInterest
+      ? `Hello ${formattedName}! Thanks for your interest in ${vehicleInterest}. I'm Finn with Jason Pilger Chevrolet and I'm here to help you find the perfect fit. What questions can I answer for you?`
+      : `Hello ${formattedName}! I'm Finn with Jason Pilger Chevrolet and I really enjoy helping people find the perfect vehicle for their needs. What's prompting your search for a new ride?`
+  ];
+
+  return personalTemplates[Math.floor(Math.random() * personalTemplates.length)];
+};
+
+const generateEmergencyFallback = (lead: any): string => {
+  const vehicleInterest = lead.vehicle_interest;
+  const hasVehicleInterest = vehicleInterest && vehicleInterest !== 'Not specified';
+  
+  if (hasVehicleInterest) {
+    return `Hello! Thanks for your interest in the ${vehicleInterest}. I'm Finn with Jason Pilger Chevrolet and I'd love to help you find exactly what you're looking for. What questions can I answer for you?`;
+  } else {
+    return `Hello! Thanks for your interest in finding the right vehicle. I'm Finn with Jason Pilger Chevrolet and I'm here to make your car shopping experience as smooth as possible. What type of vehicle are you looking for?`;
   }
 };

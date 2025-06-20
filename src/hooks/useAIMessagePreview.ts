@@ -5,6 +5,7 @@ import { sendMessage } from '@/services/messagesService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { validatePersonalName, detectLeadSource } from '@/services/nameValidationService';
 
 interface UseAIMessagePreviewProps {
   leadId: string;
@@ -16,6 +17,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
   const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   const { profile } = useAuth();
 
   const generatePreview = async () => {
@@ -41,12 +43,41 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         throw new Error('Failed to fetch lead details');
       }
 
-      // Generate preview message
+      console.log('🔍 [AI PREVIEW] Lead data:', {
+        firstName: lead.first_name,
+        lastName: lead.last_name,
+        vehicleInterest: lead.vehicle_interest
+      });
+
+      // Perform name validation for debugging
+      const nameValidation = validatePersonalName(lead.first_name);
+      const leadSource = detectLeadSource(lead);
+      
+      console.log('🧠 [AI PREVIEW] Smart validation results:', {
+        nameValidation,
+        leadSource
+      });
+
+      // Store debug info for UI display
+      setDebugInfo({
+        nameValidation,
+        leadSource,
+        originalFirstName: lead.first_name,
+        originalLastName: lead.last_name
+      });
+
+      // Generate preview message with enhanced logic
       const message = await generateWarmInitialMessage(lead, profile);
       
       if (message) {
         setGeneratedMessage(message);
         setShowPreview(true);
+        
+        // Show success message with debug info
+        toast({
+          title: "Message Generated",
+          description: `Name validation: ${nameValidation.detectedType} (${(nameValidation.confidence * 100).toFixed(0)}% confidence)`,
+        });
       } else {
         throw new Error('Failed to generate message');
       }
@@ -91,6 +122,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
 
       setShowPreview(false);
       setGeneratedMessage(null);
+      setDebugInfo(null);
       onMessageSent?.();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -107,6 +139,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
   const cancel = () => {
     setShowPreview(false);
     setGeneratedMessage(null);
+    setDebugInfo(null);
   };
 
   return {
@@ -114,6 +147,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     generatedMessage,
     showPreview,
     isSending,
+    debugInfo,
     generatePreview,
     sendNow,
     cancel

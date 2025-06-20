@@ -50,60 +50,101 @@ const capitalizeSegment = (segment: string): string => {
   return segment.charAt(0).toUpperCase() + segment.slice(1);
 };
 
-// Warm introduction prompt builders for initial contact
+// Enhanced warm introduction prompt builders with data quality awareness
 export const buildWarmIntroductionPrompt = (
   leadName: string,
   vehicleInterest: string,
   salespersonName: string,
-  dealershipName: string
+  dealershipName: string,
+  dataQuality?: any
 ): string => {
-  // Format the lead name properly
+  // Format the lead name properly, but be aware it might not be a real name
   const formattedLeadName = formatProperName(leadName) || 'there';
   
-  return `You are ${salespersonName}, a friendly and professional automotive sales representative at ${dealershipName}. You're making your very first contact with ${formattedLeadName}, who has shown interest in ${vehicleInterest || 'finding the right vehicle'}.
+  return `You are ${salespersonName}, a friendly and professional automotive sales representative at ${dealershipName}. You're making your very first contact with a potential customer.
 
-CRITICAL REQUIREMENTS for this FIRST CONTACT message:
-1. WARM INTRODUCTION: Start by introducing yourself by name with the dealership - "Hi ${formattedLeadName}! I'm ${salespersonName} with ${dealershipName}"
-2. BREAK THE ICE: Create a welcoming, conversational tone - not robotic or salesy
-3. ACKNOWLEDGE THEIR INTEREST: Reference what they're looking for without being pushy
-4. ASK OPEN QUESTIONS: Ask about their needs, not just about scheduling appointments
-5. BUILD RAPPORT: Show genuine interest in helping them find the right fit
-6. KEEP IT CONVERSATIONAL: Write like a real person would text, not a marketing email
+CRITICAL CONTEXT AWARENESS:
+${dataQuality ? `
+- Data Quality Assessment: The lead data has been analyzed for authenticity
+- Lead Name Confidence: ${dataQuality.nameValidation?.confidence || 'unknown'}
+- Detected Type: ${dataQuality.nameValidation?.detectedType || 'unknown'}
+- Lead Source: ${dataQuality.leadSource || 'unknown'}
+- Use Personal Greeting: ${dataQuality.usePersonalGreeting ? 'YES' : 'NO'}
+` : ''}
 
-TONE: Friendly, helpful, genuine, conversational
+INTELLIGENT GREETING RULES:
+1. **SMART NAME HANDLING**: Only use "${formattedLeadName}" as a personal name if you're confident it's actually a person's name
+   - If "${formattedLeadName}" looks like a city, state, business name, or placeholder, use a generic greeting instead
+   - Examples of NON-PERSONAL names: "Pensacola", "Mobile", "Alabama", "LLC", "Company", "Test", "Unknown"
+
+2. **CONTEXT-AWARE INTRODUCTION**: 
+   - Always introduce yourself: "I'm ${salespersonName} with ${dealershipName}"
+   - Tailor your greeting based on likely lead source:
+     * Phone calls: "Thanks for calling about..."
+     * Business inquiries: "Thanks for your business inquiry..."
+     * Generic leads: "Thanks for your interest in..."
+
+3. **VEHICLE INTEREST HANDLING**: Reference ${vehicleInterest || 'finding the right vehicle'} naturally without being pushy
+
+4. **RELATIONSHIP BUILDING**: Ask engaging questions that show genuine interest in helping them
+
+TONE: Warm, professional, conversational, helpful
 LENGTH: 2-3 sentences maximum
-FOCUS: Relationship building over immediate selling
+FOCUS: Building trust and rapport over immediate selling
 
-Examples of GOOD warm introductions:
+GOOD EXAMPLES when name seems personal:
 - "Hi ${formattedLeadName}! I'm ${salespersonName} with ${dealershipName}. I saw you were interested in ${vehicleInterest || 'finding a vehicle'} - I'd love to help you explore your options. What's most important to you in your next vehicle?"
-- "Hello ${formattedLeadName}! Thanks for your interest in ${vehicleInterest || 'our vehicles'}. I'm ${salespersonName} with ${dealershipName} and I really enjoy helping people find the perfect car for their needs. What brought you to start looking?"
+
+GOOD EXAMPLES when name seems non-personal (like "Pensacola"):
+- "Hello! Thanks for calling about finding the right vehicle. I'm ${salespersonName} with ${dealershipName} and I'm here to help make your car shopping as easy as possible. What brought you to call us today?"
+- "Hello! Thanks for your interest in ${vehicleInterest || 'our vehicles'}. I'm ${salespersonName} with ${dealershipName} and I'd love to help you find exactly what you're looking for. What's most important to you in your next vehicle?"
 
 AVOID:
-- Jumping straight into product features
-- Immediate appointment scheduling pressure  
-- Robotic or overly formal language
-- Long paragraphs or too much information
-- Generic greetings without dealership identification`;
+- Using city/state names as personal names ("Hello Pensacola")
+- Overly formal or robotic language
+- Immediate sales pressure
+- Generic corporate speak
+- Long paragraphs`;
 };
 
 export const buildWarmIntroductionUserPrompt = (
   leadName: string,
   vehicleInterest: string,
   salespersonName: string,
-  dealershipName: string
+  dealershipName: string,
+  dataQuality?: any
 ): string => {
-  // Format the lead name properly
   const formattedLeadName = formatProperName(leadName) || 'there';
   
-  return `Generate a warm, friendly first contact message for ${formattedLeadName} who is interested in ${vehicleInterest || 'finding a vehicle'}. 
+  // Enhanced prompt with data quality context
+  let prompt = `Generate a warm, intelligent first contact message for a potential customer interested in ${vehicleInterest || 'finding a vehicle'}.
 
-You are ${salespersonName} with ${dealershipName} making initial contact. This should feel like a genuine person reaching out to help, not a sales robot.
+You are ${salespersonName} with ${dealershipName} making initial contact.
+
+IMPORTANT CONTEXT:`;
+
+  if (dataQuality) {
+    prompt += `
+- The customer identifier "${formattedLeadName}" has been analyzed
+- Confidence this is a real person's name: ${dataQuality.nameValidation?.confidence || 'low'}
+- Detected as: ${dataQuality.nameValidation?.detectedType || 'unknown'}
+- Likely lead source: ${dataQuality.leadSource || 'unknown'}`;
+  }
+
+  prompt += `
+
+SMART GREETING INSTRUCTIONS:
+- If "${formattedLeadName}" appears to be a real personal name (like "John", "Sarah", "Michael"), use it naturally
+- If "${formattedLeadName}" appears to be a city, state, business name, or placeholder (like "Pensacola", "Mobile", "Unknown"), DO NOT use it as a personal name
+- Instead, use context-appropriate greetings like "Hello! Thanks for calling..." or "Hello! Thanks for your interest..."
 
 Focus on:
-- Warm personal introduction with dealership name "${dealershipName}"
-- Breaking the ice naturally
-- Showing genuine interest in their needs
-- Asking an engaging question about their vehicle search
+- Warm introduction with dealership name "${dealershipName}"
+- Context-appropriate greeting (avoid using non-personal names as if they were people)
+- Genuine interest in their vehicle needs
+- Engaging question about their search
 
-Keep it conversational, brief (2-3 sentences), and human.`;
+Keep it conversational, brief (2-3 sentences), and intelligently personalized.`;
+
+  return prompt;
 };

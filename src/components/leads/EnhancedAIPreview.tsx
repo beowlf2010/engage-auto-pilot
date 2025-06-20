@@ -31,6 +31,7 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     generatedMessage,
     showPreview,
     isSending,
+    debugInfo,
     generatePreview,
     sendNow,
     cancel
@@ -84,6 +85,31 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
 
           {!isGenerating && generatedMessage && (
             <>
+              {/* Debug Information */}
+              {debugInfo && (
+                <Card className="bg-gray-50 border-gray-200">
+                  <CardContent className="p-3">
+                    <div className="text-xs space-y-1">
+                      <div className="font-medium text-gray-700">Smart Validation Results:</div>
+                      <div className="text-gray-600">
+                        Name "{debugInfo.originalFirstName}" detected as: <span className="font-medium">{debugInfo.nameValidation.detectedType}</span>
+                      </div>
+                      <div className="text-gray-600">
+                        Confidence: <span className="font-medium">{(debugInfo.nameValidation.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="text-gray-600">
+                        Lead source: <span className="font-medium">{debugInfo.leadSource}</span>
+                      </div>
+                      {debugInfo.nameValidation.detectedType !== 'personal' && (
+                        <div className="text-orange-600 font-medium">
+                          ℹ️ Using generic greeting (name not recognized as personal)
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Message preview */}
               <Card>
                 <CardHeader className="pb-2">
