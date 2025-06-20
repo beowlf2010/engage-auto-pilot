@@ -142,7 +142,7 @@ const downloadExportFile = async (data: ExportData, exportFormat: 'csv' | 'excel
       downloadCSV(data, `${filename}.csv`);
       break;
     case 'excel':
-      downloadExcel(data, `${filename}.xlsx`);
+      downloadExcel(data, `${filename}.xls`);
       break;
   }
 };
@@ -202,11 +202,9 @@ const downloadCSV = (data: ExportData, filename: string): void => {
 };
 
 const downloadExcel = (data: ExportData, filename: string): void => {
-  // For now, create a formatted CSV that works well in Excel
-  // In a production environment, you'd use a library like xlsx
+  // Create tab-separated format for better Excel compatibility
   let excelContent = '';
   
-  // Create tab-separated format for better Excel compatibility
   excelContent += 'COMPREHENSIVE MESSAGE EXPORT REPORT\n\n';
   excelContent += `Generated: ${data.summary.exportedAt}\n`;
   excelContent += `Period: ${data.summary.dateRange}\n\n`;
