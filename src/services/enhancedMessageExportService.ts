@@ -121,7 +121,7 @@ export const exportCurrentMessages = async (options: ExportOptions): Promise<voi
       exportData.analytics = feedback || [];
     }
 
-    // Generate and download the file
+    // Generate and download the file - FIXED: Pass format as parameter, not call it
     await downloadExportFile(exportData, options.format);
     
     console.log('✅ Export completed successfully');
@@ -324,7 +324,7 @@ export const generateExecutiveSummaryExport = async (): Promise<void> => {
       reportContent += `• ${insight}\n`;
     });
     
-    reportContent += `\nRECOMMendations\n`;
+    reportContent += `\nRECOMMENDATIONS\n`;
     summaryData.recommendations.forEach(rec => {
       reportContent += `• ${rec}\n`;
     });
