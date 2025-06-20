@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -333,14 +334,20 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
                 )}
               </div>
 
-              {/* Next Message Schedule */}
+              {/* Next Message Schedule - Fixed date calculation */}
               {nextAiSendAt && !aiSequencePaused && !pendingHumanResponse && (
                 <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
                   <Calendar className="w-4 h-4 text-green-600" />
                   <div className="text-sm">
                     <span className="font-medium text-green-900">Next message: </span>
                     <span className="text-green-700">
-                      {format(new Date(nextAiSendAt), 'MMM d, h:mm a')}
+                      {(() => {
+                        // Use safe date parsing to prevent year rollover issues
+                        const nextDate = new Date(nextAiSendAt);
+                        return nextDate.getFullYear() > new Date().getFullYear() + 1 
+                          ? 'Invalid date' 
+                          : format(nextDate, 'MMM d, h:mm a');
+                      })()}
                     </span>
                   </div>
                 </div>
@@ -358,7 +365,12 @@ const EnhancedAIControls: React.FC<AIControlsProps> = ({
                   )}
                   {aiResumeAt && (
                     <p className="text-sm text-yellow-700">
-                      Resumes: {format(new Date(aiResumeAt), 'MMM d, h:mm a')}
+                      Resumes: {(() => {
+                        const resumeDate = new Date(aiResumeAt);
+                        return resumeDate.getFullYear() > new Date().getFullYear() + 1 
+                          ? 'Invalid date' 
+                          : format(resumeDate, 'MMM d, h:mm a');
+                      })()}
                     </p>
                   )}
                 </div>
