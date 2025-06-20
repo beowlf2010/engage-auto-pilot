@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface AIAutomationResult {
@@ -84,27 +83,29 @@ export const getAIAutomationStatus = async () => {
   }
 };
 
-// Enable AI for a lead with initial scheduling
+// Enable AI for a lead with super aggressive initial scheduling
 export const enableAIForLead = async (leadId: string): Promise<boolean> => {
   try {
-    // Schedule first message for 1 hour from now
+    // Schedule first message for 30 minutes from now for immediate engagement
     const nextSendTime = new Date();
-    nextSendTime.setHours(nextSendTime.getHours() + 1);
+    nextSendTime.setMinutes(nextSendTime.getMinutes() + 30);
 
     const { error } = await supabase
       .from('leads')
       .update({
         ai_opt_in: true,
         ai_sequence_paused: false,
-        ai_stage: 'initial',
+        ai_stage: 'super_aggressive_initial',
         ai_messages_sent: 0,
-        next_ai_send_at: nextSendTime.toISOString()
+        message_intensity: 'super_aggressive',
+        next_ai_send_at: nextSendTime.toISOString(),
+        ai_enabled_at: new Date().toISOString()
       })
       .eq('id', leadId);
 
     if (error) throw error;
 
-    console.log(`✅ AI enabled for lead ${leadId}, first message scheduled for ${nextSendTime.toISOString()}`);
+    console.log(`✅ AI enabled for lead ${leadId} with super aggressive mode, first message scheduled for ${nextSendTime.toISOString()}`);
     return true;
   } catch (error) {
     console.error('Error enabling AI for lead:', error);

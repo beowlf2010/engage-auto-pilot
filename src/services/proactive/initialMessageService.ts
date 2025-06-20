@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { sendMessage } from '../messagesService';
 import { addAIConversationNote } from '../vehicleMention/aiConversationNotes';
@@ -45,10 +44,10 @@ const cleanProfileData = (profile: any) => {
   return cleanProfile;
 };
 
-// Send immediate first message when AI is enabled - NOW USES ENHANCED AI WITH WARM INTRODUCTION
+// Send immediate first message when AI is enabled - NOW USES SUPER AGGRESSIVE TIMING
 export const sendInitialMessage = async (leadId: string, profile: any): Promise<ProactiveMessageResult> => {
   try {
-    console.log(`🚀 [INITIAL MESSAGE SERVICE] === DEBUGGING CORRY BAGGETT - STARTING INITIAL MESSAGE ===`);
+    console.log(`🚀 [INITIAL MESSAGE SERVICE] === SUPER AGGRESSIVE - STARTING INITIAL MESSAGE ===`);
     console.log(`🚀 [INITIAL MESSAGE SERVICE] Lead ID: ${leadId}`);
     console.log(`👤 [INITIAL MESSAGE SERVICE] Raw profile data:`, profile);
 
@@ -112,16 +111,9 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
     }
 
     // Generate warm initial message using ENHANCED AI with introduction context
-    console.log(`🤖 [INITIAL MESSAGE SERVICE] === GENERATING WARM INITIAL MESSAGE ===`);
-    console.log(`🤖 [INITIAL MESSAGE SERVICE] Calling generateWarmInitialMessage...`);
+    console.log(`🤖 [INITIAL MESSAGE SERVICE] === GENERATING SUPER AGGRESSIVE INITIAL MESSAGE ===`);
     
     const message = await generateWarmInitialMessage(lead, cleanedProfile);
-    
-    console.log(`📝 [INITIAL MESSAGE SERVICE] Message generation result:`, {
-      hasMessage: !!message,
-      messageLength: message?.length || 0,
-      messagePreview: message?.substring(0, 100) || 'NO MESSAGE'
-    });
     
     if (!message) {
       console.error(`❌ [INITIAL MESSAGE SERVICE] === MESSAGE GENERATION FAILED ===`);
@@ -133,8 +125,6 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
     // Send the message using cleaned profile
     try {
       console.log(`📤 [INITIAL MESSAGE SERVICE] === SENDING MESSAGE VIA MESSAGES SERVICE ===`);
-      console.log(`📤 [INITIAL MESSAGE SERVICE] Message to send: "${message}"`);
-      console.log(`📤 [INITIAL MESSAGE SERVICE] Using profile:`, cleanedProfile);
       
       await sendMessage(leadId, message, cleanedProfile, true);
       console.log(`✅ [INITIAL MESSAGE SERVICE] === MESSAGE SENT SUCCESSFULLY ===`);
@@ -168,36 +158,36 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
       }
     } catch (sendError) {
       console.error('❌ [INITIAL MESSAGE SERVICE] === MESSAGE SENDING FAILED ===');
-      console.error('❌ [INITIAL MESSAGE SERVICE] Send error details:', sendError);
-      console.error('❌ [INITIAL MESSAGE SERVICE] Send error stack:', sendError instanceof Error ? sendError.stack : 'No stack trace');
       return { success: false, leadId, error: `Failed to send message: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`, messageSource: 'initial_message_service' };
     }
 
-    // Update lead status
-    console.log(`🔄 [INITIAL MESSAGE SERVICE] === UPDATING LEAD STATUS ===`);
+    // Update lead status with super aggressive timing for next messages
+    console.log(`🔄 [INITIAL MESSAGE SERVICE] === UPDATING LEAD TO SUPER AGGRESSIVE STATUS ===`);
     try {
+      const nextMessageTime = new Date();
+      nextMessageTime.setHours(nextMessageTime.getHours() + 2 + Math.random()); // 2-3 hours for second message
+      
       await supabase
         .from('leads')
         .update({
           ai_messages_sent: 1,
-          ai_stage: 'initial_contact_sent',
-          next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          ai_stage: 'super_aggressive_followup',
+          message_intensity: 'super_aggressive',
+          next_ai_send_at: nextMessageTime.toISOString(),
+          ai_enabled_at: new Date().toISOString()
         })
         .eq('id', leadId);
-      console.log(`✅ [INITIAL MESSAGE SERVICE] Lead status updated successfully`);
+      console.log(`✅ [INITIAL MESSAGE SERVICE] Lead updated to super aggressive mode - next message at ${nextMessageTime.toISOString()}`);
     } catch (updateError) {
       console.warn(`⚠️ [INITIAL MESSAGE SERVICE] Failed to update lead status:`, updateError);
-      // Don't fail the whole operation for this
     }
 
-    console.log(`✅ [INITIAL MESSAGE SERVICE] === COMPLETE SUCCESS! ===`);
-    console.log(`✅ [INITIAL MESSAGE SERVICE] Successfully sent warm introduction to ${lead.first_name}: ${message}`);
+    console.log(`✅ [INITIAL MESSAGE SERVICE] === SUPER AGGRESSIVE SUCCESS! ===`);
+    console.log(`✅ [INITIAL MESSAGE SERVICE] Successfully sent super aggressive introduction to ${lead.first_name}: ${message}`);
     
     return { success: true, leadId, message, messageSource: 'initial_message_service' };
   } catch (error) {
     console.error(`❌ [INITIAL MESSAGE SERVICE] === CRITICAL EXCEPTION ===`);
-    console.error(`❌ [INITIAL MESSAGE SERVICE] Exception in sendInitialMessage for lead ${leadId}:`, error);
-    console.error(`❌ [INITIAL MESSAGE SERVICE] Exception stack:`, error instanceof Error ? error.stack : 'No stack trace');
     return { 
       success: false, 
       leadId, 
