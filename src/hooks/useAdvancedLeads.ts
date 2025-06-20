@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { Lead } from '@/types/lead';
 import { useLeads } from '@/hooks/useLeads';
@@ -14,6 +13,7 @@ export interface SearchFilters {
   vehicleModel?: string;
   salesperson?: string;
   contactStatus?: string;
+  dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
 }
 
 export interface SavedPreset {
