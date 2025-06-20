@@ -26,6 +26,8 @@ interface Lead {
   ai_stage: string;
   ai_messages_sent: number;
   next_ai_send_at: string;
+  message_intensity: string;
+  created_at: string;
 }
 
 interface MessageTemplate {
@@ -41,7 +43,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🤖 [AI-AUTOMATION] Starting AI automation process...');
+    console.log('🤖 [AI-AUTOMATION] Starting unified AI automation process...');
     
     const { automated = false } = await req.json().catch(() => ({ automated: false }));
     
@@ -49,7 +51,13 @@ serve(async (req) => {
     const now = new Date().toISOString();
     console.log(`⏰ [AI-AUTOMATION] Current time: ${now}`);
 
-    // 1. Get leads that are due for AI messages
+    // 1. Auto-pause sequences when leads reply (last 5 minutes)
+    await pauseSequencesForRepliedLeads();
+
+    // 2. Set new uncontacted leads to aggressive mode
+    await setNewLeadsToAggressive();
+
+    // 3. Get leads that are due for AI messages OR new leads needing first contact
     const { data: dueLeads, error: leadsError } = await supabase
       .from('leads')
       .select(`
@@ -62,20 +70,21 @@ serve(async (req) => {
         ai_sequence_paused,
         ai_stage,
         ai_messages_sent,
-        next_ai_send_at
+        next_ai_send_at,
+        message_intensity,
+        created_at
       `)
       .eq('ai_opt_in', true)
       .eq('ai_sequence_paused', false)
-      .not('next_ai_send_at', 'is', null)
-      .lt('next_ai_send_at', now)
-      .limit(20);
+      .or(`next_ai_send_at.lt.${now},and(ai_messages_sent.is.null,next_ai_send_at.is.null),and(ai_messages_sent.eq.0,next_ai_send_at.is.null)`)
+      .limit(30);
 
     if (leadsError) {
-      console.error('❌ [AI-AUTOMATION] Error fetching due leads:', leadsError);
+      console.error('❌ [AI-AUTOMATION] Error fetching leads:', leadsError);
       throw leadsError;
     }
 
-    console.log(`📋 [AI-AUTOMATION] Found ${dueLeads?.length || 0} leads due for messages`);
+    console.log(`📋 [AI-AUTOMATION] Found ${dueLeads?.length || 0} leads for processing`);
 
     if (!dueLeads || dueLeads.length === 0) {
       return new Response(JSON.stringify({ 
@@ -87,7 +96,7 @@ serve(async (req) => {
       });
     }
 
-    // 2. Get available message templates
+    // 4. Get available message templates
     const { data: templates, error: templatesError } = await supabase
       .from('ai_message_templates')
       .select('*')
@@ -102,10 +111,10 @@ serve(async (req) => {
 
     const results = [];
 
-    // 3. Process each due lead
+    // 5. Process each lead
     for (const lead of dueLeads) {
       try {
-        console.log(`👤 [AI-AUTOMATION] Processing lead: ${lead.first_name} ${lead.last_name} (${lead.vehicle_interest})`);
+        console.log(`👤 [AI-AUTOMATION] Processing lead: ${lead.first_name} ${lead.last_name} (${lead.vehicle_interest}) - Intensity: ${lead.message_intensity || 'gentle'}`);
         
         // Skip if no phone number
         if (!lead.phone) {
@@ -134,7 +143,16 @@ serve(async (req) => {
           }
         }
 
-        // 4. Generate AI message
+        // Skip leads with unknown vehicle interest
+        if (!lead.vehicle_interest || 
+            lead.vehicle_interest.toLowerCase().includes('unknown') ||
+            lead.vehicle_interest.trim() === '') {
+          console.warn(`⚠️ [AI-AUTOMATION] Skipping lead with unknown vehicle interest: ${lead.first_name}`);
+          results.push({ leadId: lead.id, success: false, error: 'Unknown vehicle interest' });
+          continue;
+        }
+
+        // 6. Generate AI message based on intensity
         const message = await generateAIMessage(lead, templates);
         if (!message) {
           console.warn(`⚠️ [AI-AUTOMATION] No message generated for lead ${lead.id}`);
@@ -142,28 +160,25 @@ serve(async (req) => {
           continue;
         }
 
-        console.log(`📤 [AI-AUTOMATION] Generated message for ${lead.first_name}: "${message}"`);
+        // Additional validation to ensure no "Unknown" vehicles in message
+        if (message.includes('Unknown') || message.toLowerCase().includes('unknown')) {
+          console.warn(`⚠️ [AI-AUTOMATION] Skipping message with unknown vehicle for ${lead.first_name}`);
+          results.push({ leadId: lead.id, success: false, error: 'Message contains unknown vehicle' });
+          continue;
+        }
 
-        // 5. Send the message via SMS
+        const intensity = lead.message_intensity || 'gentle';
+        console.log(`📤 [AI-AUTOMATION] Sending ${intensity} message to ${lead.first_name}: "${message}"`);
+
+        // 7. Send the message via SMS
         const messageResult = await sendSMSMessage(lead.phone, message, lead.id);
         
         if (messageResult.success) {
-          // 6. Update lead's AI tracking
-          const nextStage = getNextAIStage(lead.ai_stage, lead.ai_messages_sent || 0);
-          const nextSendTime = calculateNextSendTime(nextStage);
+          // 8. Update lead's AI tracking with proper timing
+          await updateLeadAfterMessage(lead);
 
-          await supabase
-            .from('leads')
-            .update({
-              ai_messages_sent: (lead.ai_messages_sent || 0) + 1,
-              ai_stage: nextStage,
-              next_ai_send_at: nextSendTime,
-              ai_last_message_stage: lead.ai_stage
-            })
-            .eq('id', lead.id);
-
-          console.log(`✅ [AI-AUTOMATION] Successfully processed lead ${lead.id}. Next stage: ${nextStage}, Next send: ${nextSendTime}`);
-          results.push({ leadId: lead.id, success: true, message, nextStage, nextSendTime });
+          console.log(`✅ [AI-AUTOMATION] Successfully processed lead ${lead.id}`);
+          results.push({ leadId: lead.id, success: true, message });
         } else {
           console.error(`❌ [AI-AUTOMATION] Failed to send message to lead ${lead.id}:`, messageResult.error);
           results.push({ leadId: lead.id, success: false, error: messageResult.error });
@@ -203,31 +218,65 @@ serve(async (req) => {
   }
 });
 
-// Generate AI message for a lead
+// Auto-pause AI sequences when leads reply
+async function pauseSequencesForRepliedLeads() {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  
+  const { data: recentReplies } = await supabase
+    .from('conversations')
+    .select('lead_id, sent_at')
+    .eq('direction', 'in')
+    .gte('sent_at', fiveMinutesAgo)
+    .order('sent_at', { ascending: false });
+
+  if (recentReplies && recentReplies.length > 0) {
+    const leadIds = [...new Set(recentReplies.map(r => r.lead_id))];
+    
+    await supabase
+      .from('leads')
+      .update({
+        ai_sequence_paused: true,
+        ai_pause_reason: 'Customer replied - human review needed',
+        next_ai_send_at: null
+      })
+      .in('id', leadIds)
+      .eq('ai_opt_in', true)
+      .eq('ai_sequence_paused', false);
+
+    console.log(`⏸️ [AI-AUTOMATION] Auto-paused ${leadIds.length} sequences due to replies`);
+  }
+}
+
+// Set new uncontacted leads to aggressive mode
+async function setNewLeadsToAggressive() {
+  await supabase
+    .from('leads')
+    .update({ message_intensity: 'aggressive' })
+    .eq('ai_opt_in', true)
+    .eq('ai_sequence_paused', false)
+    .or('ai_messages_sent.is.null,ai_messages_sent.eq.0')
+    .neq('message_intensity', 'aggressive');
+
+  console.log(`🔥 [AI-AUTOMATION] Set uncontacted leads to aggressive mode`);
+}
+
+// Generate AI message for a lead based on intensity
 async function generateAIMessage(lead: Lead, templates: MessageTemplate[]): Promise<string | null> {
   try {
-    // Find appropriate template based on AI stage
-    const currentStage = lead.ai_stage || 'initial';
-    let template = templates.find(t => t.stage === currentStage);
+    const messagesSent = lead.ai_messages_sent || 0;
+    const isAggressive = lead.message_intensity === 'aggressive';
+    const isNewLead = messagesSent === 0;
     
-    // Fallback to initial template if stage not found
-    if (!template) {
-      template = templates.find(t => t.stage === 'initial') || templates[0];
-    }
+    let message: string;
     
-    if (!template) {
-      console.error('No templates available');
-      return null;
+    if (isAggressive) {
+      message = generateAggressiveMessage(lead, messagesSent);
+    } else {
+      message = generateGentleMessage(lead, messagesSent);
     }
 
-    // Replace template variables
-    let message = template.template;
-    message = message.replace(/\{\{firstName\}\}/g, lead.first_name || 'there');
-    message = message.replace(/\{\{lastName\}\}/g, lead.last_name || '');
-    message = message.replace(/\{\{vehicleInterest\}\}/g, lead.vehicle_interest || 'a vehicle');
-
-    // If OpenAI is available, enhance the message
-    if (openAIApiKey && message.length > 50) {
+    // If OpenAI is available and message is substantial, enhance it
+    if (openAIApiKey && message.length > 50 && !isNewLead) {
       try {
         const enhancedMessage = await enhanceMessageWithAI(message, lead);
         return enhancedMessage || message;
@@ -242,6 +291,38 @@ async function generateAIMessage(lead: Lead, templates: MessageTemplate[]): Prom
     console.error('Error generating AI message:', error);
     return null;
   }
+}
+
+// Generate aggressive messages for uncontacted leads
+function generateAggressiveMessage(lead: Lead, messagesSent: number): string {
+  const vehicleInterest = lead.vehicle_interest || 'a vehicle';
+  const firstName = lead.first_name || 'there';
+  
+  const templates = [
+    `Hi ${firstName}! I see you're interested in ${vehicleInterest}. We have some great options available right now. When can you come take a look?`,
+    `${firstName}, that ${vehicleInterest} won't last long! We've had several people ask about it today. Want to secure it with a quick visit?`,
+    `Hey ${firstName}! Great news - we have special financing available on ${vehicleInterest} this week. Interested in learning more?`,
+    `${firstName}, this might be your final opportunity on the ${vehicleInterest}. Don't miss out! Available for a quick call today?`,
+    `Hi ${firstName}! Last chance - the ${vehicleInterest} you inquired about is being considered by another customer. Still interested?`
+  ];
+  
+  const templateIndex = messagesSent % templates.length;
+  return templates[templateIndex];
+}
+
+// Generate gentle messages for engaged leads
+function generateGentleMessage(lead: Lead, messagesSent: number): string {
+  const vehicleInterest = lead.vehicle_interest || 'a vehicle';
+  const firstName = lead.first_name || 'there';
+  
+  const templates = [
+    `Hi ${firstName}, hope you're doing well! Still thinking about ${vehicleInterest}? Happy to answer any questions.`,
+    `${firstName}, just wanted to follow up on ${vehicleInterest}. Any questions I can help with?`,
+    `Hi ${firstName}, hope you found what you were looking for! If you're still interested in ${vehicleInterest}, we're here to help.`
+  ];
+  
+  const templateIndex = messagesSent % templates.length;
+  return templates[templateIndex];
 }
 
 // Enhance message with OpenAI
@@ -348,48 +429,83 @@ async function sendSMSMessage(phone: string, message: string, leadId: string): P
   }
 }
 
-// Determine next AI stage based on current stage and message count
-function getNextAIStage(currentStage: string, messageCount: number): string {
-  switch (currentStage) {
-    case 'initial':
-      return messageCount < 3 ? 'follow_up' : 'engagement';
-    case 'follow_up':
-      return messageCount < 5 ? 'engagement' : 'nurture';
-    case 'engagement':
-      return messageCount < 8 ? 'nurture' : 'closing';
-    case 'nurture':
-      return messageCount < 12 ? 'closing' : 'long_term_follow_up';
-    case 'closing':
-      return 'long_term_follow_up';
-    default:
-      return 'follow_up';
+// Update lead after sending message with proper aggressive vs gentle timing
+async function updateLeadAfterMessage(lead: Lead): Promise<void> {
+  try {
+    const messagesSent = (lead.ai_messages_sent || 0) + 1;
+    const isAggressive = lead.message_intensity === 'aggressive';
+    
+    // Calculate next send time based on intensity and business hours
+    const nextSendAt = calculateNextSendTime(isAggressive, messagesSent);
+    const nextStage = getNextAIStage(lead.ai_stage, messagesSent, isAggressive);
+
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        ai_messages_sent: messagesSent,
+        next_ai_send_at: nextSendAt,
+        ai_stage: nextStage,
+        ai_last_message_stage: lead.ai_stage
+      })
+      .eq('id', lead.id);
+
+    if (error) {
+      console.error(`Error updating lead ${lead.id} after message:`, error);
+    } else {
+      console.log(`✅ Updated lead ${lead.id}: messages=${messagesSent}, next_send=${nextSendAt}, stage=${nextStage}`);
+    }
+
+  } catch (error) {
+    console.error(`Error in updateLeadAfterMessage for lead ${lead.id}:`, error);
   }
 }
 
-// Calculate next send time based on stage
-function calculateNextSendTime(stage: string): string {
+// Calculate next send time with business hours consideration
+function calculateNextSendTime(isAggressive: boolean, messagesSent: number): string {
   const now = new Date();
-  let hoursToAdd = 24; // Default 24 hours
-
-  switch (stage) {
-    case 'initial':
-    case 'follow_up':
-      hoursToAdd = 24; // 1 day
-      break;
-    case 'engagement':
-      hoursToAdd = 48; // 2 days
-      break;
-    case 'nurture':
-      hoursToAdd = 72; // 3 days
-      break;
-    case 'closing':
-      hoursToAdd = 96; // 4 days
-      break;
-    case 'long_term_follow_up':
-      hoursToAdd = 168; // 1 week
-      break;
+  
+  // Central Time business hours (8 AM - 7 PM)
+  const centralOffset = 6; // UTC-6 for Central Standard Time
+  const businessStart = 8; // 8 AM Central
+  const businessEnd = 19; // 7 PM Central
+  
+  let hoursToAdd: number;
+  
+  if (isAggressive) {
+    // Aggressive: 2-4 hours between messages, but respect business hours
+    hoursToAdd = 2 + Math.random() * 2; // 2-4 hours
+  } else {
+    // Gentle: 24-48 hours between messages
+    hoursToAdd = 24 + Math.random() * 24; // 24-48 hours
   }
+  
+  const nextSendAt = new Date(now.getTime() + (hoursToAdd * 60 * 60 * 1000));
+  
+  // Adjust to business hours if needed
+  const centralHour = (nextSendAt.getUTCHours() - centralOffset + 24) % 24;
+  
+  if (centralHour < businessStart) {
+    // Too early, move to business start
+    nextSendAt.setUTCHours((businessStart + centralOffset) % 24, 0, 0, 0);
+  } else if (centralHour >= businessEnd) {
+    // Too late, move to next business day start
+    nextSendAt.setDate(nextSendAt.getDate() + 1);
+    nextSendAt.setUTCHours((businessStart + centralOffset) % 24, 0, 0, 0);
+  }
+  
+  return nextSendAt.toISOString();
+}
 
-  now.setHours(now.getHours() + hoursToAdd);
-  return now.toISOString();
+// Determine next AI stage based on current stage, message count, and intensity
+function getNextAIStage(currentStage: string, messageCount: number, isAggressive: boolean): string {
+  if (isAggressive) {
+    if (messageCount <= 2) return 'aggressive_initial';
+    if (messageCount <= 5) return 'aggressive_urgency';
+    if (messageCount <= 8) return 'aggressive_deals';
+    return 'aggressive_final';
+  } else {
+    if (messageCount <= 2) return 'gentle_follow_up';
+    if (messageCount <= 4) return 'gentle_nurture';
+    return 'gentle_maintenance';
+  }
 }

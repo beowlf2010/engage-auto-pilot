@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Play, Pause, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Bot, Play, Pause, AlertCircle, CheckCircle, Clock, Flame } from 'lucide-react';
 import { getAIAutomationStatus, triggerAIAutomation } from '@/services/aiAutomationService';
 import { toast } from '@/hooks/use-toast';
 
@@ -30,7 +30,7 @@ const AIAutomationMonitor: React.FC = () => {
       const result = await triggerAIAutomation();
       
       toast({
-        title: "AI Automation Triggered",
+        title: "Unified AI Automation Triggered",
         description: `Processed ${result.processed} leads. ${result.successful} successful, ${result.failed} failed.`,
       });
       
@@ -39,7 +39,7 @@ const AIAutomationMonitor: React.FC = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to trigger AI automation",
+        description: "Failed to trigger unified AI automation",
         variant: "destructive",
       });
     } finally {
@@ -59,7 +59,7 @@ const AIAutomationMonitor: React.FC = () => {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-center">
-            <div className="text-sm text-gray-500">Loading AI status...</div>
+            <div className="text-sm text-gray-500">Loading unified AI status...</div>
           </div>
         </CardContent>
       </Card>
@@ -71,7 +71,11 @@ const AIAutomationMonitor: React.FC = () => {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Bot className="w-5 h-5 text-blue-600" />
-          AI Automation Status
+          Unified AI Automation Status
+          <Badge variant="outline" className="ml-2 text-xs">
+            <Flame className="w-3 h-3 mr-1" />
+            Aggressive + Gentle
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -79,7 +83,7 @@ const AIAutomationMonitor: React.FC = () => {
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-orange-500" />
             <div>
-              <div className="text-sm text-gray-600">Pending Messages</div>
+              <div className="text-sm text-gray-600">Messages Due</div>
               <div className="font-semibold">{status?.pendingMessages || 0}</div>
             </div>
           </div>
@@ -103,8 +107,8 @@ const AIAutomationMonitor: React.FC = () => {
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-purple-500" />
             <div>
-              <div className="text-sm text-gray-600">Auto-runs every</div>
-              <div className="font-semibold">15 minutes</div>
+              <div className="text-sm text-gray-600">Unified System</div>
+              <div className="font-semibold text-green-600">Active</div>
             </div>
           </div>
         </div>
@@ -126,7 +130,7 @@ const AIAutomationMonitor: React.FC = () => {
             className="flex items-center gap-2"
           >
             <Play className="w-4 h-4" />
-            {triggering ? 'Triggering...' : 'Trigger Now'}
+            {triggering ? 'Processing...' : 'Process Now'}
           </Button>
         </div>
 
@@ -135,10 +139,16 @@ const AIAutomationMonitor: React.FC = () => {
             <div className="text-sm text-orange-800">
               <strong>{status.pendingMessages}</strong> lead{status.pendingMessages !== 1 ? 's' : ''} 
               {status.pendingMessages === 1 ? ' has' : ' have'} messages ready to send.
-              The system will automatically process them within 15 minutes, or you can trigger manually.
+              The unified system processes aggressive (2-4hr) and gentle (24hr) messaging automatically every 15 minutes.
             </div>
           </div>
         )}
+
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="text-sm text-blue-800">
+            <strong>Unified System Active:</strong> All AI messaging is now handled by a single system that supports both aggressive (new leads, 2-4 hour intervals) and gentle messaging (engaged leads, 24+ hour intervals). Auto-pauses when customers reply.
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
