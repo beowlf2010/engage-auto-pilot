@@ -1,3 +1,4 @@
+
 /**
  * Unified Data Quality Service
  * Combines name validation and vehicle interest validation
@@ -83,29 +84,44 @@ export const assessLeadDataQuality = async (
   };
 };
 
-export const generateDataQualityAwareGreeting = (
+// Helper function to clean vehicle interest data
+const cleanVehicleInterest = (vehicleInterest: string): string => {
+  if (!vehicleInterest) return vehicleInterest;
+  
+  // Remove extra quotes and clean up the format
+  return vehicleInterest
+    .replace(/"/g, '') // Remove all quotes
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim();
+};
+
+export const generateDataQualityAwareGreeting = async (
   firstName: string,
   vehicleInterest: string,
   salespersonName: string = 'Finn',
   dealershipName: string = 'Jason Pilger Chevrolet',
   dataQuality?: UnifiedDataQualityResult
-): string => {
+): Promise<string> => {
   // Use provided data quality or assess it
-  const quality = dataQuality || assessLeadDataQuality(firstName, vehicleInterest);
+  const quality = dataQuality || await assessLeadDataQuality(firstName, vehicleInterest);
   const { messageStrategy, recommendations } = quality;
+
+  // Clean the vehicle interest to remove quotes
+  const cleanedVehicleInterest = cleanVehicleInterest(vehicleInterest);
 
   console.log('💬 [UNIFIED DATA QUALITY] Generating greeting with strategy:', messageStrategy);
   console.log('💬 [UNIFIED DATA QUALITY] Using personal greeting:', recommendations.usePersonalGreeting);
+  console.log('💬 [UNIFIED DATA QUALITY] Cleaned vehicle interest:', cleanedVehicleInterest);
 
   switch (messageStrategy) {
     case 'personal_with_vehicle':
-      return `Hi ${firstName}! I'm ${salespersonName} with ${dealershipName}. I noticed you were interested in ${vehicleInterest}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at this vehicle?`;
+      return `Hi ${firstName}! I'm ${salespersonName} with ${dealershipName}. I noticed you were interested in ${cleanedVehicleInterest}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at this vehicle?`;
 
     case 'personal_generic_vehicle':
       return `Hi ${firstName}! I'm ${salespersonName} with ${dealershipName}. I'd love to help you find exactly what you're looking for in your next vehicle. What's most important to you in your search?`;
 
     case 'generic_with_vehicle':
-      return `Hello! Thanks for your interest in ${vehicleInterest}. I'm ${salespersonName} with ${dealershipName} and I'd love to help you explore your options. What questions can I answer for you?`;
+      return `Hello! Thanks for your interest in ${cleanedVehicleInterest}. I'm ${salespersonName} with ${dealershipName} and I'd love to help you explore your options. What questions can I answer for you?`;
 
     case 'fully_generic':
     default:

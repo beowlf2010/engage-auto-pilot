@@ -43,7 +43,7 @@ const INCOMPLETE_PATTERN = /^\d{4}\s+(make|model|unknown|year)/i;
 export interface VehicleInterestValidationResult {
   isValidVehicleInterest: boolean;
   confidence: number;
-  detectedIssue: 'corruption' | 'generic' | 'incomplete' | 'valid';
+  detectedIssue: 'corruption' | 'generic' | 'incomplete' | 'quoted_data' | 'valid';
   suggestions: {
     useGenericVehicleMessage: boolean;
     fallbackMessage?: string;
@@ -63,7 +63,15 @@ export const validateVehicleInterest = (vehicleInterest: string): VehicleInteres
     };
   }
 
-  const cleanInterest = vehicleInterest.trim().toLowerCase();
+  // Clean the interest by removing quotes and normalizing
+  const cleanInterest = vehicleInterest
+    .replace(/"/g, '') // Remove all quotes
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim()
+    .toLowerCase();
+  
+  // Check if the original had excessive quotes (indicates data quality issue)
+  const hasExcessiveQuotes = (vehicleInterest.match(/"/g) || []).length > 2;
   
   // Check for known corruption patterns
   const hasCorruption = CORRUPTION_PATTERNS.some(pattern => 
@@ -95,6 +103,19 @@ export const validateVehicleInterest = (vehicleInterest: string): VehicleInteres
     };
   }
 
+  // Handle quoted data issue - lower confidence but still usable
+  if (hasExcessiveQuotes) {
+    return {
+      isValidVehicleInterest: true,
+      confidence: 0.7, // Lower confidence due to data quality issues
+      detectedIssue: 'quoted_data',
+      suggestions: {
+        useGenericVehicleMessage: false,
+        fallbackMessage: 'exploring your vehicle options'
+      }
+    };
+  }
+
   // Check if it's just generic vehicle terms
   const isOnlyGeneric = GENERIC_VEHICLE_TERMS.some(term => 
     cleanInterest === term || cleanInterest === `${term}s`
@@ -113,7 +134,7 @@ export const validateVehicleInterest = (vehicleInterest: string): VehicleInteres
   }
 
   // If it contains specific make/model information, it's likely valid
-  const hasSpecificInfo = /\b(chevrolet|chevy|ford|toyota|honda|nissan|bmw|mercedes|audi|silverado|camaro|equinox|traverse|tahoe|suburban|malibu|cruze|sonic|spark|bolt|corvette|colorado|express|impala|trailblazer|blazer|acadia|terrain|yukon|sierra|canyon)\b/i.test(cleanInterest);
+  const hasSpecificInfo = /\b(chevrolet|chevy|ford|toyota|honda|nissan|bmw|mercedes|audi|silverado|camaro|equinox|traverse|tahoe|suburban|malibu|cruze|sonic|spark|bolt|corvette|colorado|express|impala|trailblazer|blazer|acadia|terrain|yukon|sierra|canyon|tundra|camry|corolla|prius|rav4|highlander|4runner|tacoma|sienna)\b/i.test(cleanInterest);
   
   if (hasSpecificInfo) {
     return {
@@ -162,5 +183,9 @@ export const getCleanVehicleInterest = (vehicleInterest: string): string => {
     return validation.suggestions.fallbackMessage || 'finding the right vehicle';
   }
   
-  return vehicleInterest;
+  // Clean and return the vehicle interest
+  return vehicleInterest
+    .replace(/"/g, '') // Remove all quotes
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim();
 };

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from '../enhancedIntelligentConversationAI';
 import { formatProperName } from '@/utils/nameFormatter';
@@ -20,7 +19,7 @@ export const generateWarmInitialMessage = async (
     });
 
     // Use provided data quality override or perform comprehensive assessment
-    const dataQuality = dataQualityOverride || assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
+    const dataQuality = dataQualityOverride || await assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
     
     console.log(`🧠 [ENHANCED WARM INTRO] Data quality assessment (override: ${!!dataQualityOverride}):`, {
       overallScore: dataQuality.overallQualityScore,
@@ -82,7 +81,7 @@ export const generateWarmInitialMessage = async (
     // Use data-quality-aware template generation with override support
     console.log(`📝 [ENHANCED WARM INTRO] Using data-quality-aware template generation`);
     
-    const smartMessage = generateDataQualityAwareGreeting(
+    const smartMessage = await generateDataQualityAwareGreeting(
       lead.first_name,
       lead.vehicle_interest,
       'Finn',
