@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -70,18 +71,13 @@ const ConversationsList = ({
     return matchesSearch && matchesStatus;
   });
 
-  // Sort by unread first, then by AI score
+  // Sort by latest activity - prioritize unread first, then by most recent message
   const sortedConversations = filteredConversations.sort((a, b) => {
-    // Unread messages first
+    // Unread messages first (highest priority)
     if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
     if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
     
-    // Then by AI score
-    const scoreA = getAIScore(a);
-    const scoreB = getAIScore(b);
-    if (scoreA !== scoreB) return scoreB - scoreA;
-    
-    // Finally by last message time
+    // Then by last message time (newest first) - this ensures latest activity is at top
     return (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0);
   });
 
