@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -79,6 +80,7 @@ export const useLeadDetail = () => {
     contactStatus: 'no_contact' as const,
     incomingCount: 0,
     outgoingCount: 0,
+    unrepliedCount: 0, // Add the missing unrepliedCount property
     messageCount: lead.conversations.length,
     // Additional required Lead properties
     first_name: lead.firstName,
