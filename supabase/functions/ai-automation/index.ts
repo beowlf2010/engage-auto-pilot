@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -36,6 +35,57 @@ interface MessageTemplate {
   template: string;
   variant_name: string;
 }
+
+// Name formatting utilities (copied from frontend)
+const formatProperName = (name: string): string => {
+  if (!name || typeof name !== 'string') return '';
+  
+  const trimmed = name.trim();
+  if (!trimmed) return '';
+  
+  return trimmed
+    .split(' ')
+    .map(part => formatNamePart(part))
+    .join(' ');
+};
+
+const formatNamePart = (part: string): string => {
+  if (!part) return '';
+  
+  const lower = part.toLowerCase();
+  
+  if (lower.includes('-')) {
+    return lower
+      .split('-')
+      .map(segment => capitalizeSegment(segment))
+      .join('-');
+  }
+  
+  if (lower.includes("'")) {
+    return lower
+      .split("'")
+      .map((segment, index) => {
+        if (index === 0) return capitalizeSegment(segment);
+        return capitalizeSegment(segment);
+      })
+      .join("'");
+  }
+  
+  if (lower.startsWith('mc') && lower.length > 2) {
+    return 'Mc' + capitalizeSegment(lower.slice(2));
+  }
+  
+  if (lower.startsWith('mac') && lower.length > 3) {
+    return 'Mac' + capitalizeSegment(lower.slice(3));
+  }
+  
+  return capitalizeSegment(lower);
+};
+
+const capitalizeSegment = (segment: string): string => {
+  if (!segment) return '';
+  return segment.charAt(0).toUpperCase() + segment.slice(1);
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -114,7 +164,11 @@ serve(async (req) => {
     // 5. Process each lead
     for (const lead of dueLeads) {
       try {
-        console.log(`👤 [AI-AUTOMATION] Processing lead: ${lead.first_name} ${lead.last_name} (${lead.vehicle_interest}) - Intensity: ${lead.message_intensity || 'gentle'}`);
+        // Format lead name properly
+        const formattedFirstName = formatProperName(lead.first_name);
+        const formattedLastName = formatProperName(lead.last_name);
+        
+        console.log(`👤 [AI-AUTOMATION] Processing lead: ${formattedFirstName} ${formattedLastName} (${lead.vehicle_interest}) - Intensity: ${lead.message_intensity || 'gentle'}`);
         
         // Skip if no phone number
         if (!lead.phone) {
@@ -147,7 +201,7 @@ serve(async (req) => {
         if (!lead.vehicle_interest || 
             lead.vehicle_interest.toLowerCase().includes('unknown') ||
             lead.vehicle_interest.trim() === '') {
-          console.warn(`⚠️ [AI-AUTOMATION] Skipping lead with unknown vehicle interest: ${lead.first_name}`);
+          console.warn(`⚠️ [AI-AUTOMATION] Skipping lead with unknown vehicle interest: ${formattedFirstName}`);
           results.push({ leadId: lead.id, success: false, error: 'Unknown vehicle interest' });
           continue;
         }
@@ -162,13 +216,13 @@ serve(async (req) => {
 
         // Additional validation to ensure no "Unknown" vehicles in message
         if (message.includes('Unknown') || message.toLowerCase().includes('unknown')) {
-          console.warn(`⚠️ [AI-AUTOMATION] Skipping message with unknown vehicle for ${lead.first_name}`);
+          console.warn(`⚠️ [AI-AUTOMATION] Skipping message with unknown vehicle for ${formattedFirstName}`);
           results.push({ leadId: lead.id, success: false, error: 'Message contains unknown vehicle' });
           continue;
         }
 
         const intensity = lead.message_intensity || 'gentle';
-        console.log(`📤 [AI-AUTOMATION] Sending ${intensity} message to ${lead.first_name}: "${message}"`);
+        console.log(`📤 [AI-AUTOMATION] Sending ${intensity} message to ${formattedFirstName}: "${message}"`);
 
         // 7. Send the message via SMS
         const messageResult = await sendSMSMessage(lead.phone, message, lead.id);
@@ -296,7 +350,7 @@ async function generateAIMessage(lead: Lead, templates: MessageTemplate[]): Prom
 // Generate aggressive messages for uncontacted leads
 function generateAggressiveMessage(lead: Lead, messagesSent: number): string {
   const vehicleInterest = lead.vehicle_interest || 'a vehicle';
-  const firstName = lead.first_name || 'there';
+  const firstName = formatProperName(lead.first_name) || 'there';
   
   const templates = [
     `Hi ${firstName}! I see you're interested in ${vehicleInterest}. We have some great options available right now. When can you come take a look?`,
@@ -313,7 +367,7 @@ function generateAggressiveMessage(lead: Lead, messagesSent: number): string {
 // Generate gentle messages for engaged leads
 function generateGentleMessage(lead: Lead, messagesSent: number): string {
   const vehicleInterest = lead.vehicle_interest || 'a vehicle';
-  const firstName = lead.first_name || 'there';
+  const firstName = formatProperName(lead.first_name) || 'there';
   
   const templates = [
     `Hi ${firstName}, hope you're doing well! Still thinking about ${vehicleInterest}? Happy to answer any questions.`,
@@ -330,6 +384,8 @@ async function enhanceMessageWithAI(baseMessage: string, lead: Lead): Promise<st
   try {
     if (!openAIApiKey) return null;
 
+    const formattedFirstName = formatProperName(lead.first_name);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -345,7 +401,7 @@ async function enhanceMessageWithAI(baseMessage: string, lead: Lead): Promise<st
           },
           {
             role: 'user',
-            content: `Enhance this message for ${lead.first_name} who is interested in ${lead.vehicle_interest}:\n\n${baseMessage}`
+            content: `Enhance this message for ${formattedFirstName} who is interested in ${lead.vehicle_interest}:\n\n${baseMessage}`
           }
         ],
         max_tokens: 100,

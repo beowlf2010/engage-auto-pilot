@@ -1,12 +1,20 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from '../enhancedIntelligentConversationAI';
+import { formatProperName } from '@/utils/nameFormatter';
 
 // Generate warm, introductory initial outreach messages using UNIFIED AI
 export const generateWarmInitialMessage = async (lead: any, profile: any): Promise<string | null> => {
   try {
-    console.log(`🤖 [UNIFIED WARM INTRO] === DEBUGGING CORRY BAGGETT - GENERATING WARM AI MESSAGE ===`);
-    console.log(`🤖 [UNIFIED WARM INTRO] Lead name: ${lead.first_name} ${lead.last_name}`);
+    // Format the lead name properly (convert from ALL CAPS to Proper Case)
+    const formattedFirstName = formatProperName(lead.first_name);
+    const formattedLastName = formatProperName(lead.last_name);
+    const formattedFullName = formattedFirstName && formattedLastName ? 
+      `${formattedFirstName} ${formattedLastName}` : 
+      formattedFirstName || formattedLastName || 'there';
+
+    console.log(`🤖 [UNIFIED WARM INTRO] === DEBUGGING - GENERATING WARM AI MESSAGE ===`);
+    console.log(`🤖 [UNIFIED WARM INTRO] Lead name: ${formattedFullName} (formatted from: ${lead.first_name} ${lead.last_name})`);
     console.log(`🤖 [UNIFIED WARM INTRO] Vehicle interest: ${lead.vehicle_interest || 'Not specified'}`);
     console.log(`👤 [UNIFIED WARM INTRO] Using profile:`, {
       profileFirstName: profile?.first_name,
@@ -16,7 +24,7 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
     // Use the unified AI service for warm initial contact
     const context = {
       leadId: lead.id,
-      leadName: `${lead.first_name} ${lead.last_name}`,
+      leadName: formattedFullName,
       vehicleInterest: lead.vehicle_interest || '',
       messages: [], // No previous messages for initial contact
       leadInfo: {
@@ -56,13 +64,13 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
     // Improved fallback templates that are warm and conversational
     console.log('⚠️ [UNIFIED WARM INTRO] === AI FAILED - USING FALLBACK TEMPLATES ===');
     const warmTemplates = [
-      `Hi ${lead.first_name}! I'm Finn with Jason Pilger Chevrolet. I noticed you were interested in ${lead.vehicle_interest || 'finding the right vehicle'}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at vehicles today?`,
+      `Hi ${formattedFirstName}! I'm Finn with Jason Pilger Chevrolet. I noticed you were interested in ${lead.vehicle_interest || 'finding the right vehicle'}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at vehicles today?`,
       
-      `Hello ${lead.first_name}! Thanks for your interest in ${lead.vehicle_interest || 'our vehicles'}. I'm Finn with Jason Pilger Chevrolet and I'm here to help you find exactly what you're looking for. I know car shopping can feel overwhelming, so I'm here to make it as easy as possible. What's most important to you in your next vehicle?`,
+      `Hello ${formattedFirstName}! Thanks for your interest in ${lead.vehicle_interest || 'our vehicles'}. I'm Finn with Jason Pilger Chevrolet and I'm here to help you find exactly what you're looking for. I know car shopping can feel overwhelming, so I'm here to make it as easy as possible. What's most important to you in your next vehicle?`,
       
-      `Hi ${lead.first_name}! I hope you're having a great day. I'm Finn with Jason Pilger Chevrolet and I saw you were looking at ${lead.vehicle_interest || 'vehicles'}. I'd love to learn more about what you're hoping to find and see how I can help. Are you replacing a current vehicle or adding to the family fleet?`,
+      `Hi ${formattedFirstName}! I hope you're having a great day. I'm Finn with Jason Pilger Chevrolet and I saw you were looking at ${lead.vehicle_interest || 'vehicles'}. I'd love to learn more about what you're hoping to find and see how I can help. Are you replacing a current vehicle or adding to the family fleet?`,
       
-      `Hello ${lead.first_name}! I'm Finn with Jason Pilger Chevrolet and I noticed your interest in ${lead.vehicle_interest || 'our inventory'}. I really enjoy helping people find the perfect vehicle for their needs. What's prompting your search for a new ride?`
+      `Hello ${formattedFirstName}! I'm Finn with Jason Pilger Chevrolet and I noticed your interest in ${lead.vehicle_interest || 'our inventory'}. I really enjoy helping people find the perfect vehicle for their needs. What's prompting your search for a new ride?`
     ];
 
     const selectedTemplate = warmTemplates[Math.floor(Math.random() * warmTemplates.length)];
