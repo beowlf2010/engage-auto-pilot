@@ -1,7 +1,8 @@
 
 
-import { LeadData, ProcessedLead, ConversationData } from './types';
-import { PhoneNumber } from '@/types/lead';
+
+import { LeadData, ConversationData } from './types';
+import { Lead } from '@/types/lead';
 import { processConversations, determineContactStatus } from './conversationProcessor';
 
 // Helper function to ensure status is a valid Lead status
@@ -20,14 +21,14 @@ const normalizeStatus = (status: string): 'new' | 'engaged' | 'paused' | 'closed
 export const transformLeadData = (
   lead: LeadData,
   conversationsData: ConversationData[] | null
-): ProcessedLead => {
+): Lead => {
   const stats = processConversations(conversationsData, lead.id);
   const contactStatus = determineContactStatus(stats.outgoingCount, stats.incomingCount);
   
   console.log(`Lead ${lead.first_name} ${lead.last_name}: outgoing=${stats.outgoingCount}, incoming=${stats.incomingCount}, contactStatus=${contactStatus}`);
   
   // Transform phone numbers to match the PhoneNumber interface
-  const transformedPhoneNumbers: PhoneNumber[] = lead.phone_numbers.map(phone => ({
+  const transformedPhoneNumbers = lead.phone_numbers.map(phone => ({
     id: phone.id,
     number: phone.number,
     type: phone.type as 'cell' | 'day' | 'eve',
@@ -57,7 +58,7 @@ export const transformLeadData = (
     vehicleModel: lead.vehicle_model,
     vehicleVIN: lead.vehicle_vin,
     source: lead.source,
-    status: normalizeStatus(lead.status), // Ensure status is properly typed
+    status: normalizeStatus(lead.status),
     salesperson: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : 'Unassigned',
     salespersonId: lead.salesperson_id,
     aiOptIn: lead.ai_opt_in || false,
@@ -66,19 +67,22 @@ export const transformLeadData = (
     aiStage: lead.ai_stage,
     nextAiSendAt: lead.next_ai_send_at,
     createdAt: lead.created_at,
-    lastMessage: stats.latestConversation?.body || null,
-    lastMessageTime: stats.latestConversation ? new Date(stats.latestConversation.sent_at).toLocaleString() : null,
+    lastMessage: stats.latestConversation?.body || undefined,
+    lastMessageTime: stats.latestConversation ? new Date(stats.latestConversation.sent_at).toLocaleString() : undefined,
     lastMessageDirection: stats.lastMessageDirection,
     unreadCount: stats.unreadCount,
-    messageCount: stats.messageCount,
-    outgoingCount: stats.outgoingCount,
-    incomingCount: stats.incomingCount,
-    unrepliedCount: stats.unrepliedCount,
-    contactStatus: contactStatus,
-    hasBeenMessaged: stats.messageCount > 0,
     doNotCall: lead.do_not_call,
     doNotEmail: lead.do_not_email,
     doNotMail: lead.do_not_mail,
+    vehicleYear: lead.vehicle_year,
+    vehicleMake: lead.vehicle_make,
+    vehicleModel: lead.vehicle_model,
+    vehicleVIN: lead.vehicle_vin,
+    contactStatus: contactStatus,
+    incomingCount: stats.incomingCount,
+    outgoingCount: stats.outgoingCount,
+    unrepliedCount: stats.unrepliedCount,
+    messageCount: stats.messageCount,
     aiMessagesSent: lead.ai_messages_sent || 0,
     aiLastMessageStage: lead.ai_last_message_stage,
     aiSequencePaused: lead.ai_sequence_paused || false,
@@ -90,4 +94,5 @@ export const transformLeadData = (
     created_at: lead.created_at
   };
 };
+
 

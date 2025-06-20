@@ -1,5 +1,6 @@
 
 
+
 export interface ConversationData {
   lead_id: string;
   body: string;
@@ -57,57 +58,4 @@ export interface LeadData {
   };
 }
 
-// Import PhoneNumber from the main Lead type to ensure compatibility
-import { PhoneNumber } from '@/types/lead';
-
-export interface ProcessedLead {
-  id: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  phoneNumbers: PhoneNumber[]; // Use the same PhoneNumber type as Lead
-  primaryPhone: string;
-  email: string;
-  emailAlt?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  postalCode?: string;
-  vehicleInterest: string;
-  vehicleYear?: string;
-  vehicleMake?: string;
-  vehicleModel?: string;
-  vehicleVIN?: string;
-  source: string;
-  status: 'new' | 'engaged' | 'paused' | 'closed' | 'lost'; // Use the same status type as Lead
-  salesperson: string;
-  salespersonId: string;
-  aiOptIn: boolean;
-  aiContactEnabled?: boolean;
-  aiRepliesEnabled?: boolean;
-  aiStage?: string;
-  nextAiSendAt?: string;
-  createdAt: string;
-  lastMessage?: string;
-  lastMessageTime?: string;
-  lastMessageDirection?: 'in' | 'out' | null;
-  unreadCount: number;
-  messageCount: number;
-  outgoingCount: number;
-  incomingCount: number;
-  unrepliedCount: number;
-  contactStatus: 'no_contact' | 'contact_attempted' | 'response_received';
-  hasBeenMessaged: boolean;
-  doNotCall: boolean;
-  doNotEmail: boolean;
-  doNotMail: boolean;
-  aiMessagesSent?: number;
-  aiLastMessageStage?: string;
-  aiSequencePaused?: boolean;
-  aiPauseReason?: string;
-  aiResumeAt?: string;
-  first_name: string;
-  last_name: string;
-  created_at: string;
-}
 

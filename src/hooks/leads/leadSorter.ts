@@ -1,7 +1,8 @@
 
-import { ProcessedLead } from './types';
 
-export const sortLeads = (leads: ProcessedLead[]): ProcessedLead[] => {
+import { Lead } from '@/types/lead';
+
+export const sortLeads = (leads: Lead[]): Lead[] => {
   return [...leads].sort((a, b) => {
     const statusOrder = { 'no_contact': 0, 'contact_attempted': 1, 'response_received': 2 };
     
@@ -20,3 +21,4 @@ export const sortLeads = (leads: ProcessedLead[]): ProcessedLead[] => {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 };
+

@@ -1,13 +1,15 @@
 
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { LeadData, ConversationData, ProcessedLead } from './leads/types';
+import { LeadData, ConversationData } from './leads/types';
+import { Lead } from '@/types/lead';
 import { transformLeadData } from './leads/leadDataProcessor';
 import { sortLeads } from './leads/leadSorter';
 
 export const useLeads = () => {
-  const [leads, setLeads] = useState<ProcessedLead[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
 
@@ -71,3 +73,4 @@ export const useLeads = () => {
 
   return { leads, loading, refetch: fetchLeads };
 };
+
