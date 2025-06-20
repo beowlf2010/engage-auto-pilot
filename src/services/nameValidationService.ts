@@ -1,4 +1,3 @@
-
 /**
  * Smart name validation service to detect non-personal identifiers
  * like cities, business names, and other geographic/business entities
@@ -52,6 +51,20 @@ const GENERIC_NAMES = new Set([
 
 // Phone number patterns
 const PHONE_PATTERN = /^[\+]?[1]?[\s\-\(\)]?[\d\s\-\(\)]{10,}$/;
+
+// Common personal names that should get higher confidence scores
+const COMMON_PERSONAL_NAMES = new Set([
+  'kimberly', 'jennifer', 'michael', 'david', 'susan', 'robert', 'lisa', 'james',
+  'mary', 'john', 'patricia', 'william', 'elizabeth', 'richard', 'barbara',
+  'thomas', 'helen', 'charles', 'nancy', 'christopher', 'karen', 'daniel',
+  'betty', 'matthew', 'dorothy', 'anthony', 'sandra', 'mark', 'donna',
+  'donald', 'carol', 'steven', 'ruth', 'paul', 'sharon', 'andrew', 'michelle',
+  'connie', 'sarah', 'brian', 'laura', 'kevin', 'emily', 'george', 'amanda',
+  'edward', 'melissa', 'ronald', 'deborah', 'timothy', 'stephanie', 'jason',
+  'maria', 'jeffrey', 'catherine', 'ryan', 'christine', 'jacob', 'samantha',
+  'gary', 'debra', 'nicholas', 'rachel', 'eric', 'carolyn', 'jonathan',
+  'janet', 'stephen', 'virginia', 'larry', 'maria', 'justin', 'heather'
+]);
 
 export interface NameValidationResult {
   isValidPersonalName: boolean;
@@ -186,8 +199,14 @@ export const validatePersonalName = (name: string): NameValidationResult => {
   // Check confidence based on common name patterns
   let confidence = 0.8;
   
-  // Single word names are less confident
-  if (words.length === 1) {
+  // Boost confidence for common personal names
+  if (COMMON_PERSONAL_NAMES.has(cleanName)) {
+    confidence = 0.9;
+    console.log(`✅ [NAME VALIDATION] "${cleanName}" recognized as common personal name - confidence boosted to ${confidence}`);
+  }
+  
+  // Single word names are less confident (unless they're common names)
+  if (words.length === 1 && !COMMON_PERSONAL_NAMES.has(cleanName)) {
     confidence = 0.6;
   }
   
@@ -195,6 +214,12 @@ export const validatePersonalName = (name: string): NameValidationResult => {
   if (cleanName.length < 2 || cleanName.length > 25) {
     confidence = 0.4;
   }
+
+  console.log(`📝 [NAME VALIDATION] Final assessment for "${cleanName}":`, {
+    isValid: confidence > 0.5,
+    confidence: confidence,
+    detectedType: 'personal'
+  });
 
   return {
     isValidPersonalName: confidence > 0.5,

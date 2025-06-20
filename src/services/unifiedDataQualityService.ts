@@ -50,7 +50,8 @@ export const assessLeadDataQuality = (
 
   // Determine message strategy based on validation results
   let messageStrategy: UnifiedDataQualityResult['messageStrategy'];
-  const usePersonalGreeting = nameValidation.isValidPersonalName && nameValidation.confidence > 0.7;
+  // Lowered threshold from 0.7 to 0.6 for personal greetings
+  const usePersonalGreeting = nameValidation.isValidPersonalName && nameValidation.confidence > 0.6;
   const useSpecificVehicle = vehicleValidation.isValidVehicleInterest && vehicleValidation.confidence > 0.5;
 
   if (usePersonalGreeting && useSpecificVehicle) {
@@ -64,6 +65,7 @@ export const assessLeadDataQuality = (
   }
 
   console.log('🎯 [UNIFIED DATA QUALITY] Strategy:', messageStrategy);
+  console.log('🎯 [UNIFIED DATA QUALITY] Use personal greeting:', usePersonalGreeting, '(confidence:', nameValidation.confidence, ')');
 
   // Generate recommendations
   const recommendations = {
