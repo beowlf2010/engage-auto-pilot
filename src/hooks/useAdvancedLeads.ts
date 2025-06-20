@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { Lead } from '@/types/lead';
 import { useLeads } from '@/hooks/useLeads';
@@ -62,8 +61,14 @@ export const useAdvancedLeads = () => {
   // Filter leads based on current filters and status
   const filteredLeads = useMemo(() => {
     let filtered = [...leads];
+    
+    // Check if user is searching by name or phone number
+    const isSearchingByNameOrPhone = searchFilters.searchTerm && (
+      /^[\d\s\-\(\)\+]+$/.test(searchFilters.searchTerm) || // Phone number pattern
+      /^[a-zA-Z\s]+$/.test(searchFilters.searchTerm) // Name pattern
+    );
 
-    // Search term filter
+    // Apply search term filter first
     if (searchFilters.searchTerm) {
       const searchTerm = searchFilters.searchTerm.toLowerCase();
       filtered = filtered.filter(lead => 
@@ -75,16 +80,50 @@ export const useAdvancedLeads = () => {
       );
     }
 
-    // Status filter from tabs (takes precedence if not 'all')
+    // Enhanced status-based filtering with special handling for lost leads
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(lead => lead.status === statusFilter);
-    } else if (searchFilters.status) {
-      // Only apply search filter status if tab status is 'all'
+      switch (statusFilter) {
+        case 'new':
+          // Only show leads with no contact attempted and not lost
+          filtered = filtered.filter(lead => 
+            lead.contactStatus === 'no_contact' && lead.status !== 'lost'
+          );
+          break;
+        case 'engaged':
+          // Show leads that have received responses or are marked as engaged
+          filtered = filtered.filter(lead => 
+            (lead.contactStatus === 'response_received' || lead.status === 'engaged') && 
+            lead.status !== 'lost'
+          );
+          break;
+        case 'paused':
+          filtered = filtered.filter(lead => lead.status === 'paused');
+          break;
+        case 'closed':
+          filtered = filtered.filter(lead => lead.status === 'closed');
+          break;
+        case 'lost':
+          // Only show lost leads in the Lost tab
+          filtered = filtered.filter(lead => lead.status === 'lost');
+          break;
+        default:
+          // For any other status filter
+          filtered = filtered.filter(lead => lead.status === statusFilter);
+      }
+    } else {
+      // For "All" tab: exclude lost leads unless searching by name/phone
+      if (!isSearchingByNameOrPhone) {
+        filtered = filtered.filter(lead => lead.status !== 'lost');
+      }
+    }
+
+    // Apply other search filters only if tab status is 'all' (to avoid conflicts)
+    if (statusFilter === 'all' && searchFilters.status && !isSearchingByNameOrPhone) {
       filtered = filtered.filter(lead => lead.status === searchFilters.status);
     }
 
-    // Contact status filter
-    if (searchFilters.contactStatus) {
+    // Contact status filter (only apply if not conflicting with tab-based filtering)
+    if (searchFilters.contactStatus && statusFilter === 'all') {
       filtered = filtered.filter(lead => lead.contactStatus === searchFilters.contactStatus);
     }
 

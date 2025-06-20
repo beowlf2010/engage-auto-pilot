@@ -34,49 +34,87 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
   searchTerm,
   onQuickView,
   getEngagementScore,
-}) => (
-  <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
-    <TabsList className="grid w-full grid-cols-6">
-      <TabsTrigger value="all">All</TabsTrigger>
-      <TabsTrigger value="new">New</TabsTrigger>
-      <TabsTrigger value="engaged">Engaged</TabsTrigger>
-      <TabsTrigger value="paused">Paused</TabsTrigger>
-      <TabsTrigger value="closed">Closed</TabsTrigger>
-      <TabsTrigger value="lost">Lost</TabsTrigger>
-    </TabsList>
+}) => {
+  // Helper function to get tab description
+  const getTabDescription = (tabValue: string) => {
+    switch (tabValue) {
+      case 'all':
+        return 'All active leads (excludes lost)';
+      case 'new':
+        return 'No contact attempted yet';
+      case 'engaged':
+        return 'Actively communicating';
+      case 'paused':
+        return 'Temporarily paused';
+      case 'closed':
+        return 'Successfully closed';
+      case 'lost':
+        return 'Marked as lost';
+      default:
+        return '';
+    }
+  };
 
-    <TabsContent value={statusFilter} className="mt-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <Badge variant="outline">
-            {finalFilteredLeads.length} lead{finalFilteredLeads.length !== 1 ? "s" : ""}
-          </Badge>
+  return (
+    <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
+      <TabsList className="grid w-full grid-cols-6">
+        <TabsTrigger value="all" title={getTabDescription('all')}>
+          All
+        </TabsTrigger>
+        <TabsTrigger value="new" title={getTabDescription('new')}>
+          New
+        </TabsTrigger>
+        <TabsTrigger value="engaged" title={getTabDescription('engaged')}>
+          Engaged
+        </TabsTrigger>
+        <TabsTrigger value="paused" title={getTabDescription('paused')}>
+          Paused
+        </TabsTrigger>
+        <TabsTrigger value="closed" title={getTabDescription('closed')}>
+          Closed
+        </TabsTrigger>
+        <TabsTrigger value="lost" title={getTabDescription('lost')}>
+          Lost
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value={statusFilter} className="mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <Badge variant="outline">
+              {finalFilteredLeads.length} lead{finalFilteredLeads.length !== 1 ? "s" : ""}
+            </Badge>
+            {statusFilter !== 'all' && (
+              <Badge variant="secondary" className="text-xs">
+                {getTabDescription(statusFilter)}
+              </Badge>
+            )}
+          </div>
+          {finalFilteredLeads.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={selectAllFiltered}
+              disabled={selectedLeads.length === finalFilteredLeads.length}
+            >
+              Select All ({finalFilteredLeads.length})
+            </Button>
+          )}
         </div>
-        {finalFilteredLeads.length > 0 && (
-          <Button
-            variant="outline"
-            onClick={selectAllFiltered}
-            disabled={selectedLeads.length === finalFilteredLeads.length}
-          >
-            Select All ({finalFilteredLeads.length})
-          </Button>
-        )}
-      </div>
 
-      <LeadsTable
-        leads={finalFilteredLeads}
-        onAiOptInChange={handleAiOptInChange}
-        canEdit={canEdit}
-        loading={loading}
-        searchTerm={searchTerm}
-        selectedLeads={selectedLeads}
-        onLeadSelect={toggleLeadSelection}
-        onQuickView={onQuickView}
-        getEngagementScore={getEngagementScore}
-      />
-    </TabsContent>
-  </Tabs>
-);
+        <LeadsTable
+          leads={finalFilteredLeads}
+          onAiOptInChange={handleAiOptInChange}
+          canEdit={canEdit}
+          loading={loading}
+          searchTerm={searchTerm}
+          selectedLeads={selectedLeads}
+          onLeadSelect={toggleLeadSelection}
+          onQuickView={onQuickView}
+          getEngagementScore={getEngagementScore}
+        />
+      </TabsContent>
+    </Tabs>
+  );
+};
 
 export default LeadsStatusTabs;
-
