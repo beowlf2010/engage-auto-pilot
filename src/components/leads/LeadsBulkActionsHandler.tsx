@@ -3,7 +3,7 @@ import React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Lead } from '@/types/lead';
-import EnhancedBulkActionsPanel from './EnhancedBulkActionsPanel';
+import BulkActionsPanel from './BulkActionsPanel';
 
 interface LeadsBulkActionsHandlerProps {
   selectedLeads: string[];
@@ -78,7 +78,7 @@ const LeadsBulkActionsHandler = ({
     }
   };
 
-  // Transform selected leads for EnhancedBulkActionsPanel
+  // Transform selected leads for BulkActionsPanel
   const selectedLeadObjects = leads.filter(lead => 
     selectedLeads.includes(lead.id.toString())
   ).map(lead => ({
@@ -87,10 +87,7 @@ const LeadsBulkActionsHandler = ({
     last_name: lead.lastName,
     email: lead.email,
     status: lead.status,
-    vehicle_interest: lead.vehicleInterest,
-    ai_contact_enabled: lead.aiContactEnabled,
-    ai_replies_enabled: lead.aiRepliesEnabled,
-    ai_opt_in: lead.aiOptIn
+    vehicle_interest: lead.vehicleInterest
   }));
 
   if (selectedLeads.length === 0) {
@@ -98,7 +95,7 @@ const LeadsBulkActionsHandler = ({
   }
 
   return (
-    <EnhancedBulkActionsPanel
+    <BulkActionsPanel
       selectedLeads={selectedLeadObjects}
       onClearSelection={clearSelection}
       onBulkStatusUpdate={handleBulkStatusUpdate}

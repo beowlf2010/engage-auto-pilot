@@ -2,10 +2,13 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Phone, MessageSquare, Mail, User, Calendar, MapPin, Car } from "lucide-react";
+import { Phone, MessageSquare, Mail, User, Calendar, MapPin, Car, UserX } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "@/hooks/use-toast";
 import EmailComposer from "../../email/EmailComposer";
 import QuickControlsCard from "./QuickControlsCard";
+import MarkLostConfirmDialog from "../MarkLostConfirmDialog";
+import { markLeadAsLost } from "@/services/leadStatusService";
 
 interface Lead {
   id: string;
@@ -24,10 +27,13 @@ interface LeadDetailHeaderProps {
   lead: Lead;
   onSendMessage?: () => void;
   onAIOptInChange?: (enabled: boolean) => Promise<void>;
+  onLeadUpdate?: () => void;
 }
 
-const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange }: LeadDetailHeaderProps) => {
+const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange, onLeadUpdate }: LeadDetailHeaderProps) => {
   const [showEmailComposer, setShowEmailComposer] = useState(false);
+  const [showMarkLostDialog, setShowMarkLostDialog] = useState(false);
+  const [isMarkingLost, setIsMarkingLost] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -37,6 +43,8 @@ const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange }: LeadDetailHe
         return "bg-yellow-100 text-yellow-800";
       case "qualified":
         return "bg-green-100 text-green-800";
+      case "lost":
+        return "bg-red-100 text-red-800";
       case "closed":
         return "bg-gray-100 text-gray-800";
       default:
@@ -47,6 +55,39 @@ const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange }: LeadDetailHe
   const handleAIOptInChange = async (enabled: boolean) => {
     if (onAIOptInChange) {
       await onAIOptInChange(enabled);
+    }
+  };
+
+  const handleMarkAsLost = async () => {
+    setIsMarkingLost(true);
+    try {
+      const result = await markLeadAsLost(lead.id);
+      
+      if (result.success) {
+        toast({
+          title: "Lead marked as lost",
+          description: `${lead.first_name} ${lead.last_name} has been marked as lost and removed from all automation.`,
+        });
+        
+        if (onLeadUpdate) {
+          onLeadUpdate();
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to mark lead as lost",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingLost(false);
+      setShowMarkLostDialog(false);
     }
   };
 
@@ -108,6 +149,17 @@ const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange }: LeadDetailHe
                 <Mail className="w-4 h-4 mr-2" />
                 Email
               </Button>
+
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => setShowMarkLostDialog(true)}
+                disabled={isMarkingLost || lead.status === 'lost'}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <UserX className="w-4 h-4 mr-2" />
+                Mark Lost
+              </Button>
             </div>
           </div>
         </div>
@@ -128,6 +180,14 @@ const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange }: LeadDetailHe
         leadFirstName={lead.first_name}
         leadLastName={lead.last_name}
         vehicleInterest={lead.vehicle_interest}
+      />
+
+      <MarkLostConfirmDialog
+        open={showMarkLostDialog}
+        onOpenChange={setShowMarkLostDialog}
+        onConfirm={handleMarkAsLost}
+        leadCount={1}
+        leadName={`${lead.first_name} ${lead.last_name}`}
       />
     </>
   );
