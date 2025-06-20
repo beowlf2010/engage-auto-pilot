@@ -130,11 +130,11 @@ export const exportCurrentMessages = async (options: ExportOptions): Promise<voi
   }
 };
 
-const downloadExportFile = async (data: ExportData, format: 'csv' | 'excel' | 'json'): Promise<void> => {
+const downloadExportFile = async (data: ExportData, exportFormat: 'csv' | 'excel' | 'json'): Promise<void> => {
   const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
   const filename = `message_export_${timestamp}`;
 
-  switch (format) {
+  switch (exportFormat) {
     case 'json':
       downloadJSON(data, `${filename}.json`);
       break;
