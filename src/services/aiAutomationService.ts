@@ -8,7 +8,7 @@ export const enableAIForLead = async (leadId: string): Promise<boolean> => {
     // Calculate next AI send time - super aggressive (2-4 hours from now)
     const nextSendTime = new Date();
     const hoursToAdd = 2 + Math.random() * 2; // 2-4 hours
-    nextSendTime.setHours(nextSendTime.getHours() + hoursToAdd);
+    nextSendTime.setTime(nextSendTime.getTime() + (hoursToAdd * 60 * 60 * 1000));
     
     console.log(`📅 [AI AUTOMATION] Next message scheduled for: ${nextSendTime.toLocaleString()}`);
     
@@ -61,6 +61,37 @@ export const pauseAIForLead = async (leadId: string, reason: string): Promise<bo
     return true;
   } catch (error) {
     console.error('❌ [AI AUTOMATION] Exception pausing AI:', error);
+    return false;
+  }
+};
+
+export const resumeAIForLead = async (leadId: string): Promise<boolean> => {
+  try {
+    console.log(`▶️ [AI AUTOMATION] Resuming AI for lead: ${leadId}`);
+    
+    // Calculate next send time when resuming
+    const nextSendTime = new Date();
+    const hoursToAdd = 2 + Math.random() * 2; // 2-4 hours from now
+    nextSendTime.setTime(nextSendTime.getTime() + (hoursToAdd * 60 * 60 * 1000));
+    
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        ai_sequence_paused: false,
+        ai_pause_reason: null,
+        next_ai_send_at: nextSendTime.toISOString()
+      })
+      .eq('id', leadId);
+
+    if (error) {
+      console.error('❌ [AI AUTOMATION] Error resuming AI:', error);
+      return false;
+    }
+
+    console.log('✅ [AI AUTOMATION] AI resumed successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ [AI AUTOMATION] Exception resuming AI:', error);
     return false;
   }
 };
@@ -131,5 +162,107 @@ export const scheduleNextAIMessage = async (leadId: string, currentStage?: strin
   } catch (error) {
     console.error('❌ [AI AUTOMATION] Exception scheduling next message:', error);
     return false;
+  }
+};
+
+export const getAIAutomationStatus = async () => {
+  try {
+    console.log('📊 [AI AUTOMATION] Getting automation status');
+    
+    // Get counts of pending messages
+    const { count: pendingMessages } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('ai_opt_in', true)
+      .eq('ai_sequence_paused', false)
+      .not('next_ai_send_at', 'is', null)
+      .lte('next_ai_send_at', new Date().toISOString());
+
+    // Get count of messages sent today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const { count: messagesSentToday } = await supabase
+      .from('conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('ai_generated', true)
+      .gte('sent_at', today.toISOString());
+
+    // Get total AI enabled leads
+    const { count: totalAILeads } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('ai_opt_in', true);
+
+    return {
+      pendingMessages: pendingMessages || 0,
+      messagesSentToday: messagesSentToday || 0,
+      totalAILeads: totalAILeads || 0
+    };
+  } catch (error) {
+    console.error('❌ [AI AUTOMATION] Error getting status:', error);
+    return {
+      pendingMessages: 0,
+      messagesSentToday: 0,
+      totalAILeads: 0
+    };
+  }
+};
+
+export const triggerAIAutomation = async () => {
+  try {
+    console.log('🚀 [AI AUTOMATION] Triggering unified automation');
+    
+    // Get leads that need AI messages
+    const { data: dueLeads } = await supabase
+      .from('leads')
+      .select('id, first_name, last_name, ai_stage, ai_messages_sent')
+      .eq('ai_opt_in', true)
+      .eq('ai_sequence_paused', false)
+      .not('next_ai_send_at', 'is', null)
+      .lte('next_ai_send_at', new Date().toISOString())
+      .limit(50);
+
+    if (!dueLeads || dueLeads.length === 0) {
+      console.log('📭 [AI AUTOMATION] No leads due for messaging');
+      return {
+        processed: 0,
+        successful: 0,
+        failed: 0
+      };
+    }
+
+    let successful = 0;
+    let failed = 0;
+
+    for (const lead of dueLeads) {
+      try {
+        // Here you would typically call an AI message generation service
+        // For now, we'll just schedule the next message
+        const success = await scheduleNextAIMessage(lead.id, lead.ai_stage);
+        if (success) {
+          successful++;
+        } else {
+          failed++;
+        }
+      } catch (error) {
+        console.error(`❌ [AI AUTOMATION] Error processing lead ${lead.id}:`, error);
+        failed++;
+      }
+    }
+
+    console.log(`✅ [AI AUTOMATION] Processed ${dueLeads.length} leads: ${successful} successful, ${failed} failed`);
+    
+    return {
+      processed: dueLeads.length,
+      successful,
+      failed
+    };
+  } catch (error) {
+    console.error('❌ [AI AUTOMATION] Error triggering automation:', error);
+    return {
+      processed: 0,
+      successful: 0,
+      failed: 0
+    };
   }
 };
