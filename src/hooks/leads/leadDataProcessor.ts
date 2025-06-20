@@ -1,6 +1,4 @@
 
-
-
 import { LeadData, ConversationData } from './types';
 import { Lead } from '@/types/lead';
 import { processConversations, determineContactStatus } from './conversationProcessor';
@@ -74,10 +72,6 @@ export const transformLeadData = (
     doNotCall: lead.do_not_call,
     doNotEmail: lead.do_not_email,
     doNotMail: lead.do_not_mail,
-    vehicleYear: lead.vehicle_year,
-    vehicleMake: lead.vehicle_make,
-    vehicleModel: lead.vehicle_model,
-    vehicleVIN: lead.vehicle_vin,
     contactStatus: contactStatus,
     incomingCount: stats.incomingCount,
     outgoingCount: stats.outgoingCount,
@@ -94,5 +88,3 @@ export const transformLeadData = (
     created_at: lead.created_at
   };
 };
-
-
