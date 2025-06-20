@@ -7,7 +7,11 @@ import { fetchConversations, fetchMessages, markMessagesAsRead } from '@/service
 import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
 import type { ConversationData, MessageData } from '@/types/conversation';
 
-export const useFixedConversationOperations = () => {
+interface UseFixedConversationOperationsProps {
+  onLeadsRefresh?: () => void;
+}
+
+export const useFixedConversationOperations = (props?: UseFixedConversationOperationsProps) => {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -82,6 +86,12 @@ export const useFixedConversationOperations = () => {
       // Immediately reload messages to show the new message
       await loadMessages(leadId);
       
+      // Trigger leads refresh to update status tabs
+      if (props?.onLeadsRefresh) {
+        console.log('🔄 [FIXED OPS] Triggering leads refresh after message send');
+        props.onLeadsRefresh();
+      }
+      
       toast({
         title: "Message sent",
         description: "Your message has been sent successfully.",
@@ -100,12 +110,18 @@ export const useFixedConversationOperations = () => {
       });
       throw err;
     }
-  }, [profile, loadMessages, toast]);
+  }, [profile, loadMessages, toast, props?.onLeadsRefresh]);
 
   const manualRefresh = useCallback(async () => {
     console.log('🔄 [FIXED OPS] Manual refresh triggered');
     await loadConversations();
-  }, [loadConversations]);
+    
+    // Also trigger leads refresh if available
+    if (props?.onLeadsRefresh) {
+      console.log('🔄 [FIXED OPS] Triggering leads refresh during manual refresh');
+      props.onLeadsRefresh();
+    }
+  }, [loadConversations, props?.onLeadsRefresh]);
 
   return {
     conversations,

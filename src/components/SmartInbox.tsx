@@ -4,6 +4,7 @@ import { useStableConversationOperations } from "@/hooks/useStableConversationOp
 import { useInboxOperations } from "@/hooks/inbox/useInboxOperations";
 import { useConversationInitialization } from "@/hooks/inbox/useConversationInitialization";
 import { useUnifiedAIScheduler } from "@/hooks/useUnifiedAIScheduler";
+import { useLeads } from "@/hooks/useLeads";
 import InboxStateManager from "./inbox/InboxStateManager";
 import InboxStatusDisplay from "./inbox/InboxStatusDisplay";
 import InboxLayout from "./inbox/InboxLayout";
@@ -19,7 +20,10 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   // Use the unified AI scheduler
   useUnifiedAIScheduler();
 
-  // Use the stable conversation operations
+  // Get leads refresh function
+  const { forceRefresh: refreshLeads } = useLeads();
+
+  // Use the stable conversation operations with leads refresh callback
   const { 
     conversations, 
     messages, 
@@ -30,7 +34,9 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     sendMessage, 
     manualRefresh,
     setError
-  } = useStableConversationOperations();
+  } = useStableConversationOperations({
+    onLeadsRefresh: refreshLeads
+  });
 
   // Get inbox operations
   const {
@@ -94,12 +100,13 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           setIsInitialized
         });
 
-        // Handle sending messages with proper state management
+        // Handle sending messages with proper state management and leads refresh
         const onSendMessage = async (message: string, isTemplate?: boolean) => {
           await handleSendMessage(selectedLead, selectedConversation, message, isTemplate);
           if (isTemplate) {
             handleToggleTemplates();
           }
+          // The leads refresh is automatically triggered by the conversation operations
         };
 
         // Main inbox layout

@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -18,6 +17,8 @@ export const useLeads = () => {
 
     setLoading(true);
     try {
+      console.log('🔄 [LEADS] Fetching leads...');
+      
       // Fetch leads with phone numbers
       const { data: leadsData, error: leadsError } = await supabase
         .from('leads')
@@ -58,8 +59,9 @@ export const useLeads = () => {
       const sortedLeads = sortLeads(transformedLeads);
 
       setLeads(sortedLeads);
+      console.log('✅ [LEADS] Leads fetched successfully:', sortedLeads.length);
     } catch (error) {
-      console.error('Error fetching leads:', error);
+      console.error('❌ [LEADS] Error fetching leads:', error);
     } finally {
       setLoading(false);
     }
@@ -71,6 +73,14 @@ export const useLeads = () => {
     }
   }, [profile]);
 
-  return { leads, loading, refetch: fetchLeads };
+  return { 
+    leads, 
+    loading, 
+    refetch: fetchLeads,
+    // Expose a forced refresh function that others can call
+    forceRefresh: () => {
+      console.log('🔄 [LEADS] Force refresh triggered');
+      return fetchLeads();
+    }
+  };
 };
-

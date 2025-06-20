@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
@@ -92,9 +93,13 @@ const LeadsDataProvider = ({
 
   const leads = getFilteredLeads();
 
-  // Handle stats card clicks
+  // Handle stats card clicks with forced refresh
   const handleStatsCardClick = (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled') => {
     setActiveStatsFilter(filterType);
+    
+    // Force a refresh to get the latest data from database
+    console.log('🔄 [LEADS DATA] Forcing refresh for stats card click:', filterType);
+    refetch();
     
     switch (filterType) {
       case 'fresh':
@@ -183,6 +188,8 @@ const LeadsDataProvider = ({
         description: `Finn AI ${value ? 'enabled' : 'disabled'} for this lead`,
       });
 
+      // Force refresh to get updated data
+      console.log('🔄 [LEADS DATA] Forcing refresh after AI opt-in change');
       refetch();
     } catch (error) {
       console.error('Error updating lead:', error);
@@ -210,6 +217,7 @@ const LeadsDataProvider = ({
   };
 
   const handleVINImportSuccess = () => {
+    console.log('🔄 [LEADS DATA] Forcing refresh after VIN import');
     refetch();
     toast({
       title: "Import successful",
