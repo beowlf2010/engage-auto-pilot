@@ -58,9 +58,9 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     onClose();
   };
 
-  // Calculate next message time (24 hours from now)
+  // Calculate next message time (24 hours from now) using milliseconds to prevent year rollover
   const nextMessageTime = new Date();
-  nextMessageTime.setHours(nextMessageTime.getHours() + 24);
+  nextMessageTime.setTime(nextMessageTime.getTime() + (24 * 60 * 60 * 1000));
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
