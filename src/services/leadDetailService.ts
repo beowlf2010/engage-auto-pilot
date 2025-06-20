@@ -76,7 +76,7 @@ export interface LeadDetailData {
   doNotCall: boolean;
   doNotEmail: boolean;
   doNotMail: boolean;
-  // Other fields
+  // Other fields with safe defaults
   salespersonId?: string;
   salespersonName?: string;
   temperatureScore?: number;
@@ -269,21 +269,21 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       doNotCall: lead.do_not_call || false,
       doNotEmail: lead.do_not_email || false,
       doNotMail: lead.do_not_mail || false,
-      // Other fields
+      // Other fields with safe defaults
       salespersonId: lead.salesperson_id,
       salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : undefined,
       temperatureScore: lead.temperature_score,
       hasTradeVehicle: lead.has_trade_vehicle || false,
-      lastContactedAt: lead.last_contacted_at,
+      lastContactedAt: undefined, // Field doesn't exist in schema
       totalMessages: messageCount || 0,
-      averageResponseTime: lead.average_response_time,
-      preferredContactMethod: lead.preferred_contact_method,
-      timezone: lead.timezone,
-      bestContactHours: lead.best_contact_hours,
-      lastActivityAt: lead.last_activity_at,
-      leadScore: lead.lead_score,
-      convertedAt: lead.converted_at,
-      conversionValue: lead.conversion_value,
+      averageResponseTime: undefined, // Field doesn't exist in schema
+      preferredContactMethod: undefined, // Field doesn't exist in schema
+      timezone: undefined, // Field doesn't exist in schema
+      bestContactHours: undefined, // Field doesn't exist in schema
+      lastActivityAt: undefined, // Field doesn't exist in schema
+      leadScore: undefined, // Field doesn't exist in schema
+      convertedAt: undefined, // Field doesn't exist in schema
+      conversionValue: undefined, // Field doesn't exist in schema
       appointmentBooked: (appointments && appointments.length > 0) || false,
       lastAppointmentAt: appointments?.[0]?.created_at,
       emailOptIn: lead.email_opt_in ?? true,

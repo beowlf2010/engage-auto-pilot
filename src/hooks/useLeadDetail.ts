@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchLeadDetail, LeadDetailData } from '@/services/leadDetailService';
+import { getLeadDetail, LeadDetailData } from '@/services/leadDetailService';
 import { PhoneNumber } from '@/types/lead';
 
 export const useLeadDetail = () => {
@@ -21,7 +21,7 @@ export const useLeadDetail = () => {
       }
       
       console.log('Fetching lead with ID:', leadId);
-      return await fetchLeadDetail(leadId);
+      return await getLeadDetail(leadId);
     },
     enabled: !!leadId,
   });
@@ -62,7 +62,7 @@ export const useLeadDetail = () => {
     vehicleYear: lead.vehicleYear,
     vehicleMake: lead.vehicleMake,
     vehicleModel: lead.vehicleModel,
-    vehicleVIN: lead.vehicleVIN,
+    vehicleVin: lead.vehicleVin,
     status: lead.status as 'new' | 'engaged' | 'paused' | 'closed' | 'lost',
     source: lead.source,
     aiOptIn: lead.aiOptIn,
@@ -80,7 +80,7 @@ export const useLeadDetail = () => {
     contactStatus: 'no_contact' as const,
     incomingCount: 0,
     outgoingCount: 0,
-    unrepliedCount: 0, // Add the missing unrepliedCount property
+    unrepliedCount: 0,
     messageCount: lead.conversations.length,
     // Additional required Lead properties
     first_name: lead.firstName,

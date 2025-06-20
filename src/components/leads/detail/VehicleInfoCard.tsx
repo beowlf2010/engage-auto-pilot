@@ -41,10 +41,10 @@ const VehicleInfoCard = ({ lead }: VehicleInfoCardProps) => {
               <p className="text-sm">{lead.vehicleModel}</p>
             </div>
           )}
-          {lead.vehicleVIN && (
+          {lead.vehicleVin && (
             <div className="col-span-2">
               <span className="text-sm font-medium text-gray-700">VIN:</span>
-              <p className="text-sm font-mono">{lead.vehicleVIN}</p>
+              <p className="text-sm font-mono">{lead.vehicleVin}</p>
             </div>
           )}
         </div>
