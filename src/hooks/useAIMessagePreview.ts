@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { generateWarmInitialMessage } from '@/services/proactive/warmIntroductionService';
 import { sendMessage } from '@/services/messagesService';
@@ -122,7 +123,8 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         messageStrategy: finalDataQuality.messageStrategy,
         nameValid: finalDataQuality.nameValidation.isValidPersonalName,
         vehicleValid: finalDataQuality.vehicleValidation.isValidVehicleInterest,
-        overrides: overrides
+        overrides: overrides,
+        useOverrides: useOverrides
       });
 
       // Store comprehensive debug info for UI display
@@ -135,8 +137,9 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         originalVehicleInterest: lead.vehicle_interest
       });
 
-      // Generate preview message with enhanced data quality logic
-      const message = await generateWarmInitialMessage(lead, profile);
+      // Generate preview message with data quality override if overrides are applied
+      const dataQualityParam = useOverrides ? finalDataQuality : undefined;
+      const message = await generateWarmInitialMessage(lead, profile, dataQualityParam);
       
       if (message) {
         setGeneratedMessage(message);

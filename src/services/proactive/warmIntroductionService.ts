@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from '../enhancedIntelligentConversationAI';
 import { formatProperName } from '@/utils/nameFormatter';
@@ -5,7 +6,11 @@ import { validatePersonalName, detectLeadSource } from '../nameValidationService
 import { assessLeadDataQuality, generateDataQualityAwareGreeting } from '../unifiedDataQualityService';
 
 // Generate warm, introductory initial outreach messages using UNIFIED AI with comprehensive data quality validation
-export const generateWarmInitialMessage = async (lead: any, profile: any): Promise<string | null> => {
+export const generateWarmInitialMessage = async (
+  lead: any, 
+  profile: any, 
+  dataQualityOverride?: any
+): Promise<string | null> => {
   try {
     console.log(`🤖 [ENHANCED WARM INTRO] === STARTING COMPREHENSIVE DATA QUALITY VALIDATION ===`);
     console.log(`🤖 [ENHANCED WARM INTRO] Lead data:`, {
@@ -14,10 +19,10 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
       vehicleInterest: lead.vehicle_interest || 'Not specified'
     });
 
-    // Comprehensive data quality assessment
-    const dataQuality = assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
+    // Use provided data quality override or perform comprehensive assessment
+    const dataQuality = dataQualityOverride || assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
     
-    console.log(`🧠 [ENHANCED WARM INTRO] Comprehensive data quality assessment:`, {
+    console.log(`🧠 [ENHANCED WARM INTRO] Data quality assessment (override: ${!!dataQualityOverride}):`, {
       overallScore: dataQuality.overallQualityScore,
       messageStrategy: dataQuality.messageStrategy,
       nameValid: dataQuality.nameValidation.isValidPersonalName,
@@ -47,7 +52,7 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
           status: 'new',
           lastReplyAt: new Date().toISOString(),
           dataQuality: {
-            nameValidation: nameValidation,
+            nameValidation: dataQuality.nameValidation,
             vehicleValidation: dataQuality.vehicleValidation,
             overallQuality: dataQuality,
             leadSource: leadSource,
@@ -74,14 +79,15 @@ export const generateWarmInitialMessage = async (lead: any, profile: any): Promi
       }
     }
 
-    // Use data-quality-aware template generation
+    // Use data-quality-aware template generation with override support
     console.log(`📝 [ENHANCED WARM INTRO] Using data-quality-aware template generation`);
     
     const smartMessage = generateDataQualityAwareGreeting(
       lead.first_name,
       lead.vehicle_interest,
       'Finn',
-      'Jason Pilger Chevrolet'
+      'Jason Pilger Chevrolet',
+      dataQuality
     );
     
     console.log(`✅ [ENHANCED WARM INTRO] Generated data-quality-aware message: ${smartMessage}`);

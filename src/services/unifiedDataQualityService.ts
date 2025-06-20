@@ -86,12 +86,15 @@ export const generateDataQualityAwareGreeting = (
   firstName: string,
   vehicleInterest: string,
   salespersonName: string = 'Finn',
-  dealershipName: string = 'Jason Pilger Chevrolet'
+  dealershipName: string = 'Jason Pilger Chevrolet',
+  dataQuality?: UnifiedDataQualityResult
 ): string => {
-  const dataQuality = assessLeadDataQuality(firstName, vehicleInterest);
-  const { messageStrategy, recommendations } = dataQuality;
+  // Use provided data quality or assess it
+  const quality = dataQuality || assessLeadDataQuality(firstName, vehicleInterest);
+  const { messageStrategy, recommendations } = quality;
 
   console.log('💬 [UNIFIED DATA QUALITY] Generating greeting with strategy:', messageStrategy);
+  console.log('💬 [UNIFIED DATA QUALITY] Using personal greeting:', recommendations.usePersonalGreeting);
 
   switch (messageStrategy) {
     case 'personal_with_vehicle':
