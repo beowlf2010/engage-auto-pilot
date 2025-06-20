@@ -1,4 +1,5 @@
 
+
 export interface ConversationData {
   lead_id: string;
   body: string;
@@ -78,7 +79,7 @@ export interface ProcessedLead {
   vehicleModel?: string;
   vehicleVIN?: string;
   source: string;
-  status: string;
+  status: 'new' | 'engaged' | 'paused' | 'closed' | 'lost'; // Use the same status type as Lead
   salesperson: string;
   salespersonId: string;
   aiOptIn: boolean;
@@ -109,3 +110,4 @@ export interface ProcessedLead {
   last_name: string;
   created_at: string;
 }
+

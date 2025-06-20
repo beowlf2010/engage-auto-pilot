@@ -1,7 +1,21 @@
 
+
 import { LeadData, ProcessedLead, ConversationData } from './types';
 import { PhoneNumber } from '@/types/lead';
 import { processConversations, determineContactStatus } from './conversationProcessor';
+
+// Helper function to ensure status is a valid Lead status
+const normalizeStatus = (status: string): 'new' | 'engaged' | 'paused' | 'closed' | 'lost' => {
+  const validStatuses = ['new', 'engaged', 'paused', 'closed', 'lost'] as const;
+  const lowerStatus = status.toLowerCase();
+  
+  if (validStatuses.includes(lowerStatus as any)) {
+    return lowerStatus as 'new' | 'engaged' | 'paused' | 'closed' | 'lost';
+  }
+  
+  // Default to 'new' if status is not recognized
+  return 'new';
+};
 
 export const transformLeadData = (
   lead: LeadData,
@@ -43,7 +57,7 @@ export const transformLeadData = (
     vehicleModel: lead.vehicle_model,
     vehicleVIN: lead.vehicle_vin,
     source: lead.source,
-    status: lead.status,
+    status: normalizeStatus(lead.status), // Ensure status is properly typed
     salesperson: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : 'Unassigned',
     salespersonId: lead.salesperson_id,
     aiOptIn: lead.ai_opt_in || false,
@@ -76,3 +90,4 @@ export const transformLeadData = (
     created_at: lead.created_at
   };
 };
+
