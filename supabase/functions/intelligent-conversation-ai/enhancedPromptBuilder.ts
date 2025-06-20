@@ -1,4 +1,3 @@
-
 import { analyzeCustomerIntent, generateAnswerGuidance, needsConversationRepair } from './enhancedIntentAnalysis.ts';
 import { buildSalesProgressionPrompt } from './salesProgressionPrompts.ts';
 
@@ -98,12 +97,17 @@ export const buildEnhancedSystemPrompt = (
   
   if (shouldUseSalesProgression) {
     console.log('🎯 Using SALES PROGRESSION system for objection handling and forward movement');
+    
+    // Get conversation memory for better context
+    const conversationMemory = analyzeConversationMemory(conversationHistory);
+    
     const salesPromptData = buildSalesProgressionPrompt(
       leadName,
       vehicleInterest,
       lastCustomerMessage,
       conversationHistory,
-      inventoryStatus
+      inventoryStatus,
+      conversationMemory
     );
     
     return {

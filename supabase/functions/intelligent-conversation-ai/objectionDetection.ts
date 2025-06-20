@@ -1,4 +1,3 @@
-
 // Objection Detection and Sales Progression System
 // Identifies customer hesitation, objections, and appropriate sales responses
 
@@ -199,12 +198,14 @@ export const analyzeSalesProgression = (
   };
 };
 
-// Generate objection-handling responses
+// Generate objection-handling responses with improved tone
 export const generateObjectionResponse = (
   objectionSignals: ObjectionSignal[],
   salesProgression: SalesProgression,
   customerMessage: string,
-  vehicleInterest: string
+  vehicleInterest: string,
+  leadName: string,
+  conversationMemory?: any
 ): string => {
   if (objectionSignals.length === 0) {
     return '';
@@ -215,30 +216,37 @@ export const generateObjectionResponse = (
   );
 
   const cleanVehicle = vehicleInterest.replace(/"/g, '').trim();
+  
+  // Check if we've already introduced ourselves
+  const hasIntroduced = conversationMemory?.hasIntroduced || false;
 
   switch (primarySignal.suggestedResponse) {
     case 'probe_deeper':
-      return `I understand you want to think it over, Aaron. Is there something specific about the ${cleanVehicle} that's holding you back? Price, timing, or maybe a particular feature you're concerned about?`;
+      if (hasIntroduced) {
+        return `I understand you want to think it over, ${leadName}. What's your main concern about the ${cleanVehicle}? Is it the timing, price, or maybe specific features you're looking for?`;
+      } else {
+        return `Hi ${leadName}, it's Finn from Jason Pilger Chevrolet. I understand you want to think it over. What's your main concern about the ${cleanVehicle} - timing, price, or specific features?`;
+      }
 
     case 'address_price':
-      return `I hear you on the budget concern, Aaron. What monthly payment would feel comfortable for you? We have several financing options that might work better than you think.`;
+      return `I understand budget is important, ${leadName}. What monthly payment would feel comfortable for you? We have several financing options that might work better than you think.`;
 
     case 'create_urgency':
-      return `I totally get wanting to wait, Aaron. Just so you know, ${cleanVehicle}s have been moving pretty quickly lately. What would need to happen for you to move forward sooner rather than later?`;
+      return `I totally understand wanting to wait, ${leadName}. ${cleanVehicle}s have been moving pretty quickly lately. What would need to happen for you to consider moving forward sooner?`;
 
     case 'feature_benefits':
-      return `What specific features are most important to you in your next vehicle, Aaron? I want to make sure the ${cleanVehicle} checks all your boxes before we go any further.`;
+      return `What specific features are most important to you in your next vehicle, ${leadName}? I want to make sure the ${cleanVehicle} checks all your boxes.`;
 
     case 'competitor_comparison':
-      return `Smart to compare options, Aaron. What other vehicles are you considering? I'd love to show you how the ${cleanVehicle} stacks up - there might be some advantages you haven't considered yet.`;
+      return `Smart to compare options, ${leadName}. What other vehicles are you considering? I'd love to show you how the ${cleanVehicle} compares - there might be some advantages you haven't considered.`;
 
     case 'assumptive_close':
       if (salesProgression.closeOpportunity) {
-        return `Based on what you've told me, Aaron, it sounds like the ${cleanVehicle} could be a great fit. When would be a good time for you to come take a look at it in person?`;
+        return `Based on what you've told me, ${leadName}, the ${cleanVehicle} sounds like it could be a great fit. When would be a good time for you to come take a look?`;
       }
-      return `What questions can I answer to help you feel confident about moving forward with the ${cleanVehicle}, Aaron?`;
+      return `What questions can I answer to help you feel confident about the ${cleanVehicle}, ${leadName}?`;
 
     default:
-      return `I want to make sure I'm helping you find exactly what you need, Aaron. What's the most important thing for you to know about the ${cleanVehicle} right now?`;
+      return `I want to make sure I'm helping you find exactly what you need, ${leadName}. What's your main question about the ${cleanVehicle} right now?`;
   }
 };
