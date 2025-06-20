@@ -183,7 +183,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
             if ((window as any).debugLog) {
               (window as any).debugLog('error', 'Smart Inbox', 'Send Message Handler Failed', { 
                 selectedLead,
-                conversationId: selectedConversation?.id,
+                conversationLeadId: selectedConversation?.leadId,
                 error: error instanceof Error ? error.message : 'Unknown error'
               });
             }
