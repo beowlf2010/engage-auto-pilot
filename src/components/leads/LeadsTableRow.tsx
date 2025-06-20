@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -9,6 +10,7 @@ import { Lead } from "@/types/lead";
 import LeadStatusBadge from "./LeadStatusBadge";
 import LeadContactStatusBadge from "./LeadContactStatusBadge";
 import FreshLeadBadge from "./FreshLeadBadge";
+import AIPreviewPopout from "./AIPreviewPopout";
 
 interface LeadsTableRowProps {
   lead: Lead;
@@ -47,6 +49,18 @@ const LeadsTableRow = ({
 
   const handleLeadClick = (leadId: string) => {
     navigate(`/lead/${leadId}`);
+  };
+
+  const handleAIToggle = (checked: boolean) => {
+    // If disabling AI, use simple toggle
+    if (!checked) {
+      onAiOptInChange(lead.id.toString(), false);
+    }
+    // If enabling AI, it will be handled by AIPreviewPopout
+  };
+
+  const handleAIEnabled = () => {
+    onAiOptInChange(lead.id.toString(), true);
   };
 
   const engagementScore = getEngagementScore(lead);
@@ -121,10 +135,28 @@ const LeadsTableRow = ({
       <TableCell>
         <div className="space-y-1">
           {canEdit && (
-            <Checkbox
-              checked={lead.aiOptIn}
-              onCheckedChange={(checked) => onAiOptInChange(lead.id.toString(), !!checked)}
-            />
+            <div className="flex items-center gap-2">
+              {!lead.aiOptIn ? (
+                // Show preview modal when enabling AI
+                <AIPreviewPopout
+                  lead={lead}
+                  onAIOptInChange={onAiOptInChange}
+                >
+                  <div className="cursor-pointer">
+                    <Checkbox
+                      checked={false}
+                      onCheckedChange={() => {}}
+                    />
+                  </div>
+                </AIPreviewPopout>
+              ) : (
+                // Show simple checkbox when disabling AI
+                <Checkbox
+                  checked={true}
+                  onCheckedChange={handleAIToggle}
+                />
+              )}
+            </div>
           )}
           {!canEdit && (
             <Badge variant={lead.aiOptIn ? "default" : "outline"}>
