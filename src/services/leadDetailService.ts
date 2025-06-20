@@ -1,223 +1,259 @@
-
 import { supabase } from '@/integrations/supabase/client';
+
+export interface PhoneNumber {
+  id: string;
+  number: string;
+  isPrimary: boolean;
+  type?: string;
+}
+
+export interface TradeVehicle {
+  id: string;
+  year?: number;
+  make?: string;
+  model?: string;
+  vin?: string;
+  mileage?: number;
+  condition?: string;
+  estimatedValue?: number;
+  owedAmount?: number;
+  description?: string;
+}
 
 export interface LeadDetailData {
   id: string;
   firstName: string;
   lastName: string;
-  middleName?: string;
   email?: string;
-  emailAlt?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  postalCode?: string;
-  vehicleInterest: string;
-  vehicleYear?: string;
+  source: string;
+  status: string;
+  vehicleInterest?: string;
   vehicleMake?: string;
   vehicleModel?: string;
-  vehicleVIN?: string;
-  status: string;
-  source: string;
-  aiOptIn: boolean;
-  aiStage?: string;
-  aiSequencePaused?: boolean;
-  nextAiSendAt?: string;
+  vehicleYear?: number;
+  vehicleVin?: string;
   createdAt: string;
   lastReplyAt?: string;
-  salespersonId?: string;
-  salespersonName?: string;
-  doNotCall: boolean;
-  doNotEmail: boolean;
-  doNotMail: boolean;
-  // Price preferences
   preferredPriceMin?: number;
   preferredPriceMax?: number;
-  // Trade information
-  hasTradeVehicle?: boolean;
-  tradeInVehicle?: string;
-  tradePayoffAmount?: number;
-  // AI Takeover fields
-  aiTakeoverEnabled?: boolean;
-  aiTakeoverDelayMinutes?: number;
-  pendingHumanResponse?: boolean;
-  humanResponseDeadline?: string;
-  // Unified AI fields
-  messageIntensity?: string;
-  aiMessagesSent?: number;
+  notes?: string;
+  phoneNumbers: PhoneNumber[];
+  tradeVehicles: TradeVehicle[];
+  // AI fields with super aggressive defaults
+  aiOptIn: boolean;
+  messageIntensity: string;
+  aiMessagesSent: number;
+  aiStage?: string;
+  aiSequencePaused: boolean;
   aiPauseReason?: string;
-  primaryPhone?: string;
-  phoneNumbers: Array<{
-    id: string;
-    number: string;
-    type: string;
-    isPrimary: boolean;
-    status: string;
-    priority: number;
-    lastAttempt?: string;
-  }>;
-  conversations: Array<{
-    id: string;
-    body: string;
-    direction: 'in' | 'out';
-    sentAt: string;
-    aiGenerated: boolean;
-    smsStatus?: string;
-    leadId: string;
-  }>;
-  activityTimeline: Array<{
-    id: string;
-    type: string;
-    description: string;
-    timestamp: string;
-    metadata?: Record<string, any>;
-  }>;
+  pendingHumanResponse: boolean;
+  nextAiSendAt?: string;
+  // Other fields
+  salespersonId?: string;
+  temperatureScore?: number;
+  hasTradeVehicle: boolean;
+  lastContactedAt?: string;
+  totalMessages: number;
+  averageResponseTime?: number;
+  preferredContactMethod?: string;
+  timezone?: string;
+  bestContactHours?: number[];
+  lastActivityAt?: string;
+  leadScore?: number;
+  convertedAt?: string;
+  conversionValue?: number;
+  appointmentBooked: boolean;
+  lastAppointmentAt?: string;
+  emailOptIn: boolean;
+  smsOptIn: boolean;
+  callOptIn: boolean;
+  unsubscribed: boolean;
+  doNotContact: boolean;
+  aiSequenceStartedAt?: string;
+  aiLastMessageAt?: string;
+  manuallyAssigned: boolean;
+  campaignSource?: string;
+  referralSource?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  landingPage?: string;
+  deviceType?: string;
+  browserType?: string;
+  ipAddress?: string;
+  geoLocation?: string;
 }
 
-export const fetchLeadDetail = async (leadId: string): Promise<LeadDetailData | null> => {
+export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | null> => {
   try {
-    // Fetch lead basic information including unified AI fields
-    const { data: leadData, error: leadError } = await supabase
+    // Get lead details with phone numbers and trade vehicles
+    const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select(`
         *,
-        profiles (
-          first_name,
-          last_name
+        phone_numbers (
+          id,
+          number,
+          is_primary,
+          type
+        ),
+        trade_vehicles (
+          id,
+          year,
+          make,
+          model,
+          vin,
+          mileage,
+          condition,
+          estimated_value,
+          owed_amount,
+          description
         )
       `)
       .eq('id', leadId)
       .single();
 
-    if (leadError || !leadData) {
-      console.error('Error fetching lead:', leadError);
+    if (leadError) {
+      console.error('Error fetching lead detail:', leadError);
       return null;
     }
 
-    // Fetch phone numbers
-    const { data: phoneNumbers, error: phoneError } = await supabase
-      .from('phone_numbers')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('priority');
-
-    if (phoneError) {
-      console.error('Error fetching phone numbers:', phoneError);
+    if (!lead) {
+      return null;
     }
 
-    // Fetch conversations
-    const { data: conversations, error: conversationsError } = await supabase
+    // Count conversations for this lead
+    const { count: messageCount } = await supabase
       .from('conversations')
-      .select('*')
+      .select('*', { count: 'exact', head: true })
+      .eq('lead_id', leadId);
+
+    // Check if lead has any appointments
+    const { data: appointments } = await supabase
+      .from('appointments')
+      .select('id, created_at')
       .eq('lead_id', leadId)
-      .order('sent_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    if (conversationsError) {
-      console.error('Error fetching conversations:', conversationsError);
-    }
-
-    // Create activity timeline from conversations and lead updates
-    const activityTimeline: LeadDetailData['activityTimeline'] = [];
-    
-    // Add lead creation
-    activityTimeline.push({
-      id: `lead-created-${leadData.id}`,
-      type: 'lead_created',
-      description: 'Lead was created',
-      timestamp: leadData.created_at
-    });
-
-    // Add conversations to timeline
-    conversations?.forEach(conv => {
-      activityTimeline.push({
-        id: conv.id,
-        type: conv.direction === 'in' ? 'message_received' : 'message_sent',
-        description: conv.direction === 'in' 
-          ? 'Customer replied' 
-          : conv.ai_generated 
-          ? 'AI message sent' 
-          : 'Manual message sent',
-        timestamp: conv.sent_at
-      });
-    });
-
-    // Sort timeline by timestamp
-    activityTimeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    // Get primary phone number
-    const primaryPhoneNumber = phoneNumbers?.find(phone => phone.is_primary)?.number || 
-                              phoneNumbers?.[0]?.number || '';
-
-    return {
-      id: leadData.id,
-      firstName: leadData.first_name,
-      lastName: leadData.last_name,
-      middleName: leadData.middle_name,
-      email: leadData.email,
-      emailAlt: leadData.email_alt,
-      address: leadData.address,
-      city: leadData.city,
-      state: leadData.state,
-      postalCode: leadData.postal_code,
-      vehicleInterest: leadData.vehicle_interest,
-      vehicleYear: leadData.vehicle_year,
-      vehicleMake: leadData.vehicle_make,
-      vehicleModel: leadData.vehicle_model,
-      vehicleVIN: leadData.vehicle_vin,
-      status: leadData.status,
-      source: leadData.source,
-      aiOptIn: leadData.ai_opt_in || false,
-      aiStage: leadData.ai_stage,
-      aiSequencePaused: leadData.ai_sequence_paused || false,
-      nextAiSendAt: leadData.next_ai_send_at,
-      createdAt: leadData.created_at,
-      lastReplyAt: leadData.last_reply_at,
-      salespersonId: leadData.salesperson_id,
-      salespersonName: leadData.profiles 
-        ? `${leadData.profiles.first_name} ${leadData.profiles.last_name}`
-        : undefined,
-      doNotCall: leadData.do_not_call,
-      doNotEmail: leadData.do_not_email,
-      doNotMail: leadData.do_not_mail,
-      // Price preferences
-      preferredPriceMin: leadData.preferred_price_min,
-      preferredPriceMax: leadData.preferred_price_max,
-      // Trade information
-      hasTradeVehicle: leadData.has_trade_vehicle,
-      tradeInVehicle: leadData.trade_in_vehicle,
-      tradePayoffAmount: leadData.trade_payoff_amount,
-      // AI Takeover fields
-      aiTakeoverEnabled: leadData.ai_takeover_enabled || false,
-      aiTakeoverDelayMinutes: leadData.ai_takeover_delay_minutes || 7,
-      pendingHumanResponse: leadData.pending_human_response || false,
-      humanResponseDeadline: leadData.human_response_deadline,
-      // Unified AI fields
-      messageIntensity: leadData.message_intensity || 'gentle',
-      aiMessagesSent: leadData.ai_messages_sent || 0,
-      aiPauseReason: leadData.ai_pause_reason,
-      primaryPhone: primaryPhoneNumber,
-      phoneNumbers: phoneNumbers?.map(phone => ({
+    // Transform the data to match our interface
+    const leadDetail: LeadDetailData = {
+      id: lead.id,
+      firstName: lead.first_name || '',
+      lastName: lead.last_name || '',
+      email: lead.email,
+      source: lead.source || 'unknown',
+      status: lead.status || 'new',
+      vehicleInterest: lead.vehicle_interest,
+      vehicleMake: lead.vehicle_make,
+      vehicleModel: lead.vehicle_model,
+      vehicleYear: lead.vehicle_year,
+      vehicleVin: lead.vehicle_vin,
+      createdAt: lead.created_at,
+      lastReplyAt: lead.last_reply_at,
+      preferredPriceMin: lead.preferred_price_min,
+      preferredPriceMax: lead.preferred_price_max,
+      notes: lead.notes,
+      phoneNumbers: (lead.phone_numbers || []).map((phone: any) => ({
         id: phone.id,
         number: phone.number,
-        type: phone.type,
         isPrimary: phone.is_primary,
-        status: phone.status,
-        priority: phone.priority,
-        lastAttempt: phone.last_attempt
-      })) || [],
-      conversations: conversations?.map(conv => ({
-        id: conv.id,
-        body: conv.body,
-        direction: conv.direction as 'in' | 'out',
-        sentAt: conv.sent_at,
-        aiGenerated: conv.ai_generated || false,
-        smsStatus: conv.sms_status,
-        leadId: conv.lead_id
-      })) || [],
-      activityTimeline
+        type: phone.type
+      })),
+      tradeVehicles: (lead.trade_vehicles || []).map((trade: any) => ({
+        id: trade.id,
+        year: trade.year,
+        make: trade.make,
+        model: trade.model,
+        vin: trade.vin,
+        mileage: trade.mileage,
+        condition: trade.condition,
+        estimatedValue: trade.estimated_value,
+        owedAmount: trade.owed_amount,
+        description: trade.description
+      })),
+      // AI fields with super aggressive as the default
+      aiOptIn: lead.ai_opt_in || false,
+      messageIntensity: lead.message_intensity || 'super_aggressive', // Changed from 'gentle' to 'super_aggressive'
+      aiMessagesSent: lead.ai_messages_sent || 0,
+      aiStage: lead.ai_stage,
+      aiSequencePaused: lead.ai_sequence_paused || false,
+      aiPauseReason: lead.ai_pause_reason,
+      pendingHumanResponse: lead.pending_human_response || false,
+      nextAiSendAt: lead.next_ai_send_at,
+      // Other fields
+      salespersonId: lead.salesperson_id,
+      temperatureScore: lead.temperature_score,
+      hasTradeVehicle: lead.has_trade_vehicle || false,
+      lastContactedAt: lead.last_contacted_at,
+      totalMessages: messageCount || 0,
+      averageResponseTime: lead.average_response_time,
+      preferredContactMethod: lead.preferred_contact_method,
+      timezone: lead.timezone,
+      bestContactHours: lead.best_contact_hours,
+      lastActivityAt: lead.last_activity_at,
+      leadScore: lead.lead_score,
+      convertedAt: lead.converted_at,
+      conversionValue: lead.conversion_value,
+      appointmentBooked: (appointments && appointments.length > 0) || false,
+      lastAppointmentAt: appointments?.[0]?.created_at,
+      emailOptIn: lead.email_opt_in ?? true,
+      smsOptIn: lead.sms_opt_in ?? true,
+      callOptIn: lead.call_opt_in ?? true,
+      unsubscribed: lead.unsubscribed || false,
+      doNotContact: lead.do_not_contact || false,
+      aiSequenceStartedAt: lead.ai_sequence_started_at,
+      aiLastMessageAt: lead.ai_last_message_at,
+      manuallyAssigned: lead.manually_assigned || false,
+      campaignSource: lead.campaign_source,
+      referralSource: lead.referral_source,
+      utmSource: lead.utm_source,
+      utmMedium: lead.utm_medium,
+      utmCampaign: lead.utm_campaign,
+      landingPage: lead.landing_page,
+      deviceType: lead.device_type,
+      browserType: lead.browser_type,
+      ipAddress: lead.ip_address,
+      geoLocation: lead.geo_location
     };
+
+    return leadDetail;
+
   } catch (error) {
-    console.error('Error fetching lead detail:', error);
+    console.error('Error in getLeadDetail:', error);
     return null;
+  }
+};
+
+export const updateLeadBasicInfo = async (
+  leadId: string, 
+  updates: Partial<{
+    first_name: string;
+    last_name: string;
+    email: string;
+    vehicle_interest: string;
+    preferred_price_min: number;
+    preferred_price_max: number;
+    notes: string;
+  }>
+) => {
+  const { error } = await supabase
+    .from('leads')
+    .update(updates)
+    .eq('id', leadId);
+  
+  if (error) {
+    throw error;
+  }
+};
+
+export const updateLeadStatus = async (leadId: string, status: string) => {
+  const { error } = await supabase
+    .from('leads')
+    .update({ status })
+    .eq('id', leadId);
+  
+  if (error) {
+    throw error;
   }
 };

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bot, Play, Pause, Zap, Heart, MessageSquare, Users, Timer } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
+import { enableAIForLead, pauseAIForLead, resumeAIForLead } from '@/services/aiAutomationService';
 
 interface UnifiedAIControlsProps {
   leadId: string;
@@ -25,7 +26,7 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
   leadId,
   leadName,
   aiOptIn,
-  messageIntensity = 'gentle',
+  messageIntensity = 'super_aggressive',
   aiMessagesSent = 0,
   aiSequencePaused,
   aiPauseReason,
@@ -37,23 +38,34 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
   const handleAIToggle = async (enabled: boolean) => {
     setUpdating(true);
     try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ 
-          ai_opt_in: enabled,
-          message_intensity: enabled ? 'aggressive' : 'gentle', // Start with aggressive for new opt-ins
-          ai_sequence_paused: false
-        })
-        .eq('id', leadId);
+      if (enabled) {
+        // Use the centralized enableAIForLead function for consistent super aggressive setup
+        const success = await enableAIForLead(leadId);
+        if (!success) {
+          throw new Error('Failed to enable AI for lead');
+        }
+        
+        toast({
+          title: "AI Messaging Enabled",
+          description: `${leadName} will receive super aggressive AI messaging with 3 messages on the first day`,
+        });
+      } else {
+        const { error } = await supabase
+          .from('leads')
+          .update({ 
+            ai_opt_in: false,
+            ai_sequence_paused: true,
+            next_ai_send_at: null
+          })
+          .eq('id', leadId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: enabled ? "AI Messaging Enabled" : "AI Messaging Disabled",
-        description: enabled 
-          ? `${leadName} will receive ${enabled ? 'aggressive' : 'gentle'} AI messaging`
-          : "AI messaging has been turned off",
-      });
+        toast({
+          title: "AI Messaging Disabled",
+          description: "AI messaging has been turned off",
+        });
+      }
 
       onUpdate();
     } catch (error) {
@@ -100,16 +112,17 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
   const handlePauseResume = async () => {
     setUpdating(true);
     try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ 
-          ai_sequence_paused: !aiSequencePaused,
-          ai_pause_reason: !aiSequencePaused ? 'Manually paused' : null,
-          pending_human_response: false
-        })
-        .eq('id', leadId);
-
-      if (error) throw error;
+      if (aiSequencePaused) {
+        const success = await resumeAIForLead(leadId);
+        if (!success) {
+          throw new Error('Failed to resume AI for lead');
+        }
+      } else {
+        const success = await pauseAIForLead(leadId, 'Manually paused');
+        if (!success) {
+          throw new Error('Failed to pause AI for lead');
+        }
+      }
 
       toast({
         title: aiSequencePaused ? "AI Resumed" : "AI Paused",
@@ -134,6 +147,7 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
     if (!aiOptIn) return 'bg-gray-100 text-gray-800';
     if (pendingHumanResponse) return 'bg-blue-100 text-blue-800';
     if (aiSequencePaused) return 'bg-yellow-100 text-yellow-800';
+    if (messageIntensity === 'super_aggressive') return 'bg-purple-100 text-purple-800';
     if (messageIntensity === 'aggressive') return 'bg-red-100 text-red-800';
     return 'bg-green-100 text-green-800';
   };
@@ -142,6 +156,7 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
     if (!aiOptIn) return <Bot className="w-3 h-3 text-gray-500" />;
     if (pendingHumanResponse) return <Users className="w-3 h-3 text-blue-500" />;
     if (aiSequencePaused) return <Pause className="w-3 h-3 text-yellow-500" />;
+    if (messageIntensity === 'super_aggressive') return <Zap className="w-3 h-3 text-purple-500" />;
     if (messageIntensity === 'aggressive') return <Zap className="w-3 h-3 text-red-500" />;
     return <Heart className="w-3 h-3 text-green-500" />;
   };
@@ -150,6 +165,7 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
     if (!aiOptIn) return 'Disabled';
     if (pendingHumanResponse) return 'Waiting for Human';
     if (aiSequencePaused) return 'Paused';
+    if (messageIntensity === 'super_aggressive') return 'Super Aggressive Mode';
     if (messageIntensity === 'aggressive') return 'Aggressive Mode';
     return 'Gentle Mode';
   };
@@ -177,7 +193,7 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
           <div>
             <div className="font-medium">AI Messaging</div>
             <div className="text-sm text-muted-foreground">
-              Enable automated messaging sequences
+              Enable automated messaging sequences (starts with super aggressive first-day burst)
             </div>
           </div>
           <Switch
@@ -207,6 +223,17 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="super_aggressive">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-3 h-3 text-purple-500" />
+                      <div>
+                        <div className="font-medium">Super Aggressive (Default)</div>
+                        <div className="text-xs text-muted-foreground">
+                          3 messages first day, then multiple daily
+                        </div>
+                      </div>
+                    </div>
+                  </SelectItem>
                   <SelectItem value="aggressive">
                     <div className="flex items-center gap-2">
                       <Zap className="w-3 h-3 text-red-500" />
@@ -234,7 +261,17 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
 
               {/* Intensity Description */}
               <div className="p-3 bg-gray-50 rounded-lg text-sm">
-                {messageIntensity === 'aggressive' ? (
+                {messageIntensity === 'super_aggressive' ? (
+                  <div className="flex items-start gap-2">
+                    <Zap className="w-4 h-4 text-purple-500 mt-0.5" />
+                    <div>
+                      <div className="font-medium text-purple-900">Super Aggressive Mode (Default)</div>
+                      <div className="text-purple-700">
+                        Perfect for new leads. Sends 3 messages in the first 8-10 hours, then continues with aggressive follow-up to drive immediate action.
+                      </div>
+                    </div>
+                  </div>
+                ) : messageIntensity === 'aggressive' ? (
                   <div className="flex items-start gap-2">
                     <Zap className="w-4 h-4 text-red-500 mt-0.5" />
                     <div>
@@ -313,7 +350,7 @@ const UnifiedAIControls: React.FC<UnifiedAIControlsProps> = ({
               </div>
               <div className="p-2 bg-gray-50 rounded">
                 <div className="text-lg font-bold text-gray-900">
-                  {messageIntensity === 'aggressive' ? 'HIGH' : 'LOW'}
+                  {messageIntensity === 'super_aggressive' ? 'SUPER' : messageIntensity === 'aggressive' ? 'HIGH' : 'LOW'}
                 </div>
                 <div className="text-xs text-gray-600">Intensity</div>
               </div>
