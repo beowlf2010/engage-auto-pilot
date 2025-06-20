@@ -10,6 +10,7 @@ interface AIStatusBadgeProps {
   aiMessagesSent?: number;
   incomingCount?: number;
   outgoingCount?: number;
+  unrepliedCount?: number; // Add unrepliedCount prop
 }
 
 const AIStatusBadge: React.FC<AIStatusBadgeProps> = ({
@@ -19,7 +20,8 @@ const AIStatusBadge: React.FC<AIStatusBadgeProps> = ({
   messageIntensity = 'gentle',
   aiMessagesSent,
   incomingCount,
-  outgoingCount
+  outgoingCount,
+  unrepliedCount
 }) => {
   return (
     <EnhancedAIStatusDisplay
@@ -30,6 +32,7 @@ const AIStatusBadge: React.FC<AIStatusBadgeProps> = ({
       pendingHumanResponse={pendingHumanResponse}
       incomingCount={incomingCount}
       outgoingCount={outgoingCount}
+      unrepliedCount={unrepliedCount}
       size="sm"
       showDetailed={true}
     />

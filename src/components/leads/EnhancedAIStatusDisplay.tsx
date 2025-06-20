@@ -11,6 +11,7 @@ interface EnhancedAIStatusDisplayProps {
   pendingHumanResponse?: boolean;
   incomingCount?: number;
   outgoingCount?: number;
+  unrepliedCount?: number; // Use the accurate unreplied count
   size?: 'sm' | 'default';
   showDetailed?: boolean;
 }
@@ -23,22 +24,21 @@ const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
   pendingHumanResponse,
   incomingCount = 0,
   outgoingCount = 0,
+  unrepliedCount = 0, // Use the accurate count from the hook
   size = 'default',
   showDetailed = false
 }) => {
   const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-4 h-4';
   
-  // Calculate unreplied messages based on recent conversation flow
-  // This should ideally be calculated from actual message sequence, but for now
-  // we'll use a more conservative approach
-  const unrepliedCount = Math.max(0, outgoingCount - incomingCount);
+  // Use the accurate unreplied count passed in
+  const actualUnrepliedCount = unrepliedCount;
   
   // Only show unreplied count if there are actually unreplied messages
-  const hasUnrepliedMessages = unrepliedCount > 0;
+  const hasUnrepliedMessages = actualUnrepliedCount > 0;
   
-  // High count threshold - more reasonable than before
-  const highCountThreshold = 10;
-  const isHighCount = unrepliedCount >= highCountThreshold;
+  // Adjust threshold for more reasonable warning levels
+  const highCountThreshold = 5;
+  const isHighCount = actualUnrepliedCount >= highCountThreshold;
 
   if (!aiOptIn) {
     return (
@@ -85,12 +85,12 @@ const EnhancedAIStatusDisplay: React.FC<EnhancedAIStatusDisplayProps> = ({
           variant="outline" 
           className={
             isHighCount ? 'bg-red-100 text-red-700 border-red-200' :
-            unrepliedCount > 5 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+            actualUnrepliedCount > 2 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
             'bg-orange-100 text-orange-700 border-orange-200'
           }
         >
           <MessageCircle className={`${iconSize} mr-1`} />
-          {unrepliedCount} unreplied
+          {actualUnrepliedCount} unreplied
         </Badge>
       )}
 

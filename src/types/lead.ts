@@ -48,6 +48,7 @@ export interface Lead {
   // Message count properties calculated in useLeads hook
   incomingCount: number;
   outgoingCount: number;
+  unrepliedCount: number; // New field for accurate unreplied count
   messageCount?: number;
   // New enhanced AI tracking fields
   aiMessagesSent?: number;

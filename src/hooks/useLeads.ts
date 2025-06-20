@@ -51,6 +51,7 @@ export const useLeads = () => {
       const outgoingCountMap = new Map();
       const incomingCountMap = new Map();
       const lastMessageDirectionMap = new Map();
+      const unrepliedCountMap = new Map();
 
       conversationsData?.forEach(conv => {
         const leadId = conv.lead_id;
@@ -85,6 +86,36 @@ export const useLeads = () => {
         }
       });
 
+      // Calculate true unreplied counts for each lead
+      for (const leadId of [...new Set(conversationsData?.map(c => c.lead_id) || [])]) {
+        const leadConversations = conversationsData
+          ?.filter(c => c.lead_id === leadId)
+          .sort((a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime());
+
+        if (!leadConversations || leadConversations.length === 0) {
+          unrepliedCountMap.set(leadId, 0);
+          continue;
+        }
+
+        // Find the last incoming message
+        const lastIncomingMessage = [...leadConversations]
+          .reverse()
+          .find(c => c.direction === 'in');
+
+        if (!lastIncomingMessage) {
+          // No incoming messages, so all outgoing messages are unreplied
+          const outgoingCount = leadConversations.filter(c => c.direction === 'out').length;
+          unrepliedCountMap.set(leadId, outgoingCount);
+        } else {
+          // Count outgoing messages sent after the last incoming message
+          const lastIncomingTime = new Date(lastIncomingMessage.sent_at).getTime();
+          const unrepliedCount = leadConversations.filter(c => 
+            c.direction === 'out' && new Date(c.sent_at).getTime() > lastIncomingTime
+          ).length;
+          unrepliedCountMap.set(leadId, unrepliedCount);
+        }
+      }
+
       // Transform data to match existing component structure
       const transformedLeads = leadsData?.map(lead => {
         const latestConv = conversationMap.get(lead.id);
@@ -93,6 +124,7 @@ export const useLeads = () => {
         const incomingCount = incomingCountMap.get(lead.id) || 0;
         const unreadCount = unreadCountMap.get(lead.id) || 0;
         const lastMessageDirection = lastMessageDirectionMap.get(lead.id) || null;
+        const unrepliedCount = unrepliedCountMap.get(lead.id) || 0;
         
         // Determine contact status
         let contactStatus = 'no_contact';
@@ -144,6 +176,7 @@ export const useLeads = () => {
           messageCount: messageCount,
           outgoingCount: outgoingCount,
           incomingCount: incomingCount,
+          unrepliedCount: unrepliedCount,
           contactStatus: contactStatus,
           hasBeenMessaged: messageCount > 0,
           doNotCall: lead.do_not_call,
