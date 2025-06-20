@@ -18,11 +18,13 @@ import {
   TrendingUp,
   Star,
   UserX,
-  UserCheck
+  UserCheck,
+  StickyNote
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import AppointmentsList from '../appointments/AppointmentsList';
 import MarkLostConfirmDialog from '../leads/MarkLostConfirmDialog';
+import LeadNotesTab from './LeadNotesTab';
 import { markLeadAsLost } from '@/services/leadStatusService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -137,8 +139,12 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
 
         <CardContent className="p-0 h-[calc(100%-5rem)] overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 mx-4">
+            <TabsList className="grid w-full grid-cols-4 mx-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="notes">
+                <StickyNote className="h-3 w-3 mr-1" />
+                Notes
+              </TabsTrigger>
               <TabsTrigger value="appointments">Appointments</TabsTrigger>
               <TabsTrigger value="activity">Activity</TabsTrigger>
             </TabsList>
@@ -260,6 +266,20 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
                         AI assistant is helping with this lead
                       </p>
                     </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="notes" className="mt-4">
+                {conversation.leadId ? (
+                  <LeadNotesTab 
+                    leadId={conversation.leadId} 
+                    leadName={conversation.leadName || 'Lead'}
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <StickyNote className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No lead selected</p>
                   </div>
                 )}
               </TabsContent>
