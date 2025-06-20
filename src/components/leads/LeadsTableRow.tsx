@@ -11,12 +11,14 @@ import LeadStatusBadge from "./LeadStatusBadge";
 import LeadContactStatusBadge from "./LeadContactStatusBadge";
 import FreshLeadBadge from "./FreshLeadBadge";
 import AIPreviewPopout from "./AIPreviewPopout";
+import DoNotContactControls from "./DoNotContactControls";
 
 interface LeadsTableRowProps {
   lead: Lead;
   selectedLeads: string[];
   onLeadSelect: (leadId: string) => void;
   onAiOptInChange: (leadId: string, value: boolean) => void;
+  onDoNotContactChange?: (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => void;
   canEdit: boolean;
   onQuickView: (lead: Lead) => void;
   getEngagementScore: (lead: Lead) => number;
@@ -28,6 +30,7 @@ const LeadsTableRow = ({
   selectedLeads,
   onLeadSelect,
   onAiOptInChange,
+  onDoNotContactChange,
   canEdit,
   onQuickView,
   getEngagementScore,
@@ -170,6 +173,15 @@ const LeadsTableRow = ({
             </div>
           )}
         </div>
+      </TableCell>
+
+      <TableCell>
+        <DoNotContactControls
+          lead={lead}
+          onDoNotContactChange={onDoNotContactChange}
+          canEdit={canEdit}
+          size="sm"
+        />
       </TableCell>
 
       <TableCell>

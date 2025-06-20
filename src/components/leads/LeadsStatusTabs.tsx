@@ -15,6 +15,7 @@ interface LeadsStatusTabsProps {
   selectAllFiltered: () => void;
   toggleLeadSelection: (leadId: string) => void;
   handleAiOptInChange: (leadId: string, value: boolean) => void;
+  handleDoNotContactChange: (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => void;
   canEdit: boolean;
   searchTerm: string;
   onQuickView: (lead: Lead) => void;
@@ -30,6 +31,7 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
   selectAllFiltered,
   toggleLeadSelection,
   handleAiOptInChange,
+  handleDoNotContactChange,
   canEdit,
   searchTerm,
   onQuickView,
@@ -50,6 +52,8 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
         return 'Successfully closed';
       case 'lost':
         return 'Marked as lost';
+      case 'do_not_contact':
+        return 'Leads with contact restrictions';
       default:
         return '';
     }
@@ -57,7 +61,7 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
 
   return (
     <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
-      <TabsList className="grid w-full grid-cols-6">
+      <TabsList className="grid w-full grid-cols-7">
         <TabsTrigger value="all" title={getTabDescription('all')}>
           All
         </TabsTrigger>
@@ -75,6 +79,9 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
         </TabsTrigger>
         <TabsTrigger value="lost" title={getTabDescription('lost')}>
           Lost
+        </TabsTrigger>
+        <TabsTrigger value="do_not_contact" title={getTabDescription('do_not_contact')}>
+          DNC
         </TabsTrigger>
       </TabsList>
 
@@ -104,6 +111,7 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
         <LeadsTable
           leads={finalFilteredLeads}
           onAiOptInChange={handleAiOptInChange}
+          onDoNotContactChange={handleDoNotContactChange}
           canEdit={canEdit}
           loading={loading}
           searchTerm={searchTerm}

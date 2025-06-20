@@ -12,6 +12,7 @@ import LeadsTableEmptyState from "./leads/LeadsTableEmptyState";
 interface LeadsTableProps {
   leads: Lead[];
   onAiOptInChange: (leadId: string, value: boolean) => void;
+  onDoNotContactChange?: (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => void;
   canEdit: boolean;
   loading: boolean;
   searchTerm: string;
@@ -24,6 +25,7 @@ interface LeadsTableProps {
 const LeadsTable = ({
   leads,
   onAiOptInChange,
+  onDoNotContactChange,
   canEdit,
   loading,
   searchTerm,
@@ -70,6 +72,7 @@ const LeadsTable = ({
                 selectedLeads={selectedLeads}
                 onLeadSelect={onLeadSelect}
                 onAiOptInChange={onAiOptInChange}
+                onDoNotContactChange={onDoNotContactChange}
                 canEdit={canEdit}
                 onQuickView={onQuickView}
                 getEngagementScore={getEngagementScore}

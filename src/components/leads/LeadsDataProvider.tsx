@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
@@ -124,6 +123,40 @@ const LeadsDataProvider = ({
     }
   };
 
+  const handleDoNotContactChange = async (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => {
+    try {
+      const updateData = {
+        [field === 'doNotCall' ? 'do_not_call' : field === 'doNotEmail' ? 'do_not_email' : 'do_not_mail']: value
+      };
+
+      const { error } = await supabase
+        .from('leads')
+        .update(updateData)
+        .eq('id', leadId);
+
+      if (error) throw error;
+
+      const actionText = value ? 'enabled' : 'disabled';
+      const restrictionType = field === 'doNotCall' ? 'call' : field === 'doNotEmail' ? 'email' : 'mail';
+
+      toast({
+        title: "Contact restriction updated",
+        description: `Do not ${restrictionType} ${actionText} for this lead`,
+      });
+
+      // Force refresh to get updated data
+      console.log('🔄 [LEADS DATA] Forcing refresh after do-not-contact change');
+      refetch();
+    } catch (error) {
+      console.error('Error updating lead contact restrictions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update contact restrictions",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleMessage = (lead: Lead) => {
     window.location.href = `/inbox?leadId=${lead.id}`;
   };
@@ -223,6 +256,7 @@ const LeadsDataProvider = ({
         selectAllFiltered={selectAllFiltered}
         toggleLeadSelection={toggleLeadSelection}
         handleAiOptInChange={handleAiOptInChange}
+        handleDoNotContactChange={handleDoNotContactChange}
         canEdit={canEdit}
         searchTerm={searchFilters.searchTerm}
         onQuickView={showQuickView}

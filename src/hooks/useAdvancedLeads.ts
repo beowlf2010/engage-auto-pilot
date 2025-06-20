@@ -14,6 +14,7 @@ export interface SearchFilters {
   state?: string;
   engagementScoreMin?: number;
   engagementScoreMax?: number;
+  doNotContact?: boolean;
 }
 
 export interface SavedPreset {
@@ -80,13 +81,15 @@ export const useAdvancedLeads = () => {
       );
     }
 
-    // Enhanced status-based filtering with special handling for lost leads
+    // Enhanced status-based filtering with special handling for lost leads and do not contact
     if (statusFilter !== 'all') {
       switch (statusFilter) {
         case 'new':
-          // Only show leads with no contact attempted and not lost
+          // Only show leads with no contact attempted and not lost or do-not-contact
           filtered = filtered.filter(lead => 
-            lead.contactStatus === 'no_contact' && lead.status !== 'lost'
+            lead.contactStatus === 'no_contact' && 
+            lead.status !== 'lost' &&
+            !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
           );
           break;
         case 'engaged':
@@ -106,14 +109,23 @@ export const useAdvancedLeads = () => {
           // Only show lost leads in the Lost tab
           filtered = filtered.filter(lead => lead.status === 'lost');
           break;
+        case 'do_not_contact':
+          // Show leads with any do-not-contact restrictions
+          filtered = filtered.filter(lead => 
+            lead.doNotCall || lead.doNotEmail || lead.doNotMail
+          );
+          break;
         default:
           // For any other status filter
           filtered = filtered.filter(lead => lead.status === statusFilter);
       }
     } else {
-      // For "All" tab: exclude lost leads unless searching by name/phone
+      // For "All" tab: exclude lost leads and do-not-contact leads unless searching by name/phone
       if (!isSearchingByNameOrPhone) {
-        filtered = filtered.filter(lead => lead.status !== 'lost');
+        filtered = filtered.filter(lead => 
+          lead.status !== 'lost' && 
+          !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
+        );
       }
     }
 
@@ -125,6 +137,15 @@ export const useAdvancedLeads = () => {
     // Contact status filter (only apply if not conflicting with tab-based filtering)
     if (searchFilters.contactStatus && statusFilter === 'all') {
       filtered = filtered.filter(lead => lead.contactStatus === searchFilters.contactStatus);
+    }
+
+    // Do not contact filter
+    if (searchFilters.doNotContact !== undefined) {
+      if (searchFilters.doNotContact) {
+        filtered = filtered.filter(lead => lead.doNotCall || lead.doNotEmail || lead.doNotMail);
+      } else {
+        filtered = filtered.filter(lead => !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail);
+      }
     }
 
     // Source filter
