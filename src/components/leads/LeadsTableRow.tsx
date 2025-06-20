@@ -63,7 +63,7 @@ const LeadsTableRow = ({
       
       <TableCell>
         <div className="flex items-center space-x-2">
-          {isFresh && <FreshLeadBadge createdAt={lead.createdAt} />}
+          {isFresh && <FreshLeadBadge createdAt={lead.createdAt} aiOptIn={lead.aiOptIn} />}
           <div>
             <button
               onClick={() => handleLeadClick(lead.id.toString())}
@@ -114,17 +114,25 @@ const LeadsTableRow = ({
       </TableCell>
 
       <TableCell>
-        {canEdit && (
-          <Checkbox
-            checked={lead.aiOptIn}
-            onCheckedChange={(checked) => onAiOptInChange(lead.id.toString(), !!checked)}
-          />
-        )}
-        {!canEdit && (
-          <Badge variant={lead.aiOptIn ? "default" : "outline"}>
-            {lead.aiOptIn ? "On" : "Off"}
-          </Badge>
-        )}
+        <div className="space-y-1">
+          {canEdit && (
+            <Checkbox
+              checked={lead.aiOptIn}
+              onCheckedChange={(checked) => onAiOptInChange(lead.id.toString(), !!checked)}
+            />
+          )}
+          {!canEdit && (
+            <Badge variant={lead.aiOptIn ? "default" : "outline"}>
+              {lead.aiOptIn ? "On" : "Off"}
+            </Badge>
+          )}
+          {/* Show next message schedule if AI is enabled */}
+          {lead.aiOptIn && lead.nextAiSendAt && (
+            <div className="text-xs text-gray-500">
+              Next: {new Date(lead.nextAiSendAt).toLocaleDateString()} {new Date(lead.nextAiSendAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
       </TableCell>
 
       <TableCell>

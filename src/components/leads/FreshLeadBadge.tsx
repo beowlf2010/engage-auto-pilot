@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 
 interface FreshLeadBadgeProps {
   createdAt: string;
+  aiOptIn?: boolean;
 }
 
-const FreshLeadBadge: React.FC<FreshLeadBadgeProps> = ({ createdAt }) => {
+const FreshLeadBadge: React.FC<FreshLeadBadgeProps> = ({ createdAt, aiOptIn = false }) => {
   const isToday = (date: string) => {
     const today = new Date();
     const leadDate = new Date(date);
@@ -19,6 +20,11 @@ const FreshLeadBadge: React.FC<FreshLeadBadgeProps> = ({ createdAt }) => {
     const leadDate = new Date(date);
     return yesterday.toDateString() === leadDate.toDateString();
   };
+
+  // Don't show fresh badge if AI is already enabled
+  if (aiOptIn) {
+    return null;
+  }
 
   if (isToday(createdAt)) {
     return (
