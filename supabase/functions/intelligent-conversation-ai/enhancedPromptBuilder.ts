@@ -1,5 +1,6 @@
 
 import { analyzeCustomerIntent, generateAnswerGuidance, needsConversationRepair } from './enhancedIntentAnalysis.ts';
+import { buildSalesProgressionPrompt } from './salesProgressionPrompts.ts';
 
 // Enhanced prompt builder to create context-rich prompts for the OpenAI API
 // This function takes lead information, conversation history, and inventory status as input
@@ -35,11 +36,20 @@ This is an ongoing conversation. Use the conversation history to provide relevan
 This is a new conversation. Introduce yourself and offer assistance.`;
   }
 
+  // NEW: Add objection handling guidance
+  if (customerIntent?.needsObjectionHandling) {
+    userPrompt += `
+
+🚨 OBJECTION DETECTED: The customer is showing signs of ${customerIntent.detectedObjections.join(', ')}. 
+You MUST address their underlying concern and ask probing questions to uncover the real objection.
+Do NOT give weak responses like "let me know if you need anything" - this is a sales opportunity!`;
+  }
+
   // Add customer intent analysis
   if (customerIntent?.requiresDirectAnswer) {
     userPrompt += `
 
-The customer is asking a direct question. Provide a clear and concise answer.`;
+The customer is asking a direct question. Provide a clear and concise answer, then move the conversation forward.`;
   }
 
   // Add appointment intent analysis
@@ -83,6 +93,38 @@ export const buildEnhancedSystemPrompt = (
   conversationGuidance: any,
   lastCustomerMessage: string
 ) => {
+  // NEW: Check if we should use sales progression system
+  const shouldUseSalesProgression = conversationLength > 0 && lastCustomerMessage;
+  
+  if (shouldUseSalesProgression) {
+    console.log('🎯 Using SALES PROGRESSION system for objection handling and forward movement');
+    const salesPromptData = buildSalesProgressionPrompt(
+      leadName,
+      vehicleInterest,
+      lastCustomerMessage,
+      conversationHistory,
+      inventoryStatus
+    );
+    
+    return {
+      systemPrompt: salesPromptData.systemPrompt,
+      customerIntent: { 
+        requiresDirectAnswer: salesPromptData.objectionSignals.length > 0,
+        objectionSignals: salesPromptData.objectionSignals,
+        salesProgression: salesPromptData.salesProgression
+      },
+      answerGuidance: salesPromptData.suggestedResponse ? {
+        specificGuidance: salesPromptData.suggestedResponse,
+        salesProgression: true
+      } : null,
+      needsRepair: false,
+      appointmentIntent: null,
+      tradeIntent: null,
+      requestedCategory: null
+    };
+  }
+
+  // Fallback to original logic for initial contacts
   const customerIntent = analyzeCustomerIntent(conversationHistory, lastCustomerMessage);
   const answerGuidance = generateAnswerGuidance(customerIntent, inventoryStatus);
   const needsRepair = needsConversationRepair(customerIntent);
@@ -211,8 +253,8 @@ RESPONSE REQUIREMENTS:
     customerIntent,
     answerGuidance,
     needsRepair,
-    appointmentIntent: null, // Will be added if needed
-    tradeIntent: null, // Will be added if needed
-    requestedCategory: null // Will be added if needed
+    appointmentIntent: null,
+    tradeIntent: null,
+    requestedCategory: null
   };
 };

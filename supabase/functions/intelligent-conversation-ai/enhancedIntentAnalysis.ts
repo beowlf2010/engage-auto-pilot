@@ -1,4 +1,5 @@
-// Enhanced intent analysis to detect specific customer questions and requirements
+
+// Enhanced intent analysis to detect specific customer questions and objections
 import { analyzeTowingRequest, validateTowingCapability, generateSafeTowingResponse } from './vehicleSpecifications.ts';
 
 export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerMessage: string) => {
@@ -25,6 +26,15 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
     general_inquiry: /\?|what|how|when|where|why|can you|could you|would you/
   };
 
+  // NEW: Detect objection and hesitation patterns
+  const objectionPatterns = {
+    hesitation: /\b(think about it|let me think|not sure|maybe|might|i'll get back|talk it over)\b/,
+    price_objection: /\b(too expensive|can't afford|out of budget|too much|cheaper|better deal)\b/,
+    timing_objection: /\b(not ready|waiting|next month|current car|few more months|decided to wait)\b/,
+    feature_objection: /\b(don't like|not what i want|looking for something|wish it had|missing)\b/,
+    competitor_mention: /\b(honda|toyota|ford|other dealer|elsewhere|comparing|looking elsewhere)\b/
+  };
+
   // Detect specific question types
   const detectedQuestions = [];
   for (const [type, pattern] of Object.entries(questionPatterns)) {
@@ -33,9 +43,21 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
     }
   }
 
+  // NEW: Detect objections
+  const detectedObjections = [];
+  for (const [type, pattern] of Object.entries(objectionPatterns)) {
+    if (pattern.test(lastMessage)) {
+      detectedObjections.push(type);
+    }
+  }
+
   const isDirectQuestion = detectedQuestions.length > 0 || 
     lastMessage.includes('?') ||
     /^(what|how|when|where|why|can|could|would|do|does|is|are)\b/.test(lastMessage);
+
+  // NEW: Detect if customer is being evasive or non-committal
+  const isEvasive = /^(ok|okay|sure|maybe|i guess|we'll see|fine)\.?$/i.test(lastMessage.trim()) ||
+    /\b(think about it|get back to you|let you know|talk it over)\b/.test(lastMessage);
 
   // Extract the specific topic they're asking about
   let questionTopic = null;
@@ -55,7 +77,7 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
     }
   }
 
-  // IMPROVED: Only detect frustration with explicit indicators of being ignored
+  // REFINED: Only detect frustration with explicit indicators of being ignored
   const explicitFrustrationIndicators = /\b(but you didn't answer|i asked you|you never responded|i told you|you ignored|my question was|why didn't you|you missed my|still waiting|i'm still asking|hello\?|are you there)\b/;
   const repeatIndicators = /\b(again|i said|like i said|as i mentioned|i already|i repeat)\b/;
   
@@ -91,7 +113,12 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
     salesWasOffTopic,
     requiresDirectAnswer: isDirectQuestion,
     primaryQuestionType: detectedQuestions[0] || 'general_inquiry',
-    towingAnalysis, // NEW: Include towing analysis
+    towingAnalysis, // Include towing analysis
+    // NEW: Objection analysis
+    hasObjections: detectedObjections.length > 0,
+    detectedObjections,
+    isEvasive,
+    needsObjectionHandling: detectedObjections.length > 0 || isEvasive,
     conversationContext: {
       lastSalesMessage: lastSalesContent,
       customerMessageCount: customerMessages.length,
@@ -102,11 +129,11 @@ export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerM
   };
 };
 
-// Generate specific answer guidance based on question type
+// Generate specific answer guidance based on question type and objections
 export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any) => {
-  const { questionTypes, questionTopic, primaryQuestionType, conversationContext, towingAnalysis } = intentAnalysis;
+  const { questionTypes, questionTopic, primaryQuestionType, conversationContext, towingAnalysis, hasObjections, detectedObjections, needsObjectionHandling } = intentAnalysis;
   
-  if (!intentAnalysis.requiresDirectAnswer) {
+  if (!intentAnalysis.requiresDirectAnswer && !needsObjectionHandling) {
     return null;
   }
 
@@ -117,8 +144,38 @@ export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any
     inventoryContext: inventoryStatus,
     urgencyLevel: conversationContext.needsApology ? 'high' : 'normal',
     needsApology: conversationContext.needsApology,
-    towingValidation: null as any
+    towingValidation: null as any,
+    // NEW: Objection handling guidance
+    hasObjections,
+    objectionsDetected: detectedObjections,
+    needsObjectionHandling,
+    salesProgression: 'address_objection'
   };
+
+  // NEW: Handle objections first
+  if (needsObjectionHandling) {
+    const primaryObjection = detectedObjections[0];
+    switch (primaryObjection) {
+      case 'hesitation':
+        guidance.specificGuidance = 'Customer is hesitating. Ask specific probing questions to uncover the real concern: "Is there something specific about the vehicle that\'s concerning you - price, timing, or features?"';
+        break;
+      case 'price_objection':
+        guidance.specificGuidance = 'Customer has price concerns. Ask about their comfortable payment range and present financing options.';
+        break;
+      case 'timing_objection':
+        guidance.specificGuidance = 'Customer wants to delay. Create appropriate urgency and ask what would need to change for them to move forward sooner.';
+        break;
+      case 'feature_objection':
+        guidance.specificGuidance = 'Customer has feature concerns. Ask specifically what features are most important to them.';
+        break;
+      case 'competitor_mention':
+        guidance.specificGuidance = 'Customer mentioned competitors. Ask what other vehicles they\'re considering and highlight unique advantages.';
+        break;
+      default:
+        guidance.specificGuidance = 'Customer is being evasive. Ask direct questions to uncover their real concerns and move the conversation forward.';
+    }
+    return guidance;
+  }
 
   // ENHANCED: Handle towing questions with validation
   if (primaryQuestionType === 'towing' && towingAnalysis?.hasTowingRequest) {
@@ -151,20 +208,20 @@ export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any
         
       case 'pricing':
         guidance.specificGuidance = questionTopic ? 
-          `Provide pricing information for ${questionTopic}. Be transparent about costs.` :
-          'Answer their pricing question directly with available information.';
+          `Provide pricing information for ${questionTopic}. Be transparent about costs and ask about their payment comfort zone.` :
+          'Answer their pricing question directly and ask about their budget and payment preferences.';
         break;
         
       case 'features':
-        guidance.specificGuidance = `Provide specific feature information about ${questionTopic || 'the vehicle'}. Be detailed and helpful.`;
+        guidance.specificGuidance = `Provide specific feature information about ${questionTopic || 'the vehicle'}. Be detailed and helpful, then ask what features are most important to them.`;
         break;
         
       case 'scheduling':
-        guidance.specificGuidance = 'Help them schedule a visit or appointment. Be specific about next steps.';
+        guidance.specificGuidance = 'Help them schedule a visit or appointment. Be specific about next steps and create appropriate urgency.';
         break;
         
       default:
-        guidance.specificGuidance = 'Answer their question directly and completely.';
+        guidance.specificGuidance = 'Answer their question directly and completely, then ask a follow-up question to move the conversation forward.';
     }
   }
 
