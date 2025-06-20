@@ -145,7 +145,7 @@ export const useMessagesOperations = () => {
       // Refresh data
       queryClient.invalidateQueries({ queryKey: ['stable-conversations'] });
       
-      // Reload messages for current lead
+      // Reload messages for current lead to show the new message immediately
       if (selectedLeadId === leadId) {
         await loadMessages(leadId);
       }

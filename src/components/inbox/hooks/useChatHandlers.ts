@@ -11,6 +11,7 @@ interface UseChatHandlersProps {
   updateSummary: () => void;
   updateSuggestions: () => void;
   isSending: boolean;
+  scrollToBottom: () => void;
 }
 
 export const useChatHandlers = ({
@@ -22,16 +23,9 @@ export const useChatHandlers = ({
   onSendMessage,
   updateSummary,
   updateSuggestions,
-  isSending
+  isSending,
+  scrollToBottom
 }: UseChatHandlersProps) => {
-  const handleScroll = useCallback(() => {
-    setShowScrollButton(Math.random() > 0.7); // Placeholder logic
-  }, [setShowScrollButton]);
-
-  const handleScrollToBottom = useCallback(() => {
-    setShowScrollButton(false);
-  }, [setShowScrollButton]);
-
   const handleSend = useCallback(async () => {
     if (newMessage.trim() && !isSending) {
       setIsSending(true);
@@ -39,6 +33,9 @@ export const useChatHandlers = ({
         console.log('📤 Sending message from chat view:', newMessage.trim());
         await onSendMessage(newMessage.trim());
         setNewMessage('');
+        
+        // Auto-scroll to bottom after sending
+        setTimeout(scrollToBottom, 100);
         
         // Update analysis after sending
         setTimeout(() => {
@@ -51,7 +48,7 @@ export const useChatHandlers = ({
         setIsSending(false);
       }
     }
-  }, [newMessage, isSending, setIsSending, onSendMessage, setNewMessage, updateSummary, updateSuggestions]);
+  }, [newMessage, isSending, setIsSending, onSendMessage, setNewMessage, updateSummary, updateSuggestions, scrollToBottom]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -66,6 +63,9 @@ export const useChatHandlers = ({
       await onSendMessage(message, false);
       setShowAIGenerator(false);
       
+      // Auto-scroll to bottom after AI message
+      setTimeout(scrollToBottom, 100);
+      
       // Update analysis after AI message
       setTimeout(() => {
         updateSummary();
@@ -76,15 +76,13 @@ export const useChatHandlers = ({
     } finally {
       setIsSending(false);
     }
-  }, [setIsSending, onSendMessage, setShowAIGenerator, updateSummary, updateSuggestions]);
+  }, [setIsSending, onSendMessage, setShowAIGenerator, updateSummary, updateSuggestions, scrollToBottom]);
 
   const handleSelectSuggestion = useCallback((suggestion: string) => {
     setNewMessage(suggestion);
   }, [setNewMessage]);
 
   return {
-    handleScroll,
-    handleScrollToBottom,
     handleSend,
     handleKeyPress,
     handleAIGeneratedMessage,

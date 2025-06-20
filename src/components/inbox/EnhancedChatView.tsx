@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { MessageSquare } from 'lucide-react';
 import ChatAIPanelsContainer from './ChatAIPanelsContainer';
@@ -37,6 +37,8 @@ const EnhancedChatView = ({
   const [showAppointmentScheduler, setShowAppointmentScheduler] = useState(false);
   const [appointmentIntent, setAppointmentIntent] = useState<AppointmentIntent | null>(null);
   const [showAppointmentBanner, setShowAppointmentBanner] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   
   const chatState = useChatState();
   const {
@@ -70,6 +72,28 @@ const EnhancedChatView = ({
     getAverageSentiment
   } = useConversationAnalysis(selectedConversation?.leadId || '');
 
+  // Auto-scroll to bottom function
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Auto-scroll when messages change or conversation is selected
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Small delay to ensure DOM is updated
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [messages, selectedConversation?.leadId]);
+
+  // Handle scroll detection
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
+      setShowScrollButton(!isNearBottom);
+    }
+  };
+
   const chatHandlers = useChatHandlers({
     newMessage,
     setNewMessage,
@@ -79,12 +103,11 @@ const EnhancedChatView = ({
     onSendMessage,
     updateSummary,
     updateSuggestions,
-    isSending
+    isSending,
+    scrollToBottom
   });
 
   const {
-    handleScroll,
-    handleScrollToBottom,
     handleSend,
     handleKeyPress,
     handleAIGeneratedMessage,
@@ -185,7 +208,11 @@ const EnhancedChatView = ({
 
           {/* Fixed Height Chat Display */}
           <Card className="flex-1 flex flex-col min-h-0 h-[500px]">
-            <div className="flex-1 p-4 overflow-y-auto max-h-[400px]">
+            <div 
+              ref={messagesContainerRef}
+              className="flex-1 p-4 overflow-y-auto max-h-[400px]"
+              onScroll={handleScroll}
+            >
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div
@@ -203,7 +230,19 @@ const EnhancedChatView = ({
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
+              
+              {/* Scroll to bottom button */}
+              {showScrollButton && (
+                <button
+                  onClick={scrollToBottom}
+                  className="fixed bottom-24 right-8 bg-blue-500 text-white p-2 rounded-full shadow-lg hover:bg-blue-600 transition-colors z-10"
+                  aria-label="Scroll to bottom"
+                >
+                  ↓
+                </button>
+              )}
             </div>
             
             {/* Fixed Position Message Input */}
