@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle, Clock, AlertTriangle, Loader2, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MessageStatus {
   status: 'composing' | 'sending' | 'sent' | 'failed' | 'pending';
@@ -90,42 +90,40 @@ const EnhancedMessageStatus: React.FC<EnhancedMessageStatusProps> = ({
   };
 
   return (
-    <TooltipProvider>
-      <div className="flex items-center gap-2">
-        <Badge variant={getStatusColor() as any} className="flex items-center gap-1 text-xs">
-          {getStatusIcon()}
-          {getStatusText()}
-        </Badge>
-        
-        {status.status === 'failed' && status.error && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <AlertTriangle className="w-3 h-3 text-red-500 cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="max-w-xs text-xs">{status.error}</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
-        
-        {status.status === 'failed' && showRetryButton && onRetry && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRetry}
-            disabled={isRetrying}
-            className="h-6 px-2 text-xs"
-          >
-            {isRetrying ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <Send className="w-3 h-3" />
-            )}
-            Retry {status.retryCount ? `(${status.retryCount})` : ''}
-          </Button>
-        )}
-      </div>
-    </TooltipProvider>
+    <div className="flex items-center gap-2">
+      <Badge variant={getStatusColor() as any} className="flex items-center gap-1 text-xs">
+        {getStatusIcon()}
+        {getStatusText()}
+      </Badge>
+      
+      {status.status === 'failed' && status.error && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <AlertTriangle className="w-3 h-3 text-red-500 cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="max-w-xs text-xs">{status.error}</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
+      
+      {status.status === 'failed' && showRetryButton && onRetry && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleRetry}
+          disabled={isRetrying}
+          className="h-6 px-2 text-xs"
+        >
+          {isRetrying ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <Send className="w-3 h-3" />
+          )}
+          Retry {status.retryCount ? `(${status.retryCount})` : ''}
+        </Button>
+      )}
+    </div>
   );
 };
 
