@@ -12,7 +12,6 @@ import LeadsTableHeader from "./leads/LeadsTableHeader";
 import LeadsTableEmptyState from "./leads/LeadsTableEmptyState";
 import { useLeadsSelection } from "./leads/useLeadsSelection";
 import { useLeadsSorting } from "./leads/useLeadsSorting";
-import FreshLeadBadge from "./leads/FreshLeadBadge";
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -86,27 +85,19 @@ const LeadsTable = ({
               const isFresh = leadDate.getTime() === today.getTime();
 
               return (
-                <tr 
+                <LeadTableRow
                   key={lead.id}
-                  className={isFresh ? 'bg-green-50' : ''}
-                >
-                  <LeadTableRow
-                    lead={lead}
-                    selected={selectedLeads.includes(lead.id.toString())}
-                    onSelect={onLeadSelect}
-                    onAiOptInChange={onAiOptInChange}
-                    canEdit={canEdit}
-                    onQuickView={onQuickView}
-                    handleMessageClick={handleMessageClick}
-                    handleLeadClick={handleLeadClick}
-                    getEngagementScore={getEngagementScore}
-                  />
-                  {isFresh && (
-                    <td className="px-2">
-                      <FreshLeadBadge createdAt={lead.createdAt} />
-                    </td>
-                  )}
-                </tr>
+                  lead={lead}
+                  selected={selectedLeads.includes(lead.id.toString())}
+                  onSelect={onLeadSelect}
+                  onAiOptInChange={onAiOptInChange}
+                  canEdit={canEdit}
+                  onQuickView={onQuickView}
+                  handleMessageClick={handleMessageClick}
+                  handleLeadClick={handleLeadClick}
+                  getEngagementScore={getEngagementScore}
+                  isFresh={isFresh}
+                />
               );
             })}
           </TableBody>

@@ -103,6 +103,11 @@ export const useAdvancedLeads = () => {
       filtered = filtered.filter(lead => lead.aiOptIn === searchFilters.aiOptIn);
     }
 
+    // Add contact status filter for "No Contact" functionality
+    if (searchFilters.contactStatus) {
+      filtered = filtered.filter(lead => lead.contactStatus === searchFilters.contactStatus);
+    }
+
     // Advanced filters
     if (filters.status.length > 0) {
       filtered = filtered.filter(lead => filters.status.includes(lead.status));

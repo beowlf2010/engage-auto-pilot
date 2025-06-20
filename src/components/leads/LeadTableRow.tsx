@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,6 +11,7 @@ import LeadContactStatusBadge from "./LeadContactStatusBadge";
 import LeadEngagementScore from "./LeadEngagementScore";
 import EnhancedAIStatusDisplay from "./EnhancedAIStatusDisplay";
 import AIPreviewPopout from "./AIPreviewPopout";
+import FreshLeadBadge from "./FreshLeadBadge";
 
 interface LeadTableRowProps {
   lead: Lead;
@@ -21,6 +23,7 @@ interface LeadTableRowProps {
   handleMessageClick: (lead: Lead) => void;
   handleLeadClick: (leadId: string) => void;
   getEngagementScore: (lead: Lead) => number;
+  isFresh?: boolean;
 }
 
 const LeadTableRow = ({
@@ -32,11 +35,12 @@ const LeadTableRow = ({
   onQuickView,
   handleMessageClick,
   handleLeadClick,
-  getEngagementScore
+  getEngagementScore,
+  isFresh = false
 }: LeadTableRowProps) => {
   return (
     <TableRow 
-      className={`hover:bg-gray-50 cursor-pointer ${selected ? 'bg-blue-50' : ''}`}
+      className={`hover:bg-gray-50 cursor-pointer ${selected ? 'bg-blue-50' : ''} ${isFresh ? 'bg-green-50' : ''}`}
       onClick={() => handleLeadClick(lead.id)}
     >
       <TableCell onClick={(e) => e.stopPropagation()}>
@@ -48,7 +52,10 @@ const LeadTableRow = ({
       
       <TableCell className="font-medium">
         <div className="space-y-1">
-          <div>{lead.firstName} {lead.lastName}</div>
+          <div className="flex items-center gap-2">
+            <span>{lead.firstName} {lead.lastName}</span>
+            {isFresh && <FreshLeadBadge createdAt={lead.createdAt} />}
+          </div>
           <div className="text-xs text-gray-500">{lead.primaryPhone}</div>
           <div className="text-xs text-gray-500">{lead.email}</div>
         </div>
@@ -88,6 +95,7 @@ const LeadTableRow = ({
               aiSequencePaused={lead.aiSequencePaused}
               incomingCount={lead.incomingCount}
               outgoingCount={lead.outgoingCount}
+              unrepliedCount={lead.unrepliedCount}
               size="sm"
             />
           ) : canEdit ? (
