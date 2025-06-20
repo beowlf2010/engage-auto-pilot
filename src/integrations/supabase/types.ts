@@ -2622,6 +2622,7 @@ export type Database = {
           original_row_index: number | null
           original_status: string | null
           pending_human_response: boolean | null
+          phone: string | null
           postal_code: string | null
           predicted_close_date: string | null
           preferred_mileage_max: number | null
@@ -2691,6 +2692,7 @@ export type Database = {
           original_row_index?: number | null
           original_status?: string | null
           pending_human_response?: boolean | null
+          phone?: string | null
           postal_code?: string | null
           predicted_close_date?: string | null
           preferred_mileage_max?: number | null
@@ -2760,6 +2762,7 @@ export type Database = {
           original_row_index?: number | null
           original_status?: string | null
           pending_human_response?: boolean | null
+          phone?: string | null
           postal_code?: string | null
           predicted_close_date?: string | null
           preferred_mileage_max?: number | null

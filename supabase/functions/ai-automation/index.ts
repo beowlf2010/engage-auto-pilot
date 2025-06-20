@@ -1,705 +1,395 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+interface Lead {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  vehicle_interest: string;
+  ai_opt_in: boolean;
+  ai_sequence_paused: boolean;
+  ai_stage: string;
+  ai_messages_sent: number;
+  next_ai_send_at: string;
+}
+
+interface MessageTemplate {
+  id: string;
+  stage: string;
+  template: string;
+  variant_name: string;
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    console.log('🤖 [AI-AUTOMATION] Starting AI automation process...');
+    
+    const { automated = false } = await req.json().catch(() => ({ automated: false }));
+    
+    // Get current timestamp for due message checking
+    const now = new Date().toISOString();
+    console.log(`⏰ [AI-AUTOMATION] Current time: ${now}`);
 
-    console.log('Starting enhanced Finn AI automation (proactive + reactive)...')
-
-    // 1. Process proactive messaging first - leads that need initial contact
-    console.log('📬 Processing proactive messaging...')
-    const { data: proactiveLeads, error: proactiveError } = await supabase
+    // 1. Get leads that are due for AI messages
+    const { data: dueLeads, error: leadsError } = await supabase
       .from('leads')
-      .select('*')
-      .eq('ai_opt_in', true)
-      .eq('ai_sequence_paused', false)
-      .or('ai_messages_sent.is.null,ai_messages_sent.eq.0')
-      .not('next_ai_send_at', 'is', null)
-      .lte('next_ai_send_at', new Date().toISOString())
-      .limit(10)
-
-    if (proactiveError) {
-      console.error('Error fetching proactive leads:', proactiveError)
-    } else {
-      console.log(`Found ${proactiveLeads?.length || 0} leads needing proactive contact`)
-
-      for (const lead of proactiveLeads || []) {
-        try {
-          console.log(`🚀 Sending initial message to ${lead.first_name} ${lead.last_name}`)
-          
-          // Generate initial message
-          const message = await generateInitialMessage(lead)
-          
-          if (message) {
-            // Get lead's phone number
-            const { data: phoneData } = await supabase
-              .from('phone_numbers')
-              .select('number')
-              .eq('lead_id', lead.id)
-              .eq('is_primary', true)
-              .single()
-
-            if (phoneData?.number) {
-              // Send via Twilio
-              const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${Deno.env.get('TWILIO_ACCOUNT_SID')}/Messages.json`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Basic ${btoa(`${Deno.env.get('TWILIO_ACCOUNT_SID')}:${Deno.env.get('TWILIO_AUTH_TOKEN')}`)}`,
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                  From: Deno.env.get('TWILIO_PHONE_NUMBER') || '',
-                  To: phoneData.number,
-                  Body: message
-                })
-              })
-
-              if (twilioResponse.ok) {
-                const twilioData = await twilioResponse.json()
-                
-                // Save message to database
-                await supabase
-                  .from('conversations')
-                  .insert({
-                    lead_id: lead.id,
-                    body: message,
-                    direction: 'out',
-                    sent_at: new Date().toISOString(),
-                    ai_generated: true,
-                    twilio_message_id: twilioData.sid,
-                    sms_status: 'sent'
-                  })
-
-                // Update lead status
-                await supabase
-                  .from('leads')
-                  .update({
-                    ai_messages_sent: 1,
-                    ai_stage: 'initial_contact_sent',
-                    next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Next in 24h
-                  })
-                  .eq('id', lead.id)
-
-                console.log(`✅ Initial message sent to ${lead.first_name}: ${twilioData.sid}`)
-              } else {
-                console.error(`❌ Failed to send message to ${lead.first_name}:`, await twilioResponse.text())
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`❌ Error processing proactive message for lead ${lead.id}:`, error)
-        }
-      }
-    }
-
-    // 2. Resume any paused sequences that should resume
-    await resumePausedSequences(supabase)
-
-    // 3. Process reactive messaging - existing logic for scheduled follow-ups
-    console.log('💬 Processing reactive messaging...')
-    const { data: readyLeads, error: leadsError } = await supabase
-      .from('leads')
-      .select('*')
+      .select(`
+        id,
+        first_name,
+        last_name,
+        phone,
+        vehicle_interest,
+        ai_opt_in,
+        ai_sequence_paused,
+        ai_stage,
+        ai_messages_sent,
+        next_ai_send_at
+      `)
       .eq('ai_opt_in', true)
       .eq('ai_sequence_paused', false)
       .not('next_ai_send_at', 'is', null)
-      .lte('next_ai_send_at', new Date().toISOString())
-      .gt('ai_messages_sent', 0) // Only leads that have already been contacted
-      .limit(10)
+      .lt('next_ai_send_at', now)
+      .limit(20);
 
     if (leadsError) {
-      console.error('Error fetching reactive leads:', leadsError)
-    } else {
-      console.log(`Found ${readyLeads?.length || 0} leads ready for reactive messages`)
-
-      // Process each lead with enhanced AI
-      for (const lead of readyLeads || []) {
-        try {
-          const message = await generateEnhancedAIMessage(supabase, lead.id)
-          
-          if (message) {
-            // Send the AI-generated message via Twilio
-            const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${Deno.env.get('TWILIO_ACCOUNT_SID')}/Messages.json`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Basic ${btoa(`${Deno.env.get('TWILIO_ACCOUNT_SID')}:${Deno.env.get('TWILIO_AUTH_TOKEN')}`)}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: new URLSearchParams({
-                From: Deno.env.get('TWILIO_PHONE_NUMBER') || '',
-                To: lead.phone,
-                Body: message
-              })
-            })
-
-            if (!twilioResponse.ok) {
-              console.error(`Twilio error for lead ${lead.id}:`, await twilioResponse.text())
-              continue
-            }
-
-            const twilioData = await twilioResponse.json()
-            console.log(`Sent enhanced AI SMS to ${lead.first_name}: ${twilioData.sid}`)
-
-            // Save the message to the database
-            const { error: messageError } = await supabase
-              .from('conversations')
-              .insert({
-                lead_id: lead.id,
-                body: message,
-                direction: 'out',
-                sent_at: new Date().toISOString(),
-                ai_generated: true,
-                twilio_message_id: twilioData.sid,
-                sms_status: 'sent'
-              })
-
-            if (messageError) {
-              console.error('Error saving message:', messageError)
-            }
-
-            // Update message count and schedule next message
-            const currentCount = lead.ai_messages_sent || 0
-            await supabase
-              .from('leads')
-              .update({
-                ai_messages_sent: currentCount + 1
-              })
-              .eq('id', lead.id)
-
-            // Schedule next message using enhanced logic
-            await scheduleNextEnhancedMessage(supabase, lead.id)
-
-            console.log(`Successfully processed enhanced message for ${lead.first_name} ${lead.last_name}`)
-
-          } else {
-            // No more messages, pause sequence
-            await supabase
-              .from('leads')
-              .update({
-                next_ai_send_at: null,
-                ai_sequence_paused: true,
-                ai_pause_reason: 'sequence_completed'
-              })
-              .eq('id', lead.id)
-          }
-
-        } catch (error) {
-          console.error(`Error processing enhanced message for lead ${lead.id}:`, error)
-        }
-      }
+      console.error('❌ [AI-AUTOMATION] Error fetching due leads:', leadsError);
+      throw leadsError;
     }
 
-    // 4. Update daily KPIs
-    const { error: kpiError } = await supabase.rpc('update_daily_kpis')
-    if (kpiError) {
-      console.error('Error updating KPIs:', kpiError)
-    }
+    console.log(`📋 [AI-AUTOMATION] Found ${dueLeads?.length || 0} leads due for messages`);
 
-    const totalProcessed = (proactiveLeads?.length || 0) + (readyLeads?.length || 0)
-
-    return new Response(
-      JSON.stringify({ 
+    if (!dueLeads || dueLeads.length === 0) {
+      return new Response(JSON.stringify({ 
         success: true, 
-        proactiveProcessed: proactiveLeads?.length || 0,
-        reactiveProcessed: readyLeads?.length || 0,
-        totalProcessed,
-        message: 'Enhanced Finn AI automation completed successfully'
-      }),
-      { 
+        message: 'No leads due for AI messages at this time',
+        processed: 0
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    )
-
-  } catch (error) {
-    console.error('Enhanced AI automation error:', error)
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message 
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
-    )
-  }
-})
-
-// Generate compelling initial outreach messages
-async function generateInitialMessage(lead: any): Promise<string | null> {
-  try {
-    // Template-based initial messages for immediate deployment
-    const templates = [
-      `Hi ${lead.first_name}! I see you're interested in ${lead.vehicle_interest}. I'd love to help you find the perfect vehicle. Any questions I can answer?`,
-      `Hello ${lead.first_name}! Thanks for your interest in ${lead.vehicle_interest}. I have some great options that might be perfect for you. When would be a good time to chat?`,
-      `Hi ${lead.first_name}! I noticed you're looking for ${lead.vehicle_interest}. I specialize in helping customers find exactly what they need. What features are most important to you?`,
-      `${lead.first_name}, I wanted to reach out about ${lead.vehicle_interest}. We have some excellent vehicles that match your interests. Would you like to see what's available?`,
-      `Hi ${lead.first_name}! I'm here to help with your ${lead.vehicle_interest} search. What's the most important factor for you - price, features, or reliability?`
-    ];
-
-    // Select random template for variety
-    const template = templates[Math.floor(Math.random() * templates.length)];
-    return template;
-  } catch (error) {
-    console.error('Error generating initial message:', error)
-    return null
-  }
-}
-
-// Enhanced AI message generation using advanced templates and personalization
-async function generateEnhancedAIMessage(supabase: any, leadId: string): Promise<string | null> {
-  try {
-    // Get lead data with behavioral patterns
-    const { data: lead } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('id', leadId)
-      .single()
-
-    if (!lead) return null
-
-    // Get lead's response patterns for personalization
-    const { data: patterns } = await supabase
-      .from('lead_response_patterns')
-      .select('*')
-      .eq('lead_id', leadId)
-      .single()
-
-    // Get conversation memory for context
-    const { data: memory } = await supabase
-      .from('conversation_memory')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('confidence', { ascending: false })
-      .limit(5)
-
-    // Get matching inventory with current market data
-    const matchingInventory = await getEnhancedInventoryMatches(supabase, leadId)
-
-    // Select best template based on performance and lead patterns
-    const template = await selectOptimalTemplate(supabase, lead.ai_stage || 'day_1_morning', leadId, patterns)
-    
-    if (!template) return null
-
-    // Generate market intelligence context
-    const marketContext = await getMarketIntelligence(supabase, lead.vehicle_interest)
-
-    // Build personalized message using OpenAI with enhanced context
-    const personalizedMessage = await generatePersonalizedMessage(
-      lead,
-      template,
-      memory || [],
-      matchingInventory,
-      marketContext,
-      patterns
-    )
-
-    // Track message analytics
-    await supabase
-      .from('ai_message_analytics')
-      .insert({
-        lead_id: leadId,
-        template_id: template.id,
-        message_content: personalizedMessage,
-        message_stage: lead.ai_stage,
-        day_of_week: new Date().getDay(),
-        hour_of_day: new Date().getHours(),
-        inventory_mentioned: matchingInventory.length > 0 ? matchingInventory.slice(0, 3) : null
-      })
-
-    return personalizedMessage
-
-  } catch (error) {
-    console.error('Error generating enhanced AI message:', error)
-    return null
-  }
-}
-
-// Get enhanced inventory matches with market intelligence
-async function getEnhancedInventoryMatches(supabase: any, leadId: string) {
-  const { data: matches } = await supabase.rpc('find_matching_inventory', { p_lead_id: leadId })
-  
-  // Add market intelligence to matches
-  for (const match of matches || []) {
-    // Add days on lot calculation
-    const { data: inventory } = await supabase
-      .from('inventory')
-      .select('created_at, price')
-      .eq('id', match.inventory_id)
-      .single()
-    
-    if (inventory) {
-      const daysOnLot = Math.floor((new Date().getTime() - new Date(inventory.created_at).getTime()) / (1000 * 60 * 60 * 24))
-      match.days_on_lot = daysOnLot
-      match.urgency_level = daysOnLot > 60 ? 'high' : daysOnLot > 30 ? 'medium' : 'low'
+      });
     }
+
+    // 2. Get available message templates
+    const { data: templates, error: templatesError } = await supabase
+      .from('ai_message_templates')
+      .select('*')
+      .eq('is_active', true);
+
+    if (templatesError) {
+      console.error('❌ [AI-AUTOMATION] Error fetching templates:', templatesError);
+      throw templatesError;
+    }
+
+    console.log(`📝 [AI-AUTOMATION] Found ${templates?.length || 0} active templates`);
+
+    const results = [];
+
+    // 3. Process each due lead
+    for (const lead of dueLeads) {
+      try {
+        console.log(`👤 [AI-AUTOMATION] Processing lead: ${lead.first_name} ${lead.last_name} (${lead.vehicle_interest})`);
+        
+        // Skip if no phone number
+        if (!lead.phone) {
+          console.warn(`⚠️ [AI-AUTOMATION] Skipping lead ${lead.id} - no phone number`);
+          
+          // Try to get phone from phone_numbers table
+          const { data: phoneData } = await supabase
+            .from('phone_numbers')
+            .select('number')
+            .eq('lead_id', lead.id)
+            .eq('is_primary', true)
+            .maybeSingle();
+
+          if (phoneData) {
+            // Update the lead with the phone number
+            await supabase
+              .from('leads')
+              .update({ phone: phoneData.number })
+              .eq('id', lead.id);
+            
+            lead.phone = phoneData.number;
+            console.log(`📱 [AI-AUTOMATION] Updated phone for lead ${lead.id}: ${phoneData.number}`);
+          } else {
+            results.push({ leadId: lead.id, success: false, error: 'No phone number found' });
+            continue;
+          }
+        }
+
+        // 4. Generate AI message
+        const message = await generateAIMessage(lead, templates);
+        if (!message) {
+          console.warn(`⚠️ [AI-AUTOMATION] No message generated for lead ${lead.id}`);
+          results.push({ leadId: lead.id, success: false, error: 'Failed to generate message' });
+          continue;
+        }
+
+        console.log(`📤 [AI-AUTOMATION] Generated message for ${lead.first_name}: "${message}"`);
+
+        // 5. Send the message via SMS
+        const messageResult = await sendSMSMessage(lead.phone, message, lead.id);
+        
+        if (messageResult.success) {
+          // 6. Update lead's AI tracking
+          const nextStage = getNextAIStage(lead.ai_stage, lead.ai_messages_sent || 0);
+          const nextSendTime = calculateNextSendTime(nextStage);
+
+          await supabase
+            .from('leads')
+            .update({
+              ai_messages_sent: (lead.ai_messages_sent || 0) + 1,
+              ai_stage: nextStage,
+              next_ai_send_at: nextSendTime,
+              ai_last_message_stage: lead.ai_stage
+            })
+            .eq('id', lead.id);
+
+          console.log(`✅ [AI-AUTOMATION] Successfully processed lead ${lead.id}. Next stage: ${nextStage}, Next send: ${nextSendTime}`);
+          results.push({ leadId: lead.id, success: true, message, nextStage, nextSendTime });
+        } else {
+          console.error(`❌ [AI-AUTOMATION] Failed to send message to lead ${lead.id}:`, messageResult.error);
+          results.push({ leadId: lead.id, success: false, error: messageResult.error });
+        }
+
+        // Add delay between messages to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+      } catch (error) {
+        console.error(`❌ [AI-AUTOMATION] Error processing lead ${lead.id}:`, error);
+        results.push({ leadId: lead.id, success: false, error: error.message });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    console.log(`🎯 [AI-AUTOMATION] Completed processing. Success: ${successCount}/${results.length}`);
+
+    return new Response(JSON.stringify({
+      success: true,
+      processed: results.length,
+      successful: successCount,
+      failed: results.length - successCount,
+      results: results
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('❌ [AI-AUTOMATION] Critical error:', error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
-  
-  return matches || []
-}
+});
 
-// Select optimal template based on performance and lead behavior
-async function selectOptimalTemplate(supabase: any, stage: string, leadId: string, patterns: any) {
-  const { data: templates } = await supabase
-    .from('ai_message_templates')
-    .select('*')
-    .eq('stage', stage)
-    .eq('is_active', true)
-    .order('response_rate', { ascending: false })
-
-  if (!templates || templates.length === 0) return null
-
-  // Use behavioral patterns to select best template
-  if (patterns?.preferred_content_types?.length > 0) {
-    const preferredTemplate = templates.find(t => 
-      patterns.preferred_content_types.includes(t.variant_name)
-    )
-    if (preferredTemplate) return preferredTemplate
-  }
-
-  // A/B testing logic - favor high performers but explore others
-  const totalSent = templates.reduce((sum: number, t: any) => sum + t.total_sent, 0)
-  
-  if (totalSent < 100) {
-    return templates[Math.floor(Math.random() * templates.length)]
-  }
-
-  const rand = Math.random()
-  if (rand < 0.8) {
-    return templates[Math.floor(Math.random() * Math.min(2, templates.length))]
-  } else {
-    return templates[Math.floor(Math.random() * templates.length)]
-  }
-}
-
-// Generate personalized message using OpenAI with enhanced context
-async function generatePersonalizedMessage(lead: any, template: any, memory: any[], inventory: any[], marketContext: any, patterns: any): Promise<string> {
-  const memoryContext = memory.map(m => m.content).join('. ')
-  const inventoryContext = inventory.length > 0 ? 
-    `Available: ${inventory[0].year} ${inventory[0].make} ${inventory[0].model} at $${inventory[0].price?.toLocaleString()} (${inventory[0].urgency_level} urgency)` : 
-    'Various vehicles available'
-
-  const personalityProfile = patterns ? 
-    `Communication style: ${patterns.best_response_hours?.length > 2 ? 'frequent responder' : 'selective responder'}` : 
-    'Standard approach'
-
-  const prompt = `You are Finn, an expert car sales AI. Generate a personalized follow-up message.
-
-Lead Info: ${lead.first_name} ${lead.last_name}, interested in ${lead.vehicle_interest}
-Template: ${template.template}
-Memory: ${memoryContext || 'First interaction'}
-Inventory: ${inventoryContext}
-Market Context: ${marketContext}
-Personality: ${personalityProfile}
-
-Requirements:
-- Keep under 160 characters for SMS
-- Be conversational and helpful
-- Include specific vehicle details if relevant
-- Add urgency if inventory shows high urgency level
-- Match the lead's communication style
-- Don't be pushy, be consultative
-
-Generate a personalized message:`
-
+// Generate AI message for a lead
+async function generateAIMessage(lead: Lead, templates: MessageTemplate[]): Promise<string | null> {
   try {
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Find appropriate template based on AI stage
+    const currentStage = lead.ai_stage || 'initial';
+    let template = templates.find(t => t.stage === currentStage);
+    
+    // Fallback to initial template if stage not found
+    if (!template) {
+      template = templates.find(t => t.stage === 'initial') || templates[0];
+    }
+    
+    if (!template) {
+      console.error('No templates available');
+      return null;
+    }
+
+    // Replace template variables
+    let message = template.template;
+    message = message.replace(/\{\{firstName\}\}/g, lead.first_name || 'there');
+    message = message.replace(/\{\{lastName\}\}/g, lead.last_name || '');
+    message = message.replace(/\{\{vehicleInterest\}\}/g, lead.vehicle_interest || 'a vehicle');
+
+    // If OpenAI is available, enhance the message
+    if (openAIApiKey && message.length > 50) {
+      try {
+        const enhancedMessage = await enhanceMessageWithAI(message, lead);
+        return enhancedMessage || message;
+      } catch (aiError) {
+        console.warn('AI enhancement failed, using template:', aiError);
+        return message;
+      }
+    }
+
+    return message;
+  } catch (error) {
+    console.error('Error generating AI message:', error);
+    return null;
+  }
+}
+
+// Enhance message with OpenAI
+async function enhanceMessageWithAI(baseMessage: string, lead: Lead): Promise<string | null> {
+  try {
+    if (!openAIApiKey) return null;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          {
+            role: 'system',
+            content: `You are Finn, a friendly AI assistant for Jason Pilger Chevrolet. Enhance the following message to be more personalized and engaging while keeping it professional and conversational. The message should be warm, helpful, and focused on the customer's vehicle interest. Keep it under 160 characters for SMS. Do not change the core message intent.`
+          },
+          {
+            role: 'user',
+            content: `Enhance this message for ${lead.first_name} who is interested in ${lead.vehicle_interest}:\n\n${baseMessage}`
+          }
+        ],
         max_tokens: 100,
         temperature: 0.7
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn('OpenAI API request failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content?.trim() || null;
+  } catch (error) {
+    console.error('Error enhancing message with AI:', error);
+    return null;
+  }
+}
+
+// Send SMS message
+async function sendSMSMessage(phone: string, message: string, leadId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log(`📱 [AI-AUTOMATION] Sending SMS to ${phone}: "${message}"`);
+
+    // Create conversation record
+    const { data: conversation, error: conversationError } = await supabase
+      .from('conversations')
+      .insert({
+        lead_id: leadId,
+        body: message,
+        direction: 'out',
+        sent_at: new Date().toISOString(),
+        ai_generated: true,
+        sms_status: 'pending'
       })
-    })
+      .select()
+      .single();
 
-    if (!openaiResponse.ok) {
-      throw new Error('OpenAI API error')
+    if (conversationError) {
+      throw new Error(`Failed to create conversation: ${conversationError.message}`);
     }
 
-    const openaiData = await openaiResponse.json()
-    return openaiData.choices[0]?.message?.content || template.template
-  } catch (error) {
-    console.error('Error generating personalized message:', error)
-    return template.template.replace(/{firstName}/g, lead.first_name)
-  }
-}
-
-// Get market intelligence for context
-async function getMarketIntelligence(supabase: any, vehicleInterest: string): Promise<string> {
-  try {
-    // Get recent inventory trends
-    const { data: trends } = await supabase
-      .from('inventory')
-      .select('make, model, price, status, days_in_inventory')
-      .ilike('make', `%${vehicleInterest?.split(' ')[0] || ''}%`)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    if (!trends || trends.length === 0) return 'Market is active'
-
-    const avgPrice = trends.reduce((sum: number, item: any) => sum + (item.price || 0), 0) / trends.length
-    const soldCount = trends.filter((item: any) => item.status === 'sold').length
-    const avgDays = trends.filter((item: any) => item.days_in_inventory).reduce((sum: number, item: any) => sum + item.days_in_inventory, 0) / trends.length
-
-    if (soldCount > trends.length * 0.6) {
-      return `High demand market - ${soldCount}/${trends.length} recently sold`
-    } else if (avgDays > 45) {
-      return `Buyer's market - inventory moving slowly`
-    } else {
-      return `Balanced market - avg $${avgPrice.toLocaleString()}`
-    }
-  } catch (error) {
-    console.error('Error getting market intelligence:', error)
-    return 'Market is active'
-  }
-}
-
-// Schedule next message using enhanced logic
-async function scheduleNextEnhancedMessage(supabase: any, leadId: string) {
-  // Get schedule configurations
-  const { data: scheduleConfigs } = await supabase
-    .from('ai_schedule_config')
-    .select('*')
-    .eq('is_active', true)
-    .order('day_offset', { ascending: true })
-
-  // Get lead creation date to determine stage
-  const { data: lead } = await supabase
-    .from('leads')
-    .select('created_at, ai_stage')
-    .eq('id', leadId)
-    .single()
-
-  if (!lead || !scheduleConfigs) return
-
-  const daysSinceCreated = Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
-  
-  // Find next applicable stage
-  const nextConfig = scheduleConfigs.find((config: any) => {
-    if (config.stage_name.startsWith('day_1')) return daysSinceCreated === 0
-    if (config.stage_name.startsWith('week_1')) return daysSinceCreated >= 1 && daysSinceCreated <= 7
-    if (config.stage_name.startsWith('week_2')) return daysSinceCreated >= 8 && daysSinceCreated <= 14
-    if (config.stage_name.startsWith('month_2')) return daysSinceCreated >= 15 && daysSinceCreated <= 45
-    if (config.stage_name.startsWith('month_3')) return daysSinceCreated >= 46 && daysSinceCreated <= 90
-    return false
-  })
-
-  if (nextConfig) {
-    // Calculate optimal send time based on lead patterns
-    const { data: patterns } = await supabase
-      .from('lead_response_patterns')
-      .select('best_response_hours')
-      .eq('lead_id', leadId)
-      .single()
-
-    const preferredHours = patterns?.best_response_hours || nextConfig.preferred_hours
-    const nextHour = preferredHours[Math.floor(Math.random() * preferredHours.length)]
-    
-    const nextSendTime = new Date()
-    nextSendTime.setDate(nextSendTime.getDate() + 1)
-    nextSendTime.setHours(nextHour, 0, 0, 0)
-
-    await supabase
-      .from('leads')
-      .update({
-        next_ai_send_at: nextSendTime.toISOString(),
-        ai_stage: nextConfig.stage_name
-      })
-      .eq('id', leadId)
-  }
-}
-
-// Process behavioral triggers
-async function processBehavioralTriggers(supabase: any) {
-  try {
-    // Find leads with recent activity that should trigger messages
-    const { data: activeBehaviors } = await supabase
-      .from('lead_behavior_triggers')
-      .select('*, leads(*)')
-      .eq('is_processed', false)
-      .lte('trigger_time', new Date().toISOString())
-
-    for (const behavior of activeBehaviors || []) {
-      if (behavior.leads?.ai_opt_in && !behavior.leads?.ai_sequence_paused) {
-        // Generate trigger-specific message
-        const message = await generateTriggerMessage(supabase, behavior)
-        
-        if (message) {
-          // Send immediate message
-          const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${Deno.env.get('TWILIO_ACCOUNT_SID')}/Messages.json`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${btoa(`${Deno.env.get('TWILIO_ACCOUNT_SID')}:${Deno.env.get('TWILIO_AUTH_TOKEN')}`)}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              From: Deno.env.get('TWILIO_PHONE_NUMBER') || '',
-              To: behavior.leads.phone,
-              Body: message
-            })
-          })
-
-          if (twilioResponse.ok) {
-            const twilioData = await twilioResponse.json()
-            
-            // Save message
-            await supabase
-              .from('conversations')
-              .insert({
-                lead_id: behavior.lead_id,
-                body: message,
-                direction: 'out',
-                sent_at: new Date().toISOString(),
-                ai_generated: true,
-                twilio_message_id: twilioData.sid,
-                sms_status: 'sent'
-              })
-
-            console.log(`Sent behavioral trigger message to ${behavior.leads.first_name}`)
-          }
-        }
-
-        // Mark trigger as processed
-        await supabase
-          .from('lead_behavior_triggers')
-          .update({ is_processed: true })
-          .eq('id', behavior.id)
+    // Send SMS via send-sms function
+    const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
+      body: {
+        to: phone,
+        body: message,
+        conversationId: conversation.id
       }
-    }
-  } catch (error) {
-    console.error('Error processing behavioral triggers:', error)
-  }
-}
+    });
 
-// Generate trigger-specific messages
-async function generateTriggerMessage(supabase: any, behavior: any): Promise<string | null> {
-  const triggerMessages = {
-    'website_visit': `Hi ${behavior.leads.first_name}! I noticed you were looking at vehicles online. Found anything interesting?`,
-    'price_drop': `Great news ${behavior.leads.first_name}! The price just dropped on that ${behavior.trigger_data.vehicle} you were interested in.`,
-    'new_inventory': `Hi ${behavior.leads.first_name}! Just got a ${behavior.trigger_data.vehicle} that matches what you're looking for. Want to see it?`,
-    'abandoned_cart': `Hi ${behavior.leads.first_name}! You were looking at financing options. Any questions I can help answer?`
-  }
-
-  return triggerMessages[behavior.trigger_type] || `Hi ${behavior.leads.first_name}! Just wanted to follow up with you.`
-}
-
-// Process inventory-based triggers
-async function processInventoryTriggers(supabase: any) {
-  try {
-    // Find recent inventory changes that should trigger messages
-    const { data: recentInventory } = await supabase
-      .from('inventory')
-      .select('*')
-      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24 hours
-      .eq('status', 'available')
-
-    for (const vehicle of recentInventory || []) {
-      // Find leads interested in similar vehicles
-      const { data: interestedLeads } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('ai_opt_in', true)
-        .eq('ai_sequence_paused', false)
-        .or(`vehicle_interest.ilike.%${vehicle.make}%,vehicle_interest.ilike.%${vehicle.model}%`)
-        .limit(5)
-
-      for (const lead of interestedLeads || []) {
-        // Check if we haven't messaged them about new inventory recently
-        const { data: recentMessages } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('lead_id', lead.id)
-          .eq('direction', 'out')
-          .gte('sent_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-          .ilike('body', '%just got%')
-
-        if (!recentMessages || recentMessages.length === 0) {
-          const message = `Hi ${lead.first_name}! Just got a ${vehicle.year} ${vehicle.make} ${vehicle.model} that matches your interests. Want to take a look?`
-          
-          // Send inventory alert
-          const twilioResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${Deno.env.get('TWILIO_ACCOUNT_SID')}/Messages.json`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${btoa(`${Deno.env.get('TWILIO_ACCOUNT_SID')}:${Deno.env.get('TWILIO_AUTH_TOKEN')}`)}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              From: Deno.env.get('TWILIO_PHONE_NUMBER') || '',
-              To: lead.phone,
-              Body: message
-            })
-          })
-
-          if (twilioResponse.ok) {
-            const twilioData = await twilioResponse.json()
-            
-            await supabase
-              .from('conversations')
-              .insert({
-                lead_id: lead.id,
-                body: message,
-                direction: 'out',
-                sent_at: new Date().toISOString(),
-                ai_generated: true,
-                twilio_message_id: twilioData.sid,
-                sms_status: 'sent'
-              })
-
-            console.log(`Sent inventory alert to ${lead.first_name} about ${vehicle.make} ${vehicle.model}`)
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error processing inventory triggers:', error)
-  }
-}
-
-// Resume paused sequences that should resume
-async function resumePausedSequences(supabase: any) {
-  try {
-    const now = new Date()
-    
-    const { data: leadsToResume } = await supabase
-      .from('leads')
-      .select('id')
-      .eq('ai_opt_in', true)
-      .eq('ai_sequence_paused', true)
-      .not('ai_resume_at', 'is', null)
-      .lte('ai_resume_at', now.toISOString())
-
-    for (const lead of leadsToResume || []) {
+    if (smsError || !smsResult?.success) {
+      // Update conversation with error
       await supabase
-        .from('leads')
-        .update({
-          ai_sequence_paused: false,
-          ai_pause_reason: null,
-          ai_resume_at: null
+        .from('conversations')
+        .update({ 
+          sms_status: 'failed',
+          sms_error: smsResult?.error || smsError?.message || 'SMS sending failed'
         })
-        .eq('id', lead.id)
-
-      console.log(`Resumed AI sequence for lead ${lead.id}`)
+        .eq('id', conversation.id);
+      
+      throw new Error(smsResult?.error || smsError?.message || 'SMS sending failed');
     }
+
+    // Update conversation with success
+    await supabase
+      .from('conversations')
+      .update({
+        sms_status: 'sent',
+        twilio_message_id: smsResult.telnyxMessageId || smsResult.messageSid
+      })
+      .eq('id', conversation.id);
+
+    console.log(`✅ [AI-AUTOMATION] SMS sent successfully to ${phone}`);
+    return { success: true };
+
   } catch (error) {
-    console.error('Error resuming paused sequences:', error)
+    console.error(`❌ [AI-AUTOMATION] SMS sending failed:`, error);
+    return { success: false, error: error.message };
   }
+}
+
+// Determine next AI stage based on current stage and message count
+function getNextAIStage(currentStage: string, messageCount: number): string {
+  switch (currentStage) {
+    case 'initial':
+      return messageCount < 3 ? 'follow_up' : 'engagement';
+    case 'follow_up':
+      return messageCount < 5 ? 'engagement' : 'nurture';
+    case 'engagement':
+      return messageCount < 8 ? 'nurture' : 'closing';
+    case 'nurture':
+      return messageCount < 12 ? 'closing' : 'long_term_follow_up';
+    case 'closing':
+      return 'long_term_follow_up';
+    default:
+      return 'follow_up';
+  }
+}
+
+// Calculate next send time based on stage
+function calculateNextSendTime(stage: string): string {
+  const now = new Date();
+  let hoursToAdd = 24; // Default 24 hours
+
+  switch (stage) {
+    case 'initial':
+    case 'follow_up':
+      hoursToAdd = 24; // 1 day
+      break;
+    case 'engagement':
+      hoursToAdd = 48; // 2 days
+      break;
+    case 'nurture':
+      hoursToAdd = 72; // 3 days
+      break;
+    case 'closing':
+      hoursToAdd = 96; // 4 days
+      break;
+    case 'long_term_follow_up':
+      hoursToAdd = 168; // 1 week
+      break;
+  }
+
+  now.setHours(now.getHours() + hoursToAdd);
+  return now.toISOString();
 }

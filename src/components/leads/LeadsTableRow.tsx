@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -63,7 +62,13 @@ const LeadsTableRow = ({
       
       <TableCell>
         <div className="flex items-center space-x-2">
-          {isFresh && <FreshLeadBadge createdAt={lead.createdAt} aiOptIn={lead.aiOptIn} />}
+          {isFresh && (
+            <FreshLeadBadge 
+              createdAt={lead.createdAt} 
+              aiOptIn={lead.aiOptIn}
+              nextAiSendAt={lead.nextAiSendAt}
+            />
+          )}
           <div>
             <button
               onClick={() => handleLeadClick(lead.id.toString())}

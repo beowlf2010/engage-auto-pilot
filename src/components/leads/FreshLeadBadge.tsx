@@ -1,13 +1,19 @@
 
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
+import { Bot } from "lucide-react";
 
 interface FreshLeadBadgeProps {
   createdAt: string;
   aiOptIn?: boolean;
+  nextAiSendAt?: string;
 }
 
-const FreshLeadBadge: React.FC<FreshLeadBadgeProps> = ({ createdAt, aiOptIn = false }) => {
+const FreshLeadBadge: React.FC<FreshLeadBadgeProps> = ({ 
+  createdAt, 
+  aiOptIn = false,
+  nextAiSendAt 
+}) => {
   const isToday = (date: string) => {
     const today = new Date();
     const leadDate = new Date(date);
@@ -21,11 +27,31 @@ const FreshLeadBadge: React.FC<FreshLeadBadgeProps> = ({ createdAt, aiOptIn = fa
     return yesterday.toDateString() === leadDate.toDateString();
   };
 
-  // Don't show fresh badge if AI is already enabled
-  if (aiOptIn) {
-    return null;
+  const hasMessageDue = () => {
+    if (!nextAiSendAt) return false;
+    return new Date(nextAiSendAt) <= new Date();
+  };
+
+  // Show AI status for AI-enabled leads
+  if (aiOptIn && hasMessageDue()) {
+    return (
+      <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 text-white">
+        <Bot className="w-3 h-3 mr-1" />
+        AI DUE
+      </Badge>
+    );
   }
 
+  if (aiOptIn) {
+    return (
+      <Badge variant="outline" className="border-blue-300 text-blue-600">
+        <Bot className="w-3 h-3 mr-1" />
+        AI ON
+      </Badge>
+    );
+  }
+
+  // Show fresh badges for non-AI leads
   if (isToday(createdAt)) {
     return (
       <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white">
