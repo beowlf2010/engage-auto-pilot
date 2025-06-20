@@ -65,6 +65,7 @@ serve(async (req) => {
             id,
             first_name,
             last_name,
+            status,
             ai_takeover_enabled,
             ai_takeover_delay_minutes,
             ai_opt_in
@@ -89,6 +90,7 @@ serve(async (req) => {
     console.log('✅ Lead found:', {
       name: `${lead.first_name} ${lead.last_name}`,
       id: lead.id,
+      currentStatus: lead.status,
       aiEnabled: lead.ai_opt_in,
       aiTakeover: lead.ai_takeover_enabled
     });
@@ -112,6 +114,21 @@ serve(async (req) => {
     }
 
     console.log('💾 Message saved with ID:', messageData.id);
+
+    // Update lead status to "engaged" if currently "new"
+    if (lead.status === 'new') {
+      console.log(`🔄 Updating lead status from "new" to "engaged" due to customer reply`);
+      const { error: statusUpdateError } = await supabase
+        .from('leads')
+        .update({ status: 'engaged' })
+        .eq('id', lead.id);
+
+      if (statusUpdateError) {
+        console.warn('⚠️ Failed to update lead status:', statusUpdateError);
+      } else {
+        console.log('✅ Lead status updated to "engaged"');
+      }
+    }
 
     // Handle AI takeover logic for incoming messages
     if (lead.ai_takeover_enabled && lead.ai_opt_in) {

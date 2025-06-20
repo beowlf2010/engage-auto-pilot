@@ -52,7 +52,7 @@ export const sendMessage = async (
       firstName: cleanFirstName
     });
 
-    // Get lead data including phone number with better error handling
+    // Get lead data including phone number and current status with better error handling
     console.log(`📱 [FIXED MESSAGES] Fetching lead data for: ${leadId}`);
     
     const { data: lead, error: leadError } = await supabase
@@ -61,6 +61,7 @@ export const sendMessage = async (
         id,
         first_name,
         last_name,
+        status,
         phone_numbers (
           number,
           is_primary
@@ -81,6 +82,7 @@ export const sendMessage = async (
 
     console.log(`📋 [FIXED MESSAGES] Lead found:`, {
       leadName: `${lead.first_name} ${lead.last_name}`,
+      currentStatus: lead.status,
       phoneCount: lead.phone_numbers?.length || 0
     });
 
@@ -174,6 +176,22 @@ export const sendMessage = async (
       .from('conversations')
       .update(updateData)
       .eq('id', conversation.id);
+
+    // Update lead status to "engaged" if currently "new"
+    if (lead.status === 'new') {
+      console.log(`🔄 [FIXED MESSAGES] Updating lead status from "new" to "engaged"`);
+      const { error: statusUpdateError } = await supabase
+        .from('leads')
+        .update({ status: 'engaged' })
+        .eq('id', leadId);
+
+      if (statusUpdateError) {
+        console.warn('⚠️ [FIXED MESSAGES] Failed to update lead status:', statusUpdateError);
+        // Don't throw error for status update failure - message was sent successfully
+      } else {
+        console.log(`✅ [FIXED MESSAGES] Lead status updated to "engaged"`);
+      }
+    }
 
     console.log(`✅ [FIXED MESSAGES] === MESSAGE SENT SUCCESSFULLY ===`);
     console.log(`✅ [FIXED MESSAGES] To: ${lead.first_name} ${lead.last_name} (${primaryPhone})`);

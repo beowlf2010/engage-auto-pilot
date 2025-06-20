@@ -27,6 +27,17 @@ export const consolidatedSendMessage = async (params: SendMessageParams): Promis
       throw new Error('Lead ID, message body, and profile ID are required');
     }
 
+    // Get lead data including current status
+    const { data: leadData, error: leadError } = await supabase
+      .from('leads')
+      .select('status')
+      .eq('id', leadId)
+      .single();
+
+    if (leadError) {
+      throw new Error(`Failed to fetch lead data: ${leadError.message}`);
+    }
+
     // Get primary phone number for the lead
     const { data: phoneData, error: phoneError } = await supabase
       .from('phone_numbers')
@@ -95,6 +106,22 @@ export const consolidatedSendMessage = async (params: SendMessageParams): Promis
         twilio_message_id: smsResult.telnyxMessageId || smsResult.messageSid
       })
       .eq('id', conversation.id);
+
+    // Update lead status to "engaged" if currently "new"
+    if (leadData.status === 'new') {
+      console.log(`🔄 [CONSOLIDATED] Updating lead status from "new" to "engaged"`);
+      const { error: statusUpdateError } = await supabase
+        .from('leads')
+        .update({ status: 'engaged' })
+        .eq('id', leadId);
+
+      if (statusUpdateError) {
+        console.warn('⚠️ [CONSOLIDATED] Failed to update lead status:', statusUpdateError);
+        // Don't throw error for status update failure - message was sent successfully
+      } else {
+        console.log(`✅ [CONSOLIDATED] Lead status updated to "engaged"`);
+      }
+    }
 
     console.log(`✅ [CONSOLIDATED] Message sent successfully`);
 
