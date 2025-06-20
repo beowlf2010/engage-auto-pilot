@@ -121,7 +121,7 @@ export const exportCurrentMessages = async (options: ExportOptions): Promise<voi
       exportData.analytics = feedback || [];
     }
 
-    // Generate and download the file - FIXED: Pass format as parameter, not call it
+    // Generate and download the file
     await downloadExportFile(exportData, options.format);
     
     console.log('✅ Export completed successfully');
