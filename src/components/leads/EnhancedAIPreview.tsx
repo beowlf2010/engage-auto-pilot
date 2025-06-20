@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bot, MessageSquare, Clock, Send, X, Loader2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Bot, MessageSquare, Clock, Send, X, Loader2, AlertTriangle, CheckCircle, XCircle, Check } from 'lucide-react';
 import { useAIMessagePreview } from '@/hooks/useAIMessagePreview';
 
 interface EnhancedAIPreviewProps {
@@ -32,9 +32,13 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     showPreview,
     isSending,
     debugInfo,
+    overrides,
     generatePreview,
     sendNow,
-    cancel
+    cancel,
+    handleNameOverride,
+    handleVehicleOverride,
+    regenerateWithOverrides
   } = useAIMessagePreview({ 
     leadId, 
     onMessageSent: () => {
@@ -91,6 +95,9 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     }
   };
 
+  // Use finalDataQuality if overrides are applied, otherwise use original
+  const displayDataQuality = debugInfo?.finalDataQuality || debugInfo?.dataQuality;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
@@ -113,14 +120,19 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
 
           {!isGenerating && generatedMessage && (
             <>
-              {/* Comprehensive Data Quality Information */}
-              {debugInfo?.dataQuality && (
+              {/* Enhanced Data Quality Information with Override Controls */}
+              {displayDataQuality && (
                 <Card className="bg-gray-50 border-gray-200">
                   <CardContent className="p-3">
                     <div className="text-xs space-y-2">
                       <div className="font-medium text-gray-700 flex items-center gap-2">
                         <Bot className="w-3 h-3" />
-                        Comprehensive Data Quality Analysis
+                        Data Quality Analysis
+                        {(overrides.nameApproved || overrides.vehicleApproved) && (
+                          <Badge variant="outline" className="text-green-600 border-green-200">
+                            User Overrides Applied
+                          </Badge>
+                        )}
                       </div>
                       
                       {/* Overall Quality Score */}
@@ -128,9 +140,9 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
                         <span className="text-gray-600">Overall Quality Score:</span>
                         <Badge 
                           variant="outline" 
-                          className={getQualityScoreColor(debugInfo.dataQuality.overallQualityScore)}
+                          className={getQualityScoreColor(displayDataQuality.overallQualityScore)}
                         >
-                          {Math.round(debugInfo.dataQuality.overallQualityScore * 100)}% - {getQualityScoreLabel(debugInfo.dataQuality.overallQualityScore)}
+                          {Math.round(displayDataQuality.overallQualityScore * 100)}% - {getQualityScoreLabel(displayDataQuality.overallQualityScore)}
                         </Badge>
                       </div>
 
@@ -138,47 +150,94 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="text-gray-600">Message Strategy:</span>
                         <span className="font-medium text-blue-600 text-xs">
-                          {getStrategyDescription(debugInfo.dataQuality.messageStrategy)}
+                          {getStrategyDescription(displayDataQuality.messageStrategy)}
                         </span>
                       </div>
 
-                      {/* Name Validation */}
+                      {/* Name Analysis with Override Controls */}
                       <div className="border-t pt-2">
                         <div className="flex items-center gap-2 mb-1">
-                          {debugInfo.dataQuality.nameValidation.isValidPersonalName ? (
+                          {displayDataQuality.nameValidation.isValidPersonalName ? (
                             <CheckCircle className="w-3 h-3 text-green-600" />
                           ) : (
                             <XCircle className="w-3 h-3 text-red-600" />
                           )}
                           <span className="font-medium text-gray-700 text-xs">Name Analysis</span>
+                          {displayDataQuality.nameValidation.userOverride && (
+                            <Badge variant="outline" className="text-green-600 text-xs py-0">
+                              User Approved
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-gray-600 pl-5">
+                        <div className="text-gray-600 pl-5 mb-2">
                           "{debugInfo.originalFirstName}" detected as: <span className="font-medium">{debugInfo.dataQuality.nameValidation.detectedType}</span>
                           {' '}({Math.round(debugInfo.dataQuality.nameValidation.confidence * 100)}% confidence)
                         </div>
+                        {!displayDataQuality.nameValidation.isValidPersonalName && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleNameOverride}
+                            className="ml-5 h-6 text-xs px-2"
+                          >
+                            <Check className="w-3 h-3 mr-1" />
+                            {overrides.nameApproved ? "Remove Override" : "Approve as Personal Name"}
+                          </Button>
+                        )}
                       </div>
 
-                      {/* Vehicle Interest Validation */}
+                      {/* Vehicle Interest Analysis with Override Controls */}
                       <div className="border-t pt-2">
                         <div className="flex items-center gap-2 mb-1">
-                          {debugInfo.dataQuality.vehicleValidation.isValidVehicleInterest ? (
+                          {displayDataQuality.vehicleValidation.isValidVehicleInterest ? (
                             <CheckCircle className="w-3 h-3 text-green-600" />
                           ) : (
                             <XCircle className="w-3 h-3 text-red-600" />
                           )}
                           <span className="font-medium text-gray-700 text-xs">Vehicle Interest Analysis</span>
+                          {displayDataQuality.vehicleValidation.userOverride && (
+                            <Badge variant="outline" className="text-green-600 text-xs py-0">
+                              User Approved
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-gray-600 pl-5">
+                        <div className="text-gray-600 pl-5 mb-2">
                           "{debugInfo.originalVehicleInterest || 'Not specified'}" - {debugInfo.dataQuality.vehicleValidation.detectedIssue}
                           {' '}({Math.round(debugInfo.dataQuality.vehicleValidation.confidence * 100)}% confidence)
                         </div>
                         {debugInfo.dataQuality.vehicleValidation.detectedIssue === 'corruption' && (
-                          <div className="text-orange-600 font-medium pl-5 mt-1 flex items-center gap-1">
+                          <div className="text-orange-600 font-medium pl-5 mt-1 mb-2 flex items-center gap-1">
                             <AlertTriangle className="w-3 h-3" />
                             Corrupted vehicle data detected - using fallback message
                           </div>
                         )}
+                        {!displayDataQuality.vehicleValidation.isValidVehicleInterest && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleVehicleOverride}
+                            className="ml-5 h-6 text-xs px-2"
+                          >
+                            <Check className="w-3 h-3 mr-1" />
+                            {overrides.vehicleApproved ? "Remove Override" : "Approve as Valid Vehicle"}
+                          </Button>
+                        )}
                       </div>
+
+                      {/* Regenerate with overrides button */}
+                      {(overrides.nameApproved || overrides.vehicleApproved) && (
+                        <div className="border-t pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={regenerateWithOverrides}
+                            disabled={isGenerating}
+                            className="h-6 text-xs px-2"
+                          >
+                            🔄 Regenerate Message with Overrides
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

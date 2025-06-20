@@ -11,15 +11,76 @@ interface UseAIMessagePreviewProps {
   onMessageSent?: () => void;
 }
 
+interface DataQualityOverrides {
+  nameApproved?: boolean;
+  vehicleApproved?: boolean;
+}
+
 export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePreviewProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [overrides, setOverrides] = useState<DataQualityOverrides>({});
   const { profile } = useAuth();
 
-  const generatePreview = async () => {
+  const applyOverridesToDataQuality = (originalDataQuality: any, overrides: DataQualityOverrides) => {
+    if (!overrides.nameApproved && !overrides.vehicleApproved) {
+      return originalDataQuality;
+    }
+
+    const updatedDataQuality = { ...originalDataQuality };
+
+    // Apply name override
+    if (overrides.nameApproved) {
+      updatedDataQuality.nameValidation = {
+        ...updatedDataQuality.nameValidation,
+        isValidPersonalName: true,
+        confidence: 1.0,
+        detectedType: 'personal',
+        userOverride: true
+      };
+      updatedDataQuality.recommendations.usePersonalGreeting = true;
+    }
+
+    // Apply vehicle override
+    if (overrides.vehicleApproved) {
+      updatedDataQuality.vehicleValidation = {
+        ...updatedDataQuality.vehicleValidation,
+        isValidVehicleInterest: true,
+        confidence: 1.0,
+        detectedIssue: 'valid',
+        userOverride: true
+      };
+      updatedDataQuality.recommendations.useSpecificVehicle = true;
+    }
+
+    // Recalculate overall strategy
+    const usePersonalGreeting = updatedDataQuality.recommendations.usePersonalGreeting;
+    const useSpecificVehicle = updatedDataQuality.recommendations.useSpecificVehicle;
+
+    if (usePersonalGreeting && useSpecificVehicle) {
+      updatedDataQuality.messageStrategy = 'personal_with_vehicle';
+    } else if (usePersonalGreeting && !useSpecificVehicle) {
+      updatedDataQuality.messageStrategy = 'personal_generic_vehicle';
+    } else if (!usePersonalGreeting && useSpecificVehicle) {
+      updatedDataQuality.messageStrategy = 'generic_with_vehicle';
+    } else {
+      updatedDataQuality.messageStrategy = 'fully_generic';
+    }
+
+    // Recalculate overall quality score
+    const nameWeight = 0.6;
+    const vehicleWeight = 0.4;
+    updatedDataQuality.overallQualityScore = 
+      (updatedDataQuality.nameValidation.confidence * nameWeight) + 
+      (updatedDataQuality.vehicleValidation.confidence * vehicleWeight);
+
+    return updatedDataQuality;
+  };
+
+  const generatePreview = async (useOverrides = false) => {
     if (!profile) {
       toast({
         title: "Error",
@@ -48,19 +109,27 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         vehicleInterest: lead.vehicle_interest
       });
 
-      // Comprehensive data quality assessment
-      const dataQuality = assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
+      // Get original data quality assessment
+      const originalDataQuality = assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
       
-      console.log('🧠 [AI PREVIEW] Comprehensive data quality results:', {
-        overallScore: dataQuality.overallQualityScore,
-        messageStrategy: dataQuality.messageStrategy,
-        nameValid: dataQuality.nameValidation.isValidPersonalName,
-        vehicleValid: dataQuality.vehicleValidation.isValidVehicleInterest
+      // Apply user overrides if requested
+      const finalDataQuality = useOverrides 
+        ? applyOverridesToDataQuality(originalDataQuality, overrides)
+        : originalDataQuality;
+
+      console.log('🧠 [AI PREVIEW] Data quality results (with overrides):', {
+        overallScore: finalDataQuality.overallQualityScore,
+        messageStrategy: finalDataQuality.messageStrategy,
+        nameValid: finalDataQuality.nameValidation.isValidPersonalName,
+        vehicleValid: finalDataQuality.vehicleValidation.isValidVehicleInterest,
+        overrides: overrides
       });
 
       // Store comprehensive debug info for UI display
       setDebugInfo({
-        dataQuality,
+        originalDataQuality,
+        finalDataQuality,
+        overrides,
         originalFirstName: lead.first_name,
         originalLastName: lead.last_name,
         originalVehicleInterest: lead.vehicle_interest
@@ -76,7 +145,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         // Show success message with comprehensive debug info
         toast({
           title: "Message Generated",
-          description: `Data Quality: ${Math.round(dataQuality.overallQualityScore * 100)}% | Strategy: ${dataQuality.messageStrategy}`,
+          description: `Data Quality: ${Math.round(finalDataQuality.overallQualityScore * 100)}% | Strategy: ${finalDataQuality.messageStrategy}`,
         });
       } else {
         throw new Error('Failed to generate message');
@@ -91,6 +160,34 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleNameOverride = () => {
+    const newOverrides = { ...overrides, nameApproved: !overrides.nameApproved };
+    setOverrides(newOverrides);
+    
+    toast({
+      title: overrides.nameApproved ? "Name Override Removed" : "Name Approved",
+      description: overrides.nameApproved 
+        ? "Name will be analyzed automatically again" 
+        : "Name will be treated as a personal name",
+    });
+  };
+
+  const handleVehicleOverride = () => {
+    const newOverrides = { ...overrides, vehicleApproved: !overrides.vehicleApproved };
+    setOverrides(newOverrides);
+    
+    toast({
+      title: overrides.vehicleApproved ? "Vehicle Override Removed" : "Vehicle Approved",
+      description: overrides.vehicleApproved 
+        ? "Vehicle interest will be analyzed automatically again" 
+        : "Vehicle interest will be treated as valid",
+    });
+  };
+
+  const regenerateWithOverrides = () => {
+    generatePreview(true);
   };
 
   const sendNow = async () => {
@@ -123,6 +220,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
       setShowPreview(false);
       setGeneratedMessage(null);
       setDebugInfo(null);
+      setOverrides({});
       onMessageSent?.();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -140,6 +238,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     setShowPreview(false);
     setGeneratedMessage(null);
     setDebugInfo(null);
+    setOverrides({});
   };
 
   return {
@@ -148,8 +247,12 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     showPreview,
     isSending,
     debugInfo,
+    overrides,
     generatePreview,
     sendNow,
-    cancel
+    cancel,
+    handleNameOverride,
+    handleVehicleOverride,
+    regenerateWithOverrides
   };
 };
