@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Bot, MessageSquare, TrendingUp, Calendar, CheckCircle } from 'lucide-react';
 import { Lead } from '@/types/lead';
@@ -21,18 +20,20 @@ const AIPreviewPopout: React.FC<AIPreviewPopoutProps> = ({
   children
 }) => {
   const [isOptingIn, setIsOptingIn] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const handleOptIn = async () => {
     setIsOptingIn(true);
     try {
       await onAIOptInChange(lead.id, true);
       
-      // Show success toast
       toast({
         title: "AI Messaging Enabled ✓",
         description: `${lead.firstName} ${lead.lastName} is now opted into AI messaging sequences.`,
         duration: 4000,
       });
+      
+      setIsOpen(false);
     } catch (error) {
       toast({
         title: "Error",
@@ -45,11 +46,11 @@ const AIPreviewPopout: React.FC<AIPreviewPopoutProps> = ({
   };
 
   return (
-    <HoverCard>
-      <HoverCardTrigger asChild>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
         {children}
-      </HoverCardTrigger>
-      <HoverCardContent className="w-80" side="top">
+      </DialogTrigger>
+      <DialogContent className="w-80">
         <Card className="border-0 shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm">
@@ -110,8 +111,8 @@ const AIPreviewPopout: React.FC<AIPreviewPopoutProps> = ({
             </div>
           </CardContent>
         </Card>
-      </HoverCardContent>
-    </HoverCard>
+      </DialogContent>
+    </Dialog>
   );
 };
 

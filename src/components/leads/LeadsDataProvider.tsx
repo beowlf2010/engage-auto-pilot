@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,6 +45,9 @@ const LeadsDataProvider = ({
   const { profile } = useAuth();
   const canEdit = profile?.role === 'manager' || profile?.role === 'admin';
 
+  // Track active stats card filter
+  const [activeStatsFilter, setActiveStatsFilter] = useState<string | null>(null);
+
   // Filter leads based on fresh leads toggle and search filters
   const getFilteredLeads = () => {
     let filtered = [...allLeads];
@@ -89,6 +91,38 @@ const LeadsDataProvider = ({
   };
 
   const leads = getFilteredLeads();
+
+  // Handle stats card clicks
+  const handleStatsCardClick = (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled') => {
+    setActiveStatsFilter(filterType);
+    
+    switch (filterType) {
+      case 'fresh':
+        setSearchFilters({ ...searchFilters, dateFilter: 'today' });
+        setStatusFilter('all');
+        break;
+      case 'all':
+        setSearchFilters({ ...searchFilters, dateFilter: 'all' });
+        setStatusFilter('all');
+        break;
+      case 'no_contact':
+        setSearchFilters({ ...searchFilters, contactStatus: 'no_contact' });
+        setStatusFilter('all');
+        break;
+      case 'contact_attempted':
+        setSearchFilters({ ...searchFilters, contactStatus: 'contact_attempted' });
+        setStatusFilter('all');
+        break;
+      case 'response_received':
+        setSearchFilters({ ...searchFilters, contactStatus: 'response_received' });
+        setStatusFilter('all');
+        break;
+      case 'ai_enabled':
+        setSearchFilters({ ...searchFilters, aiOptIn: true });
+        setStatusFilter('all');
+        break;
+    }
+  };
 
   // Smart sorting: Fresh leads first, then by contact status, then by creation time
   const sortedLeads = [...leads].sort((a, b) => {
@@ -218,7 +252,11 @@ const LeadsDataProvider = ({
   return (
     <div className="space-y-6">
       {/* Stats Cards with Fresh Leads */}
-      <LeadsStatsCards stats={stats} />
+      <LeadsStatsCards 
+        stats={stats} 
+        onCardClick={handleStatsCardClick}
+        activeFilter={activeStatsFilter}
+      />
 
       {/* Enhanced Search & Filters */}
       <EnhancedLeadSearch
