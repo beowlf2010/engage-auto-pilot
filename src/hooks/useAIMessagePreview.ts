@@ -70,9 +70,9 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
       // Send the message
       await sendMessage(leadId, generatedMessage, profile, true);
 
-      // Update lead with AI settings
+      // Update lead with AI settings - Fixed date calculation using milliseconds
       const nextSendTime = new Date();
-      nextSendTime.setHours(nextSendTime.getHours() + 24);
+      nextSendTime.setTime(nextSendTime.getTime() + (24 * 60 * 60 * 1000));
 
       await supabase
         .from('leads')
