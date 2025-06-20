@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ interface EnhancedAIPreviewProps {
   isOpen: boolean;
   onClose: () => void;
   onAIEnabled: () => void;
+  autoGenerate?: boolean;
 }
 
 const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
@@ -22,7 +23,8 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
   vehicleInterest,
   isOpen,
   onClose,
-  onAIEnabled
+  onAIEnabled,
+  autoGenerate = false
 }) => {
   const {
     isGenerating,
@@ -40,9 +42,12 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     }
   });
 
-  const handlePreviewMessage = async () => {
-    await generatePreview();
-  };
+  // Auto-generate message when modal opens if autoGenerate is true
+  useEffect(() => {
+    if (isOpen && autoGenerate && !isGenerating && !generatedMessage) {
+      generatePreview();
+    }
+  }, [isOpen, autoGenerate, isGenerating, generatedMessage, generatePreview]);
 
   const handleSendMessage = async () => {
     await sendNow();
@@ -68,48 +73,6 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {!showPreview && !isGenerating && (
-            <>
-              {/* Introduction */}
-              <div className="text-sm text-gray-600">
-                Finn AI will send a personalized initial message to {leadName} 
-                {vehicleInterest && ` about their interest in ${vehicleInterest}`}.
-              </div>
-
-              {/* Next message schedule preview */}
-              <Card className="bg-blue-50 border-blue-200">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                    <span className="text-blue-900">
-                      Next message: {nextMessageTime.toLocaleDateString()} at{' '}
-                      {nextMessageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handlePreviewMessage}
-                  className="flex-1"
-                  disabled={isGenerating}
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Preview Message
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={handleCancel}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </>
-          )}
-
           {isGenerating && (
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
@@ -119,7 +82,7 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
             </div>
           )}
 
-          {showPreview && generatedMessage && (
+          {!isGenerating && generatedMessage && (
             <>
               {/* Message preview */}
               <Card>
@@ -180,6 +143,34 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
                   className="flex-1"
                 >
                   <X className="w-4 h-4 mr-2" />
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
+
+          {!isGenerating && !generatedMessage && (
+            <>
+              {/* Introduction */}
+              <div className="text-sm text-gray-600">
+                Finn AI will send a personalized initial message to {leadName} 
+                {vehicleInterest && ` about their interest in ${vehicleInterest}`}.
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <Button 
+                  onClick={generatePreview}
+                  className="flex-1"
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Generate Message
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCancel}
+                  className="flex-1"
+                >
                   Cancel
                 </Button>
               </div>

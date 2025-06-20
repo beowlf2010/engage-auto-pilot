@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DialogTrigger } from '@/components/ui/dialog';
 import { Lead } from '@/types/lead';
 import EnhancedAIPreview from './EnhancedAIPreview';
@@ -34,6 +34,7 @@ const AIPreviewPopout: React.FC<AIPreviewPopoutProps> = ({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         onAIEnabled={handleAIEnabled}
+        autoGenerate={true}
       />
     </>
   );
