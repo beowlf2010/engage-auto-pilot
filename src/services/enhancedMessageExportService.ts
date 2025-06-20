@@ -236,6 +236,48 @@ const downloadExcel = (data: ExportData, filename: string): void => {
         format(new Date(lead.created_at), 'MM/dd/yyyy')
       ].join('\t') + '\n';
     });
+    excelContent += '\n';
+  }
+
+  // Add conversations section with actual message content
+  if (data.conversations.length > 0) {
+    excelContent += 'CONVERSATIONS DETAIL\n';
+    excelContent += 'Lead Name\tDirection\tMessage Content\tSent At\tAI Generated\tStatus\n';
+    data.conversations.forEach(conv => {
+      const leadName = conv.leads ? `${conv.leads.first_name} ${conv.leads.last_name}` : 'Unknown Lead';
+      
+      // Clean message content for Excel - replace tabs and newlines with spaces
+      const cleanMessage = conv.body
+        .replace(/\t/g, ' ')
+        .replace(/\n/g, ' ')
+        .replace(/\r/g, ' ')
+        .substring(0, 500); // Limit length for readability
+      
+      excelContent += [
+        leadName,
+        conv.direction === 'in' ? 'Incoming' : 'Outgoing',
+        `"${cleanMessage}"`,
+        format(new Date(conv.sent_at), 'MM/dd/yyyy HH:mm'),
+        conv.ai_generated ? 'Yes' : 'No',
+        conv.sms_status || 'N/A'
+      ].join('\t') + '\n';
+    });
+    excelContent += '\n';
+  }
+
+  // Add AI metrics section if available
+  if (data.aiMetrics.length > 0) {
+    excelContent += 'AI METRICS\n';
+    excelContent += 'Lead ID\tMessage Stage\tSent At\tResponse Time (Hours)\tTemplate Used\n';
+    data.aiMetrics.forEach(metric => {
+      excelContent += [
+        metric.lead_id,
+        metric.message_stage || 'N/A',
+        format(new Date(metric.sent_at), 'MM/dd/yyyy HH:mm'),
+        metric.response_time_hours || 'N/A',
+        metric.template_id || 'N/A'
+      ].join('\t') + '\n';
+    });
   }
 
   const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
