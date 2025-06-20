@@ -12,6 +12,7 @@ import LeadsTableHeader from "./leads/LeadsTableHeader";
 import LeadsTableEmptyState from "./leads/LeadsTableEmptyState";
 import { useLeadsSelection } from "./leads/useLeadsSelection";
 import { useLeadsSorting } from "./leads/useLeadsSorting";
+import FreshLeadBadge from "./leads/FreshLeadBadge";
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -77,20 +78,37 @@ const LeadsTable = ({
             />
           </TableHeader>
           <TableBody>
-            {sortedLeads.map((lead) => (
-              <LeadTableRow
-                key={lead.id}
-                lead={lead}
-                selected={selectedLeads.includes(lead.id.toString())}
-                onSelect={onLeadSelect}
-                onAiOptInChange={onAiOptInChange}
-                canEdit={canEdit}
-                onQuickView={onQuickView}
-                handleMessageClick={handleMessageClick}
-                handleLeadClick={handleLeadClick}
-                getEngagementScore={getEngagementScore}
-              />
-            ))}
+            {sortedLeads.map((lead) => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const leadDate = new Date(lead.createdAt);
+              leadDate.setHours(0, 0, 0, 0);
+              const isFresh = leadDate.getTime() === today.getTime();
+
+              return (
+                <tr 
+                  key={lead.id}
+                  className={isFresh ? 'bg-green-50' : ''}
+                >
+                  <LeadTableRow
+                    lead={lead}
+                    selected={selectedLeads.includes(lead.id.toString())}
+                    onSelect={onLeadSelect}
+                    onAiOptInChange={onAiOptInChange}
+                    canEdit={canEdit}
+                    onQuickView={onQuickView}
+                    handleMessageClick={handleMessageClick}
+                    handleLeadClick={handleLeadClick}
+                    getEngagementScore={getEngagementScore}
+                  />
+                  {isFresh && (
+                    <td className="px-2">
+                      <FreshLeadBadge createdAt={lead.createdAt} />
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </TableBody>
         </Table>
 

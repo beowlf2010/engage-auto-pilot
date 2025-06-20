@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Save, X, Calendar } from "lucide-react";
+import { Search, Filter, Save, X, Calendar, Clock } from "lucide-react";
 import LeadFiltersBar from "./LeadFiltersBar";
 import { useLeadFilters } from "@/hooks/useLeadFilters";
 
@@ -18,6 +19,7 @@ export interface SearchFilters {
   vehicleModel?: string;
   salesperson?: string;
   contactStatus?: string;
+  dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
 }
 
 export interface SavedPreset {
@@ -46,6 +48,7 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
 }) => {
   const [filters, setFilters] = useState<SearchFilters>({
     searchTerm: '',
+    dateFilter: 'all'
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [savePresetName, setSavePresetName] = useState('');
@@ -60,7 +63,7 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
   };
 
   const clearFilters = () => {
-    const clearedFilters: SearchFilters = { searchTerm: '' };
+    const clearedFilters: SearchFilters = { searchTerm: '', dateFilter: 'all' };
     setFilters(clearedFilters);
     onFiltersChange(clearedFilters);
   };
@@ -74,7 +77,7 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
   };
 
   const activeFilterCount = Object.values(filters).filter(v => 
-    v !== '' && v !== undefined && v !== null
+    v !== '' && v !== undefined && v !== null && v !== 'all'
   ).length - (filters.searchTerm ? 1 : 0);
 
   return (
@@ -88,6 +91,7 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
       
       <CardContent className="space-y-4">
         <LeadFiltersBar filter={filter} setFilter={(v: string) => setFilter(v as any)} />
+        
         {/* Main Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -97,6 +101,40 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
             onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
             className="pl-10"
           />
+        </div>
+
+        {/* Quick Date Filters */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={filters.dateFilter === 'today' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleFilterChange('dateFilter', 'today')}
+            className={filters.dateFilter === 'today' ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            <Clock className="w-4 h-4 mr-1" />
+            Today
+          </Button>
+          <Button
+            variant={filters.dateFilter === 'yesterday' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleFilterChange('dateFilter', 'yesterday')}
+          >
+            Yesterday
+          </Button>
+          <Button
+            variant={filters.dateFilter === 'this_week' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleFilterChange('dateFilter', 'this_week')}
+          >
+            This Week
+          </Button>
+          <Button
+            variant={filters.dateFilter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleFilterChange('dateFilter', 'all')}
+          >
+            All Time
+          </Button>
         </div>
 
         {/* Quick Filters */}

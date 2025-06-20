@@ -17,14 +17,16 @@ import VINImportModal from './VINImportModal';
 interface LeadsDataProviderProps {
   isVINImportModalOpen: boolean;
   setIsVINImportModalOpen: (open: boolean) => void;
+  showFreshLeadsOnly?: boolean;
 }
 
 const LeadsDataProvider = ({ 
   isVINImportModalOpen, 
-  setIsVINImportModalOpen 
+  setIsVINImportModalOpen,
+  showFreshLeadsOnly = false
 }: LeadsDataProviderProps) => {
   const {
-    leads,
+    leads: allLeads,
     loading,
     selectedLeads,
     quickViewLead,
@@ -43,6 +45,77 @@ const LeadsDataProvider = ({
 
   const { profile } = useAuth();
   const canEdit = profile?.role === 'manager' || profile?.role === 'admin';
+
+  // Filter leads based on fresh leads toggle and search filters
+  const getFilteredLeads = () => {
+    let filtered = [...allLeads];
+
+    // Apply fresh leads filter
+    if (showFreshLeadsOnly) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(lead => {
+        const leadDate = new Date(lead.createdAt);
+        leadDate.setHours(0, 0, 0, 0);
+        return leadDate.getTime() === today.getTime();
+      });
+    }
+
+    // Apply date filter from search
+    if (searchFilters.dateFilter && searchFilters.dateFilter !== 'all') {
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+
+      filtered = filtered.filter(lead => {
+        const leadDate = new Date(lead.createdAt);
+        
+        switch (searchFilters.dateFilter) {
+          case 'today':
+            return today.toDateString() === leadDate.toDateString();
+          case 'yesterday':
+            return yesterday.toDateString() === leadDate.toDateString();
+          case 'this_week':
+            return leadDate >= weekAgo;
+          default:
+            return true;
+        }
+      });
+    }
+
+    return filtered;
+  };
+
+  const leads = getFilteredLeads();
+
+  // Smart sorting: Fresh leads first, then by contact status, then by creation time
+  const sortedLeads = [...leads].sort((a, b) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const aDate = new Date(a.createdAt);
+    aDate.setHours(0, 0, 0, 0);
+    const bDate = new Date(b.createdAt);
+    bDate.setHours(0, 0, 0, 0);
+    
+    const aIsFresh = aDate.getTime() === today.getTime();
+    const bIsFresh = bDate.getTime() === today.getTime();
+    
+    // Fresh leads first
+    if (aIsFresh && !bIsFresh) return -1;
+    if (!aIsFresh && bIsFresh) return 1;
+    
+    // Then by contact status
+    const statusOrder = { 'no_contact': 0, 'contact_attempted': 1, 'response_received': 2 };
+    if (a.contactStatus !== b.contactStatus) {
+      return statusOrder[a.contactStatus] - statusOrder[b.contactStatus];
+    }
+    
+    // Finally by creation time (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   const handleAiOptInChange = async (leadId: string, value: boolean) => {
     try {
@@ -92,16 +165,24 @@ const LeadsDataProvider = ({
     });
   };
 
-  // Calculate stats from all leads (not filtered)
+  // Calculate stats from all leads (not filtered) including fresh count
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
   const stats = {
-    total: leads.length,
-    noContact: leads.filter(l => l.contactStatus === 'no_contact').length,
-    contacted: leads.filter(l => l.contactStatus === 'contact_attempted').length,
-    responded: leads.filter(l => l.contactStatus === 'response_received').length,
-    aiEnabled: leads.filter(l => l.aiOptIn).length
+    total: allLeads.length,
+    noContact: allLeads.filter(l => l.contactStatus === 'no_contact').length,
+    contacted: allLeads.filter(l => l.contactStatus === 'contact_attempted').length,
+    responded: allLeads.filter(l => l.contactStatus === 'response_received').length,
+    aiEnabled: allLeads.filter(l => l.aiOptIn).length,
+    fresh: allLeads.filter(l => {
+      const leadDate = new Date(l.createdAt);
+      leadDate.setHours(0, 0, 0, 0);
+      return leadDate.getTime() === today.getTime();
+    }).length
   };
 
-  // Mock functions for the enhanced search (these will be connected later)
+  // Mock functions for the enhanced search
   const handleSavePreset = async (name: string, filters: any) => {
     console.log('Saving preset:', name, filters);
   };
@@ -113,8 +194,8 @@ const LeadsDataProvider = ({
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
                 <Skeleton className="h-4 w-16" />
@@ -136,7 +217,7 @@ const LeadsDataProvider = ({
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
+      {/* Stats Cards with Fresh Leads */}
       <LeadsStatsCards stats={stats} />
 
       {/* Enhanced Search & Filters */}
@@ -145,14 +226,14 @@ const LeadsDataProvider = ({
         savedPresets={[]}
         onSavePreset={handleSavePreset}
         onLoadPreset={handleLoadPreset}
-        totalResults={leads.length}
+        totalResults={sortedLeads.length}
         isLoading={loading}
       />
 
       {/* Bulk Actions Panel */}
       <LeadsBulkActionsHandler
         selectedLeads={selectedLeads}
-        leads={leads}
+        leads={sortedLeads}
         clearSelection={clearSelection}
         refetch={refetch}
       />
@@ -161,7 +242,7 @@ const LeadsDataProvider = ({
       <LeadsStatusTabs
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
-        finalFilteredLeads={leads}
+        finalFilteredLeads={sortedLeads}
         loading={loading}
         selectedLeads={selectedLeads}
         selectAllFiltered={selectAllFiltered}
