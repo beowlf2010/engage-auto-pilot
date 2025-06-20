@@ -17,12 +17,14 @@ import {
   MessageSquare,
   TrendingUp,
   Star,
-  UserX
+  UserX,
+  UserCheck
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import AppointmentsList from '../appointments/AppointmentsList';
 import MarkLostConfirmDialog from '../leads/MarkLostConfirmDialog';
 import { markLeadAsLost } from '@/services/leadStatusService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LeadContextPanelProps {
   conversation: any;
@@ -33,6 +35,7 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
   const [activeTab, setActiveTab] = useState('overview');
   const [showMarkLostDialog, setShowMarkLostDialog] = useState(false);
   const [isMarkingLost, setIsMarkingLost] = useState(false);
+  const [isSettingSlowerFollowup, setIsSettingSlowerFollowup] = useState(false);
 
   const handleMarkAsLost = async () => {
     if (!conversation?.leadId) return;
@@ -65,6 +68,49 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
     } finally {
       setIsMarkingLost(false);
       setShowMarkLostDialog(false);
+    }
+  };
+
+  const handleSlowerFollowup = async () => {
+    if (!conversation?.leadId) return;
+    
+    setIsSettingSlowerFollowup(true);
+    try {
+      // Calculate next send time for weekly follow-up (7 days from now)
+      const nextSendTime = new Date();
+      nextSendTime.setDate(nextSendTime.getDate() + 7);
+      
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          message_intensity: 'gentle',
+          ai_sequence_paused: false,
+          ai_pause_reason: null,
+          next_ai_send_at: nextSendTime.toISOString(),
+          ai_stage: 'gentle_nurture'
+        })
+        .eq('id', conversation.leadId);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Weekly follow-up enabled",
+        description: `${conversation.leadName} has been set to receive gentle weekly follow-ups based on conversation history.`,
+      });
+      
+      // Refresh the page to reflect changes
+      window.location.reload();
+    } catch (error) {
+      console.error('Error setting slower follow-up:', error);
+      toast({
+        title: "Error",
+        description: "Failed to set up weekly follow-up",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSettingSlowerFollowup(false);
     }
   };
 
@@ -174,16 +220,29 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
                 {/* Lead Actions */}
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm text-gray-700">Lead Actions</h4>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowMarkLostDialog(true)}
-                    disabled={isMarkingLost || conversation.status === 'lost'}
-                    className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                  >
-                    <UserX className="w-4 h-4 mr-2" />
-                    {isMarkingLost ? 'Marking Lost...' : 'Mark Lost'}
-                  </Button>
+                  <div className="space-y-2">
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSlowerFollowup}
+                      disabled={isSettingSlowerFollowup || conversation.status === 'lost'}
+                      className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                    >
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      {isSettingSlowerFollowup ? 'Setting Up...' : 'Weekly Follow-up'}
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowMarkLostDialog(true)}
+                      disabled={isMarkingLost || conversation.status === 'lost'}
+                      className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                    >
+                      <UserX className="w-4 h-4 mr-2" />
+                      {isMarkingLost ? 'Marking Lost...' : 'Mark Lost'}
+                    </Button>
+                  </div>
                 </div>
 
                 <Separator />
