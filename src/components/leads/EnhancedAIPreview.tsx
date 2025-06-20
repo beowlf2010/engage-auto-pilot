@@ -230,7 +230,7 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={regenerateWithOverrides}
+                            onClick={() => regenerateWithOverrides()}
                             disabled={isGenerating}
                             className="h-6 text-xs px-2"
                           >
