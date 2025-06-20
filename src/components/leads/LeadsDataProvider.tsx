@@ -98,27 +98,29 @@ const LeadsDataProvider = ({
     
     switch (filterType) {
       case 'fresh':
-        setSearchFilters({ ...searchFilters, dateFilter: 'today' });
+        setSearchFilters({ searchTerm: '', dateFilter: 'today' });
         setStatusFilter('all');
         break;
       case 'all':
-        setSearchFilters({ ...searchFilters, dateFilter: 'all' });
+        setSearchFilters({ searchTerm: '', dateFilter: 'all' });
         setStatusFilter('all');
         break;
       case 'no_contact':
-        setSearchFilters({ ...searchFilters, contactStatus: 'no_contact' });
+        // Clear all other filters and only set contactStatus
+        setSearchFilters({ searchTerm: '', contactStatus: 'no_contact' });
         setStatusFilter('all');
+        console.log('Setting No Contact filter - should show only leads with contactStatus: no_contact');
         break;
       case 'contact_attempted':
-        setSearchFilters({ ...searchFilters, contactStatus: 'contact_attempted' });
+        setSearchFilters({ searchTerm: '', contactStatus: 'contact_attempted' });
         setStatusFilter('all');
         break;
       case 'response_received':
-        setSearchFilters({ ...searchFilters, contactStatus: 'response_received' });
+        setSearchFilters({ searchTerm: '', contactStatus: 'response_received' });
         setStatusFilter('all');
         break;
       case 'ai_enabled':
-        setSearchFilters({ ...searchFilters, aiOptIn: true });
+        setSearchFilters({ searchTerm: '', aiOptIn: true });
         setStatusFilter('all');
         break;
     }
@@ -150,6 +152,22 @@ const LeadsDataProvider = ({
     // Finally by creation time (newest first)
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+
+  // Debug logging for No Contact filter
+  React.useEffect(() => {
+    if (searchFilters.contactStatus === 'no_contact') {
+      const noContactLeads = allLeads.filter(lead => lead.contactStatus === 'no_contact');
+      console.log('Total leads:', allLeads.length);
+      console.log('No contact leads:', noContactLeads.length);
+      console.log('No contact lead examples:', noContactLeads.slice(0, 3).map(lead => ({
+        name: `${lead.firstName} ${lead.lastName}`,
+        contactStatus: lead.contactStatus,
+        outgoingCount: lead.outgoingCount,
+        incomingCount: lead.incomingCount
+      })));
+      console.log('Filtered leads being shown:', sortedLeads.length);
+    }
+  }, [searchFilters.contactStatus, allLeads, sortedLeads]);
 
   const handleAiOptInChange = async (leadId: string, value: boolean) => {
     try {
