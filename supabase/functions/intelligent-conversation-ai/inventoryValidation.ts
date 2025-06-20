@@ -38,15 +38,18 @@ export const validateInventoryAccuracy = async (vehicleInterest: string, leadId?
       .select('id, make, model, year, fuel_type, condition, price, status, stock_number, vin, trim')
       .eq('status', 'available')
       .not('model', 'eq', 'Unknown') // STRICT: Only vehicles with known models
-      .not('model', 'is', null);
-      // REMOVED: .limit(20) - NO MORE ARTIFICIAL LIMITS
+      .not('model', 'is', null)
+      .not('make', 'eq', 'Unknown') // STRICT: Only vehicles with known makes
+      .not('make', 'is', null)
+      .not('make', 'ilike', '%unknown%') // Filter any variation of "unknown"
+      .not('model', 'ilike', '%unknown%'); // Filter any variation of "unknown"
 
     // Apply lead-specific filters if available
     if (leadPreferences) {
-      if (leadPreferences.vehicle_make) {
+      if (leadPreferences.vehicle_make && leadPreferences.vehicle_make.toLowerCase() !== 'unknown') {
         query = query.ilike('make', `%${leadPreferences.vehicle_make}%`);
       }
-      if (leadPreferences.vehicle_model) {
+      if (leadPreferences.vehicle_model && leadPreferences.vehicle_model.toLowerCase() !== 'unknown') {
         query = query.ilike('model', `%${leadPreferences.vehicle_model}%`);
       }
       if (leadPreferences.vehicle_year) {
@@ -68,7 +71,7 @@ export const validateInventoryAccuracy = async (vehicleInterest: string, leadId?
         const make = makeMatch[1].toLowerCase();
         if (make === 'chevy') {
           query = query.ilike('make', '%chevrolet%');
-        } else {
+        } else if (make !== 'unknown') {
           query = query.ilike('make', `%${make}%`);
         }
       }
@@ -83,17 +86,27 @@ export const validateInventoryAccuracy = async (vehicleInterest: string, leadId?
 
     // STRICT validation: Only count vehicles with complete, accurate data
     const validatedVehicles = (inventory || []).filter(vehicle => {
-      return vehicle.make && 
-             vehicle.model && 
-             vehicle.model !== 'Unknown' && 
-             vehicle.year && 
-             vehicle.year > 1990 && 
-             vehicle.year <= new Date().getFullYear() + 2;
+      const hasValidMake = vehicle.make && 
+                          vehicle.make !== 'Unknown' && 
+                          !vehicle.make.toLowerCase().includes('unknown') &&
+                          vehicle.make.trim().length > 0;
+                          
+      const hasValidModel = vehicle.model && 
+                           vehicle.model !== 'Unknown' && 
+                           !vehicle.model.toLowerCase().includes('unknown') &&
+                           vehicle.model.trim().length > 0;
+                           
+      const hasValidYear = vehicle.year && 
+                          vehicle.year > 1990 && 
+                          vehicle.year <= new Date().getFullYear() + 2;
+      
+      return hasValidMake && hasValidModel && hasValidYear;
     });
 
     console.log(`📊 STRICT validation results:`, {
       totalFound: inventory?.length || 0,
       validatedCount: validatedVehicles.length,
+      filteredOutUnknown: (inventory?.length || 0) - validatedVehicles.length,
       leadId: leadId || 'none',
       hasPreferences: !!leadPreferences,
       removedArtificialLimit: true

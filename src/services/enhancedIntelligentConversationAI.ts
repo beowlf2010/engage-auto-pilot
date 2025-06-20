@@ -60,7 +60,7 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
 
     console.log('🔄 [ENHANCED AI] Calling UNIFIED intelligent-conversation-ai edge function');
 
-    // Call the UNIFIED edge function that has the fixed logic
+    // Call the UNIFIED edge function that has the fixed logic and unknown vehicle filtering
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: context.leadId,
@@ -86,12 +86,18 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
       return null;
     }
 
+    // Additional validation to ensure the message doesn't contain "Unknown" vehicles
+    if (data.message.includes('Unknown') || data.message.toLowerCase().includes('unknown')) {
+      console.warn('⚠️ [ENHANCED AI] Generated message contains "Unknown" - filtering out');
+      return null;
+    }
+
     console.log('✅ [ENHANCED AI] Generated response via unified edge function:', data.message);
     
     return {
       message: data.message,
       confidence: data.confidence || 0.9,
-      reasoning: data.reasoning || 'Enhanced AI via unified edge function with fixed conversation repair logic',
+      reasoning: data.reasoning || 'Enhanced AI via unified edge function with unknown vehicle filtering',
       customerIntent: data.customerIntent || null,
       answerGuidance: data.answerGuidance || null
     };

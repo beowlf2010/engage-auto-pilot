@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { getLeadMemory } from './aiMemoryService';
 import { findMatchingInventory } from './inventoryService';
@@ -37,7 +36,22 @@ const generateInventoryMessage = async (leadId: string, vehicleInterest: string)
   try {
     const matchingInventory = await findMatchingInventory(leadId);
     
-    if (matchingInventory.length === 0) {
+    // Filter out any vehicles with unknown make/model
+    const validInventory = matchingInventory.filter(vehicle => {
+      const hasValidMake = vehicle.make && 
+        vehicle.make !== 'Unknown' && 
+        !vehicle.make.toLowerCase().includes('unknown') &&
+        vehicle.make.trim().length > 0;
+        
+      const hasValidModel = vehicle.model && 
+        vehicle.model !== 'Unknown' && 
+        !vehicle.model.toLowerCase().includes('unknown') &&
+        vehicle.model.trim().length > 0;
+        
+      return hasValidMake && hasValidModel;
+    });
+    
+    if (validInventory.length === 0) {
       return {
         inventoryMessage: "We have several vehicles that might interest you.",
         availabilityMessage: "Let me know what specific features you're looking for!",
@@ -46,7 +60,7 @@ const generateInventoryMessage = async (leadId: string, vehicleInterest: string)
       };
     }
 
-    const topMatch = matchingInventory[0];
+    const topMatch = validInventory[0];
     const price = topMatch.price ? `$${topMatch.price.toLocaleString()}` : '';
     
     let inventoryMessage = `I have a ${topMatch.year} ${topMatch.make} ${topMatch.model}`;
@@ -55,8 +69,8 @@ const generateInventoryMessage = async (leadId: string, vehicleInterest: string)
     }
     inventoryMessage += ` that matches what you're looking for.`;
 
-    const availabilityMessage = matchingInventory.length > 1 
-      ? `We also have ${matchingInventory.length - 1} other similar vehicles available.`
+    const availabilityMessage = validInventory.length > 1 
+      ? `We also have ${validInventory.length - 1} other similar vehicles available.`
       : "This one is perfect for your needs!";
 
     const pricingMessage = price 
@@ -119,7 +133,7 @@ export const generateAIMessage = async (leadId: string): Promise<string | null> 
       .map(m => m.content)
       .join('. ');
 
-    // Generate inventory-specific content
+    // Generate inventory-specific content with unknown filtering
     const inventoryData = await generateInventoryMessage(leadId, lead.vehicle_interest);
 
     // Replace template variables

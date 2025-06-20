@@ -1,3 +1,4 @@
+
 import { extractVehicleFields } from './field-extraction';
 import { extractVINField } from './field-extraction';
 import { extractOptionsFields } from './field-extraction';
@@ -72,6 +73,37 @@ export interface InventoryItem {
 // Define the upload condition type
 export type UploadCondition = 'new' | 'used' | 'gm_global';
 
+// Helper function to validate and clean vehicle data
+const isValidVehicleData = (make: string, model: string): boolean => {
+  const invalidValues = ['unknown', 'null', 'undefined', '', 'n/a', 'na', 'none'];
+  
+  const makeValid = make && 
+    typeof make === 'string' && 
+    make.trim().length > 0 && 
+    !invalidValues.includes(make.toLowerCase().trim());
+    
+  const modelValid = model && 
+    typeof model === 'string' && 
+    model.trim().length > 0 && 
+    !invalidValues.includes(model.toLowerCase().trim());
+    
+  return makeValid && modelValid;
+};
+
+// Helper function to clean vehicle data
+const cleanVehicleData = (value: string): string | null => {
+  if (!value || typeof value !== 'string') return null;
+  
+  const cleaned = value.trim();
+  const invalidValues = ['unknown', 'null', 'undefined', '', 'n/a', 'na', 'none'];
+  
+  if (invalidValues.includes(cleaned.toLowerCase())) {
+    return null;
+  }
+  
+  return cleaned;
+};
+
 export const mapRowToInventoryItem = (
   row: any,
   condition: UploadCondition,
@@ -116,13 +148,30 @@ export const mapRowToInventoryItem = (
           console.error('Error in field extraction:', error);
           // Fallback to basic mapping
           mappedData = {
-            make: row.make || row.Make || 'Unknown',
-            model: row.model || row.Model || 'Unknown',
+            make: row.make || row.Make || null,
+            model: row.model || row.Model || null,
             condition: condition === 'new' ? 'new' : 'used',
             status: 'available'
           };
         }
       }
+    }
+
+    // Clean and validate make/model data
+    const cleanedMake = cleanVehicleData(mappedData.make);
+    const cleanedModel = cleanVehicleData(mappedData.model);
+
+    // Reject vehicles with invalid make/model data
+    if (!isValidVehicleData(cleanedMake || '', cleanedModel || '')) {
+      console.warn('Rejecting vehicle with invalid make/model data:', {
+        originalMake: mappedData.make,
+        originalModel: mappedData.model,
+        cleanedMake,
+        cleanedModel
+      });
+      
+      // Return null or throw error to indicate this vehicle should be skipped
+      throw new Error(`Invalid vehicle data: make="${mappedData.make}", model="${mappedData.model}"`);
     }
 
     // Determine the final condition value
@@ -133,10 +182,10 @@ export const mapRowToInventoryItem = (
       finalCondition = condition;
     }
 
-    // Ensure required fields have defaults with error handling
+    // Ensure required fields have valid values
     const inventoryItem: InventoryItem = {
-      make: mappedData.make || 'Unknown',
-      model: mappedData.model || 'Unknown',
+      make: cleanedMake!,
+      model: cleanedModel!,
       condition: mappedData.condition || finalCondition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
@@ -180,14 +229,7 @@ export const mapRowToInventoryItem = (
   } catch (error) {
     console.error('Critical error in mapRowToInventoryItem:', error);
     
-    // Return a minimal valid inventory item to prevent complete failure
-    return {
-      make: row.make || row.Make || 'Unknown',
-      model: row.model || row.Model || 'Unknown',
-      condition: condition === 'gm_global' ? 'new' : (condition === 'new' ? 'new' : 'used'),
-      status: 'available',
-      upload_history_id: uploadId,
-      source_report: condition === 'gm_global' ? 'orders_all' : (condition === 'new' ? 'new_car_main_view' : 'merch_inv_view')
-    };
+    // Don't create invalid inventory items - let the error bubble up
+    throw new Error(`Failed to map vehicle data: ${error.message}`);
   }
 };

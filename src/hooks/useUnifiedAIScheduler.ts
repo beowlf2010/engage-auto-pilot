@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { sendMessage } from '@/services/messagesService';
@@ -111,6 +110,12 @@ export const useUnifiedAIScheduler = () => {
         const message = generateMessage(lead);
         if (!message) continue;
 
+        // Additional validation to ensure no "Unknown" vehicles in message
+        if (message.includes('Unknown') || message.toLowerCase().includes('unknown')) {
+          console.warn(`⚠️ [UNIFIED AI] Skipping message with unknown vehicle for ${lead.first_name}`);
+          continue;
+        }
+
         console.log(`📤 [UNIFIED AI] Sending ${lead.message_intensity} message to ${lead.first_name}: ${message}`);
         await sendMessage(lead.id, message, profile, true);
 
@@ -152,6 +157,12 @@ export const useUnifiedAIScheduler = () => {
         const message = generateMessage(lead);
         if (!message) continue;
 
+        // Additional validation to ensure no "Unknown" vehicles in message
+        if (message.includes('Unknown') || message.toLowerCase().includes('unknown')) {
+          console.warn(`⚠️ [UNIFIED AI] Skipping initial message with unknown vehicle for ${lead.first_name}`);
+          continue;
+        }
+
         console.log(`📤 [UNIFIED AI] Sending initial ${lead.message_intensity} message to ${lead.first_name}: ${message}`);
         await sendMessage(lead.id, message, profile, true);
 
@@ -167,10 +178,18 @@ export const useUnifiedAIScheduler = () => {
     }
   };
 
-  // Generate appropriate message based on intensity and stage
+  // Generate appropriate message based on intensity and stage with unknown filtering
   const generateMessage = (lead: any): string | null => {
     const messagesSent = lead.ai_messages_sent || 0;
     const isAggressive = lead.message_intensity === 'aggressive';
+    
+    // Don't generate messages for leads with unknown vehicle interest
+    if (!lead.vehicle_interest || 
+        lead.vehicle_interest.toLowerCase().includes('unknown') ||
+        lead.vehicle_interest.trim() === '') {
+      console.warn(`⚠️ [UNIFIED AI] Skipping lead with unknown vehicle interest: ${lead.first_name}`);
+      return null;
+    }
     
     if (isAggressive) {
       return generateAggressiveMessage(lead, messagesSent);
@@ -179,26 +198,30 @@ export const useUnifiedAIScheduler = () => {
     }
   };
 
-  // Generate aggressive messages for uncontacted leads
+  // Generate aggressive messages for uncontacted leads (with unknown filtering)
   const generateAggressiveMessage = (lead: any, messagesSent: number): string => {
+    const vehicleInterest = lead.vehicle_interest || 'a vehicle';
+    
     const templates = [
-      `Hi ${lead.first_name}! I see you're interested in ${lead.vehicle_interest}. We have some great options available right now. When can you come take a look?`,
-      `${lead.first_name}, that ${lead.vehicle_interest} won't last long! We've had several people ask about it today. Want to secure it with a quick visit?`,
-      `Hey ${lead.first_name}! Great news - we have special financing available on ${lead.vehicle_interest} this week. Interested in learning more?`,
-      `${lead.first_name}, this might be your final opportunity on the ${lead.vehicle_interest}. Don't miss out! Available for a quick call today?`,
-      `Hi ${lead.first_name}! Last chance - the ${lead.vehicle_interest} you inquired about is being considered by another customer. Still interested?`
+      `Hi ${lead.first_name}! I see you're interested in ${vehicleInterest}. We have some great options available right now. When can you come take a look?`,
+      `${lead.first_name}, that ${vehicleInterest} won't last long! We've had several people ask about it today. Want to secure it with a quick visit?`,
+      `Hey ${lead.first_name}! Great news - we have special financing available on ${vehicleInterest} this week. Interested in learning more?`,
+      `${lead.first_name}, this might be your final opportunity on the ${vehicleInterest}. Don't miss out! Available for a quick call today?`,
+      `Hi ${lead.first_name}! Last chance - the ${vehicleInterest} you inquired about is being considered by another customer. Still interested?`
     ];
     
     const templateIndex = messagesSent % templates.length;
     return templates[templateIndex];
   };
 
-  // Generate gentle messages for engaged leads
+  // Generate gentle messages for engaged leads (with unknown filtering)
   const generateGentleMessage = (lead: any, messagesSent: number): string => {
+    const vehicleInterest = lead.vehicle_interest || 'a vehicle';
+    
     const templates = [
-      `Hi ${lead.first_name}, hope you're doing well! Still thinking about ${lead.vehicle_interest}? Happy to answer any questions.`,
-      `${lead.first_name}, just wanted to follow up on ${lead.vehicle_interest}. Any questions I can help with?`,
-      `Hi ${lead.first_name}, hope you found what you were looking for! If you're still interested in ${lead.vehicle_interest}, we're here to help.`
+      `Hi ${lead.first_name}, hope you're doing well! Still thinking about ${vehicleInterest}? Happy to answer any questions.`,
+      `${lead.first_name}, just wanted to follow up on ${vehicleInterest}. Any questions I can help with?`,
+      `Hi ${lead.first_name}, hope you found what you were looking for! If you're still interested in ${vehicleInterest}, we're here to help.`
     ];
     
     const templateIndex = messagesSent % templates.length;
