@@ -21,64 +21,59 @@ export const saveNameValidationDecision = async (
   try {
     const normalizedName = originalName.toLowerCase().trim();
     
-    // Check if we already have a record for this name
-    const { data: existing, error: fetchError } = await supabase
-      .from('ai_name_validations')
-      .select('*')
-      .eq('normalized_name', normalizedName)
-      .maybeSingle();
+    // Use edge function to handle database operations
+    const { data, error } = await supabase.functions.invoke('name-validation-helpers', {
+      body: {
+        action: 'get_name_validation_record',
+        p_normalized_name: normalizedName
+      }
+    });
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      console.error('Error fetching existing validation:', fetchError);
+    if (error) {
+      console.error('Error fetching existing validation:', error);
       return;
     }
 
-    if (existing) {
+    if (data && data.length > 0) {
+      const record = data[0];
       // Update existing record
       const newTimesApproved = decision === 'approved' 
-        ? existing.times_approved + 1 
-        : existing.times_approved;
+        ? (record.times_approved || 0) + 1 
+        : (record.times_approved || 0);
       const newTimesRejected = decision === 'denied' 
-        ? existing.times_rejected + 1 
-        : existing.times_rejected;
+        ? (record.times_rejected || 0) + 1 
+        : (record.times_rejected || 0);
 
-      const { error: updateError } = await supabase
-        .from('ai_name_validations')
-        .update({
-          times_seen: existing.times_seen + 1,
-          times_approved: newTimesApproved,
-          times_rejected: newTimesRejected,
-          user_override_decision: decision,
-          override_reason: userReason,
-          confidence_after: decision === 'approved' ? 0.95 : 0.1,
-          override_by: userId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id);
-
-      if (updateError) {
-        console.error('Error updating validation decision:', updateError);
-      }
+      await supabase.functions.invoke('name-validation-helpers', {
+        body: {
+          action: 'update_name_validation_record',
+          p_id: record.id,
+          p_times_seen: (record.times_seen || 0) + 1,
+          p_times_approved: newTimesApproved,
+          p_times_rejected: newTimesRejected,
+          p_user_override_decision: decision,
+          p_override_reason: userReason,
+          p_confidence_after: decision === 'approved' ? 0.95 : 0.1,
+          p_override_by: userId
+        }
+      });
     } else {
       // Create new record
-      const { error: insertError } = await supabase
-        .from('ai_name_validations')
-        .insert({
-          original_name: originalName,
-          normalized_name: normalizedName,
-          original_validation_result: originalValidation,
-          user_override_decision: decision,
-          override_reason: userReason,
-          confidence_before: originalValidation.confidence,
-          confidence_after: decision === 'approved' ? 0.95 : 0.1,
-          times_approved: decision === 'approved' ? 1 : 0,
-          times_rejected: decision === 'denied' ? 1 : 0,
-          override_by: userId
-        });
-
-      if (insertError) {
-        console.error('Error saving validation decision:', insertError);
-      }
+      await supabase.functions.invoke('name-validation-helpers', {
+        body: {
+          action: 'insert_name_validation_record',
+          p_original_name: originalName,
+          p_normalized_name: normalizedName,
+          p_original_validation_result: originalValidation,
+          p_user_override_decision: decision,
+          p_override_reason: userReason,
+          p_confidence_before: originalValidation.confidence,
+          p_confidence_after: decision === 'approved' ? 0.95 : 0.1,
+          p_times_approved: decision === 'approved' ? 1 : 0,
+          p_times_rejected: decision === 'denied' ? 1 : 0,
+          p_override_by: userId
+        }
+      });
     }
 
     console.log(`✅ [LEARNING] Saved ${decision} decision for name: ${originalName}`);
@@ -91,31 +86,31 @@ export const getLearnedNameValidation = async (name: string): Promise<any | null
   try {
     const normalizedName = name.toLowerCase().trim();
     
-    const { data, error } = await supabase
-      .from('ai_name_validations')
-      .select('*')
-      .eq('normalized_name', normalizedName)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data, error } = await supabase.functions.invoke('name-validation-helpers', {
+      body: {
+        action: 'get_learned_name_validation',
+        p_normalized_name: normalizedName
+      }
+    });
 
     if (error) {
       console.error('Error fetching learned validation:', error);
       return null;
     }
 
-    if (data && data.user_override_decision) {
-      console.log(`🧠 [LEARNING] Found learned decision for "${name}": ${data.user_override_decision}`);
+    if (data && data.length > 0) {
+      const record = data[0];
+      console.log(`🧠 [LEARNING] Found learned decision for "${name}": ${record.user_override_decision}`);
       return {
-        isValidPersonalName: data.user_override_decision === 'approved',
-        confidence: data.confidence_after || 0.95,
-        detectedType: data.user_override_decision === 'approved' ? 'personal' : 'learned_override',
+        isValidPersonalName: record.user_override_decision === 'approved',
+        confidence: record.confidence_after || 0.95,
+        detectedType: record.user_override_decision === 'approved' ? 'personal' : 'learned_override',
         userOverride: true,
-        timesApproved: data.times_approved,
-        timesRejected: data.times_rejected,
-        timesSeen: data.times_seen,
+        timesApproved: record.times_approved || 0,
+        timesRejected: record.times_rejected || 0,
+        timesSeen: record.times_seen || 0,
         suggestions: {
-          useGenericGreeting: data.user_override_decision !== 'approved'
+          useGenericGreeting: record.user_override_decision !== 'approved'
         }
       };
     }

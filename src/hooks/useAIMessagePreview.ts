@@ -239,6 +239,17 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     setVehicleDecision(null);
   };
 
+  // Add the missing methods for CompactAIControls
+  const generatePreview = () => {
+    if (!showDecisionStep && !showPreview) {
+      startAnalysis();
+    }
+  };
+
+  const cancel = () => {
+    reset();
+  };
+
   return {
     isAnalyzing,
     isGenerating,
@@ -255,6 +266,8 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     handleVehicleDecision,
     generateWithDecisions,
     sendNow,
-    reset
+    reset,
+    generatePreview,
+    cancel
   };
 };
