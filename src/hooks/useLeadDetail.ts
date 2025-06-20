@@ -59,7 +59,7 @@ export const useLeadDetail = () => {
     state: lead.state,
     postalCode: lead.postalCode,
     vehicleInterest: lead.vehicleInterest,
-    vehicleYear: lead.vehicleYear,
+    vehicleYear: lead.vehicleYear, // Now number type matches
     vehicleMake: lead.vehicleMake,
     vehicleModel: lead.vehicleModel,
     vehicleVin: lead.vehicleVin,

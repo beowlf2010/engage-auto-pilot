@@ -5,6 +5,7 @@ export interface PhoneNumber {
   number: string;
   isPrimary: boolean;
   type?: string;
+  status?: string;
 }
 
 export interface TradeVehicle {
@@ -142,8 +143,6 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
           vin,
           mileage,
           condition,
-          estimated_value,
-          owed_amount,
           description
         ),
         profiles!salesperson_id (
@@ -227,12 +226,13 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       lastReplyAt: lead.last_reply_at,
       preferredPriceMin: lead.preferred_price_min,
       preferredPriceMax: lead.preferred_price_max,
-      notes: lead.notes,
+      notes: lead.notes || '',
       phoneNumbers: (lead.phone_numbers || []).map((phone: any) => ({
         id: phone.id,
         number: phone.number,
         isPrimary: phone.is_primary,
-        type: phone.type
+        type: phone.type,
+        status: 'active' // Default status since it's not in the database
       })),
       tradeVehicles: (lead.trade_vehicles || []).map((trade: any) => ({
         id: trade.id,
@@ -242,8 +242,8 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
         vin: trade.vin,
         mileage: trade.mileage,
         condition: trade.condition,
-        estimatedValue: trade.estimated_value,
-        owedAmount: trade.owed_amount,
+        estimatedValue: 0, // Default value since column doesn't exist
+        owedAmount: 0, // Default value since column doesn't exist
         description: trade.description
       })),
       conversations: (conversations || []).map((conv: any) => ({
@@ -287,23 +287,23 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       appointmentBooked: (appointments && appointments.length > 0) || false,
       lastAppointmentAt: appointments?.[0]?.created_at,
       emailOptIn: lead.email_opt_in ?? true,
-      smsOptIn: lead.sms_opt_in ?? true,
-      callOptIn: lead.call_opt_in ?? true,
-      unsubscribed: lead.unsubscribed || false,
-      doNotContact: lead.do_not_contact || false,
-      aiSequenceStartedAt: lead.ai_sequence_started_at,
-      aiLastMessageAt: lead.ai_last_message_at,
-      manuallyAssigned: lead.manually_assigned || false,
-      campaignSource: lead.campaign_source,
-      referralSource: lead.referral_source,
-      utmSource: lead.utm_source,
-      utmMedium: lead.utm_medium,
-      utmCampaign: lead.utm_campaign,
-      landingPage: lead.landing_page,
-      deviceType: lead.device_type,
-      browserType: lead.browser_type,
-      ipAddress: lead.ip_address,
-      geoLocation: lead.geo_location,
+      smsOptIn: true, // Default since column doesn't exist
+      callOptIn: true, // Default since column doesn't exist
+      unsubscribed: false, // Default since column doesn't exist
+      doNotContact: false, // Default since column doesn't exist
+      aiSequenceStartedAt: undefined, // Field doesn't exist in schema
+      aiLastMessageAt: undefined, // Field doesn't exist in schema
+      manuallyAssigned: false, // Default since column doesn't exist
+      campaignSource: undefined, // Field doesn't exist in schema
+      referralSource: undefined, // Field doesn't exist in schema
+      utmSource: undefined, // Field doesn't exist in schema
+      utmMedium: undefined, // Field doesn't exist in schema
+      utmCampaign: undefined, // Field doesn't exist in schema
+      landingPage: undefined, // Field doesn't exist in schema
+      deviceType: undefined, // Field doesn't exist in schema
+      browserType: undefined, // Field doesn't exist in schema
+      ipAddress: undefined, // Field doesn't exist in schema
+      geoLocation: undefined, // Field doesn't exist in schema
       // AI takeover settings
       aiTakeoverEnabled: lead.ai_takeover_enabled || false,
       aiTakeoverDelayMinutes: lead.ai_takeover_delay_minutes,
@@ -311,7 +311,7 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       tradeInVehicle: lead.trade_vehicles?.[0] ? 
         `${lead.trade_vehicles[0].year || ''} ${lead.trade_vehicles[0].make || ''} ${lead.trade_vehicles[0].model || ''}`.trim() : 
         undefined,
-      tradePayoffAmount: lead.trade_vehicles?.[0]?.owed_amount
+      tradePayoffAmount: 0 // Default since owed_amount doesn't exist
     };
 
     return leadDetail;

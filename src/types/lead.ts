@@ -40,7 +40,7 @@ export interface Lead {
   doNotCall: boolean;
   doNotEmail: boolean;
   doNotMail: boolean;
-  vehicleYear?: string;
+  vehicleYear?: number; // Changed to number to match LeadDetailData
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleVIN?: string;
