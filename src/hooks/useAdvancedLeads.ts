@@ -1,21 +1,20 @@
 
-
 import { useState, useEffect, useMemo } from 'react';
 import { Lead } from '@/types/lead';
 import { useLeads } from '@/hooks/useLeads';
-import { FilterOptions } from '@/components/leads/AdvancedFilters';
 
 export interface SearchFilters {
   searchTerm: string;
   status?: string;
   source?: string;
   aiOptIn?: boolean;
-  dateRange?: string;
-  vehicleMake?: string;
-  vehicleModel?: string;
-  salesperson?: string;
   contactStatus?: string;
   dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
+  vehicleInterest?: string;
+  city?: string;
+  state?: string;
+  engagementScoreMin?: number;
+  engagementScoreMax?: number;
 }
 
 export interface SavedPreset {
@@ -29,30 +28,20 @@ export const useAdvancedLeads = () => {
   const { leads, loading, refetch } = useLeads();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
-  const [savedPresets, setSavedPresets] = useState<Array<{ name: string; filters: FilterOptions }>>([]);
+  const [savedPresets, setSavedPresets] = useState<SavedPreset[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({ searchTerm: '' });
-  
-  const defaultFilters: FilterOptions = {
-    status: [],
-    contactStatus: [],
-    source: [],
-    aiOptIn: null,
-    dateRange: { from: null, to: null },
-    vehicleInterest: '',
-    city: '',
-    state: '',
-    engagementScore: { min: null, max: null }
-  };
-
-  const [filters, setFilters] = useState<FilterOptions>(defaultFilters);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({ 
+    searchTerm: '',
+    dateFilter: 'all'
+  });
 
   // Load saved presets from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('lead-filter-presets');
     if (saved) {
       try {
-        setSavedPresets(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setSavedPresets(parsed);
       } catch (error) {
         console.error('Error loading saved presets:', error);
       }
@@ -86,96 +75,107 @@ export const useAdvancedLeads = () => {
       );
     }
 
-    // Status filter from tabs
+    // Status filter from tabs (takes precedence if not 'all')
     if (statusFilter !== 'all') {
       filtered = filtered.filter(lead => lead.status === statusFilter);
-    }
-
-    // Search filters
-    if (searchFilters.status && searchFilters.status !== statusFilter) {
+    } else if (searchFilters.status) {
+      // Only apply search filter status if tab status is 'all'
       filtered = filtered.filter(lead => lead.status === searchFilters.status);
     }
 
-    if (searchFilters.source) {
-      filtered = filtered.filter(lead => lead.source === searchFilters.source);
-    }
-
-    if (searchFilters.aiOptIn !== undefined) {
-      filtered = filtered.filter(lead => lead.aiOptIn === searchFilters.aiOptIn);
-    }
-
-    // Add contact status filter for "No Contact" functionality
+    // Contact status filter
     if (searchFilters.contactStatus) {
       filtered = filtered.filter(lead => lead.contactStatus === searchFilters.contactStatus);
     }
 
-    // Advanced filters
-    if (filters.status.length > 0) {
-      filtered = filtered.filter(lead => filters.status.includes(lead.status));
+    // Source filter
+    if (searchFilters.source) {
+      filtered = filtered.filter(lead => lead.source === searchFilters.source);
     }
 
-    if (filters.contactStatus.length > 0) {
-      filtered = filtered.filter(lead => filters.contactStatus.includes(lead.contactStatus));
+    // AI opt-in filter
+    if (searchFilters.aiOptIn !== undefined) {
+      filtered = filtered.filter(lead => lead.aiOptIn === searchFilters.aiOptIn);
     }
 
-    if (filters.aiOptIn !== null) {
-      filtered = filtered.filter(lead => lead.aiOptIn === filters.aiOptIn);
+    // Date filter
+    if (searchFilters.dateFilter && searchFilters.dateFilter !== 'all') {
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+
+      filtered = filtered.filter(lead => {
+        const leadDate = new Date(lead.createdAt);
+        
+        switch (searchFilters.dateFilter) {
+          case 'today':
+            return today.toDateString() === leadDate.toDateString();
+          case 'yesterday':
+            return yesterday.toDateString() === leadDate.toDateString();
+          case 'this_week':
+            return leadDate >= weekAgo;
+          default:
+            return true;
+        }
+      });
     }
 
-    if (filters.dateRange.from) {
+    // Vehicle interest filter
+    if (searchFilters.vehicleInterest) {
       filtered = filtered.filter(lead => 
-        new Date(lead.createdAt) >= filters.dateRange.from!
+        lead.vehicleInterest?.toLowerCase().includes(searchFilters.vehicleInterest!.toLowerCase())
       );
     }
-    if (filters.dateRange.to) {
+
+    // City filter
+    if (searchFilters.city) {
       filtered = filtered.filter(lead => 
-        new Date(lead.createdAt) <= filters.dateRange.to!
+        lead.city?.toLowerCase().includes(searchFilters.city!.toLowerCase())
       );
     }
 
-    if (filters.vehicleInterest) {
+    // State filter
+    if (searchFilters.state) {
       filtered = filtered.filter(lead => 
-        lead.vehicleInterest?.toLowerCase().includes(filters.vehicleInterest.toLowerCase())
+        lead.state?.toLowerCase().includes(searchFilters.state!.toLowerCase())
       );
     }
 
-    if (filters.city) {
-      filtered = filtered.filter(lead => 
-        lead.city?.toLowerCase().includes(filters.city.toLowerCase())
-      );
-    }
-
-    if (filters.state) {
-      filtered = filtered.filter(lead => 
-        lead.state?.toLowerCase().includes(filters.state.toLowerCase())
-      );
-    }
-
-    if (filters.engagementScore.min !== null || filters.engagementScore.max !== null) {
+    // Engagement score filter
+    if (searchFilters.engagementScoreMin !== undefined || searchFilters.engagementScoreMax !== undefined) {
       filtered = filtered.filter(lead => {
         const score = getEngagementScore(lead);
-        const min = filters.engagementScore.min ?? 0;
-        const max = filters.engagementScore.max ?? 100;
+        const min = searchFilters.engagementScoreMin ?? 0;
+        const max = searchFilters.engagementScoreMax ?? 100;
         return score >= min && score <= max;
       });
     }
 
     return filtered;
-  }, [leads, filters, statusFilter, searchFilters]);
+  }, [leads, statusFilter, searchFilters]);
 
-  const savePreset = (name: string, filterOptions: FilterOptions) => {
-    const newPresets = [...savedPresets, { name, filters: filterOptions }];
+  const savePreset = (name: string, filters: SearchFilters) => {
+    const newPreset: SavedPreset = {
+      id: Date.now().toString(),
+      name,
+      filters,
+      createdAt: new Date().toISOString()
+    };
+    const newPresets = [...savedPresets, newPreset];
     setSavedPresets(newPresets);
     localStorage.setItem('lead-filter-presets', JSON.stringify(newPresets));
   };
 
-  const loadPreset = (filterOptions: FilterOptions) => {
-    setFilters(filterOptions);
+  const loadPreset = (preset: SavedPreset) => {
+    setSearchFilters(preset.filters);
+    setStatusFilter('all'); // Reset status filter when loading preset
   };
 
   const clearFilters = () => {
-    setFilters(defaultFilters);
-    setSearchFilters({ searchTerm: '' });
+    setSearchFilters({ searchTerm: '', dateFilter: 'all' });
+    setStatusFilter('all');
     setSelectedLeads([]);
   };
 
@@ -210,12 +210,10 @@ export const useAdvancedLeads = () => {
     selectedLeads,
     quickViewLead,
     savedPresets,
-    filters,
     statusFilter,
     searchFilters,
     
     // Actions
-    setFilters,
     setStatusFilter,
     setSearchFilters,
     savePreset,
@@ -232,4 +230,3 @@ export const useAdvancedLeads = () => {
     getEngagementScore
   };
 };
-

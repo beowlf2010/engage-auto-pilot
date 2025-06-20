@@ -5,34 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Save, X, Calendar, Clock } from "lucide-react";
-import LeadFiltersBar from "./LeadFiltersBar";
-import { useLeadFilters } from "@/hooks/useLeadFilters";
-
-export interface SearchFilters {
-  searchTerm: string;
-  status?: string;
-  source?: string;
-  aiOptIn?: boolean;
-  dateRange?: string;
-  vehicleMake?: string;
-  vehicleModel?: string;
-  salesperson?: string;
-  contactStatus?: string;
-  dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
-}
-
-export interface SavedPreset {
-  id: string;
-  name: string;
-  filters: SearchFilters;
-  createdAt: string;
-}
+import { Search, Filter, Save, X, Clock } from "lucide-react";
+import { SearchFilters, SavedPreset } from "@/hooks/useAdvancedLeads";
 
 interface EnhancedLeadSearchProps {
   onFiltersChange: (filters: SearchFilters) => void;
   savedPresets: SavedPreset[];
-  onSavePreset: (name: string, filters: SearchFilters) => Promise<void>;
+  onSavePreset: (name: string, filters: SearchFilters) => void;
   onLoadPreset: (preset: SavedPreset) => void;
   totalResults: number;
   isLoading?: boolean;
@@ -54,8 +33,6 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
   const [savePresetName, setSavePresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
 
-  const { filter, setFilter, filterLeads } = useLeadFilters();
-
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
@@ -68,12 +45,17 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
     onFiltersChange(clearedFilters);
   };
 
-  const handleSavePreset = async () => {
-    if (savePresetName.trim() && Object.keys(filters).length > 1) {
-      await onSavePreset(savePresetName.trim(), filters);
+  const handleSavePreset = () => {
+    if (savePresetName.trim()) {
+      onSavePreset(savePresetName.trim(), filters);
       setSavePresetName('');
       setShowSavePreset(false);
     }
+  };
+
+  const handleLoadPreset = (preset: SavedPreset) => {
+    setFilters(preset.filters);
+    onFiltersChange(preset.filters);
   };
 
   const activeFilterCount = Object.values(filters).filter(v => 
@@ -90,8 +72,6 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-4">
-        <LeadFiltersBar filter={filter} setFilter={(v: string) => setFilter(v as any)} />
-        
         {/* Main Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -178,7 +158,7 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
             <div>
               <label className="text-sm font-medium mb-1 block">Status</label>
-              <Select value={filters.status || ''} onValueChange={(value) => handleFilterChange('status', value)}>
+              <Select value={filters.status || ''} onValueChange={(value) => handleFilterChange('status', value || undefined)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Any status" />
                 </SelectTrigger>
@@ -194,18 +174,16 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-1 block">Source</label>
-              <Select value={filters.source || ''} onValueChange={(value) => handleFilterChange('source', value)}>
+              <label className="text-sm font-medium mb-1 block">Contact Status</label>
+              <Select value={filters.contactStatus || ''} onValueChange={(value) => handleFilterChange('contactStatus', value || undefined)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Any source" />
+                  <SelectValue placeholder="Any contact status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any source</SelectItem>
-                  <SelectItem value="Website">Website</SelectItem>
-                  <SelectItem value="Facebook">Facebook</SelectItem>
-                  <SelectItem value="Google">Google</SelectItem>
-                  <SelectItem value="Referral">Referral</SelectItem>
-                  <SelectItem value="Walk-in">Walk-in</SelectItem>
+                  <SelectItem value="">Any contact status</SelectItem>
+                  <SelectItem value="no_contact">No Contact</SelectItem>
+                  <SelectItem value="contact_attempted">Contact Attempted</SelectItem>
+                  <SelectItem value="response_received">Response Received</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -226,6 +204,32 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
                 </SelectContent>
               </Select>
             </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1 block">Vehicle Interest</label>
+              <Input
+                placeholder="Search vehicle interest..."
+                value={filters.vehicleInterest || ''}
+                onChange={(e) => handleFilterChange('vehicleInterest', e.target.value || undefined)}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1 block">Source</label>
+              <Select value={filters.source || ''} onValueChange={(value) => handleFilterChange('source', value || undefined)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Any source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Any source</SelectItem>
+                  <SelectItem value="Website">Website</SelectItem>
+                  <SelectItem value="Facebook">Facebook</SelectItem>
+                  <SelectItem value="Google">Google</SelectItem>
+                  <SelectItem value="Referral">Referral</SelectItem>
+                  <SelectItem value="Walk-in">Walk-in</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
 
@@ -239,7 +243,7 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
                   key={preset.id}
                   variant="outline"
                   size="sm"
-                  onClick={() => onLoadPreset(preset)}
+                  onClick={() => handleLoadPreset(preset)}
                   className="text-sm"
                 >
                   {preset.name}

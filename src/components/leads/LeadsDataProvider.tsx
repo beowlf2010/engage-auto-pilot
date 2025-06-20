@@ -32,10 +32,13 @@ const LeadsDataProvider = ({
     quickViewLead,
     statusFilter,
     searchFilters,
+    savedPresets,
     refetch,
     getEngagementScore,
     setStatusFilter,
     setSearchFilters,
+    savePreset,
+    loadPreset,
     selectAllFiltered,
     clearSelection,
     toggleLeadSelection,
@@ -49,51 +52,16 @@ const LeadsDataProvider = ({
   // Track active stats card filter
   const [activeStatsFilter, setActiveStatsFilter] = useState<string | null>(null);
 
-  // Filter leads based on fresh leads toggle and search filters
-  const getFilteredLeads = () => {
-    let filtered = [...allLeads];
+  // Get the final filtered leads
+  const leads = showFreshLeadsOnly ? allLeads.filter(lead => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const leadDate = new Date(lead.createdAt);
+    leadDate.setHours(0, 0, 0, 0);
+    return leadDate.getTime() === today.getTime();
+  }) : allLeads;
 
-    // Apply fresh leads filter
-    if (showFreshLeadsOnly) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(lead => {
-        const leadDate = new Date(lead.createdAt);
-        leadDate.setHours(0, 0, 0, 0);
-        return leadDate.getTime() === today.getTime();
-      });
-    }
-
-    // Apply date filter from search
-    if (searchFilters.dateFilter && searchFilters.dateFilter !== 'all') {
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const weekAgo = new Date(today);
-      weekAgo.setDate(weekAgo.getDate() - 7);
-
-      filtered = filtered.filter(lead => {
-        const leadDate = new Date(lead.createdAt);
-        
-        switch (searchFilters.dateFilter) {
-          case 'today':
-            return today.toDateString() === leadDate.toDateString();
-          case 'yesterday':
-            return yesterday.toDateString() === leadDate.toDateString();
-          case 'this_week':
-            return leadDate >= weekAgo;
-          default:
-            return true;
-        }
-      });
-    }
-
-    return filtered;
-  };
-
-  const leads = getFilteredLeads();
-
-  // Handle stats card clicks with forced refresh
+  // Handle stats card clicks with proper filtering
   const handleStatsCardClick = (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled') => {
     setActiveStatsFilter(filterType);
     
@@ -103,76 +71,31 @@ const LeadsDataProvider = ({
     
     switch (filterType) {
       case 'fresh':
-        setSearchFilters({ searchTerm: '', dateFilter: 'today' });
+        setSearchFilters({ ...searchFilters, dateFilter: 'today', contactStatus: undefined });
         setStatusFilter('all');
         break;
       case 'all':
-        setSearchFilters({ searchTerm: '', dateFilter: 'all' });
+        setSearchFilters({ ...searchFilters, dateFilter: 'all', contactStatus: undefined });
         setStatusFilter('all');
         break;
       case 'no_contact':
-        // Clear all other filters and only set contactStatus
-        setSearchFilters({ searchTerm: '', contactStatus: 'no_contact' });
+        setSearchFilters({ ...searchFilters, contactStatus: 'no_contact', dateFilter: 'all' });
         setStatusFilter('all');
-        console.log('Setting No Contact filter - should show only leads with contactStatus: no_contact');
         break;
       case 'contact_attempted':
-        setSearchFilters({ searchTerm: '', contactStatus: 'contact_attempted' });
+        setSearchFilters({ ...searchFilters, contactStatus: 'contact_attempted', dateFilter: 'all' });
         setStatusFilter('all');
         break;
       case 'response_received':
-        setSearchFilters({ searchTerm: '', contactStatus: 'response_received' });
+        setSearchFilters({ ...searchFilters, contactStatus: 'response_received', dateFilter: 'all' });
         setStatusFilter('all');
         break;
       case 'ai_enabled':
-        setSearchFilters({ searchTerm: '', aiOptIn: true });
+        setSearchFilters({ ...searchFilters, aiOptIn: true, contactStatus: undefined, dateFilter: 'all' });
         setStatusFilter('all');
         break;
     }
   };
-
-  // Smart sorting: Fresh leads first, then by contact status, then by creation time
-  const sortedLeads = [...leads].sort((a, b) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const aDate = new Date(a.createdAt);
-    aDate.setHours(0, 0, 0, 0);
-    const bDate = new Date(b.createdAt);
-    bDate.setHours(0, 0, 0, 0);
-    
-    const aIsFresh = aDate.getTime() === today.getTime();
-    const bIsFresh = bDate.getTime() === today.getTime();
-    
-    // Fresh leads first
-    if (aIsFresh && !bIsFresh) return -1;
-    if (!aIsFresh && bIsFresh) return 1;
-    
-    // Then by contact status
-    const statusOrder = { 'no_contact': 0, 'contact_attempted': 1, 'response_received': 2 };
-    if (a.contactStatus !== b.contactStatus) {
-      return statusOrder[a.contactStatus] - statusOrder[b.contactStatus];
-    }
-    
-    // Finally by creation time (newest first)
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
-
-  // Debug logging for No Contact filter
-  React.useEffect(() => {
-    if (searchFilters.contactStatus === 'no_contact') {
-      const noContactLeads = allLeads.filter(lead => lead.contactStatus === 'no_contact');
-      console.log('Total leads:', allLeads.length);
-      console.log('No contact leads:', noContactLeads.length);
-      console.log('No contact lead examples:', noContactLeads.slice(0, 3).map(lead => ({
-        name: `${lead.firstName} ${lead.lastName}`,
-        contactStatus: lead.contactStatus,
-        outgoingCount: lead.outgoingCount,
-        incomingCount: lead.incomingCount
-      })));
-      console.log('Filtered leads being shown:', sortedLeads.length);
-    }
-  }, [searchFilters.contactStatus, allLeads, sortedLeads]);
 
   const handleAiOptInChange = async (leadId: string, value: boolean) => {
     try {
@@ -210,10 +133,7 @@ const LeadsDataProvider = ({
   };
 
   const handleSchedule = (lead: Lead) => {
-    toast({
-      title: "Schedule appointment",
-      description: `Opening calendar for ${lead.firstName} ${lead.lastName}`,
-    });
+    window.location.href = `/appointments/schedule?leadId=${lead.id}`;
   };
 
   const handleVINImportSuccess = () => {
@@ -240,15 +160,6 @@ const LeadsDataProvider = ({
       leadDate.setHours(0, 0, 0, 0);
       return leadDate.getTime() === today.getTime();
     }).length
-  };
-
-  // Mock functions for the enhanced search
-  const handleSavePreset = async (name: string, filters: any) => {
-    console.log('Saving preset:', name, filters);
-  };
-
-  const handleLoadPreset = (preset: any) => {
-    console.log('Loading preset:', preset);
   };
 
   if (loading) {
@@ -287,17 +198,17 @@ const LeadsDataProvider = ({
       {/* Enhanced Search & Filters */}
       <EnhancedLeadSearch
         onFiltersChange={setSearchFilters}
-        savedPresets={[]}
-        onSavePreset={handleSavePreset}
-        onLoadPreset={handleLoadPreset}
-        totalResults={sortedLeads.length}
+        savedPresets={savedPresets}
+        onSavePreset={savePreset}
+        onLoadPreset={loadPreset}
+        totalResults={leads.length}
         isLoading={loading}
       />
 
       {/* Bulk Actions Panel */}
       <LeadsBulkActionsHandler
         selectedLeads={selectedLeads}
-        leads={sortedLeads}
+        leads={leads}
         clearSelection={clearSelection}
         refetch={refetch}
       />
@@ -306,7 +217,7 @@ const LeadsDataProvider = ({
       <LeadsStatusTabs
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
-        finalFilteredLeads={sortedLeads}
+        finalFilteredLeads={leads}
         loading={loading}
         selectedLeads={selectedLeads}
         selectAllFiltered={selectAllFiltered}
