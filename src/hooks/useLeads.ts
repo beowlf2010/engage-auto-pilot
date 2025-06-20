@@ -52,7 +52,6 @@ export const useLeads = () => {
       const incomingCountMap = new Map();
       const lastMessageDirectionMap = new Map();
       const unrepliedCountMap = new Map();
-      const successfulOutgoingMap = new Map(); // Track successful outgoing messages
 
       conversationsData?.forEach(conv => {
         const leadId = conv.lead_id;
@@ -72,12 +71,6 @@ export const useLeads = () => {
         if (conv.direction === 'out') {
           const currentOutgoing = outgoingCountMap.get(leadId) || 0;
           outgoingCountMap.set(leadId, currentOutgoing + 1);
-
-          // Count successful outgoing messages (delivered or sent)
-          if (conv.sms_status === 'delivered' || conv.sms_status === 'sent') {
-            const currentSuccessful = successfulOutgoingMap.get(leadId) || 0;
-            successfulOutgoingMap.set(leadId, currentSuccessful + 1);
-          }
         }
 
         // Count incoming messages (responses received)
@@ -132,18 +125,17 @@ export const useLeads = () => {
         const unreadCount = unreadCountMap.get(lead.id) || 0;
         const lastMessageDirection = lastMessageDirectionMap.get(lead.id) || null;
         const unrepliedCount = unrepliedCountMap.get(lead.id) || 0;
-        const successfulOutgoingCount = successfulOutgoingMap.get(lead.id) || 0;
         
-        // Improved contact status determination
+        // Fixed contact status determination - ANY outgoing message counts as contact_attempted
         let contactStatus = 'no_contact';
         if (incomingCount > 0) {
           contactStatus = 'response_received';
-        } else if (successfulOutgoingCount > 0) {
-          // Only count as contact_attempted if we have successfully delivered messages
+        } else if (outgoingCount > 0) {
+          // ANY outgoing message attempt counts as contact_attempted
           contactStatus = 'contact_attempted';
         }
         
-        console.log(`Lead ${lead.first_name} ${lead.last_name}: outgoing=${outgoingCount}, successful=${successfulOutgoingCount}, incoming=${incomingCount}, contactStatus=${contactStatus}`);
+        console.log(`Lead ${lead.first_name} ${lead.last_name}: outgoing=${outgoingCount}, incoming=${incomingCount}, contactStatus=${contactStatus}`);
         
         return {
           id: lead.id,
