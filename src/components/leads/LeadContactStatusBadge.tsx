@@ -13,14 +13,18 @@ const contactColors: Record<string, string> = {
 };
 
 function formatContactStatus(status: string) {
+  if (!status || typeof status !== 'string') {
+    return 'No Contact';
+  }
   return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 const LeadContactStatusBadge: React.FC<LeadContactStatusBadgeProps> = ({ contactStatus }) => {
-  const color = contactColors[contactStatus] || 'bg-gray-100 text-gray-800';
+  const safeContactStatus = contactStatus || 'no_contact';
+  const color = contactColors[safeContactStatus] || 'bg-gray-100 text-gray-800';
   return (
     <Badge className={color}>
-      {formatContactStatus(contactStatus)}
+      {formatContactStatus(safeContactStatus)}
     </Badge>
   );
 };

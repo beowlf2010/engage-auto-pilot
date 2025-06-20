@@ -132,7 +132,7 @@ const LeadsTable = ({
                 
                 <TableCell>
                   <div className="flex items-center space-x-2">
-                    {isFresh && <FreshLeadBadge />}
+                    {isFresh && <FreshLeadBadge createdAt={lead.createdAt} />}
                     <div>
                       <button
                         onClick={() => handleLeadClick(lead.id.toString())}
@@ -152,7 +152,7 @@ const LeadsTable = ({
                     {lead.primaryPhone && (
                       <div className="text-sm">{lead.primaryPhone}</div>
                     )}
-                    <LeadContactStatusBadge status={lead.contactStatus} />
+                    <LeadContactStatusBadge contactStatus={lead.contactStatus || 'no_contact'} />
                   </div>
                 </TableCell>
 
