@@ -56,18 +56,15 @@ export interface LeadData {
   };
 }
 
+// Import PhoneNumber from the main Lead type to ensure compatibility
+import { PhoneNumber } from '@/types/lead';
+
 export interface ProcessedLead {
   id: string;
   firstName: string;
   lastName: string;
   middleName?: string;
-  phoneNumbers: Array<{
-    number: string;
-    type: string;
-    priority: number;
-    status: string;
-    lastAttempt?: string;
-  }>;
+  phoneNumbers: PhoneNumber[]; // Use the same PhoneNumber type as Lead
   primaryPhone: string;
   email: string;
   emailAlt?: string;

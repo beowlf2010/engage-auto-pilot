@@ -1,5 +1,6 @@
 
 import { LeadData, ProcessedLead, ConversationData } from './types';
+import { PhoneNumber } from '@/types/lead';
 import { processConversations, determineContactStatus } from './conversationProcessor';
 
 export const transformLeadData = (
@@ -11,18 +12,23 @@ export const transformLeadData = (
   
   console.log(`Lead ${lead.first_name} ${lead.last_name}: outgoing=${stats.outgoingCount}, incoming=${stats.incomingCount}, contactStatus=${contactStatus}`);
   
+  // Transform phone numbers to match the PhoneNumber interface
+  const transformedPhoneNumbers: PhoneNumber[] = lead.phone_numbers.map(phone => ({
+    id: phone.id,
+    number: phone.number,
+    type: phone.type as 'cell' | 'day' | 'eve',
+    priority: phone.priority,
+    status: phone.status as 'active' | 'failed' | 'opted_out',
+    isPrimary: phone.is_primary,
+    lastAttempt: phone.last_attempt
+  }));
+  
   return {
     id: lead.id,
     firstName: lead.first_name,
     lastName: lead.last_name,
     middleName: lead.middle_name,
-    phoneNumbers: lead.phone_numbers.map(phone => ({
-      number: phone.number,
-      type: phone.type,
-      priority: phone.priority,
-      status: phone.status,
-      lastAttempt: phone.last_attempt
-    })),
+    phoneNumbers: transformedPhoneNumbers,
     primaryPhone: lead.phone_numbers.find(p => p.is_primary)?.number || 
                  lead.phone_numbers[0]?.number || '',
     email: lead.email,
