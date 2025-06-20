@@ -1,4 +1,3 @@
-
 /**
  * Unified Data Quality Service
  * Combines name validation and vehicle interest validation
@@ -20,15 +19,15 @@ export interface UnifiedDataQualityResult {
   };
 }
 
-export const assessLeadDataQuality = (
+export const assessLeadDataQuality = async (
   firstName: string, 
   vehicleInterest: string
-): UnifiedDataQualityResult => {
+): Promise<UnifiedDataQualityResult> => {
   console.log('🔍 [UNIFIED DATA QUALITY] Assessing lead data quality');
   console.log('🔍 [UNIFIED DATA QUALITY] First name:', firstName);
   console.log('🔍 [UNIFIED DATA QUALITY] Vehicle interest:', vehicleInterest);
 
-  const nameValidation = validatePersonalName(firstName);
+  const nameValidation = await validatePersonalName(firstName);
   const vehicleValidation = validateVehicleInterest(vehicleInterest);
   
   console.log('📊 [UNIFIED DATA QUALITY] Name validation:', {

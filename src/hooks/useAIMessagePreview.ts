@@ -6,82 +6,32 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { assessLeadDataQuality } from '@/services/unifiedDataQualityService';
+import { saveNameValidationDecision, saveVehicleValidationDecision } from '@/services/nameValidationLearningService';
 
 interface UseAIMessagePreviewProps {
   leadId: string;
   onMessageSent?: () => void;
 }
 
-interface DataQualityOverrides {
-  nameApproved?: boolean;
-  vehicleApproved?: boolean;
-}
-
 export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePreviewProps) => {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
+  const [showDecisionStep, setShowDecisionStep] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [overrides, setOverrides] = useState<DataQualityOverrides>({});
+  
+  // Validation data
+  const [originalDataQuality, setOriginalDataQuality] = useState<any>(null);
+  const [leadData, setLeadData] = useState<any>(null);
+  
+  // User decisions
+  const [nameDecision, setNameDecision] = useState<'approved' | 'denied' | null>(null);
+  const [vehicleDecision, setVehicleDecision] = useState<'approved' | 'denied' | null>(null);
+  
   const { profile } = useAuth();
 
-  const applyOverridesToDataQuality = (originalDataQuality: any, overrides: DataQualityOverrides) => {
-    if (!overrides.nameApproved && !overrides.vehicleApproved) {
-      return originalDataQuality;
-    }
-
-    const updatedDataQuality = { ...originalDataQuality };
-
-    // Apply name override
-    if (overrides.nameApproved) {
-      updatedDataQuality.nameValidation = {
-        ...updatedDataQuality.nameValidation,
-        isValidPersonalName: true,
-        confidence: 1.0,
-        detectedType: 'personal',
-        userOverride: true
-      };
-      updatedDataQuality.recommendations.usePersonalGreeting = true;
-    }
-
-    // Apply vehicle override
-    if (overrides.vehicleApproved) {
-      updatedDataQuality.vehicleValidation = {
-        ...updatedDataQuality.vehicleValidation,
-        isValidVehicleInterest: true,
-        confidence: 1.0,
-        detectedIssue: 'valid',
-        userOverride: true
-      };
-      updatedDataQuality.recommendations.useSpecificVehicle = true;
-    }
-
-    // Recalculate overall strategy
-    const usePersonalGreeting = updatedDataQuality.recommendations.usePersonalGreeting;
-    const useSpecificVehicle = updatedDataQuality.recommendations.useSpecificVehicle;
-
-    if (usePersonalGreeting && useSpecificVehicle) {
-      updatedDataQuality.messageStrategy = 'personal_with_vehicle';
-    } else if (usePersonalGreeting && !useSpecificVehicle) {
-      updatedDataQuality.messageStrategy = 'personal_generic_vehicle';
-    } else if (!usePersonalGreeting && useSpecificVehicle) {
-      updatedDataQuality.messageStrategy = 'generic_with_vehicle';
-    } else {
-      updatedDataQuality.messageStrategy = 'fully_generic';
-    }
-
-    // Recalculate overall quality score
-    const nameWeight = 0.6;
-    const vehicleWeight = 0.4;
-    updatedDataQuality.overallQualityScore = 
-      (updatedDataQuality.nameValidation.confidence * nameWeight) + 
-      (updatedDataQuality.vehicleValidation.confidence * vehicleWeight);
-
-    return updatedDataQuality;
-  };
-
-  const generatePreview = async (useOverrides = false) => {
+  const startAnalysis = async () => {
     if (!profile) {
       toast({
         title: "Error",
@@ -91,7 +41,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
       return;
     }
 
-    setIsGenerating(true);
+    setIsAnalyzing(true);
     try {
       // Get lead details
       const { data: lead, error: leadError } = await supabase
@@ -104,60 +54,135 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         throw new Error('Failed to fetch lead details');
       }
 
-      console.log('🔍 [AI PREVIEW] Lead data:', {
-        firstName: lead.first_name,
-        lastName: lead.last_name,
-        vehicleInterest: lead.vehicle_interest
-      });
+      setLeadData(lead);
 
       // Get original data quality assessment
-      const originalDataQuality = assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
+      const dataQuality = await assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
+      setOriginalDataQuality(dataQuality);
+
+      console.log('🔍 [AI PREVIEW] Lead analysis complete:', {
+        firstName: lead.first_name,
+        vehicleInterest: lead.vehicle_interest,
+        nameValid: dataQuality.nameValidation.isValidPersonalName,
+        vehicleValid: dataQuality.vehicleValidation.isValidVehicleInterest
+      });
+
+      setShowDecisionStep(true);
       
-      // Apply user overrides if requested
-      const finalDataQuality = useOverrides 
-        ? applyOverridesToDataQuality(originalDataQuality, overrides)
-        : originalDataQuality;
-
-      console.log('🧠 [AI PREVIEW] Data quality results (with overrides):', {
-        overallScore: finalDataQuality.overallQualityScore,
-        messageStrategy: finalDataQuality.messageStrategy,
-        nameValid: finalDataQuality.nameValidation.isValidPersonalName,
-        vehicleValid: finalDataQuality.vehicleValidation.isValidVehicleInterest,
-        overrides: overrides,
-        useOverrides: useOverrides
+      toast({
+        title: "Analysis Complete",
+        description: "Please review and approve the name and vehicle data",
       });
-
-      // Store comprehensive debug info for UI display
-      setDebugInfo({
-        originalDataQuality,
-        finalDataQuality,
-        overrides,
-        originalFirstName: lead.first_name,
-        originalLastName: lead.last_name,
-        originalVehicleInterest: lead.vehicle_interest
+    } catch (error) {
+      console.error('Error analyzing lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to analyze lead data",
+        variant: "destructive",
       });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
-      // Generate preview message with data quality override if overrides are applied
-      const dataQualityParam = useOverrides ? finalDataQuality : undefined;
-      const message = await generateWarmInitialMessage(lead, profile, dataQualityParam);
+  const handleNameDecision = (decision: 'approved' | 'denied') => {
+    setNameDecision(decision);
+    toast({
+      title: decision === 'approved' ? "Name Approved" : "Name Denied",
+      description: `"${leadData?.first_name}" will be ${decision === 'approved' ? 'treated as a personal name' : 'handled generically'}`,
+    });
+  };
+
+  const handleVehicleDecision = (decision: 'approved' | 'denied') => {
+    setVehicleDecision(decision);
+    toast({
+      title: decision === 'approved' ? "Vehicle Approved" : "Vehicle Denied",
+      description: `Vehicle interest will be ${decision === 'approved' ? 'used specifically' : 'handled generically'}`,
+    });
+  };
+
+  const generateWithDecisions = async () => {
+    if (!nameDecision || !vehicleDecision || !originalDataQuality || !leadData || !profile) {
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // Save decisions to database
+      await saveNameValidationDecision(
+        leadData.first_name,
+        originalDataQuality.nameValidation,
+        nameDecision,
+        `User decision during AI message generation`,
+        profile.id
+      );
+
+      await saveVehicleValidationDecision(
+        leadData.vehicle_interest || 'Not specified',
+        originalDataQuality.vehicleValidation,
+        vehicleDecision,
+        `User decision during AI message generation`,
+        profile.id
+      );
+
+      // Create override data quality with user decisions
+      const overrideDataQuality = {
+        ...originalDataQuality,
+        nameValidation: {
+          ...originalDataQuality.nameValidation,
+          isValidPersonalName: nameDecision === 'approved',
+          confidence: nameDecision === 'approved' ? 1.0 : 0.0,
+          userOverride: true
+        },
+        vehicleValidation: {
+          ...originalDataQuality.vehicleValidation,
+          isValidVehicleInterest: vehicleDecision === 'approved',
+          confidence: vehicleDecision === 'approved' ? 1.0 : 0.0,
+          userOverride: true
+        }
+      };
+
+      // Recalculate strategy
+      const usePersonalGreeting = nameDecision === 'approved';
+      const useSpecificVehicle = vehicleDecision === 'approved';
+
+      if (usePersonalGreeting && useSpecificVehicle) {
+        overrideDataQuality.messageStrategy = 'personal_with_vehicle';
+      } else if (usePersonalGreeting && !useSpecificVehicle) {
+        overrideDataQuality.messageStrategy = 'personal_generic_vehicle';
+      } else if (!usePersonalGreeting && useSpecificVehicle) {
+        overrideDataQuality.messageStrategy = 'generic_with_vehicle';
+      } else {
+        overrideDataQuality.messageStrategy = 'fully_generic';
+      }
+
+      overrideDataQuality.recommendations = {
+        usePersonalGreeting,
+        useSpecificVehicle,
+        fallbackGreeting: originalDataQuality.recommendations.fallbackGreeting,
+        fallbackVehicleMessage: originalDataQuality.recommendations.fallbackVehicleMessage
+      };
+
+      // Generate message with override
+      const message = await generateWarmInitialMessage(leadData, profile, overrideDataQuality);
       
       if (message) {
         setGeneratedMessage(message);
+        setShowDecisionStep(false);
         setShowPreview(true);
         
-        // Show success message with comprehensive debug info
         toast({
           title: "Message Generated",
-          description: `Data Quality: ${Math.round(finalDataQuality.overallQualityScore * 100)}% | Strategy: ${finalDataQuality.messageStrategy}`,
+          description: `Strategy: ${overrideDataQuality.messageStrategy}`,
         });
       } else {
         throw new Error('Failed to generate message');
       }
     } catch (error) {
-      console.error('Error generating preview:', error);
+      console.error('Error generating message with decisions:', error);
       toast({
         title: "Error",
-        description: "Failed to generate message preview",
+        description: "Failed to generate message",
         variant: "destructive",
       });
     } finally {
@@ -165,43 +190,13 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     }
   };
 
-  const handleNameOverride = () => {
-    const newOverrides = { ...overrides, nameApproved: !overrides.nameApproved };
-    setOverrides(newOverrides);
-    
-    toast({
-      title: overrides.nameApproved ? "Name Override Removed" : "Name Approved",
-      description: overrides.nameApproved 
-        ? "Name will be analyzed automatically again" 
-        : "Name will be treated as a personal name",
-    });
-  };
-
-  const handleVehicleOverride = () => {
-    const newOverrides = { ...overrides, vehicleApproved: !overrides.vehicleApproved };
-    setOverrides(newOverrides);
-    
-    toast({
-      title: overrides.vehicleApproved ? "Vehicle Override Removed" : "Vehicle Approved",
-      description: overrides.vehicleApproved 
-        ? "Vehicle interest will be analyzed automatically again" 
-        : "Vehicle interest will be treated as valid",
-    });
-  };
-
-  const regenerateWithOverrides = () => {
-    generatePreview(true);
-  };
-
   const sendNow = async () => {
     if (!generatedMessage || !profile) return;
 
     setIsSending(true);
     try {
-      // Send the message
       await sendMessage(leadId, generatedMessage, profile, true);
 
-      // Update lead with AI settings - Fixed date calculation using milliseconds
       const nextSendTime = new Date();
       nextSendTime.setTime(nextSendTime.getTime() + (24 * 60 * 60 * 1000));
 
@@ -217,13 +212,10 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
 
       toast({
         title: "Message sent successfully!",
-        description: `Next AI message scheduled for ${nextSendTime.toLocaleDateString()} at ${nextSendTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        description: `Decisions saved to learning database. Next AI message scheduled for ${nextSendTime.toLocaleDateString()}`,
       });
 
-      setShowPreview(false);
-      setGeneratedMessage(null);
-      setDebugInfo(null);
-      setOverrides({});
+      reset();
       onMessageSent?.();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -237,25 +229,32 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     }
   };
 
-  const cancel = () => {
+  const reset = () => {
+    setShowDecisionStep(false);
     setShowPreview(false);
     setGeneratedMessage(null);
-    setDebugInfo(null);
-    setOverrides({});
+    setOriginalDataQuality(null);
+    setLeadData(null);
+    setNameDecision(null);
+    setVehicleDecision(null);
   };
 
   return {
+    isAnalyzing,
     isGenerating,
     generatedMessage,
+    showDecisionStep,
     showPreview,
     isSending,
-    debugInfo,
-    overrides,
-    generatePreview,
+    originalDataQuality,
+    leadData,
+    nameDecision,
+    vehicleDecision,
+    startAnalysis,
+    handleNameDecision,
+    handleVehicleDecision,
+    generateWithDecisions,
     sendNow,
-    cancel,
-    handleNameOverride,
-    handleVehicleOverride,
-    regenerateWithOverrides
+    reset
   };
 };

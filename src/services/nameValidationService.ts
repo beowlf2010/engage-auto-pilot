@@ -3,6 +3,8 @@
  * like cities, business names, and other geographic/business entities
  */
 
+import { getLearnedNameValidation } from './nameValidationLearningService';
+
 // Common US cities and states that might appear as "names"
 const COMMON_CITIES = new Set([
   'pensacola', 'mobile', 'birmingham', 'huntsville', 'montgomery', 'tuscaloosa',
@@ -69,7 +71,11 @@ const COMMON_PERSONAL_NAMES = new Set([
 export interface NameValidationResult {
   isValidPersonalName: boolean;
   confidence: number;
-  detectedType: 'personal' | 'city' | 'state' | 'business' | 'generic' | 'phone' | 'unknown';
+  detectedType: 'personal' | 'city' | 'state' | 'business' | 'generic' | 'phone' | 'unknown' | 'learned_override';
+  userOverride?: boolean;
+  timesApproved?: number;
+  timesRejected?: number;
+  timesSeen?: number;
   suggestions: {
     useGenericGreeting: boolean;
     contextualGreeting?: string;
@@ -77,7 +83,7 @@ export interface NameValidationResult {
   };
 }
 
-export const validatePersonalName = (name: string): NameValidationResult => {
+export const validatePersonalName = async (name: string): Promise<NameValidationResult> => {
   if (!name || typeof name !== 'string') {
     return {
       isValidPersonalName: false,
@@ -90,6 +96,14 @@ export const validatePersonalName = (name: string): NameValidationResult => {
     };
   }
 
+  // First, check if we have a learned decision for this name
+  const learnedValidation = await getLearnedNameValidation(name);
+  if (learnedValidation) {
+    console.log(`🧠 [NAME VALIDATION] Using learned validation for "${name}"`);
+    return learnedValidation;
+  }
+
+  // Fall back to original validation logic
   const cleanName = name.trim().toLowerCase();
   
   // Check for phone numbers

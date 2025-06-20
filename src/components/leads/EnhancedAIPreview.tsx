@@ -1,9 +1,9 @@
 
 import React, { useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot } from 'lucide-react';
+import { Bot, Brain } from 'lucide-react';
 import { useAIMessagePreview } from '@/hooks/useAIMessagePreview';
-import DataQualityCard from './preview/DataQualityCard';
+import ValidationDecisionCard from './preview/ValidationDecisionCard';
 import MessagePreviewCard from './preview/MessagePreviewCard';
 import SchedulingInfoCard from './preview/SchedulingInfoCard';
 import AIPreviewActions from './preview/AIPreviewActions';
@@ -29,18 +29,22 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
   autoGenerate = false
 }) => {
   const {
+    isAnalyzing,
     isGenerating,
     generatedMessage,
+    showDecisionStep,
     showPreview,
     isSending,
-    debugInfo,
-    overrides,
-    generatePreview,
+    originalDataQuality,
+    leadData,
+    nameDecision,
+    vehicleDecision,
+    startAnalysis,
+    handleNameDecision,
+    handleVehicleDecision,
+    generateWithDecisions,
     sendNow,
-    cancel,
-    handleNameOverride,
-    handleVehicleOverride,
-    regenerateWithOverrides
+    reset
   } = useAIMessagePreview({ 
     leadId, 
     onMessageSent: () => {
@@ -49,24 +53,17 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     }
   });
 
-  // Auto-generate message when modal opens if autoGenerate is true
+  // Auto-start analysis when modal opens if autoGenerate is true
   useEffect(() => {
-    if (isOpen && autoGenerate && !isGenerating && !generatedMessage) {
-      generatePreview();
+    if (isOpen && autoGenerate && !isAnalyzing && !showDecisionStep && !showPreview) {
+      startAnalysis();
     }
-  }, [isOpen, autoGenerate, isGenerating, generatedMessage, generatePreview]);
-
-  const handleSendMessage = async () => {
-    await sendNow();
-  };
+  }, [isOpen, autoGenerate, isAnalyzing, showDecisionStep, showPreview, startAnalysis]);
 
   const handleCancel = () => {
-    cancel();
+    reset();
     onClose();
   };
-
-  // Use finalDataQuality if overrides are applied, otherwise use original
-  const displayDataQuality = debugInfo?.finalDataQuality || debugInfo?.dataQuality;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -79,55 +76,61 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {isGenerating && <LoadingState />}
+          {/* Analyzing State */}
+          {isAnalyzing && (
+            <div className="text-center py-8">
+              <Brain className="w-8 h-8 text-blue-600 mx-auto mb-4 animate-pulse" />
+              <h3 className="font-medium mb-2">Analyzing Lead Data</h3>
+              <p className="text-sm text-gray-600">
+                AI is reviewing name and vehicle information for quality...
+              </p>
+            </div>
+          )}
 
-          {!isGenerating && generatedMessage && (
+          {/* Decision Step */}
+          {showDecisionStep && originalDataQuality && leadData && (
+            <ValidationDecisionCard
+              firstName={leadData.first_name}
+              vehicleInterest={leadData.vehicle_interest}
+              nameValidation={originalDataQuality.nameValidation}
+              vehicleValidation={originalDataQuality.vehicleValidation}
+              nameDecision={nameDecision}
+              vehicleDecision={vehicleDecision}
+              onNameDecision={handleNameDecision}
+              onVehicleDecision={handleVehicleDecision}
+              onGenerate={generateWithDecisions}
+              isGenerating={isGenerating}
+            />
+          )}
+
+          {/* Message Preview Step */}
+          {showPreview && generatedMessage && (
             <>
-              {/* Enhanced Data Quality Information with Override Controls */}
-              {displayDataQuality && (
-                <DataQualityCard
-                  displayDataQuality={displayDataQuality}
-                  debugInfo={debugInfo}
-                  overrides={overrides}
-                  isGenerating={isGenerating}
-                  onNameOverride={handleNameOverride}
-                  onVehicleOverride={handleVehicleOverride}
-                  onRegenerateWithOverrides={regenerateWithOverrides}
-                />
-              )}
-
-              {/* Message preview */}
               <MessagePreviewCard generatedMessage={generatedMessage} />
-
-              {/* Scheduling info */}
               <SchedulingInfoCard />
-
-              {/* Action buttons */}
               <AIPreviewActions
                 generatedMessage={generatedMessage}
-                isGenerating={isGenerating}
+                isGenerating={false}
                 isSending={isSending}
-                onSend={handleSendMessage}
+                onSend={sendNow}
                 onCancel={handleCancel}
               />
             </>
           )}
 
-          {!isGenerating && !generatedMessage && (
+          {/* Initial State */}
+          {!isAnalyzing && !showDecisionStep && !showPreview && (
             <>
-              {/* Introduction */}
               <div className="text-sm text-gray-600">
-                Finn AI will analyze data quality and send a personalized initial message to {leadName} 
-                {vehicleInterest && ` about their interest in ${vehicleInterest}`}.
+                Finn AI will analyze data quality and let you approve the name and vehicle information before generating a personalized message for {leadName}.
               </div>
 
-              {/* Action buttons */}
               <AIPreviewActions
-                generatedMessage={generatedMessage}
-                isGenerating={isGenerating}
-                isSending={isSending}
+                generatedMessage={null}
+                isGenerating={false}
+                isSending={false}
                 onCancel={handleCancel}
-                onGenerate={generatePreview}
+                onGenerate={startAnalysis}
               />
             </>
           )}
