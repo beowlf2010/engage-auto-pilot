@@ -1,10 +1,11 @@
-import { serve } from '@supabase/functions-js'
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 import { analyzeCustomerIntent, generateAnswerGuidance } from './enhancedIntentAnalysis.ts';
 import { buildEnhancedPrompt } from './promptBuilder.ts';
 import { detectEnhancedObjectionSignals } from './enhancedObjectionDetection.ts';
 
-const openAIApiKey = process.env.OPENAI_API_KEY
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,7 +66,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: pricingConcerns ? 300 : 200, // More tokens for pricing concerns
         temperature: 0.7,
