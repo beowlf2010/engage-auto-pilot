@@ -151,7 +151,7 @@ const RPOManualEntry = () => {
         .insert({
           session_name: sessionName || `RPO Session ${new Date().toLocaleDateString()}`,
           source_data: pastedData,
-          processed_mappings: detectedMappings,
+          processed_mappings: detectedMappings as any,
           notes: `Processed ${detectedMappings.length} RPO codes`
         })
         .select()
