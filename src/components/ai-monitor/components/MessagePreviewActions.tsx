@@ -29,7 +29,7 @@ const MessagePreviewActions = ({
       <Button
         size="sm"
         onClick={onSendNow}
-        disabled={!message || loading || sending || error}
+        disabled={!message || loading || sending || !!error}
         className="flex-1"
       >
         <Send className="w-3 h-3 mr-1" />
