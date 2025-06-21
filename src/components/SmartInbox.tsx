@@ -42,7 +42,10 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
 
   // Enhanced send message function with debug logging
   const { sendEnhancedMessageWrapper } = useEnhancedMessageWrapper({
-    onMessageSent: loadMessages,
+    onMessageSent: () => {
+      // This callback doesn't need parameters since loadMessages will be called elsewhere
+      console.log('Message sent callback triggered');
+    },
     onLeadsRefresh: refreshLeads
   });
 
