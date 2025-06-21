@@ -5,13 +5,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { User, Phone, Car, Mail, ExternalLink } from 'lucide-react';
@@ -20,13 +17,6 @@ interface LeadDetailsModalProps {
   open: boolean;
   onClose: () => void;
   leadId: string;
-}
-
-interface PhoneNumber {
-  id: string;
-  number: string;
-  type: string;
-  is_primary: boolean;
 }
 
 interface LeadDetails {
@@ -39,7 +29,12 @@ interface LeadDetails {
   status: string;
   ai_opt_in: boolean;
   created_at: string;
-  phone_numbers: PhoneNumber[];
+  phone_numbers: Array<{
+    id: string;
+    number: string;
+    type: string;
+    is_primary: boolean;
+  }>;
 }
 
 const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, leadId }) => {
@@ -85,17 +80,6 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
            'No phone number';
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      'new': 'default',
-      'engaged': 'secondary',
-      'paused': 'outline',
-      'closed': 'secondary',
-      'lost': 'destructive'
-    };
-    return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
-  };
-
   if (loading) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
@@ -128,85 +112,54 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
             <User className="h-5 w-5" />
             {leadDetails.first_name} {leadDetails.last_name}
           </DialogTitle>
-          <DialogDescription>
-            Lead details and contact information
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                Contact Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div>
-                <span className="text-sm font-medium">Primary Phone:</span>
-                <span className="ml-2">{getPrimaryPhone()}</span>
-                {leadDetails.phone_numbers.length > 1 && (
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    +{leadDetails.phone_numbers.length - 1} more
-                  </Badge>
-                )}
-              </div>
-              {leadDetails.email && (
-                <div>
-                  <span className="text-sm font-medium">Email:</span>
-                  <span className="ml-2">{leadDetails.email}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-sm font-medium">Status:</span>
-                {getStatusBadge(leadDetails.status)}
-                <span className="text-sm font-medium ml-2">Source:</span>
+          <div className="p-4 border rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Phone className="h-4 w-4" />
+              <span className="font-medium">Contact</span>
+            </div>
+            <div className="space-y-1 text-sm">
+              <div>Phone: {getPrimaryPhone()}</div>
+              {leadDetails.email && <div>Email: {leadDetails.email}</div>}
+              <div className="flex gap-2 mt-2">
+                <Badge variant="outline">{leadDetails.status}</Badge>
                 <Badge variant="outline">{leadDetails.source}</Badge>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Car className="h-4 w-4" />
-                Vehicle Interest
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">{leadDetails.vehicle_interest}</p>
-            </CardContent>
-          </Card>
+          <div className="p-4 border rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Car className="h-4 w-4" />
+              <span className="font-medium">Vehicle Interest</span>
+            </div>
+            <p className="text-sm">{leadDetails.vehicle_interest}</p>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                AI Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Badge variant={leadDetails.ai_opt_in ? 'default' : 'secondary'}>
-                  {leadDetails.ai_opt_in ? 'AI Enabled' : 'AI Disabled'}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="p-4 border rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Mail className="h-4 w-4" />
+              <span className="font-medium">AI Status</span>
+            </div>
+            <Badge variant={leadDetails.ai_opt_in ? 'default' : 'secondary'}>
+              {leadDetails.ai_opt_in ? 'AI Enabled' : 'AI Disabled'}
+            </Badge>
+          </div>
 
-          <div className="text-xs text-gray-500 flex items-center gap-1">
-            Lead created: {new Date(leadDetails.created_at).toLocaleDateString()}
+          <div className="text-xs text-gray-500">
+            Created: {new Date(leadDetails.created_at).toLocaleDateString()}
           </div>
         </div>
 
-        <Separator />
         <DialogFooter className="flex justify-between">
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
           <Button onClick={handleNavigateToLead} className="flex items-center gap-2">
             <ExternalLink className="h-4 w-4" />
-            View Full Lead Details
+            View Full Details
           </Button>
         </DialogFooter>
       </DialogContent>
