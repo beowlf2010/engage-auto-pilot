@@ -96,17 +96,22 @@ export const validatePersonalName = async (name: string): Promise<NameValidation
     };
   }
 
-  // First, check if we have a learned decision for this name
-  const learnedValidation = await getLearnedNameValidation(name);
-  if (learnedValidation) {
-    console.log(`🧠 [NAME VALIDATION] Using learned validation for "${name}"`);
-    return learnedValidation;
+  // First, try to check learned validation (will return null if table doesn't exist)
+  try {
+    const learnedValidation = await getLearnedNameValidation(name);
+    if (learnedValidation) {
+      console.log(`🧠 [NAME VALIDATION] Using learned validation for "${name}"`);
+      return learnedValidation;
+    }
+  } catch (error) {
+    console.log(`⚠️ [NAME VALIDATION] Learned validation not available, using fallback logic`);
   }
 
   // Fall back to original validation logic
   const cleanName = name.trim().toLowerCase();
   
   // Check for phone numbers
+  const PHONE_PATTERN = /^[\+]?[1]?[\s\-\(\)]?[\d\s\-\(\)]?[\d\s\-\(\)]{10,}$/;
   if (PHONE_PATTERN.test(cleanName)) {
     return {
       isValidPersonalName: false,
@@ -121,6 +126,13 @@ export const validatePersonalName = async (name: string): Promise<NameValidation
   }
 
   // Check for generic/placeholder names
+  const GENERIC_NAMES = new Set([
+    'unknown', 'test', 'n/a', 'na', 'null', 'undefined', 'none', 'customer',
+    'lead', 'prospect', 'caller', 'visitor', 'user', 'guest', 'anonymous',
+    'not specified', 'not provided', 'no name', 'firstname', 'lastname',
+    'name', 'enter name', 'your name', 'full name'
+  ]);
+  
   if (GENERIC_NAMES.has(cleanName)) {
     return {
       isValidPersonalName: false,
@@ -134,6 +146,24 @@ export const validatePersonalName = async (name: string): Promise<NameValidation
   }
 
   // Check for cities
+  const COMMON_CITIES = new Set([
+    'pensacola', 'mobile', 'birmingham', 'huntsville', 'montgomery', 'tuscaloosa',
+    'atlanta', 'savannah', 'augusta', 'columbus', 'macon', 'albany',
+    'jacksonville', 'miami', 'tampa', 'orlando', 'tallahassee', 'gainesville',
+    'new york', 'los angeles', 'chicago', 'houston', 'phoenix', 'philadelphia',
+    'san antonio', 'san diego', 'dallas', 'san jose', 'austin', 'fort worth',
+    'charlotte', 'memphis', 'boston', 'seattle', 'denver', 'nashville',
+    'baltimore', 'louisville', 'portland', 'oklahoma city', 'milwaukee',
+    'las vegas', 'albuquerque', 'tucson', 'fresno', 'sacramento', 'kansas city',
+    'mesa', 'virginia beach', 'atlanta', 'colorado springs', 'omaha',
+    'raleigh', 'long beach', 'miami', 'virginia beach', 'oakland', 'minneapolis',
+    'tulsa', 'arlington', 'new orleans', 'wichita', 'cleveland', 'tampa',
+    'honolulu', 'anaheim', 'lexington', 'stockton', 'corpus christi', 'henderson',
+    'riverside', 'santa ana', 'lincoln', 'greensboro', 'plano', 'newark',
+    'toledo', 'jersey city', 'chula vista', 'buffalo', 'fort wayne', 'chandler',
+    'st petersburg', 'laredo', 'durham', 'irvine', 'madison', 'norfolk'
+  ]);
+  
   if (COMMON_CITIES.has(cleanName)) {
     return {
       isValidPersonalName: false,
@@ -148,6 +178,18 @@ export const validatePersonalName = async (name: string): Promise<NameValidation
   }
 
   // Check for states
+  const COMMON_STATES = new Set([
+    'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
+    'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho',
+    'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana',
+    'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi',
+    'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey',
+    'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio',
+    'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina',
+    'south dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia',
+    'washington', 'west virginia', 'wisconsin', 'wyoming'
+  ]);
+  
   if (COMMON_STATES.has(cleanName)) {
     return {
       isValidPersonalName: false,
@@ -162,6 +204,12 @@ export const validatePersonalName = async (name: string): Promise<NameValidation
   }
 
   // Check for business indicators
+  const BUSINESS_INDICATORS = [
+    'llc', 'inc', 'corp', 'corporation', 'company', 'co', 'ltd', 'limited',
+    'group', 'enterprises', 'solutions', 'services', 'systems', 'technologies',
+    'automotive', 'motors', 'dealership', 'dealer', 'sales', 'auto'
+  ];
+  
   const hasBusinessIndicator = BUSINESS_INDICATORS.some(indicator => 
     cleanName.includes(indicator)
   );
@@ -213,6 +261,21 @@ export const validatePersonalName = async (name: string): Promise<NameValidation
   // Check confidence based on common name patterns
   let confidence = 0.8;
   
+  // Common personal names that should get higher confidence scores
+  const COMMON_PERSONAL_NAMES = new Set([
+    'kimberly', 'jennifer', 'michael', 'david', 'susan', 'robert', 'lisa', 'james',
+    'mary', 'john', 'patricia', 'william', 'elizabeth', 'richard', 'barbara',
+    'thomas', 'helen', 'charles', 'nancy', 'christopher', 'karen', 'daniel',
+    'betty', 'matthew', 'dorothy', 'anthony', 'sandra', 'mark', 'donna',
+    'donald', 'carol', 'steven', 'ruth', 'paul', 'sharon', 'andrew', 'michelle',
+    'connie', 'sarah', 'brian', 'laura', 'kevin', 'emily', 'george', 'amanda',
+    'edward', 'melissa', 'ronald', 'deborah', 'timothy', 'stephanie', 'jason',
+    'maria', 'jeffrey', 'catherine', 'ryan', 'christine', 'jacob', 'samantha',
+    'gary', 'debra', 'nicholas', 'rachel', 'eric', 'carolyn', 'jonathan',
+    'janet', 'stephen', 'virginia', 'larry', 'maria', 'justin', 'heather',
+    'wanda' // Adding Wanda to the common names list
+  ]);
+  
   // Boost confidence for common personal names
   if (COMMON_PERSONAL_NAMES.has(cleanName)) {
     confidence = 0.9;
@@ -248,7 +311,7 @@ export const validatePersonalName = async (name: string): Promise<NameValidation
   };
 };
 
-// Helper function to format proper names (reuse existing logic)
+// Helper function to format proper names
 const formatProperName = (name: string): string => {
   if (!name || typeof name !== 'string') return '';
   
@@ -267,6 +330,19 @@ export const detectLeadSource = (leadData: any): string => {
   const lastName = leadData.last_name?.toLowerCase() || '';
   const phone = leadData.phone || '';
   const vehicleInterest = leadData.vehicle_interest || '';
+  
+  const GENERIC_NAMES = new Set([
+    'unknown', 'test', 'n/a', 'na', 'null', 'undefined', 'none', 'customer',
+    'lead', 'prospect', 'caller', 'visitor', 'user', 'guest', 'anonymous'
+  ]);
+  
+  const COMMON_CITIES = new Set([
+    'pensacola', 'mobile', 'birmingham', 'atlanta', 'miami', 'tampa'
+  ]);
+  
+  const COMMON_STATES = new Set([
+    'alabama', 'florida', 'georgia'
+  ]);
   
   // Phone call indicators
   if (COMMON_CITIES.has(name) || COMMON_STATES.has(name)) {

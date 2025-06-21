@@ -1,130 +1,163 @@
 
-/**
- * Unified Data Quality Service
- * Combines name validation and vehicle interest validation
- */
+import { validatePersonalName, type NameValidationResult } from './nameValidationService';
 
-import { validatePersonalName, NameValidationResult } from './nameValidationService';
-import { validateVehicleInterest, VehicleInterestValidationResult } from './vehicleInterestValidationService';
-
-export interface UnifiedDataQualityResult {
-  nameValidation: NameValidationResult;
-  vehicleValidation: VehicleInterestValidationResult;
+export interface DataQualityAssessment {
   overallQualityScore: number;
+  nameValidation: NameValidationResult;
+  vehicleValidation: {
+    isValid: boolean;
+    confidence: number;
+    detectedIssue: string;
+  };
   messageStrategy: 'personal_with_vehicle' | 'personal_generic_vehicle' | 'generic_with_vehicle' | 'fully_generic';
   recommendations: {
     usePersonalGreeting: boolean;
     useSpecificVehicle: boolean;
-    fallbackGreeting: string;
-    fallbackVehicleMessage: string;
+    contextualGreeting?: string;
   };
 }
 
 export const assessLeadDataQuality = async (
-  firstName: string, 
-  vehicleInterest: string
-): Promise<UnifiedDataQualityResult> => {
-  console.log('🔍 [UNIFIED DATA QUALITY] Assessing lead data quality');
-  console.log('🔍 [UNIFIED DATA QUALITY] First name:', firstName);
-  console.log('🔍 [UNIFIED DATA QUALITY] Vehicle interest:', vehicleInterest);
-
-  const nameValidation = await validatePersonalName(firstName);
-  const vehicleValidation = validateVehicleInterest(vehicleInterest);
-  
-  console.log('📊 [UNIFIED DATA QUALITY] Name validation:', {
-    isValid: nameValidation.isValidPersonalName,
-    confidence: nameValidation.confidence,
-    type: nameValidation.detectedType
-  });
-  
-  console.log('📊 [UNIFIED DATA QUALITY] Vehicle validation:', {
-    isValid: vehicleValidation.isValidVehicleInterest,
-    confidence: vehicleValidation.confidence,
-    issue: vehicleValidation.detectedIssue
-  });
-
-  // Calculate overall quality score (weighted average)
-  const nameWeight = 0.6;
-  const vehicleWeight = 0.4;
-  const overallQualityScore = (nameValidation.confidence * nameWeight) + (vehicleValidation.confidence * vehicleWeight);
-
-  // Determine message strategy based on validation results
-  let messageStrategy: UnifiedDataQualityResult['messageStrategy'];
-  // Lowered threshold from 0.7 to 0.6 for personal greetings
-  const usePersonalGreeting = nameValidation.isValidPersonalName && nameValidation.confidence > 0.6;
-  const useSpecificVehicle = vehicleValidation.isValidVehicleInterest && vehicleValidation.confidence > 0.5;
-
-  if (usePersonalGreeting && useSpecificVehicle) {
-    messageStrategy = 'personal_with_vehicle';
-  } else if (usePersonalGreeting && !useSpecificVehicle) {
-    messageStrategy = 'personal_generic_vehicle';
-  } else if (!usePersonalGreeting && useSpecificVehicle) {
-    messageStrategy = 'generic_with_vehicle';
-  } else {
-    messageStrategy = 'fully_generic';
-  }
-
-  console.log('🎯 [UNIFIED DATA QUALITY] Strategy:', messageStrategy);
-  console.log('🎯 [UNIFIED DATA QUALITY] Use personal greeting:', usePersonalGreeting, '(confidence:', nameValidation.confidence, ')');
-
-  // Generate recommendations
-  const recommendations = {
-    usePersonalGreeting,
-    useSpecificVehicle,
-    fallbackGreeting: nameValidation.suggestions.contextualGreeting || 'Hello! Thanks for your interest.',
-    fallbackVehicleMessage: vehicleValidation.suggestions.fallbackMessage || 'finding the right vehicle'
-  };
-
-  return {
-    nameValidation,
-    vehicleValidation,
-    overallQualityScore,
-    messageStrategy,
-    recommendations
-  };
-};
-
-// Helper function to clean vehicle interest data
-const cleanVehicleInterest = (vehicleInterest: string): string => {
-  if (!vehicleInterest) return vehicleInterest;
-  
-  // Remove extra quotes and clean up the format
-  return vehicleInterest
-    .replace(/"/g, '') // Remove all quotes
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim();
-};
-
-export const generateDataQualityAwareGreeting = async (
   firstName: string,
-  vehicleInterest: string,
-  salespersonName: string = 'Finn',
-  dealershipName: string = 'Jason Pilger Chevrolet',
-  dataQuality?: UnifiedDataQualityResult
-): Promise<string> => {
-  // Use provided data quality or assess it
-  const quality = dataQuality || await assessLeadDataQuality(firstName, vehicleInterest);
-  const { messageStrategy, recommendations } = quality;
+  vehicleInterest?: string
+): Promise<DataQualityAssessment> => {
+  try {
+    console.log(`🔍 [DATA QUALITY] Assessing quality for name: "${firstName}", vehicle: "${vehicleInterest}"`);
 
-  // Clean the vehicle interest to remove quotes
-  const cleanedVehicleInterest = cleanVehicleInterest(vehicleInterest);
-
-  console.log('💬 [UNIFIED DATA QUALITY] Generating greeting with strategy:', messageStrategy);
-  console.log('💬 [UNIFIED DATA QUALITY] Using personal greeting:', recommendations.usePersonalGreeting);
-  console.log('💬 [UNIFIED DATA QUALITY] Cleaned vehicle interest:', cleanedVehicleInterest);
-
-  switch (messageStrategy) {
-    case 'personal_with_vehicle':
-      return `Hi ${firstName}! I'm ${salespersonName} with ${dealershipName}. I noticed you were interested in ${cleanedVehicleInterest}. I'd love to help you explore your options and answer any questions you might have. What brought you to look at this vehicle?`;
-
-    case 'personal_generic_vehicle':
-      return `Hi ${firstName}! I'm ${salespersonName} with ${dealershipName}. I'd love to help you find exactly what you're looking for in your next vehicle. What's most important to you in your search?`;
-
-    case 'generic_with_vehicle':
-      return `Hello! Thanks for your interest in ${cleanedVehicleInterest}. I'm ${salespersonName} with ${dealershipName} and I'd love to help you explore your options. What questions can I answer for you?`;
-
-    case 'fully_generic':
-    default:
-      return `Hello! Thanks for your interest in ${recommendations.fallbackVehicleMessage}. I'm ${salespersonName} with ${dealershipName} and I'm here to help make your car shopping experience as smooth as possible. What type of vehicle are you looking for?`;
+    // Validate the name
+    const nameValidation = await validatePersonalName(firstName);
+    
+    // Validate vehicle interest
+    const vehicleValidation = assessVehicleInterest(vehicleInterest);
+    
+    // Calculate overall quality score
+    const nameScore = nameValidation.confidence;
+    const vehicleScore = vehicleValidation.confidence;
+    const overallQualityScore = (nameScore + vehicleScore) / 2;
+    
+    // Determine message strategy
+    const usePersonalGreeting = nameValidation.isValidPersonalName && nameScore > 0.7;
+    const useSpecificVehicle = vehicleValidation.isValid && vehicleScore > 0.6;
+    
+    let messageStrategy: DataQualityAssessment['messageStrategy'];
+    if (usePersonalGreeting && useSpecificVehicle) {
+      messageStrategy = 'personal_with_vehicle';
+    } else if (usePersonalGreeting) {
+      messageStrategy = 'personal_generic_vehicle';
+    } else if (useSpecificVehicle) {
+      messageStrategy = 'generic_with_vehicle';
+    } else {
+      messageStrategy = 'fully_generic';
+    }
+    
+    console.log(`✅ [DATA QUALITY] Assessment complete:`, {
+      overallScore: overallQualityScore,
+      strategy: messageStrategy,
+      usePersonal: usePersonalGreeting,
+      useVehicle: useSpecificVehicle
+    });
+    
+    return {
+      overallQualityScore,
+      nameValidation,
+      vehicleValidation,
+      messageStrategy,
+      recommendations: {
+        usePersonalGreeting,
+        useSpecificVehicle,
+        contextualGreeting: nameValidation.suggestions.contextualGreeting
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ [DATA QUALITY] Error assessing quality:', error);
+    
+    // Return safe fallback assessment
+    return {
+      overallQualityScore: 0.5,
+      nameValidation: {
+        isValidPersonalName: false,
+        confidence: 0.5,
+        detectedType: 'unknown',
+        suggestions: {
+          useGenericGreeting: true,
+          contextualGreeting: 'Hello! Thanks for your interest in finding the right vehicle.'
+        }
+      },
+      vehicleValidation: {
+        isValid: false,
+        confidence: 0.5,
+        detectedIssue: 'Generic vehicle interest'
+      },
+      messageStrategy: 'fully_generic',
+      recommendations: {
+        usePersonalGreeting: false,
+        useSpecificVehicle: false,
+        contextualGreeting: 'Hello! Thanks for your interest in finding the right vehicle.'
+      }
+    };
   }
+};
+
+const assessVehicleInterest = (vehicleInterest?: string): {
+  isValid: boolean;
+  confidence: number;
+  detectedIssue: string;
+} => {
+  if (!vehicleInterest || vehicleInterest.trim() === '') {
+    return {
+      isValid: false,
+      confidence: 0.1,
+      detectedIssue: 'No vehicle interest specified'
+    };
+  }
+  
+  const cleanVehicle = vehicleInterest.trim().toLowerCase();
+  
+  // Check for generic phrases
+  const genericPhrases = [
+    'finding the right vehicle',
+    'finding the right vehicle for your needs',
+    'not specified',
+    'unknown',
+    'car',
+    'truck',
+    'vehicle',
+    'auto'
+  ];
+  
+  if (genericPhrases.some(phrase => cleanVehicle.includes(phrase))) {
+    return {
+      isValid: false,
+      confidence: 0.3,
+      detectedIssue: 'Generic vehicle interest phrase'
+    };
+  }
+  
+  // Check for specific vehicle information
+  const hasYear = /\b(19|20)\d{2}\b/.test(cleanVehicle);
+  const hasMake = /\b(chevrolet|chevy|ford|toyota|honda|nissan|hyundai|kia|bmw|mercedes|audi)\b/.test(cleanVehicle);
+  const hasModel = /\b(equinox|malibu|silverado|cruze|tahoe|suburban|camaro|corvette|pacifica)\b/.test(cleanVehicle);
+  
+  let confidence = 0.5;
+  if (hasYear) confidence += 0.2;
+  if (hasMake) confidence += 0.2;
+  if (hasModel) confidence += 0.3;
+  
+  // Cap at 0.9 to leave room for improvement
+  confidence = Math.min(confidence, 0.9);
+  
+  if (confidence > 0.6) {
+    return {
+      isValid: true,
+      confidence,
+      detectedIssue: 'None'
+    };
+  }
+  
+  return {
+    isValid: false,
+    confidence,
+    detectedIssue: 'Insufficient vehicle details'
+  };
 };
