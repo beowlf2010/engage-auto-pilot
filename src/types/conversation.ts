@@ -20,6 +20,7 @@ export interface MessageData {
   direction: 'in' | 'out';
   body: string;
   sentAt: string;
+  readAt?: string; // Add the missing readAt property
   aiGenerated?: boolean;
   smsStatus?: string;
   smsError?: string;

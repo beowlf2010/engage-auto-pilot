@@ -59,15 +59,28 @@ export const sendMessage = async (
 
     // Update lead's AI message count if this was AI generated
     if (isAIGenerated) {
-      const { error: leadUpdateError } = await supabase
+      // Get current count and increment it
+      const { data: leadData, error: leadFetchError } = await supabase
         .from('leads')
-        .update({
-          ai_messages_sent: supabase.rpc('increment', { x: 1 })
-        })
-        .eq('id', leadId);
+        .select('ai_messages_sent')
+        .eq('id', leadId)
+        .single();
 
-      if (leadUpdateError) {
-        console.error('❌ [MESSAGES] Error updating AI message count:', leadUpdateError);
+      if (leadFetchError) {
+        console.error('❌ [MESSAGES] Error fetching lead for AI count update:', leadFetchError);
+      } else {
+        const newCount = (leadData.ai_messages_sent || 0) + 1;
+        
+        const { error: leadUpdateError } = await supabase
+          .from('leads')
+          .update({
+            ai_messages_sent: newCount
+          })
+          .eq('id', leadId);
+
+        if (leadUpdateError) {
+          console.error('❌ [MESSAGES] Error updating AI message count:', leadUpdateError);
+        }
       }
 
       // Handle status transition for AI messages

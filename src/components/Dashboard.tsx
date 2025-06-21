@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +56,7 @@ const Dashboard = ({ user }: DashboardProps) => {
     fetchLeadCounts();
   }, []);
 
-  const unreadMessages = messages.filter(msg => !msg.read_at && msg.direction === 'in').length;
+  const unreadMessages = messages.filter(msg => !msg.readAt && msg.direction === 'in').length;
 
   const quickActions = [
     {
