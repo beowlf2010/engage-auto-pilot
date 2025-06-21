@@ -1,8 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { validateVehicleInterest, validateAndUpdateLeadVehicleInterest } from './vehicleInterestValidator';
 import { queueMessageForApproval } from './aiMessageApprovalService';
-import { enhancedConversationAI } from './enhancedConversationAI';
+import { generateEnhancedIntelligentResponse } from './intelligentConversationAI';
 
 export interface ImprovedAIMessageRequest {
   leadId: string;
@@ -33,7 +32,6 @@ export const generateImprovedIntelligentAIMessage = async (
   try {
     console.log(`🤖 [IMPROVED AI MSG] Generating message for lead ${request.leadId}`);
 
-    // Step 1: Validate and fix vehicle interest data before generating message
     const validationSuccess = await validateAndUpdateLeadVehicleInterest(request.leadId);
     if (!validationSuccess) {
       return {
@@ -44,7 +42,6 @@ export const generateImprovedIntelligentAIMessage = async (
       };
     }
 
-    // Step 2: Get updated lead details
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select(`
@@ -69,7 +66,6 @@ export const generateImprovedIntelligentAIMessage = async (
       };
     }
 
-    // Step 3: Final vehicle interest validation
     const validation = validateVehicleInterest(lead.vehicle_interest);
     if (!validation.isValid) {
       console.error('❌ [IMPROVED AI MSG] Invalid vehicle interest after validation');
@@ -81,7 +77,6 @@ export const generateImprovedIntelligentAIMessage = async (
       };
     }
 
-    // Step 4: Get conversation history
     const { data: conversations, error: convError } = await supabase
       .from('conversations')
       .select('*')
@@ -100,18 +95,24 @@ export const generateImprovedIntelligentAIMessage = async (
 
     const conversationHistory = conversations || [];
     const isInitialContact = conversationHistory.length === 0;
-    const lastCustomerMessage = conversationHistory.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '';
 
     console.log(`🎯 [IMPROVED AI MSG] Lead: ${lead.first_name} ${lead.last_name}, Vehicle: ${validation.sanitizedInterest}`);
 
-    // Step 5: Generate message using enhanced AI
-    const enhancedResponse = await enhancedConversationAI.generateEnhancedResponse({
+    const enhancedResponse = await generateEnhancedIntelligentResponse({
       leadId: request.leadId,
       leadName: `${lead.first_name} ${lead.last_name}`,
       vehicleInterest: validation.sanitizedInterest,
-      lastCustomerMessage: lastCustomerMessage,
-      conversationHistory: conversationHistory.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
-      isInitialContact: isInitialContact
+      messages: conversationHistory.map(msg => ({
+        id: msg.id,
+        body: msg.body,
+        direction: msg.direction,
+        sentAt: msg.sent_at,
+        aiGenerated: msg.ai_generated
+      })),
+      leadInfo: {
+        phone: '',
+        status: 'new'
+      }
     });
 
     if (!enhancedResponse || !enhancedResponse.message) {
@@ -124,17 +125,15 @@ export const generateImprovedIntelligentAIMessage = async (
       };
     }
 
-    // Step 6: Determine if approval is required
     const messagesSent = lead.ai_messages_sent || 0;
     const isHighRisk = messagesSent === 0 || lead.message_intensity === 'super_aggressive';
     const requiresApproval = request.requireApproval !== false && isHighRisk;
 
-    // Step 7: Either queue for approval or return for immediate sending
     if (requiresApproval) {
       console.log(`📋 [IMPROVED AI MSG] Queueing message for approval (high risk)`);
       
       const urgencyLevel = lead.message_intensity === 'super_aggressive' ? 'high' : 'normal';
-      const scheduledSendAt = new Date(Date.now() + (isInitialContact ? 0 : 2 * 60 * 60 * 1000)); // Send immediately for initial, 2h delay for follow-ups
+      const scheduledSendAt = new Date(Date.now() + (isInitialContact ? 0 : 2 * 60 * 60 * 1000));
 
       const queuedMessage = await queueMessageForApproval({
         leadId: request.leadId,
@@ -184,7 +183,6 @@ export const generateImprovedIntelligentAIMessage = async (
 // Check if a lead should receive a message (enhanced quality controls)
 export const shouldSendImprovedMessage = async (leadId: string): Promise<boolean> => {
   try {
-    // Get lead details with enhanced validation
     const { data: lead } = await supabase
       .from('leads')
       .select('ai_opt_in, ai_sequence_paused, do_not_call, first_name, last_name, vehicle_interest, ai_enabled_at')
@@ -195,14 +193,12 @@ export const shouldSendImprovedMessage = async (leadId: string): Promise<boolean
       return false;
     }
 
-    // Validate vehicle interest
     const validation = validateVehicleInterest(lead.vehicle_interest);
     if (!validation.isValid) {
       console.log(`❌ [IMPROVED AI MSG] Lead ${leadId} has invalid vehicle interest, skipping`);
       return false;
     }
 
-    // Check if ai_enabled_at exists (emergency fix)
     if (!lead.ai_enabled_at) {
       console.log(`⚠️ [IMPROVED AI MSG] Lead ${leadId} missing ai_enabled_at, updating...`);
       await supabase
@@ -211,7 +207,6 @@ export const shouldSendImprovedMessage = async (leadId: string): Promise<boolean
         .eq('id', leadId);
     }
 
-    // Check daily message limit (max 2 per day)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -228,7 +223,6 @@ export const shouldSendImprovedMessage = async (leadId: string): Promise<boolean
       return false;
     }
 
-    // Check minimum interval (2 hours between messages)
     const { data: lastMessage } = await supabase
       .from('conversations')
       .select('sent_at')
@@ -249,7 +243,6 @@ export const shouldSendImprovedMessage = async (leadId: string): Promise<boolean
       }
     }
 
-    // Check business hours (8 AM - 7 PM)
     const now = new Date();
     const hour = now.getHours();
     if (hour < 8 || hour >= 19) {

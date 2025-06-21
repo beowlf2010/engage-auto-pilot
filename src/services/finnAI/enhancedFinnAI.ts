@@ -1,7 +1,6 @@
-
 import { enhancedContextEngine } from './contextEngine';
 import { customerJourneyTracker } from './customerJourneyTracker';
-import { generateEnhancedIntelligentResponse } from '../enhancedIntelligentConversationAI';
+import { generateEnhancedIntelligentResponse } from '../intelligentConversationAI';
 
 export interface EnhancedAIRequest {
   leadId: string;

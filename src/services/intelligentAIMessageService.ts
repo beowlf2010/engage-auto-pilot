@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { enhancedConversationAI } from './enhancedConversationAI';
+import { generateEnhancedIntelligentResponse } from './intelligentConversationAI';
 
 export interface AIMessageRequest {
   leadId: string;
@@ -21,10 +21,10 @@ export interface AIMessageResponse {
   error?: string;
 }
 
-// Enhanced version that uses the new appointment-aware AI
+// Simplified version that uses the unified intelligent conversation AI
 export const generateIntelligentAIMessage = async (request: AIMessageRequest): Promise<string | null> => {
   try {
-    console.log(`🤖 [INTELLIGENT AI MSG] Generating message via ENHANCED function for lead ${request.leadId}`);
+    console.log(`🤖 [INTELLIGENT AI MSG] Generating message for lead ${request.leadId}`);
 
     // Get lead details to provide proper context
     const { data: lead, error: leadError } = await supabase
@@ -58,30 +58,37 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
 
     const conversationHistory = conversations || [];
     const isInitialContact = conversationHistory.length === 0;
-    const lastCustomerMessage = conversationHistory.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '';
 
     console.log(`🎯 [INTELLIGENT AI MSG] Lead: ${lead.first_name} ${lead.last_name}, Initial contact: ${isInitialContact}`);
 
-    // Use enhanced conversation AI that includes appointment intent detection
-    const enhancedResponse = await enhancedConversationAI.generateEnhancedResponse({
+    // Use simplified conversation AI
+    const response = await generateEnhancedIntelligentResponse({
       leadId: request.leadId,
       leadName: `${lead.first_name} ${lead.last_name}`,
       vehicleInterest: lead.vehicle_interest || '',
-      lastCustomerMessage: lastCustomerMessage,
-      conversationHistory: conversationHistory.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
-      isInitialContact: isInitialContact
+      messages: conversationHistory.map(msg => ({
+        id: msg.id,
+        body: msg.body,
+        direction: msg.direction,
+        sentAt: msg.sent_at,
+        aiGenerated: msg.ai_generated
+      })),
+      leadInfo: {
+        phone: '',
+        status: 'new'
+      }
     });
 
-    if (!enhancedResponse || !enhancedResponse.message) {
-      console.error('❌ [INTELLIGENT AI MSG] No message returned from enhanced function');
+    if (!response || !response.message) {
+      console.error('❌ [INTELLIGENT AI MSG] No message returned');
       return null;
     }
 
-    console.log(`✅ [INTELLIGENT AI MSG] Generated message via enhanced function: ${enhancedResponse.message}`);
-    return enhancedResponse.message;
+    console.log(`✅ [INTELLIGENT AI MSG] Generated message: ${response.message}`);
+    return response.message;
 
   } catch (error) {
-    console.error('❌ [INTELLIGENT AI MSG] Error generating message via enhanced function:', error);
+    console.error('❌ [INTELLIGENT AI MSG] Error generating message:', error);
     return null;
   }
 };
@@ -89,7 +96,6 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
 // Check if a lead should receive a message (quality controls)
 export const shouldSendMessage = async (leadId: string): Promise<boolean> => {
   try {
-    // Check if lead is opted in
     const { data: lead } = await supabase
       .from('leads')
       .select('ai_opt_in, ai_sequence_paused, do_not_call, first_name, last_name')
@@ -100,7 +106,6 @@ export const shouldSendMessage = async (leadId: string): Promise<boolean> => {
       return false;
     }
 
-    // Check daily message limit (max 2 per day)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -117,7 +122,6 @@ export const shouldSendMessage = async (leadId: string): Promise<boolean> => {
       return false;
     }
 
-    // Check minimum interval (2 hours between messages)
     const { data: lastMessage } = await supabase
       .from('conversations')
       .select('sent_at')
@@ -138,7 +142,6 @@ export const shouldSendMessage = async (leadId: string): Promise<boolean> => {
       }
     }
 
-    // Check business hours (9 AM - 6 PM)
     const now = new Date();
     const hour = now.getHours();
     if (hour < 9 || hour >= 18) {
