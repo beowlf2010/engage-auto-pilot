@@ -134,7 +134,6 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Contact Information Card */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -167,7 +166,6 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
             </CardContent>
           </Card>
 
-          {/* Vehicle Interest Card */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -180,7 +178,6 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
             </CardContent>
           </Card>
 
-          {/* AI Status Card */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
