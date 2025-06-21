@@ -28,6 +28,7 @@ import UnreadMessageBanner from './components/inbox/UnreadMessageBanner';
 import RPODatabasePage from "@/pages/RPODatabasePage";
 import RPOInsightsPage from "@/pages/RPOInsightsPage";
 import PredictiveAnalyticsPage from './pages/PredictiveAnalyticsPage';
+import LeadRedirect from './components/LeadRedirect';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -50,6 +51,8 @@ function App() {
               <UnreadMessageBanner />
               <Routes>
                 <Route path="/auth" element={<AuthPage />} />
+                {/* Redirect singular /lead/:leadId to plural /leads/:leadId */}
+                <Route path="/lead/:leadId" element={<LeadRedirect />} />
                 <Route
                   path="/*"
                   element={
