@@ -40,7 +40,7 @@ export const useSmartInventoryDetection = () => {
       const inventory = await findMatchingInventory(leadId);
       console.log('📦 Found inventory items:', inventory.length);
 
-      // Find specific matches
+      // Find specific matches - Note: inventory items from findMatchingInventory don't have stock_number
       const vehicleName = vehicleInterest.primaryVehicle.toLowerCase();
       const matchingVehicles = inventory.filter(item => {
         const makeMatch = item.make?.toLowerCase().includes(vehicleName.split(' ')[0]);
@@ -56,7 +56,9 @@ export const useSmartInventoryDetection = () => {
 
       if (matchingVehicles.length > 0) {
         const vehicle = matchingVehicles[0];
-        suggestedResponse = `Yes, I can see we have a ${vehicle.year} ${vehicle.make} ${vehicle.model} available in our inventory (Stock #${vehicle.stock_number}). Would you like me to share more details about this vehicle?`;
+        // Use inventory_id or vin as identifier since stock_number may not be available
+        const identifier = vehicle.inventory_id || vehicle.vin || 'Unknown';
+        suggestedResponse = `Yes, I can see we have a ${vehicle.year} ${vehicle.make} ${vehicle.model} available in our inventory (ID: ${identifier}). Would you like me to share more details about this vehicle?`;
         confidence = Math.min(confidence + 0.2, 0.95);
       } else {
         // Check for partial matches or similar vehicles
@@ -79,7 +81,8 @@ export const useSmartInventoryDetection = () => {
         );
         
         if (maximaInInventory) {
-          suggestedResponse = `Yes, I can see your ${maximaInInventory.year} Nissan Maxima from today's uploads (Stock #${maximaInInventory.stock_number}). It's showing as available in our system. Were you looking to schedule a viewing or did you have specific questions about this vehicle?`;
+          const identifier = maximaInInventory.inventory_id || maximaInInventory.vin || 'Unknown';
+          suggestedResponse = `Yes, I can see your ${maximaInInventory.year} Nissan Maxima from today's uploads (ID: ${identifier}). It's showing as available in our system. Were you looking to schedule a viewing or did you have specific questions about this vehicle?`;
           confidence = 0.95;
         }
       }

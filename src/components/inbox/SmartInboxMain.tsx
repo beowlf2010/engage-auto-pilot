@@ -143,7 +143,8 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
               direction: 'out' as const,
               sentAt: new Date().toISOString(),
               leadId: selectedLead,
-              aiGenerated: false
+              aiGenerated: false,
+              smsStatus: 'pending'
             }]);
 
             const conversationHistory = updatedMessages
