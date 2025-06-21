@@ -32,16 +32,16 @@ const StreamlinedNavigation: React.FC<StreamlinedNavigationProps> = ({ isCollaps
   // Filter navigation items based on user role - simple role-based filtering
   const filteredNavigationItems = navigationItems.filter(item => {
     // If no access requirement specified, show to all users
-    if (!item.access) return true;
+    if (!item.access || item.access.length === 0) return true;
     
     // If user has admin role, show everything
     if (profile?.role === 'admin') return true;
     
     // If user has manager role, show manager and user level items
-    if (profile?.role === 'manager' && ['manager', 'user'].includes(item.access)) return true;
+    if (profile?.role === 'manager' && item.access.some(role => ['manager', 'sales'].includes(role))) return true;
     
-    // If user has user role, show only user level items
-    if (profile?.role === 'user' && item.access === 'user') return true;
+    // If user has sales role, show only sales level items
+    if (profile?.role === 'sales' && item.access.includes('sales')) return true;
     
     return false;
   });
