@@ -9,7 +9,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Clock, MessageSquare, User, Car, Pause, Eye, Filter, Search, CheckSquare, AlertTriangle, Zap, ChevronDown, ChevronUp, Bot } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import MessagePreviewModal from './MessagePreviewModal';
 import MessagePreviewInline from './MessagePreviewInline';
 import { sendMessage } from '@/services/messagesService';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -38,8 +37,6 @@ const EnhancedAIQueueTab = () => {
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
   const [expandedPreviews, setExpandedPreviews] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [selectedLead, setSelectedLead] = useState<string | null>(null);
-  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [complianceFilter, setComplianceFilter] = useState<string>('all');
@@ -280,11 +277,6 @@ const EnhancedAIQueueTab = () => {
     } finally {
       setBatchOperation(null);
     }
-  };
-
-  const handlePreviewMessage = (leadId: string) => {
-    setSelectedLead(leadId);
-    setPreviewModalOpen(true);
   };
 
   const formatTimeUntilDue = (nextSendAt: string) => {
@@ -539,7 +531,7 @@ const EnhancedAIQueueTab = () => {
                             vehicleInterest={message.vehicleInterest}
                             aiStage={message.aiStage}
                             onMessageSent={fetchQueuedMessages}
-                            onPreviewFull={() => handlePreviewMessage(message.id)}
+                            onPreviewFull={() => console.log('Preview full for:', message.id)}
                           />
                         </div>
                       )}
@@ -551,16 +543,6 @@ const EnhancedAIQueueTab = () => {
           </>
         )}
       </div>
-
-      {/* Preview Modal */}
-      {previewModalOpen && selectedLead && (
-        <MessagePreviewModal
-          open={previewModalOpen}
-          onOpenChange={setPreviewModalOpen}
-          leadId={selectedLead}
-          onMessageSent={fetchQueuedMessages}
-        />
-      )}
     </div>
   );
 };

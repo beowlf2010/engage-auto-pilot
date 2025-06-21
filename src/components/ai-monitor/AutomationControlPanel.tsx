@@ -84,24 +84,27 @@ const AutomationControlPanel = () => {
         .eq('ai_generated', true)
         .gte('sent_at', oneHourAgo);
 
-      // Get automation setting
-      const { data: automationSetting } = await supabase
-        .from('ai_automation_settings')
-        .select('setting_value')
-        .eq('setting_key', 'automation_enabled')
-        .single();
+      // Get automation setting using rpc to avoid type issues
+      const { data: automationSetting, error: settingError } = await supabase
+        .rpc('sql', {
+          query: "SELECT setting_value FROM ai_automation_settings WHERE setting_key = 'automation_enabled'"
+        });
 
-      // Calculate success rate from recent runs
-      const { data: recentRunsForStats } = await supabase
-        .from('ai_automation_runs')
-        .select('successful_sends, failed_sends')
-        .gte('started_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .eq('status', 'completed');
+      // Calculate success rate from recent runs using rpc
+      const { data: recentRunsForStats, error: runsError } = await supabase
+        .rpc('sql', {
+          query: `
+            SELECT successful_sends, failed_sends 
+            FROM ai_automation_runs 
+            WHERE started_at >= $1 AND status = 'completed'
+          `,
+          params: [new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()]
+        });
 
       let successRate = 0;
       if (recentRunsForStats && recentRunsForStats.length > 0) {
-        const totalSuccessful = recentRunsForStats.reduce((sum, run) => sum + (run.successful_sends || 0), 0);
-        const totalFailed = recentRunsForStats.reduce((sum, run) => sum + (run.failed_sends || 0), 0);
+        const totalSuccessful = recentRunsForStats.reduce((sum: number, run: any) => sum + (run.successful_sends || 0), 0);
+        const totalFailed = recentRunsForStats.reduce((sum: number, run: any) => sum + (run.failed_sends || 0), 0);
         const total = totalSuccessful + totalFailed;
         successRate = total > 0 ? Math.round((totalSuccessful / total) * 100) : 100;
       }
@@ -110,12 +113,20 @@ const AutomationControlPanel = () => {
         totalLeadsInQueue: queueCount || 0,
         messagesLastHour: messagesCount || 0,
         successRate,
-        automationEnabled: automationSetting?.setting_value === true,
-        lastRunTime: null, // Will be set from recent runs
-        nextRunTime: null // Calculate based on cron schedule
+        automationEnabled: automationSetting?.[0]?.setting_value === true,
+        lastRunTime: null,
+        nextRunTime: null
       });
     } catch (error) {
       console.error('Error fetching automation stats:', error);
+      // Fallback to basic stats without automation-specific data
+      setStats(prev => ({
+        ...prev,
+        totalLeadsInQueue: 0,
+        messagesLastHour: 0,
+        successRate: 0,
+        automationEnabled: true
+      }));
     } finally {
       setLoading(false);
     }
@@ -123,13 +134,16 @@ const AutomationControlPanel = () => {
 
   const fetchRecentRuns = async () => {
     try {
-      const { data } = await supabase
-        .from('ai_automation_runs')
-        .select('*')
-        .order('started_at', { ascending: false })
-        .limit(5);
+      const { data, error } = await supabase
+        .rpc('sql', {
+          query: `
+            SELECT * FROM ai_automation_runs 
+            ORDER BY started_at DESC 
+            LIMIT 5
+          `
+        });
 
-      if (data) {
+      if (data && !error) {
         setRecentRuns(data as AutomationRun[]);
       }
     } catch (error) {
@@ -140,9 +154,14 @@ const AutomationControlPanel = () => {
   const toggleAutomation = async (enabled: boolean) => {
     try {
       const { error } = await supabase
-        .from('ai_automation_settings')
-        .update({ setting_value: enabled })
-        .eq('setting_key', 'automation_enabled');
+        .rpc('sql', {
+          query: `
+            UPDATE ai_automation_settings 
+            SET setting_value = $1 
+            WHERE setting_key = 'automation_enabled'
+          `,
+          params: [enabled]
+        });
 
       if (error) throw error;
 
