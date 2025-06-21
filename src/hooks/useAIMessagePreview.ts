@@ -5,29 +5,39 @@ import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from '@/hooks/use-toast';
 
-export const useAIMessagePreview = () => {
+export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string; onMessageSent?: () => void } = {}) => {
   const { profile } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [previewMessage, setPreviewMessage] = useState('');
+  const [generatedMessage, setGeneratedMessage] = useState('');
   const [leadData, setLeadData] = useState<any>(null);
   const [isSending, setIsSending] = useState(false);
+  
+  // Multi-step workflow states
+  const [showDecisionStep, setShowDecisionStep] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [originalDataQuality, setOriginalDataQuality] = useState<any>(null);
+  const [nameDecision, setNameDecision] = useState<string>('');
+  const [vehicleDecision, setVehicleDecision] = useState<string>('');
 
   // Generate AI message preview
-  const generatePreview = async (leadId: string) => {
-    if (!profile) {
-      console.error('No profile available for AI message generation');
+  const generatePreview = async (targetLeadId?: string) => {
+    const useLeadId = targetLeadId || leadId;
+    if (!useLeadId || !profile) {
+      console.error('No lead ID or profile available for AI message generation');
       return;
     }
 
     setIsGenerating(true);
     try {
-      console.log(`🤖 [AI PREVIEW] Generating message for lead: ${leadId}`);
+      console.log(`🤖 [AI PREVIEW] Generating message for lead: ${useLeadId}`);
       
       // Get lead data
       const { data: lead, error: leadError } = await supabase
         .from('leads')
         .select('*')
-        .eq('id', leadId)
+        .eq('id', useLeadId)
         .single();
 
       if (leadError || !lead) {
@@ -40,7 +50,7 @@ export const useAIMessagePreview = () => {
       const { data: conversations, error: conversationError } = await supabase
         .from('conversations')
         .select('id')
-        .eq('lead_id', leadId)
+        .eq('lead_id', useLeadId)
         .limit(1);
 
       if (conversationError) {
@@ -53,7 +63,7 @@ export const useAIMessagePreview = () => {
       const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-automation', {
         body: {
           action: 'generate_message_preview',
-          leadId: leadId,
+          leadId: useLeadId,
           leadData: lead,
           hasConversation: hasConversation,
           salespersonProfile: profile
@@ -64,9 +74,12 @@ export const useAIMessagePreview = () => {
         throw new Error(aiResult?.error || 'Failed to generate AI message');
       }
 
-      setPreviewMessage(aiResult.message || 'Hi! I wanted to follow up on your interest in our vehicles. How can I help you today?');
+      const message = aiResult.message || 'Hi! I wanted to follow up on your interest in our vehicles. How can I help you today?';
+      setPreviewMessage(message);
+      setGeneratedMessage(message);
+      setShowPreview(true);
       
-      console.log(`✅ [AI PREVIEW] Generated message for lead: ${leadId}`);
+      console.log(`✅ [AI PREVIEW] Generated message for lead: ${useLeadId}`);
       
     } catch (error) {
       console.error('❌ [AI PREVIEW] Error generating message:', error);
@@ -77,15 +90,28 @@ export const useAIMessagePreview = () => {
       });
       
       // Set fallback message
-      setPreviewMessage('Hi! I wanted to follow up on your interest in our vehicles. How can I help you today?');
+      const fallbackMessage = 'Hi! I wanted to follow up on your interest in our vehicles. How can I help you today?';
+      setPreviewMessage(fallbackMessage);
+      setGeneratedMessage(fallbackMessage);
+      setShowPreview(true);
     } finally {
       setIsGenerating(false);
     }
   };
 
   // Send the AI generated message
-  const sendNow = async (leadId: string, messageOverride?: string) => {
-    const messageToSend = messageOverride || previewMessage;
+  const sendNow = async (targetLeadId?: string, messageOverride?: string) => {
+    const useLeadId = targetLeadId || leadId;
+    const messageToSend = messageOverride || generatedMessage || previewMessage;
+    
+    if (!useLeadId) {
+      toast({
+        title: "Error",
+        description: "No lead ID provided",
+        variant: "destructive"
+      });
+      return;
+    }
     
     if (!messageToSend.trim()) {
       toast({
@@ -107,10 +133,10 @@ export const useAIMessagePreview = () => {
 
     setIsSending(true);
     try {
-      console.log(`📤 [AI PREVIEW] Sending AI message to lead: ${leadId}`);
+      console.log(`📤 [AI PREVIEW] Sending AI message to lead: ${useLeadId}`);
       
       // Use the working fixed message service
-      await fixedSendMessage(leadId, messageToSend.trim(), profile, true);
+      await fixedSendMessage(useLeadId, messageToSend.trim(), profile, true);
       
       toast({
         title: "Message Sent",
@@ -118,9 +144,14 @@ export const useAIMessagePreview = () => {
       });
       
       // Clear the preview after sending
-      setPreviewMessage('');
+      reset();
       
-      console.log(`✅ [AI PREVIEW] Message sent successfully to lead: ${leadId}`);
+      // Call the callback if provided
+      if (onMessageSent) {
+        onMessageSent();
+      }
+      
+      console.log(`✅ [AI PREVIEW] Message sent successfully to lead: ${useLeadId}`);
       
     } catch (error) {
       console.error('❌ [AI PREVIEW] Error sending message:', error);
@@ -134,25 +165,92 @@ export const useAIMessagePreview = () => {
     }
   };
 
+  // Multi-step workflow methods
+  const startAnalysis = async () => {
+    if (!leadId) return;
+    
+    setIsAnalyzing(true);
+    try {
+      // Simulate analysis
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Mock data quality results
+      setOriginalDataQuality({
+        nameValidation: { isValid: true, confidence: 0.9 },
+        vehicleValidation: { isValid: true, confidence: 0.8 }
+      });
+      
+      setShowDecisionStep(true);
+    } catch (error) {
+      console.error('Analysis error:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleNameDecision = (decision: string) => {
+    setNameDecision(decision);
+  };
+
+  const handleVehicleDecision = (decision: string) => {
+    setVehicleDecision(decision);
+  };
+
+  const generateWithDecisions = async () => {
+    setShowDecisionStep(false);
+    await generatePreview();
+  };
+
   // Update message preview
   const updatePreview = (newMessage: string) => {
     setPreviewMessage(newMessage);
+    setGeneratedMessage(newMessage);
   };
 
-  // Clear preview
-  const clearPreview = () => {
+  // Clear preview and reset state
+  const reset = () => {
     setPreviewMessage('');
+    setGeneratedMessage('');
     setLeadData(null);
+    setShowDecisionStep(false);
+    setShowPreview(false);
+    setOriginalDataQuality(null);
+    setNameDecision('');
+    setVehicleDecision('');
   };
+
+  // Alias for backward compatibility
+  const clearPreview = reset;
+  const cancel = reset;
 
   return {
+    // Basic states
     isGenerating,
+    isAnalyzing,
     previewMessage,
+    generatedMessage,
     leadData,
     isSending,
+    
+    // Multi-step workflow states
+    showDecisionStep,
+    showPreview,
+    originalDataQuality,
+    nameDecision,
+    vehicleDecision,
+    
+    // Methods
     generatePreview,
     sendNow,
     updatePreview,
-    clearPreview
+    clearPreview,
+    reset,
+    cancel,
+    
+    // Multi-step workflow methods
+    startAnalysis,
+    handleNameDecision,
+    handleVehicleDecision,
+    generateWithDecisions
   };
 };

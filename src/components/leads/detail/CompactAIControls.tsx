@@ -84,6 +84,18 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
     }
   };
 
+  const handlePreviewMessage = () => {
+    generatePreview();
+  };
+
+  const handleSendNow = () => {
+    sendNow();
+  };
+
+  const handleCancel = () => {
+    cancel();
+  };
+
   return (
     <Card className="p-4 w-full">
       <div className="space-y-4">
@@ -125,8 +137,8 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
             vehicleInterest={vehicleInterest}
             generatedMessage={generatedMessage}
             isGenerating={isGenerating}
-            onSendNow={sendNow}
-            onCancel={cancel}
+            onSendNow={handleSendNow}
+            onCancel={handleCancel}
           />
         )}
 
@@ -135,7 +147,7 @@ const CompactAIControls: React.FC<CompactAIControlsProps> = ({
           pendingHumanResponse={pendingHumanResponse}
           nextAiSendAt={nextAiSendAt}
           isSending={isSending || isGenerating}
-          onPreviewMessage={generatePreview}
+          onPreviewMessage={handlePreviewMessage}
         />
       </div>
     </Card>

@@ -65,6 +65,10 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     onClose();
   };
 
+  const handleSend = () => {
+    sendNow();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
@@ -112,7 +116,7 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
                 generatedMessage={generatedMessage}
                 isGenerating={false}
                 isSending={isSending}
-                onSend={sendNow}
+                onSend={handleSend}
                 onCancel={handleCancel}
               />
             </>
