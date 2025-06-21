@@ -1,50 +1,29 @@
-import { useState } from 'react';
-import { generateWarmInitialMessage } from '@/services/proactive/warmIntroductionService';
-import { generateInitialOutreachMessage } from '@/services/proactive/initialOutreachService';
-import { sendMessage } from '@/services/messagesService';
+
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { assessLeadDataQuality } from '@/services/unifiedDataQualityService';
-import { saveNameValidationDecision, saveVehicleValidationDecision } from '@/services/nameValidationLearningService';
+import { toast } from '@/hooks/use-toast';
 
-interface UseAIMessagePreviewProps {
-  leadId: string;
-  onMessageSent?: () => void;
-}
-
-export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePreviewProps) => {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
-  const [showDecisionStep, setShowDecisionStep] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  
-  // Validation data
-  const [originalDataQuality, setOriginalDataQuality] = useState<any>(null);
-  const [leadData, setLeadData] = useState<any>(null);
-  const [isInitialContact, setIsInitialContact] = useState(true);
-  
-  // User decisions
-  const [nameDecision, setNameDecision] = useState<'approved' | 'denied' | null>(null);
-  const [vehicleDecision, setVehicleDecision] = useState<'approved' | 'denied' | null>(null);
-  
+export const useAIMessagePreview = () => {
   const { profile } = useAuth();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [previewMessage, setPreviewMessage] = useState('');
+  const [leadData, setLeadData] = useState<any>(null);
+  const [isSending, setIsSending] = useState(false);
 
-  const startAnalysis = async () => {
+  // Generate AI message preview
+  const generatePreview = async (leadId: string) => {
     if (!profile) {
-      toast({
-        title: "Error",
-        description: "User profile not loaded",
-        variant: "destructive",
-      });
+      console.error('No profile available for AI message generation');
       return;
     }
 
-    setIsAnalyzing(true);
+    setIsGenerating(true);
     try {
-      // Get lead details
+      console.log(`🤖 [AI PREVIEW] Generating message for lead: ${leadId}`);
+      
+      // Get lead data
       const { data: lead, error: leadError } = await supabase
         .from('leads')
         .select('*')
@@ -52,256 +31,128 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         .single();
 
       if (leadError || !lead) {
-        throw new Error('Failed to fetch lead details');
+        throw new Error('Lead not found');
       }
 
       setLeadData(lead);
 
-      // Check if this is initial contact
-      const { data: existingMessages } = await supabase
+      // Check if lead has had conversation
+      const { data: conversations, error: conversationError } = await supabase
         .from('conversations')
         .select('id')
         .eq('lead_id', leadId)
         .limit(1);
 
-      const isInitial = !existingMessages || existingMessages.length === 0;
-      setIsInitialContact(isInitial);
+      if (conversationError) {
+        console.error('Error checking conversations:', conversationError);
+      }
 
-      console.log(`🔍 [AI PREVIEW] Is initial contact: ${isInitial}`);
+      const hasConversation = conversations && conversations.length > 0;
 
-      // Get original data quality assessment
-      const dataQuality = await assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
-      setOriginalDataQuality(dataQuality);
-
-      console.log('🔍 [AI PREVIEW] Lead analysis complete:', {
-        firstName: lead.first_name,
-        vehicleInterest: lead.vehicle_interest,
-        nameValid: dataQuality.nameValidation.isValidPersonalName,
-        vehicleValid: dataQuality.vehicleValidation.isValidVehicleInterest,
-        isInitialContact: isInitial
-      });
-
-      setShowDecisionStep(true);
-      
-      toast({
-        title: "Analysis Complete",
-        description: `Please review and approve the ${isInitial ? 'initial outreach' : 'follow-up'} data`,
-      });
-    } catch (error) {
-      console.error('Error analyzing lead:', error);
-      toast({
-        title: "Error",
-        description: "Failed to analyze lead data",
-        variant: "destructive",
-      });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleNameDecision = (decision: 'approved' | 'denied') => {
-    setNameDecision(decision);
-    toast({
-      title: decision === 'approved' ? "Name Approved" : "Name Denied",
-      description: `"${leadData?.first_name}" will be ${decision === 'approved' ? 'treated as a personal name' : 'handled generically'}`,
-    });
-  };
-
-  const handleVehicleDecision = (decision: 'approved' | 'denied') => {
-    setVehicleDecision(decision);
-    toast({
-      title: decision === 'approved' ? "Vehicle Approved" : "Vehicle Denied",
-      description: `Vehicle interest will be ${decision === 'approved' ? 'used specifically' : 'handled generically'}`,
-    });
-  };
-
-  const generateWithDecisions = async () => {
-    if (!nameDecision || !vehicleDecision || !originalDataQuality || !leadData || !profile) {
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      // Save decisions to database
-      await saveNameValidationDecision(
-        leadData.first_name,
-        originalDataQuality.nameValidation,
-        nameDecision,
-        `User decision during AI message generation`,
-        profile.id
-      );
-
-      await saveVehicleValidationDecision(
-        leadData.vehicle_interest || 'Not specified',
-        originalDataQuality.vehicleValidation,
-        vehicleDecision,
-        `User decision during AI message generation`,
-        profile.id
-      );
-
-      // Create override data quality with user decisions
-      const overrideDataQuality = {
-        ...originalDataQuality,
-        nameValidation: {
-          ...originalDataQuality.nameValidation,
-          isValidPersonalName: nameDecision === 'approved',
-          confidence: nameDecision === 'approved' ? 1.0 : 0.0,
-          userOverride: true
-        },
-        vehicleValidation: {
-          ...originalDataQuality.vehicleValidation,
-          isValidVehicleInterest: vehicleDecision === 'approved',
-          confidence: vehicleDecision === 'approved' ? 1.0 : 0.0,
-          userOverride: true
+      // Generate AI message based on lead data and conversation history
+      const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-automation', {
+        body: {
+          action: 'generate_message_preview',
+          leadId: leadId,
+          leadData: lead,
+          hasConversation: hasConversation,
+          salespersonProfile: profile
         }
-      };
+      });
 
-      // Recalculate strategy
-      const usePersonalGreeting = nameDecision === 'approved';
-      const useSpecificVehicle = vehicleDecision === 'approved';
-
-      if (usePersonalGreeting && useSpecificVehicle) {
-        overrideDataQuality.messageStrategy = 'personal_with_vehicle';
-      } else if (usePersonalGreeting && !useSpecificVehicle) {
-        overrideDataQuality.messageStrategy = 'personal_generic_vehicle';
-      } else if (!usePersonalGreeting && useSpecificVehicle) {
-        overrideDataQuality.messageStrategy = 'generic_with_vehicle';
-      } else {
-        overrideDataQuality.messageStrategy = 'fully_generic';
+      if (aiError || !aiResult?.success) {
+        throw new Error(aiResult?.error || 'Failed to generate AI message');
       }
 
-      overrideDataQuality.recommendations = {
-        usePersonalGreeting,
-        useSpecificVehicle,
-        fallbackGreeting: originalDataQuality.recommendations.fallbackGreeting,
-        fallbackVehicleMessage: originalDataQuality.recommendations.fallbackVehicleMessage
-      };
-
-      let message: string | null = null;
-
-      if (isInitialContact) {
-        // Use initial outreach service for first contact
-        console.log(`🚀 [AI PREVIEW] Generating initial outreach message`);
-        
-        const outreachResponse = await generateInitialOutreachMessage({
-          leadId: leadData.id,
-          firstName: leadData.first_name,
-          lastName: leadData.last_name,
-          vehicleInterest: leadData.vehicle_interest,
-          salespersonName: profile.first_name,
-          dealershipName: 'Jason Pilger Chevrolet'
-        });
-
-        message = outreachResponse?.message || null;
-      } else {
-        // Use warm introduction service for follow-ups
-        console.log(`🔄 [AI PREVIEW] Generating follow-up message`);
-        message = await generateWarmInitialMessage(leadData, profile, overrideDataQuality);
-      }
+      setPreviewMessage(aiResult.message || 'Hi! I wanted to follow up on your interest in our vehicles. How can I help you today?');
       
-      if (message) {
-        setGeneratedMessage(message);
-        setShowDecisionStep(false);
-        setShowPreview(true);
-        
-        toast({
-          title: "Message Generated",
-          description: `Strategy: ${overrideDataQuality.messageStrategy} (${isInitialContact ? 'Initial Contact' : 'Follow-up'})`,
-        });
-      } else {
-        throw new Error('Failed to generate message');
-      }
+      console.log(`✅ [AI PREVIEW] Generated message for lead: ${leadId}`);
+      
     } catch (error) {
-      console.error('Error generating message with decisions:', error);
+      console.error('❌ [AI PREVIEW] Error generating message:', error);
       toast({
         title: "Error",
-        description: "Failed to generate message",
-        variant: "destructive",
+        description: error instanceof Error ? error.message : "Failed to generate AI message",
+        variant: "destructive"
       });
+      
+      // Set fallback message
+      setPreviewMessage('Hi! I wanted to follow up on your interest in our vehicles. How can I help you today?');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const sendNow = async () => {
-    if (!generatedMessage || !profile) return;
+  // Send the AI generated message
+  const sendNow = async (leadId: string, messageOverride?: string) => {
+    const messageToSend = messageOverride || previewMessage;
+    
+    if (!messageToSend.trim()) {
+      toast({
+        title: "Error",
+        description: "No message to send",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!profile) {
+      toast({
+        title: "Error", 
+        description: "User profile not available",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsSending(true);
     try {
-      await sendMessage(leadId, generatedMessage, profile, true);
-
-      const nextSendTime = new Date();
-      nextSendTime.setTime(nextSendTime.getTime() + (24 * 60 * 60 * 1000));
-
-      await supabase
-        .from('leads')
-        .update({
-          ai_opt_in: true,
-          ai_stage: 'initial_contact_sent',
-          ai_messages_sent: 1,
-          next_ai_send_at: nextSendTime.toISOString(),
-        })
-        .eq('id', leadId);
-
+      console.log(`📤 [AI PREVIEW] Sending AI message to lead: ${leadId}`);
+      
+      // Use the working fixed message service
+      await fixedSendMessage(leadId, messageToSend.trim(), profile, true);
+      
       toast({
-        title: "Message sent successfully!",
-        description: `Decisions saved to learning database. Next AI message scheduled for ${nextSendTime.toLocaleDateString()}`,
+        title: "Message Sent",
+        description: "AI message sent successfully",
       });
-
-      reset();
-      onMessageSent?.();
+      
+      // Clear the preview after sending
+      setPreviewMessage('');
+      
+      console.log(`✅ [AI PREVIEW] Message sent successfully to lead: ${leadId}`);
+      
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ [AI PREVIEW] Error sending message:', error);
       toast({
         title: "Error",
-        description: "Failed to send message",
-        variant: "destructive",
+        description: error instanceof Error ? error.message : "Failed to send message",
+        variant: "destructive"
       });
     } finally {
       setIsSending(false);
     }
   };
 
-  const reset = () => {
-    setShowDecisionStep(false);
-    setShowPreview(false);
-    setGeneratedMessage(null);
-    setOriginalDataQuality(null);
+  // Update message preview
+  const updatePreview = (newMessage: string) => {
+    setPreviewMessage(newMessage);
+  };
+
+  // Clear preview
+  const clearPreview = () => {
+    setPreviewMessage('');
     setLeadData(null);
-    setNameDecision(null);
-    setVehicleDecision(null);
-    setIsInitialContact(true);
-  };
-
-  const generatePreview = () => {
-    if (!showDecisionStep && !showPreview) {
-      startAnalysis();
-    }
-  };
-
-  const cancel = () => {
-    reset();
   };
 
   return {
-    isAnalyzing,
     isGenerating,
-    generatedMessage,
-    showDecisionStep,
-    showPreview,
-    isSending,
-    originalDataQuality,
+    previewMessage,
     leadData,
-    nameDecision,
-    vehicleDecision,
-    isInitialContact,
-    startAnalysis,
-    handleNameDecision,
-    handleVehicleDecision,
-    generateWithDecisions,
-    sendNow,
-    reset,
+    isSending,
     generatePreview,
-    cancel
+    sendNow,
+    updatePreview,
+    clearPreview
   };
 };
