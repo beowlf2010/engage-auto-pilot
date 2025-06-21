@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
@@ -39,6 +38,7 @@ import {
 } from "@/components/ui/select"
 
 import LeadStatusFixPanel from './LeadStatusFixPanel';
+import LeadDetailsModal from './LeadDetailsModal';
 
 interface ApprovalQueueItem {
   id: string;
@@ -139,6 +139,8 @@ const EnhancedAIMonitorTabs = () => {
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<ApprovalQueueItem | null>(null);
   const [overrideMessage, setOverrideMessage] = useState('');
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [leadDetailsModalOpen, setLeadDetailsModalOpen] = useState(false);
   const { toast } = useToast();
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -265,6 +267,11 @@ const EnhancedAIMonitorTabs = () => {
     }
   };
 
+  const handleLeadNameClick = (leadId: string) => {
+    setSelectedLeadId(leadId);
+    setLeadDetailsModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       {/* Emergency Fixes Status */}
@@ -318,12 +325,15 @@ const EnhancedAIMonitorTabs = () => {
                               }
                             </AvatarFallback>
                           </Avatar>
-                          <span>
+                          <button
+                            onClick={() => handleLeadNameClick(message.lead_id)}
+                            className="text-left hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                          >
                             {message.leads ? 
                               `${message.leads.first_name} ${message.leads.last_name}` : 
                               'Unknown Lead'
                             }
-                          </span>
+                          </button>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -444,6 +454,16 @@ const EnhancedAIMonitorTabs = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Lead Details Modal */}
+      <LeadDetailsModal
+        open={leadDetailsModalOpen}
+        onClose={() => {
+          setLeadDetailsModalOpen(false);
+          setSelectedLeadId(null);
+        }}
+        leadId={selectedLeadId || ''}
+      />
     </div>
   );
 };
