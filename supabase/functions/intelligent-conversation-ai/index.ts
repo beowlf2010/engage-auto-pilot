@@ -1,6 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
+import { analyzeConversationalContext, generateConversationalResponse } from './conversationalAwareness.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,40 +56,29 @@ serve(async (req) => {
           }
         );
       }
-      
-      // Check recent conversation history to avoid loops
-      const { data: recentMessages } = await supabase
-        .from('conversations')
-        .select('body, direction, created_at')
-        .eq('lead_id', leadId)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      
-      const hasRecentGenericResponse = recentMessages?.some(msg => 
-        msg.direction === 'out' && 
-        msg.body.includes("message didn't come through") &&
-        new Date().getTime() - new Date(msg.created_at).getTime() < 24 * 60 * 60 * 1000 // 24 hours
-      );
-      
-      if (hasRecentGenericResponse) {
-        console.log('🔄 [ENHANCED AI] Recent generic response detected - preventing loop');
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Recent generic response exists - preventing loop',
-            skipMessage: true
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
     }
+
+    // Enhanced conversational awareness analysis
+    const conversationalContext = analyzeConversationalContext(messageBody, conversationHistory || '');
+    console.log('🗣️ [ENHANCED AI] Conversational context:', JSON.stringify(conversationalContext, null, 2));
 
     // Enhanced intent detection for better responses
     const intent = analyzeMessageIntent(messageBody, conversationHistory || []);
     console.log('🎯 [ENHANCED AI] Detected intent:', JSON.stringify(intent, null, 2));
+
+    // Check if this is a conversational message that warrants acknowledgment
+    if (conversationalContext.warrantsAcknowledgment && !intent.isDirectQuestion) {
+      console.log('🤝 [ENHANCED AI] Conversational message detected - generating acknowledgment');
+      const conversationalResponse = generateConversationalResponse(conversationalContext, leadName);
+      
+      return new Response(
+        JSON.stringify({ success: true, response: conversationalResponse }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
     // Generate contextual response based on intent
     const response = await generateEnhancedResponse(leadName, messageBody, intent, conversationHistory);

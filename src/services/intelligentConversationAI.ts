@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConversationContext {
@@ -26,6 +25,23 @@ export interface AIResponse {
   customerIntent?: any;
   answerGuidance?: any;
 }
+
+// Enhanced conversational awareness detection
+const analyzeConversationalSignals = (message: string): boolean => {
+  const text = message.toLowerCase();
+  
+  // Handoff and introduction patterns
+  const conversationalPatterns = [
+    /\b(will be handling|handling it|taking over|working with)\b/,
+    /\b(don't know if you know|meet|this is|here is)\s+\w+\b/,
+    /\b(letting you know|wanted to tell you|heads up|update)\b/,
+    /\b(by the way|also|additionally|just so you know)\b/,
+    /\b(transferred to|passed to|new contact|new person)\b/,
+    /\b(process|procedure|next steps|moving forward)\b/
+  ];
+  
+  return conversationalPatterns.some(pattern => pattern.test(text));
+};
 
 // Clean and validate vehicle interest data
 const cleanVehicleInterest = (vehicleInterest: string): string => {
@@ -274,7 +290,7 @@ const findCategoryRelevantAlternatives = async (requestedCategory: any) => {
 
 export const generateEnhancedIntelligentResponse = async (context: ConversationContext): Promise<AIResponse | null> => {
   try {
-    console.log('🤖 Generating QUESTION-FIRST intelligent AI response for lead:', context.leadId);
+    console.log('🤖 Generating CONVERSATIONALLY-AWARE intelligent AI response for lead:', context.leadId);
 
     // Clean the vehicle interest data
     const cleanedVehicleInterest = cleanVehicleInterest(context.vehicleInterest);
@@ -305,68 +321,52 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
       return null;
     }
 
-    // Enhanced inventory checking with category awareness
-    const inventoryCheck = await checkInventoryAvailability(cleanedVehicleInterest);
-    
-    // Get category-relevant alternatives
-    const availableAlternatives = inventoryCheck.requestedCategory ? 
-      await findCategoryRelevantAlternatives(inventoryCheck.requestedCategory) :
-      [];
+    // Enhanced check: also respond to conversational messages that warrant acknowledgment
+    const hasConversationalSignals = analyzeConversationalSignals(lastCustomerMessage.body);
+    console.log('🗣️ [CONVERSATIONAL AWARENESS] Message has conversational signals:', hasConversationalSignals);
 
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: context.leadId,
         leadName: context.leadName,
-        vehicleInterest: cleanedVehicleInterest,
-        lastCustomerMessage: lastCustomerMessage.body,
+        messageBody: lastCustomerMessage.body,
         conversationHistory: recentMessages,
         leadInfo: context.leadInfo,
         conversationLength: context.messages.length,
-        inventoryStatus: {
-          hasRequestedVehicle: inventoryCheck.hasInventory,
-          requestedMake: inventoryCheck.searchedMake,
-          matchingVehicles: inventoryCheck.matchingVehicles,
-          availableAlternatives: availableAlternatives,
-          requestedCategory: inventoryCheck.requestedCategory,
-          hasActualInventory: inventoryCheck.hasInventory,
-          actualVehicles: inventoryCheck.matchingVehicles || [],
-          validatedCount: inventoryCheck.matchingVehicles?.length || 0,
-          inventoryWarning: inventoryCheck.warning,
-          realInventoryCount: inventoryCheck.matchingVehicles?.length || 0,
-          strictMode: true,
-          mustNotClaim: !inventoryCheck.hasInventory
-        }
+        hasConversationalSignals,
+        salespersonName: 'Finn',
+        dealershipName: 'Jason Pilger Chevrolet'
       }
     });
 
     if (error) {
-      console.error('❌ Error from intelligent AI function:', error);
+      console.error('❌ Error from conversationally-aware AI function:', error);
       return null;
     }
 
-    if (!data?.message) {
-      console.error('❌ No message returned from AI function');
+    if (!data?.response) {
+      console.error('❌ No response returned from AI function');
       return null;
     }
 
-    console.log('✅ Generated QUESTION-FIRST intelligent response:', data.message);
+    console.log('✅ Generated CONVERSATIONALLY-AWARE response:', data.response);
     
     return {
-      message: data.message,
+      message: data.response,
       confidence: data.confidence || 0.8,
-      reasoning: data.reasoning || 'Enhanced QUESTION-FIRST AI analysis with strict inventory validation and customer intent detection',
+      reasoning: 'Enhanced conversationally-aware AI with handoff and informational message detection',
       customerIntent: data.customerIntent || null,
       answerGuidance: data.answerGuidance || null
     };
 
   } catch (error) {
-    console.error('❌ Error generating QUESTION-FIRST intelligent response:', error);
+    console.error('❌ Error generating conversationally-aware response:', error);
     return null;
   }
 };
 
 export const shouldGenerateResponse = (context: ConversationContext): boolean => {
-  // Only generate if there's a recent customer message we haven't responded to
+  // Get the last customer message
   const lastCustomerMessage = context.messages
     .filter(msg => msg.direction === 'in')
     .slice(-1)[0];
@@ -378,5 +378,16 @@ export const shouldGenerateResponse = (context: ConversationContext): boolean =>
     new Date(msg.sentAt) > new Date(lastCustomerMessage.sentAt) && msg.direction === 'out'
   );
 
-  return messagesAfterCustomer.length === 0;
+  if (messagesAfterCustomer.length > 0) return false;
+
+  // Enhanced logic: also respond to conversational messages
+  const hasConversationalSignals = analyzeConversationalSignals(lastCustomerMessage.body);
+  
+  // Traditional direct questions or new conversational awareness
+  const hasDirectQuestion = /\?/.test(lastCustomerMessage.body) || 
+    /\b(what|how|when|where|why|can you|could you|would you|do you|are you|is there)\b/i.test(lastCustomerMessage.body);
+
+  console.log('🤔 [SHOULD GENERATE] Direct question:', hasDirectQuestion, 'Conversational signals:', hasConversationalSignals);
+  
+  return hasDirectQuestion || hasConversationalSignals;
 };
