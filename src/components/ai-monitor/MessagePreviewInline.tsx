@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ const MessagePreviewInline = ({
   const [showIssueSelector, setShowIssueSelector] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
   const [error, setError] = useState<string>('');
+  const [leadPhone, setLeadPhone] = useState<string>('');
 
   useEffect(() => {
     loadConversationHistory();
@@ -61,6 +63,7 @@ const MessagePreviewInline = ({
 
   const loadConversationHistory = async () => {
     try {
+      // Load conversation history
       const { data: conversations } = await supabase
         .from('conversations')
         .select('*')
@@ -68,9 +71,32 @@ const MessagePreviewInline = ({
         .order('sent_at', { ascending: true });
 
       setConversationHistory(conversations || []);
+
+      // Load lead phone number
+      const { data: phoneData } = await supabase
+        .from('phone_numbers')
+        .select('number')
+        .eq('lead_id', leadId)
+        .eq('is_primary', true)
+        .single();
+
+      if (phoneData?.number) {
+        setLeadPhone(phoneData.number);
+      } else {
+        // Fallback: get any phone number for this lead
+        const { data: anyPhone } = await supabase
+          .from('phone_numbers')
+          .select('number')
+          .eq('lead_id', leadId)
+          .limit(1)
+          .single();
+        
+        setLeadPhone(anyPhone?.number || '');
+      }
     } catch (error) {
       console.error('Error loading conversation history:', error);
       setConversationHistory([]);
+      setLeadPhone('');
     }
   };
 
@@ -79,9 +105,12 @@ const MessagePreviewInline = ({
     setError('');
     
     try {
-      const isInitialContact = conversationHistory.length === 0;
+      // Check for incoming customer messages (direction = 'in')
+      const incomingMessages = conversationHistory.filter(msg => msg.direction === 'in');
+      const isInitialContact = incomingMessages.length === 0;
       
       console.log(`🔄 [UNIFIED PREVIEW] Generating preview for ${leadName} - ${isInitialContact ? 'INITIAL CONTACT' : 'FOLLOW-UP'}`);
+      console.log(`📞 [UNIFIED PREVIEW] Lead phone: ${leadPhone}`);
 
       if (isInitialContact) {
         console.log(`🚀 [UNIFIED PREVIEW] Using initial outreach service`);
@@ -108,9 +137,7 @@ const MessagePreviewInline = ({
         console.log(`🔄 [UNIFIED PREVIEW] Using conversation AI for follow-up`);
         
         // Prepare proper conversation context for follow-up
-        const lastCustomerMessage = conversationHistory
-          .filter(msg => msg.direction === 'in')
-          .slice(-1)[0];
+        const lastCustomerMessage = incomingMessages.slice(-1)[0];
 
         const conversationContext = conversationHistory
           .map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`)
@@ -120,11 +147,12 @@ const MessagePreviewInline = ({
           body: {
             leadId,
             leadName,
+            messageBody: lastCustomerMessage?.body || 'No recent customer message',
             vehicleInterest: vehicleInterest || 'finding the right vehicle',
             lastCustomerMessage: lastCustomerMessage?.body || '',
             conversationHistory: conversationContext,
             leadInfo: {
-              phone: '',
+              phone: leadPhone,
               status: 'active',
               lastReplyAt: conversationHistory[conversationHistory.length - 1]?.sent_at || new Date().toISOString()
             },
@@ -163,7 +191,8 @@ const MessagePreviewInline = ({
       setError(errorMessage);
       
       // Fallback message based on context
-      const isInitialContact = conversationHistory.length === 0;
+      const incomingMessages = conversationHistory.filter(msg => msg.direction === 'in');
+      const isInitialContact = incomingMessages.length === 0;
       const fallbackMessage = isInitialContact 
         ? `Hi ${leadName.split(' ')[0]}! I'm Finn with Jason Pilger Chevrolet. I wanted to follow up on your interest in ${vehicleInterest}. What questions can I answer for you?`
         : `Thanks for your message! I'm here to help you with any questions about ${vehicleInterest}. What would you like to know?`;
@@ -195,7 +224,7 @@ const MessagePreviewInline = ({
       if (!profile) throw new Error('No user profile found');
       
       // Send the message using the messages service - explicitly ensure boolean type
-      const isAIGenerated: boolean = true;
+      const isAIGenerated = true;
       const conversation = await sendMessage(leadId, message, profile, isAIGenerated);
       
       if (conversation) {
@@ -259,7 +288,7 @@ const MessagePreviewInline = ({
     const hasVehicle = msg.toLowerCase().includes(vehicleInterest.toLowerCase());
     const goodLength = msg.length > 50 && msg.length < 300;
     const hasCall2Action = /\?|call|visit|appointment|interested|available/i.test(msg);
-    const hasFinnIntro = msg.toLowerCase().includes('finn') && conversationHistory.length === 0;
+    const hasFinnIntro = msg.toLowerCase().includes('finn') && conversationHistory.filter(msg => msg.direction === 'in').length === 0;
     const hasJasonPilger = msg.toLowerCase().includes('jason pilger chevrolet');
     
     let score = 5;
@@ -276,7 +305,8 @@ const MessagePreviewInline = ({
   };
 
   const quality = getMessageQuality(message);
-  const isInitialContact = conversationHistory.length === 0;
+  const incomingMessages = conversationHistory.filter(msg => msg.direction === 'in');
+  const isInitialContact = incomingMessages.length === 0;
 
   return (
     <Card className="border-l-4 border-l-blue-500">
