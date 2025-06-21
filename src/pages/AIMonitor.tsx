@@ -1,9 +1,9 @@
 
 import React from 'react';
-import EnhancedAIMonitorTabs from '@/components/ai-monitor/EnhancedAIMonitorTabs';
+import AutomatedAIMonitorTabs from '@/components/ai-monitor/AutomatedAIMonitorTabs';
 
 const AIMonitor = () => {
-  return <EnhancedAIMonitorTabs />;
+  return <AutomatedAIMonitorTabs />;
 };
 
 export default AIMonitor;

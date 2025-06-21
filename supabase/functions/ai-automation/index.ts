@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -30,14 +31,7 @@ interface Lead {
   ai_enabled_at: string;
 }
 
-interface MessageTemplate {
-  id: string;
-  stage: string;
-  template: string;
-  variant_name: string;
-}
-
-// Name formatting utilities (copied from frontend)
+// Name formatting utilities
 const formatProperName = (name: string): string => {
   if (!name || typeof name !== 'string') return '';
   
@@ -96,7 +90,55 @@ serve(async (req) => {
   try {
     console.log('🤖 [AI-AUTOMATION] Starting unified AI automation process...');
     
-    const { automated = false } = await req.json().catch(() => ({ automated: false }));
+    const { automated = false, source = 'manual' } = await req.json().catch(() => ({ automated: false, source: 'manual' }));
+    
+    // Create automation run record
+    const { data: runRecord, error: runError } = await supabase
+      .from('ai_automation_runs')
+      .insert({
+        source,
+        status: 'running'
+      })
+      .select()
+      .single();
+
+    if (runError) {
+      console.error('❌ [AI-AUTOMATION] Error creating run record:', runError);
+    }
+
+    const runId = runRecord?.id;
+
+    // Check if automation is globally enabled
+    const { data: automationSetting } = await supabase
+      .from('ai_automation_settings')
+      .select('setting_value')
+      .eq('setting_key', 'automation_enabled')
+      .single();
+
+    if (automationSetting?.setting_value === false) {
+      console.log('⏸️ [AI-AUTOMATION] Automation is disabled globally');
+      
+      if (runId) {
+        await supabase
+          .from('ai_automation_runs')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            processed_leads: 0,
+            successful_sends: 0,
+            failed_sends: 0
+          })
+          .eq('id', runId);
+      }
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'Automation is disabled',
+        processed: 0
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     // Get current timestamp for due message checking
     const now = new Date().toISOString();
@@ -108,7 +150,16 @@ serve(async (req) => {
     // 2. Set new uncontacted leads to super aggressive mode for first day
     await setNewLeadsToSuperAggressive();
 
-    // 3. Get leads that are due for AI messages OR new leads needing first contact
+    // 3. Check daily message limits
+    const { data: dailyLimitSetting } = await supabase
+      .from('ai_automation_settings')
+      .select('setting_value')
+      .eq('setting_key', 'daily_message_limit_per_lead')
+      .single();
+
+    const dailyLimit = parseInt(dailyLimitSetting?.setting_value || '5');
+
+    // 4. Get leads that are due for AI messages OR new leads needing first contact
     const { data: dueLeads, error: leadsError } = await supabase
       .from('leads')
       .select(`
@@ -139,6 +190,19 @@ serve(async (req) => {
     console.log(`📋 [AI-AUTOMATION] Found ${dueLeads?.length || 0} leads for processing`);
 
     if (!dueLeads || dueLeads.length === 0) {
+      if (runId) {
+        await supabase
+          .from('ai_automation_runs')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            processed_leads: 0,
+            successful_sends: 0,
+            failed_sends: 0
+          })
+          .eq('id', runId);
+      }
+
       return new Response(JSON.stringify({ 
         success: true, 
         message: 'No leads due for AI messages at this time',
@@ -148,31 +212,37 @@ serve(async (req) => {
       });
     }
 
-    // 4. Get available message templates
-    const { data: templates, error: templatesError } = await supabase
-      .from('ai_message_templates')
-      .select('*')
-      .eq('is_active', true);
-
-    if (templatesError) {
-      console.error('❌ [AI-AUTOMATION] Error fetching templates:', templatesError);
-      throw templatesError;
-    }
-
-    console.log(`📝 [AI-AUTOMATION] Found ${templates?.length || 0} active templates`);
-
     const results = [];
+    let successfulSends = 0;
+    let failedSends = 0;
 
     // 5. Process each lead
     for (const lead of dueLeads) {
       try {
+        // Check daily message limit for this lead
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const { count: todayMessageCount } = await supabase
+          .from('conversations')
+          .select('*', { count: 'exact', head: true })
+          .eq('lead_id', lead.id)
+          .eq('direction', 'out')
+          .eq('ai_generated', true)
+          .gte('sent_at', today.toISOString());
+
+        if ((todayMessageCount || 0) >= dailyLimit) {
+          console.log(`⏭️ [AI-AUTOMATION] Skipping lead ${lead.id} - daily limit reached (${todayMessageCount}/${dailyLimit})`);
+          results.push({ leadId: lead.id, success: false, error: 'Daily limit reached' });
+          continue;
+        }
+
         // Format lead name properly
         const formattedFirstName = formatProperName(lead.first_name);
         const formattedLastName = formatProperName(lead.last_name);
         
         const intensity = lead.message_intensity || 'gentle';
         const messagesSent = lead.ai_messages_sent || 0;
-        const isSuperAggressive = intensity === 'super_aggressive';
         
         console.log(`👤 [AI-AUTOMATION] Processing lead: ${formattedFirstName} ${formattedLastName} (${lead.vehicle_interest}) - Intensity: ${intensity} - Messages: ${messagesSent}`);
         
@@ -199,6 +269,7 @@ serve(async (req) => {
             console.log(`📱 [AI-AUTOMATION] Updated phone for lead ${lead.id}: ${phoneData.number}`);
           } else {
             results.push({ leadId: lead.id, success: false, error: 'No phone number found' });
+            failedSends++;
             continue;
           }
         }
@@ -209,14 +280,16 @@ serve(async (req) => {
             lead.vehicle_interest.trim() === '') {
           console.warn(`⚠️ [AI-AUTOMATION] Skipping lead with unknown vehicle interest: ${formattedFirstName}`);
           results.push({ leadId: lead.id, success: false, error: 'Unknown vehicle interest' });
+          failedSends++;
           continue;
         }
 
         // 6. Generate AI message based on intensity and first-day logic
-        const message = await generateAIMessage(lead, templates);
+        const message = await generateAIMessage(lead);
         if (!message) {
           console.warn(`⚠️ [AI-AUTOMATION] No message generated for lead ${lead.id}`);
           results.push({ leadId: lead.id, success: false, error: 'Failed to generate message' });
+          failedSends++;
           continue;
         }
 
@@ -224,6 +297,7 @@ serve(async (req) => {
         if (message.includes('Unknown') || message.toLowerCase().includes('unknown')) {
           console.warn(`⚠️ [AI-AUTOMATION] Skipping message with unknown vehicle for ${formattedFirstName}`);
           results.push({ leadId: lead.id, success: false, error: 'Message contains unknown vehicle' });
+          failedSends++;
           continue;
         }
 
@@ -233,14 +307,16 @@ serve(async (req) => {
         const messageResult = await sendSMSMessage(lead.phone, message, lead.id);
         
         if (messageResult.success) {
-          // 8. Update lead's AI tracking with super aggressive timing
+          // 8. Update lead's AI tracking
           await updateLeadAfterMessage(lead);
 
           console.log(`✅ [AI-AUTOMATION] Successfully processed lead ${lead.id}`);
           results.push({ leadId: lead.id, success: true, message });
+          successfulSends++;
         } else {
           console.error(`❌ [AI-AUTOMATION] Failed to send message to lead ${lead.id}:`, messageResult.error);
           results.push({ leadId: lead.id, success: false, error: messageResult.error });
+          failedSends++;
         }
 
         // Add delay between messages to avoid rate limiting
@@ -249,17 +325,31 @@ serve(async (req) => {
       } catch (error) {
         console.error(`❌ [AI-AUTOMATION] Error processing lead ${lead.id}:`, error);
         results.push({ leadId: lead.id, success: false, error: error.message });
+        failedSends++;
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
-    console.log(`🎯 [AI-AUTOMATION] Completed processing. Success: ${successCount}/${results.length}`);
+    console.log(`🎯 [AI-AUTOMATION] Completed processing. Success: ${successfulSends}/${results.length}`);
+
+    // Update run record
+    if (runId) {
+      await supabase
+        .from('ai_automation_runs')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          processed_leads: results.length,
+          successful_sends: successfulSends,
+          failed_sends: failedSends
+        })
+        .eq('id', runId);
+    }
 
     return new Response(JSON.stringify({
       success: true,
       processed: results.length,
-      successful: successCount,
-      failed: results.length - successCount,
+      successful: successfulSends,
+      failed: failedSends,
       results: results
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -324,12 +414,11 @@ async function setNewLeadsToSuperAggressive() {
 }
 
 // Generate AI message for a lead based on intensity and first-day logic
-async function generateAIMessage(lead: Lead, templates: MessageTemplate[]): Promise<string | null> {
+async function generateAIMessage(lead: Lead): Promise<string | null> {
   try {
     const messagesSent = lead.ai_messages_sent || 0;
     const isSuperAggressive = lead.message_intensity === 'super_aggressive';
     const isAggressive = lead.message_intensity === 'aggressive';
-    const isNewLead = messagesSent === 0;
     
     let message: string;
     
@@ -342,7 +431,7 @@ async function generateAIMessage(lead: Lead, templates: MessageTemplate[]): Prom
     }
 
     // If OpenAI is available and message is substantial, enhance it
-    if (openAIApiKey && message.length > 50 && !isNewLead) {
+    if (openAIApiKey && message.length > 50 && messagesSent > 0) {
       try {
         const enhancedMessage = await enhanceMessageWithAI(message, lead);
         return enhancedMessage || message;

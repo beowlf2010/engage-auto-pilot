@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Clock, MessageSquare, User, Car, Play, Pause, Eye, Filter, Search, CheckSquare, AlertTriangle, Zap, ChevronDown, ChevronUp } from 'lucide-react';
+import { Clock, MessageSquare, User, Car, Pause, Eye, Filter, Search, CheckSquare, AlertTriangle, Zap, ChevronDown, ChevronUp, Bot } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import MessagePreviewModal from './MessagePreviewModal';
@@ -28,6 +29,8 @@ interface QueuedMessage {
   priority: 'low' | 'medium' | 'high';
   complianceFlags: string[];
   aiQualityScore: number;
+  messageIntensity: string;
+  isOverdue: boolean;
 }
 
 const EnhancedAIQueueTab = () => {
@@ -43,7 +46,7 @@ const EnhancedAIQueueTab = () => {
   const [complianceFilter, setComplianceFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'time' | 'engagement' | 'stage' | 'priority' | 'quality'>('time');
-  const [batchOperation, setBatchOperation] = useState<'approve' | 'pause' | 'skip' | null>(null);
+  const [batchOperation, setBatchOperation] = useState<'pause' | 'skip' | null>(null);
   const { profile } = useAuth();
 
   useEffect(() => {
@@ -58,6 +61,8 @@ const EnhancedAIQueueTab = () => {
 
   const fetchQueuedMessages = async () => {
     try {
+      const now = new Date().toISOString();
+      
       const { data: leads, error } = await supabase
         .from('leads')
         .select(`
@@ -68,6 +73,7 @@ const EnhancedAIQueueTab = () => {
           ai_stage,
           next_ai_send_at,
           ai_messages_sent,
+          message_intensity,
           phone_numbers (number, is_primary),
           conversations (body, direction, sent_at),
           conversation_quality_scores (overall_score),
@@ -92,11 +98,11 @@ const EnhancedAIQueueTab = () => {
 
         // Calculate priority based on engagement and time
         const nextSendTime = new Date(lead.next_ai_send_at);
-        const now = new Date();
-        const hoursDiff = (nextSendTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const isOverdue = nextSendTime.getTime() < new Date(now).getTime();
+        const hoursDiff = (nextSendTime.getTime() - new Date(now).getTime()) / (1000 * 60 * 60);
         
         let priority: 'low' | 'medium' | 'high' = 'medium';
-        if (hoursDiff < 0) priority = 'high'; // Overdue
+        if (isOverdue) priority = 'high';
         else if (hoursDiff < 2 && engagementScore > 50) priority = 'high';
         else if (engagementScore > 70) priority = 'medium';
         else priority = 'low';
@@ -122,7 +128,9 @@ const EnhancedAIQueueTab = () => {
           engagementScore,
           priority,
           complianceFlags,
-          aiQualityScore
+          aiQualityScore,
+          messageIntensity: lead.message_intensity || 'gentle',
+          isOverdue
         };
       }) || [];
 
@@ -216,7 +224,7 @@ const EnhancedAIQueueTab = () => {
     setExpandedPreviews(newExpanded);
   };
 
-  const handleBatchOperation = async (operation: 'approve' | 'pause' | 'skip') => {
+  const handleBatchOperation = async (operation: 'pause' | 'skip') => {
     if (selectedMessages.size === 0) return;
 
     setBatchOperation(operation);
@@ -226,16 +234,6 @@ const EnhancedAIQueueTab = () => {
       for (const messageId of selectedMessages) {
         try {
           switch (operation) {
-            case 'approve':
-              // Generate and send AI message
-              const { generateIntelligentAIMessage } = await import('@/services/intelligentAIMessageService');
-              const message = await generateIntelligentAIMessage({ leadId: messageId });
-              if (message && profile) {
-                await sendMessage(messageId, message, profile, true);
-                successCount++;
-              }
-              break;
-            
             case 'pause':
               await supabase
                 .from('leads')
@@ -290,65 +288,12 @@ const EnhancedAIQueueTab = () => {
     setPreviewModalOpen(true);
   };
 
-  const handleApproveMessage = async (message: string) => {
-    if (!selectedLead || !profile) return;
-
-    try {
-      await sendMessage(selectedLead, message, profile, true);
-      
-      const { scheduleEnhancedAIMessages } = await import('@/services/enhancedAIMessageService');
-      await scheduleEnhancedAIMessages(selectedLead);
-      
-      toast({
-        title: "Message Sent",
-        description: "AI message approved and sent successfully",
-      });
-
-      fetchQueuedMessages();
-    } catch (error) {
-      console.error('Error sending approved message:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleSkipLead = async () => {
-    if (!selectedLead) return;
-
-    try {
-      await supabase
-        .from('leads')
-        .update({
-          ai_sequence_paused: true,
-          ai_pause_reason: 'manual_skip'
-        })
-        .eq('id', selectedLead);
-
-      toast({
-        title: "Lead Skipped",
-        description: "AI sequence paused for this lead",
-      });
-
-      fetchQueuedMessages();
-    } catch (error) {
-      console.error('Error skipping lead:', error);
-      toast({
-        title: "Error",
-        description: "Failed to skip lead",
-        variant: "destructive"
-      });
-    }
-  };
-
   const formatTimeUntilDue = (nextSendAt: string) => {
     const now = new Date();
     const sendTime = new Date(nextSendAt);
     const diffMs = sendTime.getTime() - now.getTime();
     
-    if (diffMs < 0) return 'Due now';
+    if (diffMs < 0) return 'Overdue';
     
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -366,33 +311,46 @@ const EnhancedAIQueueTab = () => {
     }
   };
 
-  const getEngagementBadgeVariant = (score: number) => {
-    if (score >= 70) return 'default';
-    if (score >= 40) return 'secondary';
-    return 'destructive';
+  const getIntensityBadgeVariant = (intensity: string) => {
+    switch (intensity) {
+      case 'super_aggressive': return 'destructive';
+      case 'aggressive': return 'secondary';
+      case 'gentle': return 'outline';
+      default: return 'outline';
+    }
   };
 
   const uniqueStages = [...new Set(queuedMessages.map(msg => msg.aiStage))];
   const highPriorityCount = filteredMessages.filter(m => m.priority === 'high').length;
+  const overdueCount = filteredMessages.filter(m => m.isOverdue).length;
   const complianceFlaggedCount = filteredMessages.filter(m => m.complianceFlags.length > 0).length;
 
   if (loading) {
-    return <div className="flex items-center justify-center p-8">Loading enhanced AI queue...</div>;
+    return <div className="flex items-center justify-center p-8">Loading AI queue monitor...</div>;
   }
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Header with Stats */}
+      {/* Enhanced Header with Automation Status */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold">Enhanced AI Message Queue</h2>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Bot className="w-5 h-5 text-blue-600" />
+              AI Queue Monitor (Auto-Sending Every 15 Minutes)
+            </h2>
             <p className="text-sm text-muted-foreground">
-              {filteredMessages.length} messages scheduled • Advanced filtering and batch operations
+              {filteredMessages.length} messages in queue • Automation handles sending automatically
             </p>
           </div>
 
           <div className="flex gap-2 flex-wrap">
+            {overdueCount > 0 && (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {overdueCount} Processing Now
+              </Badge>
+            )}
             {highPriorityCount > 0 && (
               <Badge variant="destructive" className="flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
@@ -408,7 +366,7 @@ const EnhancedAIQueueTab = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
+        {/* Filters */}
         <div className="flex gap-2 flex-wrap items-center">
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -445,218 +403,149 @@ const EnhancedAIQueueTab = () => {
             </SelectContent>
           </Select>
 
-          <Select value={complianceFilter} onValueChange={setComplianceFilter}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Compliance" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Messages</SelectItem>
-              <SelectItem value="clean">Clean</SelectItem>
-              <SelectItem value="flagged">Flagged</SelectItem>
-            </SelectContent>
-          </Select>
-
           <Select value={sortBy} onValueChange={(value: 'time' | 'engagement' | 'stage' | 'priority' | 'quality') => setSortBy(value)}>
             <SelectTrigger className="w-36">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="time">Due Time</SelectItem>
+              <SelectItem value="time">Next Send Time</SelectItem>
               <SelectItem value="priority">Priority</SelectItem>
               <SelectItem value="engagement">Engagement</SelectItem>
-              <SelectItem value="quality">AI Quality</SelectItem>
-              <SelectItem value="stage">AI Stage</SelectItem>
+              <SelectItem value="stage">Stage</SelectItem>
+              <SelectItem value="quality">Quality</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {/* Batch Operations */}
         {selectedMessages.size > 0 && (
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-            <CheckSquare className="w-4 h-4" />
-            <span className="text-sm font-medium">{selectedMessages.size} messages selected</span>
+          <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+            <CheckSquare className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium">{selectedMessages.size} selected</span>
             <Separator orientation="vertical" className="h-4" />
             <Button
-              variant="outline"
               size="sm"
-              onClick={() => handleBatchOperation('approve')}
-              disabled={batchOperation === 'approve'}
-            >
-              {batchOperation === 'approve' ? 'Approving...' : 'Approve All'}
-            </Button>
-            <Button
               variant="outline"
-              size="sm"
               onClick={() => handleBatchOperation('pause')}
-              disabled={batchOperation === 'pause'}
+              disabled={!!batchOperation}
             >
-              {batchOperation === 'pause' ? 'Pausing...' : 'Pause All'}
+              <Pause className="w-3 h-3 mr-1" />
+              Pause Selected
             </Button>
             <Button
+              size="sm"
               variant="outline"
-              size="sm"
               onClick={() => handleBatchOperation('skip')}
-              disabled={batchOperation === 'skip'}
+              disabled={!!batchOperation}
             >
-              {batchOperation === 'skip' ? 'Skipping...' : 'Skip All'}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedMessages(new Set())}
-            >
-              Clear Selection
+              <Clock className="w-3 h-3 mr-1" />
+              Skip to Tomorrow
             </Button>
           </div>
         )}
       </div>
 
-      {/* Message Queue */}
-      <div className="space-y-3">
+      {/* Messages List */}
+      <div className="space-y-4">
         {filteredMessages.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">No Messages Found</h3>
+              <Bot className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No Messages in Queue</h3>
               <p className="text-muted-foreground">
-                {searchQuery || stageFilter !== 'all' || priorityFilter !== 'all'
-                  ? 'No messages match your current filters'
-                  : 'All AI sequences are up to date or paused'}
+                All leads are up to date or automation is running smoothly. 
+                New messages will appear here when leads are due for contact.
               </p>
             </CardContent>
           </Card>
         ) : (
           <>
-            {/* Select All Header */}
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+            {/* Select All */}
+            <div className="flex items-center gap-2 text-sm">
               <Checkbox
-                checked={selectedMessages.size === filteredMessages.length && filteredMessages.length > 0}
+                checked={selectedMessages.size === filteredMessages.length}
                 onCheckedChange={handleSelectAll}
               />
-              <span className="text-sm font-medium">Select All ({filteredMessages.length})</span>
+              <span>Select all ({filteredMessages.length})</span>
             </div>
 
             {filteredMessages.map((message) => (
-              <Card key={message.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        checked={selectedMessages.has(message.id)}
-                        onCheckedChange={(checked) => handleSelectMessage(message.id, checked as boolean)}
-                      />
-                      
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {message.firstName} {message.lastName}
-                            </span>
-                          </div>
-                          
-                          <Badge variant="outline">{message.aiStage}</Badge>
+              <Card key={message.id} className={`${message.isOverdue ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-blue-500'}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={selectedMessages.has(message.id)}
+                      onCheckedChange={(checked) => handleSelectMessage(message.id, checked as boolean)}
+                    />
+                    
+                    <div className="flex-1 space-y-3">
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-blue-600" />
+                          <span className="font-medium">
+                            {message.firstName} {message.lastName}
+                          </span>
                           <Badge variant={getPriorityBadgeVariant(message.priority)}>
                             {message.priority}
                           </Badge>
-                          <Badge variant={getEngagementBadgeVariant(message.engagementScore)}>
-                            {message.engagementScore}% engaged
+                          <Badge variant={getIntensityBadgeVariant(message.messageIntensity)}>
+                            {message.messageIntensity}
                           </Badge>
-                          
                           {message.complianceFlags.length > 0 && (
-                            <Badge variant="destructive" className="text-xs">
-                              Compliance Issues
-                            </Badge>
+                            <Badge variant="secondary">Flagged</Badge>
                           )}
                         </div>
-
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Car className="h-3 w-3" />
-                            {message.vehicleInterest}
-                          </div>
-                          
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            Due {formatTimeUntilDue(message.nextSendAt)}
-                          </div>
-                          
-                          <div className="flex items-center gap-1">
-                            <MessageSquare className="h-3 w-3" />
-                            {message.messagesSent} sent
-                          </div>
-
-                          {message.aiQualityScore > 0 && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs">Quality: {message.aiQualityScore}/10</span>
-                            </div>
-                          )}
+                        
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {formatTimeUntilDue(message.nextSendAt)}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => togglePreviewExpanded(message.id)}
+                          >
+                            {expandedPreviews.has(message.id) ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </Button>
                         </div>
-
-                        {message.lastResponse && (
-                          <div className="bg-muted p-2 rounded text-sm">
-                            <span className="font-medium">Last response: </span>
-                            {message.lastResponse.length > 100
-                              ? `${message.lastResponse.substring(0, 100)}...`
-                              : message.lastResponse
-                            }
-                          </div>
-                        )}
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-2 ml-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => togglePreviewExpanded(message.id)}
-                        className="flex items-center gap-1"
-                      >
-                        {expandedPreviews.has(message.id) ? (
-                          <>
-                            <ChevronUp className="h-4 w-4" />
-                            Hide Preview
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="h-4 w-4" />
-                            Show Preview
-                          </>
-                        )}
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePreviewMessage(message.id)}
-                        className="flex items-center gap-1"
-                      >
-                        <Eye className="h-4 w-4" />
-                        Full Preview
-                      </Button>
+                      {/* Info Row */}
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Car className="w-3 h-3" />
+                          {message.vehicleInterest}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3" />
+                          {message.messagesSent} sent
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Stage: {message.aiStage}
+                        </div>
+                      </div>
+
+                      {/* Expanded Preview */}
+                      {expandedPreviews.has(message.id) && (
+                        <div className="mt-4">
+                          <MessagePreviewInline
+                            leadId={message.id}
+                            leadName={`${message.firstName} ${message.lastName}`}
+                            vehicleInterest={message.vehicleInterest}
+                            aiStage={message.aiStage}
+                            onMessageSent={fetchQueuedMessages}
+                            onPreviewFull={() => handlePreviewMessage(message.id)}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Inline Message Preview */}
-                  {expandedPreviews.has(message.id) && (
-                    <div className="mt-3 pt-3 border-t">
-                      <MessagePreviewInline
-                        leadId={message.id}
-                        leadName={`${message.firstName} ${message.lastName}`}
-                        vehicleInterest={message.vehicleInterest}
-                        aiStage={message.aiStage}
-                        onMessageSent={() => {
-                          fetchQueuedMessages();
-                          setExpandedPreviews(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete(message.id);
-                            return newSet;
-                          });
-                        }}
-                        onPreviewFull={() => handlePreviewMessage(message.id)}
-                      />
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             ))}
@@ -664,17 +553,15 @@ const EnhancedAIQueueTab = () => {
         )}
       </div>
 
-      {/* Message Preview Modal */}
-      <MessagePreviewModal
-        open={previewModalOpen}
-        onClose={() => {
-          setPreviewModalOpen(false);
-          setSelectedLead(null);
-        }}
-        leadId={selectedLead || ''}
-        onApprove={handleApproveMessage}
-        onReject={handleSkipLead}
-      />
+      {/* Preview Modal */}
+      {previewModalOpen && selectedLead && (
+        <MessagePreviewModal
+          open={previewModalOpen}
+          onOpenChange={setPreviewModalOpen}
+          leadId={selectedLead}
+          onMessageSent={fetchQueuedMessages}
+        />
+      )}
     </div>
   );
 };
