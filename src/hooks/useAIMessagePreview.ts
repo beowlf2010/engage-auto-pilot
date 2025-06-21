@@ -53,39 +53,29 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
     try {
       console.log(`🤖 [AI PREVIEW] Generating message for lead: ${useLeadId}`);
       
-      // Get lead data
-      const { data: lead, error: leadError } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('id', useLeadId)
-        .single();
+      // Get lead data if not already loaded
+      let currentLeadData = leadData;
+      if (!currentLeadData) {
+        const { data: lead, error: leadError } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('id', useLeadId)
+          .single();
 
-      if (leadError || !lead) {
-        throw new Error('Lead not found');
+        if (leadError || !lead) {
+          throw new Error('Lead not found');
+        }
+        currentLeadData = lead;
+        setLeadData(lead);
       }
 
-      setLeadData(lead);
-
-      // Check if lead has had conversation
-      const { data: conversations, error: conversationError } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('lead_id', useLeadId)
-        .limit(1);
-
-      if (conversationError) {
-        console.error('Error checking conversations:', conversationError);
-      }
-
-      const hasConversation = conversations && conversations.length > 0;
-
-      // Generate AI message based on lead data and conversation history
-      const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-automation', {
+      // Use the new dedicated edge function with validation decisions
+      const { data: aiResult, error: aiError } = await supabase.functions.invoke('generate-ai-message', {
         body: {
-          action: 'generate_message_preview',
           leadId: useLeadId,
-          leadData: lead,
-          hasConversation: hasConversation,
+          nameDecision,
+          vehicleDecision,
+          leadData: currentLeadData,
           salespersonProfile: profile
         }
       });
@@ -99,7 +89,12 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
       setGeneratedMessage(message);
       setShowPreview(true);
       
-      console.log(`✅ [AI PREVIEW] Generated message for lead: ${useLeadId}`);
+      console.log(`✅ [AI PREVIEW] Generated message: "${message}"`);
+      
+      // Log personalization used
+      if (aiResult.personalization) {
+        console.log(`🎯 [AI PREVIEW] Personalization used:`, aiResult.personalization);
+      }
       
     } catch (error) {
       console.error('❌ [AI PREVIEW] Error generating message:', error);
