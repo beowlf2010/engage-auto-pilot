@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 import { analyzeConversationalContext, generateConversationalResponse } from './conversationalAwareness.ts'
@@ -13,28 +14,17 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🤖 [ENHANCED AI] === AI CONVERSATION REQUEST ===');
-    
     const { leadId, leadName, messageBody, conversationHistory } = await req.json()
     
-    console.log('🤖 [ENHANCED AI] Processing message for', leadName + ':', `"${messageBody}"`);
+    console.log('🤖 Processing message for', leadName + ':', `"${messageBody}"`);
     
-    // Enhanced empty message detection
-    const isEmpty = !messageBody || 
-                   messageBody.trim() === '' || 
-                   messageBody.trim() === 'null' || 
-                   messageBody.trim() === 'undefined' ||
-                   messageBody.length === 0;
-    
-    if (isEmpty) {
-      console.log('⚠️ [ENHANCED AI] Empty message detected - checking lead status');
-      
+    // Check for empty messages
+    if (!messageBody || messageBody.trim() === '') {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
       
-      // Check if this lead has a valid phone number
       const { data: phoneData } = await supabase
         .from('phone_numbers')
         .select('number')
@@ -43,11 +33,10 @@ serve(async (req) => {
         .single();
       
       if (!phoneData || phoneData.number === '+15551234567') {
-        console.log('❌ [ENHANCED AI] No valid phone number - skipping AI response');
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'No valid phone number for lead - AI response skipped',
+            error: 'No valid phone number for lead',
             skipMessage: true
           }),
           { 
@@ -58,21 +47,16 @@ serve(async (req) => {
       }
     }
 
-    // Enhanced conversational awareness analysis
-    const conversationalContext = analyzeConversationalContext(messageBody, conversationHistory || '');
-    console.log('🗣️ [ENHANCED AI] Conversational context:', JSON.stringify(conversationalContext, null, 2));
+    // Simple conversational analysis
+    const conversationalContext = analyzeConversationalContext(messageBody);
+    console.log('🗣️ Conversational context:', conversationalContext);
 
-    // Enhanced intent detection for better responses
-    const intent = analyzeMessageIntent(messageBody, conversationHistory || []);
-    console.log('🎯 [ENHANCED AI] Detected intent:', JSON.stringify(intent, null, 2));
-
-    // Check if this is a conversational message that warrants acknowledgment
-    if (conversationalContext.warrantsAcknowledgment && !intent.isDirectQuestion) {
-      console.log('🤝 [ENHANCED AI] Conversational message detected - generating acknowledgment');
-      const conversationalResponse = generateConversationalResponse(conversationalContext, leadName);
+    // Check if message warrants acknowledgment
+    if (conversationalContext.warrantsAcknowledgment) {
+      const response = generateConversationalResponse(conversationalContext, leadName);
       
       return new Response(
-        JSON.stringify({ success: true, response: conversationalResponse }),
+        JSON.stringify({ success: true, response }),
         { 
           status: 200, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -80,11 +64,23 @@ serve(async (req) => {
       );
     }
 
-    // Generate contextual response based on intent
-    const response = await generateEnhancedResponse(leadName, messageBody, intent, conversationHistory);
-    
-    console.log('✅ [ENHANCED AI] Generated response:', response);
+    // Simple intent detection
+    const hasQuestion = /\?/.test(messageBody) || 
+      /\b(what|how|when|where|why|can you|could you|would you|do you|are you|is there)\b/i.test(messageBody);
 
+    if (!hasQuestion) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'No question detected' }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Generate response using OpenAI
+    const response = await generateSimpleResponse(leadName, messageBody);
+    
     return new Response(
       JSON.stringify({ success: true, response }),
       { 
@@ -94,7 +90,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ [ENHANCED AI] Error:', error);
+    console.error('❌ Error:', error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { 
@@ -105,113 +101,19 @@ serve(async (req) => {
   }
 })
 
-function analyzeMessageIntent(message: string, history: any[]) {
-  const isDirectQuestion = /\?/.test(message) || 
-    /\b(what|how|when|where|why|can you|could you|would you|do you|are you|is there)\b/i.test(message);
-  
-  const questionTypes = [];
-  let questionTopic = null;
-  
-  if (/\b(price|cost|payment|finance|lease|monthly)\b/i.test(message)) {
-    questionTypes.push('pricing');
-    questionTopic = 'pricing';
-  }
-  
-  if (/\b(available|inventory|stock|see|show|find|have)\b/i.test(message)) {
-    questionTypes.push('inventory');
-    questionTopic = 'availability';
-  }
-  
-  if (/\b(visit|come|address|location|hours|directions)\b/i.test(message)) {
-    questionTypes.push('location');
-    questionTopic = 'dealership_info';
-  }
-  
-  const showingFrustration = /\b(frustrated|annoyed|tired|enough|stop)\b/i.test(message);
-  const requiresDirectAnswer = isDirectQuestion && questionTypes.length > 0;
-  
-  const primaryQuestionType = questionTypes[0] || 'general_inquiry';
-  
-  // Analyze conversation context
-  const lastSalesMessage = history.filter(h => h.direction === 'out').slice(-1)[0]?.body || '';
-  const customerMessageCount = history.filter(h => h.direction === 'in').length;
-  const salesMessageCount = history.filter(h => h.direction === 'out').length;
-  
-  const conversationContext = {
-    lastSalesMessage,
-    customerMessageCount,
-    salesMessageCount,
-    hasBeenIgnored: customerMessageCount === 0 && salesMessageCount > 0,
-    needsApology: showingFrustration,
-    needsImmediateResponse: requiresDirectAnswer
-  };
-  
-  return {
-    isDirectQuestion,
-    questionTypes,
-    questionTopic,
-    showingFrustration,
-    requiresDirectAnswer,
-    primaryQuestionType,
-    towingAnalysis: {
-      hasTowingRequest: false,
-      equipmentMentioned: undefined,
-      vehicleMentioned: undefined,
-      isQuestionAboutTowing: false
-    },
-    hasObjections: false,
-    detectedObjections: [],
-    hasPricingConcerns: /\b(expensive|costly|budget|afford)\b/i.test(message),
-    requiresUrgentResponse: showingFrustration || requiresDirectAnswer,
-    vehicleNicknames: [],
-    conversationContext
-  };
-}
-
-async function generateEnhancedResponse(leadName: string, message: string, intent: any, history: any[]) {
+async function generateSimpleResponse(leadName: string, message: string) {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
   
   if (!openaiApiKey) {
     throw new Error('OpenAI API key not configured');
   }
 
-  // Enhanced prompt for better responses
-  const prompt = `You are Finn, a friendly AI assistant for Jason Pilger Chevrolet in Atmore, AL. 
+  const prompt = `You are Finn, a helpful AI assistant for Jason Pilger Chevrolet in Atmore, AL.
 
-DEALERSHIP INFO:
-- Location: 406 E Nashville Ave, Atmore, AL 36502
-- Phone: (251) 368-4053
-- Website: www.jasonpilgerchevrolet.com
+Customer: ${leadName}
+Message: "${message}"
 
-CUSTOMER: ${leadName}
-THEIR MESSAGE: "${message}"
-
-CONVERSATION CONTEXT:
-- Customer has sent ${intent.conversationContext.customerMessageCount} messages
-- We've sent ${intent.conversationContext.salesMessageCount} messages
-- Last sales message: "${intent.conversationContext.lastSalesMessage}"
-
-INTENT ANALYSIS:
-- Direct question: ${intent.isDirectQuestion}
-- Question topic: ${intent.questionTopic || 'none'}
-- Showing frustration: ${intent.showingFrustration}
-- Needs immediate response: ${intent.requiresDirectAnswer}
-
-RESPONSE GUIDELINES:
-${message.trim() === '' ? 
-  `- This appears to be an empty message or technical issue
-  - Acknowledge this politely and offer help
-  - Include dealership contact info
-  - Ask what they're looking for specifically` :
-  `- Address their specific question/concern directly
-  - Be conversational and helpful
-  - Include relevant dealership info when appropriate
-  - Keep response under 160 characters if possible`
-}
-
-Generate a helpful, professional response:`;
-
-  console.log('📝 [ENHANCED AI] Generated prompt length:', prompt.length);
+Respond helpfully and professionally in under 160 characters.`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -222,16 +124,10 @@ Generate a helpful, professional response:`;
     body: JSON.stringify({
       model: 'gpt-3.5-turbo',
       messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful automotive sales assistant. Keep responses concise and professional.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
+        { role: 'system', content: 'You are a helpful automotive sales assistant.' },
+        { role: 'user', content: prompt }
       ],
-      max_tokens: 200,
+      max_tokens: 100,
       temperature: 0.7,
     }),
   });
@@ -241,5 +137,5 @@ Generate a helpful, professional response:`;
   }
 
   const data = await response.json();
-  return data.choices[0]?.message?.content?.trim() || 'I apologize, but I encountered an issue generating a response. Please call us at (251) 368-4053 and we\'ll be happy to help!';
+  return data.choices[0]?.message?.content?.trim() || 'I apologize, but I encountered an issue. Please call us at (251) 368-4053!';
 }
