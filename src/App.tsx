@@ -26,6 +26,7 @@ import AppointmentSettingsPage from './pages/AppointmentSettingsPage';
 import PublicAppointmentBookingPage from './pages/PublicAppointmentBookingPage';
 import UnreadMessageBanner from './components/inbox/UnreadMessageBanner';
 import RPODatabasePage from "@/pages/RPODatabasePage";
+import RPOInsightsPage from "@/pages/RPOInsightsPage";
 import PredictiveAnalyticsPage from './pages/PredictiveAnalyticsPage';
 
 // Create a client
@@ -63,6 +64,7 @@ function App() {
                           <Route path="/upload-inventory" element={<InventoryUploadPage />} />
                           <Route path="/inventory/:id" element={<VehicleDetailPage />} />
                           <Route path="/rpo-database" element={<RPODatabasePage />} />
+                          <Route path="/rpo-insights" element={<RPOInsightsPage />} />
                           <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />
                           <Route path="/ai-monitor" element={<AIMonitorPage />} />
                           <Route path="/analytics" element={<AdvancedAnalyticsPage />} />
