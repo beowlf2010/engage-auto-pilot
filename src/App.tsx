@@ -13,6 +13,7 @@ import SmartInboxPage from './pages/SmartInboxPage';
 import StreamlinedLeadsPage from './pages/StreamlinedLeadsPage';
 import LeadDetailPage from './pages/LeadDetailPage';
 import InventoryDashboardPage from './pages/InventoryDashboardPage';
+import InventoryUploadPage from './pages/InventoryUploadPage';
 import VehicleDetailPage from './pages/VehicleDetailPage';
 import FinancialDashboardPage from './pages/FinancialDashboardPage';
 import AIMonitorPage from './pages/AIMonitorPage';
@@ -59,6 +60,7 @@ function App() {
                           <Route path="/leads" element={<StreamlinedLeadsPage />} />
                           <Route path="/leads/:leadId" element={<LeadDetailPage />} />
                           <Route path="/inventory-dashboard" element={<InventoryDashboardPage />} />
+                          <Route path="/inventory-upload" element={<InventoryUploadPage />} />
                           <Route path="/inventory/:id" element={<VehicleDetailPage />} />
                           <Route path="/rpo-database" element={<RPODatabasePage />} />
                           <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />
