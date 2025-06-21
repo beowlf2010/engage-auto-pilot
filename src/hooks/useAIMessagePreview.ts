@@ -195,7 +195,10 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
 
   // Multi-step workflow methods
   const startAnalysis = async () => {
-    if (!leadId) return;
+    if (!leadId) {
+      setError('No lead ID provided');
+      return;
+    }
     
     setIsAnalyzing(true);
     setError(null);
@@ -213,19 +216,55 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
     }, 10000);
     
     try {
-      // Simulate analysis
+      console.log(`🔍 [AI PREVIEW] Starting analysis for lead: ${leadId}`);
+      
+      // Fetch real lead data
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .single();
+
+      if (leadError || !lead) {
+        throw new Error('Lead not found');
+      }
+
+      setLeadData(lead);
+
+      // Simulate analysis with actual data
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Mock data quality results
+      // Create validation results based on actual data
+      const nameValidation = {
+        isValid: Boolean(lead.first_name && lead.first_name.length > 1),
+        confidence: 0.9,
+        detectedType: lead.first_name ? 'Personal Name' : 'Unknown',
+        isValidPersonalName: Boolean(lead.first_name && lead.first_name.length > 1)
+      };
+
+      const vehicleValidation = {
+        isValid: Boolean(lead.vehicle_interest && lead.vehicle_interest.length > 2),
+        confidence: 0.8,
+        detectedIssue: lead.vehicle_interest ? 'None' : 'No vehicle interest specified',
+        isValidVehicleInterest: Boolean(lead.vehicle_interest && lead.vehicle_interest.length > 2)
+      };
+      
       setOriginalDataQuality({
-        nameValidation: { isValid: true, confidence: 0.9 },
-        vehicleValidation: { isValid: true, confidence: 0.8 }
+        nameValidation,
+        vehicleValidation
       });
       
       setShowDecisionStep(true);
+      console.log(`✅ [AI PREVIEW] Analysis completed for lead: ${leadId}`);
+      
     } catch (error) {
-      console.error('Analysis error:', error);
-      setError('Analysis failed. Please try again.');
+      console.error('❌ [AI PREVIEW] Analysis error:', error);
+      setError(error instanceof Error ? error.message : 'Analysis failed. Please try again.');
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Analysis failed",
+        variant: "destructive"
+      });
     } finally {
       setIsAnalyzing(false);
       if (analysisTimeoutRef.current) {
@@ -236,14 +275,17 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
   };
 
   const handleNameDecision = (decision: 'approved' | 'denied') => {
+    console.log(`👤 [AI PREVIEW] Name decision: ${decision}`);
     setNameDecision(decision);
   };
 
   const handleVehicleDecision = (decision: 'approved' | 'denied') => {
+    console.log(`🚗 [AI PREVIEW] Vehicle decision: ${decision}`);
     setVehicleDecision(decision);
   };
 
   const generateWithDecisions = async () => {
+    console.log(`🎯 [AI PREVIEW] Generating with decisions - Name: ${nameDecision}, Vehicle: ${vehicleDecision}`);
     setShowDecisionStep(false);
     await generatePreview();
   };
@@ -256,6 +298,8 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
 
   // Clear preview and reset state
   const reset = () => {
+    console.log('🔄 [AI PREVIEW] Resetting all state');
+    
     // Clear timeouts
     if (analysisTimeoutRef.current) {
       clearTimeout(analysisTimeoutRef.current);

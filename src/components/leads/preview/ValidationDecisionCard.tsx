@@ -10,8 +10,8 @@ interface ValidationDecisionCardProps {
   vehicleInterest: string;
   nameValidation: any;
   vehicleValidation: any;
-  nameDecision: 'approved' | 'denied' | '' | null;
-  vehicleDecision: 'approved' | 'denied' | '' | null;
+  nameDecision: 'approved' | 'denied' | '';
+  vehicleDecision: 'approved' | 'denied' | '';
   onNameDecision: (decision: 'approved' | 'denied') => void;
   onVehicleDecision: (decision: 'approved' | 'denied') => void;
   onGenerate: () => void;
@@ -30,7 +30,16 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
   onGenerate,
   isGenerating
 }) => {
-  const canGenerate = nameDecision !== null && nameDecision !== '' && vehicleDecision !== null && vehicleDecision !== '';
+  // Fixed logic to properly check for valid decisions
+  const canGenerate = nameDecision !== '' && vehicleDecision !== '' && nameDecision !== null && vehicleDecision !== null;
+
+  // Safe access with fallbacks
+  const safeFirstName = firstName || 'Unknown';
+  const safeVehicleInterest = vehicleInterest || 'Not specified';
+  const nameConfidence = nameValidation?.confidence || 0;
+  const vehicleConfidence = vehicleValidation?.confidence || 0;
+  const nameIsValid = nameValidation?.isValidPersonalName ?? false;
+  const vehicleIsValid = nameValidation?.isValidVehicleInterest ?? false;
 
   return (
     <Card>
@@ -45,7 +54,7 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
         <div className="border rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <span className="font-medium">Name: "{firstName}"</span>
+              <span className="font-medium">Name: "{safeFirstName}"</span>
               {nameValidation?.userOverride && (
                 <Badge variant="outline" className="ml-2 text-green-600">
                   Previously {nameValidation.timesApproved > nameValidation.timesRejected ? 'Approved' : 'Denied'}
@@ -53,22 +62,22 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
               )}
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-600">
-              {nameValidation?.isValidPersonalName ? (
+              {nameIsValid ? (
                 <CheckCircle className="w-4 h-4 text-green-600" />
               ) : (
                 <XCircle className="w-4 h-4 text-red-600" />
               )}
-              AI: {Math.round((nameValidation?.confidence || 0) * 100)}%
+              AI: {Math.round(nameConfidence * 100)}%
             </div>
           </div>
           
           <div className="text-sm text-gray-600">
-            Detected as: <span className="font-medium">{nameValidation?.detectedType}</span>
+            Detected as: <span className="font-medium">{nameValidation?.detectedType || 'Unknown'}</span>
             {nameValidation?.userOverride && (
               <span className="ml-2">
-                (Seen {nameValidation.timesSeen} times, 
-                 Approved {nameValidation.timesApproved}, 
-                 Denied {nameValidation.timesRejected})
+                (Seen {nameValidation.timesSeen || 0} times, 
+                 Approved {nameValidation.timesApproved || 0}, 
+                 Denied {nameValidation.timesRejected || 0})
               </span>
             )}
           </div>
@@ -99,20 +108,20 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
         <div className="border rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <span className="font-medium">Vehicle: "{vehicleInterest || 'Not specified'}"</span>
+              <span className="font-medium">Vehicle: "{safeVehicleInterest}"</span>
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-600">
-              {vehicleValidation?.isValidVehicleInterest ? (
+              {vehicleIsValid ? (
                 <CheckCircle className="w-4 h-4 text-green-600" />
               ) : (
                 <XCircle className="w-4 h-4 text-red-600" />
               )}
-              AI: {Math.round((vehicleValidation?.confidence || 0) * 100)}%
+              AI: {Math.round(vehicleConfidence * 100)}%
             </div>
           </div>
           
           <div className="text-sm text-gray-600">
-            Detected issue: <span className="font-medium">{vehicleValidation?.detectedIssue}</span>
+            Detected issue: <span className="font-medium">{vehicleValidation?.detectedIssue || 'None'}</span>
           </div>
 
           <div className="flex gap-2">
