@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -223,9 +222,8 @@ const MessagePreviewInline = ({
       
       if (!profile) throw new Error('No user profile found');
       
-      // Send the message using the messages service - explicitly ensure boolean type
-      const isAIGenerated = true;
-      const conversation = await sendMessage(leadId, message, profile, isAIGenerated);
+      // Send the message using the messages service - explicitly cast to boolean
+      const conversation = await sendMessage(leadId, message, profile, true as boolean);
       
       if (conversation) {
         console.log(`✅ [MESSAGE PREVIEW] Message sent successfully`);
