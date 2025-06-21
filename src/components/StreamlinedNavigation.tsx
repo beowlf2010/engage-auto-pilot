@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
@@ -26,9 +27,24 @@ interface StreamlinedNavigationProps {
 
 const StreamlinedNavigation: React.FC<StreamlinedNavigationProps> = ({ isCollapsed, onExpand, onCollapse }) => {
   const location = useLocation();
-  const { user, hasAccess } = useAuth();
+  const { user, profile } = useAuth();
 
-  const filteredNavigationItems = navigationItems.filter(item => hasAccess(item.access));
+  // Filter navigation items based on user role - simple role-based filtering
+  const filteredNavigationItems = navigationItems.filter(item => {
+    // If no access requirement specified, show to all users
+    if (!item.access) return true;
+    
+    // If user has admin role, show everything
+    if (profile?.role === 'admin') return true;
+    
+    // If user has manager role, show manager and user level items
+    if (profile?.role === 'manager' && ['manager', 'user'].includes(item.access)) return true;
+    
+    // If user has user role, show only user level items
+    if (profile?.role === 'user' && item.access === 'user') return true;
+    
+    return false;
+  });
 
   return (
     <div className="flex flex-col h-full space-y-1">

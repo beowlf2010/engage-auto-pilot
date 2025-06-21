@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import StreamlinedNavigation from "@/components/StreamlinedNavigation";
 import PredictiveAnalyticsOverview from "@/components/predictive/PredictiveAnalyticsOverview";
@@ -6,6 +7,7 @@ import { Navigate } from "react-router-dom";
 
 const PredictiveAnalyticsPage = () => {
   const { profile, loading } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   if (loading) {
     return (
@@ -28,8 +30,14 @@ const PredictiveAnalyticsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <StreamlinedNavigation />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex">
+      <div className="flex-shrink-0">
+        <StreamlinedNavigation 
+          isCollapsed={isCollapsed}
+          onExpand={() => setIsCollapsed(false)}
+          onCollapse={() => setIsCollapsed(true)}
+        />
+      </div>
       <main className="flex-1 p-6">
         <PredictiveAnalyticsOverview />
       </main>
