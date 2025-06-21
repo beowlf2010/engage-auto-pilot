@@ -115,6 +115,9 @@ serve(async (req) => {
 
     console.log('💾 Message saved with ID:', messageData.id);
 
+    // NEW: Track learning outcome for this reply
+    await trackLearningOutcome(supabase, lead.id, messageData.id, body);
+
     // Update lead status to "engaged" if currently "new"
     if (lead.status === 'new') {
       console.log(`🔄 Updating lead status from "new" to "engaged" due to customer reply`);
@@ -182,7 +185,7 @@ serve(async (req) => {
         .from('conversation_memory')
         .upsert({
           lead_id: lead.id,
-          memory_type: 'conversation_context',
+          memory_type: 'lead_response',
           content: `Lead replied: "${body}"`,
           confidence: 1.0,
           created_at: new Date().toISOString()
@@ -200,9 +203,9 @@ serve(async (req) => {
     console.log('✅ Webhook processed successfully');
     console.log('=== TWILIO WEBHOOK END ===');
     
-    // Return empty response with 204 status - no content for customer
-    return new Response('', { 
-      status: 204, 
+    // Return empty response with 200 status
+    return new Response('OK', { 
+      status: 200, 
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/plain'
@@ -218,3 +221,90 @@ serve(async (req) => {
     return new Response('', { status: 500, headers: corsHeaders })
   }
 })
+
+// NEW: Function to track learning outcomes when replies are received
+async function trackLearningOutcome(supabase: any, leadId: string, messageId: string, replyBody: string) {
+  try {
+    console.log('📊 [LEARNING] Tracking reply outcome for lead:', leadId);
+
+    // Get the most recent outbound AI message before this reply
+    const { data: lastAIMessage } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('lead_id', leadId)
+      .eq('direction', 'out')
+      .eq('ai_generated', true)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (lastAIMessage) {
+      const responseTimeHours = (new Date().getTime() - new Date(lastAIMessage.sent_at).getTime()) / (1000 * 60 * 60);
+      
+      // Determine sentiment/outcome type
+      const lowerReply = replyBody.toLowerCase();
+      let outcomeType = 'response_received';
+      
+      if (lowerReply.includes('stop') || lowerReply.includes('unsubscribe')) {
+        outcomeType = 'opt_out';
+      } else if (lowerReply.includes('yes') || lowerReply.includes('interested') || lowerReply.includes('appointment')) {
+        outcomeType = 'positive_response';
+      } else if (lowerReply.includes('no') || lowerReply.includes('not interested')) {
+        outcomeType = 'negative_response';
+      }
+
+      // Record the learning outcome
+      await supabase.from('ai_learning_outcomes').insert({
+        lead_id: leadId,
+        message_id: lastAIMessage.id,
+        outcome_type: outcomeType,
+        days_to_outcome: Math.ceil(responseTimeHours / 24),
+        message_characteristics: {
+          message_content: lastAIMessage.body,
+          message_length: lastAIMessage.body.length,
+          sent_hour: new Date(lastAIMessage.sent_at).getHours(),
+          response_time_hours: responseTimeHours
+        },
+        lead_characteristics: {
+          reply_content: replyBody,
+          reply_length: replyBody.length,
+          reply_sentiment: outcomeType
+        },
+        seasonal_context: {
+          hour: new Date().getHours(),
+          day_of_week: new Date().getDay(),
+          month: new Date().getMonth()
+        }
+      });
+
+      // Record message feedback
+      await supabase.from('ai_message_feedback').insert({
+        lead_id: leadId,
+        conversation_id: lastAIMessage.id,
+        message_content: lastAIMessage.body,
+        feedback_type: outcomeType.includes('positive') ? 'positive' : 
+                      outcomeType.includes('negative') ? 'negative' : 'neutral',
+        response_received: true,
+        response_time_hours: responseTimeHours,
+        conversion_outcome: outcomeType
+      });
+
+      // Update message analytics
+      await supabase.from('ai_message_analytics').insert({
+        lead_id: leadId,
+        message_content: lastAIMessage.body,
+        message_stage: 'follow_up',
+        sent_at: lastAIMessage.sent_at,
+        responded_at: new Date().toISOString(),
+        response_time_hours: responseTimeHours,
+        hour_of_day: new Date(lastAIMessage.sent_at).getHours(),
+        day_of_week: new Date(lastAIMessage.sent_at).getDay()
+      });
+
+      console.log(`✅ [LEARNING] Recorded outcome: ${outcomeType}, Response time: ${responseTimeHours.toFixed(2)}h`);
+    }
+
+  } catch (error) {
+    console.error('❌ [LEARNING] Error tracking outcome:', error);
+  }
+}
