@@ -264,6 +264,74 @@ export type Database = {
           },
         ]
       }
+      ai_message_approval_queue: {
+        Row: {
+          approved: boolean
+          approved_at: string | null
+          approved_by: string | null
+          auto_approved: boolean
+          created_at: string
+          id: string
+          lead_id: string
+          message_content: string
+          message_stage: string
+          rejected: boolean
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          scheduled_send_at: string
+          sent_at: string | null
+          updated_at: string
+          urgency_level: string
+        }
+        Insert: {
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          auto_approved?: boolean
+          created_at?: string
+          id?: string
+          lead_id: string
+          message_content: string
+          message_stage?: string
+          rejected?: boolean
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          scheduled_send_at: string
+          sent_at?: string | null
+          updated_at?: string
+          urgency_level?: string
+        }
+        Update: {
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          auto_approved?: boolean
+          created_at?: string
+          id?: string
+          lead_id?: string
+          message_content?: string
+          message_stage?: string
+          rejected?: boolean
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          scheduled_send_at?: string
+          sent_at?: string | null
+          updated_at?: string
+          urgency_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_message_approval_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_message_feedback: {
         Row: {
           conversation_id: string | null
@@ -2627,6 +2695,7 @@ export type Database = {
         Row: {
           address: string | null
           ai_contact_enabled: boolean | null
+          ai_enabled_at: string | null
           ai_last_message_stage: string | null
           ai_messages_sent: number | null
           ai_opt_in: boolean
@@ -2697,6 +2766,7 @@ export type Database = {
         Insert: {
           address?: string | null
           ai_contact_enabled?: boolean | null
+          ai_enabled_at?: string | null
           ai_last_message_stage?: string | null
           ai_messages_sent?: number | null
           ai_opt_in?: boolean
@@ -2767,6 +2837,7 @@ export type Database = {
         Update: {
           address?: string | null
           ai_contact_enabled?: boolean | null
+          ai_enabled_at?: string | null
           ai_last_message_stage?: string | null
           ai_messages_sent?: number | null
           ai_opt_in?: boolean
@@ -4458,6 +4529,10 @@ export type Database = {
       classify_deal_by_stock: {
         Args: { stock_number: string }
         Returns: string
+      }
+      clean_vehicle_interest_data: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       detect_vehicle_duplicates: {
         Args: { p_upload_history_id: string }
