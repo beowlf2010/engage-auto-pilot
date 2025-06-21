@@ -60,7 +60,7 @@ function App() {
                           <Route path="/leads" element={<StreamlinedLeadsPage />} />
                           <Route path="/leads/:leadId" element={<LeadDetailPage />} />
                           <Route path="/inventory-dashboard" element={<InventoryDashboardPage />} />
-                          <Route path="/inventory-upload" element={<InventoryUploadPage />} />
+                          <Route path="/upload-inventory" element={<InventoryUploadPage />} />
                           <Route path="/inventory/:id" element={<VehicleDetailPage />} />
                           <Route path="/rpo-database" element={<RPODatabasePage />} />
                           <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />
