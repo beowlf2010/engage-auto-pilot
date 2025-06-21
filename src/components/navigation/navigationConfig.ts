@@ -1,179 +1,77 @@
-
 import {
-  Home,
-  LayoutDashboard,
-  Settings,
-  User,
-  Users,
-  Calendar,
-  Mail,
-  Package,
-  TrendingUp,
   BarChart3,
-  Brain,
-  Upload,
-  ChevronDown,
-  LogOut,
-  DollarSign,
   MessageSquare,
-  Shield,
-  Car,
-  Eye,
-  Palette
-} from "lucide-react"
-
-interface NavConfig {
-  title: string
-  href: string
-  icon: any
-  roles: string[]
-  badge?: string
-  priority: 'primary' | 'secondary'
-}
+  Users,
+  Package,
+  DollarSign,
+  Bot,
+  TrendingUp,
+  Settings,
+  Brain
+} from 'lucide-react';
 
 export interface NavigationItem {
-  path: string;
   label: string;
+  href: string;
   icon: any;
-  badge?: string;
-  color?: string;
-  priority: 'primary' | 'secondary';
-  hoverActions?: Array<{
-    label: string;
-    icon: any;
-    action: () => void;
-  }>;
+  access: string[];
+  badge?: { type: 'unread' };
 }
 
-export const navigationConfig: NavConfig[] = [
-  // Primary navigation items
+export const navigationItems: NavigationItem[] = [
   {
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    roles: ["admin", "manager", "salesperson"],
-    priority: 'primary'
+    label: 'Dashboard',
+    href: '/',
+    icon: BarChart3,
+    access: ['admin', 'manager', 'sales']
   },
   {
-    title: "Leads",
-    href: "/leads",
+    label: 'Smart Inbox',
+    href: '/smart-inbox',
+    icon: MessageSquare,
+    access: ['admin', 'manager', 'sales'],
+    badge: { type: 'unread' }
+  },
+  {
+    label: 'Leads',
+    href: '/leads',
     icon: Users,
-    roles: ["admin", "manager", "salesperson"],
-    priority: 'primary'
+    access: ['admin', 'manager', 'sales']
   },
   {
-    title: "Inbox",
-    href: "/smart-inbox",
-    icon: Mail,
-    roles: ["admin", "manager", "salesperson"],
-    priority: 'primary'
-  },
-  {
-    title: "Inventory",
-    href: "/inventory-dashboard",
+    label: 'Inventory',
+    href: '/inventory-dashboard',
     icon: Package,
-    roles: ["admin", "manager", "salesperson"],
-    priority: 'primary'
+    access: ['admin', 'manager', 'sales']
   },
   {
-    title: "AI Monitor",
-    href: "/ai-monitor",
-    icon: Eye,
-    roles: ["admin", "manager"],
-    priority: 'primary'
-  },
-  {
-    title: "Financial Dashboard",
-    href: "/financial-dashboard",
-    icon: DollarSign,
-    roles: ["admin", "manager"],
-    priority: 'primary'
-  },
-  
-  // Secondary navigation items (for dropdown)
-  {
-    title: "Upload Inventory",
-    href: "/upload-inventory",
-    icon: Upload,
-    roles: ["admin", "manager"],
-    priority: 'secondary'
-  },
-  {
-    title: "Predictive Analytics",
-    href: "/predictive-analytics",
+    label: 'RPO Database',
+    href: '/rpo-database',
     icon: Brain,
-    roles: ["admin", "manager"],
-    priority: 'secondary'
+    access: ['admin', 'manager']
   },
   {
-    title: "Message Export",
-    href: "/message-export",
-    icon: Upload,
-    roles: ["admin", "manager"],
-    badge: "New",
-    priority: 'secondary'
+    label: 'Financial',
+    href: '/financial-dashboard',
+    icon: DollarSign,
+    access: ['admin', 'manager']
   },
   {
-    title: "Admin Dashboard",
-    href: "/admin-dashboard",
-    icon: Shield,
-    roles: ["admin"],
-    priority: 'secondary'
+    label: 'AI Monitor',
+    href: '/ai-monitor',
+    icon: Bot,
+    access: ['admin', 'manager']
   },
   {
-    title: "Manager Dashboard",
-    href: "/manager-dashboard",
-    icon: BarChart3,
-    roles: ["admin", "manager"],
-    priority: 'secondary'
-  },
-  {
-    title: "Sales Dashboard",
-    href: "/sales-dashboard",
+    label: 'Analytics',
+    href: '/analytics',
     icon: TrendingUp,
-    roles: ["admin", "manager", "salesperson"],
-    priority: 'secondary'
+    access: ['admin', 'manager']
   },
   {
-    title: "Personalization",
-    href: "/personalization",
-    icon: Palette,
-    roles: ["admin", "manager"],
-    priority: 'secondary'
-  },
-  {
-    title: "RPO Insights",
-    href: "/rpo-insights",
-    icon: Car,
-    roles: ["admin", "manager", "salesperson"],
-    priority: 'secondary'
-  },
-  {
-    title: "Analytics",
-    href: "/analytics",
-    icon: BarChart3,
-    roles: ["admin", "manager"],
-    priority: 'secondary'
-  },
-  {
-    title: "Settings",
-    href: "/settings",
+    label: 'Settings',
+    href: '/settings',
     icon: Settings,
-    roles: ["admin"],
-    priority: 'secondary'
-  },
-]
-
-export const getNavigationItems = (userRole: string, navigate: (path: string) => void): NavigationItem[] => {
-  return navigationConfig
-    .filter(item => item.roles.includes(userRole))
-    .map(item => ({
-      path: item.href,
-      label: item.title,
-      icon: item.icon,
-      badge: item.badge,
-      color: 'blue',
-      priority: item.priority,
-      hoverActions: []
-    }));
-};
+    access: ['admin', 'manager']
+  }
+];

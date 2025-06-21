@@ -3721,6 +3721,89 @@ export type Database = {
           },
         ]
       }
+      rpo_code_intelligence: {
+        Row: {
+          category: string | null
+          confidence_score: number | null
+          created_at: string
+          description: string | null
+          feature_type: string | null
+          id: string
+          learned_from_source: string[] | null
+          mapped_value: string | null
+          model_years: number[] | null
+          rpo_code: string
+          updated_at: string
+          vehicle_makes: string[] | null
+        }
+        Insert: {
+          category?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          description?: string | null
+          feature_type?: string | null
+          id?: string
+          learned_from_source?: string[] | null
+          mapped_value?: string | null
+          model_years?: number[] | null
+          rpo_code: string
+          updated_at?: string
+          vehicle_makes?: string[] | null
+        }
+        Update: {
+          category?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          description?: string | null
+          feature_type?: string | null
+          id?: string
+          learned_from_source?: string[] | null
+          mapped_value?: string | null
+          model_years?: number[] | null
+          rpo_code?: string
+          updated_at?: string
+          vehicle_makes?: string[] | null
+        }
+        Relationships: []
+      }
+      rpo_learning_sessions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          processed_mappings: Json | null
+          session_name: string | null
+          source_data: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          processed_mappings?: Json | null
+          session_name?: string | null
+          source_data?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          processed_mappings?: Json | null
+          session_name?: string | null
+          source_data?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rpo_learning_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_forecasts: {
         Row: {
           confidence_score: number
@@ -4680,6 +4763,19 @@ export type Database = {
           p_used_units: number
           p_used_gross: number
           p_upload_history_id: string
+        }
+        Returns: string
+      }
+      upsert_rpo_intelligence: {
+        Args: {
+          p_rpo_code: string
+          p_category: string
+          p_description: string
+          p_feature_type?: string
+          p_mapped_value?: string
+          p_confidence_score?: number
+          p_vehicle_makes?: string[]
+          p_model_years?: number[]
         }
         Returns: string
       }

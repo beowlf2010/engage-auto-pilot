@@ -1,258 +1,70 @@
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { Toaster } from "@/components/ui/toaster"
 
-import React, { useEffect } from 'react';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/components/auth/AuthProvider";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import AppLayout from "@/components/layout/AppLayout";
-import AuthPage from "@/pages/AuthPage";
-import SmartInboxPage from "@/pages/SmartInboxPage";
-import SettingsPage from "@/pages/SettingsPage";
-import StreamlinedLeadsPage from "@/pages/StreamlinedLeadsPage";
-import LeadDetailPage from "@/pages/LeadDetailPage";
-import AdvancedAnalyticsPage from "@/pages/AdvancedAnalyticsPage";
-import InventoryDashboardPage from "@/pages/InventoryDashboardPage";
-import InventoryUploadPage from "@/pages/InventoryUploadPage";
-import DashboardPage from "@/pages/DashboardPage";
-import FinancialDashboardPage from "@/pages/FinancialDashboardPage";
-import PredictiveAnalyticsPage from "@/pages/PredictiveAnalyticsPage";
-import MessageExportPage from "@/pages/MessageExportPage";
-import AIMonitorPage from "@/pages/AIMonitorPage";
-import AdminDashboardPage from "@/pages/AdminDashboardPage";
-import ManagerDashboardPage from "@/pages/ManagerDashboardPage";
-import PersonalizationPage from "@/pages/PersonalizationPage";
-import RPOInsightsPage from "@/pages/RPOInsightsPage";
-import SalesDashboardPage from "@/pages/SalesDashboardPage";
-import VehicleDetailPage from "@/pages/VehicleDetailPage";
-import { NotificationService } from '@/services/notificationService';
-
-const queryClient = new QueryClient();
+import { AuthProvider } from './components/auth/AuthProvider';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import AuthPage from './pages/AuthPage';
+import DashboardPage from './pages/DashboardPage';
+import SmartInboxPage from './pages/SmartInboxPage';
+import StreamlinedLeadsPage from './pages/StreamlinedLeadsPage';
+import LeadDetailPage from './pages/LeadDetailPage';
+import InventoryDashboardPage from './pages/InventoryDashboardPage';
+import VehicleDetailPage from './pages/VehicleDetailPage';
+import FinancialDashboardPage from './pages/FinancialDashboardPage';
+import AIMonitorPage from './pages/AIMonitorPage';
+import AdvancedAnalyticsPage from './pages/AdvancedAnalyticsPage';
+import SettingsPage from './pages/SettingsPage';
+import AppLayout from './components/layout/AppLayout';
+import NotFound from './components/NotFound';
+import MessageExportPage from './pages/MessageExportPage';
+import AppointmentSettingsPage from './pages/AppointmentSettingsPage';
+import PublicAppointmentBookingPage from './pages/PublicAppointmentBookingPage';
+import UnreadMessageBanner from './components/inbox/UnreadMessageBanner';
+import RPODatabasePage from "@/pages/RPODatabasePage";
 
 function App() {
-  useEffect(() => {
-    // Request notification permission on app start
-    NotificationService.requestPermission().then(granted => {
-      if (granted) {
-        console.log('Notification permission granted');
-      }
-    });
-  }, []);
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <div className="min-h-screen bg-background font-sans antialiased">
+    <Router>
+      <AuthProvider>
+        <TooltipProvider>
+          <div className="min-h-screen bg-background">
+            <Toaster />
+            <UnreadMessageBanner />
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
-              
               <Route
-                path="/"
+                path="/*"
                 element={
                   <ProtectedRoute>
                     <AppLayout>
-                      <DashboardPage />
+                      <Routes>
+                        <Route path="/" element={<DashboardPage />} />
+                        <Route path="/smart-inbox" element={<SmartInboxPage />} />
+                        <Route path="/leads" element={<StreamlinedLeadsPage />} />
+                        <Route path="/leads/:leadId" element={<LeadDetailPage />} />
+                        <Route path="/inventory-dashboard" element={<InventoryDashboardPage />} />
+                        <Route path="/inventory/:id" element={<VehicleDetailPage />} />
+                        <Route path="/rpo-database" element={<RPODatabasePage />} />
+                        <Route path="/financial-dashboard" element={<FinancialDashboardPage />} />
+                        <Route path="/ai-monitor" element={<AIMonitorPage />} />
+                        <Route path="/analytics" element={<AdvancedAnalyticsPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/message-export" element={<MessageExportPage />} />
+                        <Route path="/appointment-settings" element={<AppointmentSettingsPage />} />
+                        <Route path="/book-appointment/:token" element={<PublicAppointmentBookingPage />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
                     </AppLayout>
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <DashboardPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/smart-inbox"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <SmartInboxPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/inventory-dashboard"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <InventoryDashboardPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/upload-inventory"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <InventoryUploadPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/financial-dashboard"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <FinancialDashboardPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/predictive-analytics"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <PredictiveAnalyticsPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/message-export"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <MessageExportPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ai-monitor"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <AIMonitorPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin-dashboard"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <AdminDashboardPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/manager-dashboard"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <ManagerDashboardPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/personalization"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <PersonalizationPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/rpo-insights"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <RPOInsightsPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/sales-dashboard"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <SalesDashboardPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/vehicle/:id"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <VehicleDetailPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <SettingsPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/leads"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <StreamlinedLeadsPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/lead/:id"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <LeadDetailPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/analytics"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <AdvancedAnalyticsPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              
-              {/* Redirect any unknown routes to the dashboard */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
-            <Toaster />
-            <SonnerToaster 
-              position="top-right"
-              expand={true}
-              richColors={true}
-              closeButton={true}
-            />
           </div>
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+        </TooltipProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
