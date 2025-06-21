@@ -1,4 +1,5 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { sendMessage as fixedSendMessage } from './fixedMessagesService';
 
 // Redirect all message sending through the working fixed service
