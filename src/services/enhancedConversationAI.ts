@@ -1,205 +1,344 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { appointmentLinkService } from './appointmentLinkService';
 
 export interface EnhancedAIRequest {
   leadId: string;
   leadName: string;
-  vehicleInterest?: string;
+  vehicleInterest: string;
   lastCustomerMessage: string;
   conversationHistory: string;
-  isInitialContact?: boolean;
+  isInitialContact: boolean;
+  behavioralData?: any;
+  inventoryContext?: any;
 }
 
 export interface EnhancedAIResponse {
   message: string;
   confidence: number;
+  qualityScore: number;
   reasoning: string;
-  includesAppointmentLink: boolean;
-  appointmentIntent?: {
-    detected: boolean;
-    confidence: number;
-    intentType: string;
-  };
+  suggestedFollowUpTime?: Date;
+  messageType: 'greeting' | 'follow_up' | 'inventory_mention' | 'appointment_request' | 'closing';
 }
 
 class EnhancedConversationAI {
-  // Enhanced appointment intent detection with proactive triggers
-  private detectAppointmentIntent(message: string, conversationHistory: string): { detected: boolean; confidence: number; intentType: string } {
-    const appointmentKeywords = [
-      'appointment', 'schedule', 'meet', 'visit', 'come in', 'stop by',
-      'test drive', 'see the car', 'look at', 'check out', 'available',
-      'when can', 'what time', 'this week', 'tomorrow', 'today'
-    ];
+  // Generate enhanced AI response with quality scoring
+  async generateEnhancedResponse(request: EnhancedAIRequest): Promise<EnhancedAIResponse | null> {
+    try {
+      console.log(`🤖 [ENHANCED AI] Generating enhanced response for lead ${request.leadId}`);
 
-    const questionWords = ['when', 'what time', 'how about', 'can we', 'could we', 'would you'];
+      // Analyze conversation context
+      const contextAnalysis = this.analyzeConversationContext(request);
+      
+      // Get personalization data
+      const personalization = await this.getPersonalizationData(request.leadId);
+      
+      // Generate message using unified AI with enhanced context
+      const aiResponse = await this.callUnifiedAI({
+        ...request,
+        contextAnalysis,
+        personalization
+      });
+
+      if (!aiResponse) {
+        return null;
+      }
+
+      // Score message quality
+      const qualityScore = this.calculateMessageQuality(aiResponse, contextAnalysis);
+      
+      // Determine message type
+      const messageType = this.classifyMessageType(aiResponse, contextAnalysis);
+      
+      // Suggest optimal follow-up timing
+      const suggestedFollowUpTime = this.calculateOptimalFollowUpTime(
+        request.leadId, 
+        messageType, 
+        personalization
+      );
+
+      return {
+        message: aiResponse,
+        confidence: contextAnalysis.confidence,
+        qualityScore,
+        reasoning: `Enhanced AI with context analysis: ${contextAnalysis.stage}, quality: ${qualityScore}/100`,
+        suggestedFollowUpTime,
+        messageType
+      };
+
+    } catch (error) {
+      console.error('❌ [ENHANCED AI] Error generating enhanced response:', error);
+      return null;
+    }
+  }
+
+  // Analyze conversation context for better understanding
+  private analyzeConversationContext(request: EnhancedAIRequest) {
+    const { conversationHistory, lastCustomerMessage, isInitialContact } = request;
     
-    // ENHANCED: Detect conversation ending/closing signals (proactive triggers)
-    const closingSignals = [
-      'nothing else', 'that\'s all', 'sounds good', 'looks good', 'seems good',
-      'no other questions', 'no more questions', 'i think that covers it',
-      'that answers my questions', 'nothing else concerns me', 'that\'s everything',
-      'all set', 'good to know', 'makes sense', 'understand', 'got it'
-    ];
-    
-    // ENHANCED: Detect interest without action signals
-    const interestWithoutAction = [
-      'interesting', 'nice', 'cool', 'good', 'great', 'perfect', 'excellent',
-      'i like', 'sounds nice', 'looks nice', 'that works', 'that\'s good'
-    ];
-
-    const messageLower = message.toLowerCase();
-    const historyLower = conversationHistory.toLowerCase();
-    let confidence = 0;
-    let intentType = 'general';
-
-    // Count conversation exchanges to detect if we should be more proactive
-    const conversationLines = conversationHistory.split('\n').filter(line => line.trim());
-    const customerMessages = conversationLines.filter(line => line.startsWith('Customer:'));
-    const salesMessages = conversationLines.filter(line => line.startsWith('Sales:') || line.startsWith('You:'));
-    const exchangeCount = Math.min(customerMessages.length, salesMessages.length);
-
-    // Check for direct appointment keywords
-    const keywordMatches = appointmentKeywords.filter(keyword => 
-      messageLower.includes(keyword)
-    ).length;
-    confidence += keywordMatches * 0.3;
-
-    // Check for question patterns about availability
-    const questionMatches = questionWords.filter(word => 
-      messageLower.includes(word)
-    ).length;
-    confidence += questionMatches * 0.2;
-
-    // ENHANCED: Check for closing/ending signals (PROACTIVE TRIGGER)
-    const closingSignalMatches = closingSignals.filter(signal => 
-      messageLower.includes(signal)
-    ).length;
-    if (closingSignalMatches > 0) {
-      confidence += 0.6; // High confidence for proactive appointment request
-      intentType = 'conversation_ending';
+    // Analyze conversation stage
+    let stage = 'initial';
+    if (!isInitialContact) {
+      if (conversationHistory.includes('appointment') || conversationHistory.includes('visit')) {
+        stage = 'appointment_discussion';
+      } else if (conversationHistory.includes('price') || conversationHistory.includes('cost')) {
+        stage = 'pricing_discussion';
+      } else if (lastCustomerMessage.length > 0) {
+        stage = 'active_conversation';
+      } else {
+        stage = 'follow_up';
+      }
     }
 
-    // ENHANCED: Check for interest without action (PROACTIVE TRIGGER)
-    const interestMatches = interestWithoutAction.filter(signal => 
-      messageLower.includes(signal)
-    ).length;
-    if (interestMatches > 0 && exchangeCount >= 2) {
-      confidence += 0.4; // Medium-high confidence for follow-up
-      intentType = 'interested_but_stalling';
-    }
+    // Detect customer intent signals
+    const buyingSignals = this.detectBuyingSignals(lastCustomerMessage, conversationHistory);
+    const objectionSignals = this.detectObjectionSignals(lastCustomerMessage);
+    const urgencySignals = this.detectUrgencySignals(lastCustomerMessage);
 
-    // ENHANCED: Proactive trigger for extended conversations without progression
-    if (exchangeCount >= 3 && !historyLower.includes('appointment') && !historyLower.includes('test drive')) {
-      confidence += 0.5; // High confidence for conversations that need direction
-      intentType = 'conversation_stalling';
-    }
-
-    // ENHANCED: Time-based urgency (if it's later in the day, be more direct)
-    const currentHour = new Date().getHours();
-    if (currentHour >= 16 && currentHour <= 18) { // 4-6 PM
-      confidence += 0.2; // Slight boost for end-of-day urgency
-    }
-
-    // Specific intent types (original logic)
-    if (messageLower.includes('test drive')) {
-      intentType = 'test_drive';
-      confidence += 0.4;
-    } else if (messageLower.includes('appointment') || messageLower.includes('schedule')) {
-      intentType = 'consultation';
-      confidence += 0.3;
-    } else if (messageLower.includes('visit') || messageLower.includes('come in')) {
-      intentType = 'visit';
-      confidence += 0.2;
-    }
-
-    // Cap confidence at 1.0
-    confidence = Math.min(confidence, 1.0);
+    // Calculate confidence based on context
+    let confidence = 0.7; // Base confidence
+    if (buyingSignals.length > 0) confidence += 0.2;
+    if (objectionSignals.length > 0) confidence += 0.1; // Objections need careful handling
+    if (urgencySignals.length > 0) confidence += 0.1;
 
     return {
-      detected: confidence > 0.3, // LOWERED threshold from 0.6 to 0.3 for more proactive approach
-      confidence,
-      intentType
+      stage,
+      buyingSignals,
+      objectionSignals,
+      urgencySignals,
+      confidence: Math.min(confidence, 1.0),
+      conversationLength: conversationHistory.split('\n').length,
+      lastMessageLength: lastCustomerMessage.length
     };
   }
 
-  // Generate enhanced AI response with proactive appointment link injection
-  async generateEnhancedResponse(request: EnhancedAIRequest): Promise<EnhancedAIResponse | null> {
+  // Detect buying signals in customer messages
+  private detectBuyingSignals(message: string, history: string): string[] {
+    const signals: string[] = [];
+    const buyingKeywords = [
+      'interested', 'when can', 'available', 'price', 'financing', 'trade',
+      'schedule', 'appointment', 'visit', 'come in', 'test drive',
+      'ready to buy', 'want to purchase', 'looking to get', 'need a car'
+    ];
+
+    const text = (message + ' ' + history).toLowerCase();
+    buyingKeywords.forEach(keyword => {
+      if (text.includes(keyword)) {
+        signals.push(keyword);
+      }
+    });
+
+    return signals;
+  }
+
+  // Detect objection signals
+  private detectObjectionSignals(message: string): string[] {
+    const signals: string[] = [];
+    const objectionKeywords = [
+      'too expensive', 'too much', 'budget', 'can\'t afford',
+      'not sure', 'thinking about it', 'need to discuss',
+      'other options', 'shopping around', 'not ready'
+    ];
+
+    const text = message.toLowerCase();
+    objectionKeywords.forEach(keyword => {
+      if (text.includes(keyword)) {
+        signals.push(keyword);
+      }
+    });
+
+    return signals;
+  }
+
+  // Detect urgency signals
+  private detectUrgencySignals(message: string): string[] {
+    const signals: string[] = [];
+    const urgencyKeywords = [
+      'soon', 'asap', 'quickly', 'urgent', 'need today',
+      'this week', 'right away', 'immediately'
+    ];
+
+    const text = message.toLowerCase();
+    urgencyKeywords.forEach(keyword => {
+      if (text.includes(keyword)) {
+        signals.push(keyword);
+      }
+    });
+
+    return signals;
+  }
+
+  // Get personalization data for the lead
+  private async getPersonalizationData(leadId: string) {
     try {
-      console.log('🎯 [ENHANCED AI] Processing request for', request.leadName);
+      // Get lead personality data
+      const { data: personality } = await supabase
+        .from('lead_personalities')
+        .select('*')
+        .eq('lead_id', leadId)
+        .maybeSingle();
 
-      // Enhanced appointment intent detection
-      const appointmentIntent = this.detectAppointmentIntent(
-        request.lastCustomerMessage, 
-        request.conversationHistory
-      );
-      
-      console.log('📅 [ENHANCED AI] Appointment intent:', appointmentIntent);
+      // Get communication patterns
+      const { data: patterns } = await supabase
+        .from('lead_communication_patterns')
+        .select('*')
+        .eq('lead_id', leadId)
+        .maybeSingle();
 
-      // Call the existing intelligent conversation AI
+      // Get recent conversation data
+      const { data: recentMessages } = await supabase
+        .from('conversations')
+        .select('direction, sent_at, body')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: false })
+        .limit(10);
+
+      return {
+        personality,
+        patterns,
+        recentMessages: recentMessages || [],
+        preferredTone: personality?.communication_style || 'professional',
+        responseSpeed: personality?.decision_speed || 'moderate'
+      };
+    } catch (error) {
+      console.error('Error getting personalization data:', error);
+      return {};
+    }
+  }
+
+  // Call unified AI with enhanced context
+  private async callUnifiedAI(request: any): Promise<string | null> {
+    try {
+      // For now, use a simplified approach - in production, this would call the enhanced edge function
       const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
         body: {
           leadId: request.leadId,
           leadName: request.leadName,
-          vehicleInterest: request.vehicleInterest || '',
+          vehicleInterest: request.vehicleInterest,
           lastCustomerMessage: request.lastCustomerMessage,
           conversationHistory: request.conversationHistory,
-          isInitialContact: request.isInitialContact || false,
-          salespersonName: 'Finn',
-          dealershipName: 'Jason Pilger Chevrolet',
-          appointmentIntent: appointmentIntent, // Pass enhanced intent to AI
-          shouldBeAssertive: appointmentIntent.detected && appointmentIntent.confidence > 0.4 // Tell AI to be more assertive
+          isInitialContact: request.isInitialContact,
+          enhancedContext: {
+            stage: request.contextAnalysis?.stage,
+            buyingSignals: request.contextAnalysis?.buyingSignals,
+            objectionSignals: request.contextAnalysis?.objectionSignals,
+            personalization: request.personalization
+          }
         }
       });
 
-      if (error || !data?.message) {
-        console.error('❌ [ENHANCED AI] Error from base AI:', error);
+      if (error) {
+        console.error('Error calling unified AI:', error);
         return null;
       }
 
-      let finalMessage = data.message;
-      let includesAppointmentLink = false;
-
-      // ENHANCED: More aggressive appointment link inclusion (lowered threshold to 0.3)
-      if (appointmentIntent.detected && appointmentIntent.confidence > 0.3) {
-        console.log('🔗 [ENHANCED AI] Adding appointment booking link (confidence:', appointmentIntent.confidence, ')');
-        
-        try {
-          const appointmentLink = await appointmentLinkService.generateBookingLink({
-            leadId: request.leadId,
-            leadName: request.leadName,
-            vehicleInterest: request.vehicleInterest
-          });
-
-          // Use enhanced appointment message generation with context-specific templates
-          finalMessage = appointmentLinkService.generateContextualAppointmentMessage(
-            appointmentLink,
-            request.leadName,
-            request.vehicleInterest,
-            appointmentIntent.intentType,
-            appointmentIntent.confidence
-          );
-
-          includesAppointmentLink = true;
-          console.log('✅ [ENHANCED AI] Proactive appointment link included in response');
-        } catch (linkError) {
-          console.error('❌ [ENHANCED AI] Error generating appointment link:', linkError);
-          // Fall back to original message if link generation fails
-        }
-      }
-
-      return {
-        message: finalMessage,
-        confidence: data.confidence || 0.9,
-        reasoning: data.reasoning || 'Enhanced AI with proactive appointment intent detection',
-        includesAppointmentLink,
-        appointmentIntent
-      };
-
+      return data?.message || null;
     } catch (error) {
-      console.error('❌ [ENHANCED AI] Error in enhanced response generation:', error);
+      console.error('Error in callUnifiedAI:', error);
       return null;
     }
+  }
+
+  // Calculate message quality score (0-100)
+  private calculateMessageQuality(message: string, context: any): number {
+    let score = 50; // Base score
+
+    // Length optimization (SMS-friendly)
+    if (message.length <= 160) score += 15;
+    else if (message.length <= 200) score += 10;
+    else score -= 5;
+
+    // Personalization bonus
+    if (message.includes('Hi ') || message.includes('Hello ')) score += 10;
+
+    // Context relevance
+    if (context.buyingSignals.length > 0) {
+      // Message should address buying signals
+      const addressesBuyingSignals = context.buyingSignals.some((signal: string) => 
+        message.toLowerCase().includes(signal.toLowerCase())
+      );
+      if (addressesBuyingSignals) score += 15;
+    }
+
+    // Professional tone check
+    if (!message.includes('!!!!') && !message.toLowerCase().includes('urgent')) score += 5;
+
+    // Clear call-to-action
+    if (message.includes('?') || message.includes('call') || message.includes('visit')) score += 10;
+
+    return Math.max(0, Math.min(100, score));
+  }
+
+  // Classify message type for analytics
+  private classifyMessageType(message: string, context: any): 'greeting' | 'follow_up' | 'inventory_mention' | 'appointment_request' | 'closing' {
+    const text = message.toLowerCase();
+    
+    if (context.stage === 'initial') return 'greeting';
+    if (text.includes('appointment') || text.includes('visit') || text.includes('come in')) return 'appointment_request';
+    if (text.includes('available') || text.includes('inventory') || text.includes('vehicle')) return 'inventory_mention';
+    if (text.includes('deal') || text.includes('price') || text.includes('financing')) return 'closing';
+    
+    return 'follow_up';
+  }
+
+  // Calculate optimal follow-up timing
+  private calculateOptimalFollowUpTime(leadId: string, messageType: string, personalization: any): Date {
+    const now = new Date();
+    let hoursToAdd = 24; // Default 24 hours
+
+    // Adjust based on message type
+    switch (messageType) {
+      case 'greeting':
+        hoursToAdd = 4; // Quick follow-up for initial contact
+        break;
+      case 'appointment_request':
+        hoursToAdd = 2; // Quick follow-up for appointment interest
+        break;
+      case 'inventory_mention':
+        hoursToAdd = 6; // Medium follow-up for inventory interest
+        break;
+      case 'closing':
+        hoursToAdd = 1; // Very quick follow-up for closing attempts
+        break;
+      default:
+        hoursToAdd = 24;
+    }
+
+    // Adjust based on lead personality
+    if (personalization.responseSpeed === 'fast') {
+      hoursToAdd *= 0.5; // Faster follow-up for quick decision makers
+    } else if (personalization.responseSpeed === 'slow') {
+      hoursToAdd *= 2; // Slower follow-up for careful decision makers
+    }
+
+    // Ensure business hours
+    const followUpTime = new Date(now.getTime() + (hoursToAdd * 60 * 60 * 1000));
+    return this.adjustForBusinessHours(followUpTime);
+  }
+
+  // Adjust time to fall within business hours
+  private adjustForBusinessHours(date: Date): Date {
+    const hour = date.getHours();
+    const day = date.getDay();
+
+    // If weekend, move to Monday
+    if (day === 0) { // Sunday
+      date.setDate(date.getDate() + 1);
+      date.setHours(9, 0, 0, 0);
+    } else if (day === 6) { // Saturday
+      date.setDate(date.getDate() + 2);
+      date.setHours(9, 0, 0, 0);
+    }
+
+    // If outside business hours (8 AM - 7 PM), adjust
+    if (hour < 8) {
+      date.setHours(9, 0, 0, 0);
+    } else if (hour >= 19) {
+      date.setDate(date.getDate() + 1);
+      date.setHours(9, 0, 0, 0);
+    }
+
+    return date;
   }
 }
 

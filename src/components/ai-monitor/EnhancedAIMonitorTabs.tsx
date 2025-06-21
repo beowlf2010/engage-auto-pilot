@@ -5,23 +5,26 @@ import AIQueueTab from './AIQueueTab';
 import MessageApprovalQueue from './MessageApprovalQueue';
 import EmergencyFixesStatus from './EmergencyFixesStatus';
 import MessageQueueDashboard from './MessageQueueDashboard';
+import QualityMetricsPanel from './QualityMetricsPanel';
 import { 
   Activity, 
   CheckSquare, 
   AlertTriangle, 
-  Clock 
+  Clock,
+  Award,
+  TrendingUp
 } from 'lucide-react';
 
 const EnhancedAIMonitorTabs = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">AI Monitor Dashboard</h1>
-        <p className="text-gray-600 mt-1">Monitor and manage AI messaging system</p>
+        <h1 className="text-2xl font-bold text-gray-900">Enhanced AI Monitor Dashboard</h1>
+        <p className="text-gray-600 mt-1">Advanced AI messaging system with quality scoring and intelligent scheduling</p>
       </div>
 
       <Tabs defaultValue="health" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="health" className="flex items-center space-x-2">
             <Activity className="h-4 w-4" />
             <span>System Health</span>
@@ -32,7 +35,15 @@ const EnhancedAIMonitorTabs = () => {
           </TabsTrigger>
           <TabsTrigger value="schedule" className="flex items-center space-x-2">
             <Clock className="h-4 w-4" />
-            <span>Message Schedule</span>
+            <span>Smart Schedule</span>
+          </TabsTrigger>
+          <TabsTrigger value="quality" className="flex items-center space-x-2">
+            <Award className="h-4 w-4" />
+            <span>Quality Metrics</span>
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center space-x-2">
+            <TrendingUp className="h-4 w-4" />
+            <span>Analytics</span>
           </TabsTrigger>
           <TabsTrigger value="legacy" className="flex items-center space-x-2">
             <AlertTriangle className="h-4 w-4" />
@@ -50,6 +61,21 @@ const EnhancedAIMonitorTabs = () => {
 
         <TabsContent value="schedule" className="mt-6">
           <MessageQueueDashboard />
+        </TabsContent>
+
+        <TabsContent value="quality" className="mt-6">
+          <QualityMetricsPanel />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6">
+          <div className="text-center py-12">
+            <TrendingUp className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Advanced Analytics</h3>
+            <p className="text-gray-500 max-w-md mx-auto">
+              Detailed analytics and reporting features are coming soon. This will include response rate analysis, 
+              conversion tracking, A/B testing results, and performance trends.
+            </p>
+          </div>
         </TabsContent>
 
         <TabsContent value="legacy" className="mt-6">
