@@ -1,37 +1,45 @@
 
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { NavigationItem as NavigationItemType } from './navigationConfig';
-import { getColorClasses } from './navigationStyles';
 
 interface NavigationItemProps {
   item: NavigationItemType;
+  isCollapsed?: boolean;
+  onClick?: () => void;
 }
 
-const NavigationItem: React.FC<NavigationItemProps> = ({ item }) => {
-  const navigate = useNavigate();
+const NavigationItem: React.FC<NavigationItemProps> = ({ item, isCollapsed, onClick }) => {
   const location = useLocation();
-  
-  const Icon = item.icon;
-  const isActive = location.pathname === item.path || 
-    (item.path === '/inventory-dashboard' && location.pathname.startsWith('/inventory')) ||
-    (item.path === '/streamlined-leads' && location.pathname === '/leads') ||
-    (item.path === '/smart-inbox' && location.pathname === '/inbox');
+  const isActive = location.pathname === item.href;
+
+  const handleClick = () => {
+    window.location.href = item.href;
+    onClick?.();
+  };
 
   return (
     <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => navigate(item.path)}
-      className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${getColorClasses(item.color, isActive)}`}
+      variant={isActive ? "secondary" : "ghost"}
+      className={cn(
+        "w-full justify-start gap-3 h-12",
+        isCollapsed && "justify-center px-2"
+      )}
+      onClick={handleClick}
     >
-      <Icon size={16} />
-      <span className="font-medium text-sm">{item.label}</span>
-      {item.badge && (
-        <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-          {item.badge}
-        </span>
+      <item.icon className="h-5 w-5 flex-shrink-0" />
+      {!isCollapsed && (
+        <>
+          <span className="font-medium">{item.label}</span>
+          {item.badge?.type === 'unread' && (
+            <Badge variant="destructive" className="ml-auto">
+              New
+            </Badge>
+          )}
+        </>
       )}
     </Button>
   );
