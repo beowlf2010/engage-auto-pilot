@@ -4,9 +4,7 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
-import { Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
 import LeadDetailsHeader from './lead-details/LeadDetailsHeader';
@@ -23,6 +21,13 @@ interface LeadDetailsModalProps {
   leadId: string;
 }
 
+interface PhoneNumber {
+  id: string;
+  number: string;
+  type: string;
+  is_primary: boolean;
+}
+
 interface LeadDetails {
   id: string;
   first_name: string;
@@ -33,12 +38,7 @@ interface LeadDetails {
   status: string;
   ai_opt_in: boolean;
   created_at: string;
-  phone_numbers: Array<{
-    id: string;
-    number: string;
-    type: string;
-    is_primary: boolean;
-  }>;
+  phone_numbers: PhoneNumber[];
 }
 
 const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, leadId }) => {
@@ -106,10 +106,8 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
 
           <LeadAIStatusCard aiOptIn={leadDetails.ai_opt_in} />
 
-          {/* Lead Created */}
           <div className="text-xs text-gray-500 flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            Lead created: {format(new Date(leadDetails.created_at), 'MMM dd, yyyy hh:mm a')}
+            Lead created: {new Date(leadDetails.created_at).toLocaleDateString()}
           </div>
         </div>
 
