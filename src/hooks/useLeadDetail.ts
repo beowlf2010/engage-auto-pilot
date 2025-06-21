@@ -6,7 +6,7 @@ import { getLeadDetail, LeadDetailData } from '@/services/leadDetailService';
 import { PhoneNumber } from '@/types/lead';
 
 export const useLeadDetail = () => {
-  const { id: leadId } = useParams<{ id: string }>();
+  const { leadId } = useParams<{ leadId: string }>();
   const [showMessageComposer, setShowMessageComposer] = useState(false);
   const queryClient = useQueryClient();
 
