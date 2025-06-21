@@ -2,13 +2,16 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   Clock, 
   MessageSquare, 
   CheckCircle, 
   Bot,
-  Calendar
+  Calendar,
+  Settings
 } from 'lucide-react';
 
 interface LeadsStatsCardsProps {
@@ -25,6 +28,8 @@ interface LeadsStatsCardsProps {
 }
 
 const LeadsStatsCards = ({ stats, onCardClick, activeFilter }: LeadsStatsCardsProps) => {
+  const navigate = useNavigate();
+  
   const cards = [
     {
       id: 'fresh',
@@ -90,40 +95,61 @@ const LeadsStatsCards = ({ stats, onCardClick, activeFilter }: LeadsStatsCardsPr
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-      {cards.map((card) => (
-        <Card 
-          key={card.id}
-          className={`cursor-pointer transition-all hover:shadow-md ${
-            activeFilter === card.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''
-          } ${card.urgent ? 'border-red-200' : ''}`}
-          onClick={() => card.clickable && onCardClick?.(card.id as any)}
-        >
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                {card.title}
-              </CardTitle>
-              <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                <card.icon className={`w-4 h-4 ${card.color}`} />
+    <div className="space-y-4">
+      {/* Quick Settings Navigation */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-medium text-amber-800">SMS Configuration Required</h3>
+            <p className="text-sm text-amber-700">Configure your Twilio credentials to enable messaging</p>
+          </div>
+          <Button 
+            onClick={() => navigate('/settings')}
+            className="flex items-center space-x-2"
+            variant="outline"
+          >
+            <Settings className="w-4 h-4" />
+            <span>Go to Settings</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        {cards.map((card) => (
+          <Card 
+            key={card.id}
+            className={`cursor-pointer transition-all hover:shadow-md ${
+              activeFilter === card.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+            } ${card.urgent ? 'border-red-200' : ''}`}
+            onClick={() => card.clickable && onCardClick?.(card.id as any)}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {card.title}
+                </CardTitle>
+                <div className={`p-2 rounded-lg ${card.bgColor}`}>
+                  <card.icon className={`w-4 h-4 ${card.color}`} />
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${card.color}`}>
-              {card.value}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {card.description}
-            </p>
-            {card.urgent && card.value > 0 && (
-              <Badge variant="destructive" className="mt-2 text-xs">
-                Needs Action
-              </Badge>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${card.color}`}>
+                {card.value}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {card.description}
+              </p>
+              {card.urgent && card.value > 0 && (
+                <Badge variant="destructive" className="mt-2 text-xs">
+                  Needs Action
+                </Badge>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };
