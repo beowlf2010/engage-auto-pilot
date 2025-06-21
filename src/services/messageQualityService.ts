@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface MessageQualityMetrics {
@@ -254,10 +253,16 @@ class MessageQualityService {
         };
       }
 
-      // Calculate average quality
+      // Calculate average quality with safe type checking
       const qualityScores = analytics
-        .map(a => a.inventory_mentioned?.qualityScore)
-        .filter(score => typeof score === 'number');
+        .map(a => {
+          if (a.inventory_mentioned && typeof a.inventory_mentioned === 'object' && a.inventory_mentioned !== null) {
+            const inventoryData = a.inventory_mentioned as any;
+            return typeof inventoryData.qualityScore === 'number' ? inventoryData.qualityScore : null;
+          }
+          return null;
+        })
+        .filter((score): score is number => score !== null);
       
       const averageQuality = qualityScores.length > 0 
         ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length 

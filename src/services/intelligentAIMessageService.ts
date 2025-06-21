@@ -77,10 +77,6 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
       return null;
     }
 
-    if (enhancedResponse.includesAppointmentLink) {
-      console.log('📅 [INTELLIGENT AI MSG] Response includes appointment booking link');
-    }
-
     console.log(`✅ [INTELLIGENT AI MSG] Generated message via enhanced function: ${enhancedResponse.message}`);
     return enhancedResponse.message;
 

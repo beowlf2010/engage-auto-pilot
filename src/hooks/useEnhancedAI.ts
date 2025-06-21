@@ -59,7 +59,11 @@ export const useEnhancedAI = () => {
       const result = await intelligentSchedulingService.scheduleMessage(
         leadId,
         messageContent,
-        context
+        {
+          leadId,
+          messageType: context.messageType,
+          urgencyLevel: context.urgencyLevel
+        }
       );
       
       return result;
