@@ -164,6 +164,7 @@ const MessagePreviewInline = ({
       setError(errorMessage);
       
       // Fallback message based on context
+      const isInitialContact = conversationHistory.length === 0;
       const fallbackMessage = isInitialContact 
         ? `Hi ${leadName.split(' ')[0]}! I'm Finn with Jason Pilger Chevrolet. I wanted to follow up on your interest in ${vehicleInterest}. What questions can I answer for you?`
         : `Thanks for your message! I'm here to help you with any questions about ${vehicleInterest}. What would you like to know?`;
@@ -194,8 +195,8 @@ const MessagePreviewInline = ({
       
       if (!profile) throw new Error('No user profile found');
       
-      // Send the message using the messages service
-      const conversation = await sendMessage(leadId, message, profile, true);
+      // Send the message using the messages service - explicitly cast to boolean
+      const conversation = await sendMessage(leadId, message, profile, true as boolean);
       
       if (conversation) {
         console.log(`✅ [MESSAGE PREVIEW] Message sent successfully`);
