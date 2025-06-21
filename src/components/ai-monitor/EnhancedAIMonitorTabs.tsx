@@ -6,13 +6,16 @@ import MessageApprovalQueue from './MessageApprovalQueue';
 import EmergencyFixesStatus from './EmergencyFixesStatus';
 import MessageQueueDashboard from './MessageQueueDashboard';
 import QualityMetricsPanel from './QualityMetricsPanel';
+import Phase3Dashboard from './Phase3Dashboard';
 import { 
   Activity, 
   CheckSquare, 
   AlertTriangle, 
   Clock,
   Award,
-  TrendingUp
+  TrendingUp,
+  Brain,
+  Zap
 } from 'lucide-react';
 
 const EnhancedAIMonitorTabs = () => {
@@ -20,11 +23,15 @@ const EnhancedAIMonitorTabs = () => {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Enhanced AI Monitor Dashboard</h1>
-        <p className="text-gray-600 mt-1">Advanced AI messaging system with quality scoring and intelligent scheduling</p>
+        <p className="text-gray-600 mt-1">Advanced AI messaging system with intelligent learning and automation</p>
       </div>
 
-      <Tabs defaultValue="health" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+      <Tabs defaultValue="phase3" className="w-full">
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="phase3" className="flex items-center space-x-2">
+            <Brain className="h-4 w-4" />
+            <span>AI Intelligence</span>
+          </TabsTrigger>
           <TabsTrigger value="health" className="flex items-center space-x-2">
             <Activity className="h-4 w-4" />
             <span>System Health</span>
@@ -51,6 +58,10 @@ const EnhancedAIMonitorTabs = () => {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="phase3" className="mt-6">
+          <Phase3Dashboard />
+        </TabsContent>
+
         <TabsContent value="health" className="mt-6">
           <EmergencyFixesStatus />
         </TabsContent>
@@ -70,10 +81,10 @@ const EnhancedAIMonitorTabs = () => {
         <TabsContent value="analytics" className="mt-6">
           <div className="text-center py-12">
             <TrendingUp className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Advanced Analytics</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Legacy Analytics</h3>
             <p className="text-gray-500 max-w-md mx-auto">
-              Detailed analytics and reporting features are coming soon. This will include response rate analysis, 
-              conversion tracking, A/B testing results, and performance trends.
+              Basic analytics features. For advanced analytics with AI insights, 
+              predictive modeling, and real-time learning, check the AI Intelligence tab.
             </p>
           </div>
         </TabsContent>

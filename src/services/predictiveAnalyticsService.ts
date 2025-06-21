@@ -1,385 +1,466 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { aiLearningService } from '@/services/aiLearningService';
 
 export interface PredictiveInsight {
-  type: 'conversion_probability' | 'optimal_timing' | 'content_recommendation' | 'churn_risk';
+  id: string;
+  type: 'conversion_prediction' | 'churn_risk' | 'optimal_timing' | 'content_recommendation';
+  leadId?: string;
   confidence: number;
   prediction: any;
-  reasoning: string[];
-  recommendedActions: string[];
-  expectedOutcome: string;
+  reasoning: string;
+  createdAt: Date;
+  expiresAt: Date;
 }
 
 export interface LeadPrediction {
   leadId: string;
   conversionProbability: number;
-  predictedCloseDate: Date | null;
-  predictedValue: number;
   churnRisk: number;
-  optimalContactTimes: number[];
-  recommendedMessages: string[];
-  predictionFactors: Record<string, number>;
+  predictedValue: number;
+  optimalContactTime: Date;
+  recommendedActions: string[];
+  confidenceScore: number;
 }
 
 class PredictiveAnalyticsService {
-  // Predict lead conversion probability using historical patterns
-  async predictLeadConversion(leadId: string): Promise<LeadPrediction> {
+  // Predict lead conversion probability using behavioral patterns
+  async predictLeadConversion(leadId: string): Promise<LeadPrediction | null> {
     try {
       // Get lead data and interaction history
-      const { data: leadData } = await supabase
+      const { data: lead } = await supabase
         .from('leads')
-        .select(`
-          *,
-          conversations(count),
-          appointments(count),
-          lead_inventory_interests(count)
-        `)
+        .select('*')
         .eq('id', leadId)
         .single();
 
-      if (!leadData) {
-        throw new Error('Lead not found');
-      }
+      if (!lead) return null;
 
-      // Get similar leads for pattern matching
-      const { data: similarLeads } = await supabase
+      // Get conversation history
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: true });
+
+      // Get communication patterns
+      const { data: patterns } = await supabase
+        .from('lead_communication_patterns')
+        .select('*')
+        .eq('lead_id', leadId)
+        .single();
+
+      // Get similar successful leads for comparison
+      const { data: successfulLeads } = await supabase
         .from('ai_learning_outcomes')
         .select('*')
-        .eq('outcome_type', 'conversion')
-        .limit(100);
+        .in('outcome_type', ['sale', 'appointment_booked'])
+        .limit(50);
 
-      // Calculate conversion probability based on multiple factors
-      const factors = await this.calculateConversionFactors(leadData);
-      const conversionProbability = this.calculateWeightedProbability(factors);
-
-      // Predict optimal contact times
-      const optimalTimes = await this.predictOptimalContactTimes(leadId);
-
-      // Predict message recommendations
-      const recommendedMessages = await this.generateMessageRecommendations(leadData, factors);
-
-      // Calculate predicted close date and value
-      const predictedCloseDate = this.predictCloseDate(conversionProbability, factors);
-      const predictedValue = this.predictDealValue(leadData, factors);
-
-      // Calculate churn risk
-      const churnRisk = await this.calculateChurnRisk(leadId);
+      // Calculate prediction factors
+      const factors = this.calculatePredictionFactors(lead, conversations || [], patterns, successfulLeads || []);
+      
+      // Generate prediction
+      const conversionProbability = this.calculateConversionProbability(factors);
+      const churnRisk = this.calculateChurnRisk(factors);
+      const predictedValue = this.estimatePotentialValue(factors);
+      const optimalContactTime = this.predictOptimalContactTime(factors);
+      const recommendedActions = this.generateRecommendedActions(factors);
 
       return {
         leadId,
         conversionProbability,
-        predictedCloseDate,
-        predictedValue,
         churnRisk,
-        optimalContactTimes: optimalTimes,
-        recommendedMessages,
-        predictionFactors: factors
+        predictedValue,
+        optimalContactTime,
+        recommendedActions,
+        confidenceScore: factors.dataQuality
       };
+
     } catch (error) {
       console.error('Error predicting lead conversion:', error);
-      throw error;
+      return null;
     }
   }
 
-  // Calculate various factors that influence conversion
-  private async calculateConversionFactors(leadData: any): Promise<Record<string, number>> {
-    const factors: Record<string, number> = {};
-
-    // Response rate factor
-    const { data: conversations } = await supabase
-      .from('conversations')
-      .select('direction')
-      .eq('lead_id', leadData.id);
-
-    if (conversations && conversations.length > 0) {
-      const outbound = conversations.filter(c => c.direction === 'out').length;
-      const inbound = conversations.filter(c => c.direction === 'in').length;
-      factors.responseRate = outbound > 0 ? inbound / outbound : 0;
-    } else {
-      factors.responseRate = 0;
-    }
-
-    // Engagement factor
-    factors.messageCount = conversations?.length || 0;
-    factors.engagementScore = Math.min(factors.messageCount / 10, 1); // Normalize to 0-1
-
-    // Time since last interaction
-    const daysSinceLastReply = leadData.last_reply_at 
-      ? (Date.now() - new Date(leadData.last_reply_at).getTime()) / (1000 * 60 * 60 * 24)
-      : 999;
-    factors.recencyScore = Math.max(0, 1 - (daysSinceLastReply / 30)); // Decay over 30 days
-
-    // Vehicle interest specificity
-    const vehicleInterest = leadData.vehicle_interest || '';
-    factors.specificityScore = this.calculateInterestSpecificity(vehicleInterest);
-
-    // Source quality (some sources convert better)
-    factors.sourceQuality = this.getSourceQuality(leadData.source);
-
-    // Appointment factor
-    const { data: appointments } = await supabase
-      .from('appointments')
-      .select('status')
-      .eq('lead_id', leadData.id);
+  // Calculate various prediction factors
+  private calculatePredictionFactors(
+    lead: any,
+    conversations: any[],
+    patterns: any,
+    successfulLeads: any[]
+  ) {
+    // Engagement factors
+    const totalMessages = conversations.length;
+    const customerMessages = conversations.filter(c => c.direction === 'in').length;
+    const responseRate = totalMessages > 0 ? customerMessages / totalMessages : 0;
+    const avgResponseTime = this.calculateAverageResponseTime(conversations);
     
-    factors.appointmentFactor = appointments?.length > 0 ? 0.8 : 0;
+    // Timing factors
+    const daysSinceFirstContact = lead.created_at 
+      ? (Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24)
+      : 0;
+    const daysSinceLastReply = lead.last_reply_at
+      ? (Date.now() - new Date(lead.last_reply_at).getTime()) / (1000 * 60 * 60 * 24)
+      : 999;
 
-    return factors;
-  }
+    // Interest factors
+    const hasSpecificVehicleInterest = lead.vehicle_interest && 
+      !lead.vehicle_interest.includes('finding the right vehicle');
+    const hasPriceRange = lead.preferred_price_min || lead.preferred_price_max;
+    
+    // Behavioral factors
+    const messageSentiment = this.analyzeSentiment(conversations);
+    const engagementTrend = this.calculateEngagementTrend(conversations);
+    
+    // Pattern matching with successful leads
+    const similarityScore = this.calculateSimilarityToSuccessfulLeads(
+      { responseRate, avgResponseTime, daysSinceFirstContact, hasSpecificVehicleInterest },
+      successfulLeads
+    );
 
-  // Calculate weighted probability from factors
-  private calculateWeightedProbability(factors: Record<string, number>): number {
-    const weights = {
-      responseRate: 0.25,
-      engagementScore: 0.20,
-      recencyScore: 0.15,
-      specificityScore: 0.15,
-      sourceQuality: 0.10,
-      appointmentFactor: 0.15
+    // Data quality assessment
+    const dataQuality = this.assessDataQuality(conversations, patterns);
+
+    return {
+      totalMessages,
+      responseRate,
+      avgResponseTime,
+      daysSinceFirstContact,
+      daysSinceLastReply,
+      hasSpecificVehicleInterest,
+      hasPriceRange,
+      messageSentiment,
+      engagementTrend,
+      similarityScore,
+      dataQuality
     };
-
-    let probability = 0;
-    for (const [factor, value] of Object.entries(factors)) {
-      const weight = weights[factor as keyof typeof weights] || 0;
-      probability += value * weight;
-    }
-
-    return Math.min(Math.max(probability, 0), 1); // Clamp between 0 and 1
   }
 
-  // Predict optimal contact times based on response patterns
-  private async predictOptimalContactTimes(leadId: string): Promise<number[]> {
-    const { data: analytics } = await supabase
-      .from('ai_message_analytics')
-      .select('hour_of_day, response_time_hours')
-      .eq('lead_id', leadId)
-      .not('response_time_hours', 'is', null);
+  // Calculate conversion probability (0-1)
+  private calculateConversionProbability(factors: any): number {
+    let probability = 0.3; // Base probability
 
-    if (!analytics || analytics.length === 0) {
-      // Default optimal times if no data
-      return [9, 14, 17]; // 9 AM, 2 PM, 5 PM
+    // Response engagement boost
+    if (factors.responseRate > 0.6) probability += 0.25;
+    else if (factors.responseRate > 0.3) probability += 0.15;
+    else if (factors.responseRate < 0.1) probability -= 0.2;
+
+    // Response timing boost
+    if (factors.avgResponseTime < 2) probability += 0.2;
+    else if (factors.avgResponseTime < 6) probability += 0.1;
+    else if (factors.avgResponseTime > 24) probability -= 0.15;
+
+    // Interest specificity boost
+    if (factors.hasSpecificVehicleInterest) probability += 0.15;
+    if (factors.hasPriceRange) probability += 0.1;
+
+    // Sentiment boost
+    if (factors.messageSentiment > 0.6) probability += 0.2;
+    else if (factors.messageSentiment < 0.3) probability -= 0.15;
+
+    // Engagement trend
+    if (factors.engagementTrend > 0) probability += 0.1;
+    else if (factors.engagementTrend < -0.2) probability -= 0.2;
+
+    // Recent activity penalty
+    if (factors.daysSinceLastReply > 14) probability -= 0.3;
+    else if (factors.daysSinceLastReply > 7) probability -= 0.1;
+
+    // Similarity to successful leads
+    probability += factors.similarityScore * 0.2;
+
+    // Keep within bounds
+    return Math.max(0, Math.min(1, probability));
+  }
+
+  // Calculate churn risk (0-1)
+  private calculateChurnRisk(factors: any): number {
+    let risk = 0.2; // Base risk
+
+    // Time-based risk
+    if (factors.daysSinceLastReply > 21) risk += 0.4;
+    else if (factors.daysSinceLastReply > 14) risk += 0.3;
+    else if (factors.daysSinceLastReply > 7) risk += 0.1;
+
+    // Engagement risk
+    if (factors.responseRate < 0.1) risk += 0.3;
+    else if (factors.responseRate < 0.3) risk += 0.2;
+
+    // Sentiment risk
+    if (factors.messageSentiment < 0.3) risk += 0.2;
+
+    // Trend risk
+    if (factors.engagementTrend < -0.3) risk += 0.3;
+
+    return Math.max(0, Math.min(1, risk));
+  }
+
+  // Estimate potential deal value
+  private estimatePotentialValue(factors: any): number {
+    let baseValue = 25000; // Average vehicle price
+
+    // Interest specificity multiplier
+    if (factors.hasSpecificVehicleInterest) baseValue *= 1.2;
+    if (factors.hasPriceRange) baseValue *= 1.1;
+
+    // Engagement multiplier
+    if (factors.responseRate > 0.5) baseValue *= 1.3;
+    else if (factors.responseRate < 0.2) baseValue *= 0.8;
+
+    // Sentiment multiplier
+    if (factors.messageSentiment > 0.6) baseValue *= 1.2;
+    else if (factors.messageSentiment < 0.4) baseValue *= 0.9;
+
+    return Math.round(baseValue);
+  }
+
+  // Predict optimal contact time
+  private predictOptimalContactTime(factors: any): Date {
+    const now = new Date();
+    let optimalTime = new Date(now);
+
+    // If recent engagement, contact soon
+    if (factors.daysSinceLastReply < 1) {
+      optimalTime.setHours(optimalTime.getHours() + 4);
+    } else if (factors.daysSinceLastReply < 3) {
+      optimalTime.setHours(optimalTime.getHours() + 12);
+    } else if (factors.daysSinceLastReply < 7) {
+      optimalTime.setDate(optimalTime.getDate() + 1);
+    } else {
+      // For cold leads, wait for next business day
+      optimalTime.setDate(optimalTime.getDate() + 2);
     }
 
-    // Find hours with fastest response times
-    const hourMap = new Map<number, number[]>();
-    analytics.forEach(a => {
-      if (!hourMap.has(a.hour_of_day)) {
-        hourMap.set(a.hour_of_day, []);
+    // Adjust to business hours (9 AM - 6 PM)
+    if (optimalTime.getHours() < 9) {
+      optimalTime.setHours(9, 0, 0, 0);
+    } else if (optimalTime.getHours() >= 18) {
+      optimalTime.setDate(optimalTime.getDate() + 1);
+      optimalTime.setHours(9, 0, 0, 0);
+    }
+
+    return optimalTime;
+  }
+
+  // Generate recommended actions
+  private generateRecommendedActions(factors: any): string[] {
+    const actions: string[] = [];
+
+    if (factors.churnRisk > 0.7) {
+      actions.push('High churn risk - escalate to human agent immediately');
+    } else if (factors.churnRisk > 0.5) {
+      actions.push('Medium churn risk - send personalized re-engagement message');
+    }
+
+    if (factors.conversionProbability > 0.7) {
+      actions.push('High conversion probability - offer test drive or appointment');
+    } else if (factors.conversionProbability > 0.5) {
+      actions.push('Good conversion potential - provide detailed vehicle information');
+    }
+
+    if (factors.responseRate > 0.6) {
+      actions.push('Highly engaged - maintain regular communication');
+    } else if (factors.responseRate < 0.2) {
+      actions.push('Low engagement - try different communication approach');
+    }
+
+    if (factors.daysSinceLastReply > 7) {
+      actions.push('Re-engagement needed - send compelling offer or new inventory alert');
+    }
+
+    if (factors.messageSentiment < 0.4) {
+      actions.push('Address concerns - focus on objection handling');
+    }
+
+    return actions.slice(0, 3); // Return top 3 actions
+  }
+
+  // Helper methods
+  private calculateAverageResponseTime(conversations: any[]): number {
+    const responses = conversations
+      .filter(c => c.direction === 'in')
+      .map((response, index) => {
+        const prevMessage = conversations
+          .slice(0, index)
+          .reverse()
+          .find(c => c.direction === 'out');
+        
+        if (prevMessage) {
+          const timeDiff = new Date(response.sent_at).getTime() - new Date(prevMessage.sent_at).getTime();
+          return timeDiff / (1000 * 60 * 60); // Convert to hours
+        }
+        return null;
+      })
+      .filter(time => time !== null);
+
+    return responses.length > 0 
+      ? responses.reduce((sum, time) => sum + time, 0) / responses.length 
+      : 24;
+  }
+
+  private analyzeSentiment(conversations: any[]): number {
+    const customerMessages = conversations.filter(c => c.direction === 'in');
+    if (customerMessages.length === 0) return 0.5;
+
+    // Simple sentiment analysis based on keywords
+    let totalSentiment = 0;
+    
+    customerMessages.forEach(msg => {
+      const text = msg.body.toLowerCase();
+      let sentiment = 0.5; // Neutral
+
+      // Positive indicators
+      if (text.includes('interested') || text.includes('yes') || text.includes('great') || 
+          text.includes('good') || text.includes('perfect') || text.includes('love')) {
+        sentiment += 0.3;
       }
-      hourMap.get(a.hour_of_day)!.push(a.response_time_hours);
+
+      // Negative indicators
+      if (text.includes('not interested') || text.includes('no') || text.includes('stop') || 
+          text.includes('expensive') || text.includes('busy') || text.includes('maybe later')) {
+        sentiment -= 0.3;
+      }
+
+      totalSentiment += Math.max(0, Math.min(1, sentiment));
     });
 
-    // Calculate average response time per hour
-    const hourAverages = Array.from(hourMap.entries()).map(([hour, times]) => ({
-      hour,
-      avgResponse: times.reduce((sum, time) => sum + time, 0) / times.length
-    }));
-
-    // Sort by fastest response and return top 3 hours
-    return hourAverages
-      .sort((a, b) => a.avgResponse - b.avgResponse)
-      .slice(0, 3)
-      .map(h => h.hour);
+    return totalSentiment / customerMessages.length;
   }
 
-  // Generate message recommendations based on successful patterns
-  private async generateMessageRecommendations(leadData: any, factors: Record<string, number>): Promise<string[]> {
-    // Get high-performing message templates for similar leads
-    const { data: templates } = await supabase
-      .from('ai_template_performance')
-      .select('*')
-      .gte('performance_score', 0.7)
-      .order('performance_score', { ascending: false })
-      .limit(5);
+  private calculateEngagementTrend(conversations: any[]): number {
+    if (conversations.length < 4) return 0;
 
-    if (!templates) return [];
+    const recent = conversations.slice(-4);
+    const earlier = conversations.slice(-8, -4);
 
-    // Filter templates based on lead characteristics
-    return templates
-      .filter(t => this.isTemplateRelevant(t, leadData, factors))
-      .map(t => t.template_content)
-      .slice(0, 3);
+    const recentEngagement = recent.filter(c => c.direction === 'in').length / recent.length;
+    const earlierEngagement = earlier.length > 0 
+      ? earlier.filter(c => c.direction === 'in').length / earlier.length 
+      : 0;
+
+    return recentEngagement - earlierEngagement;
   }
 
-  // Check if template is relevant for the lead
-  private isTemplateRelevant(template: any, leadData: any, factors: Record<string, number>): boolean {
-    // Simple relevance check - can be enhanced with ML
-    const vehicleInterest = leadData.vehicle_interest?.toLowerCase() || '';
-    const templateContent = template.template_content?.toLowerCase() || '';
+  private calculateSimilarityToSuccessfulLeads(factors: any, successfulLeads: any[]): number {
+    if (successfulLeads.length === 0) return 0;
+
+    // Calculate average characteristics of successful leads
+    let avgResponseRate = 0, avgResponseTime = 0, avgDaysToSuccess = 0;
+    let specificInterestCount = 0;
+
+    successfulLeads.forEach(lead => {
+      // This would need to be enhanced with actual lead characteristic data
+      avgResponseRate += 0.4; // Placeholder
+      avgResponseTime += 8; // Placeholder
+      avgDaysToSuccess += lead.days_to_outcome || 14;
+      if (Math.random() > 0.5) specificInterestCount++; // Placeholder
+    });
+
+    avgResponseRate /= successfulLeads.length;
+    avgResponseTime /= successfulLeads.length;
+    avgDaysToSuccess /= successfulLeads.length;
+    const specificInterestRate = specificInterestCount / successfulLeads.length;
+
+    // Calculate similarity score
+    let similarity = 0;
     
-    // Check for vehicle mention alignment
-    if (vehicleInterest.includes('truck') && templateContent.includes('truck')) return true;
-    if (vehicleInterest.includes('suv') && templateContent.includes('suv')) return true;
-    if (vehicleInterest.includes('sedan') && templateContent.includes('sedan')) return true;
+    // Response rate similarity
+    similarity += 1 - Math.abs(factors.responseRate - avgResponseRate);
     
-    // Default relevance for general templates
-    return template.performance_score > 0.8;
+    // Response time similarity (inverse - lower is better)
+    const responseTimeDiff = Math.abs(factors.avgResponseTime - avgResponseTime) / 24;
+    similarity += Math.max(0, 1 - responseTimeDiff);
+    
+    // Interest specificity similarity
+    const hasSpecific = factors.hasSpecificVehicleInterest ? 1 : 0;
+    similarity += 1 - Math.abs(hasSpecific - specificInterestRate);
+
+    return similarity / 3; // Average of all factors
   }
 
-  // Predict close date based on conversion probability and factors
-  private predictCloseDate(probability: number, factors: Record<string, number>): Date | null {
-    if (probability < 0.3) return null; // Low probability leads unlikely to close
+  private assessDataQuality(conversations: any[], patterns: any): number {
+    let quality = 0.5; // Base quality
 
-    // Base days to close based on probability
-    const baseDays = Math.round(60 * (1 - probability)); // Higher probability = faster close
+    // Conversation volume
+    if (conversations.length > 10) quality += 0.2;
+    else if (conversations.length > 5) quality += 0.1;
+    else if (conversations.length < 3) quality -= 0.2;
+
+    // Two-way conversation
+    const customerMessages = conversations.filter(c => c.direction === 'in').length;
+    const totalMessages = conversations.length;
+    if (customerMessages > 0 && totalMessages > 0) {
+      const ratio = customerMessages / totalMessages;
+      if (ratio > 0.2 && ratio < 0.8) quality += 0.2;
+    }
+
+    // Pattern data availability
+    if (patterns) quality += 0.1;
+
+    // Recent data
+    const recentMessages = conversations.filter(c => {
+      const msgDate = new Date(c.sent_at);
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      return msgDate > weekAgo;
+    });
     
-    // Adjust based on engagement
-    const engagementAdjustment = (factors.engagementScore - 0.5) * 14; // +/- 2 weeks
-    
-    const totalDays = Math.max(7, baseDays + engagementAdjustment); // Minimum 1 week
-    
-    const closeDate = new Date();
-    closeDate.setDate(closeDate.getDate() + totalDays);
-    
-    return closeDate;
+    if (recentMessages.length > 0) quality += 0.2;
+
+    return Math.max(0, Math.min(1, quality));
   }
 
-  // Predict deal value based on vehicle interest and historical data
-  private predictDealValue(leadData: any, factors: Record<string, number>): number {
-    // Base value estimates by vehicle type
-    const vehicleInterest = leadData.vehicle_interest?.toLowerCase() || '';
-    let baseValue = 25000; // Default
-
-    if (vehicleInterest.includes('truck')) baseValue = 45000;
-    else if (vehicleInterest.includes('suv')) baseValue = 35000;
-    else if (vehicleInterest.includes('luxury')) baseValue = 55000;
-    else if (vehicleInterest.includes('sedan')) baseValue = 28000;
-
-    // Adjust based on engagement and source quality
-    const multiplier = 0.8 + (factors.engagementScore * 0.3) + (factors.sourceQuality * 0.2);
-    
-    return Math.round(baseValue * multiplier);
-  }
-
-  // Calculate churn risk based on interaction patterns
-  private async calculateChurnRisk(leadId: string): Promise<number> {
-    const { data: leadData } = await supabase
-      .from('leads')
-      .select('last_reply_at, created_at')
-      .eq('id', leadId)
-      .single();
-
-    if (!leadData) return 0.5; // Default medium risk
-
-    const daysSinceCreated = (Date.now() - new Date(leadData.created_at).getTime()) / (1000 * 60 * 60 * 24);
-    const daysSinceLastReply = leadData.last_reply_at 
-      ? (Date.now() - new Date(leadData.last_reply_at).getTime()) / (1000 * 60 * 60 * 24)
-      : daysSinceCreated;
-
-    // Higher risk if no recent interaction and lead is getting old
-    let churnRisk = 0;
-    
-    if (daysSinceLastReply > 14) churnRisk += 0.4;
-    if (daysSinceLastReply > 30) churnRisk += 0.3;
-    if (daysSinceCreated > 90) churnRisk += 0.2;
-    if (daysSinceCreated > 180) churnRisk += 0.1;
-
-    return Math.min(churnRisk, 1);
-  }
-
-  // Calculate interest specificity score
-  private calculateInterestSpecificity(interest: string): number {
-    if (!interest) return 0.1;
-    
-    const specificTerms = ['vin', 'stock', 'year', 'model', 'trim', 'color', 'mileage'];
-    const mentionedTerms = specificTerms.filter(term => 
-      interest.toLowerCase().includes(term)
-    );
-    
-    return Math.min(mentionedTerms.length / 3, 1); // Normalize to max 1
-  }
-
-  // Get source quality score
-  private getSourceQuality(source: string): number {
-    const sourceScores: Record<string, number> = {
-      'website': 0.8,
-      'referral': 0.9,
-      'facebook': 0.6,
-      'google': 0.7,
-      'autotrader': 0.75,
-      'cars.com': 0.75,
-      'walk-in': 0.85,
-      'phone': 0.8,
-      'unknown': 0.5
-    };
-
-    return sourceScores[source?.toLowerCase()] || 0.5;
-  }
-
-  // Generate predictive insights for all active leads
+  // Generate predictive insights for multiple leads
   async generatePredictiveInsights(): Promise<PredictiveInsight[]> {
     const insights: PredictiveInsight[] = [];
 
     try {
-      // Get active leads
-      const { data: activeLeads } = await supabase
+      // Get active leads for analysis
+      const { data: leads } = await supabase
         .from('leads')
-        .select('id, first_name, last_name, vehicle_interest')
+        .select('id')
         .eq('ai_opt_in', true)
-        .eq('ai_sequence_paused', false)
-        .limit(50);
+        .limit(20);
 
-      if (!activeLeads) return insights;
+      if (!leads) return insights;
 
-      for (const lead of activeLeads) {
+      for (const lead of leads) {
         const prediction = await this.predictLeadConversion(lead.id);
         
-        // Generate conversion probability insight
-        if (prediction.conversionProbability > 0.7) {
-          insights.push({
-            type: 'conversion_probability',
-            confidence: prediction.conversionProbability,
-            prediction: {
+        if (prediction) {
+          // High conversion probability insight
+          if (prediction.conversionProbability > 0.7) {
+            insights.push({
+              id: `conversion_${lead.id}_${Date.now()}`,
+              type: 'conversion_prediction',
               leadId: lead.id,
-              leadName: `${lead.first_name} ${lead.last_name}`,
-              probability: prediction.conversionProbability,
-              predictedValue: prediction.predictedValue
-            },
-            reasoning: [
-              'High engagement score',
-              'Strong response pattern',
-              'Recent interaction activity'
-            ],
-            recommendedActions: [
-              'Schedule follow-up call',
-              'Send personalized offer',
-              'Prioritize in sales queue'
-            ],
-            expectedOutcome: `High probability conversion worth $${prediction.predictedValue.toLocaleString()}`
-          });
-        }
+              confidence: prediction.confidenceScore,
+              prediction: { probability: prediction.conversionProbability },
+              reasoning: `High conversion probability (${Math.round(prediction.conversionProbability * 100)}%) based on engagement patterns`,
+              createdAt: new Date(),
+              expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            });
+          }
 
-        // Generate churn risk insight
-        if (prediction.churnRisk > 0.6) {
-          insights.push({
-            type: 'churn_risk',
-            confidence: prediction.churnRisk,
-            prediction: {
+          // High churn risk insight
+          if (prediction.churnRisk > 0.6) {
+            insights.push({
+              id: `churn_${lead.id}_${Date.now()}`,
+              type: 'churn_risk',
               leadId: lead.id,
-              leadName: `${lead.first_name} ${lead.last_name}`,
-              churnRisk: prediction.churnRisk
-            },
-            reasoning: [
-              'Extended period without response',
-              'Declining engagement pattern',
-              'Lead aging without progress'
-            ],
-            recommendedActions: [
-              'Send re-engagement campaign',
-              'Offer special incentive',
-              'Human intervention recommended'
-            ],
-            expectedOutcome: 'Prevent lead churn and re-engage customer'
-          });
+              confidence: prediction.confidenceScore,
+              prediction: { risk: prediction.churnRisk },
+              reasoning: `High churn risk (${Math.round(prediction.churnRisk * 100)}%) - immediate action needed`,
+              createdAt: new Date(),
+              expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000)
+            });
+          }
         }
       }
 
-      return insights;
     } catch (error) {
       console.error('Error generating predictive insights:', error);
-      return insights;
     }
+
+    return insights;
   }
 }
 
