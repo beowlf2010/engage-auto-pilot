@@ -10,8 +10,8 @@ interface ValidationDecisionCardProps {
   vehicleInterest: string;
   nameValidation: any;
   vehicleValidation: any;
-  nameDecision: 'approved' | 'denied' | null;
-  vehicleDecision: 'approved' | 'denied' | null;
+  nameDecision: 'approved' | 'denied' | '' | null;
+  vehicleDecision: 'approved' | 'denied' | '' | null;
   onNameDecision: (decision: 'approved' | 'denied') => void;
   onVehicleDecision: (decision: 'approved' | 'denied') => void;
   onGenerate: () => void;
@@ -30,7 +30,7 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
   onGenerate,
   isGenerating
 }) => {
-  const canGenerate = nameDecision !== null && vehicleDecision !== null;
+  const canGenerate = nameDecision !== null && nameDecision !== '' && vehicleDecision !== null && vehicleDecision !== '';
 
   return (
     <Card>
