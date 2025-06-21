@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MessageSquare, Send, RefreshCcw, Eye, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { generateInitialOutreachMessage } from '@/services/proactive/initialOutreachService';
+import { sendMessage } from '@/services/messagesService';
 import { toast } from '@/hooks/use-toast';
 
 interface MessagePreviewInlineProps {
@@ -168,23 +168,20 @@ const MessagePreviewInline = ({
       
       if (!profile) throw new Error('No user profile found');
       
-      // Send the message using the messages service
-      const { sendMessage } = await import('@/services/messagesService');
+      // Send the message using the messages service (this will handle status transitions)
       const conversation = await sendMessage(leadId, message, profile, true);
       
       if (conversation) {
         console.log(`✅ [MESSAGE PREVIEW] Message sent successfully`);
         
-        // Update lead status to reflect message was sent
+        // Update lead AI scheduling
         const nextSendTime = new Date();
         nextSendTime.setTime(nextSendTime.getTime() + (24 * 60 * 60 * 1000));
 
         await supabase
           .from('leads')
           .update({
-            ai_opt_in: true,
             ai_stage: 'initial_contact_sent',
-            ai_messages_sent: 1,
             next_ai_send_at: nextSendTime.toISOString(),
             pending_human_response: false
           })
@@ -192,7 +189,7 @@ const MessagePreviewInline = ({
         
         toast({
           title: "Message Sent",
-          description: `AI message sent successfully to ${leadName}`,
+          description: `AI message sent successfully to ${leadName}. Lead status updated to engaged.`,
         });
         
         // Trigger the callback to refresh the queue

@@ -1,7 +1,15 @@
 
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, MessageSquare, UserCheck, UserX, Clock } from "lucide-react";
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Users, 
+  Clock, 
+  MessageSquare, 
+  CheckCircle, 
+  Bot,
+  Calendar
+} from 'lucide-react';
 
 interface LeadsStatsCardsProps {
   stats: {
@@ -13,105 +21,111 @@ interface LeadsStatsCardsProps {
     fresh: number;
   };
   onCardClick?: (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled') => void;
-  activeFilter?: string;
+  activeFilter?: string | null;
 }
 
-const LeadsStatsCards: React.FC<LeadsStatsCardsProps> = ({ 
-  stats, 
-  onCardClick,
-  activeFilter 
-}) => (
-  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-    <Card 
-      className={`bg-green-50 border-green-200 cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
-        activeFilter === 'fresh' ? 'ring-2 ring-green-400 shadow-lg' : ''
-      }`}
-      onClick={() => onCardClick?.('fresh')}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-green-700">Fresh Today</CardTitle>
-        <Clock className="h-4 w-4 text-green-600" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold text-green-700">{stats.fresh}</div>
-      </CardContent>
-    </Card>
-    
-    <Card 
-      className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
-        activeFilter === 'all' ? 'ring-2 ring-blue-400 shadow-lg' : ''
-      }`}
-      onClick={() => onCardClick?.('all')}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
-        <Users className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.total}</div>
-      </CardContent>
-    </Card>
-    
-    <Card 
-      className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
-        activeFilter === 'no_contact' ? 'ring-2 ring-blue-400 shadow-lg' : ''
-      }`}
-      onClick={() => onCardClick?.('no_contact')}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">No Contact</CardTitle>
-        <UserX className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.noContact}</div>
-      </CardContent>
-    </Card>
-    
-    <Card 
-      className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
-        activeFilter === 'contact_attempted' ? 'ring-2 ring-blue-400 shadow-lg' : ''
-      }`}
-      onClick={() => onCardClick?.('contact_attempted')}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Contacted</CardTitle>
-        <MessageSquare className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.contacted}</div>
-      </CardContent>
-    </Card>
-    
-    <Card 
-      className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
-        activeFilter === 'response_received' ? 'ring-2 ring-blue-400 shadow-lg' : ''
-      }`}
-      onClick={() => onCardClick?.('response_received')}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Responded</CardTitle>
-        <UserCheck className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.responded}</div>
-      </CardContent>
-    </Card>
-    
-    <Card 
-      className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
-        activeFilter === 'ai_enabled' ? 'ring-2 ring-blue-400 shadow-lg' : ''
-      }`}
-      onClick={() => onCardClick?.('ai_enabled')}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Finn AI Enabled</CardTitle>
-        <Users className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{stats.aiEnabled}</div>
-      </CardContent>
-    </Card>
-  </div>
-);
+const LeadsStatsCards = ({ stats, onCardClick, activeFilter }: LeadsStatsCardsProps) => {
+  const cards = [
+    {
+      id: 'fresh',
+      title: 'Fresh Today',
+      value: stats.fresh,
+      description: 'New leads today',
+      icon: Calendar,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-50',
+      clickable: true
+    },
+    {
+      id: 'all',
+      title: 'Total Leads',
+      value: stats.total,
+      description: 'All active leads',
+      icon: Users,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      clickable: true
+    },
+    {
+      id: 'no_contact',
+      title: 'Need Attention',
+      value: stats.noContact,
+      description: 'Not contacted yet',
+      icon: Clock,
+      color: 'text-red-600',
+      bgColor: 'bg-red-50',
+      clickable: true,
+      urgent: stats.noContact > 0
+    },
+    {
+      id: 'contact_attempted',
+      title: 'Contacted',
+      value: stats.contacted,
+      description: 'Outreach attempted',
+      icon: MessageSquare,
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-50',
+      clickable: true
+    },
+    {
+      id: 'response_received',
+      title: 'Engaged',
+      value: stats.responded,
+      description: 'In conversation',
+      icon: CheckCircle,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+      clickable: true
+    },
+    {
+      id: 'ai_enabled',
+      title: 'AI Enabled',
+      value: stats.aiEnabled,
+      description: 'Finn AI active',
+      icon: Bot,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      clickable: true
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      {cards.map((card) => (
+        <Card 
+          key={card.id}
+          className={`cursor-pointer transition-all hover:shadow-md ${
+            activeFilter === card.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+          } ${card.urgent ? 'border-red-200' : ''}`}
+          onClick={() => card.clickable && onCardClick?.(card.id as any)}
+        >
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                {card.title}
+              </CardTitle>
+              <div className={`p-2 rounded-lg ${card.bgColor}`}>
+                <card.icon className={`w-4 h-4 ${card.color}`} />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${card.color}`}>
+              {card.value}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {card.description}
+            </p>
+            {card.urgent && card.value > 0 && (
+              <Badge variant="destructive" className="mt-2 text-xs">
+                Needs Action
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+};
 
 export default LeadsStatsCards;
