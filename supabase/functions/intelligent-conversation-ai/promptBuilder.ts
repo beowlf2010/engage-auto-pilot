@@ -1,7 +1,8 @@
-
 import { classifyVehicle } from './vehicleClassification.ts';
 import { analyzeConversationPattern } from './conversationAnalysis.ts';
 import { analyzeCustomerIntent, generateFollowUpContent, detectRedundantPatterns } from './intentAnalysis.ts';
+import { detectEnhancedObjectionSignals, generateEnhancedObjectionResponse } from './enhancedObjectionDetection.ts';
+import { generatePricingResponse, generatePricingTransparencyResponse } from './pricingResponseTemplates.ts';
 
 export const buildSystemPrompt = (
   leadName: string,
@@ -213,4 +214,123 @@ ${redundancyCheck.shouldAvoidRedundancy ?
 }`;
 
   return promptInstructions;
+};
+
+export const buildEnhancedPrompt = (
+  leadName: string,
+  vehicleInterest: string,
+  lastCustomerMessage: string,
+  conversationHistory: string,
+  customerIntent: any,
+  answerGuidance: any,
+  inventoryStatus: any,
+  isInitialContact: boolean = false
+): string => {
+  
+  // ENHANCED: Detect pricing concerns and objections
+  const objectionSignals = detectEnhancedObjectionSignals(lastCustomerMessage, conversationHistory);
+  const hasPricingConcerns = objectionSignals.some(obj => 
+    ['pricing_discrepancy', 'pricing_shock', 'online_vs_call_price', 'upgrade_costs'].includes(obj.type)
+  );
+
+  // PRIORITY HANDLING: Pricing concerns get immediate attention
+  if (hasPricingConcerns) {
+    const pricingObjection = objectionSignals.find(obj => 
+      ['pricing_discrepancy', 'pricing_shock', 'online_vs_call_price', 'upgrade_costs'].includes(obj.type)
+    );
+
+    if (pricingObjection) {
+      const pricingResponse = generatePricingResponse({
+        leadName,
+        vehicleInterest,
+        priceContext: pricingObjection.priceContext,
+        objectionType: pricingObjection.type
+      });
+
+      return `CRITICAL PRICING CONCERN DETECTED - RESPOND IMMEDIATELY:
+
+Customer Message: "${lastCustomerMessage}"
+Objection Type: ${pricingObjection.type}
+Confidence: ${pricingObjection.confidence}
+
+REQUIRED RESPONSE (use this exact response):
+"${pricingResponse}"
+
+IMPORTANT GUIDELINES:
+- Address pricing concern FIRST and COMPLETELY
+- Show empathy for their confusion/frustration
+- Be transparent about pricing structure
+- Ask about their budget/payment preferences
+- Offer to clarify and find solutions
+- Never dismiss their concerns
+- Focus on finding alternatives within their budget
+
+Do NOT add any other topics or questions. Focus entirely on resolving their pricing concern.`;
+    }
+  }
+
+  // ENHANCED: Handle other objections with empathy
+  if (objectionSignals.length > 0 && !hasPricingConcerns) {
+    const primaryObjection = objectionSignals[0];
+    const objectionResponse = generateEnhancedObjectionResponse(
+      objectionSignals,
+      lastCustomerMessage,
+      vehicleInterest,
+      leadName
+    );
+
+    if (objectionResponse) {
+      return `CUSTOMER OBJECTION DETECTED - HANDLE WITH CARE:
+
+Customer Message: "${lastCustomerMessage}"
+Objection Type: ${primaryObjection.type}
+Confidence: ${primaryObjection.confidence}
+
+SUGGESTED RESPONSE:
+"${objectionResponse}"
+
+IMPORTANT:
+- Address their concern directly and empathetically
+- Ask probing questions to understand the real issue
+- Provide solutions, not just information
+- Move the conversation toward next steps`;
+    }
+  }
+
+  const cleanVehicle = vehicleInterest?.replace(/"/g, '').trim() || '';
+  
+  // Build the rest of the prompt for non-objection scenarios
+  let prompt = `You are Finn, a helpful automotive sales assistant for Jason Pilger Chevrolet. You're having a conversation with ${leadName}.`;
+
+  if (customerIntent?.requiresDirectAnswer) {
+    prompt += `\n\nIMPORTANT: Customer asked a direct question about ${customerIntent.questionTopic || 'their inquiry'}. You MUST answer their question first and completely before doing anything else.`;
+    
+    if (answerGuidance?.specificGuidance) {
+      prompt += `\n\nSPECIFIC GUIDANCE: ${answerGuidance.specificGuidance}`;
+    }
+  }
+
+  if (answerGuidance?.needsApology) {
+    prompt += `\n\nIMPORTANT: Apologize for missing their previous question, then answer it directly.`;
+  }
+
+  // Add inventory context if relevant
+  if (inventoryStatus?.hasActualInventory && inventoryStatus.matchingVehicles?.length > 0) {
+    prompt += `\n\nAVAILABLE INVENTORY: We have ${inventoryStatus.matchingVehicles.length} vehicles that match their interest.`;
+  } else if (inventoryStatus?.mustNotClaim) {
+    prompt += `\n\nIMPORTANT: Do NOT claim to have inventory we don't actually have. Be honest about availability.`;
+  }
+
+  prompt += `\n\nCustomer's latest message: "${lastCustomerMessage}"
+
+Generate a helpful, empathetic response that:
+1. ${customerIntent?.requiresDirectAnswer ? 'Answers their question completely FIRST' : 'Addresses their message appropriately'}
+2. ${hasPricingConcerns ? 'Resolves their pricing concerns with transparency' : 'Maintains a helpful, professional tone'}
+3. Moves the conversation forward naturally
+4. Asks relevant follow-up questions
+5. Shows genuine interest in helping them
+
+Keep responses conversational and under 150 words unless addressing complex pricing concerns.`;
+
+  return prompt;
 };
