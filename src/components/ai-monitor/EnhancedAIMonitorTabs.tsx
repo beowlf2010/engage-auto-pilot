@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
@@ -42,10 +43,15 @@ import LeadStatusFixPanel from './LeadStatusFixPanel';
 interface ApprovalQueueItem {
   id: string;
   lead_id: string;
-  lead_name: string;
-  message_body: string;
+  message_content: string;
+  message_stage: string;
   created_at: string;
-  ai_stage: string;
+  urgency_level: string;
+  leads?: {
+    first_name: string;
+    last_name: string;
+    vehicle_interest: string;
+  };
 }
 
 interface EmergencyFixesStatusProps {
@@ -164,7 +170,10 @@ const EnhancedAIMonitorTabs = () => {
     try {
       const { data, error } = await supabase
         .from('ai_message_approval_queue')
-        .select('*')
+        .select(`
+          *,
+          leads!inner(first_name, last_name, vehicle_interest)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -184,7 +193,7 @@ const EnhancedAIMonitorTabs = () => {
 
   const handleMessageSelect = (message: ApprovalQueueItem) => {
     setSelectedMessage(message);
-    setOverrideMessage(message.message_body); // Initialize override with original
+    setOverrideMessage(message.message_content); // Initialize override with original
   };
 
   const handleApproveMessage = async () => {
@@ -281,7 +290,7 @@ const EnhancedAIMonitorTabs = () => {
                   <TableHead className="w-[100px]">Created At</TableHead>
                   <TableHead>Lead</TableHead>
                   <TableHead>Message</TableHead>
-                  <TableHead>AI Stage</TableHead>
+                  <TableHead>Stage</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -302,15 +311,25 @@ const EnhancedAIMonitorTabs = () => {
                         <div className="flex items-center space-x-2">
                           <Avatar>
                             <AvatarImage src={`https://api.dicebear.com/7.x/lorelei/svg?seed=${message.lead_id}`} />
-                            <AvatarFallback>{message.lead_name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                            <AvatarFallback>
+                              {message.leads ? 
+                                `${message.leads.first_name.substring(0, 1)}${message.leads.last_name.substring(0, 1)}`.toUpperCase() : 
+                                'UN'
+                              }
+                            </AvatarFallback>
                           </Avatar>
-                          <span>{message.lead_name}</span>
+                          <span>
+                            {message.leads ? 
+                              `${message.leads.first_name} ${message.leads.last_name}` : 
+                              'Unknown Lead'
+                            }
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="truncate">{message.message_body}</div>
+                        <div className="truncate">{message.message_content}</div>
                       </TableCell>
-                      <TableCell>{message.ai_stage}</TableCell>
+                      <TableCell>{message.message_stage}</TableCell>
                       <TableCell className="text-right">
                         <Dialog>
                           <DialogTrigger asChild>
@@ -330,13 +349,21 @@ const EnhancedAIMonitorTabs = () => {
                                 <Label htmlFor="name" className="text-right">
                                   Lead
                                 </Label>
-                                <Input id="name" value={message.lead_name} className="col-span-3" disabled />
+                                <Input 
+                                  id="name" 
+                                  value={message.leads ? 
+                                    `${message.leads.first_name} ${message.leads.last_name}` : 
+                                    'Unknown Lead'
+                                  } 
+                                  className="col-span-3" 
+                                  disabled 
+                                />
                               </div>
                               <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="ai-stage" className="text-right">
-                                  AI Stage
+                                  Stage
                                 </Label>
-                                <Input id="ai-stage" value={message.ai_stage} className="col-span-3" disabled />
+                                <Input id="ai-stage" value={message.message_stage} className="col-span-3" disabled />
                               </div>
                               <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="message" className="text-right">
