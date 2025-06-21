@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageSquare, Send, RefreshCcw, Eye, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { generateInitialOutreachMessage } from '@/services/proactive/initialOutreachService';
 import { toast } from '@/hooks/use-toast';
 
 interface MessagePreviewInlineProps {
@@ -76,47 +78,70 @@ const MessagePreviewInline = ({
       const isInitialContact = conversationHistory.length === 0;
       
       console.log(`🔄 [UNIFIED PREVIEW] Generating preview for ${leadName} - ${isInitialContact ? 'INITIAL CONTACT' : 'FOLLOW-UP'}`);
-      console.log(`🏢 [UNIFIED PREVIEW] Using dealership: Jason Pilger Chevrolet`);
-      console.log(`👤 [UNIFIED PREVIEW] Using salesperson: Finn`);
-      
-      // Always use the unified intelligent-conversation-ai function with proper context
-      const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
-        body: {
-          leadId,
-          leadName,
-          vehicleInterest,
-          lastCustomerMessage: conversationHistory.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '',
-          conversationHistory: conversationHistory.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
-          leadInfo: {
-            phone: '',
-            status: 'new',
-            lastReplyAt: new Date().toISOString()
-          },
-          conversationLength: conversationHistory.length,
-          inventoryStatus: {
-            hasInventory: true,
-            totalVehicles: 20
-          },
-          isInitialContact: isInitialContact,
-          salespersonName: 'Finn', // Always force Finn
-          dealershipName: 'Jason Pilger Chevrolet', // Always use correct dealership
-          context: {
-            preview: true,
-            issueContext: issueContext || undefined,
-            regeneration: !!issueContext
-          }
-        }
-      });
 
-      if (error) {
-        console.error('❌ [UNIFIED PREVIEW] Edge function error:', error);
-        throw error;
+      if (isInitialContact) {
+        // Use initial outreach service for first-time contact
+        console.log(`🚀 [UNIFIED PREVIEW] Using initial outreach service`);
+        
+        const [firstName, ...lastNameParts] = leadName.split(' ');
+        const lastName = lastNameParts.join(' ');
+
+        const outreachResponse = await generateInitialOutreachMessage({
+          leadId,
+          firstName,
+          lastName,
+          vehicleInterest,
+          salespersonName: 'Finn',
+          dealershipName: 'Jason Pilger Chevrolet'
+        });
+
+        if (outreachResponse?.message) {
+          setMessage(outreachResponse.message);
+          console.log(`✅ [UNIFIED PREVIEW] Generated initial outreach: "${outreachResponse.message}"`);
+        } else {
+          throw new Error('Failed to generate initial outreach message');
+        }
+      } else {
+        // Use the unified intelligent-conversation-ai function for follow-ups
+        console.log(`🔄 [UNIFIED PREVIEW] Using conversation AI for follow-up`);
+        
+        const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
+          body: {
+            leadId,
+            leadName,
+            vehicleInterest,
+            lastCustomerMessage: conversationHistory.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '',
+            conversationHistory: conversationHistory.map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`).join('\n') || '',
+            leadInfo: {
+              phone: '',
+              status: 'active',
+              lastReplyAt: new Date().toISOString()
+            },
+            conversationLength: conversationHistory.length,
+            inventoryStatus: {
+              hasInventory: true,
+              totalVehicles: 20
+            },
+            isInitialContact: false,
+            salespersonName: 'Finn',
+            dealershipName: 'Jason Pilger Chevrolet',
+            context: {
+              preview: true,
+              issueContext: issueContext || undefined,
+              regeneration: !!issueContext
+            }
+          }
+        });
+
+        if (error) {
+          console.error('❌ [UNIFIED PREVIEW] Edge function error:', error);
+          throw error;
+        }
+        
+        setMessage(data?.message || 'Unable to generate preview');
+        console.log(`✅ [UNIFIED PREVIEW] Generated follow-up message: "${data?.message}"`);
       }
       
-      setMessage(data?.message || 'Unable to generate preview');
-      
-      console.log(`✅ [UNIFIED PREVIEW] Generated message: "${data?.message}"`);
-      console.log(`🎯 [UNIFIED PREVIEW] Message type: ${data?.messageType || 'unknown'}`);
     } catch (error) {
       console.error('❌ [UNIFIED PREVIEW] Error generating preview:', error);
       setMessage('Error generating message preview');

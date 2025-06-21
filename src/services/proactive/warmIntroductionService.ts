@@ -1,9 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from '../intelligentConversationAI';
+import { generateInitialOutreachMessage } from './initialOutreachService';
 import { formatProperName } from '@/utils/nameFormatter';
-import { validatePersonalName, detectLeadSource } from '../nameValidationService';
-import { assessLeadDataQuality, generateDataQualityAwareGreeting } from '../unifiedDataQualityService';
+import { assessLeadDataQuality } from '../unifiedDataQualityService';
 
 // Generate warm, introductory initial outreach messages using UNIFIED AI
 export const generateWarmInitialMessage = async (
@@ -14,60 +14,95 @@ export const generateWarmInitialMessage = async (
   try {
     console.log(`🤖 [WARM INTRO] Starting message generation for ${lead.first_name}`);
 
-    const dataQuality = dataQualityOverride || await assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
-    
-    console.log(`🧠 [WARM INTRO] Data quality score: ${dataQuality.overallQualityScore}`);
+    // Check if this lead has any existing conversations
+    const { data: existingMessages } = await supabase
+      .from('conversations')
+      .select('id, direction, body, sent_at')
+      .eq('lead_id', lead.id)
+      .order('sent_at', { ascending: false })
+      .limit(5);
 
-    // For high-quality data, use AI generation
-    if (dataQuality.overallQualityScore > 0.7 && dataQuality.messageStrategy === 'personal_with_vehicle') {
-      console.log(`🔄 [WARM INTRO] Using AI generation for high-quality data`);
+    const isInitialContact = !existingMessages || existingMessages.length === 0;
+
+    console.log(`🔍 [WARM INTRO] Is initial contact: ${isInitialContact}`);
+
+    if (isInitialContact) {
+      // Use dedicated initial outreach service for first-time contact
+      console.log(`🚀 [WARM INTRO] Using initial outreach service`);
       
-      const formattedName = formatProperName(lead.first_name);
-      
-      const context = {
+      const outreachResponse = await generateInitialOutreachMessage({
         leadId: lead.id,
-        leadName: formattedName,
+        firstName: lead.first_name,
+        lastName: lead.last_name,
         vehicleInterest: lead.vehicle_interest,
-        messages: [],
-        leadInfo: {
-          phone: '',
-          status: 'new',
-          lastReplyAt: new Date().toISOString()
-        }
-      };
+        salespersonName: profile?.first_name || 'Finn',
+        dealershipName: 'Jason Pilger Chevrolet'
+      });
+
+      if (outreachResponse?.message) {
+        console.log(`✅ [WARM INTRO] Generated initial outreach: ${outreachResponse.message}`);
+        return outreachResponse.message;
+      }
+    } else {
+      // Use conversation AI for follow-up messages
+      console.log(`🔄 [WARM INTRO] Using conversation AI for follow-up`);
+
+      const dataQuality = dataQualityOverride || await assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
       
-      try {
+      if (dataQuality.overallQualityScore > 0.7) {
+        const formattedName = formatProperName(lead.first_name);
+        
+        const context = {
+          leadId: lead.id,
+          leadName: formattedName,
+          vehicleInterest: lead.vehicle_interest,
+          messages: existingMessages.map(msg => ({
+            id: msg.id,
+            body: msg.body,
+            direction: msg.direction as 'in' | 'out',
+            sentAt: msg.sent_at,
+            aiGenerated: false
+          })),
+          leadInfo: {
+            phone: '',
+            status: 'active',
+            lastReplyAt: existingMessages[0]?.sent_at || new Date().toISOString()
+          }
+        };
+        
         const aiResponse = await generateEnhancedIntelligentResponse(context);
         
         if (aiResponse?.message) {
-          console.log(`✅ [WARM INTRO] AI generated message: ${aiResponse.message}`);
+          console.log(`✅ [WARM INTRO] Generated follow-up message: ${aiResponse.message}`);
           return aiResponse.message;
         }
-      } catch (aiError) {
-        console.warn(`⚠️ [WARM INTRO] AI generation failed, falling back to template`);
       }
     }
 
-    // Use data-quality-aware template generation
-    console.log(`📝 [WARM INTRO] Using template generation`);
-    
-    const smartMessage = await generateDataQualityAwareGreeting(
-      lead.first_name,
-      lead.vehicle_interest,
-      'Finn',
-      'Jason Pilger Chevrolet',
-      dataQuality
-    );
-    
-    console.log(`✅ [WARM INTRO] Generated template message: ${smartMessage}`);
-    return smartMessage;
+    // Emergency fallback
+    console.log(`⚠️ [WARM INTRO] Using emergency fallback`);
+    return generateEmergencyFallback(lead, profile);
 
   } catch (error) {
     console.error('❌ [WARM INTRO] Error:', error);
-    return generateEmergencyFallback(lead);
+    return generateEmergencyFallback(lead, profile);
   }
 };
 
-const generateEmergencyFallback = (lead: any): string => {
-  return `Hello! Thanks for your interest in finding the right vehicle. I'm Finn with Jason Pilger Chevrolet and I'm here to make your car shopping experience as smooth as possible. What type of vehicle are you looking for?`;
+const generateEmergencyFallback = (lead: any, profile?: any): string => {
+  const salespersonName = profile?.first_name || 'Finn';
+  const formattedName = formatProperName(lead.first_name);
+  
+  // Use personal name if it looks legitimate, otherwise use generic greeting
+  const isValidName = formattedName && 
+    formattedName.length > 1 && 
+    formattedName.length < 20 &&
+    !/^(unknown|test|sample|demo|null|undefined)$/i.test(formattedName) &&
+    !/\d/.test(formattedName);
+
+  if (isValidName) {
+    return `Hi ${formattedName}! I'm ${salespersonName} with Jason Pilger Chevrolet. I'm here to help you find the perfect vehicle for your needs. What type of vehicle are you looking for?`;
+  } else {
+    return `Hello! Thanks for your interest in finding the right vehicle. I'm ${salespersonName} with Jason Pilger Chevrolet and I'm here to make your car shopping experience as smooth as possible. What type of vehicle are you looking for?`;
+  }
 };

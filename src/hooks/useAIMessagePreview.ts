@@ -1,6 +1,6 @@
-
 import { useState } from 'react';
 import { generateWarmInitialMessage } from '@/services/proactive/warmIntroductionService';
+import { generateInitialOutreachMessage } from '@/services/proactive/initialOutreachService';
 import { sendMessage } from '@/services/messagesService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -24,6 +24,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
   // Validation data
   const [originalDataQuality, setOriginalDataQuality] = useState<any>(null);
   const [leadData, setLeadData] = useState<any>(null);
+  const [isInitialContact, setIsInitialContact] = useState(true);
   
   // User decisions
   const [nameDecision, setNameDecision] = useState<'approved' | 'denied' | null>(null);
@@ -56,6 +57,18 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
 
       setLeadData(lead);
 
+      // Check if this is initial contact
+      const { data: existingMessages } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('lead_id', leadId)
+        .limit(1);
+
+      const isInitial = !existingMessages || existingMessages.length === 0;
+      setIsInitialContact(isInitial);
+
+      console.log(`🔍 [AI PREVIEW] Is initial contact: ${isInitial}`);
+
       // Get original data quality assessment
       const dataQuality = await assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
       setOriginalDataQuality(dataQuality);
@@ -64,14 +77,15 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         firstName: lead.first_name,
         vehicleInterest: lead.vehicle_interest,
         nameValid: dataQuality.nameValidation.isValidPersonalName,
-        vehicleValid: dataQuality.vehicleValidation.isValidVehicleInterest
+        vehicleValid: dataQuality.vehicleValidation.isValidVehicleInterest,
+        isInitialContact: isInitial
       });
 
       setShowDecisionStep(true);
       
       toast({
         title: "Analysis Complete",
-        description: "Please review and approve the name and vehicle data",
+        description: `Please review and approve the ${isInitial ? 'initial outreach' : 'follow-up'} data`,
       });
     } catch (error) {
       console.error('Error analyzing lead:', error);
@@ -163,8 +177,27 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         fallbackVehicleMessage: originalDataQuality.recommendations.fallbackVehicleMessage
       };
 
-      // Generate message with override
-      const message = await generateWarmInitialMessage(leadData, profile, overrideDataQuality);
+      let message: string | null = null;
+
+      if (isInitialContact) {
+        // Use initial outreach service for first contact
+        console.log(`🚀 [AI PREVIEW] Generating initial outreach message`);
+        
+        const outreachResponse = await generateInitialOutreachMessage({
+          leadId: leadData.id,
+          firstName: leadData.first_name,
+          lastName: leadData.last_name,
+          vehicleInterest: leadData.vehicle_interest,
+          salespersonName: profile.first_name,
+          dealershipName: 'Jason Pilger Chevrolet'
+        });
+
+        message = outreachResponse?.message || null;
+      } else {
+        // Use warm introduction service for follow-ups
+        console.log(`🔄 [AI PREVIEW] Generating follow-up message`);
+        message = await generateWarmInitialMessage(leadData, profile, overrideDataQuality);
+      }
       
       if (message) {
         setGeneratedMessage(message);
@@ -173,7 +206,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         
         toast({
           title: "Message Generated",
-          description: `Strategy: ${overrideDataQuality.messageStrategy}`,
+          description: `Strategy: ${overrideDataQuality.messageStrategy} (${isInitialContact ? 'Initial Contact' : 'Follow-up'})`,
         });
       } else {
         throw new Error('Failed to generate message');
@@ -237,9 +270,9 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     setLeadData(null);
     setNameDecision(null);
     setVehicleDecision(null);
+    setIsInitialContact(true);
   };
 
-  // Add the missing methods for CompactAIControls
   const generatePreview = () => {
     if (!showDecisionStep && !showPreview) {
       startAnalysis();
@@ -261,6 +294,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     leadData,
     nameDecision,
     vehicleDecision,
+    isInitialContact,
     startAnalysis,
     handleNameDecision,
     handleVehicleDecision,
