@@ -194,8 +194,9 @@ const MessagePreviewInline = ({
       
       if (!profile) throw new Error('No user profile found');
       
-      // Send the message using the messages service - fix the boolean type
-      const conversation = await sendMessage(leadId, message, profile, true);
+      // Send the message using the messages service - explicitly ensure boolean type
+      const isAIGenerated: boolean = true;
+      const conversation = await sendMessage(leadId, message, profile, isAIGenerated);
       
       if (conversation) {
         console.log(`✅ [MESSAGE PREVIEW] Message sent successfully`);
