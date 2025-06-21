@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from './intelligentConversationAI';
 
@@ -69,7 +70,7 @@ export const generateIntelligentAIMessage = async (request: AIMessageRequest): P
       messages: conversationHistory.map(msg => ({
         id: msg.id,
         body: msg.body,
-        direction: msg.direction,
+        direction: msg.direction as 'in' | 'out',
         sentAt: msg.sent_at,
         aiGenerated: msg.ai_generated
       })),

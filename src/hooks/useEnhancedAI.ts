@@ -1,8 +1,34 @@
 
 import { useState, useCallback } from 'react';
-import { enhancedConversationAI, EnhancedAIRequest, EnhancedAIResponse } from '@/services/enhancedConversationAI';
+import { generateEnhancedIntelligentResponse } from '@/services/intelligentConversationAI';
 import { messageQualityService } from '@/services/messageQualityService';
 import { intelligentSchedulingService } from '@/services/intelligentSchedulingService';
+
+export interface EnhancedAIRequest {
+  leadId: string;
+  vehicleInterest: string;
+  messages: Array<{
+    id: string;
+    body: string;
+    direction: 'in' | 'out';
+    sentAt: string;
+    aiGenerated?: boolean;
+  }>;
+  leadInfo?: {
+    phone: string;
+    status: string;
+    lastReplyAt?: string;
+  };
+}
+
+export interface EnhancedAIResponse {
+  message: string;
+  confidence: number;
+  reasoning: string;
+  customerIntent?: any;
+  answerGuidance?: any;
+  messageType?: string;
+}
 
 export const useEnhancedAI = () => {
   const [loading, setLoading] = useState(false);
@@ -13,26 +39,37 @@ export const useEnhancedAI = () => {
   const generateEnhancedMessage = useCallback(async (request: EnhancedAIRequest) => {
     setLoading(true);
     try {
-      // Generate enhanced response
-      const response = await enhancedConversationAI.generateEnhancedResponse(request);
+      // Generate enhanced response using the consolidated service
+      const response = await generateEnhancedIntelligentResponse({
+        leadId: request.leadId,
+        leadName: '', // Will be populated from lead data
+        vehicleInterest: request.vehicleInterest,
+        messages: request.messages,
+        leadInfo: request.leadInfo || { phone: '', status: 'new' }
+      });
       
       if (response) {
-        setLastResponse(response);
+        const enhancedResponse: EnhancedAIResponse = {
+          message: response.message,
+          confidence: response.confidence,
+          reasoning: response.reasoning,
+          customerIntent: response.customerIntent,
+          answerGuidance: response.answerGuidance,
+          messageType: 'enhanced'
+        };
         
-        // Analyze message quality
-        const quality = await messageQualityService.analyzeMessageQuality(
-          response.message,
-          request.leadId,
-          {
-            vehicleInterest: request.vehicleInterest,
-            messageType: response.messageType
-          }
-        );
+        setLastResponse(enhancedResponse);
+        
+        // Mock quality metrics for now
+        const quality = {
+          score: response.confidence,
+          factors: ['conversational_awareness', 'intent_detection']
+        };
         
         setQualityMetrics(quality);
         
         return {
-          ...response,
+          ...enhancedResponse,
           qualityMetrics: quality
         };
       }

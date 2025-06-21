@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { generateEnhancedIntelligentResponse } from './enhancedIntelligentConversationAI';
+import { generateEnhancedIntelligentResponse } from './intelligentConversationAI';
 
 // Consolidated AI service that ONLY uses the unified edge function
 class ConsolidatedAIService {
@@ -70,7 +70,7 @@ class ConsolidatedAIService {
 
       if (!lastCustomerMessage) return null;
 
-      // Format messages for AI
+      // Format messages for AI with proper type casting
       const formattedMessages = conversations.map(msg => ({
         id: msg.id,
         body: msg.body,

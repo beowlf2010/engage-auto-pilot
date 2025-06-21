@@ -25,7 +25,6 @@ export interface ImprovedAIMessageResponse {
   error?: string;
 }
 
-// Improved version with vehicle interest validation and approval queue
 export const generateImprovedIntelligentAIMessage = async (
   request: ImprovedAIMessageRequest
 ): Promise<ImprovedAIMessageResponse> => {
@@ -105,7 +104,7 @@ export const generateImprovedIntelligentAIMessage = async (
       messages: conversationHistory.map(msg => ({
         id: msg.id,
         body: msg.body,
-        direction: msg.direction,
+        direction: msg.direction as 'in' | 'out',
         sentAt: msg.sent_at,
         aiGenerated: msg.ai_generated
       })),
@@ -180,7 +179,6 @@ export const generateImprovedIntelligentAIMessage = async (
   }
 };
 
-// Check if a lead should receive a message (enhanced quality controls)
 export const shouldSendImprovedMessage = async (leadId: string): Promise<boolean> => {
   try {
     const { data: lead } = await supabase
