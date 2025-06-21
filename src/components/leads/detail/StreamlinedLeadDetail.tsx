@@ -4,7 +4,7 @@ import { useConversationData } from "@/hooks/useConversationData";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { toggleFinnAI } from '@/services/finnAIService';
-import { sendEnhancedMessage } from '@/services/enhancedMessagesService';
+import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
 import { useAuth } from '@/components/auth/AuthProvider';
 import LeadDetailHeader from "./streamlined/LeadDetailHeader";
 import ChatContainer from "./streamlined/ChatContainer";
@@ -46,26 +46,18 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
     }
   }, [lead.id, loadMessages]);
 
-  // Enhanced send message using the working service
+  // Fixed send message using the working service that powers the Smart Inbox
   const sendMessage = async (leadId: string, messageBody: string): Promise<void> => {
     if (!profile || !messageBody.trim()) {
       throw new Error('Missing profile or message body');
     }
 
-    console.log('📤 [LEAD DETAIL] Sending message using enhanced service');
+    console.log('📤 [LEAD DETAIL] Sending message using fixed service');
     
-    const result = await sendEnhancedMessage({
-      leadId,
-      messageBody: messageBody.trim(),
-      profile,
-      isAIGenerated: false
-    });
-
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to send message');
-    }
-
-    console.log('✅ [LEAD DETAIL] Message sent successfully');
+    // Use the same working service that the Smart Inbox uses
+    await fixedSendMessage(leadId, messageBody.trim(), profile, false);
+    
+    console.log('✅ [LEAD DETAIL] Message sent successfully via fixed service');
   };
 
   // Watch for newMessage changes and send if it's set
