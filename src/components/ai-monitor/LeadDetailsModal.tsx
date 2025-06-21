@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Phone, Mail, Car, Clock, MessageSquare, Settings, ExternalLink } from 'lucide-react';
+import { User, Phone, Mail, Car, Clock, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -92,10 +92,6 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
       'lost': 'destructive'
     };
     return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
-  };
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'MMM dd, yyyy hh:mm a');
   };
 
   if (loading) {
@@ -186,7 +182,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Settings className="h-4 w-4" />
+                <Mail className="h-4 w-4" />
                 AI Status
               </CardTitle>
             </CardHeader>
@@ -202,7 +198,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
           {/* Lead Created */}
           <div className="text-xs text-gray-500 flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            Lead created: {formatDate(leadDetails.created_at)}
+            Lead created: {format(new Date(leadDetails.created_at), 'MMM dd, yyyy hh:mm a')}
           </div>
         </div>
 
