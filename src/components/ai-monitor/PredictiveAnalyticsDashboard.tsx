@@ -25,7 +25,7 @@ const PredictiveAnalyticsDashboard = () => {
 
   const getInsightIcon = (type: string) => {
     switch (type) {
-      case 'conversion_probability': return <Target className="w-4 h-4 text-green-600" />;
+      case 'conversion_prediction': return <Target className="w-4 h-4 text-green-600" />;
       case 'churn_risk': return <AlertCircle className="w-4 h-4 text-red-600" />;
       case 'optimal_timing': return <Clock className="w-4 h-4 text-blue-600" />;
       case 'content_recommendation': return <Brain className="w-4 h-4 text-purple-600" />;
@@ -101,7 +101,7 @@ const PredictiveAnalyticsDashboard = () => {
               <div>
                 <p className="text-sm text-muted-foreground">High Conversion</p>
                 <p className="text-2xl font-bold">
-                  {insights.filter(i => i.type === 'conversion_probability').length}
+                  {insights.filter(i => i.type === 'conversion_prediction').length}
                 </p>
               </div>
               <Target className="w-8 h-8 text-green-600" />
@@ -186,15 +186,15 @@ const PredictiveAnalyticsDashboard = () => {
 
                       {/* Prediction Details */}
                       <div className="bg-muted p-3 rounded">
-                        {insight.type === 'conversion_probability' && (
+                        {insight.type === 'conversion_prediction' && (
                           <div className="space-y-2">
                             <div className="flex justify-between">
                               <span>Conversion Probability:</span>
                               <span className="font-medium">
-                                {(insight.prediction.probability * 100).toFixed(1)}%
+                                {((insight.prediction.probability || 0) * 100).toFixed(1)}%
                               </span>
                             </div>
-                            <Progress value={insight.prediction.probability * 100} className="h-2" />
+                            <Progress value={(insight.prediction.probability || 0) * 100} className="h-2" />
                             <div className="flex justify-between text-sm">
                               <span>Predicted Value:</span>
                               <span className="font-medium text-green-600">
@@ -209,10 +209,10 @@ const PredictiveAnalyticsDashboard = () => {
                             <div className="flex justify-between">
                               <span>Churn Risk:</span>
                               <span className="font-medium text-red-600">
-                                {(insight.prediction.churnRisk * 100).toFixed(1)}%
+                                {((insight.prediction.churnRisk || 0) * 100).toFixed(1)}%
                               </span>
                             </div>
-                            <Progress value={insight.prediction.churnRisk * 100} className="h-2" />
+                            <Progress value={(insight.prediction.churnRisk || 0) * 100} className="h-2" />
                           </div>
                         )}
                       </div>
