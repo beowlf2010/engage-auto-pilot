@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/components/auth/AuthProvider';
 import ApiKeysSettings from '@/components/settings/ApiKeysSettings';
 import EmailSettings from '@/components/settings/EmailSettings';
 import AISettingsPanel from '@/components/settings/AISettingsPanel';
@@ -9,6 +10,10 @@ import { Settings as SettingsIcon, Key, Mail, Bot, Bell } from 'lucide-react';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('api-keys');
+  const { profile } = useAuth();
+
+  // Get the user's actual role from their profile
+  const userRole = profile?.role || 'user';
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -38,11 +43,11 @@ const Settings = () => {
         </TabsList>
 
         <TabsContent value="api-keys" className="mt-6">
-          <ApiKeysSettings userRole="user" />
+          <ApiKeysSettings userRole={userRole} />
         </TabsContent>
 
         <TabsContent value="email" className="mt-6">
-          <EmailSettings userRole="user" />
+          <EmailSettings userRole={userRole} />
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-6">
