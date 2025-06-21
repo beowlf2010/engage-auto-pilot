@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
@@ -18,8 +17,8 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
   const [showDecisionStep, setShowDecisionStep] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [originalDataQuality, setOriginalDataQuality] = useState<any>(null);
-  const [nameDecision, setNameDecision] = useState<string>('');
-  const [vehicleDecision, setVehicleDecision] = useState<string>('');
+  const [nameDecision, setNameDecision] = useState<'approved' | 'denied' | ''>('');
+  const [vehicleDecision, setVehicleDecision] = useState<'approved' | 'denied' | ''>('');
 
   // Generate AI message preview
   const generatePreview = async (targetLeadId?: string) => {
@@ -188,11 +187,11 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
     }
   };
 
-  const handleNameDecision = (decision: string) => {
+  const handleNameDecision = (decision: 'approved' | 'denied') => {
     setNameDecision(decision);
   };
 
-  const handleVehicleDecision = (decision: string) => {
+  const handleVehicleDecision = (decision: 'approved' | 'denied') => {
     setVehicleDecision(decision);
   };
 
