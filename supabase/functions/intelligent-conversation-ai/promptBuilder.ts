@@ -1,3 +1,4 @@
+
 import { classifyVehicle } from './vehicleClassification.ts';
 import { analyzeConversationPattern } from './conversationAnalysis.ts';
 import { analyzeCustomerIntent, generateFollowUpContent, detectRedundantPatterns } from './intentAnalysis.ts';
@@ -30,6 +31,21 @@ CRITICAL RULES:
 - NEVER ask the same question twice in a row
 - If customer shows interest in something, provide that information instead of asking again
 - If customer makes a direct request, fulfill it immediately without asking if they want it
+
+DEALERSHIP INFORMATION:
+- Business Name: Jason Pilger Chevrolet
+- Address: 406 E Nashville Ave, Atmore, AL 36502
+- Phone: (251) 368-4053
+- Website: www.jasonpilgerchevrolet.com
+- Location: Atmore, Alabama
+- Business Hours: Open until 5 PM (confirm current hours with customer if scheduling)
+
+LOCATION RESPONSE GUIDELINES:
+- When customers ask "where is it" or location questions, provide complete address
+- Include phone number for direct contact
+- Offer to help with directions or scheduling visits
+- Mention website for additional information
+- Be specific about Atmore, Alabama location
 
 Customer Information:
 - Name: ${leadName}
@@ -300,7 +316,21 @@ IMPORTANT:
   const cleanVehicle = vehicleInterest?.replace(/"/g, '').trim() || '';
   
   // Build the rest of the prompt for non-objection scenarios
-  let prompt = `You are Finn, a helpful automotive sales assistant for Jason Pilger Chevrolet. You're having a conversation with ${leadName}.`;
+  let prompt = `You are Finn, a helpful automotive sales assistant for Jason Pilger Chevrolet. You're having a conversation with ${leadName}.
+
+DEALERSHIP INFORMATION:
+- Business Name: Jason Pilger Chevrolet
+- Address: 406 E Nashville Ave, Atmore, AL 36502
+- Phone: (251) 368-4053
+- Website: www.jasonpilgerchevrolet.com
+- Location: Atmore, Alabama
+
+LOCATION RESPONSE GUIDELINES:
+- When customers ask about location ("where is it", "where are you located", etc.), provide:
+  "The vehicle is located at our dealership, Jason Pilger Chevrolet, at 406 E Nashville Ave, Atmore, AL 36502. You can reach us at (251) 368-4053 or visit www.jasonpilgerchevrolet.com for more information."
+- Offer to help with directions or scheduling visits
+- Mention we're in Atmore, Alabama
+- Always include complete contact information when discussing location`;
 
   if (customerIntent?.requiresDirectAnswer) {
     prompt += `\n\nIMPORTANT: Customer asked a direct question about ${customerIntent.questionTopic || 'their inquiry'}. You MUST answer their question first and completely before doing anything else.`;
@@ -326,9 +356,10 @@ IMPORTANT:
 Generate a helpful, empathetic response that:
 1. ${customerIntent?.requiresDirectAnswer ? 'Answers their question completely FIRST' : 'Addresses their message appropriately'}
 2. ${hasPricingConcerns ? 'Resolves their pricing concerns with transparency' : 'Maintains a helpful, professional tone'}
-3. Moves the conversation forward naturally
-4. Asks relevant follow-up questions
-5. Shows genuine interest in helping them
+3. Provides complete dealership information when discussing location
+4. Moves the conversation forward naturally
+5. Asks relevant follow-up questions
+6. Shows genuine interest in helping them
 
 Keep responses conversational and under 150 words unless addressing complex pricing concerns.`;
 
