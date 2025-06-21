@@ -57,6 +57,7 @@ function App() {
                       <AppLayout>
                         <Routes>
                           <Route path="/" element={<DashboardPage />} />
+                          <Route path="/dashboard" element={<DashboardPage />} />
                           <Route path="/smart-inbox" element={<SmartInboxPage />} />
                           <Route path="/leads" element={<StreamlinedLeadsPage />} />
                           <Route path="/leads/:leadId" element={<LeadDetailPage />} />
