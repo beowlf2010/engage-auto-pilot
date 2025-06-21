@@ -4,6 +4,8 @@ import { useConversationData } from "@/hooks/useConversationData";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { toggleFinnAI } from '@/services/finnAIService';
+import { sendEnhancedMessage } from '@/services/enhancedMessagesService';
+import { useAuth } from '@/components/auth/AuthProvider';
 import LeadDetailHeader from "./streamlined/LeadDetailHeader";
 import ChatContainer from "./streamlined/ChatContainer";
 import LeadDetailSidebar from "./streamlined/LeadDetailSidebar";
@@ -31,7 +33,8 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
   setShowMessageComposer,
   onPhoneSelect
 }) => {
-  const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
+  const { messages, messagesLoading, loadMessages } = useConversationData();
+  const { profile } = useAuth();
   const [aiLoading, setAiLoading] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -42,6 +45,28 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
       loadMessages(lead.id);
     }
   }, [lead.id, loadMessages]);
+
+  // Enhanced send message using the working service
+  const sendMessage = async (leadId: string, messageBody: string): Promise<void> => {
+    if (!profile || !messageBody.trim()) {
+      throw new Error('Missing profile or message body');
+    }
+
+    console.log('📤 [LEAD DETAIL] Sending message using enhanced service');
+    
+    const result = await sendEnhancedMessage({
+      leadId,
+      messageBody: messageBody.trim(),
+      profile,
+      isAIGenerated: false
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send message');
+    }
+
+    console.log('✅ [LEAD DETAIL] Message sent successfully');
+  };
 
   // Watch for newMessage changes and send if it's set
   useEffect(() => {
@@ -68,7 +93,7 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
       console.error("Failed to send message:", error);
       toast({
         title: "Error",
-        description: "Failed to send message",
+        description: error instanceof Error ? error.message : "Failed to send message",
         variant: "destructive"
       });
     } finally {
