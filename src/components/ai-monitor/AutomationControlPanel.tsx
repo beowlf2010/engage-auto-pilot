@@ -129,7 +129,9 @@ const AutomationControlPanel = () => {
         .order('started_at', { ascending: false })
         .limit(5);
 
-      setRecentRuns(data || []);
+      if (data) {
+        setRecentRuns(data as AutomationRun[]);
+      }
     } catch (error) {
       console.error('Error fetching recent runs:', error);
     }
