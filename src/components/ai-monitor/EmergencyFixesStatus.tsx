@@ -33,17 +33,29 @@ const EmergencyFixesStatus = () => {
     try {
       setLoading(true);
 
-      // Check if ai_enabled_at column exists
-      const { data: columns } = await supabase
-        .rpc('get_table_columns', { table_name: 'leads' });
-      
-      const aiEnabledAtExists = columns?.some((col: any) => col.column_name === 'ai_enabled_at') || false;
+      // Check if ai_enabled_at column exists by querying the table directly
+      let aiEnabledAtExists = false;
+      try {
+        const { error } = await supabase
+          .from('leads')
+          .select('ai_enabled_at')
+          .limit(1);
+        aiEnabledAtExists = !error;
+      } catch {
+        aiEnabledAtExists = false;
+      }
 
-      // Check if approval queue table exists
-      const { data: tables } = await supabase
-        .rpc('get_schema_tables');
-      
-      const approvalQueueExists = tables?.some((table: any) => table.table_name === 'ai_message_approval_queue') || false;
+      // Check if approval queue table exists by querying it directly
+      let approvalQueueExists = false;
+      try {
+        const { error } = await supabase
+          .from('ai_message_approval_queue')
+          .select('id')
+          .limit(1);
+        approvalQueueExists = !error;
+      } catch {
+        approvalQueueExists = false;
+      }
 
       // Count corrupted vehicle interests
       const { data: corruptedLeads } = await supabase

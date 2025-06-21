@@ -55,7 +55,7 @@ export const queueMessageForApproval = async (request: QueueMessageRequest): Pro
     }
 
     console.log(`✅ [APPROVAL QUEUE] Message queued successfully: ${data.id}`);
-    return data;
+    return data as ApprovalQueueMessage;
   } catch (error) {
     console.error('❌ [APPROVAL QUEUE] Error in queueMessageForApproval:', error);
     return null;
@@ -82,7 +82,7 @@ export const getPendingMessages = async (): Promise<ApprovalQueueMessage[]> => {
       return [];
     }
 
-    return data || [];
+    return (data || []) as ApprovalQueueMessage[];
   } catch (error) {
     console.error('❌ [APPROVAL QUEUE] Error in getPendingMessages:', error);
     return [];
@@ -162,7 +162,7 @@ export const getApprovedMessagesReadyToSend = async (): Promise<ApprovalQueueMes
       return [];
     }
 
-    return data || [];
+    return (data || []) as ApprovalQueueMessage[];
   } catch (error) {
     console.error('❌ [APPROVAL QUEUE] Error in getApprovedMessagesReadyToSend:', error);
     return [];
