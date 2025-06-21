@@ -25,7 +25,7 @@ export interface SavedPreset {
 }
 
 export const useAdvancedLeads = () => {
-  const { leads, loading, refetch } = useLeads();
+  const { leads, loading, error, loadingProgress, refetch, retry } = useLeads();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>([]);
@@ -267,6 +267,8 @@ export const useAdvancedLeads = () => {
     // Data
     leads: filteredLeads,
     loading,
+    error,
+    loadingProgress,
     selectedLeads,
     quickViewLead,
     savedPresets,
@@ -285,6 +287,7 @@ export const useAdvancedLeads = () => {
     showQuickView,
     hideQuickView,
     refetch,
+    retry,
     
     // Utilities
     getEngagementScore
