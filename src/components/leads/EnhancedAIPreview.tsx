@@ -1,7 +1,8 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot, Brain } from 'lucide-react';
+import { Bot, Brain, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useAIMessagePreview } from '@/hooks/useAIMessagePreview';
 import ValidationDecisionCard from './preview/ValidationDecisionCard';
 import MessagePreviewCard from './preview/MessagePreviewCard';
@@ -28,6 +29,8 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
   onAIEnabled,
   autoGenerate = false
 }) => {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const {
     isAnalyzing,
     isGenerating,
@@ -60,7 +63,48 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     }
   }, [isOpen, autoGenerate, isAnalyzing, showDecisionStep, showPreview, startAnalysis]);
 
+  // Add timeout protection - auto close modal after 30 seconds if stuck
+  useEffect(() => {
+    if (isOpen && (isAnalyzing || isGenerating)) {
+      timeoutRef.current = setTimeout(() => {
+        console.log('🚨 Modal timeout - force closing after 30 seconds');
+        handleCancel();
+      }, 30000);
+    }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [isOpen, isAnalyzing, isGenerating]);
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        handleCancel();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen]);
+
   const handleCancel = () => {
+    // Clear any timeouts
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
+    // Reset state and close
     reset();
     onClose();
   };
@@ -69,13 +113,30 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     sendNow();
   };
 
+  // Force close functionality
+  const handleForceClose = (open: boolean) => {
+    if (!open) {
+      handleCancel();
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+    <Dialog open={isOpen} onOpenChange={handleForceClose}>
+      <DialogContent className="max-w-lg" onPointerDownOutside={handleCancel}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Bot className="w-5 h-5 text-blue-600" />
-            Enable AI for {leadName}
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bot className="w-5 h-5 text-blue-600" />
+              Enable AI for {leadName}
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleCancel}
+              className="h-6 w-6 p-0"
+            >
+              <X className="w-4 h-4" />
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -88,6 +149,11 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
               <p className="text-sm text-gray-600">
                 AI is reviewing name and vehicle information for quality...
               </p>
+              <div className="mt-4">
+                <Button variant="outline" size="sm" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              </div>
             </div>
           )}
 
@@ -137,6 +203,18 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
                 onGenerate={startAnalysis}
               />
             </>
+          )}
+
+          {/* Force close option if stuck */}
+          {(isAnalyzing || isGenerating) && (
+            <div className="text-center pt-4 border-t">
+              <p className="text-xs text-gray-500 mb-2">
+                Taking longer than expected?
+              </p>
+              <Button variant="outline" size="sm" onClick={handleCancel}>
+                Force Close
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>

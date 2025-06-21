@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -12,6 +13,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
   const [generatedMessage, setGeneratedMessage] = useState('');
   const [leadData, setLeadData] = useState<any>(null);
   const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Multi-step workflow states
   const [showDecisionStep, setShowDecisionStep] = useState(false);
@@ -20,15 +22,34 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
   const [nameDecision, setNameDecision] = useState<'approved' | 'denied' | ''>('');
   const [vehicleDecision, setVehicleDecision] = useState<'approved' | 'denied' | ''>('');
 
+  // Timeout refs for cleanup
+  const analysisTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const generationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Generate AI message preview
   const generatePreview = async (targetLeadId?: string) => {
     const useLeadId = targetLeadId || leadId;
     if (!useLeadId || !profile) {
       console.error('No lead ID or profile available for AI message generation');
+      setError('Missing lead ID or profile');
       return;
     }
 
     setIsGenerating(true);
+    setError(null);
+    
+    // Set timeout for generation
+    generationTimeoutRef.current = setTimeout(() => {
+      console.log('🚨 Message generation timeout');
+      setIsGenerating(false);
+      setError('Message generation timed out. Please try again.');
+      toast({
+        title: "Timeout",
+        description: "Message generation took too long. Please try again.",
+        variant: "destructive"
+      });
+    }, 15000);
+
     try {
       console.log(`🤖 [AI PREVIEW] Generating message for lead: ${useLeadId}`);
       
@@ -82,6 +103,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
       
     } catch (error) {
       console.error('❌ [AI PREVIEW] Error generating message:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate message');
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to generate AI message",
@@ -95,6 +117,10 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
       setShowPreview(true);
     } finally {
       setIsGenerating(false);
+      if (generationTimeoutRef.current) {
+        clearTimeout(generationTimeoutRef.current);
+        generationTimeoutRef.current = null;
+      }
     }
   };
 
@@ -131,6 +157,8 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
     }
 
     setIsSending(true);
+    setError(null);
+    
     try {
       console.log(`📤 [AI PREVIEW] Sending AI message to lead: ${useLeadId}`);
       
@@ -154,6 +182,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
       
     } catch (error) {
       console.error('❌ [AI PREVIEW] Error sending message:', error);
+      setError(error instanceof Error ? error.message : 'Failed to send message');
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to send message",
@@ -169,6 +198,20 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
     if (!leadId) return;
     
     setIsAnalyzing(true);
+    setError(null);
+    
+    // Set timeout for analysis
+    analysisTimeoutRef.current = setTimeout(() => {
+      console.log('🚨 Analysis timeout');
+      setIsAnalyzing(false);
+      setError('Analysis timed out. Please try again.');
+      toast({
+        title: "Timeout",
+        description: "Analysis took too long. Please try again.",
+        variant: "destructive"
+      });
+    }, 10000);
+    
     try {
       // Simulate analysis
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -182,8 +225,13 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
       setShowDecisionStep(true);
     } catch (error) {
       console.error('Analysis error:', error);
+      setError('Analysis failed. Please try again.');
     } finally {
       setIsAnalyzing(false);
+      if (analysisTimeoutRef.current) {
+        clearTimeout(analysisTimeoutRef.current);
+        analysisTimeoutRef.current = null;
+      }
     }
   };
 
@@ -208,6 +256,17 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
 
   // Clear preview and reset state
   const reset = () => {
+    // Clear timeouts
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+      analysisTimeoutRef.current = null;
+    }
+    if (generationTimeoutRef.current) {
+      clearTimeout(generationTimeoutRef.current);
+      generationTimeoutRef.current = null;
+    }
+    
+    // Reset all state
     setPreviewMessage('');
     setGeneratedMessage('');
     setLeadData(null);
@@ -216,7 +275,23 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
     setOriginalDataQuality(null);
     setNameDecision('');
     setVehicleDecision('');
+    setError(null);
+    setIsAnalyzing(false);
+    setIsGenerating(false);
+    setIsSending(false);
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (analysisTimeoutRef.current) {
+        clearTimeout(analysisTimeoutRef.current);
+      }
+      if (generationTimeoutRef.current) {
+        clearTimeout(generationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Alias for backward compatibility
   const clearPreview = reset;
@@ -230,6 +305,7 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
     generatedMessage,
     leadData,
     isSending,
+    error,
     
     // Multi-step workflow states
     showDecisionStep,
