@@ -31,25 +31,12 @@ interface LeadDetails {
   source: string;
   status: string;
   ai_opt_in: boolean;
-  ai_stage?: string;
-  ai_sequence_paused: boolean;
-  ai_pause_reason?: string;
-  next_ai_send_at?: string;
-  ai_messages_sent: number;
   created_at: string;
   phone_numbers: Array<{
     id: string;
     number: string;
     type: string;
     is_primary: boolean;
-    status: string;
-  }>;
-  conversations: Array<{
-    id: string;
-    body: string;
-    direction: string;
-    sent_at: string;
-    ai_generated: boolean;
   }>;
 }
 
@@ -71,8 +58,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
         .from('leads')
         .select(`
           *,
-          phone_numbers (id, number, type, is_primary, status),
-          conversations (id, body, direction, sent_at, ai_generated)
+          phone_numbers (id, number, type, is_primary)
         `)
         .eq('id', leadId)
         .single();
@@ -97,12 +83,6 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
            'No phone number';
   };
 
-  const getAIStatusBadge = () => {
-    if (!leadDetails?.ai_opt_in) return <Badge variant="secondary">AI Disabled</Badge>;
-    if (leadDetails.ai_sequence_paused) return <Badge variant="destructive">AI Paused</Badge>;
-    return <Badge variant="default">AI Active</Badge>;
-  };
-
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
       'new': 'default',
@@ -118,14 +98,10 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
     return format(new Date(dateString), 'MMM dd, yyyy hh:mm a');
   };
 
-  const recentMessages = leadDetails?.conversations
-    ?.sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())
-    ?.slice(0, 3) || [];
-
   if (loading) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[500px]">
           <div className="flex items-center justify-center p-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
@@ -137,7 +113,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
   if (!leadDetails) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[500px]">
           <div className="text-center p-8">
             <p>Lead details not found</p>
           </div>
@@ -148,14 +124,14 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
             {leadDetails.first_name} {leadDetails.last_name}
           </DialogTitle>
           <DialogDescription>
-            Lead details and communication history
+            Lead details and contact information
           </DialogDescription>
         </DialogHeader>
 
@@ -214,64 +190,14 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ open, onClose, lead
                 AI Status
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent>
               <div className="flex items-center gap-2">
-                {getAIStatusBadge()}
-                <span className="text-sm">Messages sent: {leadDetails.ai_messages_sent}</span>
+                <Badge variant={leadDetails.ai_opt_in ? 'default' : 'secondary'}>
+                  {leadDetails.ai_opt_in ? 'AI Enabled' : 'AI Disabled'}
+                </Badge>
               </div>
-              
-              {leadDetails.ai_stage && (
-                <div>
-                  <span className="text-sm font-medium">Current Stage:</span>
-                  <Badge variant="outline" className="ml-2">{leadDetails.ai_stage}</Badge>
-                </div>
-              )}
-
-              {leadDetails.ai_sequence_paused && leadDetails.ai_pause_reason && (
-                <div>
-                  <span className="text-sm font-medium">Pause Reason:</span>
-                  <span className="ml-2 text-sm text-red-600">{leadDetails.ai_pause_reason}</span>
-                </div>
-              )}
-
-              {leadDetails.next_ai_send_at && !leadDetails.ai_sequence_paused && (
-                <div>
-                  <span className="text-sm font-medium">Next Message:</span>
-                  <span className="ml-2 text-sm">{formatDate(leadDetails.next_ai_send_at)}</span>
-                </div>
-              )}
             </CardContent>
           </Card>
-
-          {/* Recent Messages */}
-          {recentMessages.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Recent Messages ({leadDetails.conversations.length} total)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {recentMessages.map((message) => (
-                  <div key={message.id} className="border-l-2 border-gray-200 pl-3 pb-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant={message.direction === 'in' ? 'default' : 'secondary'}>
-                        {message.direction === 'in' ? 'Incoming' : 'Outgoing'}
-                      </Badge>
-                      {message.ai_generated && (
-                        <Badge variant="outline" className="text-xs">AI</Badge>
-                      )}
-                      <span className="text-xs text-gray-500">
-                        {formatDate(message.sent_at)}
-                      </span>
-                    </div>
-                    <p className="text-sm">{message.body}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
 
           {/* Lead Created */}
           <div className="text-xs text-gray-500 flex items-center gap-1">
