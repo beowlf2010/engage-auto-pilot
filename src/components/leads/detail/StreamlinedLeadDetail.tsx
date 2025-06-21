@@ -46,15 +46,16 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
     }
   }, [lead.id, loadMessages]);
 
-  // Fixed send message using the working service that powers the Smart Inbox
+  // Simplified send message - let fixedMessagesService handle phone number lookup
   const sendMessage = async (leadId: string, messageBody: string): Promise<void> => {
     if (!profile || !messageBody.trim()) {
       throw new Error('Missing profile or message body');
     }
 
-    console.log('📤 [LEAD DETAIL] Sending message using fixed service');
+    console.log('📤 [LEAD DETAIL] Sending message - letting service handle phone lookup');
     
-    // Use the same working service that the Smart Inbox uses
+    // Let fixedMessagesService handle all the phone number lookup and validation
+    // This service already works correctly in the Smart Inbox
     await fixedSendMessage(leadId, messageBody.trim(), profile, false);
     
     console.log('✅ [LEAD DETAIL] Message sent successfully via fixed service');
