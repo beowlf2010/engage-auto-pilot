@@ -43,6 +43,7 @@ const MessagePreviewInline = ({
   const [message, setMessage] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [sending, setSending] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string>('');
   const [showIssueSelector, setShowIssueSelector] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
@@ -80,7 +81,6 @@ const MessagePreviewInline = ({
       console.log(`🔄 [UNIFIED PREVIEW] Generating preview for ${leadName} - ${isInitialContact ? 'INITIAL CONTACT' : 'FOLLOW-UP'}`);
 
       if (isInitialContact) {
-        // Use initial outreach service for first-time contact
         console.log(`🚀 [UNIFIED PREVIEW] Using initial outreach service`);
         
         const [firstName, ...lastNameParts] = leadName.split(' ');
@@ -102,7 +102,6 @@ const MessagePreviewInline = ({
           throw new Error('Failed to generate initial outreach message');
         }
       } else {
-        // Use the unified intelligent-conversation-ai function for follow-ups
         console.log(`🔄 [UNIFIED PREVIEW] Using conversation AI for follow-up`);
         
         const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
@@ -151,10 +150,11 @@ const MessagePreviewInline = ({
   };
 
   const handleSendNow = async () => {
-    if (!message) return;
+    if (!message || sending) return;
     
+    setSending(true);
     try {
-      const { sendMessage } = await import('@/services/messagesService');
+      console.log(`📤 [MESSAGE PREVIEW] Sending message for lead ${leadId}`);
       
       // Get current user profile
       const { data: { user } } = await supabase.auth.getUser();
@@ -168,21 +168,46 @@ const MessagePreviewInline = ({
       
       if (!profile) throw new Error('No user profile found');
       
-      await sendMessage(leadId, message, profile, true);
+      // Send the message using the messages service
+      const { sendMessage } = await import('@/services/messagesService');
+      const conversation = await sendMessage(leadId, message, profile, true);
       
-      toast({
-        title: "Message Sent",
-        description: "AI message sent immediately",
-      });
+      if (conversation) {
+        console.log(`✅ [MESSAGE PREVIEW] Message sent successfully`);
+        
+        // Update lead status to reflect message was sent
+        const nextSendTime = new Date();
+        nextSendTime.setTime(nextSendTime.getTime() + (24 * 60 * 60 * 1000));
+
+        await supabase
+          .from('leads')
+          .update({
+            ai_opt_in: true,
+            ai_stage: 'initial_contact_sent',
+            ai_messages_sent: 1,
+            next_ai_send_at: nextSendTime.toISOString(),
+            pending_human_response: false
+          })
+          .eq('id', leadId);
+        
+        toast({
+          title: "Message Sent",
+          description: `AI message sent successfully to ${leadName}`,
+        });
+        
+        // Trigger the callback to refresh the queue
+        onMessageSent();
+      }
       
-      onMessageSent();
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ [MESSAGE PREVIEW] Error sending message:', error);
       toast({
         title: "Error",
         description: "Failed to send message",
         variant: "destructive"
       });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -218,8 +243,8 @@ const MessagePreviewInline = ({
     if (hasVehicle) score += 1;
     if (goodLength) score += 1;
     if (hasCall2Action) score += 2;
-    if (hasFinnIntro) score += 1; // Bonus for proper Finn introduction
-    if (hasJasonPilger) score += 1; // Bonus for proper dealership name
+    if (hasFinnIntro) score += 1;
+    if (hasJasonPilger) score += 1;
     
     if (score >= 9) return { score, color: 'text-green-600' };
     if (score >= 7) return { score, color: 'text-yellow-600' };
@@ -312,18 +337,18 @@ const MessagePreviewInline = ({
           <Button
             size="sm"
             onClick={handleSendNow}
-            disabled={!message || loading || message.includes('Error')}
+            disabled={!message || loading || message.includes('Error') || sending}
             className="flex-1"
           >
             <Send className="w-3 h-3 mr-1" />
-            Send Now
+            {sending ? 'Sending...' : 'Send Now'}
           </Button>
           
           <Button
             variant="outline"
             size="sm"
             onClick={() => generatePreview()}
-            disabled={loading || regenerating}
+            disabled={loading || regenerating || sending}
           >
             <RefreshCcw className="w-3 h-3 mr-1" />
             Regenerate
@@ -333,7 +358,7 @@ const MessagePreviewInline = ({
             variant="outline"
             size="sm"
             onClick={() => setShowIssueSelector(true)}
-            disabled={loading || regenerating}
+            disabled={loading || regenerating || sending}
           >
             <AlertTriangle className="w-3 h-3 mr-1" />
             Flag Issue
