@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import RPODataInput from './manual-entry/RPODataInput';
 import RPOMappingsList from './manual-entry/RPOMappingsList';
+import CategoryManager from './manual-entry/CategoryManager';
 import { processOrderData } from './manual-entry/rpoDataProcessor';
 import { saveMappingsToDatabase } from './manual-entry/rpoSaveService';
 
@@ -21,14 +22,25 @@ const RPOManualEntry = () => {
   const [detectedMappings, setDetectedMappings] = useState<DetectedMapping[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const categories = [
-    'engine', 'transmission', 'interior', 'exterior', 'package', 'option', 'safety', 'technology'
+  // Enhanced categories to match order bank structure
+  const defaultCategories = [
+    'engine', 'transmission', 'interior', 'exterior', 'package', 'option', 
+    'safety', 'technology', 'additional_options', 'performance', 'convenience',
+    'appearance', 'protection', 'towing', 'off_road', 'comfort', 'lighting',
+    'suspension', 'wheels_tires', 'audio', 'navigation', 'climate'
   ];
 
+  // Combine default and custom categories
+  const allCategories = [...defaultCategories, ...customCategories];
+
   const featureTypes = [
-    'color', 'trim_level', 'engine_option', 'package_feature', 'safety_feature', 'technology_feature', 'accessory'
+    'color', 'trim_level', 'engine_option', 'package_feature', 'safety_feature', 
+    'technology_feature', 'accessory', 'equipment', 'upgrade', 'deletion',
+    'performance_upgrade', 'convenience_feature', 'appearance_package',
+    'protection_feature', 'towing_equipment', 'off_road_equipment'
   ];
 
   const handleProcessOrderData = () => {
@@ -111,8 +123,24 @@ const RPOManualEntry = () => {
     }
   };
 
+  const addCustomCategory = (categoryName: string) => {
+    const sanitizedName = categoryName.toLowerCase().replace(/\s+/g, '_');
+    if (!allCategories.includes(sanitizedName)) {
+      setCustomCategories(prev => [...prev, sanitizedName]);
+      toast({
+        title: "Category Added",
+        description: `Added "${categoryName}" to available categories.`,
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <CategoryManager 
+        categories={allCategories}
+        onAddCategory={addCustomCategory}
+      />
+
       <RPODataInput
         sessionName={sessionName}
         setSessionName={setSessionName}
@@ -128,7 +156,7 @@ const RPOManualEntry = () => {
         onRemoveMapping={removeMapping}
         onSaveMappings={handleSaveMappings}
         isSaving={isSaving}
-        categories={categories}
+        categories={allCategories}
         featureTypes={featureTypes}
       />
     </div>

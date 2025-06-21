@@ -84,3 +84,18 @@ export const fieldSections: FieldSection[] = [
     ]
   }
 ];
+
+// Enhanced RPO categories for order bank matching
+export const rpoCategories = [
+  'engine', 'transmission', 'interior', 'exterior', 'package', 'option', 
+  'safety', 'technology', 'additional_options', 'performance', 'convenience',
+  'appearance', 'protection', 'towing', 'off_road', 'comfort', 'lighting',
+  'suspension', 'wheels_tires', 'audio', 'navigation', 'climate'
+];
+
+export const rpoFeatureTypes = [
+  'color', 'trim_level', 'engine_option', 'package_feature', 'safety_feature', 
+  'technology_feature', 'accessory', 'equipment', 'upgrade', 'deletion',
+  'performance_upgrade', 'convenience_feature', 'appearance_package',
+  'protection_feature', 'towing_equipment', 'off_road_equipment'
+];
