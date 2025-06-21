@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Brain, TrendingUp, Zap, Target, AlertTriangle, Users, BarChart3, Activity } from 'lucide-react';
+import { Brain, TrendingUp, TrendingDown, Zap, Target, AlertTriangle, Users, BarChart3, Activity } from 'lucide-react';
 import AdvancedPerformanceDashboard from '@/components/analytics/AdvancedPerformanceDashboard';
 import { behavioralTriggersEngine, BehavioralTrigger } from '@/services/behavioralTriggersEngine';
 import { predictiveAnalyticsService, PredictiveInsight } from '@/services/predictiveAnalyticsService';

@@ -21,7 +21,7 @@ const PredictiveAnalyticsOverview = () => {
   }
 
   // Extract different types of insights
-  const conversionInsights = insights.filter(i => i.type === 'conversion_probability');
+  const conversionInsights = insights.filter(i => i.type === 'conversion_prediction');
   const churnInsights = insights.filter(i => i.type === 'churn_risk');
   const contentInsights = insights.filter(i => i.type === 'content_recommendation');
   const timingInsights = insights.filter(i => i.type === 'optimal_timing');

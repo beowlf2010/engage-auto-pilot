@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { messageQualityService } from './messageQualityService';
 
@@ -285,32 +284,48 @@ class RealtimeLearningEngine {
     return null;
   }
 
-  // Store optimization insights
+  // Store optimization insights in existing tables
   private async storeInsights(insights: OptimizationInsight[]): Promise<void> {
     for (const insight of insights) {
       console.log('💡 [LEARNING] Generated insight:', insight.recommendation);
       
-      // Store in analytics for dashboard display
-      await supabase.from('ai_optimization_insights').insert({
-        insight_type: insight.type,
-        confidence: insight.confidence,
-        impact: insight.impact,
-        recommendation: insight.recommendation,
-        expected_improvement: insight.expectedImprovement,
-        created_at: new Date().toISOString()
+      // Store in ai_learning_outcomes table instead
+      await supabase.from('ai_learning_outcomes').insert({
+        lead_id: 'system', // System-level insight
+        outcome_type: insight.type,
+        message_characteristics: {
+          insight_type: insight.type,
+          confidence: insight.confidence,
+          impact: insight.impact,
+          recommendation: insight.recommendation,
+          expected_improvement: insight.expectedImprovement
+        },
+        success_factors: {
+          optimization_type: insight.type,
+          created_at: new Date().toISOString()
+        }
       });
     }
   }
 
-  // Get recent optimization insights
+  // Get recent optimization insights from existing tables
   async getOptimizationInsights(limit = 10): Promise<OptimizationInsight[]> {
     const { data } = await supabase
-      .from('ai_optimization_insights')
+      .from('ai_learning_outcomes')
       .select('*')
+      .eq('outcome_type', 'timing')
+      .or('outcome_type.eq.content,outcome_type.eq.frequency,outcome_type.eq.targeting')
       .order('created_at', { ascending: false })
       .limit(limit);
     
-    return data || [];
+    return (data || []).map(row => ({
+      id: row.id,
+      type: row.outcome_type as OptimizationInsight['type'],
+      confidence: (row.message_characteristics as any)?.confidence || 0.7,
+      impact: (row.message_characteristics as any)?.impact || 'medium',
+      recommendation: (row.message_characteristics as any)?.recommendation || 'Optimization available',
+      expectedImprovement: (row.message_characteristics as any)?.expected_improvement || 10
+    }));
   }
 }
 

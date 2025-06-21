@@ -1,94 +1,77 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Brain, TrendingUp, Zap, AlertTriangle, Target, ArrowRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Package, DollarSign, Brain, AlertTriangle } from 'lucide-react';
 import { usePredictiveAnalytics } from '@/hooks/usePredictiveAnalytics';
-import { useNavigate } from 'react-router-dom';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const AIInsightsWidget = () => {
-  const { insights, decisions, loading } = usePredictiveAnalytics();
-  const navigate = useNavigate();
+  const { insights, loading, lastUpdated, loadInsights } = usePredictiveAnalytics();
 
   if (loading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <LoadingSpinner text="Loading AI insights..." />
         </CardContent>
       </Card>
     );
   }
 
-  const highValueLeads = insights.filter(i => 
-    i.type === 'conversion_probability' && i.confidence > 0.7
-  ).length;
-
-  const urgentDecisions = decisions.filter(d => 
-    d.type === 'human_handoff' || d.type === 'campaign_trigger'
-  ).length;
-
-  // Calculate today's insights without using createdAt
-  const todayInsights = insights.length; // Simplified - show all insights for now
+  // Extract different types of insights
+  const conversionInsights = insights.filter(i => i.type === 'conversion_prediction');
+  const churnInsights = insights.filter(i => i.type === 'churn_risk');
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Brain className="w-5 h-5 text-blue-600" />
-          AI Insights
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{highValueLeads}</div>
-            <div className="text-xs text-muted-foreground">High-Value Leads</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{urgentDecisions}</div>
-            <div className="text-xs text-muted-foreground">Urgent Actions</div>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-1">
-              <Target className="w-3 h-3" />
-              Today's Insights
-            </span>
-            <Badge variant="outline">{todayInsights}</Badge>
-          </div>
-          
-          <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-1">
-              <Zap className="w-3 h-3" />
-              Active Predictions
-            </span>
-            <Badge variant="outline">{insights.length}</Badge>
-          </div>
-
-          {urgentDecisions > 0 && (
-            <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg">
-              <AlertTriangle className="w-4 h-4 text-orange-600" />
-              <span className="text-sm text-orange-800">
-                {urgentDecisions} decisions need attention
-              </span>
+    <ErrorBoundary>
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Insights</CardTitle>
+          {lastUpdated && (
+            <p className="text-sm text-muted-foreground">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </p>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {conversionInsights.length > 0 && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">High Conversion Leads</p>
+                <p className="text-2xl font-bold">{conversionInsights.length}</p>
+              </div>
+              <TrendingUp className="w-6 h-6 text-green-500" />
             </div>
           )}
-        </div>
 
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => navigate('/ai-monitor')}
-          className="w-full flex items-center gap-2"
-        >
-          View AI Monitor
-          <ArrowRight className="w-3 h-3" />
-        </Button>
-      </CardContent>
-    </Card>
+          {churnInsights.length > 0 && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">At-Risk Leads</p>
+                <p className="text-2xl font-bold">{churnInsights.length}</p>
+              </div>
+              <AlertTriangle className="w-6 h-6 text-red-500" />
+            </div>
+          )}
+
+          {insights.length === 0 && (
+            <div className="text-center py-4">
+              <Brain className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No predictive insights available yet
+              </p>
+              <button
+                onClick={loadInsights}
+                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+              >
+                Generate Insights
+              </button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </ErrorBoundary>
   );
 };
 

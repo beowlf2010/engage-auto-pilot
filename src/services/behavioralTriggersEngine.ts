@@ -408,8 +408,8 @@ class BehavioralTriggersEngine {
     return data?.map(row => ({
       id: row.id,
       leadId: row.lead_id,
-      triggerType: row.trigger_type,
-      urgencyLevel: row.urgency_level,
+      triggerType: row.trigger_type as BehavioralTrigger['triggerType'],
+      urgencyLevel: row.urgency_level as BehavioralTrigger['urgencyLevel'],
       confidence: (row.trigger_data as any)?.confidence || 0.5,
       context: {
         leadName: `${row.leads?.first_name} ${row.leads?.last_name}`,
