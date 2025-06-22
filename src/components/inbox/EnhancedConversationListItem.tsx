@@ -28,10 +28,29 @@ const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> 
   viewMode = 'list'
 }) => {
   const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    const nameParts = name.split(' ');
-    const initials = nameParts.map((part) => part.charAt(0).toUpperCase()).join('');
-    return initials.substring(0, 2);
+    // Handle null, undefined, empty string, or non-string values
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      return 'U';
+    }
+    
+    try {
+      const trimmedName = name.trim();
+      const nameParts = trimmedName.split(' ').filter(part => part.length > 0);
+      
+      if (nameParts.length === 0) {
+        return 'U';
+      }
+      
+      const initials = nameParts
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('')
+        .substring(0, 2);
+      
+      return initials || 'U';
+    } catch (error) {
+      console.warn('Error generating initials for name:', name, error);
+      return 'U';
+    }
   };
 
   const formatTime = (timestamp: string) => {
@@ -52,6 +71,9 @@ const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> 
     await markAsRead(conversation.leadId);
   };
 
+  // Safely get the conversation name with fallbacks
+  const conversationName = conversation.name || conversation.leadName || 'Unknown';
+
   return (
     <div
       className={`cursor-pointer transition-all duration-200 ${
@@ -64,14 +86,14 @@ const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> 
       <div className="flex items-start space-x-3">
         <div className="flex-shrink-0">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
-            {getInitials(conversation.name)}
+            {getInitials(conversationName)}
           </div>
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-semibold text-gray-900 truncate">
-              {conversation.name}
+              {conversationName}
             </h3>
             <div className="flex items-center space-x-2">
               {/* AI Insights Indicator */}
