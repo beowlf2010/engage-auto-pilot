@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ConversationsList from './ConversationsList';
 import EnhancedChatView from './EnhancedChatView';
@@ -57,7 +56,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
         />
       </div>
 
-      {/* Chat View - Remove sendingMessage prop that doesn't exist */}
+      {/* Chat View - Remove canReply prop that doesn't exist */}
       <div className="flex-1 flex flex-col">
         <EnhancedChatView
           messages={messages}
@@ -65,7 +64,6 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           showTemplates={showTemplates}
           onSendMessage={onSendMessage}
           onToggleTemplates={onToggleTemplates}
-          canReply={canReply}
           user={user}
         />
       </div>
