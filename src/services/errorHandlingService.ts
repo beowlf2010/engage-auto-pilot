@@ -1,3 +1,4 @@
+
 import { toast } from '@/hooks/use-toast';
 
 export interface ErrorContext {
@@ -67,9 +68,12 @@ class ErrorHandlingService {
       }
     }
 
-    // Determine severity based on operation
+    // Determine severity based on operation - fix the type issue
     if (context.operation.includes('send') || context.operation.includes('load')) {
-      severity = severity === 'low' ? 'medium' : severity;
+      // Only upgrade severity if it's currently low
+      if (severity === 'low') {
+        severity = 'medium';
+      }
     }
 
     return {
