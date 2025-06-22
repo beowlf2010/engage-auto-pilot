@@ -30,7 +30,6 @@ class RealtimeLearningService {
     
     this.learningQueue.push(event);
     
-    // Process queue if not already processing
     if (!this.processingQueue) {
       await this.processQueue();
     }
@@ -73,7 +72,6 @@ class RealtimeLearningService {
           break;
       }
       
-      // Update learning metrics
       await this.updateLearningMetrics(event);
       
     } catch (error) {
@@ -84,7 +82,6 @@ class RealtimeLearningService {
   private async handleMessageSent(event: LearningEvent): Promise<void> {
     const { leadId, data } = event;
     
-    // Track template usage
     if (data.content) {
       await supabase
         .from('ai_template_performance')
@@ -99,7 +96,6 @@ class RealtimeLearningService {
         });
     }
 
-    // Update lead response patterns
     await this.updateLeadResponsePatterns(leadId, {
       last_interaction_type: 'message_sent',
       message_content: data.content
@@ -109,17 +105,15 @@ class RealtimeLearningService {
   private async handleResponseReceived(event: LearningEvent): Promise<void> {
     const { leadId, data } = event;
     
-    // Update response patterns
     await this.updateLeadResponsePatterns(leadId, {
       total_responses: 1,
       response_time_hours: data.responseTimeHours || 0,
       last_response_at: event.timestamp.toISOString()
     });
 
-    // Track learning outcome
     await aiLearningService.trackLearningOutcome({
       leadId,
-      outcomeType: 'response_received',
+      outcomeType: 'positive_response',
       messageCharacteristics: {
         responseTime: data.responseTimeHours,
         messageLength: data.messageLength
@@ -130,7 +124,6 @@ class RealtimeLearningService {
   private async handleFeedbackSubmitted(event: LearningEvent): Promise<void> {
     const { leadId, data } = event;
     
-    // Submit feedback through learning service
     await aiLearningService.submitMessageFeedback({
       leadId,
       messageContent: data.messageContent,
@@ -139,7 +132,6 @@ class RealtimeLearningService {
       improvementSuggestions: data.suggestions
     });
 
-    // Generate insights based on feedback
     await this.generateFeedbackInsights(leadId, data);
   }
 
@@ -153,7 +145,6 @@ class RealtimeLearningService {
       leadCharacteristics: data.leadCharacteristics
     });
 
-    // Generate high-impact insight
     await this.createLearningInsight({
       type: 'performance',
       title: 'Appointment Booked',
@@ -169,7 +160,6 @@ class RealtimeLearningService {
   private async handleConversationAnalyzed(event: LearningEvent): Promise<void> {
     const { leadId, data } = event;
     
-    // Create analysis insights
     if (data.insights) {
       for (const insight of data.insights) {
         await this.createLearningInsight({
@@ -223,7 +213,6 @@ class RealtimeLearningService {
   }
 
   private async generateFeedbackInsights(leadId: string, feedbackData: any): Promise<void> {
-    // Generate insights based on feedback patterns
     if (feedbackData.feedbackType === 'negative' && feedbackData.rating <= 2) {
       await this.createLearningInsight({
         type: 'optimization',
@@ -260,7 +249,6 @@ class RealtimeLearningService {
 
   private async updateLearningMetrics(event: LearningEvent): Promise<void> {
     try {
-      // Get today's metrics
       const { data: todayMetrics } = await supabase
         .from('ai_learning_metrics')
         .select('*')
@@ -303,7 +291,6 @@ class RealtimeLearningService {
     learningMetrics: any;
   }> {
     try {
-      // Get insights
       let insightsQuery = supabase
         .from('ai_learning_insights')
         .select('*')
@@ -317,7 +304,6 @@ class RealtimeLearningService {
 
       const { data: insightsData } = await insightsQuery;
 
-      // Get active optimizations
       const { data: optimizationsData } = await supabase
         .from('ai_template_performance')
         .select('*')
@@ -325,7 +311,6 @@ class RealtimeLearningService {
         .order('performance_score', { ascending: false })
         .limit(5);
 
-      // Get learning metrics
       const { data: metricsData } = await supabase
         .from('ai_learning_metrics')
         .select('*')
@@ -334,11 +319,11 @@ class RealtimeLearningService {
 
       const insights: OptimizationInsight[] = (insightsData || []).map(insight => ({
         id: insight.id,
-        type: insight.insight_type,
+        type: insight.insight_type as 'pattern' | 'optimization' | 'prediction' | 'performance',
         title: insight.insight_title,
         description: insight.insight_description,
         confidence: insight.confidence_score,
-        impact: insight.impact_level,
+        impact: insight.impact_level as 'low' | 'medium' | 'high' | 'critical',
         actionable: insight.actionable,
         leadId: insight.lead_id,
         data: insight.insight_data

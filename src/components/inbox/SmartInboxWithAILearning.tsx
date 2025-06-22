@@ -4,14 +4,17 @@ import { useStableConversationOperations } from '@/hooks/useStableConversationOp
 import { useUnifiedAIScheduler } from '@/hooks/useUnifiedAIScheduler';
 import { useLeads } from '@/hooks/useLeads';
 import { realtimeLearningService } from '@/services/realtimeLearningService';
+import { aiEmergencyService } from '@/services/aiEmergencyService';
 import SmartInboxMain from './SmartInboxMain';
 import AILearningDashboard from '@/components/ai/AILearningDashboard';
 import AILearningMessageWrapper from './AILearningMessageWrapper';
+import AIEmergencyToggle from '@/components/ai/AIEmergencyToggle';
 import InboxStateManager from './InboxStateManager';
 import InboxStatusDisplay from './InboxStatusDisplay';
 import MessageDebugPanel from '../debug/MessageDebugPanel';
 import { Button } from '@/components/ui/button';
-import { Brain, BarChart3 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Brain, BarChart3, AlertTriangle } from 'lucide-react';
 
 interface SmartInboxWithAILearningProps {
   user: {
@@ -25,14 +28,12 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   const [showLearningDashboard, setShowLearningDashboard] = useState(false);
   const [showAIMessageWrapper, setShowAIMessageWrapper] = useState(false);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
+  const [aiDisabled, setAiDisabled] = useState(false);
+  const [aiDisableInfo, setAiDisableInfo] = useState<any>(null);
 
-  // Use the unified AI scheduler
   useUnifiedAIScheduler();
-
-  // Get leads refresh function
   const { forceRefresh: refreshLeads } = useLeads();
 
-  // Use stable conversation operations with learning integration
   const { 
     conversations, 
     messages, 
@@ -42,20 +43,51 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     loadMessages, 
     sendMessage: originalSendMessage, 
     manualRefresh,
-    setError
+    setError,
+    markAsRead,
+    markingAsRead
   } = useStableConversationOperations({
     onLeadsRefresh: refreshLeads
   });
 
-  // Enhanced send message with learning integration
+  // Initialize AI emergency service
+  useEffect(() => {
+    const initializeEmergencyService = async () => {
+      await aiEmergencyService.initialize();
+      setAiDisabled(aiEmergencyService.isAIDisabled());
+      setAiDisableInfo(aiEmergencyService.getDisableInfo());
+
+      const unsubscribe = aiEmergencyService.onStatusChange((disabled) => {
+        setAiDisabled(disabled);
+        setAiDisableInfo(aiEmergencyService.getDisableInfo());
+      });
+
+      return unsubscribe;
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    initializeEmergencyService().then((unsub) => {
+      unsubscribe = unsub;
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Enhanced send message with AI safety checks
   const sendMessage = async (leadId: string, messageContent: string) => {
+    // AI Safety Check
+    const canProceed = await aiEmergencyService.checkBeforeAIAction('send_message');
+    if (!canProceed) {
+      throw new Error('AI messaging is currently disabled for safety reasons');
+    }
+
     try {
       console.log('🧠 Enhanced AI Learning: Sending message with learning integration');
       
-      // Send message using original function
       await originalSendMessage(leadId, messageContent);
       
-      // Process learning event
       await realtimeLearningService.processLearningEvent({
         type: 'message_sent',
         leadId,
@@ -75,12 +107,10 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     }
   };
 
-  // Enhanced message loading with response tracking
   const enhancedLoadMessages = async (leadId: string) => {
     setSelectedLead(leadId);
     await loadMessages(leadId);
     
-    // Track conversation analysis event
     setTimeout(async () => {
       const conversationHistory = messages
         .map(m => `${m.direction === 'in' ? 'Customer' : 'Agent'}: ${m.body}`)
@@ -101,7 +131,6 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     }, 1000);
   };
 
-  // Track response received events
   useEffect(() => {
     if (messages.length > 0 && selectedLead) {
       const incomingMessages = messages.filter(m => m.direction === 'in');
@@ -128,7 +157,6 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     }
   }, [messages, selectedLead]);
 
-  // Filter conversations based on user role
   const filteredConversations = conversations.filter(conv => 
     user.role === "manager" || user.role === "admin" || conv.salespersonId === user.id || !conv.salespersonId
   );
@@ -138,10 +166,10 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     conversationsCount: filteredConversations.length,
     hasError: !!error,
     showLearningDashboard,
-    selectedLead
+    selectedLead,
+    aiDisabled
   });
 
-  // Check if we should show status displays
   const shouldShowStatus = error || (loading && filteredConversations.length === 0);
 
   if (shouldShowStatus) {
@@ -163,12 +191,26 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
 
   return (
     <div className="flex h-screen">
-      {/* Main Inbox */}
       <div className={`flex-1 ${showLearningDashboard ? 'mr-2' : ''}`}>
         <InboxStateManager>
           {(stateProps) => (
             <div className="h-full flex flex-col">
-              {/* Enhanced Header with Learning Controls */}
+              {/* AI Emergency Warning Banner */}
+              {aiDisabled && (
+                <Alert className="border-red-500 bg-red-50 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    <strong>AI EMERGENCY SHUTDOWN ACTIVE:</strong> {aiDisableInfo?.reason || 'AI messaging disabled'}
+                    {aiDisableInfo?.disabledAt && (
+                      <div className="text-sm mt-1">
+                        Disabled at: {new Date(aiDisableInfo.disabledAt).toLocaleString()}
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Enhanced Header with Emergency Controls */}
               <div className="border-b bg-white p-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Brain className="w-6 h-6 text-blue-600" />
@@ -176,11 +218,19 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                 </div>
                 
                 <div className="flex items-center gap-2">
+                  {/* Emergency AI Toggle - Always Visible */}
+                  <AIEmergencyToggle 
+                    userId={user.id} 
+                    size="sm"
+                    showStatus={false}
+                  />
+                  
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowAIMessageWrapper(!showAIMessageWrapper)}
                     className={showAIMessageWrapper ? 'bg-blue-50 border-blue-300' : ''}
+                    disabled={aiDisabled}
                   >
                     <Brain className="w-4 h-4 mr-1" />
                     AI Assistant
@@ -199,7 +249,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
               </div>
 
               {/* AI Message Wrapper */}
-              {showAIMessageWrapper && selectedLead && (
+              {showAIMessageWrapper && selectedLead && !aiDisabled && (
                 <div className="border-b bg-blue-50 p-4">
                   <AILearningMessageWrapper
                     leadId={selectedLead}
@@ -224,6 +274,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                   setError={setError}
                   debugPanelOpen={debugPanelOpen}
                   setDebugPanelOpen={setDebugPanelOpen}
+                  markAsRead={markAsRead}
+                  markingAsRead={markingAsRead}
                   getLeadIdFromUrl={() => {
                     const searchParams = new URLSearchParams(window.location.search);
                     return searchParams.get('leadId');
@@ -248,7 +300,6 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
         </div>
       )}
 
-      {/* Debug Panel */}
       <MessageDebugPanel
         isOpen={debugPanelOpen}
         onToggle={() => setDebugPanelOpen(!debugPanelOpen)}
