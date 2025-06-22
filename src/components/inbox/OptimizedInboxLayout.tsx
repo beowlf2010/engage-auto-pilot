@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ConversationsList from './ConversationsList';
 import EnhancedChatView from './EnhancedChatView';
@@ -56,7 +57,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
         />
       </div>
 
-      {/* Chat View - Remove canReply prop that doesn't exist */}
+      {/* Chat View */}
       <div className="flex-1 flex flex-col">
         <EnhancedChatView
           messages={messages}
@@ -68,7 +69,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
         />
       </div>
 
-      {/* Lead Context Panel - Use conversation prop structure */}
+      {/* Lead Context Panel */}
       {selectedConversation && (
         <div className="w-80 border-l border-gray-200">
           <LeadContextPanel
