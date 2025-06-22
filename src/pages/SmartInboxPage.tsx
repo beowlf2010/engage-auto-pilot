@@ -1,6 +1,6 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import OptimizedSmartInbox from "@/components/OptimizedSmartInbox";
+import SmartInboxWithAILearning from "@/components/inbox/SmartInboxWithAILearning";
 import { Navigate } from "react-router-dom";
 import { useEffect } from "react";
 
@@ -36,14 +36,10 @@ const SmartInboxPage = () => {
 
   const user = {
     id: profile.id,
-    email: profile.email,
-    role: profile.role,
-    firstName: profile.first_name,
-    lastName: profile.last_name,
-    phone: profile.phone
+    role: profile.role
   };
 
-  return <OptimizedSmartInbox user={user} />;
+  return <SmartInboxWithAILearning user={user} />;
 };
 
 export default SmartInboxPage;
