@@ -101,9 +101,9 @@ class EnhancedFinnAI {
         },
         journeyInsights: {
           stage: journeyInsights.stage,
-          probability: journeyInsights.probability,
-          urgency: journeyInsights.urgency,
-          nextAction: journeyInsights.nextAction
+          conversionProbability: journeyInsights.conversionProbability,
+          estimatedTimeToDecision: journeyInsights.estimatedTimeToDecision,
+          nextBestAction: journeyInsights.nextBestAction
         },
         recommendations: this.generateRecommendedActions(contextInsights, journeyInsights)
       };
@@ -118,9 +118,9 @@ class EnhancedFinnAI {
         },
         journeyInsights: {
           stage: 'awareness',
-          probability: 0.3,
-          urgency: 'medium',
-          nextAction: 'Send follow-up message'
+          conversionProbability: 0.3,
+          estimatedTimeToDecision: 30,
+          nextBestAction: 'Send follow-up message'
         },
         recommendations: ['Follow up with customer']
       };
