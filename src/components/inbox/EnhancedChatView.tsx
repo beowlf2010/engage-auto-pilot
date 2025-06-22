@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,13 +56,6 @@ const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Focus input when conversation changes
-  useEffect(() => {
-    if (selectedConversation && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [selectedConversation]);
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || isLoading) return;
