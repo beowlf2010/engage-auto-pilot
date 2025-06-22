@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { optimizedConversationService, ConversationFilters } from '@/services/optimizedConversationService';
 import { messageCacheService } from '@/services/messageCacheService';
 import { ConversationListItem, MessageData } from '@/types/conversation';
