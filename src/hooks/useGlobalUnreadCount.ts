@@ -14,36 +14,38 @@ export const useGlobalUnreadCount = () => {
     try {
       console.log('🔍 [GLOBAL UNREAD COUNT] Fetching unread count for profile:', profile.id);
 
-      // Get unread SMS conversations
+      // Get unread SMS conversations - using left join to include unassigned leads
       const { data: smsConversations, error: smsError } = await supabase
         .from('conversations')
-        .select('lead_id, leads!inner(salesperson_id)')
+        .select('lead_id, leads(salesperson_id)')
         .eq('direction', 'in')
         .is('read_at', null);
 
       if (smsError) throw smsError;
 
-      // Get unread email conversations
+      // Get unread email conversations - using left join to include unassigned leads
       const { data: emailConversations, error: emailError } = await supabase
         .from('email_conversations')
-        .select('lead_id, leads!inner(salesperson_id)')
+        .select('lead_id, leads(salesperson_id)')
         .eq('direction', 'in')
         .is('read_at', null);
 
       if (emailError) throw emailError;
 
-      // Filter by assigned leads or unassigned leads
+      // Filter by assigned leads or unassigned leads - handle null leads gracefully
       const smsUnread = smsConversations?.filter(conv => 
-        !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id
+        !conv.leads || !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id
       ).length || 0;
 
       const emailUnread = emailConversations?.filter(conv => 
-        !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id
+        !conv.leads || !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id
       ).length || 0;
 
       const totalUnread = smsUnread + emailUnread;
       
       console.log('📊 [GLOBAL UNREAD COUNT] SMS unread:', smsUnread, 'Email unread:', emailUnread, 'Total:', totalUnread);
+      console.log('🔍 [GLOBAL UNREAD COUNT] SMS conversations found:', smsConversations?.length);
+      console.log('🔍 [GLOBAL UNREAD COUNT] Email conversations found:', emailConversations?.length);
       
       setUnreadCount(totalUnread);
     } catch (error) {
