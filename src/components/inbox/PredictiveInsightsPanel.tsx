@@ -1,21 +1,15 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Brain, Zap, Target, TrendingUp } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { TrendingUp, X, Clock, Target, Zap } from 'lucide-react';
 
 interface PredictiveInsightsPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   predictions: any[];
-  insights: {
-    preloadedCount: number;
-    behaviorPatternsCount: number;
-    queueSize: number;
-    isPreloading: boolean;
-  };
+  insights: any;
 }
 
 const PredictiveInsightsPanel: React.FC<PredictiveInsightsPanelProps> = ({
@@ -27,128 +21,121 @@ const PredictiveInsightsPanel: React.FC<PredictiveInsightsPanelProps> = ({
   if (!isOpen) return null;
 
   const topPredictions = predictions.slice(0, 5);
-  const preloadCandidates = predictions.filter(p => p.shouldPreload);
-  const averageScore = predictions.length > 0 
-    ? predictions.reduce((sum, p) => sum + p.predictionScore, 0) / predictions.length 
-    : 0;
+  const predictionScore = topPredictions.reduce((sum, p) => sum + (p.predictionScore || 0), 0);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-4xl h-3/4 m-4">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-blue-500" />
-            Predictive Loading Insights
-          </CardTitle>
+    <div className="fixed inset-y-0 right-0 w-96 bg-white border-l shadow-lg z-50 overflow-y-auto">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-blue-600" />
+            <h2 className="text-lg font-semibold">Predictive Insights</h2>
+          </div>
           <Button variant="ghost" size="sm" onClick={onToggle}>
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </Button>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          {/* Key Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-4">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-green-500" />
-                <div>
-                  <div className="text-2xl font-bold">{insights.preloadedCount}</div>
-                  <div className="text-sm text-gray-600">Preloaded</div>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-blue-500" />
-                <div>
-                  <div className="text-2xl font-bold">{preloadCandidates.length}</div>
-                  <div className="text-sm text-gray-600">To Preload</div>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-purple-500" />
-                <div>
-                  <div className="text-2xl font-bold">{averageScore.toFixed(1)}</div>
-                  <div className="text-sm text-gray-600">Avg Score</div>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center gap-2">
-                <Brain className="w-4 h-4 text-orange-500" />
-                <div>
-                  <div className="text-2xl font-bold">{insights.behaviorPatternsCount}</div>
-                  <div className="text-sm text-gray-600">Patterns</div>
-                </div>
-              </div>
-            </Card>
-          </div>
+        </div>
 
-          {/* Status Indicators */}
-          <div className="flex items-center gap-4">
-            <Badge variant={insights.isPreloading ? "default" : "secondary"}>
-              {insights.isPreloading ? "🔄 Preloading Active" : "⏸️ Preloading Idle"}
-            </Badge>
-            {insights.queueSize > 0 && (
-              <Badge variant="outline">
-                📥 {insights.queueSize} in queue
-              </Badge>
-            )}
-          </div>
+        <div className="space-y-4">
+          {/* Performance Metrics */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Performance Metrics</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-gray-600">Avg Load Time</div>
+                  <div className="font-medium">{insights?.performanceMetrics?.avgLoadTime || '0ms'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Active Jobs</div>
+                  <div className="font-medium">{insights?.performanceMetrics?.activeJobs || 0}</div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Total Loaded</div>
+                  <div className="font-medium">{insights?.performanceMetrics?.totalLoaded || 0}</div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Prediction Score</div>
+                  <div className="font-medium text-green-600">{predictionScore.toFixed(1)}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Top Predictions */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Top Predictions</h3>
-            <ScrollArea className="h-64">
-              <div className="space-y-2">
-                {topPredictions.map((prediction, index) => (
-                  <Card key={prediction.conversationId} className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={prediction.shouldPreload ? "default" : "outline"}>
-                            #{index + 1}
-                          </Badge>
-                          <span className="font-medium">Lead {prediction.leadId.slice(0, 8)}...</span>
-                          <span className="text-lg font-bold text-blue-600">
-                            {prediction.predictionScore.toFixed(1)}
-                          </span>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {prediction.reasons.map((reason: string, idx: number) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
-                              {reason}
-                            </Badge>
-                          ))}
-                        </div>
+          {topPredictions.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Top Predictions</CardTitle>
+                <CardDescription>Conversations likely to need attention</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-2">
+                  {topPredictions.map((prediction, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-sm font-medium">Lead {prediction.leadId?.slice(-6) || 'Unknown'}</span>
                       </div>
-                      {prediction.shouldPreload && (
-                        <Zap className="w-4 h-4 text-green-500" />
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {prediction.predictionScore?.toFixed(1) || '0.0'}
+                        </Badge>
+                        {prediction.shouldPreload && (
+                          <Zap className="h-3 w-3 text-yellow-500" />
+                        )}
+                      </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Performance Summary */}
-          <Card className="p-4 bg-blue-50">
-            <h4 className="font-semibold text-blue-800 mb-2">Performance Summary</h4>
-            <div className="text-sm text-blue-700 space-y-1">
-              <div>• {preloadCandidates.length} conversations predicted for preloading</div>
-              <div>• {insights.preloadedCount} messages cached and ready</div>
-              <div>• {insights.behaviorPatternsCount} user behavior patterns learned</div>
-              <div>• Average prediction confidence: {averageScore.toFixed(1)}/100</div>
-            </div>
-          </Card>
-        </CardContent>
-      </Card>
+          {/* Queue Status */}
+          {insights?.performanceMetrics?.queueStatus && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Queue Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-2">
+                  {Object.entries(insights.performanceMetrics.queueStatus).map(([priority, count]) => (
+                    <div key={priority} className="flex justify-between items-center">
+                      <span className="text-sm capitalize">{priority}</span>
+                      <Badge variant={priority === 'urgent' ? 'destructive' : 'secondary'}>
+                        {count as number}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Enhanced Insights */}
+          {insights?.enhanced && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  AI Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-sm text-gray-600">
+                  <p>Advanced ML predictions and patterns will appear here as they become available.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

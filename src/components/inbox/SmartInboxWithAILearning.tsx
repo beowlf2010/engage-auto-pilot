@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { useStableConversationOperations } from '@/hooks/useStableConversationOperations';
+import { useEnhancedPredictiveInbox } from '@/hooks/useEnhancedPredictiveInbox';
 import { useUnifiedAIScheduler } from '@/hooks/useUnifiedAIScheduler';
 import { useLeads } from '@/hooks/useLeads';
+import { useMarkAsRead } from '@/hooks/inbox/useMarkAsRead';
 import { realtimeLearningService } from '@/services/realtimeLearningService';
 import { aiEmergencyService } from '@/services/aiEmergencyService';
 import SmartInboxMain from './SmartInboxMain';
@@ -12,9 +13,10 @@ import AIEmergencyToggle from '@/components/ai/AIEmergencyToggle';
 import InboxStateManager from './InboxStateManager';
 import InboxStatusDisplay from './InboxStatusDisplay';
 import MessageDebugPanel from '../debug/MessageDebugPanel';
+import PredictiveInsightsPanel from './PredictiveInsightsPanel';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Brain, BarChart3, AlertTriangle } from 'lucide-react';
+import { Brain, BarChart3, AlertTriangle, TrendingUp } from 'lucide-react';
 
 interface SmartInboxWithAILearningProps {
   user: {
@@ -27,6 +29,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [showLearningDashboard, setShowLearningDashboard] = useState(false);
   const [showAIMessageWrapper, setShowAIMessageWrapper] = useState(false);
+  const [predictiveInsightsOpen, setPredictiveInsightsOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [aiDisabled, setAiDisabled] = useState(false);
   const [aiDisableInfo, setAiDisableInfo] = useState<any>(null);
@@ -34,21 +37,31 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   useUnifiedAIScheduler();
   const { forceRefresh: refreshLeads } = useLeads();
 
+  // Use enhanced predictive inbox with all advanced features
   const { 
     conversations, 
     messages, 
     loading, 
+    messagesLoading,
     error,
     sendingMessage,
+    totalConversations,
+    predictions,
+    searchQuery,
+    searchResults,
     loadMessages, 
-    sendMessage: originalSendMessage, 
+    sendMessage: baseSendMessage, 
     manualRefresh,
-    setError,
-    markAsRead,
-    markingAsRead
-  } = useStableConversationOperations({
-    onLeadsRefresh: refreshLeads
+    searchConversations,
+    getPredictionInsights,
+    setError
+  } = useEnhancedPredictiveInbox({
+    onLeadsRefresh: refreshLeads,
+    enablePredictiveLoading: true
   });
+
+  // Mark as read functionality
+  const { markAsRead, markingAsRead } = useMarkAsRead(manualRefresh);
 
   // Initialize AI emergency service
   useEffect(() => {
@@ -75,7 +88,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     };
   }, []);
 
-  // Enhanced send message with AI safety checks
+  // Enhanced send message with AI safety checks and learning integration
   const sendMessage = async (leadId: string, messageContent: string) => {
     // AI Safety Check
     const canProceed = await aiEmergencyService.checkBeforeAIAction('send_message');
@@ -86,7 +99,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     try {
       console.log('🧠 Enhanced AI Learning: Sending message with learning integration');
       
-      await originalSendMessage(leadId, messageContent);
+      await baseSendMessage(leadId, messageContent);
       
       await realtimeLearningService.processLearningEvent({
         type: 'message_sent',
@@ -131,7 +144,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     }, 1000);
   };
 
-  // Fixed complete useEffect for response time tracking
+  // Response time tracking
   useEffect(() => {
     if (messages.length > 0 && selectedLead) {
       const incomingMessages = messages.filter(m => m.direction === 'in');
@@ -165,6 +178,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   console.log('🧠 [SMART INBOX AI LEARNING] Render state:', {
     loading,
     conversationsCount: filteredConversations.length,
+    totalConversations,
+    predictionsCount: predictions.length,
     hasError: !!error,
     showLearningDashboard,
     selectedLead,
@@ -190,6 +205,9 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     );
   }
 
+  const topPredictions = predictions.slice(0, 3);
+  const predictionScore = topPredictions.reduce((sum, p) => sum + p.predictionScore, 0);
+
   return (
     <div className="flex h-screen">
       <div className={`flex-1 ${showLearningDashboard ? 'mr-2' : ''}`}>
@@ -211,11 +229,28 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                 </Alert>
               )}
 
-              {/* Enhanced Header with Emergency Controls */}
+              {/* Enhanced Header with Predictive Stats */}
               <div className="border-b bg-white p-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Brain className="w-6 h-6 text-blue-600" />
-                  <h1 className="text-xl font-semibold">Smart Inbox with AI Learning</h1>
+                  <div>
+                    <h1 className="text-xl font-semibold">Smart Inbox with AI Learning</h1>
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <span>
+                        {totalConversations} total conversations • {filteredConversations.length} loaded
+                      </span>
+                      {predictions.length > 0 && (
+                        <span className="text-blue-600">
+                          {predictions.filter(p => p.shouldPreload).length} predicted to preload
+                        </span>
+                      )}
+                      {predictionScore > 0 && (
+                        <span className="text-green-600">
+                          Prediction confidence: {predictionScore.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -225,6 +260,16 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                     size="sm"
                     showStatus={false}
                   />
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPredictiveInsightsOpen(!predictiveInsightsOpen)}
+                    className={predictiveInsightsOpen ? 'bg-blue-50 border-blue-300' : ''}
+                  >
+                    <TrendingUp className="w-4 h-4 mr-1" />
+                    Insights
+                  </Button>
                   
                   <Button
                     variant="outline"
@@ -301,9 +346,18 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
         </div>
       )}
 
+      {/* Predictive Insights Panel */}
+      <PredictiveInsightsPanel
+        isOpen={predictiveInsightsOpen}
+        onToggle={() => setPredictiveInsightsOpen(!predictiveInsightsOpen)}
+        predictions={predictions}
+        insights={getPredictionInsights()}
+      />
+
       <MessageDebugPanel
         isOpen={debugPanelOpen}
         onToggle={() => setDebugPanelOpen(!debugPanelOpen)}
+        leadId={selectedLead || undefined}
       />
     </div>
   );
