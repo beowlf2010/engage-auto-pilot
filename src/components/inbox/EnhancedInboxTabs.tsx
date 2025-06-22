@@ -26,10 +26,8 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
   markingAsRead,
   loading = false
 }) => {
-  // Filter unread incoming messages (highest priority)
-  const unreadIncoming = conversations.filter(conv => 
-    conv.unreadCount > 0 && conv.lastMessageDirection === 'in'
-  );
+  // Filter ALL conversations with unread messages (regardless of last message direction)
+  const unreadConversations = conversations.filter(conv => conv.unreadCount > 0);
 
   // Filter all conversations with incoming messages
   const allIncoming = conversations.filter(conv => 
@@ -47,7 +45,7 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
   };
 
   // Sort unread by urgency and time
-  const sortedUnreadIncoming = [...unreadIncoming].sort((a, b) => {
+  const sortedUnreadConversations = [...unreadConversations].sort((a, b) => {
     const urgencyOrder = { high: 0, medium: 1, low: 2 };
     const aUrgency = getUrgencyLevel(a);
     const bUrgency = getUrgencyLevel(b);
@@ -71,9 +69,9 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
         <TabsTrigger value="unread" className="flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />
           <span>Unread</span>
-          {!loading && unreadIncoming.length > 0 && (
+          {!loading && unreadConversations.length > 0 && (
             <Badge variant="destructive" className="text-xs">
-              {unreadIncoming.length}
+              {unreadConversations.length}
             </Badge>
           )}
         </TabsTrigger>
@@ -104,10 +102,10 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
           {!loading && (
             <div className="flex items-center justify-between px-2 py-1 bg-red-50 border border-red-200 rounded">
               <span className="text-sm font-medium text-red-800">
-                🚨 Urgent: Unread Customer Messages
+                🚨 Priority: All Unread Messages
               </span>
               <span className="text-xs text-red-600">
-                {unreadIncoming.length} need attention
+                {unreadConversations.length} leads need attention
               </span>
             </div>
           )}
@@ -116,7 +114,7 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
             <ConversationListSkeleton />
           ) : (
             <ConversationsList
-              conversations={sortedUnreadIncoming}
+              conversations={sortedUnreadConversations}
               selectedLead={selectedLead}
               onSelectConversation={onSelectConversation}
               canReply={canReply}
