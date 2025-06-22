@@ -67,10 +67,13 @@ class ErrorHandlingService {
       }
     }
 
+    // Store the original severity before any modifications
+    const originalSeverity = severity;
+    
     // Determine final severity based on operation - upgrade low severity for critical operations
     const isCriticalOperation = context.operation.includes('send') || context.operation.includes('load');
     const finalSeverity: 'low' | 'medium' | 'high' | 'critical' = 
-      isCriticalOperation && severity === 'low' ? 'medium' : severity;
+      isCriticalOperation && originalSeverity === 'low' ? 'medium' : severity;
 
     return {
       message,
