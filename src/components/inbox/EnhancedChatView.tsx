@@ -1,24 +1,33 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { Card } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { MessageSquare } from 'lucide-react';
-import ChatAIPanelsContainer from './ChatAIPanelsContainer';
-import LeadContextPanel from './LeadContextPanel';
-import AppointmentScheduler from '../appointments/AppointmentScheduler';
-import AppointmentInterestBanner from './AppointmentInterestBanner';
-import EnhancedMessageBubble from './EnhancedMessageBubble';
-import { MessageListSkeleton } from '@/components/ui/skeletons/MessageSkeleton';
-import { useChatState } from './hooks/useChatState';
-import { useChatHandlers } from './hooks/useChatHandlers';
-import { useConversationAnalysis } from '@/hooks/useConversationAnalysis';
-import { analyzeAppointmentIntent, logAppointmentIntent } from '@/services/appointmentIntentService';
-import type { AppointmentIntent } from '@/services/appointmentIntentService';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Send, 
+  Smile, 
+  Paperclip, 
+  MoreVertical, 
+  MessageSquare,
+  Phone,
+  User,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+  Search,
+  Filter,
+  Bookmark,
+  Eye,
+  EyeOff
+} from 'lucide-react';
+import MessageTemplates from '../MessageTemplates';
+import type { ConversationListItem, MessageData } from '@/types/conversation';
 
 interface EnhancedChatViewProps {
-  selectedConversation: any;
-  messages: any[];
-  onSendMessage: (message: string, isTemplate?: boolean) => void;
+  selectedConversation: ConversationListItem | undefined;
+  messages: MessageData[];
+  onSendMessage: (message: string, isTemplate?: boolean) => Promise<void>;
   showTemplates: boolean;
   onToggleTemplates: () => void;
   user: {
@@ -26,281 +35,374 @@ interface EnhancedChatViewProps {
     id: string;
   };
   isLoading?: boolean;
-  messagesLoading?: boolean;
-  // Enhanced real-time props
-  connectionState?: any;
-  onRetryMessage?: (messageId: string) => void;
-  isConnected?: boolean;
+  onThreadView?: () => void;
 }
 
-const EnhancedChatView = ({ 
-  selectedConversation, 
-  messages, 
-  onSendMessage, 
+const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
+  selectedConversation,
+  messages,
+  onSendMessage,
   showTemplates,
   onToggleTemplates,
   user,
   isLoading = false,
-  messagesLoading = false,
-  connectionState,
-  onRetryMessage,
-  isConnected = true
-}: EnhancedChatViewProps) => {
-  const [showAppointmentScheduler, setShowAppointmentScheduler] = useState(false);
-  const [appointmentIntent, setAppointmentIntent] = useState<AppointmentIntent | null>(null);
-  const [showAppointmentBanner, setShowAppointmentBanner] = useState(false);
+  onThreadView
+}) => {
+  const [messageInput, setMessageInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  
-  const chatState = useChatState();
-  const {
-    newMessage,
-    setNewMessage,
-    showLeadContext,
-    setShowLeadContext,
-    showAIGenerator,
-    setShowAIGenerator,
-    showAnalysis,
-    setShowAnalysis,
-    showAIPanel,
-    setShowAIPanel,
-    isSending,
-    setIsSending,
-    showScrollButton,
-    setShowScrollButton
-  } = chatState;
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const {
-    summary,
-    sentiments,
-    suggestions,
-    loading,
-    updateSummary,
-    loadExistingSummary,
-    analyzeSentiment,
-    loadSentiments,
-    updateSuggestions,
-    getSentimentForMessage,
-    getAverageSentiment
-  } = useConversationAnalysis(selectedConversation?.leadId || '');
-
-  // Auto-scroll to bottom function
-  const scrollToBottom = () => {
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Focus input when conversation changes
+  useEffect(() => {
+    if (selectedConversation && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [selectedConversation]);
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || isLoading) return;
+
+    const message = messageInput.trim();
+    setMessageInput('');
+    setIsTyping(false);
+
+    try {
+      await onSendMessage(message);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // Restore message input on error
+      setMessageInput(message);
+    }
   };
 
-  // Auto-scroll when messages change or conversation is selected
-  useEffect(() => {
-    if (messages.length > 0 && !messagesLoading) {
-      // Small delay to ensure DOM is updated
-      setTimeout(scrollToBottom, 100);
-    }
-  }, [messages, selectedConversation?.leadId, messagesLoading]);
-
-  // Handle scroll detection
-  const handleScroll = () => {
-    if (messagesContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
-      setShowScrollButton(!isNearBottom);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
-  const chatHandlers = useChatHandlers({
-    newMessage,
-    setNewMessage,
-    setIsSending,
-    setShowAIGenerator,
-    setShowScrollButton,
-    onSendMessage,
-    updateSummary,
-    updateSuggestions,
-    isSending,
-    scrollToBottom
-  });
+  const formatMessageTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
-  const {
-    handleSend,
-    handleKeyPress,
-    handleAIGeneratedMessage,
-    handleSelectSuggestion
-  } = chatHandlers;
+  const formatMessageDate = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
 
-  // Analyze appointment intent when messages change
-  useEffect(() => {
-    if (messages.length > 0 && selectedConversation?.leadId && !messagesLoading) {
-      const intent = analyzeAppointmentIntent(messages);
-      setAppointmentIntent(intent);
-      
-      // Show banner if appointment intent detected and not already showing scheduler
-      if (intent.hasAppointmentIntent && !showAppointmentScheduler) {
-        setShowAppointmentBanner(true);
-        
-        // Log the intent detection
-        const lastMessage = messages.filter(msg => msg.direction === 'in').slice(-1)[0];
-        if (lastMessage) {
-          logAppointmentIntent(selectedConversation.leadId, intent, lastMessage.id);
-        }
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  // Group messages by date
+  const groupedMessages = useMemo(() => {
+    const groups: { [key: string]: MessageData[] } = {};
+    
+    messages.forEach(message => {
+      const dateKey = new Date(message.sentAt).toDateString();
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
       }
-    }
-  }, [messages, selectedConversation?.leadId, showAppointmentScheduler, messagesLoading]);
+      groups[dateKey].push(message);
+    });
 
-  // Load analysis data when conversation changes
-  useEffect(() => {
-    if (selectedConversation?.leadId && !messagesLoading) {
-      loadExistingSummary();
-      const conversationIds = messages.map(msg => msg.id);
-      if (conversationIds.length > 0) {
-        loadSentiments(conversationIds);
-      }
-    }
-  }, [selectedConversation?.leadId, messages.length, loadExistingSummary, loadSentiments, messagesLoading]);
-
-  const canReply = selectedConversation && (
-    user.role === "manager" || 
-    user.role === "admin" || 
-    selectedConversation.salespersonId === user.id || 
-    !selectedConversation.salespersonId
-  );
-
-  const handleScheduleAppointment = () => {
-    setShowAppointmentScheduler(true);
-    setShowAppointmentBanner(false);
-  };
-
-  const handleDismissAppointmentBanner = () => {
-    setShowAppointmentBanner(false);
-  };
+    return Object.entries(groups).sort(([a], [b]) => 
+      new Date(a).getTime() - new Date(b).getTime()
+    );
+  }, [messages]);
 
   if (!selectedConversation) {
     return (
-      <Card className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-600 mb-2">Select a conversation</h3>
-          <p className="text-slate-500">Choose a conversation from the list to start messaging</p>
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center text-gray-500">
+          <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-medium mb-2">No conversation selected</h3>
+          <p>Choose a conversation from the sidebar to start messaging</p>
         </div>
-      </Card>
+      </div>
     );
   }
 
-  const leadName = `${selectedConversation.leadName || 'Unknown Lead'}`;
+  const canReply = user.role === "manager" || user.role === "admin" || 
+    !selectedConversation.salespersonId || selectedConversation.salespersonId === user.id;
 
   return (
-    <>
-      <div className="grid grid-cols-12 gap-4 h-full">
-        {/* Main Chat Area - Fixed Height */}
-        <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col space-y-2`}>
-          {/* Appointment Interest Banner */}
-          {appointmentIntent && !messagesLoading && (
-            <AppointmentInterestBanner
-              isVisible={showAppointmentBanner}
-              confidence={appointmentIntent.confidence}
-              appointmentType={appointmentIntent.appointmentType}
-              urgency={appointmentIntent.urgency}
-              timePreferences={appointmentIntent.timePreferences}
-              onScheduleAppointment={handleScheduleAppointment}
-              onDismiss={handleDismissAppointmentBanner}
-            />
-          )}
-
-          <ChatAIPanelsContainer
-            showAnalysis={showAnalysis}
-            showAIPanel={showAIPanel}
-            showAIGenerator={showAIGenerator}
-            canReply={canReply}
-            selectedConversation={selectedConversation}
-            messages={messages}
-            onSummaryUpdate={updateSummary}
-            onSelectSuggestion={handleSelectSuggestion}
-            onToggleAIPanel={() => setShowAIPanel(!showAIPanel)}
-            onSendAIMessage={handleAIGeneratedMessage}
-            onCloseAIGenerator={() => setShowAIGenerator(false)}
-          />
-
-          {/* Fixed Height Chat Display */}
-          <Card className="flex-1 flex flex-col min-h-0 h-[500px]">
-            <div 
-              ref={messagesContainerRef}
-              className="flex-1 p-4 overflow-y-auto max-h-[400px]"
-              onScroll={handleScroll}
-            >
-              {messagesLoading ? (
-                <MessageListSkeleton />
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((message) => {
-                    const isOptimistic = message.id?.startsWith('optimistic-');
-                    
-                    return (
-                      <EnhancedMessageBubble
-                        key={message.id}
-                        message={message}
-                        isOptimistic={isOptimistic}
-                        onRetry={onRetryMessage}
-                      />
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
+    <div className="flex-1 flex flex-col bg-white">
+      {/* Enhanced header */}
+      <div className="px-6 py-4 border-b border-gray-200 bg-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <User className="h-5 w-5 text-white" />
+              </div>
               
-              {/* Scroll to bottom button */}
-              {showScrollButton && !messagesLoading && (
-                <button
-                  onClick={scrollToBottom}
-                  className="fixed bottom-24 right-8 bg-blue-500 text-white p-2 rounded-full shadow-lg hover:bg-blue-600 transition-colors z-10"
-                  aria-label="Scroll to bottom"
-                >
-                  ↓
-                </button>
-              )}
-            </div>
-            
-            {/* Fixed Position Message Input */}
-            {canReply && (
-              <div className="border-t p-4 bg-white">
-                <div className="flex space-x-2">
-                  <Textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Type your message..."
-                    className="flex-1 min-h-[60px] resize-none"
-                    disabled={isSending || isLoading || messagesLoading}
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={isSending || isLoading || !newMessage.trim() || messagesLoading}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed self-end"
-                  >
-                    {isSending || isLoading ? 'Sending...' : 'Send'}
-                  </button>
+              <div>
+                <h2 className="font-semibold text-lg">
+                  {selectedConversation.leadName || 'Unknown Lead'}
+                </h2>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Phone className="h-3 w-3" />
+                  {selectedConversation.primaryPhone}
+                  
+                  {selectedConversation.vehicleInterest && (
+                    <>
+                      <span>•</span>
+                      <span>🚗 {selectedConversation.vehicleInterest}</span>
+                    </>
+                  )}
                 </div>
               </div>
-            )}
-          </Card>
-        </div>
+            </div>
 
-        {/* Lead Context Panel */}
-        {showLeadContext && (
-          <div className="col-span-4">
-            <LeadContextPanel 
-              conversation={selectedConversation}
-              onScheduleAppointment={handleScheduleAppointment}
-            />
+            {/* Status badges */}
+            <div className="flex items-center gap-2">
+              {selectedConversation.unreadCount > 0 && (
+                <Badge variant="secondary">
+                  {selectedConversation.unreadCount} unread
+                </Badge>
+              )}
+              
+              {selectedConversation.aiOptIn && (
+                <Badge variant="outline" className="bg-purple-50 text-purple-700">
+                  AI Enabled
+                </Badge>
+              )}
+              
+              {selectedConversation.aiStage && (
+                <Badge variant="outline">
+                  AI: {selectedConversation.aiStage}
+                </Badge>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* Header actions */}
+          <div className="flex items-center gap-2">
+            {onThreadView && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onThreadView}
+                title="View as threads"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </Button>
+            )}
+            
+            <Button variant="outline" size="sm">
+              <Search className="h-4 w-4" />
+            </Button>
+            
+            <Button variant="outline" size="sm">
+              <Bookmark className="h-4 w-4" />
+            </Button>
+            
+            <Button variant="ghost" size="sm">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Appointment Scheduler Dialog */}
-      <AppointmentScheduler
-        isOpen={showAppointmentScheduler}
-        onClose={() => setShowAppointmentScheduler(false)}
-        leadId={selectedConversation.leadId}
-        leadName={leadName}
-      />
-    </>
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {groupedMessages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="text-center">
+              <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>No messages yet</p>
+              <p className="text-sm">Start the conversation!</p>
+            </div>
+          </div>
+        ) : (
+          groupedMessages.map(([dateKey, dateMessages]) => (
+            <div key={dateKey}>
+              {/* Date separator */}
+              <div className="flex items-center justify-center my-6">
+                <div className="bg-gray-100 px-3 py-1 rounded-full text-xs text-gray-600">
+                  {formatMessageDate(dateKey)}
+                </div>
+              </div>
+
+              {/* Messages for this date */}
+              <div className="space-y-3">
+                {dateMessages.map((message, index) => {
+                  const isIncoming = message.direction === 'in';
+                  const showTime = index === 0 || 
+                    new Date(message.sentAt).getTime() - new Date(dateMessages[index - 1].sentAt).getTime() > 300000; // 5 minutes
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${isIncoming ? 'justify-start' : 'justify-end'} animate-fade-in`}
+                    >
+                      <div className={`max-w-xs lg:max-w-md ${isIncoming ? 'order-2' : 'order-1'}`}>
+                        <div
+                          className={`
+                            px-4 py-3 rounded-lg shadow-sm
+                            ${isIncoming 
+                              ? 'bg-gray-100 text-gray-900' 
+                              : 'bg-blue-600 text-white'
+                            }
+                            ${message.aiGenerated ? 'border-l-4 border-purple-400' : ''}
+                          `}
+                        >
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                            {message.body}
+                          </p>
+                          
+                          {message.aiGenerated && (
+                            <div className="mt-2 pt-2 border-t border-purple-200">
+                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                                AI Generated
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+
+                        {showTime && (
+                          <div className={`flex items-center gap-2 mt-1 text-xs text-gray-500 ${
+                            isIncoming ? 'justify-start' : 'justify-end'
+                          }`}>
+                            <span>{formatMessageTime(message.sentAt)}</span>
+                            {!isIncoming && message.smsStatus && (
+                              <span className="flex items-center gap-1">
+                                {message.smsStatus === 'sent' ? (
+                                  <CheckCircle className="h-3 w-3 text-green-500" />
+                                ) : message.smsStatus === 'failed' ? (
+                                  <AlertCircle className="h-3 w-3 text-red-500" />
+                                ) : (
+                                  <Clock className="h-3 w-3" />
+                                )}
+                                {message.smsStatus}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )}
+        
+        {/* Typing indicator */}
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 px-4 py-3 rounded-lg">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Message templates */}
+      {showTemplates && (
+        <div className="border-t border-gray-200 p-4 bg-gray-50">
+          <MessageTemplates
+            onSelectTemplate={(template) => onSendMessage(template, true)}
+            leadInterest={selectedConversation.vehicleInterest}
+          />
+        </div>
+      )}
+
+      {/* Input area */}
+      {canReply ? (
+        <div className="p-4 border-t border-gray-200 bg-white">
+          <div className="flex items-end gap-3">
+            <div className="flex-1 relative">
+              <Input
+                ref={inputRef}
+                value={messageInput}
+                onChange={(e) => {
+                  setMessageInput(e.target.value);
+                  setIsTyping(e.target.value.length > 0);
+                }}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                disabled={isLoading}
+                className="pr-20 resize-none"
+                maxLength={1000}
+              />
+              
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  title="Add emoji"
+                >
+                  <Smile className="h-4 w-4" />
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  title="Attach file"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onToggleTemplates}
+              className={showTemplates ? 'bg-blue-50' : ''}
+            >
+              Templates
+            </Button>
+
+            <Button
+              onClick={handleSendMessage}
+              disabled={!messageInput.trim() || isLoading}
+              className="shrink-0"
+            >
+              {isLoading ? (
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+            <span>{messageInput.length}/1000 characters</span>
+            <span>Press Enter to send, Shift+Enter for new line</span>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 border-t border-gray-200 bg-gray-50 text-center text-gray-600">
+          <p>You don't have permission to reply to this conversation.</p>
+          <p className="text-sm">Contact your manager or the assigned salesperson.</p>
+        </div>
+      )}
+    </div>
   );
 };
 
