@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { enhancedConversationService } from '@/services/enhancedConversationService';
+import { userActivityMonitor } from '@/services/userActivityMonitor';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ConversationListItem, MessageData } from '@/types/conversation';
@@ -8,11 +9,13 @@ import { ConversationListItem, MessageData } from '@/types/conversation';
 interface UseEnhancedPredictiveInboxProps {
   onLeadsRefresh?: () => void;
   enablePredictiveLoading?: boolean;
+  enableAdvancedTracking?: boolean;
 }
 
 export const useEnhancedPredictiveInbox = ({ 
   onLeadsRefresh, 
-  enablePredictiveLoading = true 
+  enablePredictiveLoading = true,
+  enableAdvancedTracking = true
 }: UseEnhancedPredictiveInboxProps = {}) => {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
@@ -25,17 +28,60 @@ export const useEnhancedPredictiveInbox = ({
   const [predictions, setPredictions] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ConversationListItem[]>([]);
+  const [performanceMetrics, setPerformanceMetrics] = useState<any>({});
 
   const queryClient = useQueryClient();
   const loadingRef = useRef(false);
   const currentLeadRef = useRef<string | null>(null);
+  const accessSequence = useRef<string[]>([]);
 
-  // Configure predictive service
+  // Setup advanced activity tracking
   useEffect(() => {
-    enhancedConversationService.setBackgroundLoading(enablePredictiveLoading);
-  }, [enablePredictiveLoading]);
+    if (!enableAdvancedTracking) return;
 
-  // Load conversations with predictive features
+    console.log('🎯 [ENHANCED PREDICTIVE] Setting up advanced activity tracking');
+
+    const cleanup = userActivityMonitor.onActivity((activity) => {
+      console.log('📱 [ENHANCED PREDICTIVE] User activity detected:', activity.type);
+      
+      // Track different types of activities for better predictions
+      switch (activity.type) {
+        case 'conversation_hover':
+          if (activity.leadId) {
+            enhancedConversationService.scheduleUrgentLoading(activity.leadId, 'hover preload');
+          }
+          break;
+        case 'conversation_selection':
+          if (activity.leadId && currentLeadRef.current !== activity.leadId) {
+            accessSequence.current.push(activity.leadId);
+            if (accessSequence.current.length > 10) {
+              accessSequence.current.shift();
+            }
+          }
+          break;
+        case 'search_query':
+          if (activity.query) {
+            setSearchQuery(activity.query);
+            searchConversations(activity.query);
+          }
+          break;
+      }
+    });
+
+    return cleanup;
+  }, [enableAdvancedTracking]);
+
+  // Monitor performance metrics
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const metrics = enhancedConversationService.getPerformanceMetrics();
+      setPerformanceMetrics(metrics);
+    }, 10000); // Update every 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load conversations with advanced predictions
   const loadConversations = useCallback(async (filters = {}) => {
     if (loadingRef.current) return;
     
@@ -44,7 +90,7 @@ export const useEnhancedPredictiveInbox = ({
     setError(null);
 
     try {
-      console.log('🚀 [ENHANCED PREDICTIVE] Loading conversations with filters:', filters);
+      console.log('🚀 [ENHANCED PREDICTIVE] Loading conversations with ML predictions');
       
       const result = await enhancedConversationService.getConversationsWithPrediction(0, 50, filters);
       
@@ -52,10 +98,11 @@ export const useEnhancedPredictiveInbox = ({
       setTotalConversations(result.totalCount);
       setPredictions(result.predictions || []);
       
-      console.log('📊 [ENHANCED PREDICTIVE] Loaded:', {
+      console.log('📊 [ENHANCED PREDICTIVE] Loaded with ML insights:', {
         conversations: result.conversations.length,
         total: result.totalCount,
-        predictions: result.predictions?.length || 0
+        predictions: result.predictions?.length || 0,
+        highConfidencePredictions: result.predictions?.filter(p => p.confidenceLevel > 0.7).length || 0
       });
 
       if (onLeadsRefresh) {
@@ -71,22 +118,31 @@ export const useEnhancedPredictiveInbox = ({
     }
   }, [onLeadsRefresh]);
 
-  // Load messages with predictive caching
+  // Load messages with advanced context tracking
   const loadMessages = useCallback(async (leadId: string) => {
     if (!leadId || currentLeadRef.current === leadId) return;
     
     setMessagesLoading(true);
     setError(null);
+    
+    const previousLead = currentLeadRef.current;
     currentLeadRef.current = leadId;
 
     try {
-      console.log('📱 [ENHANCED PREDICTIVE] Loading messages for lead:', leadId);
+      console.log('📱 [ENHANCED PREDICTIVE] Loading messages with context tracking for:', leadId);
       
-      const loadedMessages = await enhancedConversationService.getMessagesWithPrediction(leadId);
+      const context = {
+        fromLeadId: previousLead,
+        searchQuery: searchQuery || undefined,
+        accessSequence: [...accessSequence.current],
+        timestamp: new Date()
+      };
+
+      const loadedMessages = await enhancedConversationService.getMessagesWithPrediction(leadId, context);
       
       setMessages(loadedMessages);
       
-      console.log(`📦 [ENHANCED PREDICTIVE] Loaded ${loadedMessages.length} messages for lead:`, leadId);
+      console.log(`📦 [ENHANCED PREDICTIVE] Loaded ${loadedMessages.length} messages with context tracking`);
 
     } catch (error) {
       console.error('❌ [ENHANCED PREDICTIVE] Error loading messages:', error);
@@ -94,9 +150,9 @@ export const useEnhancedPredictiveInbox = ({
     } finally {
       setMessagesLoading(false);
     }
-  }, []);
+  }, [searchQuery]);
 
-  // Enhanced search with fast results
+  // Enhanced search with ML-powered relevance
   const searchConversations = useCallback((query: string) => {
     setSearchQuery(query);
     
@@ -105,15 +161,15 @@ export const useEnhancedPredictiveInbox = ({
       return;
     }
 
-    console.log('🔍 [ENHANCED PREDICTIVE] Searching for:', query);
+    console.log('🔍 [ENHANCED PREDICTIVE] ML-powered search for:', query);
     
     const results = enhancedConversationService.searchConversations(query, 20);
     setSearchResults(results);
     
-    console.log(`🎯 [ENHANCED PREDICTIVE] Found ${results.length} search results`);
+    console.log(`🎯 [ENHANCED PREDICTIVE] Found ${results.length} ML-enhanced results`);
   }, []);
 
-  // Send message with enhanced caching
+  // Send message with enhanced tracking
   const sendMessage = useCallback(async (leadId: string, messageContent: string) => {
     if (!leadId || !messageContent.trim() || sendingMessage) return;
 
@@ -121,7 +177,7 @@ export const useEnhancedPredictiveInbox = ({
     setError(null);
 
     try {
-      console.log('📤 [ENHANCED PREDICTIVE] Sending message to lead:', leadId);
+      console.log('📤 [ENHANCED PREDICTIVE] Sending message with context tracking');
 
       // Get phone number
       const { data: phoneData, error: phoneError } = await supabase
@@ -184,7 +240,7 @@ export const useEnhancedPredictiveInbox = ({
       // Refresh conversations list
       await loadConversations();
 
-      console.log('✅ [ENHANCED PREDICTIVE] Message sent successfully');
+      console.log('✅ [ENHANCED PREDICTIVE] Message sent with enhanced tracking');
 
     } catch (error) {
       console.error('❌ [ENHANCED PREDICTIVE] Error sending message:', error);
@@ -195,21 +251,40 @@ export const useEnhancedPredictiveInbox = ({
     }
   }, [sendingMessage, queryClient, loadMessages, loadConversations]);
 
-  // Manual refresh
+  // Manual refresh with enhanced metrics
   const manualRefresh = useCallback(async () => {
-    console.log('🔄 [ENHANCED PREDICTIVE] Manual refresh triggered');
+    console.log('🔄 [ENHANCED PREDICTIVE] Manual refresh with performance tracking');
+    const startTime = Date.now();
+    
     await loadConversations();
+    
+    const refreshTime = Date.now() - startTime;
+    console.log(`⚡ [ENHANCED PREDICTIVE] Refresh completed in ${refreshTime}ms`);
   }, [loadConversations]);
 
-  // Get prediction insights for debugging
+  // Get comprehensive prediction insights
   const getPredictionInsights = useCallback(() => {
-    return enhancedConversationService.getPredictionInsights();
-  }, []);
+    const insights = enhancedConversationService.getPredictionInsights();
+    
+    return {
+      ...insights,
+      performanceMetrics,
+      userActivity: userActivityMonitor.getCurrentSession(),
+      activityPatterns: userActivityMonitor.getActivityPatterns()
+    };
+  }, [performanceMetrics]);
 
   // Initial load
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      enhancedConversationService.stop();
+    };
+  }, []);
 
   return {
     // Core data
@@ -226,6 +301,7 @@ export const useEnhancedPredictiveInbox = ({
     predictions,
     searchQuery,
     searchResults,
+    performanceMetrics,
     
     // Actions
     setSelectedLead,
@@ -236,7 +312,11 @@ export const useEnhancedPredictiveInbox = ({
     searchConversations,
     setError,
     
-    // Insights
-    getPredictionInsights
+    // Enhanced insights
+    getPredictionInsights,
+    
+    // Activity monitoring
+    getUserActivity: () => userActivityMonitor.getCurrentSession(),
+    getActivityPatterns: () => userActivityMonitor.getActivityPatterns()
   };
 };

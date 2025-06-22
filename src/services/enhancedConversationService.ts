@@ -1,7 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { ConversationListItem, MessageData } from '@/types/conversation';
-import { predictiveMessageService } from './predictiveMessageService';
+import { advancedBackgroundLoadingService } from './advancedBackgroundLoadingService';
+import { enhancedPredictiveService } from './enhancedPredictiveService';
+import { conversationRelationshipEngine } from './conversationRelationshipEngine';
 import { messageCacheService } from './messageCacheService';
 
 interface EnhancedConversationFilters {
@@ -17,18 +19,25 @@ interface EnhancedConversationFilters {
 }
 
 class EnhancedConversationService {
-  private backgroundLoadingEnabled = true;
   private searchIndex = new Map<string, any>();
-  private lastPreloadTime = 0;
-  private readonly PRELOAD_INTERVAL = 30000; // 30 seconds
+  private lastConversationLoad = 0;
+  private readonly LOAD_DEBOUNCE = 1000; // 1 second
 
-  // Enhanced conversation loading with predictive features
+  // Enhanced conversation loading with advanced predictive features
   async getConversationsWithPrediction(
     page = 0, 
     limit = 50, 
     filters: EnhancedConversationFilters = {}
   ) {
-    console.log('🚀 [ENHANCED] Loading conversations with prediction, page:', page);
+    console.log('🚀 [ENHANCED] Loading conversations with advanced prediction, page:', page);
+
+    // Debounce rapid requests
+    const now = Date.now();
+    if (now - this.lastConversationLoad < this.LOAD_DEBOUNCE) {
+      console.log('⏰ [ENHANCED] Debouncing conversation load request');
+      await new Promise(resolve => setTimeout(resolve, this.LOAD_DEBOUNCE));
+    }
+    this.lastConversationLoad = now;
 
     try {
       // Build the query with correct column names
@@ -117,19 +126,26 @@ class EnhancedConversationService {
         filteredConversations = filteredConversations.filter(c => c.lastMessageDirection === 'in');
       }
 
-      // Generate predictions and start background preloading
-      if (this.backgroundLoadingEnabled && page === 0) {
-        this.startPredictivePreloading(filteredConversations);
-      }
+      // Build conversation relationships for contextual loading
+      conversationRelationshipEngine.buildRelationships(filteredConversations);
 
-      // Update search index
-      this.updateSearchIndex(filteredConversations);
+      // Update enhanced predictive service search index
+      enhancedPredictiveService.updateSearchIndex(filteredConversations);
+
+      // Generate enhanced predictions with ML
+      const predictions = await enhancedPredictiveService.predictConversationsToPreload(
+        filteredConversations, 
+        new Date(),
+        { searchQuery: filters.search }
+      );
+
+      console.log(`📊 [ENHANCED] Generated ${predictions.length} ML-powered predictions`);
 
       return {
         conversations: filteredConversations,
         totalCount: count || 0,
         hasMore: conversations.length === limit,
-        predictions: await predictiveMessageService.predictConversationsToPreload(filteredConversations)
+        predictions
       };
 
     } catch (error) {
@@ -138,16 +154,15 @@ class EnhancedConversationService {
     }
   }
 
-  // Enhanced message loading with cache check and prediction tracking
-  async getMessagesWithPrediction(leadId: string): Promise<MessageData[]> {
-    console.log('📱 [ENHANCED] Loading messages for lead:', leadId);
+  // Enhanced message loading with advanced background service
+  async getMessagesWithPrediction(leadId: string, context?: any): Promise<MessageData[]> {
+    console.log('📱 [ENHANCED] Loading messages with advanced system for lead:', leadId);
 
-    // Check if messages are preloaded
-    const preloaded = predictiveMessageService.getPreloadedMessages(leadId);
+    // Check if messages are preloaded by advanced background service
+    const preloaded = advancedBackgroundLoadingService.getPreloadedMessages(leadId);
     if (preloaded) {
-      console.log('⚡ [ENHANCED] Using preloaded messages for:', leadId);
-      // Track successful prediction
-      predictiveMessageService.trackConversationAccess(leadId, leadId);
+      console.log('⚡ [ENHANCED] Using advanced preloaded messages for:', leadId);
+      enhancedPredictiveService.trackConversationAccess(leadId, leadId, undefined, context);
       return preloaded;
     }
 
@@ -155,42 +170,30 @@ class EnhancedConversationService {
     const cached = messageCacheService.getCachedMessages(leadId);
     if (cached) {
       console.log('💾 [ENHANCED] Using cached messages for:', leadId);
-      predictiveMessageService.trackConversationAccess(leadId, leadId);
+      enhancedPredictiveService.trackConversationAccess(leadId, leadId, undefined, context);
       return cached;
     }
 
-    // Load from database
+    // Load from database with timing
     const startTime = Date.now();
     
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('sent_at', { ascending: true });
-
-      if (error) throw error;
-
-      const messages: MessageData[] = data.map(msg => ({
-        id: msg.id,
-        leadId: msg.lead_id,
-        body: msg.body,
-        direction: msg.direction as 'in' | 'out',
-        sentAt: msg.sent_at,
-        readAt: msg.read_at,
-        smsStatus: msg.sms_status || 'delivered',
-        aiGenerated: msg.ai_generated || false,
-        smsError: msg.sms_error
-      }));
+      const messages = await enhancedPredictiveService.loadMessagesFromDatabase(leadId);
 
       // Cache the messages
       messageCacheService.cacheMessages(leadId, messages);
 
-      // Track access with timing
+      // Track access with enhanced context
       const timeSpent = Date.now() - startTime;
-      predictiveMessageService.trackConversationAccess(leadId, leadId, timeSpent);
+      enhancedPredictiveService.trackConversationAccess(leadId, leadId, timeSpent, context);
 
-      console.log(`📦 [ENHANCED] Loaded ${messages.length} messages for lead:`, leadId);
+      // Schedule immediate background loading for related conversations
+      const related = conversationRelationshipEngine.getRelatedConversations(leadId, 2);
+      related.forEach(relatedId => {
+        advancedBackgroundLoadingService.scheduleImmediate(relatedId);
+      });
+
+      console.log(`📦 [ENHANCED] Loaded ${messages.length} messages for lead ${leadId} in ${timeSpent}ms`);
       return messages;
 
     } catch (error) {
@@ -199,105 +202,41 @@ class EnhancedConversationService {
     }
   }
 
-  // Start predictive preloading in background
-  private async startPredictivePreloading(conversations: ConversationListItem[]) {
-    const now = Date.now();
-    
-    // Throttle preloading to avoid excessive requests
-    if (now - this.lastPreloadTime < this.PRELOAD_INTERVAL) {
-      return;
-    }
-    
-    this.lastPreloadTime = now;
-
-    try {
-      const predictions = await predictiveMessageService.predictConversationsToPreload(conversations);
-      
-      // Start preloading in background (don't await)
-      predictiveMessageService.preloadMessages(
-        predictions,
-        (leadId) => this.loadMessagesFromDatabase(leadId)
-      ).catch(error => {
-        console.error('❌ [ENHANCED] Background preloading failed:', error);
-      });
-
-      // Cleanup old preloaded data
-      const activeLeadIds = conversations.slice(0, 10).map(c => c.leadId);
-      predictiveMessageService.cleanupPreloadedData(activeLeadIds);
-
-    } catch (error) {
-      console.error('❌ [ENHANCED] Predictive preloading setup failed:', error);
-    }
-  }
-
-  // Internal method to load messages from database
-  private async loadMessagesFromDatabase(leadId: string): Promise<MessageData[]> {
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('sent_at', { ascending: true });
-
-    if (error) throw error;
-
-    return data.map(msg => ({
-      id: msg.id,
-      leadId: msg.lead_id,
-      body: msg.body,
-      direction: msg.direction as 'in' | 'out',
-      sentAt: msg.sent_at,
-      readAt: msg.read_at,
-      smsStatus: msg.sms_status || 'delivered',
-      aiGenerated: msg.ai_generated || false,
-      smsError: msg.sms_error
-    }));
-  }
-
-  // Update search index for fast searching
-  private updateSearchIndex(conversations: ConversationListItem[]) {
-    conversations.forEach(conv => {
-      const searchableText = [
-        conv.leadName,
-        conv.primaryPhone,
-        conv.vehicleInterest,
-        conv.lastMessage,
-        conv.leadSource
-      ].filter(Boolean).join(' ').toLowerCase();
-
-      this.searchIndex.set(conv.leadId, {
-        conversation: conv,
-        searchableText
-      });
-    });
-  }
-
-  // Fast search across conversations
+  // Enhanced search with ML-powered relevance
   searchConversations(query: string, limit = 10): ConversationListItem[] {
-    if (!query.trim()) return [];
-
-    const searchTerm = query.toLowerCase();
-    const results: ConversationListItem[] = [];
-
-    for (const [, item] of this.searchIndex) {
-      if (item.searchableText.includes(searchTerm)) {
-        results.push(item.conversation);
-      }
-
-      if (results.length >= limit) break;
-    }
-
-    return results.sort((a, b) => b.unreadCount - a.unreadCount);
+    console.log('🔍 [ENHANCED] ML-powered search for:', query);
+    
+    // Use enhanced predictive service for ML-powered search
+    const results = enhancedPredictiveService.searchConversations(query, limit);
+    
+    console.log(`🎯 [ENHANCED] Found ${results.length} ML-enhanced search results`);
+    return results;
   }
 
-  // Get prediction insights for debugging
+  // Get advanced prediction insights
   getPredictionInsights() {
-    return predictiveMessageService.getPredictionInsights();
+    return {
+      enhanced: enhancedPredictiveService.getPredictionInsights(),
+      backgroundLoading: advancedBackgroundLoadingService.getPerformanceMetrics(),
+      queueStatus: advancedBackgroundLoadingService.getQueueStatus(),
+      relationships: conversationRelationshipEngine.getGlobalInsights()
+    };
   }
 
-  // Toggle background loading
-  setBackgroundLoading(enabled: boolean) {
-    this.backgroundLoadingEnabled = enabled;
-    console.log('🔄 [ENHANCED] Background loading:', enabled ? 'enabled' : 'disabled');
+  // Schedule urgent loading for immediate access
+  scheduleUrgentLoading(leadId: string, reason = 'user requested') {
+    advancedBackgroundLoadingService.scheduleImmediate(leadId);
+  }
+
+  // Get performance metrics for monitoring
+  getPerformanceMetrics() {
+    return advancedBackgroundLoadingService.getPerformanceMetrics();
+  }
+
+  // Stop all background services
+  stop() {
+    advancedBackgroundLoadingService.stop();
+    console.log('🛑 [ENHANCED] All advanced services stopped');
   }
 }
 
