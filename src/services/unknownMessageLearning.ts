@@ -37,12 +37,13 @@ class UnknownMessageLearningService {
       // Record the unknown message learning outcome
       await supabase.from('ai_learning_outcomes').insert({
         lead_id: leadId,
-        outcome_type: 'unknown_response',
+        outcome_type: 'response_received',
         message_characteristics: {
           message_content: messageContent,
           message_length: messageContent.length,
           failure_reason: failureReason,
-          context: context
+          context: context,
+          unknown_scenario: true
         },
         lead_characteristics: {
           unknown_scenario: true,
@@ -55,14 +56,15 @@ class UnknownMessageLearningService {
         }
       });
 
-      // Trigger real-time learning event
+      // Trigger real-time learning event using valid event type
       await realtimeLearningService.processLearningEvent({
-        type: 'unknown_message',
+        type: 'response_received',
         leadId,
         data: {
           messageContent,
           failureReason,
-          context
+          context,
+          unknownScenario: true
         },
         timestamp: new Date()
       });
@@ -87,7 +89,7 @@ class UnknownMessageLearningService {
       // Record as positive learning outcome
       await supabase.from('ai_learning_outcomes').insert({
         lead_id: leadId,
-        outcome_type: 'human_intervention_success',
+        outcome_type: 'message_sent',
         message_characteristics: {
           original_unknown_message: originalMessage,
           human_response: humanResponse,
@@ -218,12 +220,14 @@ class UnknownMessageLearningService {
       const { data: unknownOutcomes } = await supabase
         .from('ai_learning_outcomes')
         .select('*')
-        .eq('outcome_type', 'unknown_response');
+        .eq('outcome_type', 'response_received')
+        .contains('message_characteristics', { unknown_scenario: true });
 
       const { data: resolvedOutcomes } = await supabase
         .from('ai_learning_outcomes')
         .select('*')
-        .eq('outcome_type', 'human_intervention_success');
+        .eq('outcome_type', 'message_sent')
+        .contains('lead_characteristics', { learned_from_human: true });
 
       const recentCutoff = new Date();
       recentCutoff.setDate(recentCutoff.getDate() - 7);
