@@ -123,7 +123,7 @@ export class AIDataSeeder {
         actionable: true,
         applies_globally: false,
         insight_data: {
-          preferred_style: 'direct',
+          communication_style: 'direct',
           response_rate: 0.73,
           avg_response_time: 2.4
         }
