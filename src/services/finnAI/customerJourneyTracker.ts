@@ -33,13 +33,13 @@ class CustomerJourneyTracker {
         .single();
 
       if (!journey) {
-        // Create new journey
+        // Create new journey with properly typed data
         const { data: newJourney } = await supabase
           .from('customer_journeys')
           .insert({
             lead_id: leadId,
             journey_stage: 'awareness',
-            touchpoints: [touchpoint],
+            touchpoints: [this.touchpointToJson(touchpoint)],
             milestones: [],
             next_best_action: 'Send follow-up message',
             estimated_time_to_decision: 30,
@@ -50,8 +50,9 @@ class CustomerJourneyTracker {
         
         journey = newJourney;
       } else {
-        // Update existing journey
-        const updatedTouchpoints = [...(journey.touchpoints || []), touchpoint];
+        // Update existing journey with properly typed data
+        const existingTouchpoints = this.safeJsonArray(journey.touchpoints);
+        const updatedTouchpoints = [...existingTouchpoints, this.touchpointToJson(touchpoint)];
         const updatedStage = this.determineJourneyStage(updatedTouchpoints);
         
         await supabase
@@ -106,7 +107,37 @@ class CustomerJourneyTracker {
     }
   }
 
-  private determineJourneyStage(touchpoints: Touchpoint[]): string {
+  // Convert Touchpoint object to JSON-safe format
+  private touchpointToJson(touchpoint: Touchpoint): any {
+    return {
+      id: touchpoint.id,
+      type: touchpoint.type,
+      timestamp: touchpoint.timestamp.toISOString(),
+      channel: touchpoint.channel,
+      data: touchpoint.data,
+      engagement_score: touchpoint.engagement_score,
+      outcome: touchpoint.outcome
+    };
+  }
+
+  // Safely parse JSON array from database
+  private safeJsonArray(jsonData: any): any[] {
+    try {
+      if (Array.isArray(jsonData)) {
+        return jsonData;
+      }
+      if (typeof jsonData === 'string') {
+        const parsed = JSON.parse(jsonData);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      return [];
+    } catch (error) {
+      console.warn('Failed to parse JSON array:', error);
+      return [];
+    }
+  }
+
+  private determineJourneyStage(touchpoints: any[]): string {
     const recentTouchpoints = touchpoints.slice(-5);
     
     if (recentTouchpoints.some(t => t.type === 'appointment' || t.type === 'test_drive')) {
@@ -120,7 +151,7 @@ class CustomerJourneyTracker {
     return 'awareness';
   }
 
-  private calculateConversionProbability(touchpoints: Touchpoint[]): number {
+  private calculateConversionProbability(touchpoints: any[]): number {
     let probability = 0.3; // Base probability
     
     // Increase based on engagement

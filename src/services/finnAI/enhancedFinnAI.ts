@@ -86,6 +86,47 @@ class EnhancedFinnAI {
     }
   }
 
+  // Get enhanced insights for a lead
+  async getEnhancedInsights(leadId: string) {
+    try {
+      const contextInsights = await enhancedContextEngine.getContextualInsights(leadId);
+      const journeyInsights = await customerJourneyTracker.getJourneyInsights(leadId);
+
+      return {
+        contextInsights: {
+          communicationStyle: contextInsights.communicationStyle,
+          emotionalState: contextInsights.emotionalState,
+          urgencyLevel: contextInsights.urgencyLevel,
+          recentPatterns: Array.isArray(contextInsights.patterns) ? contextInsights.patterns : []
+        },
+        journeyInsights: {
+          stage: journeyInsights.stage,
+          probability: journeyInsights.probability,
+          urgency: journeyInsights.urgency,
+          nextAction: journeyInsights.nextAction
+        },
+        recommendations: this.generateRecommendedActions(contextInsights, journeyInsights)
+      };
+    } catch (error) {
+      console.error('Error getting enhanced insights:', error);
+      return {
+        contextInsights: {
+          communicationStyle: 'casual',
+          emotionalState: 'neutral',
+          urgencyLevel: 'medium',
+          recentPatterns: []
+        },
+        journeyInsights: {
+          stage: 'awareness',
+          probability: 0.3,
+          urgency: 'medium',
+          nextAction: 'Send follow-up message'
+        },
+        recommendations: ['Follow up with customer']
+      };
+    }
+  }
+
   // Detect message sentiment
   private detectMessageSentiment(message: string): 'positive' | 'neutral' | 'negative' {
     const positiveWords = ['great', 'love', 'excellent', 'perfect', 'amazing', 'interested', 'yes', 'good'];

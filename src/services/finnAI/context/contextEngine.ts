@@ -40,12 +40,17 @@ class EnhancedContextEngine {
         .single();
 
       if (memory) {
+        // Safe JSON access with type checking
+        const customerProfile = this.safeJsonAccess(memory.customer_profile) || {};
+        const emotionalContext = this.safeJsonAccess(memory.emotional_context) || {};
+        const behavioralPatterns = this.safeJsonAccess(memory.behavioral_patterns) || {};
+
         return {
-          communicationStyle: memory.customer_profile?.communicationStyle || 'casual',
-          emotionalState: memory.emotional_context?.currentState || 'neutral',
-          urgencyLevel: memory.behavioral_patterns?.urgencyLevel || 'medium',
-          preferences: memory.customer_profile?.preferences || {},
-          patterns: memory.behavioral_patterns?.patterns || []
+          communicationStyle: customerProfile.communicationStyle || 'casual',
+          emotionalState: emotionalContext.currentState || 'neutral',
+          urgencyLevel: behavioralPatterns.urgencyLevel || 'medium',
+          preferences: customerProfile.preferences || {},
+          patterns: Array.isArray(behavioralPatterns.patterns) ? behavioralPatterns.patterns : []
         };
       }
 
@@ -69,6 +74,21 @@ class EnhancedContextEngine {
     }
   }
 
+  private safeJsonAccess(jsonData: any): any {
+    try {
+      if (typeof jsonData === 'string') {
+        return JSON.parse(jsonData);
+      }
+      if (typeof jsonData === 'object' && jsonData !== null) {
+        return jsonData;
+      }
+      return {};
+    } catch (error) {
+      console.warn('Failed to parse JSON data:', error);
+      return {};
+    }
+  }
+
   private async updateConversationMemory(leadId: string, messageData: any): Promise<void> {
     try {
       const { data: existingMemory } = await supabase
@@ -79,7 +99,8 @@ class EnhancedContextEngine {
 
       if (existingMemory) {
         // Update existing memory
-        const updatedHistory = [...(existingMemory.conversation_history || []), messageData];
+        const existingHistory = this.safeJsonAccess(existingMemory.conversation_history) || [];
+        const updatedHistory = Array.isArray(existingHistory) ? [...existingHistory, messageData] : [messageData];
         
         await supabase
           .from('conversation_memory')
@@ -98,7 +119,7 @@ class EnhancedContextEngine {
             content: 'Conversation memory initialized',
             conversation_history: [messageData],
             customer_profile: {},
-            behavioral_patterns: [],
+            behavioral_patterns: {},
             emotional_context: {}
           });
       }
