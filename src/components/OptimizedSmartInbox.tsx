@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { useOptimizedInbox } from "@/hooks/useOptimizedInbox";
+import { useEnhancedRealtimeInbox } from "@/hooks/useEnhancedRealtimeInbox";
 import { useUnifiedAIScheduler } from "@/hooks/useUnifiedAIScheduler";
 import { useLeads } from "@/hooks/useLeads";
 import { useEnhancedMessageWrapper } from "./inbox/EnhancedMessageWrapper";
@@ -8,6 +8,7 @@ import { useMarkAsRead } from "@/hooks/inbox/useMarkAsRead";
 import InboxStateManager from "./inbox/InboxStateManager";
 import InboxStatusDisplay from "./inbox/InboxStatusDisplay";
 import OptimizedInboxLayout from "./inbox/OptimizedInboxLayout";
+import ConnectionStatusIndicator from "./inbox/ConnectionStatusIndicator";
 import MessageDebugPanel from "./debug/MessageDebugPanel";
 
 interface OptimizedSmartInboxProps {
@@ -26,7 +27,7 @@ const OptimizedSmartInbox = ({ user }: OptimizedSmartInboxProps) => {
   // Get leads refresh function
   const { forceRefresh: refreshLeads } = useLeads();
 
-  // Use the optimized inbox hook
+  // Use the enhanced real-time inbox hook
   const { 
     conversations, 
     messages, 
@@ -34,11 +35,16 @@ const OptimizedSmartInbox = ({ user }: OptimizedSmartInboxProps) => {
     error,
     sendingMessage,
     totalConversations,
+    connectionState,
+    optimisticMessages,
     loadMessages, 
-    sendMessage: originalSendMessage, 
+    sendMessage, 
     manualRefresh,
+    retryMessage,
+    reconnect,
+    isConnected,
     setError
-  } = useOptimizedInbox({
+  } = useEnhancedRealtimeInbox({
     onLeadsRefresh: refreshLeads
   });
 
@@ -62,6 +68,8 @@ const OptimizedSmartInbox = ({ user }: OptimizedSmartInboxProps) => {
     loading,
     conversationsCount: filteredConversations.length,
     totalConversations,
+    isConnected,
+    optimisticCount: Array.from(optimisticMessages.values()).flat().length,
     hasError: !!error
   });
 
@@ -95,8 +103,13 @@ const OptimizedSmartInbox = ({ user }: OptimizedSmartInboxProps) => {
           sendingMessage={sendingMessage}
           loading={loading}
           totalConversations={totalConversations}
+          connectionState={connectionState}
+          optimisticMessages={optimisticMessages}
           loadMessages={loadMessages}
-          sendMessage={sendEnhancedMessageWrapper}
+          sendMessage={sendMessage}
+          retryMessage={retryMessage}
+          reconnect={reconnect}
+          isConnected={isConnected}
           setError={setError}
           debugPanelOpen={debugPanelOpen}
           setDebugPanelOpen={setDebugPanelOpen}
@@ -120,8 +133,13 @@ const OptimizedInboxMain = ({
   sendingMessage,
   loading,
   totalConversations,
+  connectionState,
+  optimisticMessages,
   loadMessages,
   sendMessage,
+  retryMessage,
+  reconnect,
+  isConnected,
   setError,
   selectedLead,
   showMemory,
@@ -165,16 +183,39 @@ const OptimizedInboxMain = ({
     }
   };
 
+  const handleRetryMessage = async (messageId: string) => {
+    if (!selectedLead) return;
+    
+    try {
+      await retryMessage(selectedLead, messageId);
+    } catch (error) {
+      console.error('❌ [OPTIMIZED INBOX] Retry message error:', error);
+    }
+  };
+
+  const optimisticCount = Array.from(optimisticMessages.values()).flat().length;
+
   return (
     <>
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Smart Inbox</h1>
-          <p className="text-gray-600">
-            {totalConversations} total conversations • {conversations.length} loaded
-          </p>
+          <div className="flex items-center gap-4 text-gray-600">
+            <span>
+              {totalConversations} total conversations • {conversations.length} loaded
+            </span>
+            {optimisticCount > 0 && (
+              <span className="text-blue-600">
+                {optimisticCount} sending...
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
+          <ConnectionStatusIndicator
+            connectionState={connectionState}
+            onReconnect={reconnect}
+          />
           <button
             onClick={() => setDebugPanelOpen(!debugPanelOpen)}
             className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
@@ -200,6 +241,11 @@ const OptimizedInboxMain = ({
         canReply={canReply}
         markAsRead={markAsRead}
         markingAsRead={markingAsRead}
+        // Enhanced real-time props
+        connectionState={connectionState}
+        optimisticMessages={optimisticMessages}
+        onRetryMessage={handleRetryMessage}
+        isConnected={isConnected}
       />
       
       <MessageDebugPanel

@@ -24,6 +24,12 @@ interface OptimizedInboxLayoutProps {
   canReply: (conv: any) => boolean;
   markAsRead: (leadId: string) => Promise<void>;
   markingAsRead: string | null;
+  
+  // Enhanced real-time props
+  connectionState?: any;
+  optimisticMessages?: Map<string, MessageData[]>;
+  onRetryMessage?: (messageId: string) => void;
+  isConnected?: boolean;
 }
 
 const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
@@ -40,7 +46,11 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
   onToggleTemplates,
   canReply,
   markAsRead,
-  markingAsRead
+  markingAsRead,
+  connectionState,
+  optimisticMessages,
+  onRetryMessage,
+  isConnected = true
 }) => {
   return (
     <div className="h-[calc(100vh-8rem)] flex space-x-4">
@@ -53,6 +63,9 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           markAsRead={markAsRead}
           markingAsRead={markingAsRead}
           loading={loading}
+          // Pass connection state for real-time indicators
+          isConnected={isConnected}
+          optimisticMessages={optimisticMessages}
         />
       </div>
 
@@ -66,6 +79,10 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           onToggleTemplates={onToggleTemplates}
           user={user}
           isLoading={sendingMessage}
+          // Enhanced real-time props
+          connectionState={connectionState}
+          onRetryMessage={onRetryMessage}
+          isConnected={isConnected}
         />
       </div>
 
