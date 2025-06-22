@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
 import { useUnifiedAIScheduler } from '@/hooks/useUnifiedAIScheduler';
@@ -52,6 +51,21 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   } = useOptimizedInbox({
     onLeadsRefresh: refreshLeads
   });
+
+  // Initialize enhanced learning service
+  useEffect(() => {
+    const initializeLearning = async () => {
+      try {
+        const { enhancedRealtimeLearningService } = await import('@/services/enhancedRealtimeLearningService');
+        await enhancedRealtimeLearningService.initialize();
+        console.log('✅ [SMART INBOX] Enhanced learning service initialized');
+      } catch (error) {
+        console.warn('⚠️ [SMART INBOX] Failed to initialize learning service:', error);
+      }
+    };
+
+    initializeLearning();
+  }, []);
 
   // Mock data for enhanced features to prevent UI breaking
   const mockPredictions = [];
@@ -118,15 +132,17 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
       
       await baseSendMessage(leadId, messageContent);
       
-      // Process learning event with error handling
+      // Process learning event with enhanced service
       try {
-        await realtimeLearningService.processLearningEvent({
+        const { enhancedRealtimeLearningService } = await import('@/services/enhancedRealtimeLearningService');
+        await enhancedRealtimeLearningService.processLearningEvent({
           type: 'message_sent',
           leadId,
           data: {
             content: messageContent,
             messageLength: messageContent.length,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            aiGenerated: false
           },
           timestamp: new Date()
         });
@@ -147,7 +163,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     setSelectedLead(leadId);
     await loadMessages(leadId);
     
-    // Process learning event with error handling
+    // Process learning event with enhanced service
     setTimeout(async () => {
       try {
         const conversationHistory = messages
@@ -155,7 +171,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
           .join('\n');
         
         if (conversationHistory) {
-          await realtimeLearningService.processLearningEvent({
+          const { enhancedRealtimeLearningService } = await import('@/services/enhancedRealtimeLearningService');
+          await enhancedRealtimeLearningService.processLearningEvent({
             type: 'conversation_analyzed',
             leadId,
             data: {
@@ -173,7 +190,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     }, 1000);
   };
 
-  // Response time tracking with error handling
+  // Response time tracking with enhanced service
   useEffect(() => {
     if (messages.length > 0 && selectedLead) {
       try {
@@ -187,16 +204,18 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
           if (lastOutgoing) {
             const responseTimeHours = (new Date(lastIncoming.sentAt).getTime() - new Date(lastOutgoing.sentAt).getTime()) / (1000 * 60 * 60);
             
-            realtimeLearningService.processLearningEvent({
-              type: 'response_received',
-              leadId: selectedLead,
-              data: {
-                responseTimeHours,
-                messageLength: lastIncoming.body.length
-              },
-              timestamp: new Date(lastIncoming.sentAt)
-            }).catch(error => {
-              console.warn('Response time tracking failed:', error);
+            import('@/services/enhancedRealtimeLearningService').then(({ enhancedRealtimeLearningService }) => {
+              enhancedRealtimeLearningService.processLearningEvent({
+                type: 'response_received',
+                leadId: selectedLead,
+                data: {
+                  responseTimeHours,
+                  messageLength: lastIncoming.body.length
+                },
+                timestamp: new Date(lastIncoming.sentAt)
+              }).catch(error => {
+                console.warn('Response time tracking failed:', error);
+              });
             });
           }
         }
@@ -260,7 +279,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                 </Alert>
               )}
 
-              {/* Enhanced Header with Basic Stats */}
+              {/* Enhanced Header with Learning Status */}
               <div className="border-b bg-white p-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Brain className="w-6 h-6 text-blue-600" />
@@ -270,8 +289,9 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                       <span>
                         {totalConversations} total conversations • {filteredConversations.length} loaded
                       </span>
-                      <span className="text-green-600">
-                        System operational
+                      <span className="text-green-600 flex items-center gap-1">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        AI Learning Active
                       </span>
                     </div>
                   </div>

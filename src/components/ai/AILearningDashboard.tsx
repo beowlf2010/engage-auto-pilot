@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Brain, TrendingUp, Target, Lightbulb, BarChart3, Zap } from 'lucide-react';
-import { realtimeLearningService } from '@/services/realtimeLearningService';
-import { useAIPerformanceMetrics } from '@/hooks/useAILearning';
+import { Brain, TrendingUp, Target, Lightbulb, BarChart3, Zap, RefreshCw } from 'lucide-react';
+import { enhancedRealtimeLearningService } from '@/services/enhancedRealtimeLearningService';
+import { useEnhancedAILearning } from '@/hooks/useEnhancedAILearning';
 
 interface AILearningDashboardProps {
   leadId?: string;
@@ -16,25 +16,24 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
   leadId,
   compact = false
 }) => {
-  const [learningData, setLearningData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const { metrics, loading: metricsLoading } = useAIPerformanceMetrics('week');
+  const { insights, metrics, loading, error, refresh } = useEnhancedAILearning(leadId);
+  const [initializing, setInitializing] = useState(false);
 
   useEffect(() => {
-    loadLearningData();
-  }, [leadId]);
+    // Initialize the enhanced learning service
+    const initializeService = async () => {
+      try {
+        setInitializing(true);
+        await enhancedRealtimeLearningService.initialize();
+      } catch (error) {
+        console.error('Failed to initialize learning service:', error);
+      } finally {
+        setInitializing(false);
+      }
+    };
 
-  const loadLearningData = async () => {
-    setLoading(true);
-    try {
-      const data = await realtimeLearningService.getOptimizationInsights(leadId);
-      setLearningData(data);
-    } catch (error) {
-      console.error('Error loading learning data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    initializeService();
+  }, []);
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
@@ -52,20 +51,37 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
     return { label: 'Low', color: 'text-red-600' };
   };
 
-  if (loading || metricsLoading) {
+  const handleRefresh = async () => {
+    await refresh();
+  };
+
+  if (loading || initializing) {
     return (
       <Card>
         <CardContent className="p-6 text-center">
           <Brain className="w-8 h-8 mx-auto mb-2 animate-pulse text-blue-600" />
-          <p className="text-sm text-muted-foreground">Loading AI learning insights...</p>
+          <p className="text-sm text-muted-foreground">
+            {initializing ? 'Initializing AI learning system...' : 'Loading AI insights...'}
+          </p>
         </CardContent>
       </Card>
     );
   }
 
-  const todayMetrics = metrics?.feedback?.[0] || {};
-  const insights = learningData?.insights || [];
-  const activeOptimizations = learningData?.activeOptimizations || [];
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <div className="text-red-600 mb-2">⚠️ Error loading AI data</div>
+          <p className="text-sm text-muted-foreground mb-4">{error}</p>
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (compact) {
     return (
@@ -76,8 +92,8 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-green-600" />
               <div>
-                <div className="text-lg font-semibold">{metrics?.feedback?.filter((f: any) => f.feedback_type === 'positive').length || 0}</div>
-                <div className="text-xs text-muted-foreground">Positive Feedback</div>
+                <div className="text-lg font-semibold">{metrics?.highImpact || 0}</div>
+                <div className="text-xs text-muted-foreground">High Impact</div>
               </div>
             </div>
           </Card>
@@ -85,8 +101,8 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-blue-600" />
               <div>
-                <div className="text-lg font-semibold">{insights.length}</div>
-                <div className="text-xs text-muted-foreground">Active Insights</div>
+                <div className="text-lg font-semibold">{metrics?.actionable || 0}</div>
+                <div className="text-xs text-muted-foreground">Actionable</div>
               </div>
             </div>
           </Card>
@@ -99,15 +115,15 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <Lightbulb className="w-3 h-3 text-yellow-600" />
-                  <span className="text-xs font-medium">{insight.title}</span>
-                  <Badge variant="outline" className={`text-xs ${getImpactColor(insight.impact)}`}>
-                    {insight.impact}
+                  <span className="text-xs font-medium">{insight.insight_title}</span>
+                  <Badge variant="outline" className={`text-xs ${getImpactColor(insight.impact_level)}`}>
+                    {insight.impact_level}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">{insight.description}</p>
+                <p className="text-xs text-muted-foreground">{insight.insight_description}</p>
               </div>
-              <div className={`text-xs font-medium ${getConfidenceLevel(insight.confidence).color}`}>
-                {Math.round(insight.confidence * 100)}%
+              <div className={`text-xs font-medium ${getConfidenceLevel(insight.confidence_score).color}`}>
+                {Math.round(insight.confidence_score * 100)}%
               </div>
             </div>
           </Card>
@@ -124,7 +140,8 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
           <Brain className="w-6 h-6 text-blue-600" />
           <h2 className="text-lg font-semibold">AI Learning Dashboard</h2>
         </div>
-        <Button variant="outline" size="sm" onClick={loadLearningData}>
+        <Button variant="outline" size="sm" onClick={handleRefresh}>
+          <RefreshCw className="w-4 h-4 mr-1" />
           Refresh
         </Button>
       </div>
@@ -138,10 +155,8 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
                 <BarChart3 className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">
-                  {metrics?.feedback?.length || 0}
-                </div>
-                <div className="text-sm text-muted-foreground">Total Interactions</div>
+                <div className="text-2xl font-bold">{metrics?.totalInsights || 0}</div>
+                <div className="text-sm text-muted-foreground">Total Insights</div>
               </div>
             </div>
           </CardContent>
@@ -154,10 +169,8 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
                 <TrendingUp className="w-4 h-4 text-green-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">
-                  {Math.round(((metrics?.feedback?.filter((f: any) => f.feedback_type === 'positive').length || 0) / (metrics?.feedback?.length || 1)) * 100)}%
-                </div>
-                <div className="text-sm text-muted-foreground">Success Rate</div>
+                <div className="text-2xl font-bold">{metrics?.highImpact || 0}</div>
+                <div className="text-sm text-muted-foreground">High Impact</div>
               </div>
             </div>
           </CardContent>
@@ -170,8 +183,8 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
                 <Lightbulb className="w-4 h-4 text-yellow-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">{insights.length}</div>
-                <div className="text-sm text-muted-foreground">Active Insights</div>
+                <div className="text-2xl font-bold">{metrics?.actionable || 0}</div>
+                <div className="text-sm text-muted-foreground">Actionable</div>
               </div>
             </div>
           </CardContent>
@@ -184,8 +197,10 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
                 <Zap className="w-4 h-4 text-purple-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">{activeOptimizations.length}</div>
-                <div className="text-sm text-muted-foreground">Optimizations</div>
+                <div className="text-2xl font-bold">
+                  {insights.filter(i => i.actionable && !i.implemented).length}
+                </div>
+                <div className="text-sm text-muted-foreground">Ready to Apply</div>
               </div>
             </div>
           </CardContent>
@@ -197,85 +212,73 @@ const AILearningDashboard: React.FC<AILearningDashboardProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Lightbulb className="w-5 h-5 text-yellow-600" />
-            Learning Insights
+            AI Learning Insights
           </CardTitle>
         </CardHeader>
         <CardContent>
           {insights.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No learning insights available yet. Keep interacting to generate insights!
-            </p>
+            <div className="text-center py-8">
+              <Brain className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-lg font-medium text-gray-900 mb-2">AI Learning Active</p>
+              <p className="text-sm text-gray-600 mb-4">
+                The AI is learning from your interactions. Use the Smart Inbox to generate more insights!
+              </p>
+              <Button variant="outline" onClick={handleRefresh}>
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Check for New Insights
+              </Button>
+            </div>
           ) : (
             <div className="space-y-4">
               {insights.map((insight: any, index: number) => (
                 <div key={index} className="border rounded p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={getImpactColor(insight.impact)}>
-                        {insight.impact.toUpperCase()}
+                      <Badge variant="outline" className={getImpactColor(insight.impact_level)}>
+                        {insight.impact_level.toUpperCase()}
                       </Badge>
                       <Badge variant="secondary">
-                        {insight.type}
+                        {insight.insight_type}
                       </Badge>
-                      <span className={`text-sm font-medium ${getConfidenceLevel(insight.confidence).color}`}>
-                        {getConfidenceLevel(insight.confidence).label} Confidence ({Math.round(insight.confidence * 100)}%)
+                      <span className={`text-sm font-medium ${getConfidenceLevel(insight.confidence_score).color}`}>
+                        {getConfidenceLevel(insight.confidence_score).label} Confidence ({Math.round(insight.confidence_score * 100)}%)
                       </span>
                     </div>
-                    {insight.actionable && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                        Actionable
-                      </Badge>
-                    )}
+                    <div className="flex gap-2">
+                      {insight.actionable && (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          Actionable
+                        </Badge>
+                      )}
+                      {insight.applies_globally && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          Global
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   
-                  <h4 className="font-medium mb-1">{insight.title}</h4>
-                  <p className="text-sm text-muted-foreground mb-2">{insight.description}</p>
+                  <h4 className="font-medium mb-1">{insight.insight_title}</h4>
+                  <p className="text-sm text-muted-foreground mb-2">{insight.insight_description}</p>
                   
-                  {insight.data && Object.keys(insight.data).length > 0 && (
-                    <div className="bg-muted p-2 rounded text-xs">
-                      <strong>Data:</strong> {JSON.stringify(insight.data, null, 2)}
+                  {insight.insight_data && Object.keys(insight.insight_data).length > 0 && (
+                    <div className="bg-muted p-2 rounded text-xs mt-2">
+                      <strong>Data:</strong>
+                      <div className="mt-1">
+                        {Object.entries(insight.insight_data).map(([key, value]) => (
+                          <div key={key} className="flex justify-between">
+                            <span>{key.replace(/_/g, ' ')}:</span>
+                            <span className="font-mono">
+                              {typeof value === 'number' ? 
+                                (value < 1 ? (value * 100).toFixed(1) + '%' : value.toFixed(2)) : 
+                                String(value)
+                              }
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Template Performance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-blue-600" />
-            Template Performance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {activeOptimizations.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No template performance data available yet.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {activeOptimizations.slice(0, 5).map((template: any, index: number) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded">
-                  <div className="flex-1">
-                    <div className="font-medium text-sm mb-1">
-                      Template #{index + 1}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {template.template_content?.substring(0, 60)}...
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">
-                      {Math.round((template.response_rate || 0) * 100)}% response
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Used {template.usage_count} times
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
