@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export class AIDataSeeder {
@@ -111,7 +110,7 @@ export class AIDataSeeder {
       }
     ];
 
-    // Add lead-specific insights with simplified data structure
+    // Add lead-specific insights with matching type structure
     if (leads.length > 0) {
       insights.push({
         lead_id: leads[0].id,
@@ -123,6 +122,7 @@ export class AIDataSeeder {
         actionable: true,
         applies_globally: false,
         insight_data: {
+          optimal_length: 60,
           response_rate_improvement: 0.73,
           sample_size: 12
         }
