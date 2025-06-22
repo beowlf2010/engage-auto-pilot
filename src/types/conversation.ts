@@ -7,6 +7,7 @@ export interface ConversationData {
   unreadCount: number;
   lastMessage: string;
   lastMessageTime: string;
+  lastMessageDirection?: 'in' | 'out';
   status: string;
   salespersonId: string;
   salespersonName?: string;
@@ -20,7 +21,7 @@ export interface MessageData {
   direction: 'in' | 'out';
   body: string;
   sentAt: string;
-  readAt?: string; // Add the missing readAt property
+  readAt?: string;
   aiGenerated?: boolean;
   smsStatus?: string;
   smsError?: string;

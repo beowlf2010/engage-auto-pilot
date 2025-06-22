@@ -1,6 +1,6 @@
 
 import React from 'react';
-import ConversationsList from './ConversationsList';
+import EnhancedInboxTabs from './EnhancedInboxTabs';
 import EnhancedChatView from './EnhancedChatView';
 import ConversationMemory from '../ConversationMemory';
 import type { ConversationListItem, MessageData } from '@/hooks/conversation/conversationTypes';
@@ -39,9 +39,9 @@ const InboxLayout: React.FC<InboxLayoutProps> = ({
 }) => {
   return (
     <div className="h-[calc(100vh-8rem)] flex space-x-4">
-      {/* Conversations list with reasonable width */}
+      {/* Enhanced conversations list with tabs - reasonable width */}
       <div className="w-80 flex-shrink-0 relative">
-        <ConversationsList
+        <EnhancedInboxTabs
           conversations={conversations}
           selectedLead={selectedLead}
           onSelectConversation={onSelectConversation}
