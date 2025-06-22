@@ -14,9 +14,19 @@ serve(async (req) => {
   }
 
   try {
-    const { leadId, leadName, messageBody, conversationHistory } = await req.json()
+    const { 
+      leadId, 
+      leadName, 
+      messageBody, 
+      conversationHistory, 
+      hasConversationalSignals,
+      leadSource,
+      leadSourceData,
+      vehicleInterest
+    } = await req.json()
     
-    console.log('🤖 Processing message for', leadName + ':', `"${messageBody}"`);
+    console.log('🤖 Processing source-aware message for', leadName + ':', `"${messageBody}"`);
+    console.log('📍 Lead source:', leadSource, 'Category:', leadSourceData?.sourceCategory);
     
     // Check for empty messages
     if (!messageBody || messageBody.trim() === '') {
@@ -78,8 +88,15 @@ serve(async (req) => {
       );
     }
 
-    // Generate response using OpenAI
-    const response = await generateSimpleResponse(leadName, messageBody);
+    // Generate source-aware response using OpenAI
+    const response = await generateSourceAwareResponse(
+      leadName, 
+      messageBody, 
+      leadSource, 
+      leadSourceData, 
+      vehicleInterest,
+      conversationHistory
+    );
     
     return new Response(
       JSON.stringify({ success: true, response }),
@@ -101,19 +118,42 @@ serve(async (req) => {
   }
 })
 
-async function generateSimpleResponse(leadName: string, message: string) {
+async function generateSourceAwareResponse(
+  leadName: string, 
+  message: string, 
+  leadSource?: string, 
+  leadSourceData?: any,
+  vehicleInterest?: string,
+  conversationHistory?: string
+) {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
   
   if (!openaiApiKey) {
     throw new Error('OpenAI API key not configured');
   }
 
-  const prompt = `You are Finn, a helpful AI assistant for Jason Pilger Chevrolet in Atmore, AL.
+  // Generate source-aware prompt
+  let prompt = `You are Finn, a helpful AI assistant for Jason Pilger Chevrolet in Atmore, AL.
 
 Customer: ${leadName}
-Message: "${message}"
+Vehicle Interest: ${vehicleInterest || 'Not specified'}
+Message: "${message}"`;
 
-Respond helpfully and professionally in under 160 characters.`;
+  // Add source-specific context if available
+  if (leadSource && leadSourceData) {
+    const sourceContext = getSourceContext(leadSourceData);
+    prompt += `\n\nLEAD SOURCE CONTEXT:
+Source: ${leadSource}
+Category: ${leadSourceData.sourceCategory}
+${sourceContext}`;
+  }
+
+  // Add conversation history if available
+  if (conversationHistory) {
+    prompt += `\n\nRecent conversation:\n${conversationHistory}`;
+  }
+
+  prompt += `\n\nRespond helpfully and professionally in under 160 characters. ${getSourceSpecificInstructions(leadSourceData?.sourceCategory)}`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -124,7 +164,7 @@ Respond helpfully and professionally in under 160 characters.`;
     body: JSON.stringify({
       model: 'gpt-3.5-turbo',
       messages: [
-        { role: 'system', content: 'You are a helpful automotive sales assistant.' },
+        { role: 'system', content: 'You are a helpful automotive sales assistant specialized in adapting to different customer sources and needs.' },
         { role: 'user', content: prompt }
       ],
       max_tokens: 100,
@@ -138,4 +178,27 @@ Respond helpfully and professionally in under 160 characters.`;
 
   const data = await response.json();
   return data.choices[0]?.message?.content?.trim() || 'I apologize, but I encountered an issue. Please call us at (251) 368-4053!';
+}
+
+function getSourceContext(leadSourceData: any): string {
+  if (!leadSourceData) return '';
+  
+  return `Priority: ${leadSourceData.urgencyLevel}
+Communication Style: ${leadSourceData.communicationStyle}
+Expected Response Time: ${leadSourceData.expectedResponseTime} hours
+Conversion Probability: ${Math.round(leadSourceData.conversionProbability * 100)}%`;
+}
+
+function getSourceSpecificInstructions(sourceCategory?: string): string {
+  const instructions: Record<string, string> = {
+    'high_intent_digital': 'Be direct about availability and competitive pricing. This customer is actively shopping.',
+    'value_focused': 'Focus on value proposition and cost savings. Address pricing concerns upfront.',
+    'credit_ready': 'Emphasize financing solutions and payment options. Be reassuring about approval.',
+    'direct_inquiry': 'Provide personalized attention and detailed information. Build the relationship.',
+    'social_discovery': 'Keep it friendly and low-pressure. Make the process seem easy and approachable.',
+    'referral_based': 'Acknowledge the referral and provide VIP treatment. Live up to the recommendation.',
+    'service_related': 'Appreciate their loyalty and leverage the existing relationship.',
+  };
+  
+  return instructions[sourceCategory || ''] || 'Adapt your response based on customer needs.';
 }

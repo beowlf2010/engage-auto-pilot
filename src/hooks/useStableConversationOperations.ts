@@ -1,79 +1,259 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
+import { ConversationListItem, MessageData } from '@/types/conversation';
 
-import { useState, useCallback } from 'react';
-import { useConversationsList } from './conversation/useConversationsList';
-import { useMessagesOperations } from './conversation/useMessagesOperations';
-import { useConversationRealtime } from './conversation/useConversationRealtime';
-
-interface UseStableConversationOperationsProps {
+interface ConversationOperationsProps {
   onLeadsRefresh?: () => void;
 }
 
-export const useStableConversationOperations = (props?: UseStableConversationOperationsProps) => {
+export const useStableConversationOperations = ({ onLeadsRefresh }: ConversationOperationsProps = {}) => {
+  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
+  const [messages, setMessages] = useState<MessageData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Use the smaller focused hooks
-  const { conversations, conversationsLoading, refetchConversations } = useConversationsList();
-  const { selectedLeadId, messages, sendingMessage, loadMessages, sendMessage: originalSendMessage } = useMessagesOperations();
-  
-  // Set up realtime subscriptions with error handling
-  useConversationRealtime(selectedLeadId, loadMessages);
+  const loadingRef = useRef(false);
 
-  // Enhanced send message that triggers leads refresh
-  const sendMessage = useCallback(async (leadId: string, messageBody: string, retryCount: number = 0) => {
+  const loadConversations = useCallback(async () => {
+    if (loadingRef.current) return;
+    
     try {
-      await originalSendMessage(leadId, messageBody, retryCount);
-      
-      // Trigger leads refresh after successful message send
-      if (props?.onLeadsRefresh) {
-        console.log('🔄 [STABLE CONV] Triggering leads refresh after message send');
-        setTimeout(() => {
-          props.onLeadsRefresh?.();
-        }, 500); // Small delay to ensure database updates are complete
-      }
-    } catch (error) {
-      console.error('❌ [STABLE CONV] Enhanced send message error:', error);
-      throw error;
-    }
-  }, [originalSendMessage, props?.onLeadsRefresh]);
-
-  // Manual refresh function with better error handling
-  const manualRefresh = useCallback(async () => {
-    try {
-      console.log('🔄 [STABLE CONV] Manual refresh started');
+      loadingRef.current = true;
+      setLoading(true);
       setError(null);
       
-      // Refresh conversations
-      await refetchConversations();
-      console.log('✅ [STABLE CONV] Conversations refreshed');
+      console.log('🔄 Loading conversations with source data...');
       
-      // Refresh messages if a lead is selected
-      if (selectedLeadId) {
-        await loadMessages(selectedLeadId);
-        console.log('✅ [STABLE CONV] Messages refreshed for lead:', selectedLeadId);
+      const { data: leadsData, error: leadsError } = await supabase
+        .from('leads')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          vehicle_interest,
+          status,
+          salesperson_id,
+          ai_opt_in,
+          source,
+          created_at,
+          profiles!inner(first_name, last_name)
+        `)
+        .not('ai_opt_in', 'is', null);
+
+      if (leadsError) {
+        console.error('Error loading leads:', leadsError);
+        throw leadsError;
       }
-      
-      // Also trigger leads refresh if available
-      if (props?.onLeadsRefresh) {
-        console.log('🔄 [STABLE CONV] Triggering leads refresh during manual refresh');
-        props.onLeadsRefresh();
-      }
-      
+
+      const conversationsData = await Promise.all(
+        (leadsData || []).map(async (lead) => {
+          const { data: latestConversation, error: conversationError } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('lead_id', lead.id)
+            .order('sent_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (conversationError && conversationError.code !== 'PGRST116') {
+            console.error('Error fetching latest conversation:', conversationError);
+          }
+
+          const { data: phoneNumbers, error: phoneError } = await supabase
+            .from('phone_numbers')
+            .select('number')
+            .eq('lead_id', lead.id)
+            .eq('is_primary', true)
+            .single();
+
+          if (phoneError && phoneError.code !== 'PGRST116') {
+            console.error('Error fetching phone number:', phoneError);
+          }
+
+          const phoneNumber = phoneNumbers ? phoneNumbers.number : null;
+
+          const { data: aiData, error: aiError } = await supabase
+            .from('ai_lead_stages')
+            .select('*')
+            .eq('lead_id', lead.id)
+            .single();
+
+          if (aiError && aiError.code !== 'PGRST116') {
+            console.error('Error fetching AI data:', aiError);
+          }
+
+          const { count: unreadCount, error: unreadError } = await supabase
+            .from('conversations')
+            .select('*', { count: 'exact' })
+            .eq('lead_id', lead.id)
+            .is('read_at', null);
+
+          if (unreadError) {
+            console.error('Error fetching unread count:', unreadError);
+          }
+
+          const { data: incoming, error: incomingError } = await supabase
+            .from('conversations')
+            .select('*', { count: 'exact' })
+            .eq('lead_id', lead.id)
+            .eq('direction', 'in');
+
+          if (incomingError) {
+            console.error('Error fetching incoming count:', incomingError);
+          }
+
+          const { data: outgoing, error: outgoingError } = await supabase
+            .from('conversations')
+            .select('*', { count: 'exact' })
+            .eq('lead_id', lead.id)
+            .eq('direction', 'out');
+
+          if (outgoingError) {
+            console.error('Error fetching outgoing count:', outgoingError);
+          }
+
+          const incomingCount = incoming ? incoming.length : 0;
+          const outgoingCount = outgoing ? outgoing.length : 0;
+
+          return {
+            leadId: lead.id,
+            leadName: `${lead.first_name} ${lead.last_name}`,
+            leadPhone: phoneNumber || 'No phone',
+            vehicleInterest: lead.vehicle_interest || 'Unknown',
+            leadSource: lead.source || 'Unknown', // Add lead source
+            unreadCount: unreadCount || 0,
+            lastMessage: latestConversation?.body || 'No messages yet',
+            lastMessageTime: latestConversation 
+              ? formatDistanceToNow(new Date(latestConversation.sent_at), { addSuffix: true })
+              : 'Never',
+            lastMessageDirection: latestConversation?.direction as 'in' | 'out' | undefined,
+            lastMessageDate: latestConversation ? new Date(latestConversation.sent_at) : undefined,
+            status: lead.status || 'new',
+            salespersonId: lead.salesperson_id,
+            salespersonName: lead.profiles?.first_name && lead.profiles?.last_name 
+              ? `${lead.profiles.first_name} ${lead.profiles.last_name}`
+              : undefined,
+            aiOptIn: lead.ai_opt_in,
+            aiStage: aiData?.ai_stage,
+            aiMessagesSent: aiData?.ai_messages_sent || 0,
+            aiSequencePaused: aiData?.ai_sequence_paused || false,
+            messageIntensity: aiData?.message_intensity || 'gentle',
+            incomingCount: incomingCount,
+            outgoingCount: outgoingCount
+          };
+        })
+      );
+
+      const sortedConversations = conversationsData.sort((a, b) => {
+        const aTime = a.lastMessageDate?.getTime() || 0;
+        const bTime = b.lastMessageDate?.getTime() || 0;
+        return bTime - aTime;
+      });
+
+      setConversations(sortedConversations);
+
     } catch (err) {
-      console.error('❌ [STABLE CONV] Error during manual refresh:', err);
-      // Don't set error for realtime connection issues, only for data loading issues
-      if (err instanceof Error && !err.message.includes('realtime') && !err.message.includes('timeout')) {
-        setError('Failed to refresh data. Please try again.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred.');
       }
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
     }
-  }, [refetchConversations, selectedLeadId, loadMessages, props?.onLeadsRefresh]);
+  }, []);
+
+  const loadMessages = useCallback(async (leadId: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data: leadData } = await supabase
+        .from('leads')
+        .select('first_name, last_name, vehicle_interest, source')
+        .eq('id', leadId)
+        .single();
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        throw error;
+      }
+
+      const messagesWithContext = (data || []).map(msg => ({
+        ...msg,
+        leadId,
+        leadSource: leadData?.source,
+        leadName: leadData ? `${leadData.first_name} ${leadData.last_name}` : 'Unknown',
+        vehicleInterest: leadData?.vehicle_interest || 'Unknown'
+      }));
+
+      setMessages(messagesWithContext);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const sendMessage = useCallback(async (leadId: string, message: string) => {
+    setSendingMessage(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase.from('conversations').insert({
+        lead_id: leadId,
+        direction: 'out',
+        body: message,
+        ai_generated: false
+      });
+
+      if (error) {
+        console.error('Error sending message:', error);
+        throw error;
+      }
+
+      await loadMessages(leadId);
+      if (onLeadsRefresh) {
+        onLeadsRefresh();
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred.');
+      }
+    } finally {
+      setSendingMessage(false);
+    }
+  }, [loadMessages, onLeadsRefresh]);
+
+  const manualRefresh = useCallback(() => {
+    loadConversations();
+    if (messages.length > 0) {
+      loadMessages(messages[0].leadId);
+    }
+  }, [loadConversations, loadMessages, messages]);
 
   return {
     conversations,
     messages,
-    loading: conversationsLoading,
+    loading,
     error,
-    selectedLeadId,
     sendingMessage,
+    loadConversations,
     loadMessages,
     sendMessage,
     manualRefresh,

@@ -1,11 +1,15 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { unknownMessageLearning } from './unknownMessageLearning';
+import { leadSourceStrategy } from './leadSourceStrategy';
+import { LeadSourceData } from '@/types/leadSource';
 
 export interface ConversationContext {
   leadId: string;
   leadName: string;
   vehicleInterest: string;
+  leadSource?: string;
+  leadSourceData?: LeadSourceData;
   messages: Array<{
     id: string;
     body: string;
@@ -26,6 +30,7 @@ export interface AIResponse {
   reasoning: string;
   customerIntent?: any;
   answerGuidance?: any;
+  sourceStrategy?: string;
 }
 
 // Simple conversational awareness detection
@@ -44,7 +49,7 @@ const analyzeConversationalSignals = (message: string): boolean => {
 
 export const generateEnhancedIntelligentResponse = async (context: ConversationContext): Promise<AIResponse | null> => {
   try {
-    console.log('🤖 Generating intelligent AI response for lead:', context.leadId);
+    console.log('🤖 Generating source-aware AI response for lead:', context.leadId);
 
     const recentMessages = context.messages
       .slice(-10)
@@ -68,6 +73,18 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
       return null;
     }
 
+    // Get lead source data if available
+    let leadSourceData: LeadSourceData | undefined;
+    let sourceStrategy: string = 'general';
+    
+    if (context.leadSource) {
+      leadSourceData = leadSourceStrategy.getLeadSourceData(context.leadSource);
+      const strategy = leadSourceStrategy.getConversationStrategy(leadSourceData.sourceCategory);
+      sourceStrategy = `${strategy.category} strategy`;
+      
+      console.log(`🎯 Using ${sourceStrategy} for source: ${context.leadSource}`);
+    }
+
     // First, check if we've learned how to handle this type of message
     const learnedResponse = await unknownMessageLearning.checkForLearnedPatterns(lastCustomerMessage.body);
     if (learnedResponse) {
@@ -77,7 +94,8 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
         confidence: 0.8,
         reasoning: 'Response generated from learned human intervention patterns',
         customerIntent: null,
-        answerGuidance: null
+        answerGuidance: null,
+        sourceStrategy: sourceStrategy
       };
     }
 
@@ -90,7 +108,10 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
         leadName: context.leadName,
         messageBody: lastCustomerMessage.body,
         conversationHistory: recentMessages,
-        hasConversationalSignals
+        hasConversationalSignals,
+        leadSource: context.leadSource,
+        leadSourceData: leadSourceData,
+        vehicleInterest: context.vehicleInterest
       }
     });
 
@@ -105,7 +126,8 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
           conversationHistory: recentMessages,
           leadName: context.leadName,
           vehicleInterest: context.vehicleInterest,
-          hasConversationalSignals
+          hasConversationalSignals,
+          leadSource: context.leadSource
         },
         `AI function error: ${error?.message || 'No response generated'}`
       );
@@ -116,9 +138,10 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
     return {
       message: data.response,
       confidence: 0.8,
-      reasoning: 'Enhanced conversational AI response',
+      reasoning: `Source-aware AI response using ${sourceStrategy}`,
       customerIntent: null,
-      answerGuidance: null
+      answerGuidance: null,
+      sourceStrategy: sourceStrategy
     };
 
   } catch (error) {

@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from './intelligentConversationAI';
+import { leadSourceStrategy } from './leadSourceStrategy';
 
 class CentralizedAIService {
   private processedMessages = new Set<string>();
@@ -41,10 +42,10 @@ class CentralizedAIService {
 
   async generateResponse(leadId: string): Promise<string | null> {
     try {
-      // Get lead data
+      // Get lead data with source information
       const { data: lead } = await supabase
         .from('leads')
-        .select('first_name, last_name, vehicle_interest')
+        .select('first_name, last_name, vehicle_interest, source')
         .eq('id', leadId)
         .single();
 
@@ -76,11 +77,18 @@ class CentralizedAIService {
         aiGenerated: msg.ai_generated
       }));
 
-      // Create enhanced context with QUESTION-FIRST priority
+      // Get lead source data
+      const leadSourceData = lead.source 
+        ? leadSourceStrategy.getLeadSourceData(lead.source)
+        : undefined;
+
+      // Create enhanced context with source awareness
       const context = {
         leadId,
         leadName: `${lead.first_name} ${lead.last_name}`,
         vehicleInterest: lead.vehicle_interest || '',
+        leadSource: lead.source,
+        leadSourceData: leadSourceData,
         messages: formattedMessages,
         leadInfo: {
           phone: '', // Will be populated from phone_numbers table if needed
@@ -89,34 +97,45 @@ class CentralizedAIService {
         }
       };
 
-      // Generate enhanced response with QUESTION-FIRST priority
+      // Generate enhanced response with source awareness
       const aiResponse = await generateEnhancedIntelligentResponse(context);
 
       if (aiResponse?.message) {
         // Mark this message as processed
         this.processedMessages.add(lastCustomerMessage.id);
-        console.log(`🤖 Generated QUESTION-FIRST AI response for lead ${leadId}:`, aiResponse.message);
-        console.log(`🎯 Customer intent detected:`, aiResponse.customerIntent?.requiresDirectAnswer ? 'YES' : 'NO');
-        console.log(`❓ Question type:`, aiResponse.customerIntent?.primaryQuestionType || 'none');
+        console.log(`🤖 Generated source-aware AI response for lead ${leadId}:`, aiResponse.message);
+        console.log(`📍 Source strategy used:`, aiResponse.sourceStrategy || 'general');
         
         return aiResponse.message;
       }
 
       return null;
     } catch (error) {
-      console.error('Error generating QUESTION-FIRST AI response:', error);
+      console.error('Error generating source-aware AI response:', error);
       return null;
     }
   }
 
   markResponseProcessed(leadId: string, message: string): void {
-    console.log(`✅ Marked QUESTION-FIRST AI response as processed for lead ${leadId}`);
+    console.log(`✅ Marked source-aware AI response as processed for lead ${leadId}`);
   }
 
   // Process incoming message for basic tracking
   async processIncomingMessage(leadId: string, conversationId: string, messageBody: string): Promise<void> {
     try {
       console.log(`Processing incoming message for lead ${leadId}`);
+      
+      // Get lead source for context
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('source')
+        .eq('id', leadId)
+        .single();
+        
+      if (lead?.source) {
+        const sourceData = leadSourceStrategy.getLeadSourceData(lead.source);
+        console.log(`📍 Message from ${sourceData.sourceCategory} source (${lead.source})`);
+      }
     } catch (error) {
       console.error('Error processing incoming message:', error);
     }
