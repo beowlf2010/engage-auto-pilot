@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { enhancedContextEngine } from './finnAI/context/contextEngine';
 import { customerJourneyTracker } from './finnAI/customerJourneyTracker';
@@ -89,7 +90,7 @@ class RealTimeContextSyncService {
       }
 
       // Broadcast context update
-      await this.broadcastContextUpdate(leadId, {
+      await this.broadcastContextUpdate({
         leadId,
         eventType: message.direction === 'in' ? 'message_received' : 'message_sent',
         eventData: {
@@ -124,7 +125,7 @@ class RealTimeContextSyncService {
       }
 
       // Broadcast memory update
-      await this.broadcastContextUpdate(leadId, {
+      await this.broadcastContextUpdate({
         leadId,
         eventType: 'journey_update',
         eventData: {
@@ -164,7 +165,7 @@ class RealTimeContextSyncService {
         );
 
         // Broadcast AI analysis results
-        await this.broadcastContextUpdate(leadId, {
+        await this.broadcastContextUpdate({
           leadId,
           eventType: 'ai_analysis',
           eventData: {
@@ -179,27 +180,27 @@ class RealTimeContextSyncService {
     }
   }
 
-  private async broadcastContextUpdate(leadId: string, event: ContextSyncEvent): Promise<void> {
+  private async broadcastContextUpdate(event: ContextSyncEvent): Promise<void> {
     try {
       // Store context update in database for persistence
       await supabase
         .from('ai_conversation_context')
         .upsert({
-          lead_id: leadId,
+          lead_id: event.leadId,
           last_interaction_type: event.eventType,
           context_score: this.calculateContextScore(event),
           updated_at: new Date().toISOString()
         });
 
       // Broadcast to all connected clients
-      const broadcastChannel = supabase.channel(`context-updates-${leadId}`);
+      const broadcastChannel = supabase.channel(`context-updates-${event.leadId}`);
       await broadcastChannel.send({
         type: 'broadcast',
         event: 'context_update',
         payload: event
       });
 
-      console.log('📡 Broadcasted context update for lead:', leadId);
+      console.log('📡 Broadcasted context update for lead:', event.leadId);
     } catch (error) {
       console.error('❌ Error broadcasting context update:', error);
     }

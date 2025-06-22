@@ -1,4 +1,5 @@
-import { enhancedContextEngine } from './contextEngine';
+
+import { enhancedContextEngine } from './context/contextEngine';
 import { customerJourneyTracker } from './customerJourneyTracker';
 import { generateEnhancedIntelligentResponse } from '../intelligentConversationAI';
 
@@ -31,7 +32,7 @@ class EnhancedFinnAI {
       if (direction === 'in') {
         await customerJourneyTracker.trackTouchpoint(
           leadId,
-          'sms_reply',
+          'customer_message',
           'sms',
           { content: message, messageLength: message.length },
           this.detectMessageSentiment(message)
@@ -61,7 +62,7 @@ class EnhancedFinnAI {
           // Track AI response touchpoint
           await customerJourneyTracker.trackTouchpoint(
             leadId,
-            'sms_reply',
+            'agent_message',
             'sms',
             { content: aiResponse.message, aiGenerated: true },
             'positive'
@@ -99,66 +100,23 @@ class EnhancedFinnAI {
     return 'neutral';
   }
 
-  // Generate recommended actions based on insights
+  // Generate recommended actions
   private generateRecommendedActions(contextInsights: any, journeyInsights: any): string[] {
     const actions: string[] = [];
-
-    // Actions based on journey stage
-    switch (journeyInsights.stage) {
-      case 'awareness':
-        actions.push('Send vehicle brochure');
-        actions.push('Schedule phone consultation');
-        break;
-      case 'consideration':
-        actions.push('Invite for test drive');
-        actions.push('Provide financing options');
-        break;
-      case 'decision':
-        actions.push('Prepare personalized offer');
-        actions.push('Address specific concerns');
-        break;
+    
+    if (contextInsights?.emotionalState === 'frustrated') {
+      actions.push('Address customer concerns with empathy');
     }
-
-    // Actions based on emotional state
-    if (contextInsights.emotionalState === 'frustrated') {
-      actions.push('Escalate to senior sales representative');
-    } else if (contextInsights.emotionalState === 'excited') {
-      actions.push('Fast-track appointment scheduling');
+    
+    if (journeyInsights?.stage === 'decision') {
+      actions.push('Present clear next steps and pricing');
     }
-
-    // Actions based on urgency
-    if (journeyInsights.urgency === 'high') {
-      actions.push('Priority follow-up within 2 hours');
+    
+    if (contextInsights?.communicationStyle === 'formal') {
+      actions.push('Maintain professional tone in responses');
     }
-
-    return actions.slice(0, 3); // Return top 3 actions
-  }
-
-  // Get enhanced insights for a lead
-  async getEnhancedInsights(leadId: string): Promise<{
-    contextInsights: any;
-    journeyInsights: any;
-    recommendations: string[];
-  }> {
-    const contextInsights = await enhancedContextEngine.getContextualInsights(leadId);
-    const journeyInsights = await customerJourneyTracker.getJourneyInsights(leadId);
-    const recommendations = this.generateRecommendedActions(contextInsights, journeyInsights);
-
-    return {
-      contextInsights,
-      journeyInsights,
-      recommendations
-    };
-  }
-
-  // Track milestone achievement
-  async trackMilestone(leadId: string, milestoneType: any, data: any): Promise<void> {
-    await customerJourneyTracker.trackMilestone(leadId, milestoneType, data);
-  }
-
-  // Track custom touchpoint
-  async trackTouchpoint(leadId: string, type: any, channel: any, data: any, outcome?: any): Promise<void> {
-    await customerJourneyTracker.trackTouchpoint(leadId, type, channel, data, outcome);
+    
+    return actions;
   }
 }
 

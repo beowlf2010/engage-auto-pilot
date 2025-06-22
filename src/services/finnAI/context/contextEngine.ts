@@ -1,113 +1,145 @@
 
-import { ConversationMemory, SessionMessage } from './types';
-import { MessageAnalyzer } from './messageAnalyzer';
-import { BehavioralTracker } from './behavioralTracker';
-import { EmotionalProcessor } from './emotionalProcessor';
-import { ProfileManager } from './profileManager';
-import { MemoryStore } from './memoryStore';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface ContextualInsights {
+  communicationStyle: 'formal' | 'casual' | 'technical';
+  emotionalState: 'positive' | 'neutral' | 'frustrated' | 'excited';
+  urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
+  preferences: any;
+  patterns: any[];
+}
 
 class EnhancedContextEngine {
-  private memoryCache = new Map<string, ConversationMemory>();
-  private messageAnalyzer = new MessageAnalyzer();
-  private behavioralTracker = new BehavioralTracker();
-  private emotionalProcessor = new EmotionalProcessor();
-  private profileManager = new ProfileManager();
-  private memoryStore = new MemoryStore();
-
-  async getConversationMemory(leadId: string): Promise<ConversationMemory> {
-    if (this.memoryCache.has(leadId)) {
-      return this.memoryCache.get(leadId)!;
+  async processMessage(leadId: string, message: string, direction: 'in' | 'out', messageId?: string): Promise<void> {
+    try {
+      console.log('🧠 Processing message through enhanced context engine');
+      
+      // Store message in conversation memory
+      await this.updateConversationMemory(leadId, {
+        messageId,
+        content: message,
+        direction,
+        timestamp: new Date().toISOString(),
+        analysis: this.analyzeMessage(message)
+      });
+      
+    } catch (error) {
+      console.error('❌ Error processing message in context engine:', error);
     }
-
-    const memory = await this.memoryStore.loadMemoryFromDatabase(leadId);
-    this.memoryCache.set(leadId, memory);
-    return memory;
   }
 
-  async processMessage(
-    leadId: string,
-    messageContent: string,
-    direction: 'in' | 'out',
-    sessionId?: string
-  ): Promise<void> {
-    const memory = await this.getConversationMemory(leadId);
-    const currentSession = sessionId || this.generateSessionId();
+  async getContextualInsights(leadId: string): Promise<ContextualInsights> {
+    try {
+      // Get conversation memory
+      const { data: memory } = await supabase
+        .from('conversation_memory')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
 
-    const analysis = await this.messageAnalyzer.analyzeMessage(messageContent);
-    
-    const sessionMessage: SessionMessage = {
-      id: `msg_${Date.now()}`,
-      content: messageContent,
-      direction,
-      timestamp: new Date(),
-      sentiment: analysis.sentiment,
-      intent: analysis.intent,
-      emotionalTone: analysis.emotionalTone
-    };
+      if (memory) {
+        return {
+          communicationStyle: memory.customer_profile?.communicationStyle || 'casual',
+          emotionalState: memory.emotional_context?.currentState || 'neutral',
+          urgencyLevel: memory.behavioral_patterns?.urgencyLevel || 'medium',
+          preferences: memory.customer_profile?.preferences || {},
+          patterns: memory.behavioral_patterns?.patterns || []
+        };
+      }
 
-    let session = memory.conversationHistory.find(s => s.sessionId === currentSession);
-    if (!session) {
-      session = {
-        sessionId: currentSession,
-        startTime: new Date(),
-        messages: [],
-        sentiment: 'neutral',
-        topics: []
+      // Return default insights
+      return {
+        communicationStyle: 'casual',
+        emotionalState: 'neutral',
+        urgencyLevel: 'medium',
+        preferences: {},
+        patterns: []
       };
-      memory.conversationHistory.push(session);
+    } catch (error) {
+      console.error('❌ Error getting contextual insights:', error);
+      return {
+        communicationStyle: 'casual',
+        emotionalState: 'neutral',
+        urgencyLevel: 'medium',
+        preferences: {},
+        patterns: []
+      };
     }
-
-    session.messages.push(sessionMessage);
-    session.topics = [...new Set([...session.topics, ...analysis.topics])];
-    session.sentiment = this.calculateSessionSentiment(session.messages);
-
-    if (direction === 'in') {
-      this.behavioralTracker.updateBehavioralPatterns(memory, sessionMessage);
-    }
-
-    memory.emotionalContext = this.emotionalProcessor.updateEmotionalContext(memory.emotionalContext, sessionMessage);
-    this.profileManager.updateCustomerProfile(memory.customerProfile, sessionMessage, analysis);
-
-    await this.memoryStore.saveMemoryToDatabase(memory);
-    this.memoryCache.set(leadId, memory);
   }
 
-  async getContextualInsights(leadId: string): Promise<{
-    communicationStyle: string;
-    emotionalState: string;
-    recentPatterns: string[];
-    recommendedTone: string;
-    urgencyLevel: string;
-  }> {
-    const memory = await this.getConversationMemory(leadId);
-    
-    const recentPatterns = memory.behavioralPatterns
-      .filter(p => p.confidence > 0.5)
-      .map(p => p.pattern);
+  private async updateConversationMemory(leadId: string, messageData: any): Promise<void> {
+    try {
+      const { data: existingMemory } = await supabase
+        .from('conversation_memory')
+        .select('*')
+        .eq('lead_id', leadId)
+        .single();
 
-    let recommendedTone = 'professional';
-    if (memory.emotionalContext.currentMood === 'excited') recommendedTone = 'enthusiastic';
-    else if (memory.emotionalContext.currentMood === 'frustrated') recommendedTone = 'empathetic';
-    else if (memory.customerProfile.communicationStyle === 'casual') recommendedTone = 'friendly';
+      if (existingMemory) {
+        // Update existing memory
+        const updatedHistory = [...(existingMemory.conversation_history || []), messageData];
+        
+        await supabase
+          .from('conversation_memory')
+          .update({
+            conversation_history: updatedHistory,
+            updated_at: new Date().toISOString()
+          })
+          .eq('lead_id', leadId);
+      } else {
+        // Create new memory record
+        await supabase
+          .from('conversation_memory')
+          .insert({
+            lead_id: leadId,
+            memory_type: 'conversation',
+            content: 'Conversation memory initialized',
+            conversation_history: [messageData],
+            customer_profile: {},
+            behavioral_patterns: [],
+            emotional_context: {}
+          });
+      }
+    } catch (error) {
+      console.error('❌ Error updating conversation memory:', error);
+    }
+  }
 
+  private analyzeMessage(message: string): any {
     return {
-      communicationStyle: memory.customerProfile.communicationStyle,
-      emotionalState: memory.emotionalContext.currentMood,
-      recentPatterns,
-      recommendedTone,
-      urgencyLevel: memory.customerProfile.urgencyLevel
+      length: message.length,
+      sentiment: this.detectSentiment(message),
+      urgency: this.detectUrgency(message),
+      style: this.detectStyle(message)
     };
   }
 
-  private calculateSessionSentiment(messages: SessionMessage[]): 'positive' | 'neutral' | 'negative' {
-    const avgSentiment = messages.reduce((sum, msg) => sum + msg.sentiment, 0) / messages.length;
-    if (avgSentiment > 0.2) return 'positive';
-    if (avgSentiment < -0.2) return 'negative';
+  private detectSentiment(message: string): string {
+    const positiveWords = ['great', 'love', 'excellent', 'perfect', 'amazing'];
+    const negativeWords = ['bad', 'hate', 'terrible', 'awful', 'frustrated'];
+    
+    const lowerMessage = message.toLowerCase();
+    
+    if (positiveWords.some(word => lowerMessage.includes(word))) return 'positive';
+    if (negativeWords.some(word => lowerMessage.includes(word))) return 'negative';
     return 'neutral';
   }
 
-  private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  private detectUrgency(message: string): string {
+    const urgentWords = ['urgent', 'asap', 'immediately', 'now', 'emergency'];
+    const lowerMessage = message.toLowerCase();
+    
+    if (urgentWords.some(word => lowerMessage.includes(word))) return 'high';
+    if (message.includes('!') || message.includes('?')) return 'medium';
+    return 'low';
+  }
+
+  private detectStyle(message: string): string {
+    if (message.length > 100 && !message.includes("'")) return 'formal';
+    if (message.includes('lol') || message.includes('haha')) return 'casual';
+    return 'neutral';
   }
 }
 
