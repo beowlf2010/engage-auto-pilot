@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import { Card } from '@/components/ui/card';
@@ -21,6 +20,7 @@ interface VirtualConversationListProps {
 
 const ITEM_HEIGHT = 120;
 const CONTAINER_HEIGHT = 600;
+const CONTAINER_WIDTH = 320; // Fixed width for the conversation list
 
 const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
   selectedLead,
@@ -220,6 +220,7 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
         ) : (
           <List
             height={CONTAINER_HEIGHT}
+            width={CONTAINER_WIDTH}
             itemCount={conversations.length + (hasMore ? 1 : 0)}
             itemSize={ITEM_HEIGHT}
             overscanCount={5}
