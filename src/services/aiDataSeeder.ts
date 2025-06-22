@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export class AIDataSeeder {
@@ -67,6 +68,7 @@ export class AIDataSeeder {
   private async seedLearningInsights(leads: any[]) {
     const insights = [
       {
+        lead_id: null,
         insight_type: 'response_timing',
         insight_title: 'Optimal Response Time Detected',
         insight_description: 'Messages sent between 2-4 PM have 35% higher response rates',
@@ -81,6 +83,7 @@ export class AIDataSeeder {
         }
       },
       {
+        lead_id: null,
         insight_type: 'message_length',
         insight_title: 'Short Messages Perform Better',
         insight_description: 'Messages under 50 characters get 42% more responses',
@@ -95,6 +98,7 @@ export class AIDataSeeder {
         }
       },
       {
+        lead_id: null,
         insight_type: 'follow_up_timing',
         insight_title: 'Follow-up Timing Insight',
         insight_description: 'Second follow-up after 3 days increases engagement by 28%',
