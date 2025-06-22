@@ -165,6 +165,7 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
         showMemory={showMemory}
         showTemplates={showTemplates}
         sendingMessage={sendingMessage}
+        loading={loading}
         user={user}
         onSelectConversation={handleSimpleSelectConversation}
         onSendMessage={onSendMessage}

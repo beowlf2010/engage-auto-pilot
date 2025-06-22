@@ -7,6 +7,7 @@ import ChatAIPanelsContainer from './ChatAIPanelsContainer';
 import LeadContextPanel from './LeadContextPanel';
 import AppointmentScheduler from '../appointments/AppointmentScheduler';
 import AppointmentInterestBanner from './AppointmentInterestBanner';
+import { MessageListSkeleton } from '@/components/ui/skeletons/MessageSkeleton';
 import { useChatState } from './hooks/useChatState';
 import { useChatHandlers } from './hooks/useChatHandlers';
 import { useConversationAnalysis } from '@/hooks/useConversationAnalysis';
@@ -24,6 +25,7 @@ interface EnhancedChatViewProps {
     id: string;
   };
   isLoading?: boolean;
+  messagesLoading?: boolean;
 }
 
 const EnhancedChatView = ({ 
@@ -33,7 +35,8 @@ const EnhancedChatView = ({
   showTemplates,
   onToggleTemplates,
   user,
-  isLoading = false
+  isLoading = false,
+  messagesLoading = false
 }: EnhancedChatViewProps) => {
   const [showAppointmentScheduler, setShowAppointmentScheduler] = useState(false);
   const [appointmentIntent, setAppointmentIntent] = useState<AppointmentIntent | null>(null);
@@ -80,11 +83,11 @@ const EnhancedChatView = ({
 
   // Auto-scroll when messages change or conversation is selected
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && !messagesLoading) {
       // Small delay to ensure DOM is updated
       setTimeout(scrollToBottom, 100);
     }
-  }, [messages, selectedConversation?.leadId]);
+  }, [messages, selectedConversation?.leadId, messagesLoading]);
 
   // Handle scroll detection
   const handleScroll = () => {
@@ -117,7 +120,7 @@ const EnhancedChatView = ({
 
   // Analyze appointment intent when messages change
   useEffect(() => {
-    if (messages.length > 0 && selectedConversation?.leadId) {
+    if (messages.length > 0 && selectedConversation?.leadId && !messagesLoading) {
       const intent = analyzeAppointmentIntent(messages);
       setAppointmentIntent(intent);
       
@@ -132,18 +135,18 @@ const EnhancedChatView = ({
         }
       }
     }
-  }, [messages, selectedConversation?.leadId, showAppointmentScheduler]);
+  }, [messages, selectedConversation?.leadId, showAppointmentScheduler, messagesLoading]);
 
   // Load analysis data when conversation changes
   useEffect(() => {
-    if (selectedConversation?.leadId) {
+    if (selectedConversation?.leadId && !messagesLoading) {
       loadExistingSummary();
       const conversationIds = messages.map(msg => msg.id);
       if (conversationIds.length > 0) {
         loadSentiments(conversationIds);
       }
     }
-  }, [selectedConversation?.leadId, messages.length, loadExistingSummary, loadSentiments]);
+  }, [selectedConversation?.leadId, messages.length, loadExistingSummary, loadSentiments, messagesLoading]);
 
   const canReply = selectedConversation && (
     user.role === "manager" || 
@@ -181,7 +184,7 @@ const EnhancedChatView = ({
         {/* Main Chat Area - Fixed Height */}
         <div className={`${showLeadContext ? 'col-span-8' : 'col-span-12'} flex flex-col space-y-2`}>
           {/* Appointment Interest Banner */}
-          {appointmentIntent && (
+          {appointmentIntent && !messagesLoading && (
             <AppointmentInterestBanner
               isVisible={showAppointmentBanner}
               confidence={appointmentIntent.confidence}
@@ -214,28 +217,32 @@ const EnhancedChatView = ({
               className="flex-1 p-4 overflow-y-auto max-h-[400px]"
               onScroll={handleScroll}
             >
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
-                  >
+              {messagesLoading ? (
+                <MessageListSkeleton />
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message) => (
                     <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        message.direction === 'out'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 text-gray-800'
-                      }`}
+                      key={message.id}
+                      className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
                     >
-                      {message.body}
+                      <div
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                          message.direction === 'out'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 text-gray-800'
+                        }`}
+                      >
+                        {message.body}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
               
               {/* Scroll to bottom button */}
-              {showScrollButton && (
+              {showScrollButton && !messagesLoading && (
                 <button
                   onClick={scrollToBottom}
                   className="fixed bottom-24 right-8 bg-blue-500 text-white p-2 rounded-full shadow-lg hover:bg-blue-600 transition-colors z-10"
@@ -256,11 +263,11 @@ const EnhancedChatView = ({
                     onKeyPress={handleKeyPress}
                     placeholder="Type your message..."
                     className="flex-1 min-h-[60px] resize-none"
-                    disabled={isSending || isLoading}
+                    disabled={isSending || isLoading || messagesLoading}
                   />
                   <button
                     onClick={handleSend}
-                    disabled={isSending || isLoading || !newMessage.trim()}
+                    disabled={isSending || isLoading || !newMessage.trim() || messagesLoading}
                     className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed self-end"
                   >
                     {isSending || isLoading ? 'Sending...' : 'Send'}

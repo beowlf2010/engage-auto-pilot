@@ -13,6 +13,7 @@ interface InboxLayoutProps {
   showMemory: boolean;
   showTemplates: boolean;
   sendingMessage: boolean;
+  loading: boolean;
   user: {
     role: string;
     id: string;
@@ -33,6 +34,7 @@ const InboxLayout: React.FC<InboxLayoutProps> = ({
   showMemory,
   showTemplates,
   sendingMessage,
+  loading,
   user,
   onSelectConversation,
   onSendMessage,
@@ -52,6 +54,7 @@ const InboxLayout: React.FC<InboxLayoutProps> = ({
           canReply={canReply}
           markAsRead={markAsRead}
           markingAsRead={markingAsRead}
+          loading={loading}
         />
       </div>
 

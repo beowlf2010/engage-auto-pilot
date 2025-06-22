@@ -1,7 +1,10 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ConversationListItem, MessageData } from '@/types/conversation';
+import { messageCacheService } from '@/services/messageCacheService';
+import { errorHandlingService } from '@/services/errorHandlingService';
 
 interface ConversationOperationsProps {
   onLeadsRefresh?: () => void;
@@ -20,6 +23,15 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
   const loadConversations = useCallback(async () => {
     if (loadingRef.current) {
       console.log('⏳ [STABLE OPS] Conversations already loading, skipping');
+      return;
+    }
+
+    // Check cache first
+    const cachedConversations = messageCacheService.getCachedConversations();
+    if (cachedConversations) {
+      console.log('📋 [STABLE OPS] Using cached conversations');
+      setConversations(cachedConversations);
+      setLoading(false);
       return;
     }
     
@@ -47,7 +59,6 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
         .not('ai_opt_in', 'is', null);
 
       if (leadsError) {
-        console.error('❌ [STABLE OPS] Error loading leads:', leadsError);
         throw leadsError;
       }
 
@@ -145,10 +156,15 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       });
 
       setConversations(sortedConversations);
+      messageCacheService.cacheConversations(sortedConversations);
       console.log('✅ [STABLE OPS] Conversations loaded successfully:', sortedConversations.length);
 
     } catch (err) {
       console.error('❌ [STABLE OPS] Error loading conversations:', err);
+      errorHandlingService.handleError(err, {
+        operation: 'loadConversations'
+      });
+      
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -163,6 +179,14 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
   const loadMessages = useCallback(async (leadId: string) => {
     if (loadingMessagesRef.current) {
       console.log('⏳ [STABLE OPS] Messages already loading for another lead, skipping');
+      return;
+    }
+
+    // Check cache first
+    const cachedMessages = messageCacheService.getCachedMessages(leadId);
+    if (cachedMessages) {
+      console.log('📋 [STABLE OPS] Using cached messages for lead:', leadId);
+      setMessages(cachedMessages);
       return;
     }
 
@@ -185,7 +209,6 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
         .order('sent_at', { ascending: true });
 
       if (error) {
-        console.error('❌ [STABLE OPS] Error fetching messages:', error);
         throw error;
       }
 
@@ -205,9 +228,15 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       }));
 
       setMessages(messagesWithContext);
+      messageCacheService.cacheMessages(leadId, messagesWithContext);
       console.log('✅ [STABLE OPS] Messages loaded successfully:', messagesWithContext.length);
     } catch (err) {
       console.error('❌ [STABLE OPS] Error loading messages:', err);
+      errorHandlingService.handleError(err, {
+        operation: 'loadMessages',
+        leadId
+      });
+      
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -219,7 +248,7 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
   }, []);
 
   const sendMessage = useCallback(async (leadId: string, message: string) => {
-    if (setSendingMessage) {
+    if (sendingMessage) {
       console.log('⏳ [STABLE OPS] Already sending message, ignoring');
       return;
     }
@@ -230,6 +259,25 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
     try {
       console.log('📤 [STABLE OPS] Sending message to lead:', leadId);
       
+      // Optimistic update - add message to cache immediately
+      const optimisticMessage = {
+        id: `temp-${Date.now()}`,
+        leadId,
+        direction: 'out' as const,
+        body: message,
+        sentAt: new Date().toISOString(),
+        readAt: null,
+        aiGenerated: false,
+        smsStatus: 'pending',
+        smsError: null,
+        leadSource: '',
+        leadName: '',
+        vehicleInterest: ''
+      };
+      
+      messageCacheService.addMessageToCache(leadId, optimisticMessage);
+      setMessages(prev => [...prev, optimisticMessage]);
+
       const { error } = await supabase.from('conversations').insert({
         lead_id: leadId,
         direction: 'out',
@@ -238,11 +286,16 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       });
 
       if (error) {
-        console.error('❌ [STABLE OPS] Error sending message:', error);
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+        messageCacheService.invalidateLeadCache(leadId);
         throw error;
       }
 
+      // Invalidate cache and reload to get real message
+      messageCacheService.invalidateLeadCache(leadId);
       await loadMessages(leadId);
+      
       if (onLeadsRefresh) {
         onLeadsRefresh();
       }
@@ -250,6 +303,11 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       console.log('✅ [STABLE OPS] Message sent successfully');
     } catch (err) {
       console.error('❌ [STABLE OPS] Error sending message:', err);
+      errorHandlingService.handleError(err, {
+        operation: 'sendMessage',
+        leadId
+      });
+      
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -258,18 +316,19 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
     } finally {
       setSendingMessage(false);
     }
-  }, [loadMessages, onLeadsRefresh]);
+  }, [loadMessages, onLeadsRefresh, sendingMessage]);
 
   const manualRefresh = useCallback(() => {
     console.log('🔄 [STABLE OPS] Manual refresh triggered');
+    messageCacheService.clearAll();
     loadConversations();
   }, [loadConversations]);
 
-  // Initialize conversations on mount - this was missing!
+  // Initialize conversations on mount
   useEffect(() => {
     console.log('🚀 [STABLE OPS] Initializing Smart Inbox conversations...');
     loadConversations();
-  }, []); // Empty dependency array ensures this runs only once
+  }, [loadConversations]);
 
   return {
     conversations,
