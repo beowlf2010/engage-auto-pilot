@@ -43,7 +43,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       
       console.log('🔄 [OPTIMIZED INBOX] Loading conversations with optimized service...');
       
-      // Load conversations from Supabase directly - removed priority column
+      // Load conversations from Supabase directly
       const { data, error } = await supabase
         .from('leads')
         .select(`
@@ -70,13 +70,23 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
 
       if (error) throw error;
 
-      // Transform to ConversationListItem format
+      // Transform to ConversationListItem format with proper sorting
       const transformedConversations: ConversationListItem[] = (data || []).map(lead => {
         const conversations = lead.conversations || [];
-        const lastMessage = conversations[conversations.length - 1];
-        const unreadMessages = conversations.filter(c => c.direction === 'in' && !c.read_at);
         
-        return {
+        // CRITICAL FIX: Sort conversations by sent_at to get the actual last message
+        const sortedConversations = [...conversations].sort((a, b) => 
+          new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
+        );
+        
+        const lastMessage = sortedConversations[sortedConversations.length - 1];
+        
+        // CRITICAL FIX: Count unread messages correctly (incoming messages without read_at)
+        const unreadMessages = conversations.filter(c => 
+          c.direction === 'in' && !c.read_at
+        );
+        
+        const result = {
           leadId: lead.id,
           leadName: `${lead.first_name} ${lead.last_name}`,
           leadPhone: lead.phone || '',
@@ -91,6 +101,13 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           unreadCount: unreadMessages.length,
           messageCount: conversations.length
         };
+        
+        // Add debugging for unread messages
+        if (unreadMessages.length > 0) {
+          console.log(`📬 [OPTIMIZED INBOX] Lead ${lead.first_name} ${lead.last_name} has ${unreadMessages.length} unread messages, last message direction: ${result.lastMessageDirection}`);
+        }
+        
+        return result;
       });
       
       if (append) {
@@ -101,7 +118,13 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       
       setTotalConversations(transformedConversations.length);
       
+      // Add summary logging for debugging
+      const unreadConversations = transformedConversations.filter(c => c.unreadCount > 0);
+      const incomingConversations = transformedConversations.filter(c => c.lastMessageDirection === 'in');
+      
       console.log(`✅ [OPTIMIZED INBOX] Loaded ${transformedConversations.length} conversations`);
+      console.log(`📮 [OPTIMIZED INBOX] ${unreadConversations.length} conversations with unread messages`);
+      console.log(`📥 [OPTIMIZED INBOX] ${incomingConversations.length} conversations with incoming last message`);
 
     } catch (err) {
       console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', err);
