@@ -1,10 +1,16 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { optimizedConversationService, ConversationFilters } from '@/services/optimizedConversationService';
+import { enhancedPredictiveService } from '@/services/enhancedPredictiveService';
 import { messageCacheService } from '@/services/messageCacheService';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { errorHandlingService } from '@/services/errorHandlingService';
+
+interface ConversationFilters {
+  unreadOnly?: boolean;
+  incomingOnly?: boolean;
+  search?: string;
+}
 
 interface UseOptimizedInboxProps {
   onLeadsRefresh?: () => void;
@@ -38,17 +44,66 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       
       console.log('🔄 [OPTIMIZED INBOX] Loading conversations with optimized service...');
       
-      const result = await optimizedConversationService.getConversations(page, 50, filters);
+      // Load conversations from Supabase directly since we're replacing the optimized service
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          status,
+          source,
+          vehicle_interest,
+          created_at,
+          salesperson_id,
+          last_contact_date,
+          priority,
+          conversations (
+            id,
+            body,
+            direction,
+            sent_at,
+            read_at
+          )
+        `)
+        .order('last_contact_date', { ascending: false, nullsLast: true })
+        .range(page * 50, (page + 1) * 50 - 1);
+
+      if (error) throw error;
+
+      // Transform to ConversationListItem format
+      const transformedConversations: ConversationListItem[] = (data || []).map(lead => {
+        const conversations = lead.conversations || [];
+        const lastMessage = conversations[conversations.length - 1];
+        const unreadMessages = conversations.filter(c => c.direction === 'in' && !c.read_at);
+        
+        return {
+          leadId: lead.id,
+          leadName: `${lead.first_name} ${lead.last_name}`,
+          primaryPhone: lead.phone || '',
+          vehicleInterest: lead.vehicle_interest || 'Unknown',
+          status: lead.status || 'active',
+          source: lead.source || 'unknown',
+          salespersonId: lead.salesperson_id,
+          lastMessageTime: lastMessage?.sent_at || lead.created_at,
+          lastMessageDirection: lastMessage?.direction || 'out',
+          lastMessageBody: lastMessage?.body || '',
+          unreadCount: unreadMessages.length,
+          priority: lead.priority || 'normal'
+        };
+      });
       
       if (append) {
-        setConversations(prev => [...prev, ...result.conversations]);
+        setConversations(prev => [...prev, ...transformedConversations]);
       } else {
-        setConversations(result.conversations);
+        setConversations(transformedConversations);
       }
       
-      setTotalConversations(result.totalCount);
+      setTotalConversations(transformedConversations.length);
       
-      console.log(`✅ [OPTIMIZED INBOX] Loaded ${result.conversations.length} conversations (${result.totalCount} total)`);
+      console.log(`✅ [OPTIMIZED INBOX] Loaded ${transformedConversations.length} conversations`);
 
     } catch (err) {
       console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', err);
@@ -87,37 +142,8 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
 
       console.log('📬 [OPTIMIZED INBOX] Loading messages for lead:', leadId);
       
-      // Use the existing optimized query from the stable operations
-      const { data: leadData } = await supabase
-        .from('leads')
-        .select('first_name, last_name, vehicle_interest, source')
-        .eq('id', leadId)
-        .single();
-
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('sent_at', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      const messagesWithContext = (data || []).map(msg => ({
-        id: msg.id,
-        leadId,
-        direction: msg.direction as 'in' | 'out',
-        body: msg.body,
-        sentAt: msg.sent_at,
-        readAt: msg.read_at,
-        aiGenerated: msg.ai_generated || false,
-        smsStatus: msg.sms_status || 'pending',
-        smsError: msg.sms_error,
-        leadSource: leadData?.source,
-        leadName: leadData ? `${leadData.first_name} ${leadData.last_name}` : 'Unknown',
-        vehicleInterest: leadData?.vehicle_interest || 'Unknown'
-      }));
+      // Use enhanced predictive service for loading messages
+      const messagesWithContext = await enhancedPredictiveService.loadMessagesFromDatabase(leadId);
 
       setMessages(messagesWithContext);
       messageCacheService.cacheMessages(leadId, messagesWithContext);
@@ -165,7 +191,6 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
 
       // Invalidate relevant caches
       messageCacheService.invalidateLeadCache(leadId);
-      optimizedConversationService.invalidateCache();
       
       // Reload messages and conversations
       await Promise.all([
@@ -197,7 +222,6 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
 
   const manualRefresh = useCallback(() => {
     console.log('🔄 [OPTIMIZED INBOX] Manual refresh triggered');
-    optimizedConversationService.invalidateCache();
     messageCacheService.clearAll();
     loadConversations(0, {}, false);
   }, [loadConversations]);

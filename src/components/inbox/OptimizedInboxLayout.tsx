@@ -19,7 +19,7 @@ interface OptimizedInboxLayoutProps {
     id: string;
   };
   onSelectConversation: (leadId: string) => void;
-  onSendMessage: (message: string, isTemplate?: boolean) => void;
+  onSendMessage: (message: string, isTemplate?: boolean) => Promise<void>;
   onToggleTemplates: () => void;
   canReply: boolean;
   markAsRead: (leadId: string) => Promise<void>;
@@ -51,7 +51,6 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           conversations={conversations}
           selectedLead={selectedLead}
           onSelectConversation={onSelectConversation}
-          loading={loading}
           markAsRead={markAsRead}
           markingAsRead={markingAsRead}
         />
@@ -76,11 +75,20 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
       {selectedConversation && (
         <div className="w-80 border-l border-gray-200">
           <LeadContextPanel
-            leadId={selectedConversation.leadId}
-            leadName={selectedConversation.leadName}
-            vehicleInterest={selectedConversation.vehicleInterest}
-            status={selectedConversation.status}
-            lastMessageTime={selectedConversation.lastMessageTime}
+            lead={{
+              id: selectedConversation.leadId,
+              first_name: selectedConversation.leadName.split(' ')[0] || '',
+              last_name: selectedConversation.leadName.split(' ').slice(1).join(' ') || '',
+              phone: selectedConversation.primaryPhone,
+              vehicle_interest: selectedConversation.vehicleInterest,
+              status: selectedConversation.status,
+              last_contact_date: selectedConversation.lastMessageTime,
+              source: selectedConversation.source || 'unknown',
+              created_at: selectedConversation.lastMessageTime,
+              email: '',
+              salesperson_id: selectedConversation.salespersonId || null,
+              priority: selectedConversation.priority || 'normal'
+            }}
           />
         </div>
       )}

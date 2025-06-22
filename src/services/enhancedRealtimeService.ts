@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { optimizedConversationService } from './optimizedConversationService';
 import { messageCacheService } from './messageCacheService';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 
@@ -190,10 +189,9 @@ class EnhancedRealtimeService {
     };
 
     if (payload.eventType === 'INSERT' && payload.new?.direction === 'in') {
-      // Incoming message - invalidate cache for this lead and update conversations
+      // Incoming message - invalidate cache for this lead
       if (payload.new.lead_id) {
         messageCacheService.invalidateLeadCache(payload.new.lead_id);
-        optimizedConversationService.invalidateCache();
       }
 
       // High priority update for incoming messages
@@ -212,9 +210,6 @@ class EnhancedRealtimeService {
 
   private handleNewLead(payload: any): void {
     console.log('👤 [ENHANCED REALTIME] New lead:', payload.new?.id);
-    
-    // Invalidate conversation cache to include new lead
-    optimizedConversationService.invalidateCache();
     
     this.notifySubscribers({
       type: 'conversation_update',
@@ -291,9 +286,6 @@ class EnhancedRealtimeService {
   }
 
   private async processBatchedConversationUpdates(updates: RealtimeUpdate[]): Promise<void> {
-    // Invalidate conversation cache
-    optimizedConversationService.invalidateCache();
-
     // Notify subscribers
     this.notifySubscribers({
       type: 'conversation_update',
