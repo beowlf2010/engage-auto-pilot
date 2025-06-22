@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +20,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import MessageTemplates from '../MessageTemplates';
+import MessageTemplates from './MessageTemplates';
 import type { ConversationListItem, MessageData } from '@/types/conversation';
 
 interface EnhancedChatViewProps {
