@@ -58,7 +58,6 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           vehicle_interest,
           created_at,
           salesperson_id,
-          last_contact_date,
           priority,
           conversations (
             id,
@@ -68,7 +67,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
             read_at
           )
         `)
-        .order('last_contact_date', { ascending: false, nullsLast: true })
+        .order('created_at', { ascending: false })
         .range(page * 50, (page + 1) * 50 - 1);
 
       if (error) throw error;
@@ -82,16 +81,17 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
         return {
           leadId: lead.id,
           leadName: `${lead.first_name} ${lead.last_name}`,
+          leadPhone: lead.phone || '',
           primaryPhone: lead.phone || '',
           vehicleInterest: lead.vehicle_interest || 'Unknown',
           status: lead.status || 'active',
-          source: lead.source || 'unknown',
           salespersonId: lead.salesperson_id,
           lastMessageTime: lastMessage?.sent_at || lead.created_at,
-          lastMessageDirection: lastMessage?.direction || 'out',
-          lastMessageBody: lastMessage?.body || '',
+          lastMessageDirection: lastMessage?.direction as 'in' | 'out' | null || null,
+          lastMessage: lastMessage?.body || '',
+          lastMessageDate: new Date(lastMessage?.sent_at || lead.created_at),
           unreadCount: unreadMessages.length,
-          priority: lead.priority || 'normal'
+          messageCount: conversations.length
         };
       });
       

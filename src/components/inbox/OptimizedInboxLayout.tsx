@@ -53,6 +53,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           onSelectConversation={onSelectConversation}
           markAsRead={markAsRead}
           markingAsRead={markingAsRead}
+          canReply={(conversation) => canReply}
         />
       </div>
 
@@ -61,7 +62,6 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
         <EnhancedChatView
           messages={messages}
           selectedConversation={selectedConversation}
-          showMemory={showMemory}
           showTemplates={showTemplates}
           sendingMessage={sendingMessage}
           onSendMessage={onSendMessage}
@@ -75,20 +75,13 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
       {selectedConversation && (
         <div className="w-80 border-l border-gray-200">
           <LeadContextPanel
-            lead={{
-              id: selectedConversation.leadId,
-              first_name: selectedConversation.leadName.split(' ')[0] || '',
-              last_name: selectedConversation.leadName.split(' ').slice(1).join(' ') || '',
-              phone: selectedConversation.primaryPhone,
-              vehicle_interest: selectedConversation.vehicleInterest,
-              status: selectedConversation.status,
-              last_contact_date: selectedConversation.lastMessageTime,
-              source: selectedConversation.source || 'unknown',
-              created_at: selectedConversation.lastMessageTime,
-              email: '',
-              salesperson_id: selectedConversation.salespersonId || null,
-              priority: selectedConversation.priority || 'normal'
-            }}
+            leadId={selectedConversation.leadId}
+            leadName={selectedConversation.leadName}
+            leadPhone={selectedConversation.primaryPhone}
+            vehicleInterest={selectedConversation.vehicleInterest}
+            status={selectedConversation.status}
+            lastMessageTime={selectedConversation.lastMessageTime}
+            salespersonId={selectedConversation.salespersonId}
           />
         </div>
       )}
