@@ -32,7 +32,7 @@ class AIEmergencyService {
     try {
       // Try a simple query to check if table exists
       const { error } = await supabase
-        .from('ai_emergency_settings' as any)
+        .from('ai_emergency_settings')
         .select('id')
         .limit(1);
 
@@ -48,11 +48,11 @@ class AIEmergencyService {
       if (this.tableExists) {
         // Try to load from database first
         const { data, error } = await supabase
-          .from('ai_emergency_settings' as any)
+          .from('ai_emergency_settings')
           .select('*')
           .single();
 
-        if (data && !error) {
+        if (!error && data) {
           this.settings = {
             aiDisabled: data.ai_disabled,
             disabledAt: data.disabled_at,
@@ -89,8 +89,8 @@ class AIEmergencyService {
     try {
       if (this.tableExists) {
         // Save to database
-        await supabase
-          .from('ai_emergency_settings' as any)
+        const { error } = await supabase
+          .from('ai_emergency_settings')
           .upsert({
             ai_disabled: this.settings.aiDisabled,
             disabled_at: this.settings.disabledAt,
@@ -98,6 +98,10 @@ class AIEmergencyService {
             disable_reason: this.settings.disableReason,
             updated_at: new Date().toISOString()
           });
+
+        if (error) {
+          console.warn('⚠️ Failed to save to database, using localStorage only:', error);
+        }
       }
 
       // Always save to localStorage as backup
