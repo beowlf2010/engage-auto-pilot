@@ -4,6 +4,7 @@ import { useStableConversationOperations } from "@/hooks/useStableConversationOp
 import { useUnifiedAIScheduler } from "@/hooks/useUnifiedAIScheduler";
 import { useLeads } from "@/hooks/useLeads";
 import { useEnhancedMessageWrapper } from "./inbox/EnhancedMessageWrapper";
+import { useMarkAsRead } from "@/hooks/inbox/useMarkAsRead";
 import InboxStateManager from "./inbox/InboxStateManager";
 import InboxStatusDisplay from "./inbox/InboxStatusDisplay";
 import SmartInboxMain from "./inbox/SmartInboxMain";
@@ -39,6 +40,9 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   } = useStableConversationOperations({
     onLeadsRefresh: refreshLeads
   });
+
+  // Mark as read functionality
+  const { markAsRead, markingAsRead } = useMarkAsRead(manualRefresh);
 
   // Enhanced send message function
   const { sendEnhancedMessageWrapper } = useEnhancedMessageWrapper({
@@ -87,12 +91,14 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           conversations={filteredConversations}
           messages={messages}
           sendingMessage={sendingMessage}
-          loading={loading} // Pass actual loading state
+          loading={loading}
           loadMessages={loadMessages}
           sendMessage={sendEnhancedMessageWrapper}
           setError={setError}
           debugPanelOpen={debugPanelOpen}
           setDebugPanelOpen={setDebugPanelOpen}
+          markAsRead={markAsRead}
+          markingAsRead={markingAsRead}
           getLeadIdFromUrl={() => {
             const searchParams = new URLSearchParams(window.location.search);
             return searchParams.get('leadId');

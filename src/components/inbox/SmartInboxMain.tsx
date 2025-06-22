@@ -15,7 +15,7 @@ interface SmartInboxMainProps {
   conversations: ConversationListItem[];
   messages: MessageData[];
   sendingMessage: boolean;
-  loading: boolean; // Now properly receiving loading state
+  loading: boolean;
   loadMessages: (leadId: string) => Promise<void>;
   sendMessage: (leadId: string, message: string) => Promise<void>;
   setError: (error: string | null) => void;
@@ -30,6 +30,8 @@ interface SmartInboxMainProps {
   getLeadIdFromUrl: () => string | null;
   debugPanelOpen: boolean;
   setDebugPanelOpen: (open: boolean) => void;
+  markAsRead: (leadId: string) => Promise<void>;
+  markingAsRead: string | null;
 }
 
 const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
@@ -51,7 +53,9 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
   handleToggleTemplates,
   getLeadIdFromUrl,
   debugPanelOpen,
-  setDebugPanelOpen
+  setDebugPanelOpen,
+  markAsRead,
+  markingAsRead
 }) => {
   const leadIdFromUrl = getLeadIdFromUrl();
   const selectedConversation = conversations.find(conv => conv.leadId === selectedLead);
@@ -162,6 +166,8 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
         onSendMessage={onSendMessage}
         onToggleTemplates={handleToggleTemplates}
         canReply={canReply}
+        markAsRead={markAsRead}
+        markingAsRead={markingAsRead}
       />
       <MessageDebugPanel
         isOpen={debugPanelOpen}

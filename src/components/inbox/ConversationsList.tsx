@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, MessageSquare, Clock, User, Phone, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Search, Filter, MessageSquare, Clock, User, Phone, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import LeadScoreIndicator from './LeadScoreIndicator';
 import EnhancedAIStatusDisplay from '../leads/EnhancedAIStatusDisplay';
@@ -37,6 +37,8 @@ interface ConversationsListProps {
   canReply: (conversation: Conversation) => boolean;
   showUrgencyIndicator?: boolean;
   showTimestamps?: boolean;
+  markAsRead?: (leadId: string) => Promise<void>;
+  markingAsRead?: string | null;
 }
 
 const ConversationsList = ({
@@ -45,7 +47,9 @@ const ConversationsList = ({
   onSelectConversation,
   canReply,
   showUrgencyIndicator = false,
-  showTimestamps = false
+  showTimestamps = false,
+  markAsRead,
+  markingAsRead
 }: ConversationsListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -83,6 +87,14 @@ const ConversationsList = ({
     if (conversation.unreadCount > 2) return 'up';
     if (conversation.unreadCount === 0) return 'down';
     return 'stable';
+  };
+
+  // Handle mark as read
+  const handleMarkAsRead = async (e: React.MouseEvent, leadId: string) => {
+    e.stopPropagation(); // Prevent conversation selection
+    if (markAsRead) {
+      await markAsRead(leadId);
+    }
   };
 
   // Filter conversations
@@ -143,6 +155,7 @@ const ConversationsList = ({
                 const aiScore = getAIScore(conversation);
                 const trend = getTrend(conversation);
                 const urgencyLevel = getUrgencyLevel(conversation);
+                const isMarkingThisAsRead = markingAsRead === conversation.leadId;
                 
                 return (
                   <div
@@ -284,10 +297,20 @@ const ConversationsList = ({
                       )}
 
                       {/* Quick action for unread messages */}
-                      {showUrgencyIndicator && conversation.unreadCount > 0 && (
+                      {showUrgencyIndicator && conversation.unreadCount > 0 && markAsRead && (
                         <div className="flex items-center gap-2 pt-1">
-                          <Button size="sm" variant="outline" className="text-xs h-6">
-                            <CheckCircle className="w-3 h-3 mr-1" />
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="text-xs h-6"
+                            onClick={(e) => handleMarkAsRead(e, conversation.leadId)}
+                            disabled={isMarkingThisAsRead}
+                          >
+                            {isMarkingThisAsRead ? (
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                            )}
                             Mark as Read
                           </Button>
                           <Button size="sm" variant="default" className="text-xs h-6">

@@ -11,13 +11,17 @@ interface EnhancedInboxTabsProps {
   selectedLead: string | null;
   onSelectConversation: (leadId: string) => Promise<void>;
   canReply: (conversation: ConversationListItem) => boolean;
+  markAsRead: (leadId: string) => Promise<void>;
+  markingAsRead: string | null;
 }
 
 const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
   conversations,
   selectedLead,
   onSelectConversation,
-  canReply
+  canReply,
+  markAsRead,
+  markingAsRead
 }) => {
   // Filter unread incoming messages (highest priority)
   const unreadIncoming = conversations.filter(conv => 
@@ -105,6 +109,8 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
             onSelectConversation={onSelectConversation}
             canReply={canReply}
             showUrgencyIndicator={true}
+            markAsRead={markAsRead}
+            markingAsRead={markingAsRead}
           />
         </div>
       </TabsContent>
@@ -126,6 +132,8 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
             onSelectConversation={onSelectConversation}
             canReply={canReply}
             showTimestamps={true}
+            markAsRead={markAsRead}
+            markingAsRead={markingAsRead}
           />
         </div>
       </TabsContent>
@@ -136,6 +144,8 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
           selectedLead={selectedLead}
           onSelectConversation={onSelectConversation}
           canReply={canReply}
+          markAsRead={markAsRead}
+          markingAsRead={markingAsRead}
         />
       </TabsContent>
     </Tabs>

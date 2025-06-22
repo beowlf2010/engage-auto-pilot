@@ -21,6 +21,8 @@ interface InboxLayoutProps {
   onSendMessage: (message: string, isTemplate?: boolean) => Promise<void>;
   onToggleTemplates: () => void;
   canReply: (conv: any) => boolean;
+  markAsRead: (leadId: string) => Promise<void>;
+  markingAsRead: string | null;
 }
 
 const InboxLayout: React.FC<InboxLayoutProps> = ({
@@ -35,7 +37,9 @@ const InboxLayout: React.FC<InboxLayoutProps> = ({
   onSelectConversation,
   onSendMessage,
   onToggleTemplates,
-  canReply
+  canReply,
+  markAsRead,
+  markingAsRead
 }) => {
   return (
     <div className="h-[calc(100vh-8rem)] flex space-x-4">
@@ -46,6 +50,8 @@ const InboxLayout: React.FC<InboxLayoutProps> = ({
           selectedLead={selectedLead}
           onSelectConversation={onSelectConversation}
           canReply={canReply}
+          markAsRead={markAsRead}
+          markingAsRead={markingAsRead}
         />
       </div>
 
