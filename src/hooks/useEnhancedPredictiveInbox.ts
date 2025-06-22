@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { enhancedConversationService } from '@/services/enhancedConversationService';
 import { userActivityMonitor } from '@/services/userActivityMonitor';
@@ -163,7 +162,8 @@ export const useEnhancedPredictiveInbox = ({
 
     console.log('🔍 [ENHANCED PREDICTIVE] ML-powered search for:', query);
     
-    const results = enhancedConversationService.searchConversations(query, 20);
+    // Fix: Pass proper filters object instead of just a number
+    const results = enhancedConversationService.searchConversations(query, {}, 20);
     setSearchResults(results);
     
     console.log(`🎯 [ENHANCED PREDICTIVE] Found ${results.length} ML-enhanced results`);
