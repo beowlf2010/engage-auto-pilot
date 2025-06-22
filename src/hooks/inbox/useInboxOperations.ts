@@ -93,7 +93,7 @@ export const useInboxOperations = ({
       console.error('❌ [INBOX OPS] Message send failed:', error);
       throw error;
     }
-  }, [leadId, canReply, sendingMessage, sendMessage, loadMessages]);
+  }, [canReply, sendingMessage, sendMessage, loadMessages]);
 
   return {
     canReply,
