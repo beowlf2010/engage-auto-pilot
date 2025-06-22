@@ -48,7 +48,7 @@ export interface MessageData {
   body: string;
   sentAt: string;
   readAt?: string;
-  aiGenerated?: boolean;
+  aiGenerated: boolean;
   smsStatus: string;
   smsError?: string;
   leadSource?: string;
