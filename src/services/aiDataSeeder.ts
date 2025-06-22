@@ -111,7 +111,7 @@ export class AIDataSeeder {
       }
     ];
 
-    // Add lead-specific insights
+    // Add lead-specific insights with simplified data structure
     if (leads.length > 0) {
       insights.push({
         lead_id: leads[0].id,
@@ -123,9 +123,8 @@ export class AIDataSeeder {
         actionable: true,
         applies_globally: false,
         insight_data: {
-          communication_style: 'direct',
-          response_rate: 0.73,
-          avg_response_time: 2.4
+          response_rate_improvement: 0.73,
+          sample_size: 12
         }
       });
     }
