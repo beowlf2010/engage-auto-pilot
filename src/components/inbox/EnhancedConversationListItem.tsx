@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,9 +12,9 @@ interface EnhancedConversationListItemProps {
   onSelect: (leadId: string) => void;
   canReply: boolean;
   markAsRead: (leadId: string) => Promise<void>;
-  isMarkingAsRead: string | null;
+  isMarkingAsRead: boolean;
   predictions?: any[];
-  viewMode?: 'list' | 'grid';
+  viewMode?: 'list' | 'grid' | 'thread';
 }
 
 const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> = ({
@@ -26,7 +27,8 @@ const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> 
   predictions = [],
   viewMode = 'list'
 }) => {
-  const getInitials = (name: string) => {
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
     const nameParts = name.split(' ');
     const initials = nameParts.map((part) => part.charAt(0).toUpperCase()).join('');
     return initials.substring(0, 2);
@@ -102,7 +104,7 @@ const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> 
                   {conversation.unreadCount}
                 </Badge>
               )}
-              {isMarkingAsRead === conversation.leadId ? (
+              {isMarkingAsRead ? (
                 <div className="text-blue-500 animate-pulse">
                   Marking as read...
                 </div>

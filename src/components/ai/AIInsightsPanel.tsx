@@ -38,14 +38,11 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
   const { insights, isAnalyzing, executeRecommendation } = useContextualAI(leadId);
   const { metrics } = usePerformanceAnalytics();
 
-  const getTemperatureColor = (temp: string) => {
-    switch (temp) {
-      case 'hot': return 'bg-red-100 text-red-800';
-      case 'warm': return 'bg-orange-100 text-orange-800';
-      case 'lukewarm': return 'bg-yellow-100 text-yellow-800';
-      case 'cold': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const getTemperatureColor = (temp: number) => {
+    if (temp >= 80) return 'bg-red-100 text-red-800';
+    if (temp >= 60) return 'bg-orange-100 text-orange-800';
+    if (temp >= 40) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-blue-100 text-blue-800';
   };
 
   const getUrgencyColor = (urgency: string) => {
@@ -113,7 +110,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <div className="text-center">
                       <Badge className={getTemperatureColor(insights.leadTemperature)}>
-                        {insights.leadTemperature.toUpperCase()}
+                        {insights.leadTemperature}°
                       </Badge>
                       <p className="text-xs text-gray-600 mt-1">Lead Temperature</p>
                     </div>
@@ -125,26 +122,36 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Intent & Sentiment */}
+                  {/* Conversation Stage */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Intent</span>
-                      <Badge variant="outline">{insights.intent}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Sentiment</span>
-                      <Badge variant="outline">{insights.sentiment}</Badge>
+                      <span className="text-sm font-medium">Stage</span>
+                      <Badge variant="outline">{insights.conversationStage}</Badge>
                     </div>
                   </div>
 
-                  {/* Key Insights */}
-                  {insights.keyInsights.length > 0 && (
+                  {/* Risk Factors */}
+                  {insights.riskFactors.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Key Insights</h4>
+                      <h4 className="text-sm font-medium mb-2">Risk Factors</h4>
                       <div className="space-y-1">
-                        {insights.keyInsights.slice(0, 3).map((insight, index) => (
-                          <div key={index} className="text-xs p-2 bg-blue-50 rounded border-l-2 border-blue-400">
-                            {insight}
+                        {insights.riskFactors.slice(0, 3).map((risk, index) => (
+                          <div key={index} className="text-xs p-2 bg-red-50 rounded border-l-2 border-red-400">
+                            {risk}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Opportunities */}
+                  {insights.opportunities.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Opportunities</h4>
+                      <div className="space-y-1">
+                        {insights.opportunities.slice(0, 3).map((opportunity, index) => (
+                          <div key={index} className="text-xs p-2 bg-green-50 rounded border-l-2 border-green-400">
+                            {opportunity}
                           </div>
                         ))}
                       </div>

@@ -14,24 +14,24 @@ import {
   ArrowRight,
   Zap
 } from 'lucide-react';
-import type { ContextualInsights, AIRecommendation } from '@/services/contextualAIAssistant';
+import { useContextualAI } from '@/hooks/useContextualAI';
 
 interface ContextualAssistancePanelProps {
-  insights: ContextualInsights | null;
-  onExecuteAction: (action: AIRecommendation) => void;
-  onScheduleFollowUp: () => void;
-  isLoading: boolean;
+  leadId: string | null;
+  conversation: any;
+  onSendMessage: (message: string, isTemplate?: boolean) => Promise<void>;
   className?: string;
 }
 
 const ContextualAssistancePanel: React.FC<ContextualAssistancePanelProps> = ({
-  insights,
-  onExecuteAction,
-  onScheduleFollowUp,
-  isLoading,
+  leadId,
+  conversation,
+  onSendMessage,
   className = ''
 }) => {
-  const getPriorityIcon = (priority: AIRecommendation['priority']) => {
+  const { insights, isAnalyzing, executeRecommendation } = useContextualAI(leadId);
+
+  const getPriorityIcon = (priority: string) => {
     switch (priority) {
       case 'critical': return <AlertTriangle className="h-4 w-4 text-red-600" />;
       case 'high': return <TrendingUp className="h-4 w-4 text-orange-600" />;
@@ -40,7 +40,7 @@ const ContextualAssistancePanel: React.FC<ContextualAssistancePanelProps> = ({
     }
   };
 
-  const getPriorityColor = (priority: AIRecommendation['priority']) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'critical': return 'bg-red-100 text-red-800 border-red-200';
       case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
@@ -49,7 +49,7 @@ const ContextualAssistancePanel: React.FC<ContextualAssistancePanelProps> = ({
     }
   };
 
-  const getTypeIcon = (type: AIRecommendation['type']) => {
+  const getTypeIcon = (type: string) => {
     switch (type) {
       case 'immediate': return <Zap className="h-3 w-3" />;
       case 'scheduled': return <Calendar className="h-3 w-3" />;
@@ -65,7 +65,12 @@ const ContextualAssistancePanel: React.FC<ContextualAssistancePanelProps> = ({
     return 'text-blue-600 bg-blue-50';
   };
 
-  if (isLoading) {
+  const handleScheduleFollowUp = () => {
+    // This would integrate with calendar scheduling
+    console.log('Schedule follow-up for lead:', leadId);
+  };
+
+  if (isAnalyzing) {
     return (
       <Card className={className}>
         <CardHeader>
@@ -169,7 +174,7 @@ const ContextualAssistancePanel: React.FC<ContextualAssistancePanelProps> = ({
                   <Button
                     size="sm"
                     variant={action.priority === 'critical' ? 'default' : 'outline'}
-                    onClick={() => onExecuteAction(action)}
+                    onClick={() => executeRecommendation(action)}
                     disabled={!action.automatable && action.type === 'immediate'}
                   >
                     {action.automatable ? 'Execute' : 'Review'}
@@ -206,7 +211,7 @@ const ContextualAssistancePanel: React.FC<ContextualAssistancePanelProps> = ({
               <Button
                 size="sm"
                 className="w-full"
-                onClick={onScheduleFollowUp}
+                onClick={handleScheduleFollowUp}
               >
                 <Calendar className="h-4 w-4 mr-1" />
                 Schedule Follow-up
