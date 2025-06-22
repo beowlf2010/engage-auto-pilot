@@ -131,6 +131,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     }, 1000);
   };
 
+  // Fixed complete useEffect for response time tracking
   useEffect(() => {
     if (messages.length > 0 && selectedLead) {
       const incomingMessages = messages.filter(m => m.direction === 'in');

@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ConversationListItem, MessageData } from '@/types/conversation';
-import { advancedBackgroundLoadingService } from './advancedBackgroundLoadingService';
+import { fixedBackgroundLoadingService } from './fixedBackgroundLoadingService';
 import { enhancedPredictiveService } from './enhancedPredictiveService';
 import { conversationRelationshipEngine } from './conversationRelationshipEngine';
 import { messageCacheService } from './messageCacheService';
@@ -136,12 +136,22 @@ class EnhancedConversationService {
       // Update enhanced predictive service search index
       enhancedPredictiveService.updateSearchIndex(filteredConversations);
 
-      // Generate enhanced predictions with ML
-      const predictions = await enhancedPredictiveService.predictConversationsToPreload(
-        filteredConversations, 
-        new Date(),
-        { searchQuery: filters.search }
-      );
+      // Generate enhanced predictions with ML - with safety checks
+      let predictions = [];
+      try {
+        predictions = await enhancedPredictiveService.predictConversationsToPreload(
+          filteredConversations, 
+          new Date(),
+          { searchQuery: filters.search }
+        );
+        
+        if (!Array.isArray(predictions)) {
+          predictions = [];
+        }
+      } catch (error) {
+        console.error('❌ [ENHANCED] Error generating predictions:', error);
+        predictions = [];
+      }
 
       console.log(`📊 [ENHANCED] Generated ${predictions.length} ML-powered predictions`);
 
@@ -162,10 +172,10 @@ class EnhancedConversationService {
   async getMessagesWithPrediction(leadId: string, context?: any): Promise<MessageData[]> {
     console.log('📱 [ENHANCED] Loading messages with search integration for lead:', leadId);
 
-    // Check if messages are preloaded by advanced background service
-    const preloaded = advancedBackgroundLoadingService.getPreloadedMessages(leadId);
+    // Check if messages are preloaded by fixed background service
+    const preloaded = fixedBackgroundLoadingService.getPreloadedMessages(leadId);
     if (preloaded) {
-      console.log('⚡ [ENHANCED] Using advanced preloaded messages for:', leadId);
+      console.log('⚡ [ENHANCED] Using fixed preloaded messages for:', leadId);
       this.updateSearchServices(preloaded);
       enhancedPredictiveService.trackConversationAccess(leadId, leadId, undefined, context);
       return preloaded;
@@ -198,9 +208,11 @@ class EnhancedConversationService {
 
       // Schedule immediate background loading for related conversations
       const related = conversationRelationshipEngine.getRelatedConversations(leadId, 2);
-      related.forEach(relatedId => {
-        advancedBackgroundLoadingService.scheduleImmediate(relatedId);
-      });
+      if (Array.isArray(related)) {
+        related.forEach(relatedId => {
+          fixedBackgroundLoadingService.scheduleImmediate(relatedId);
+        });
+      }
 
       console.log(`📦 [ENHANCED] Loaded ${messages.length} messages for lead ${leadId} in ${timeSpent}ms`);
       return messages;
@@ -252,7 +264,7 @@ class EnhancedConversationService {
       direction: filters.search ? 'both' : undefined,
       leadIds: filters.leadSources,
       minRelevanceScore: 0.3
-    }, limit * 3); // Get more message results to find conversation matches
+    }, limit * 3);
     
     // Extract unique lead IDs from message results
     const leadIds = [...new Set(messageResults.map(result => result.leadId))];
@@ -321,8 +333,8 @@ class EnhancedConversationService {
   getPredictionInsights() {
     return {
       enhanced: enhancedPredictiveService.getPredictionInsights(),
-      backgroundLoading: advancedBackgroundLoadingService.getPerformanceMetrics(),
-      queueStatus: advancedBackgroundLoadingService.getQueueStatus(),
+      backgroundLoading: fixedBackgroundLoadingService.getPerformanceMetrics(),
+      queueStatus: fixedBackgroundLoadingService.getQueueStatus(),
       relationships: conversationRelationshipEngine.getGlobalInsights(),
       search: this.getSearchAnalytics()
     };
@@ -330,20 +342,20 @@ class EnhancedConversationService {
 
   // Schedule urgent loading for immediate access
   scheduleUrgentLoading(leadId: string, reason = 'user requested') {
-    advancedBackgroundLoadingService.scheduleImmediate(leadId);
+    fixedBackgroundLoadingService.scheduleImmediate(leadId);
   }
 
   // Get performance metrics for monitoring
   getPerformanceMetrics() {
-    return advancedBackgroundLoadingService.getPerformanceMetrics();
+    return fixedBackgroundLoadingService.getPerformanceMetrics();
   }
 
   // Stop all background services
   stop() {
-    advancedBackgroundLoadingService.stop();
+    fixedBackgroundLoadingService.stop();
     messageSearchService.clearCache();
     messageCategorizationService.clearCache();
-    console.log('🛑 [ENHANCED] All advanced services stopped');
+    console.log('🛑 [ENHANCED] All enhanced services stopped');
   }
 }
 
