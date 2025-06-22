@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import { Card } from '@/components/ui/card';
@@ -19,6 +20,11 @@ interface VirtualConversationListProps {
   // Enhanced real-time props
   isConnected?: boolean;
   optimisticMessages?: Map<string, MessageData[]>;
+  // Enhanced predictive props
+  searchQuery?: string;
+  searchResults?: ConversationListItem[];
+  predictions?: any[];
+  onSearch?: (query: string) => void;
 }
 
 const ITEM_HEIGHT = 120;
@@ -33,7 +39,11 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
   markingAsRead,
   loading: externalLoading = false,
   isConnected = true,
-  optimisticMessages
+  optimisticMessages,
+  searchQuery = '',
+  searchResults = [],
+  predictions = [],
+  onSearch
 }) => {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -47,12 +57,15 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
   // Debounced search
   const debouncedSearch = useMemo(() => {
     const timer = setTimeout(() => {
+      if (onSearch) {
+        onSearch(searchTerm);
+      }
       setFilters(prev => ({ ...prev, search: searchTerm || undefined }));
       setCurrentPage(0);
       setConversations([]);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, onSearch]);
 
   const loadConversations = useCallback(async (page = 0, append = false) => {
     if (page === 0) setLoading(true);
@@ -122,12 +135,15 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
     loadConversations(0, false);
   }, [loadConversations]);
 
+  // Use search results when available, otherwise use regular conversations
+  const displayConversations = searchQuery && searchResults.length > 0 ? searchResults : conversations;
+
   // Virtual list item renderer
   const renderItem = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
-    const conversation = conversations[index];
+    const conversation = displayConversations[index];
     
-    // Load more when near the end
-    if (index === conversations.length - 5 && hasMore && !loadingMore) {
+    // Load more when near the end (only for regular conversations, not search results)
+    if (index === conversations.length - 5 && hasMore && !loadingMore && !searchQuery) {
       loadMore();
     }
 
@@ -151,11 +167,11 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
         />
       </div>
     );
-  }, [conversations, selectedLead, hasMore, loadingMore, loadMore, onSelectConversation, canReply, markAsRead, markingAsRead]);
+  }, [displayConversations, conversations, selectedLead, hasMore, loadingMore, searchQuery, loadMore, onSelectConversation, canReply, markAsRead, markingAsRead]);
 
-  const filteredCount = conversations.length;
-  const unreadCount = conversations.filter(c => c.unreadCount > 0).length;
-  const totalUnreadCount = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+  const filteredCount = displayConversations.length;
+  const unreadCount = displayConversations.filter(c => c.unreadCount > 0).length;
+  const totalUnreadCount = displayConversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
   return (
     <Card className="h-full flex flex-col">
@@ -168,6 +184,11 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
             {!isConnected && (
               <Badge variant="outline" className="text-xs text-orange-600">
                 Offline
+              </Badge>
+            )}
+            {predictions.length > 0 && (
+              <Badge variant="outline" className="text-xs text-blue-600">
+                {predictions.filter(p => p.shouldPreload).length} predicted
               </Badge>
             )}
             <Button onClick={handleRefresh} variant="outline" size="sm" disabled={loading}>
@@ -215,6 +236,13 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
             {filteredCount} of {totalCount} • {unreadCount} with unread
           </div>
         </div>
+
+        {/* Search results indicator */}
+        {searchQuery && (
+          <div className="text-sm text-blue-600">
+            {searchResults.length > 0 ? `Found ${searchResults.length} search results` : 'No search results'}
+          </div>
+        )}
       </div>
 
       {/* Virtual scrolling list */}
@@ -224,7 +252,7 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
             <Loader2 className="w-6 h-6 animate-spin mr-2" />
             <span>Loading conversations...</span>
           </div>
-        ) : conversations.length === 0 ? (
+        ) : displayConversations.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-gray-500">
             <div className="text-center">
               <p>No conversations found</p>
@@ -246,7 +274,7 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
           <List
             height={CONTAINER_HEIGHT}
             width={CONTAINER_WIDTH}
-            itemCount={conversations.length + (hasMore ? 1 : 0)}
+            itemCount={displayConversations.length + (hasMore && !searchQuery ? 1 : 0)}
             itemSize={ITEM_HEIGHT}
             overscanCount={5}
             className="conversation-list"

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { enhancedConversationService } from '@/services/enhancedConversationService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 
 interface UseEnhancedPredictiveInboxProps {

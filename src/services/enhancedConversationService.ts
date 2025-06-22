@@ -31,14 +31,14 @@ class EnhancedConversationService {
     console.log('🚀 [ENHANCED] Loading conversations with prediction, page:', page);
 
     try {
-      // Build the query
+      // Build the query with correct column names
       let query = supabase
         .from('leads')
         .select(`
           id,
           first_name,
           last_name,
-          lead_source,
+          source,
           vehicle_interest,
           status,
           salesperson_id,
@@ -60,7 +60,7 @@ class EnhancedConversationService {
       }
 
       if (filters.leadSources?.length) {
-        query = query.in('lead_source', filters.leadSources);
+        query = query.in('source', filters.leadSources);
       }
 
       if (filters.aiStages?.length) {
@@ -97,7 +97,7 @@ class EnhancedConversationService {
             ? `${lead.profiles.first_name} ${lead.profiles.last_name}`.trim()
             : undefined,
           aiOptIn: lead.ai_opt_in,
-          leadSource: lead.lead_source,
+          leadSource: lead.source,
           aiStage: lead.ai_stage,
           aiMessagesSent: lead.ai_messages_sent,
           aiSequencePaused: lead.ai_sequence_paused,
