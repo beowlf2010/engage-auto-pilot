@@ -1,4 +1,3 @@
-
 import { toast } from '@/hooks/use-toast';
 
 export interface ErrorContext {
@@ -93,9 +92,8 @@ class ErrorHandlingService {
   }
 
   private showUserFeedback(errorDetails: ErrorDetails): void {
-    const variant = (errorDetails.severity === 'critical' || errorDetails.severity === 'high') 
-      ? 'destructive' 
-      : 'default';
+    const isHighPriority = errorDetails.severity === 'critical' || errorDetails.severity === 'high';
+    const variant = isHighPriority ? 'destructive' : 'default';
 
     toast({
       title: this.getErrorTitle(errorDetails.severity),
