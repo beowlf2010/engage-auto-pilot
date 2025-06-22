@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { messageCacheService } from '@/services/messageCacheService';
 import { errorHandlingService } from '@/services/errorHandlingService';
+import { useMarkAsRead } from '@/hooks/inbox/useMarkAsRead';
 
 interface ConversationOperationsProps {
   onLeadsRefresh?: () => void;
@@ -324,6 +325,9 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
     loadConversations();
   }, [loadConversations]);
 
+  // Add markAsRead functionality
+  const { markAsRead, markingAsRead } = useMarkAsRead(manualRefresh);
+
   // Initialize conversations on mount
   useEffect(() => {
     console.log('🚀 [STABLE OPS] Initializing Smart Inbox conversations...');
@@ -340,6 +344,8 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
     loadMessages,
     sendMessage,
     manualRefresh,
-    setError
+    setError,
+    markAsRead,
+    markingAsRead
   };
 };

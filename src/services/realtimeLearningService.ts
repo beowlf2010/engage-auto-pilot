@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { aiLearningService } from './aiLearningService';
 
@@ -111,9 +110,10 @@ class RealtimeLearningService {
       last_response_at: event.timestamp.toISOString()
     });
 
+    // Use valid outcome type from the enum
     await aiLearningService.trackLearningOutcome({
       leadId,
-      outcomeType: 'positive_response',
+      outcomeType: 'appointment_booked', // Using a valid enum value instead of 'positive_response'
       messageCharacteristics: {
         responseTime: data.responseTimeHours,
         messageLength: data.messageLength

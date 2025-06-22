@@ -13,6 +13,7 @@ class AIEmergencyService {
   private static instance: AIEmergencyService;
   private settings: AIEmergencySettings | null = null;
   private listeners: Set<(disabled: boolean) => void> = new Set();
+  private tableExists: boolean = false;
 
   static getInstance(): AIEmergencyService {
     if (!AIEmergencyService.instance) {
@@ -22,37 +23,56 @@ class AIEmergencyService {
   }
 
   async initialize(): Promise<void> {
+    await this.checkTableExists();
     await this.loadSettings();
     this.startPeriodicCheck();
   }
 
+  private async checkTableExists(): Promise<void> {
+    try {
+      // Try a simple query to check if table exists
+      const { error } = await supabase
+        .from('ai_emergency_settings' as any)
+        .select('id')
+        .limit(1);
+
+      this.tableExists = !error;
+    } catch (error) {
+      console.warn('⚠️ AI emergency settings table not available, using localStorage only');
+      this.tableExists = false;
+    }
+  }
+
   private async loadSettings(): Promise<void> {
     try {
-      // Try to load from database first
-      const { data } = await supabase
-        .from('ai_emergency_settings')
-        .select('*')
-        .single();
+      if (this.tableExists) {
+        // Try to load from database first
+        const { data, error } = await supabase
+          .from('ai_emergency_settings' as any)
+          .select('*')
+          .single();
 
-      if (data) {
-        this.settings = {
-          aiDisabled: data.ai_disabled,
-          disabledAt: data.disabled_at,
-          disabledBy: data.disabled_by,
-          disableReason: data.disable_reason,
-          lastChecked: new Date().toISOString()
-        };
-      } else {
-        // Fallback to localStorage
-        const stored = localStorage.getItem('ai_emergency_settings');
-        if (stored) {
-          this.settings = JSON.parse(stored);
-        } else {
+        if (data && !error) {
           this.settings = {
-            aiDisabled: false,
+            aiDisabled: data.ai_disabled,
+            disabledAt: data.disabled_at,
+            disabledBy: data.disabled_by,
+            disableReason: data.disable_reason,
             lastChecked: new Date().toISOString()
           };
+          return;
         }
+      }
+
+      // Fallback to localStorage
+      const stored = localStorage.getItem('ai_emergency_settings');
+      if (stored) {
+        this.settings = JSON.parse(stored);
+      } else {
+        this.settings = {
+          aiDisabled: false,
+          lastChecked: new Date().toISOString()
+        };
       }
     } catch (error) {
       console.warn('⚠️ Could not load AI emergency settings, using defaults:', error);
@@ -67,18 +87,20 @@ class AIEmergencyService {
     if (!this.settings) return;
 
     try {
-      // Save to database
-      await supabase
-        .from('ai_emergency_settings')
-        .upsert({
-          ai_disabled: this.settings.aiDisabled,
-          disabled_at: this.settings.disabledAt,
-          disabled_by: this.settings.disabledBy,
-          disable_reason: this.settings.disableReason,
-          updated_at: new Date().toISOString()
-        });
+      if (this.tableExists) {
+        // Save to database
+        await supabase
+          .from('ai_emergency_settings' as any)
+          .upsert({
+            ai_disabled: this.settings.aiDisabled,
+            disabled_at: this.settings.disabledAt,
+            disabled_by: this.settings.disabledBy,
+            disable_reason: this.settings.disableReason,
+            updated_at: new Date().toISOString()
+          });
+      }
 
-      // Also save to localStorage as backup
+      // Always save to localStorage as backup
       localStorage.setItem('ai_emergency_settings', JSON.stringify(this.settings));
     } catch (error) {
       console.error('❌ Error saving AI emergency settings:', error);

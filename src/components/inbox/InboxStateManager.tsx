@@ -1,22 +1,35 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-interface InboxState {
+export interface InboxState {
   selectedLead: string | null;
   showMemory: boolean;
   showTemplates: boolean;
   isInitialized: boolean;
+  selectedConversation: any | null;
 }
 
+interface InboxStateContextType extends InboxState {
+  setSelectedLead: (leadId: string) => void;
+  setShowMemory: (show: boolean) => void;
+  setShowTemplates: (show: boolean) => void;
+  setIsInitialized: (initialized: boolean) => void;
+  handleToggleMemory: () => void;
+  handleToggleTemplates: () => void;
+}
+
+const InboxStateContext = createContext<InboxStateContextType | undefined>(undefined);
+
+export const useInboxState = () => {
+  const context = useContext(InboxStateContext);
+  if (context === undefined) {
+    throw new Error('useInboxState must be used within an InboxStateProvider');
+  }
+  return context;
+};
+
 interface InboxStateManagerProps {
-  children: (state: InboxState & {
-    setSelectedLead: (leadId: string | null) => void;
-    setShowMemory: (show: boolean) => void;
-    setShowTemplates: (show: boolean) => void;
-    setIsInitialized: (initialized: boolean) => void;
-    handleToggleMemory: () => void;
-    handleToggleTemplates: () => void;
-  }) => React.ReactNode;
+  children: (state: InboxStateContextType) => ReactNode;
 }
 
 const InboxStateManager: React.FC<InboxStateManagerProps> = ({ children }) => {
@@ -24,30 +37,44 @@ const InboxStateManager: React.FC<InboxStateManagerProps> = ({ children }) => {
   const [showMemory, setShowMemory] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
 
-  const handleToggleMemory = useCallback(() => {
-    setShowMemory(prev => !prev);
-  }, []);
+  const handleToggleMemory = () => {
+    setShowMemory(!showMemory);
+  };
 
-  const handleToggleTemplates = useCallback(() => {
-    setShowTemplates(prev => !prev);
-  }, []);
+  const handleToggleTemplates = () => {
+    setShowTemplates(!showTemplates);
+  };
+
+  // Update selected conversation when lead changes
+  const handleSetSelectedLead = (leadId: string) => {
+    setSelectedLead(leadId);
+    // Mock conversation object for compatibility
+    setSelectedConversation({
+      leadId,
+      leadName: 'Loading...'
+    });
+  };
+
+  const contextValue: InboxStateContextType = {
+    selectedLead,
+    showMemory,
+    showTemplates,
+    isInitialized,
+    selectedConversation,
+    setSelectedLead: handleSetSelectedLead,
+    setShowMemory,
+    setShowTemplates,
+    setIsInitialized,
+    handleToggleMemory,
+    handleToggleTemplates
+  };
 
   return (
-    <>
-      {children({
-        selectedLead,
-        showMemory,
-        showTemplates,
-        isInitialized,
-        setSelectedLead,
-        setShowMemory,
-        setShowTemplates,
-        setIsInitialized,
-        handleToggleMemory,
-        handleToggleTemplates
-      })}
-    </>
+    <InboxStateContext.Provider value={contextValue}>
+      {children(contextValue)}
+    </InboxStateContext.Provider>
   );
 };
 

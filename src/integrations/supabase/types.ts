@@ -148,6 +148,36 @@ export type Database = {
           },
         ]
       }
+      ai_emergency_settings: {
+        Row: {
+          ai_disabled: boolean
+          created_at: string
+          disable_reason: string | null
+          disabled_at: string | null
+          disabled_by: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_disabled?: boolean
+          created_at?: string
+          disable_reason?: string | null
+          disabled_at?: string | null
+          disabled_by?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_disabled?: boolean
+          created_at?: string
+          disable_reason?: string | null
+          disabled_at?: string | null
+          disabled_by?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_learning_insights: {
         Row: {
           actionable: boolean
