@@ -4,7 +4,6 @@ import { useStableConversationOperations } from "@/hooks/useStableConversationOp
 import { useUnifiedAIScheduler } from "@/hooks/useUnifiedAIScheduler";
 import { useLeads } from "@/hooks/useLeads";
 import { useEnhancedMessageWrapper } from "./inbox/EnhancedMessageWrapper";
-import { useSmartInventoryDetection } from "@/hooks/useSmartInventoryDetection";
 import InboxStateManager from "./inbox/InboxStateManager";
 import InboxStatusDisplay from "./inbox/InboxStatusDisplay";
 import SmartInboxMain from "./inbox/SmartInboxMain";
@@ -26,9 +25,6 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
   // Get leads refresh function
   const { forceRefresh: refreshLeads } = useLeads();
 
-  // Smart inventory detection for enhanced responses
-  const { detectInventoryInMessage, shouldSuggestInventoryResponse } = useSmartInventoryDetection();
-
   // Use the stable conversation operations with leads refresh callback
   const { 
     conversations, 
@@ -44,39 +40,10 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     onLeadsRefresh: refreshLeads
   });
 
-  // Enhanced send message function with inventory awareness
+  // Enhanced send message function
   const { sendEnhancedMessageWrapper } = useEnhancedMessageWrapper({
     onMessageSent: async () => {
       console.log('Enhanced message sent callback triggered');
-      
-      // Trigger inventory detection for the current conversation
-      if (messages.length > 0) {
-        const latestMessage = messages[messages.length - 1];
-        if (latestMessage && latestMessage.leadId) {
-          const conversationHistory = messages
-            .map(msg => `${msg.direction === 'in' ? 'Customer' : 'Sales'}: ${msg.body}`)
-            .join('\n');
-
-          // Check if this might be an inventory-related conversation
-          if (shouldSuggestInventoryResponse(conversationHistory, latestMessage.body)) {
-            console.log('🔍 Potential inventory inquiry detected, analyzing...');
-            
-            try {
-              const detection = await detectInventoryInMessage(
-                latestMessage.leadId,
-                conversationHistory,
-                latestMessage.body
-              );
-              
-              if (detection?.hasInventoryMatch) {
-                console.log('✅ Inventory match found for customer inquiry');
-              }
-            } catch (error) {
-              console.error('❌ Error in inventory detection:', error);
-            }
-          }
-        }
-      }
     },
     onLeadsRefresh: refreshLeads
   });

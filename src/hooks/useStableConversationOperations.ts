@@ -11,7 +11,7 @@ interface ConversationOperationsProps {
 export const useStableConversationOperations = ({ onLeadsRefresh }: ConversationOperationsProps = {}) => {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -142,8 +142,10 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       });
 
       setConversations(sortedConversations);
+      console.log('✅ Conversations loaded successfully:', sortedConversations.length);
 
     } catch (err) {
+      console.error('❌ Error loading conversations:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -160,6 +162,8 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
     setError(null);
 
     try {
+      console.log('📬 Loading messages for lead:', leadId);
+      
       const { data: leadData } = await supabase
         .from('leads')
         .select('first_name, last_name, vehicle_interest, source')
@@ -193,7 +197,9 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       }));
 
       setMessages(messagesWithContext);
+      console.log('✅ Messages loaded successfully:', messagesWithContext.length);
     } catch (err) {
+      console.error('❌ Error loading messages:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -209,6 +215,8 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
     setError(null);
 
     try {
+      console.log('📤 Sending message to lead:', leadId);
+      
       const { error } = await supabase.from('conversations').insert({
         lead_id: leadId,
         direction: 'out',
@@ -225,7 +233,10 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       if (onLeadsRefresh) {
         onLeadsRefresh();
       }
+      
+      console.log('✅ Message sent successfully');
     } catch (err) {
+      console.error('❌ Error sending message:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -237,11 +248,15 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
   }, [loadMessages, onLeadsRefresh]);
 
   const manualRefresh = useCallback(() => {
+    console.log('🔄 Manual refresh triggered');
     loadConversations();
-    if (messages.length > 0) {
-      loadMessages(messages[0].leadId);
-    }
-  }, [loadConversations, loadMessages, messages]);
+  }, [loadConversations]);
+
+  // Initialize conversations on mount
+  useEffect(() => {
+    console.log('🚀 Initializing Smart Inbox conversations...');
+    loadConversations();
+  }, [loadConversations]);
 
   return {
     conversations,

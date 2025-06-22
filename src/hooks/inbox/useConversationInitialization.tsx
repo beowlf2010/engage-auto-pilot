@@ -1,6 +1,6 @@
 
 import { useEffect } from 'react';
-import type { ConversationListItem } from '@/hooks/conversation/conversationTypes';
+import type { ConversationListItem } from '@/types/conversation';
 
 interface UseConversationInitializationProps {
   loading: boolean;
@@ -21,32 +21,37 @@ export const useConversationInitialization = ({
   onSelectConversation,
   setIsInitialized
 }: UseConversationInitializationProps) => {
-  // Handle pre-selection from URL parameter - only run once after conversations load
+  // Handle initialization only once when conversations are loaded
   useEffect(() => {
-    if (loading || isInitialized || filteredConversations.length === 0) return;
+    // Don't initialize if already done, still loading, or no conversations
+    if (isInitialized || loading || filteredConversations.length === 0) {
+      return;
+    }
 
-    console.log('🔗 [SMART INBOX] URL leadId:', leadIdFromUrl);
-    console.log('📊 [SMART INBOX] Available conversations:', filteredConversations.length);
+    console.log('🔗 [INBOX INIT] Starting conversation initialization');
+    console.log('🔗 [INBOX INIT] URL leadId:', leadIdFromUrl);
+    console.log('📊 [INBOX INIT] Available conversations:', filteredConversations.length);
 
+    // If we have a lead ID from URL, try to select it
     if (leadIdFromUrl) {
       const conversation = filteredConversations.find(conv => conv.leadId === leadIdFromUrl);
       if (conversation) {
-        console.log('✅ [SMART INBOX] Found conversation for URL leadId, selecting...');
+        console.log('✅ [INBOX INIT] Found conversation for URL leadId, selecting...');
         onSelectConversation(leadIdFromUrl);
         setIsInitialized(true);
         return;
       } else {
-        console.log('❌ [SMART INBOX] Lead from URL not found in conversations');
+        console.log('❌ [INBOX INIT] Lead from URL not found in conversations');
       }
     }
 
-    // Default selection if no URL parameter or conversation not found
-    if (filteredConversations.length > 0 && !selectedLead) {
+    // Default to first conversation if no selected lead or URL lead not found
+    if (!selectedLead && filteredConversations.length > 0) {
       const firstConv = filteredConversations[0];
-      console.log('📌 [SMART INBOX] Selecting first conversation:', firstConv.leadId);
+      console.log('📌 [INBOX INIT] Selecting first conversation:', firstConv.leadId);
       onSelectConversation(firstConv.leadId);
     }
     
     setIsInitialized(true);
-  }, [loading, isInitialized, filteredConversations, selectedLead, leadIdFromUrl, onSelectConversation, setIsInitialized]);
+  }, [loading, isInitialized, filteredConversations.length, selectedLead, leadIdFromUrl]);
 };
