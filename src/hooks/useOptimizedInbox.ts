@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { enhancedPredictiveService } from '@/services/enhancedPredictiveService';
@@ -44,7 +43,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       
       console.log('🔄 [OPTIMIZED INBOX] Loading conversations with optimized service...');
       
-      // Load conversations from Supabase directly since we're replacing the optimized service
+      // Load conversations from Supabase directly - removed priority column
       const { data, error } = await supabase
         .from('leads')
         .select(`
@@ -58,7 +57,6 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           vehicle_interest,
           created_at,
           salesperson_id,
-          priority,
           conversations (
             id,
             body,

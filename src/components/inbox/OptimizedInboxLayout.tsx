@@ -57,13 +57,12 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
         />
       </div>
 
-      {/* Chat View */}
+      {/* Chat View - Remove sendingMessage prop that doesn't exist */}
       <div className="flex-1 flex flex-col">
         <EnhancedChatView
           messages={messages}
           selectedConversation={selectedConversation}
           showTemplates={showTemplates}
-          sendingMessage={sendingMessage}
           onSendMessage={onSendMessage}
           onToggleTemplates={onToggleTemplates}
           canReply={canReply}
@@ -71,17 +70,19 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
         />
       </div>
 
-      {/* Lead Context Panel */}
+      {/* Lead Context Panel - Use conversation prop structure */}
       {selectedConversation && (
         <div className="w-80 border-l border-gray-200">
           <LeadContextPanel
-            leadId={selectedConversation.leadId}
-            leadName={selectedConversation.leadName}
-            leadPhone={selectedConversation.primaryPhone}
-            vehicleInterest={selectedConversation.vehicleInterest}
-            status={selectedConversation.status}
-            lastMessageTime={selectedConversation.lastMessageTime}
-            salespersonId={selectedConversation.salespersonId}
+            conversation={{
+              leadId: selectedConversation.leadId,
+              leadName: selectedConversation.leadName,
+              leadPhone: selectedConversation.primaryPhone,
+              vehicleInterest: selectedConversation.vehicleInterest,
+              status: selectedConversation.status,
+              lastMessageTime: selectedConversation.lastMessageTime,
+              salespersonId: selectedConversation.salespersonId
+            }}
           />
         </div>
       )}
