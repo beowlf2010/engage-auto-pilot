@@ -7,6 +7,7 @@ import ChatAIPanelsContainer from './ChatAIPanelsContainer';
 import LeadContextPanel from './LeadContextPanel';
 import AppointmentScheduler from '../appointments/AppointmentScheduler';
 import AppointmentInterestBanner from './AppointmentInterestBanner';
+import EnhancedMessageBubble from './EnhancedMessageBubble';
 import { MessageListSkeleton } from '@/components/ui/skeletons/MessageSkeleton';
 import { useChatState } from './hooks/useChatState';
 import { useChatHandlers } from './hooks/useChatHandlers';
@@ -26,6 +27,10 @@ interface EnhancedChatViewProps {
   };
   isLoading?: boolean;
   messagesLoading?: boolean;
+  // Enhanced real-time props
+  connectionState?: any;
+  onRetryMessage?: (messageId: string) => void;
+  isConnected?: boolean;
 }
 
 const EnhancedChatView = ({ 
@@ -36,7 +41,10 @@ const EnhancedChatView = ({
   onToggleTemplates,
   user,
   isLoading = false,
-  messagesLoading = false
+  messagesLoading = false,
+  connectionState,
+  onRetryMessage,
+  isConnected = true
 }: EnhancedChatViewProps) => {
   const [showAppointmentScheduler, setShowAppointmentScheduler] = useState(false);
   const [appointmentIntent, setAppointmentIntent] = useState<AppointmentIntent | null>(null);
@@ -221,22 +229,18 @@ const EnhancedChatView = ({
                 <MessageListSkeleton />
               ) : (
                 <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          message.direction === 'out'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 text-gray-800'
-                        }`}
-                      >
-                        {message.body}
-                      </div>
-                    </div>
-                  ))}
+                  {messages.map((message) => {
+                    const isOptimistic = message.id?.startsWith('optimistic-');
+                    
+                    return (
+                      <EnhancedMessageBubble
+                        key={message.id}
+                        message={message}
+                        isOptimistic={isOptimistic}
+                        onRetry={onRetryMessage}
+                      />
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
               )}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import { Card } from '@/components/ui/card';
@@ -7,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Search, Loader2, RefreshCw } from 'lucide-react';
 import { optimizedConversationService, ConversationFilters } from '@/services/optimizedConversationService';
-import { ConversationListItem } from '@/types/conversation';
+import { ConversationListItem, MessageData } from '@/types/conversation';
 import ConversationItem from './ConversationItem';
 
 interface VirtualConversationListProps {
@@ -17,6 +16,9 @@ interface VirtualConversationListProps {
   markAsRead: (leadId: string) => Promise<void>;
   markingAsRead: string | null;
   loading?: boolean;
+  // Enhanced real-time props
+  isConnected?: boolean;
+  optimisticMessages?: Map<string, MessageData[]>;
 }
 
 const ITEM_HEIGHT = 120;
@@ -29,7 +31,9 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
   canReply,
   markAsRead,
   markingAsRead,
-  loading: externalLoading = false
+  loading: externalLoading = false,
+  isConnected = true,
+  optimisticMessages
 }) => {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -159,10 +163,18 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
       <div className="p-4 border-b space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Conversations</h3>
-          <Button onClick={handleRefresh} variant="outline" size="sm" disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Connection indicator */}
+            {!isConnected && (
+              <Badge variant="outline" className="text-xs text-orange-600">
+                Offline
+              </Badge>
+            )}
+            <Button onClick={handleRefresh} variant="outline" size="sm" disabled={loading}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* Search */}
