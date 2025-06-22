@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import EnhancedConversationHeader from './EnhancedConversationHeader';
 import EnhancedConversationListItem from './EnhancedConversationListItem';
-import EnhancedChatView from './EnhancedChatView';
+import EnhancedChatViewWithAI from './EnhancedChatViewWithAI';
 import ConversationMemory from '../ConversationMemory';
 import MessageThreadView from '../search/MessageThreadView';
 import { useAdvancedMessageSearch } from '@/hooks/useAdvancedMessageSearch';
@@ -257,7 +257,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
         </div>
       </div>
 
-      {/* Main chat area */}
+      {/* Main chat area with AI integration */}
       <div className="flex-1 flex">
         {showThreadView && selectedThread ? (
           <MessageThreadView
@@ -273,7 +273,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
             }}
           />
         ) : (
-          <EnhancedChatView
+          <EnhancedChatViewWithAI
             selectedConversation={selectedConversation}
             messages={messages}
             onSendMessage={onSendMessage}

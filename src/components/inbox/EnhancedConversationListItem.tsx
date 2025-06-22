@@ -1,29 +1,19 @@
-
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { 
-  AlertCircle, 
-  Bot, 
-  Clock, 
-  MessageSquare, 
-  Star,
-  Eye,
-  EyeOff,
-  ArrowDown,
-  ArrowUp,
-  Loader2
-} from 'lucide-react';
-import type { ConversationListItem } from '@/types/conversation';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, MessageSquare, User } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import AIInsightIndicator from './AIInsightIndicator';
 
 interface EnhancedConversationListItemProps {
-  conversation: ConversationListItem;
+  conversation: any;
   isSelected: boolean;
   onSelect: (leadId: string) => void;
   canReply: boolean;
   markAsRead: (leadId: string) => Promise<void>;
-  isMarkingAsRead: boolean;
+  isMarkingAsRead: string | null;
   predictions?: any[];
-  viewMode: 'list' | 'grid' | 'thread';
+  viewMode?: 'list' | 'grid';
 }
 
 const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> = ({
@@ -34,174 +24,129 @@ const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> 
   markAsRead,
   isMarkingAsRead,
   predictions = [],
-  viewMode
+  viewMode = 'list'
 }) => {
-  const prediction = predictions.find(p => p.leadId === conversation.leadId);
-  const isUrgent = conversation.status === 'urgent' || conversation.aiStage === 'urgent';
-  const hasUnread = conversation.unreadCount > 0;
-  
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const getInitials = (name: string) => {
+    const nameParts = name.split(' ');
+    const initials = nameParts.map((part) => part.charAt(0).toUpperCase()).join('');
+    return initials.substring(0, 2);
+  };
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}d`;
-    return date.toLocaleDateString();
+  const formatTime = (timestamp: string) => {
+    return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+  };
+
+  const handleClick = () => {
+    onSelect(conversation.leadId);
+  };
+
+  const isFollowUpDue = () => {
+    // Implement logic to check if follow-up is due based on conversation data
+    return false;
   };
 
   const handleMarkAsRead = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (hasUnread && !isMarkingAsRead) {
-      await markAsRead(conversation.leadId);
-    }
-  };
-
-  const getGridLayoutClass = () => {
-    if (viewMode === 'grid') {
-      return 'p-4 rounded-lg';
-    }
-    return 'p-3 border-b border-gray-100';
-  };
-
-  const getSelectionClass = () => {
-    if (isSelected) {
-      return 'bg-blue-50 border-l-4 border-l-blue-500';
-    }
-    if (hasUnread) {
-      return 'bg-blue-25 hover:bg-blue-50';
-    }
-    return 'hover:bg-gray-50';
+    await markAsRead(conversation.leadId);
   };
 
   return (
     <div
-      onClick={() => onSelect(conversation.leadId)}
-      className={`
-        cursor-pointer transition-all duration-200 relative
-        ${getGridLayoutClass()}
-        ${getSelectionClass()}
-        ${isUrgent ? 'border-l-2 border-l-red-400' : ''}
-      `}
+      className={`cursor-pointer transition-all duration-200 ${
+        isSelected 
+          ? 'bg-blue-50 border-r-2 border-blue-500' 
+          : 'hover:bg-gray-50'
+      } ${viewMode === 'grid' ? 'p-4 border rounded-lg' : 'p-4 border-b'}`}
+      onClick={handleClick}
     >
-      {/* Prediction indicator */}
-      {prediction?.shouldPreload && (
-        <div className="absolute top-2 right-2">
-          <div className={`w-2 h-2 rounded-full ${
-            prediction.confidenceLevel > 0.8 ? 'bg-green-400' : 
-            prediction.confidenceLevel > 0.6 ? 'bg-yellow-400' : 'bg-blue-400'
-          }`} title={`AI Prediction: ${(prediction.confidenceLevel * 100).toFixed(0)}% confidence`} />
+      <div className="flex items-start space-x-3">
+        <div className="flex-shrink-0">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+            {getInitials(conversation.name)}
+          </div>
         </div>
-      )}
 
-      <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          {/* Header with name and time */}
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <h3 className={`font-medium truncate ${hasUnread ? 'font-semibold' : ''}`}>
-                {conversation.leadName || 'Unknown Lead'}
-              </h3>
+            <h3 className="text-sm font-semibold text-gray-900 truncate">
+              {conversation.name}
+            </h3>
+            <div className="flex items-center space-x-2">
+              {/* AI Insights Indicator */}
+              <AIInsightIndicator
+                leadTemperature={conversation.aiStage}
+                urgencyLevel={conversation.priority}
+                hasRecommendations={conversation.aiOptIn}
+                followUpDue={isFollowUpDue()}
+              />
               
-              {/* Status badges */}
-              <div className="flex items-center gap-1">
-                {isUrgent && (
-                  <AlertCircle className="h-3 w-3 text-red-500" />
-                )}
-                {conversation.aiOptIn && (
-                  <Bot className="h-3 w-3 text-purple-500" />
-                )}
-                {hasUnread && (
-                  <Badge variant="secondary" className="text-xs px-1">
-                    {conversation.unreadCount}
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              {formatTime(conversation.lastMessageTime)}
-              
-              {/* Message direction indicator */}
-              {conversation.lastMessageDirection === 'in' ? (
-                <ArrowDown className="h-3 w-3 text-green-500" />
-              ) : conversation.lastMessageDirection === 'out' ? (
-                <ArrowUp className="h-3 w-3 text-blue-500" />
-              ) : null}
+              <span className="text-xs text-gray-500">
+                {formatTime(conversation.lastMessageTime)}
+              </span>
             </div>
           </div>
 
-          {/* Last message preview */}
-          <p className={`text-sm text-gray-600 truncate mb-2 ${hasUnread ? 'font-medium' : ''}`}>
-            {conversation.lastMessage || 'No messages yet'}
+          <p className="text-sm text-gray-500 truncate">
+            {conversation.vehicleInterest && (
+              <span className="mr-2">
+                🚗 {conversation.vehicleInterest}
+              </span>
+            )}
+            {conversation.lastMessage}
           </p>
 
-          {/* Metadata row */}
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1">
-                <MessageSquare className="h-3 w-3" />
-                {conversation.messageCount}
-              </span>
-              
-              {conversation.vehicleInterest && (
-                <span className="truncate max-w-20" title={conversation.vehicleInterest}>
-                  🚗 {conversation.vehicleInterest}
-                </span>
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center space-x-2">
+              {conversation.unreadCount > 0 && (
+                <Badge variant="secondary">
+                  {conversation.unreadCount}
+                </Badge>
+              )}
+              {isMarkingAsRead === conversation.leadId ? (
+                <div className="text-blue-500 animate-pulse">
+                  Marking as read...
+                </div>
+              ) : conversation.unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleMarkAsRead}
+                  className="h-6 w-6 p-0"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </Button>
               )}
               
-              {conversation.salespersonName && canReply && (
-                <span className="truncate max-w-20" title={conversation.salespersonName}>
-                  👤 {conversation.salespersonName}
-                </span>
+              {/* AI Status Indicator */}
+              {conversation.aiOptIn && (
+                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                  AI Active
+                </Badge>
               )}
             </div>
 
-            {/* Read/Unread toggle */}
-            {hasUnread && (
-              <button
-                onClick={handleMarkAsRead}
-                disabled={isMarkingAsRead}
-                className="flex items-center gap-1 hover:text-blue-600 transition-colors"
-                title="Mark as read"
+            {canReply ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClick}
+                className="h-6 w-6 p-0"
               >
-                {isMarkingAsRead ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <EyeOff className="h-3 w-3" />
-                )}
-              </button>
+                <MessageSquare className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled
+                className="h-6 w-6 p-0"
+              >
+                <MessageSquare className="h-4 w-4 text-gray-400" />
+              </Button>
             )}
           </div>
-
-          {/* AI Stage indicator */}
-          {conversation.aiStage && (
-            <div className="mt-2">
-              <Badge 
-                variant="outline" 
-                className="text-xs"
-              >
-                AI: {conversation.aiStage}
-              </Badge>
-            </div>
-          )}
         </div>
       </div>
-
-      {/* Grid view additional info */}
-      {viewMode === 'grid' && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>Lead Source: {conversation.leadSource || 'Unknown'}</span>
-            <span>Messages: {conversation.incomingCount || 0} in / {conversation.outgoingCount || 0} out</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
