@@ -30,6 +30,13 @@ interface OptimizedInboxLayoutProps {
   optimisticMessages?: Map<string, MessageData[]>;
   onRetryMessage?: (messageId: string) => void;
   isConnected?: boolean;
+  
+  // Enhanced predictive props
+  searchQuery?: string;
+  searchResults?: ConversationListItem[];
+  predictions?: any[];
+  onSearch?: (query: string) => void;
+  messagesLoading?: boolean;
 }
 
 const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
@@ -50,7 +57,12 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
   connectionState,
   optimisticMessages,
   onRetryMessage,
-  isConnected = true
+  isConnected = true,
+  searchQuery,
+  searchResults,
+  predictions,
+  onSearch,
+  messagesLoading = false
 }) => {
   return (
     <div className="h-[calc(100vh-8rem)] flex space-x-4">
@@ -63,9 +75,14 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           markAsRead={markAsRead}
           markingAsRead={markingAsRead}
           loading={loading}
-          // Pass connection state for real-time indicators
+          // Enhanced real-time props
           isConnected={isConnected}
           optimisticMessages={optimisticMessages}
+          // Enhanced predictive props
+          searchQuery={searchQuery}
+          searchResults={searchResults}
+          predictions={predictions}
+          onSearch={onSearch}
         />
       </div>
 
@@ -79,6 +96,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           onToggleTemplates={onToggleTemplates}
           user={user}
           isLoading={sendingMessage}
+          messagesLoading={messagesLoading}
           // Enhanced real-time props
           connectionState={connectionState}
           onRetryMessage={onRetryMessage}

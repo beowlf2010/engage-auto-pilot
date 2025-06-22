@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { useEnhancedRealtimeInbox } from "@/hooks/useEnhancedRealtimeInbox";
+import { useEnhancedPredictiveInbox } from "@/hooks/useEnhancedPredictiveInbox";
 import { useUnifiedAIScheduler } from "@/hooks/useUnifiedAIScheduler";
 import { useLeads } from "@/hooks/useLeads";
 import { useEnhancedMessageWrapper } from "./inbox/EnhancedMessageWrapper";
@@ -10,6 +10,7 @@ import InboxStatusDisplay from "./inbox/InboxStatusDisplay";
 import OptimizedInboxLayout from "./inbox/OptimizedInboxLayout";
 import ConnectionStatusIndicator from "./inbox/ConnectionStatusIndicator";
 import MessageDebugPanel from "./debug/MessageDebugPanel";
+import PredictiveInsightsPanel from "./inbox/PredictiveInsightsPanel";
 
 interface OptimizedSmartInboxProps {
   user: {
@@ -20,6 +21,7 @@ interface OptimizedSmartInboxProps {
 
 const OptimizedSmartInbox = ({ user }: OptimizedSmartInboxProps) => {
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
+  const [predictiveInsightsOpen, setPredictiveInsightsOpen] = useState(false);
   
   // Use the unified AI scheduler
   useUnifiedAIScheduler();
@@ -27,25 +29,27 @@ const OptimizedSmartInbox = ({ user }: OptimizedSmartInboxProps) => {
   // Get leads refresh function
   const { forceRefresh: refreshLeads } = useLeads();
 
-  // Use the enhanced real-time inbox hook
+  // Use the enhanced predictive inbox hook
   const { 
     conversations, 
     messages, 
     loading, 
+    messagesLoading,
     error,
     sendingMessage,
     totalConversations,
-    connectionState,
-    optimisticMessages,
+    predictions,
+    searchQuery,
+    searchResults,
     loadMessages, 
     sendMessage, 
     manualRefresh,
-    retryMessage,
-    reconnect,
-    isConnected,
+    searchConversations,
+    getPredictionInsights,
     setError
-  } = useEnhancedRealtimeInbox({
-    onLeadsRefresh: refreshLeads
+  } = useEnhancedPredictiveInbox({
+    onLeadsRefresh: refreshLeads,
+    enablePredictiveLoading: true
   });
 
   // Mark as read functionality
@@ -68,8 +72,7 @@ const OptimizedSmartInbox = ({ user }: OptimizedSmartInboxProps) => {
     loading,
     conversationsCount: filteredConversations.length,
     totalConversations,
-    isConnected,
-    optimisticCount: Array.from(optimisticMessages.values()).flat().length,
+    predictionsCount: predictions.length,
     hasError: !!error
   });
 
@@ -102,19 +105,22 @@ const OptimizedSmartInbox = ({ user }: OptimizedSmartInboxProps) => {
           messages={messages}
           sendingMessage={sendingMessage}
           loading={loading}
+          messagesLoading={messagesLoading}
           totalConversations={totalConversations}
-          connectionState={connectionState}
-          optimisticMessages={optimisticMessages}
+          predictions={predictions}
+          searchQuery={searchQuery}
+          searchResults={searchResults}
           loadMessages={loadMessages}
           sendMessage={sendMessage}
-          retryMessage={retryMessage}
-          reconnect={reconnect}
-          isConnected={isConnected}
           setError={setError}
           debugPanelOpen={debugPanelOpen}
           setDebugPanelOpen={setDebugPanelOpen}
+          predictiveInsightsOpen={predictiveInsightsOpen}
+          setPredictiveInsightsOpen={setPredictiveInsightsOpen}
           markAsRead={markAsRead}
           markingAsRead={markingAsRead}
+          searchConversations={searchConversations}
+          getPredictionInsights={getPredictionInsights}
           getLeadIdFromUrl={() => {
             const searchParams = new URLSearchParams(window.location.search);
             return searchParams.get('leadId');
@@ -132,14 +138,13 @@ const OptimizedInboxMain = ({
   messages,
   sendingMessage,
   loading,
+  messagesLoading,
   totalConversations,
-  connectionState,
-  optimisticMessages,
+  predictions,
+  searchQuery,
+  searchResults,
   loadMessages,
   sendMessage,
-  retryMessage,
-  reconnect,
-  isConnected,
   setError,
   selectedLead,
   showMemory,
@@ -152,8 +157,12 @@ const OptimizedInboxMain = ({
   getLeadIdFromUrl,
   debugPanelOpen,
   setDebugPanelOpen,
+  predictiveInsightsOpen,
+  setPredictiveInsightsOpen,
   markAsRead,
-  markingAsRead
+  markingAsRead,
+  searchConversations,
+  getPredictionInsights
 }) => {
   const selectedConversation = conversations.find(conv => conv.leadId === selectedLead);
 
@@ -183,39 +192,37 @@ const OptimizedInboxMain = ({
     }
   };
 
-  const handleRetryMessage = async (messageId: string) => {
-    if (!selectedLead) return;
-    
-    try {
-      await retryMessage(selectedLead, messageId);
-    } catch (error) {
-      console.error('❌ [OPTIMIZED INBOX] Retry message error:', error);
-    }
-  };
-
-  const optimisticCount = Array.from(optimisticMessages.values()).flat().length;
+  const topPredictions = predictions.slice(0, 3);
+  const predictionScore = topPredictions.reduce((sum, p) => sum + p.predictionScore, 0);
 
   return (
     <>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Smart Inbox</h1>
+          <h1 className="text-2xl font-bold">Smart Inbox with Predictive Loading</h1>
           <div className="flex items-center gap-4 text-gray-600">
             <span>
               {totalConversations} total conversations • {conversations.length} loaded
             </span>
-            {optimisticCount > 0 && (
+            {predictions.length > 0 && (
               <span className="text-blue-600">
-                {optimisticCount} sending...
+                {predictions.filter(p => p.shouldPreload).length} predicted to preload
+              </span>
+            )}
+            {predictionScore > 0 && (
+              <span className="text-green-600">
+                Prediction confidence: {predictionScore.toFixed(1)}
               </span>
             )}
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          <ConnectionStatusIndicator
-            connectionState={connectionState}
-            onReconnect={reconnect}
-          />
+          <button
+            onClick={() => setPredictiveInsightsOpen(!predictiveInsightsOpen)}
+            className="px-3 py-1 text-sm bg-blue-100 hover:bg-blue-200 rounded"
+          >
+            🧠 Insights
+          </button>
           <button
             onClick={() => setDebugPanelOpen(!debugPanelOpen)}
             className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
@@ -241,11 +248,19 @@ const OptimizedInboxMain = ({
         canReply={canReply}
         markAsRead={markAsRead}
         markingAsRead={markingAsRead}
-        // Enhanced real-time props
-        connectionState={connectionState}
-        optimisticMessages={optimisticMessages}
-        onRetryMessage={handleRetryMessage}
-        isConnected={isConnected}
+        // Enhanced props
+        searchQuery={searchQuery}
+        searchResults={searchResults}
+        predictions={predictions}
+        onSearch={searchConversations}
+        messagesLoading={messagesLoading}
+      />
+      
+      <PredictiveInsightsPanel
+        isOpen={predictiveInsightsOpen}
+        onToggle={() => setPredictiveInsightsOpen(!predictiveInsightsOpen)}
+        predictions={predictions}
+        insights={getPredictionInsights()}
       />
       
       <MessageDebugPanel
