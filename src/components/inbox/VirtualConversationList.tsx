@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import { Card } from '@/components/ui/card';
@@ -54,7 +55,15 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
     else setLoadingMore(true);
 
     try {
+      console.log(`🔄 [VIRTUAL LIST] Loading page ${page} with filters:`, filters);
+      
       const result = await optimizedConversationService.getConversations(page, 50, filters);
+      
+      console.log(`📊 [VIRTUAL LIST] Page ${page} results:`, {
+        total: result.conversations.length,
+        unread: result.conversations.filter(c => c.unreadCount > 0).length,
+        hasMore: result.hasMore
+      });
       
       if (append) {
         setConversations(prev => [...prev, ...result.conversations]);
@@ -72,7 +81,7 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
       }
 
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      console.error('❌ [VIRTUAL LIST] Error loading conversations:', error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -81,11 +90,13 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
 
   const loadMore = useCallback(() => {
     if (hasMore && !loadingMore) {
+      console.log(`📄 [VIRTUAL LIST] Loading more: page ${currentPage + 1}`);
       loadConversations(currentPage + 1, true);
     }
   }, [hasMore, loadingMore, currentPage, loadConversations]);
 
   const handleRefresh = useCallback(() => {
+    console.log('🔄 [VIRTUAL LIST] Refreshing conversations...');
     optimizedConversationService.invalidateCache();
     setCurrentPage(0);
     setConversations([]);
@@ -93,6 +104,7 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
   }, [loadConversations]);
 
   const toggleFilter = useCallback((filterType: keyof ConversationFilters) => {
+    console.log(`🔧 [VIRTUAL LIST] Toggling filter: ${filterType}`);
     setFilters(prev => ({
       ...prev,
       [filterType]: !prev[filterType]
@@ -139,6 +151,7 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
 
   const filteredCount = conversations.length;
   const unreadCount = conversations.filter(c => c.unreadCount > 0).length;
+  const totalUnreadCount = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
   return (
     <Card className="h-full flex flex-col">
@@ -171,9 +184,9 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
             onClick={() => toggleFilter('unreadOnly')}
           >
             Unread Only
-            {unreadCount > 0 && (
+            {totalUnreadCount > 0 && (
               <Badge variant="destructive" className="ml-2 text-xs">
-                {unreadCount}
+                {totalUnreadCount}
               </Badge>
             )}
           </Button>
@@ -187,7 +200,7 @@ const VirtualConversationList: React.FC<VirtualConversationListProps> = ({
           </Button>
 
           <div className="text-sm text-gray-500 ml-auto">
-            {filteredCount} of {totalCount} conversations
+            {filteredCount} of {totalCount} • {unreadCount} with unread
           </div>
         </div>
       </div>

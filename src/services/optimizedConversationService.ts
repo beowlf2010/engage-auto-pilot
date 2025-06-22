@@ -43,7 +43,7 @@ class OptimizedConversationService {
     console.log('🔄 [OPTIMIZED] Fetching conversations with optimized query...');
     
     try {
-      // Use a more efficient query with existing data structure
+      // Use a more efficient query with smart ordering to prioritize unread conversations
       let query = supabase
         .from('leads')
         .select(`
@@ -61,24 +61,22 @@ class OptimizedConversationService {
           phone_numbers!inner(number, is_primary),
           conversations(id, body, sent_at, direction, read_at)
         `)
-        .eq('phone_numbers.is_primary', true)
-        .order('created_at', { ascending: false });
+        .eq('phone_numbers.is_primary', true);
 
-      // Apply filters
+      // Apply search filter early if provided
       if (filters.search) {
         query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,vehicle_interest.ilike.%${filters.search}%`);
       }
 
-      // Add pagination
-      const { data: leadData, error, count } = await query
-        .range(page * pageSize, (page + 1) * pageSize - 1)
-        .returns<any[]>();
+      // Get the data first (we'll sort and paginate in memory for better unread prioritization)
+      const { data: leadData, error, count } = await query.returns<any[]>();
 
       if (error) {
         console.error('❌ [OPTIMIZED] Query error:', error);
         throw error;
       }
 
+      // Process and transform the data
       const conversations: ConversationListItem[] = (leadData || []).map((lead: any) => {
         const messages = lead.conversations || [];
         const unreadMessages = messages.filter((msg: any) => msg.direction === 'in' && !msg.read_at);
@@ -121,15 +119,44 @@ class OptimizedConversationService {
         filteredConversations = conversations.filter(conv => conv.lastMessageDirection === 'in');
       }
 
-      const totalCount = count || 0;
-      const hasMore = (page + 1) * pageSize < totalCount;
+      // CRITICAL FIX: Smart sorting to prioritize unread conversations
+      filteredConversations.sort((a, b) => {
+        // First priority: unread count (conversations with unread messages first)
+        if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+        if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+        
+        // Second priority: within unread conversations, sort by unread count (highest first)
+        if (a.unreadCount > 0 && b.unreadCount > 0) {
+          if (a.unreadCount !== b.unreadCount) {
+            return b.unreadCount - a.unreadCount;
+          }
+        }
+        
+        // Third priority: sort by last message time (most recent first)
+        return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
+      });
 
-      const result = { conversations: filteredConversations, totalCount, hasMore };
+      // Apply pagination AFTER sorting to ensure unread conversations are in first pages
+      const startIndex = page * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedConversations = filteredConversations.slice(startIndex, endIndex);
+
+      const totalCount = filteredConversations.length;
+      const hasMore = endIndex < totalCount;
+
+      const result = { 
+        conversations: paginatedConversations, 
+        totalCount, 
+        hasMore 
+      };
       
       // Cache the result
       this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
       
-      console.log(`✅ [OPTIMIZED] Loaded ${filteredConversations.length} conversations (page ${page + 1})`);
+      console.log(`✅ [OPTIMIZED] Loaded ${paginatedConversations.length} conversations (page ${page + 1})`);
+      console.log(`📊 [OPTIMIZED] Unread conversations on this page:`, 
+        paginatedConversations.filter(c => c.unreadCount > 0).length);
+      
       return result;
 
     } catch (error) {
