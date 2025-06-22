@@ -126,7 +126,7 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
     setIsInitialized
   });
 
-  // Simplified message sending
+  // Enhanced message sending with automatic conversation reload
   const onSendMessage = async (message: string, isTemplate?: boolean) => {
     if (sendingMessage) {
       console.log('⏳ [SMART INBOX] Already sending message, ignoring');
@@ -134,11 +134,15 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
     }
 
     try {
+      console.log('📤 [SMART INBOX] Starting message send process...');
+      
       await handleSendMessage(selectedLead, selectedConversation, message, isTemplate);
       
       if (isTemplate) {
         handleToggleTemplates();
       }
+      
+      console.log('✅ [SMART INBOX] Message sent and conversation updated');
       
     } catch (error) {
       console.error('❌ [SMART INBOX] Send message error:', error);

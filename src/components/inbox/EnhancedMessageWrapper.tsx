@@ -1,10 +1,11 @@
-
 import React, { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Brain, AlertTriangle, CheckCircle, Users, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { unknownMessageLearning } from '@/services/unknownMessageLearning';
+import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 interface EnhancedMessageWrapperProps {
   onMessageSent?: () => void;
@@ -98,6 +99,7 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ analysis, clas
 };
 
 export const useEnhancedMessageWrapper = ({ onMessageSent, onLeadsRefresh }: EnhancedMessageWrapperProps) => {
+  const { profile } = useAuth();
   
   const sendEnhancedMessageWrapper = useCallback(async (
     leadId: string,
@@ -105,9 +107,16 @@ export const useEnhancedMessageWrapper = ({ onMessageSent, onLeadsRefresh }: Enh
     isTemplate?: boolean
   ) => {
     try {
-      console.log('📤 [ENHANCED WRAPPER] Sending message:', messageContent);
+      console.log('📤 [ENHANCED WRAPPER] Starting complete message send process');
+      console.log('📤 [ENHANCED WRAPPER] Lead ID:', leadId);
+      console.log('📤 [ENHANCED WRAPPER] Message preview:', messageContent.substring(0, 50) + '...');
+      console.log('📤 [ENHANCED WRAPPER] Profile available:', !!profile);
 
-      // Get recent conversation to check for unknown AI scenarios
+      if (!profile) {
+        throw new Error('User profile not available - cannot send message');
+      }
+
+      // Get recent conversation to check for unknown AI scenarios (learning data)
       const { data: recentMessages } = await supabase
         .from('conversations')
         .select('*')
@@ -131,38 +140,42 @@ export const useEnhancedMessageWrapper = ({ onMessageSent, onLeadsRefresh }: Enh
         if (!aiResponseAfter) {
           console.log('🧠 [ENHANCED WRAPPER] Capturing human response as learning data');
           
-          await unknownMessageLearning.captureHumanResponse(
-            leadId,
-            lastCustomerMessage.body,
-            messageContent,
-            lastCustomerMessage.id
-          );
+          try {
+            await unknownMessageLearning.captureHumanResponse(
+              leadId,
+              lastCustomerMessage.body,
+              messageContent,
+              lastCustomerMessage.id
+            );
+          } catch (learningError) {
+            console.warn('⚠️ [ENHANCED WRAPPER] Learning capture failed:', learningError);
+            // Don't block message sending if learning fails
+          }
         }
       }
 
-      // Send the actual message
-      await supabase.from('conversations').insert({
-        lead_id: leadId,
-        direction: 'out',
-        body: messageContent,
-        ai_generated: false
-      });
+      // Send the actual message using the complete fixed message service
+      console.log('📤 [ENHANCED WRAPPER] Sending message via fixed service...');
+      await fixedSendMessage(leadId, messageContent.trim(), profile, false);
 
-      console.log('✅ [ENHANCED WRAPPER] Message sent successfully');
+      console.log('✅ [ENHANCED WRAPPER] Message sent successfully via complete flow');
       
+      // Trigger callbacks for UI updates
       if (onMessageSent) {
+        console.log('🔄 [ENHANCED WRAPPER] Triggering onMessageSent callback');
         onMessageSent();
       }
       
       if (onLeadsRefresh) {
+        console.log('🔄 [ENHANCED WRAPPER] Triggering onLeadsRefresh callback');
         onLeadsRefresh();
       }
 
     } catch (error) {
-      console.error('❌ [ENHANCED WRAPPER] Error sending message:', error);
+      console.error('❌ [ENHANCED WRAPPER] Complete message send failed:', error);
       throw error;
     }
-  }, [onMessageSent, onLeadsRefresh]);
+  }, [profile, onMessageSent, onLeadsRefresh]);
 
   return {
     sendEnhancedMessageWrapper
