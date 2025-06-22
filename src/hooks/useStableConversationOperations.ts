@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
@@ -16,16 +15,20 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
   const [error, setError] = useState<string | null>(null);
   
   const loadingRef = useRef(false);
+  const loadingMessagesRef = useRef(false);
 
   const loadConversations = useCallback(async () => {
-    if (loadingRef.current) return;
+    if (loadingRef.current) {
+      console.log('⏳ [STABLE OPS] Conversations already loading, skipping');
+      return;
+    }
     
     try {
       loadingRef.current = true;
       setLoading(true);
       setError(null);
       
-      console.log('🔄 Loading conversations with source data...');
+      console.log('🔄 [STABLE OPS] Loading conversations with source data...');
       
       const { data: leadsData, error: leadsError } = await supabase
         .from('leads')
@@ -44,7 +47,7 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
         .not('ai_opt_in', 'is', null);
 
       if (leadsError) {
-        console.error('Error loading leads:', leadsError);
+        console.error('❌ [STABLE OPS] Error loading leads:', leadsError);
         throw leadsError;
       }
 
@@ -142,10 +145,10 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       });
 
       setConversations(sortedConversations);
-      console.log('✅ Conversations loaded successfully:', sortedConversations.length);
+      console.log('✅ [STABLE OPS] Conversations loaded successfully:', sortedConversations.length);
 
     } catch (err) {
-      console.error('❌ Error loading conversations:', err);
+      console.error('❌ [STABLE OPS] Error loading conversations:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -158,11 +161,16 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
   }, []);
 
   const loadMessages = useCallback(async (leadId: string) => {
-    setLoading(true);
-    setError(null);
+    if (loadingMessagesRef.current) {
+      console.log('⏳ [STABLE OPS] Messages already loading for another lead, skipping');
+      return;
+    }
 
     try {
-      console.log('📬 Loading messages for lead:', leadId);
+      loadingMessagesRef.current = true;
+      setError(null);
+
+      console.log('📬 [STABLE OPS] Loading messages for lead:', leadId);
       
       const { data: leadData } = await supabase
         .from('leads')
@@ -177,7 +185,7 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
         .order('sent_at', { ascending: true });
 
       if (error) {
-        console.error('Error fetching messages:', error);
+        console.error('❌ [STABLE OPS] Error fetching messages:', error);
         throw error;
       }
 
@@ -197,25 +205,30 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       }));
 
       setMessages(messagesWithContext);
-      console.log('✅ Messages loaded successfully:', messagesWithContext.length);
+      console.log('✅ [STABLE OPS] Messages loaded successfully:', messagesWithContext.length);
     } catch (err) {
-      console.error('❌ Error loading messages:', err);
+      console.error('❌ [STABLE OPS] Error loading messages:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
         setError('An unexpected error occurred.');
       }
     } finally {
-      setLoading(false);
+      loadingMessagesRef.current = false;
     }
   }, []);
 
   const sendMessage = useCallback(async (leadId: string, message: string) => {
+    if (setSendingMessage) {
+      console.log('⏳ [STABLE OPS] Already sending message, ignoring');
+      return;
+    }
+
     setSendingMessage(true);
     setError(null);
 
     try {
-      console.log('📤 Sending message to lead:', leadId);
+      console.log('📤 [STABLE OPS] Sending message to lead:', leadId);
       
       const { error } = await supabase.from('conversations').insert({
         lead_id: leadId,
@@ -225,7 +238,7 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       });
 
       if (error) {
-        console.error('Error sending message:', error);
+        console.error('❌ [STABLE OPS] Error sending message:', error);
         throw error;
       }
 
@@ -234,9 +247,9 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
         onLeadsRefresh();
       }
       
-      console.log('✅ Message sent successfully');
+      console.log('✅ [STABLE OPS] Message sent successfully');
     } catch (err) {
-      console.error('❌ Error sending message:', err);
+      console.error('❌ [STABLE OPS] Error sending message:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -248,15 +261,15 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
   }, [loadMessages, onLeadsRefresh]);
 
   const manualRefresh = useCallback(() => {
-    console.log('🔄 Manual refresh triggered');
+    console.log('🔄 [STABLE OPS] Manual refresh triggered');
     loadConversations();
   }, [loadConversations]);
 
-  // Initialize conversations on mount
+  // Initialize conversations on mount - this was missing!
   useEffect(() => {
-    console.log('🚀 Initializing Smart Inbox conversations...');
+    console.log('🚀 [STABLE OPS] Initializing Smart Inbox conversations...');
     loadConversations();
-  }, [loadConversations]);
+  }, []); // Empty dependency array ensures this runs only once
 
   return {
     conversations,

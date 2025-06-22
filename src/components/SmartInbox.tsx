@@ -53,8 +53,14 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
     user.role === "manager" || user.role === "admin" || conv.salespersonId === user.id || !conv.salespersonId
   );
 
+  console.log('🔄 [SMART INBOX] Render state:', {
+    loading,
+    conversationsCount: filteredConversations.length,
+    hasError: !!error
+  });
+
   // Check if we should show status displays
-  const shouldShowStatus = error || loading || filteredConversations.length === 0;
+  const shouldShowStatus = error || (loading && filteredConversations.length === 0);
 
   if (shouldShowStatus) {
     return (
@@ -81,6 +87,7 @@ const SmartInbox = ({ user }: SmartInboxProps) => {
           conversations={filteredConversations}
           messages={messages}
           sendingMessage={sendingMessage}
+          loading={loading} // Pass actual loading state
           loadMessages={loadMessages}
           sendMessage={sendEnhancedMessageWrapper}
           setError={setError}

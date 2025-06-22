@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { useInboxOperations } from '@/hooks/inbox/useInboxOperations';
 import { useConversationInitialization } from '@/hooks/inbox/useConversationInitialization';
 import InboxLayout from './InboxLayout';
@@ -15,6 +15,7 @@ interface SmartInboxMainProps {
   conversations: ConversationListItem[];
   messages: MessageData[];
   sendingMessage: boolean;
+  loading: boolean; // Now properly receiving loading state
   loadMessages: (leadId: string) => Promise<void>;
   sendMessage: (leadId: string, message: string) => Promise<void>;
   setError: (error: string | null) => void;
@@ -36,6 +37,7 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
   conversations,
   messages,
   sendingMessage,
+  loading,
   loadMessages,
   sendMessage,
   setError,
@@ -53,6 +55,8 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
 }) => {
   const leadIdFromUrl = getLeadIdFromUrl();
   const selectedConversation = conversations.find(conv => conv.leadId === selectedLead);
+  const isSelectingRef = useRef(false);
+  const loadingMessagesRef = useRef(false);
 
   // Get inbox operations
   const {
@@ -67,22 +71,49 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
     setError
   });
 
-  // Simplified conversation selection without AI analysis
+  // Enhanced conversation selection with guards
   const handleSimpleSelectConversation = React.useCallback(async (leadId: string) => {
+    // Prevent multiple simultaneous selections
+    if (isSelectingRef.current || loadingMessagesRef.current) {
+      console.log('⏳ [SMART INBOX] Selection already in progress, ignoring');
+      return;
+    }
+
+    // Don't re-select the same conversation
+    if (selectedLead === leadId) {
+      console.log('✅ [SMART INBOX] Conversation already selected:', leadId);
+      return;
+    }
+
     console.log('📱 [SMART INBOX] Selecting conversation for lead:', leadId);
     
-    // Set selected lead first
-    setSelectedLead(leadId);
-    
-    // Load messages
-    await handleSelectConversation(leadId);
-    
-    console.log('✅ [SMART INBOX] Conversation selected and messages loaded');
-  }, [setSelectedLead, handleSelectConversation]);
+    try {
+      isSelectingRef.current = true;
+      loadingMessagesRef.current = true;
+      
+      // Set selected lead first
+      setSelectedLead(leadId);
+      
+      // Load messages
+      await handleSelectConversation(leadId);
+      
+      console.log('✅ [SMART INBOX] Conversation selected and messages loaded');
+    } catch (error) {
+      console.error('❌ [SMART INBOX] Selection failed:', error);
+      toast({
+        title: "Error selecting conversation",
+        description: "Failed to load messages for this conversation.",
+        variant: "destructive"
+      });
+    } finally {
+      isSelectingRef.current = false;
+      loadingMessagesRef.current = false;
+    }
+  }, [selectedLead, setSelectedLead, handleSelectConversation]);
 
-  // Handle conversation initialization
+  // Handle conversation initialization with proper loading coordination
   useConversationInitialization({
-    loading: false,
+    loading,
     isInitialized,
     filteredConversations: conversations,
     selectedLead,
@@ -93,6 +124,11 @@ const SmartInboxMain: React.FC<SmartInboxMainProps> = ({
 
   // Simplified message sending
   const onSendMessage = async (message: string, isTemplate?: boolean) => {
+    if (sendingMessage) {
+      console.log('⏳ [SMART INBOX] Already sending message, ignoring');
+      return;
+    }
+
     try {
       await handleSendMessage(selectedLead, selectedConversation, message, isTemplate);
       
