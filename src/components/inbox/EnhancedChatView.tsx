@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -323,7 +324,7 @@ const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
         <div className="border-t border-gray-200 p-4 bg-gray-50">
           <MessageTemplates
             onSelectTemplate={(template) => onSendMessage(template, true)}
-            leadInterest={selectedConversation.vehicleInterest}
+            onClose={onToggleTemplates}
           />
         </div>
       )}
