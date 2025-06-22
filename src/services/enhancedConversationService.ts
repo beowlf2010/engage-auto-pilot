@@ -1,10 +1,12 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { advancedBackgroundLoadingService } from './advancedBackgroundLoadingService';
 import { enhancedPredictiveService } from './enhancedPredictiveService';
 import { conversationRelationshipEngine } from './conversationRelationshipEngine';
 import { messageCacheService } from './messageCacheService';
+import { messageSearchService } from './messageSearchService';
+import { messageThreadingService } from './messageThreadingService';
+import { messageCategorizationService } from './messageCategorizationService';
 
 interface EnhancedConversationFilters {
   search?: string;
@@ -16,6 +18,8 @@ interface EnhancedConversationFilters {
   };
   leadSources?: string[];
   aiStages?: string[];
+  categories?: string[];
+  urgency?: string[];
 }
 
 class EnhancedConversationService {
@@ -23,13 +27,13 @@ class EnhancedConversationService {
   private lastConversationLoad = 0;
   private readonly LOAD_DEBOUNCE = 1000; // 1 second
 
-  // Enhanced conversation loading with advanced predictive features
+  // Enhanced conversation loading with advanced predictive features and search integration
   async getConversationsWithPrediction(
     page = 0, 
     limit = 50, 
     filters: EnhancedConversationFilters = {}
   ) {
-    console.log('🚀 [ENHANCED] Loading conversations with advanced prediction, page:', page);
+    console.log('🚀 [ENHANCED] Loading conversations with advanced prediction and search, page:', page);
 
     // Debounce rapid requests
     const now = Date.now();
@@ -154,14 +158,15 @@ class EnhancedConversationService {
     }
   }
 
-  // Enhanced message loading with advanced background service
+  // Enhanced message loading with search integration
   async getMessagesWithPrediction(leadId: string, context?: any): Promise<MessageData[]> {
-    console.log('📱 [ENHANCED] Loading messages with advanced system for lead:', leadId);
+    console.log('📱 [ENHANCED] Loading messages with search integration for lead:', leadId);
 
     // Check if messages are preloaded by advanced background service
     const preloaded = advancedBackgroundLoadingService.getPreloadedMessages(leadId);
     if (preloaded) {
       console.log('⚡ [ENHANCED] Using advanced preloaded messages for:', leadId);
+      this.updateSearchServices(preloaded);
       enhancedPredictiveService.trackConversationAccess(leadId, leadId, undefined, context);
       return preloaded;
     }
@@ -170,6 +175,7 @@ class EnhancedConversationService {
     const cached = messageCacheService.getCachedMessages(leadId);
     if (cached) {
       console.log('💾 [ENHANCED] Using cached messages for:', leadId);
+      this.updateSearchServices(cached);
       enhancedPredictiveService.trackConversationAccess(leadId, leadId, undefined, context);
       return cached;
     }
@@ -182,6 +188,9 @@ class EnhancedConversationService {
 
       // Cache the messages
       messageCacheService.cacheMessages(leadId, messages);
+
+      // Update search services with new messages
+      this.updateSearchServices(messages);
 
       // Track access with enhanced context
       const timeSpent = Date.now() - startTime;
@@ -202,15 +211,110 @@ class EnhancedConversationService {
     }
   }
 
-  // Enhanced search with ML-powered relevance
-  searchConversations(query: string, limit = 10): ConversationListItem[] {
-    console.log('🔍 [ENHANCED] ML-powered search for:', query);
+  // Update search services when new messages are loaded
+  private updateSearchServices(messages: MessageData[]) {
+    // Update search index
+    messageSearchService.buildSearchIndex(messages);
     
-    // Use enhanced predictive service for ML-powered search
-    const results = enhancedPredictiveService.searchConversations(query, limit);
+    // Categorize messages
+    const messageData = messages.map(msg => ({
+      id: msg.id,
+      content: msg.body,
+      metadata: {
+        direction: msg.direction,
+        sentAt: msg.sentAt,
+        aiGenerated: msg.aiGenerated,
+        leadId: msg.leadId
+      }
+    }));
+    messageCategorizationService.categorizeMessages(messageData);
     
-    console.log(`🎯 [ENHANCED] Found ${results.length} ML-enhanced search results`);
-    return results;
+    // Create threads by lead
+    const messagesByLead = messages.reduce((acc, msg) => {
+      if (!acc[msg.leadId]) acc[msg.leadId] = [];
+      acc[msg.leadId].push(msg);
+      return acc;
+    }, {} as Record<string, MessageData[]>);
+    
+    Object.entries(messagesByLead).forEach(([leadId, leadMessages]) => {
+      messageThreadingService.analyzeAndCreateThreads(leadMessages, leadId);
+    });
+  }
+
+  // Enhanced search with advanced categorization and threading
+  searchConversations(query: string, filters: EnhancedConversationFilters = {}, limit = 10): ConversationListItem[] {
+    console.log('🔍 [ENHANCED] Advanced search for:', query);
+    
+    // Perform message search
+    const messageResults = messageSearchService.search(query, {
+      categories: filters.categories,
+      dateRange: filters.dateRange,
+      direction: filters.search ? 'both' : undefined,
+      leadIds: filters.leadSources,
+      minRelevanceScore: 0.3
+    }, limit * 3); // Get more message results to find conversation matches
+    
+    // Extract unique lead IDs from message results
+    const leadIds = [...new Set(messageResults.map(result => result.leadId))];
+    
+    // Use enhanced predictive service for additional ML-powered search
+    const mlResults = enhancedPredictiveService.searchConversations(query, limit);
+    
+    // Combine and deduplicate results
+    const combinedLeadIds = [...new Set([...leadIds, ...mlResults.map(r => r.leadId)])];
+    
+    // Filter conversations by found lead IDs
+    const conversations = this.getAllConversations()
+      .filter(conv => combinedLeadIds.includes(conv.leadId))
+      .slice(0, limit);
+    
+    console.log(`🎯 [ENHANCED] Found ${conversations.length} conversations from advanced search`);
+    return conversations;
+  }
+
+  // Search within threads
+  searchThreads(query: string, leadId?: string) {
+    if (leadId) {
+      const threads = messageThreadingService.getThreadsForLead(leadId);
+      return threads.filter(thread => 
+        thread.subject.toLowerCase().includes(query.toLowerCase()) ||
+        thread.summary?.toLowerCase().includes(query.toLowerCase()) ||
+        thread.messages.some(msg => msg.content.toLowerCase().includes(query.toLowerCase()))
+      );
+    }
+    
+    return messageThreadingService.searchThreads(query);
+  }
+
+  // Get categorized messages
+  getCategorizedMessages(categories: string[]) {
+    return messageCategorizationService.searchByCategory(categories);
+  }
+
+  // Get urgent messages
+  getUrgentMessages() {
+    return messageCategorizationService.getUrgentMessages();
+  }
+
+  // Get messages requiring action
+  getActionRequiredMessages() {
+    return messageCategorizationService.getActionRequiredMessages();
+  }
+
+  // Get comprehensive search analytics
+  getSearchAnalytics() {
+    return {
+      search: messageSearchService.getSearchAnalytics(),
+      categorization: messageCategorizationService.getAnalytics(),
+      threading: messageThreadingService.getAnalytics()
+    };
+  }
+
+  // Helper method to get all conversations (would need to be implemented based on your data structure)
+  private getAllConversations(): ConversationListItem[] {
+    // This would typically return cached conversations from your state management
+    // For now, return empty array as placeholder
+    return [];
   }
 
   // Get advanced prediction insights
@@ -219,7 +323,8 @@ class EnhancedConversationService {
       enhanced: enhancedPredictiveService.getPredictionInsights(),
       backgroundLoading: advancedBackgroundLoadingService.getPerformanceMetrics(),
       queueStatus: advancedBackgroundLoadingService.getQueueStatus(),
-      relationships: conversationRelationshipEngine.getGlobalInsights()
+      relationships: conversationRelationshipEngine.getGlobalInsights(),
+      search: this.getSearchAnalytics()
     };
   }
 
@@ -236,6 +341,8 @@ class EnhancedConversationService {
   // Stop all background services
   stop() {
     advancedBackgroundLoadingService.stop();
+    messageSearchService.clearCache();
+    messageCategorizationService.clearCache();
     console.log('🛑 [ENHANCED] All advanced services stopped');
   }
 }
