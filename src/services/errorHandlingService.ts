@@ -67,19 +67,15 @@ class ErrorHandlingService {
       }
     }
 
-    // Determine severity based on operation - ensure proper type handling
-    if (context.operation.includes('send') || context.operation.includes('load')) {
-      // Create a new severity value to avoid type narrowing issues
-      const currentSeverity = severity;
-      if (currentSeverity === 'low') {
-        severity = 'medium';
-      }
-    }
+    // Determine final severity based on operation - upgrade low severity for critical operations
+    const isCriticalOperation = context.operation.includes('send') || context.operation.includes('load');
+    const finalSeverity: 'low' | 'medium' | 'high' | 'critical' = 
+      isCriticalOperation && severity === 'low' ? 'medium' : severity;
 
     return {
       message,
       code,
-      severity,
+      severity: finalSeverity,
       context,
       timestamp: Date.now(),
       userFriendlyMessage
