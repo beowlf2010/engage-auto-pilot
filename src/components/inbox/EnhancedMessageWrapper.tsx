@@ -1,108 +1,81 @@
 
-import React from 'react';
-import { useEnhancedConversationAI } from '@/hooks/useEnhancedConversationAI';
+import React, { useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { unknownMessageLearning } from '@/services/unknownMessageLearning';
 
-interface UseEnhancedMessageWrapperProps {
+interface EnhancedMessageWrapperProps {
   onMessageSent?: () => void;
   onLeadsRefresh?: () => void;
 }
 
-export const useEnhancedMessageWrapper = ({ onMessageSent, onLeadsRefresh }: UseEnhancedMessageWrapperProps) => {
-  const { analyzeConversation, getResponseSuggestion, lastAnalysis } = useEnhancedConversationAI();
-
-  const sendEnhancedMessageWrapper = async (leadId: string, message: string) => {
+export const useEnhancedMessageWrapper = ({ onMessageSent, onLeadsRefresh }: EnhancedMessageWrapperProps) => {
+  
+  const sendEnhancedMessageWrapper = useCallback(async (
+    leadId: string,
+    messageContent: string,
+    isTemplate?: boolean
+  ) => {
     try {
-      console.log('📤 Sending enhanced message for lead:', leadId);
+      console.log('📤 [ENHANCED WRAPPER] Sending message:', messageContent);
+
+      // Get recent conversation to check for unknown AI scenarios
+      const { data: recentMessages } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: false })
+        .limit(10);
+
+      // Check if the most recent customer message was unhandled by AI
+      const customerMessages = recentMessages?.filter(msg => msg.direction === 'in') || [];
+      const lastCustomerMessage = customerMessages[0];
       
-      // Trigger the original message sending logic
+      if (lastCustomerMessage) {
+        // Check if AI failed to respond to this message
+        const aiResponseAfter = recentMessages?.find(msg => 
+          msg.direction === 'out' && 
+          msg.ai_generated && 
+          new Date(msg.sent_at) > new Date(lastCustomerMessage.sent_at)
+        );
+
+        // If no AI response exists, this human response is learning data
+        if (!aiResponseAfter) {
+          console.log('🧠 [ENHANCED WRAPPER] Capturing human response as learning data');
+          
+          await unknownMessageLearning.captureHumanResponse(
+            leadId,
+            lastCustomerMessage.body,
+            messageContent,
+            lastCustomerMessage.id
+          );
+        }
+      }
+
+      // Send the actual message
+      await supabase.from('conversations').insert({
+        lead_id: leadId,
+        direction: 'out',
+        body: messageContent,
+        ai_generated: false
+      });
+
+      console.log('✅ [ENHANCED WRAPPER] Message sent successfully');
+      
       if (onMessageSent) {
         onMessageSent();
       }
-
-      // Trigger leads refresh
+      
       if (onLeadsRefresh) {
         onLeadsRefresh();
       }
 
-      console.log('✅ Enhanced message sent successfully');
     } catch (error) {
-      console.error('❌ Error in enhanced message wrapper:', error);
+      console.error('❌ [ENHANCED WRAPPER] Error sending message:', error);
       throw error;
     }
-  };
-
-  const analyzeCurrentConversation = async (
-    leadId: string,
-    conversationHistory: string,
-    latestMessage: string,
-    leadName: string,
-    vehicleInterest: string
-  ) => {
-    return await analyzeConversation(leadId, conversationHistory, latestMessage, leadName, vehicleInterest);
-  };
+  }, [onMessageSent, onLeadsRefresh]);
 
   return {
-    sendEnhancedMessageWrapper,
-    analyzeCurrentConversation,
-    getResponseSuggestion,
-    lastAnalysis
+    sendEnhancedMessageWrapper
   };
-};
-
-// Component to display AI insights
-export const AIInsightsPanel: React.FC<{
-  analysis: any;
-  className?: string;
-}> = ({ analysis, className = '' }) => {
-  if (!analysis) return null;
-
-  return (
-    <div className={`bg-purple-50 border border-purple-200 rounded-lg p-4 ${className}`}>
-      <h4 className="font-semibold text-purple-800 mb-2">🤖 AI Insights</h4>
-      
-      <div className="space-y-2 text-sm">
-        <div>
-          <span className="font-medium">Lead Temperature:</span> 
-          <span className={`ml-2 px-2 py-1 rounded text-xs ${
-            analysis.leadTemperature > 80 ? 'bg-red-100 text-red-700' :
-            analysis.leadTemperature > 60 ? 'bg-yellow-100 text-yellow-700' :
-            'bg-green-100 text-green-700'
-          }`}>
-            {analysis.leadTemperature}%
-          </span>
-        </div>
-        
-        <div>
-          <span className="font-medium">Stage:</span> 
-          <span className="ml-2 capitalize">{analysis.conversationStage}</span>
-        </div>
-
-        {analysis.buyingSignals.length > 0 && (
-          <div>
-            <span className="font-medium">Buying Signals:</span>
-            <ul className="ml-2 mt-1">
-              {analysis.buyingSignals.slice(0, 2).map((signal: any, index: number) => (
-                <li key={index} className="text-xs">
-                  • {signal.type} ({Math.round(signal.strength * 100)}%)
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {analysis.nextBestActions.length > 0 && (
-          <div>
-            <span className="font-medium">Suggested Actions:</span>
-            <ul className="ml-2 mt-1">
-              {analysis.nextBestActions.slice(0, 3).map((action: string, index: number) => (
-                <li key={index} className="text-xs">
-                  • {action}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  );
 };

@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { unknownMessageLearning } from './unknownMessageLearning';
 
 export interface ConversationContext {
   leadId: string;
@@ -67,6 +68,19 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
       return null;
     }
 
+    // First, check if we've learned how to handle this type of message
+    const learnedResponse = await unknownMessageLearning.checkForLearnedPatterns(lastCustomerMessage.body);
+    if (learnedResponse) {
+      console.log('🎯 Using learned pattern for response');
+      return {
+        message: learnedResponse,
+        confidence: 0.8,
+        reasoning: 'Response generated from learned human intervention patterns',
+        customerIntent: null,
+        answerGuidance: null
+      };
+    }
+
     // Check for conversational signals
     const hasConversationalSignals = analyzeConversationalSignals(lastCustomerMessage.body);
 
@@ -82,6 +96,20 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
 
     if (error || !data?.response) {
       console.error('❌ Error from AI function:', error);
+      
+      // Capture this as an unknown message scenario
+      await unknownMessageLearning.captureUnknownMessage(
+        context.leadId,
+        lastCustomerMessage.body,
+        {
+          conversationHistory: recentMessages,
+          leadName: context.leadName,
+          vehicleInterest: context.vehicleInterest,
+          hasConversationalSignals
+        },
+        `AI function error: ${error?.message || 'No response generated'}`
+      );
+      
       return null;
     }
 
@@ -95,6 +123,21 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
 
   } catch (error) {
     console.error('❌ Error generating response:', error);
+    
+    // Capture this as an unknown message scenario
+    const lastCustomerMessage = context.messages
+      .filter(msg => msg.direction === 'in')
+      .slice(-1)[0];
+      
+    if (lastCustomerMessage) {
+      await unknownMessageLearning.captureUnknownMessage(
+        context.leadId,
+        lastCustomerMessage.body,
+        context,
+        `System error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+    
     return null;
   }
 };

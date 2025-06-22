@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Brain, TrendingUp, MessageSquare, Target, Users, Clock, RefreshCw, Data
 import { useAIPerformanceMetrics } from '@/hooks/useAILearning';
 import { useLearningBackfill } from '@/hooks/useLearningBackfill';
 import LearningAnalyticsSummary from './LearningAnalyticsSummary';
+import UnknownMessageLearning from './UnknownMessageLearning';
 
 const AILearningDashboard = () => {
   const { metrics, loading, refresh } = useAIPerformanceMetrics('week');
@@ -190,6 +192,9 @@ const AILearningDashboard = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Unknown Message Learning Section */}
+          <UnknownMessageLearning />
 
           <LearningAnalyticsSummary />
         </>
