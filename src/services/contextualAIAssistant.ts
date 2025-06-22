@@ -63,11 +63,11 @@ class ContextualAIAssistant {
         urgencyLevel
       );
 
-      // 8. Update Lead Profile (Example - can be expanded)
+      // 8. Update Lead Profile with correct database fields
       await this.updateLeadProfile(leadId, {
-        leadTemperature,
-        conversationStage,
-        urgencyLevel
+        ai_stage: conversationStage,
+        conversion_probability: leadTemperature / 100, // Convert percentage to decimal
+        message_intensity: urgencyLevel
       });
 
       return {
@@ -145,9 +145,9 @@ class ContextualAIAssistant {
   async updateLeadProfile(
     leadId: string,
     updates: Partial<{
-      leadTemperature: number;
-      conversationStage: string;
-      urgencyLevel: string;
+      ai_stage: string;
+      conversion_probability: number;
+      message_intensity: string;
     }>
   ): Promise<void> {
     try {
