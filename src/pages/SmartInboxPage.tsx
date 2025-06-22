@@ -1,6 +1,6 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import SmartInbox from "@/components/SmartInbox";
+import OptimizedSmartInbox from "@/components/OptimizedSmartInbox";
 import { Navigate } from "react-router-dom";
 import { useEffect } from "react";
 
@@ -43,7 +43,7 @@ const SmartInboxPage = () => {
     phone: profile.phone
   };
 
-  return <SmartInbox user={user} />;
+  return <OptimizedSmartInbox user={user} />;
 };
 
 export default SmartInboxPage;
