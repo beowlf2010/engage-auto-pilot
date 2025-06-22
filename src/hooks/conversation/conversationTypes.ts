@@ -15,6 +15,13 @@ export interface ConversationListItem {
   lastMessageDate: Date;
   salespersonName?: string;
   aiOptIn?: boolean;
+  leadSource?: string;
+  aiStage?: string;
+  aiMessagesSent?: number;
+  aiSequencePaused?: boolean;
+  messageIntensity?: string;
+  incomingCount?: number;
+  outgoingCount?: number;
 }
 
 export interface MessageData {
@@ -25,4 +32,9 @@ export interface MessageData {
   sentAt: string;
   smsStatus: string;
   aiGenerated: boolean;
+  readAt?: string;
+  smsError?: string;
+  leadSource?: string;
+  leadName?: string;
+  vehicleInterest?: string;
 }

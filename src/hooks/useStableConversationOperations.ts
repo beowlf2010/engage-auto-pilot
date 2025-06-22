@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
@@ -74,16 +75,6 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
 
           const phoneNumber = phoneNumbers ? phoneNumbers.number : null;
 
-          const { data: aiData, error: aiError } = await supabase
-            .from('ai_lead_stages')
-            .select('*')
-            .eq('lead_id', lead.id)
-            .single();
-
-          if (aiError && aiError.code !== 'PGRST116') {
-            console.error('Error fetching AI data:', aiError);
-          }
-
           const { count: unreadCount, error: unreadError } = await supabase
             .from('conversations')
             .select('*', { count: 'exact' })
@@ -121,25 +112,23 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
             leadId: lead.id,
             leadName: `${lead.first_name} ${lead.last_name}`,
             leadPhone: phoneNumber || 'No phone',
+            primaryPhone: phoneNumber || 'No phone',
             vehicleInterest: lead.vehicle_interest || 'Unknown',
-            leadSource: lead.source || 'Unknown', // Add lead source
+            leadSource: lead.source || 'Unknown',
             unreadCount: unreadCount || 0,
+            messageCount: incomingCount + outgoingCount,
             lastMessage: latestConversation?.body || 'No messages yet',
             lastMessageTime: latestConversation 
               ? formatDistanceToNow(new Date(latestConversation.sent_at), { addSuffix: true })
               : 'Never',
-            lastMessageDirection: latestConversation?.direction as 'in' | 'out' | undefined,
-            lastMessageDate: latestConversation ? new Date(latestConversation.sent_at) : undefined,
+            lastMessageDirection: latestConversation?.direction as 'in' | 'out' | null,
+            lastMessageDate: latestConversation ? new Date(latestConversation.sent_at) : new Date(0),
             status: lead.status || 'new',
             salespersonId: lead.salesperson_id,
             salespersonName: lead.profiles?.first_name && lead.profiles?.last_name 
               ? `${lead.profiles.first_name} ${lead.profiles.last_name}`
               : undefined,
             aiOptIn: lead.ai_opt_in,
-            aiStage: aiData?.ai_stage,
-            aiMessagesSent: aiData?.ai_messages_sent || 0,
-            aiSequencePaused: aiData?.ai_sequence_paused || false,
-            messageIntensity: aiData?.message_intensity || 'gentle',
             incomingCount: incomingCount,
             outgoingCount: outgoingCount
           };
@@ -189,8 +178,15 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
       }
 
       const messagesWithContext = (data || []).map(msg => ({
-        ...msg,
+        id: msg.id,
         leadId,
+        direction: msg.direction as 'in' | 'out',
+        body: msg.body,
+        sentAt: msg.sent_at,
+        readAt: msg.read_at,
+        aiGenerated: msg.ai_generated || false,
+        smsStatus: msg.sms_status || 'pending',
+        smsError: msg.sms_error,
         leadSource: leadData?.source,
         leadName: leadData ? `${leadData.first_name} ${leadData.last_name}` : 'Unknown',
         vehicleInterest: leadData?.vehicle_interest || 'Unknown'
