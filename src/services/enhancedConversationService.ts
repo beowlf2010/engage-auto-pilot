@@ -86,7 +86,7 @@ class EnhancedConversationService {
           leadPhone: lead.phone_numbers[0]?.number || '',
           lastMessage: lastMessage?.body || 'No messages yet',
           lastMessageTime: lastMessage?.sent_at || lead.created_at,
-          lastMessageDirection: lastMessage?.direction || null,
+          lastMessageDirection: lastMessage?.direction as 'in' | 'out' | null || null,
           unreadCount: unreadMessages.length,
           messageCount: messages.length,
           salespersonId: lead.salesperson_id,
