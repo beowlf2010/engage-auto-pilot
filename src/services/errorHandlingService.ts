@@ -64,16 +64,18 @@ class ErrorHandlingService {
         severity = 'high';
         userFriendlyMessage = 'Message could not be sent. Please try again.';
         code = 'SMS_ERROR';
+      } else if (message.includes('minor') || message.includes('warning')) {
+        // Add a case that can set severity to 'low'
+        severity = 'low';
+        userFriendlyMessage = 'Minor issue detected. Operation completed successfully.';
+        code = 'MINOR_WARNING';
       }
     }
 
-    // Store the original severity before any modifications
-    const originalSeverity = severity;
-    
     // Determine final severity based on operation - upgrade low severity for critical operations
     const isCriticalOperation = context.operation.includes('send') || context.operation.includes('load');
     const finalSeverity: 'low' | 'medium' | 'high' | 'critical' = 
-      isCriticalOperation && originalSeverity === 'low' ? 'medium' : severity;
+      isCriticalOperation && severity === 'low' ? 'medium' : severity;
 
     return {
       message,
