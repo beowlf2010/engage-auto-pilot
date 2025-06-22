@@ -1,294 +1,399 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { aiLearningService } from '@/services/aiLearningService';
+import { aiLearningService } from './aiLearningService';
 
 export interface LearningEvent {
-  type: 'message_sent' | 'response_received' | 'conversion' | 'feedback_submitted';
+  type: 'message_sent' | 'response_received' | 'feedback_submitted' | 'appointment_booked' | 'conversation_analyzed';
   leadId: string;
   data: any;
   timestamp: Date;
 }
 
-export interface OptimizationTrigger {
+export interface OptimizationInsight {
   id: string;
-  triggerType: 'poor_performance' | 'high_success' | 'pattern_detected';
-  leadId?: string;
+  type: 'pattern' | 'optimization' | 'prediction' | 'performance';
+  title: string;
+  description: string;
   confidence: number;
-  action: 'adjust_timing' | 'modify_template' | 'change_frequency' | 'escalate_human';
-  data: any;
+  impact: 'low' | 'medium' | 'high' | 'critical';
+  actionable: boolean;
+  leadId?: string;
+  data?: any;
 }
 
 class RealtimeLearningService {
-  private optimizationQueue: OptimizationTrigger[] = [];
-  private learningBuffer: LearningEvent[] = [];
+  private learningQueue: LearningEvent[] = [];
+  private processingQueue = false;
 
-  // Process learning events in real-time
-  async processLearningEvent(event: LearningEvent) {
-    console.log('Processing learning event:', event);
+  async processLearningEvent(event: LearningEvent): Promise<void> {
+    console.log('🧠 Processing learning event:', event.type, 'for lead:', event.leadId);
     
-    this.learningBuffer.push(event);
+    this.learningQueue.push(event);
     
-    // Process events in batches for efficiency
-    if (this.learningBuffer.length >= 5) {
-      await this.processBatchLearning();
-    }
-
-    // Check for optimization opportunities
-    const trigger = await this.detectOptimizationTrigger(event);
-    if (trigger) {
-      this.optimizationQueue.push(trigger);
-      await this.executeOptimization(trigger);
+    // Process queue if not already processing
+    if (!this.processingQueue) {
+      await this.processQueue();
     }
   }
 
-  // Process multiple learning events at once
-  private async processBatchLearning() {
+  private async processQueue(): Promise<void> {
+    if (this.processingQueue || this.learningQueue.length === 0) return;
+    
+    this.processingQueue = true;
+    
     try {
-      const events = [...this.learningBuffer];
-      this.learningBuffer = [];
-
-      for (const event of events) {
-        switch (event.type) {
-          case 'message_sent':
-            await this.trackMessagePerformance(event);
-            break;
-          case 'response_received':
-            await this.updateResponsePatterns(event);
-            break;
-          case 'conversion':
-            await this.recordConversionSuccess(event);
-            break;
-          case 'feedback_submitted':
-            await this.incorporateFeedback(event);
-            break;
-        }
+      while (this.learningQueue.length > 0) {
+        const event = this.learningQueue.shift()!;
+        await this.handleSingleEvent(event);
       }
     } catch (error) {
-      console.error('Error processing batch learning:', error);
+      console.error('❌ Error processing learning queue:', error);
+    } finally {
+      this.processingQueue = false;
     }
   }
 
-  // Detect when optimization is needed
-  private async detectOptimizationTrigger(event: LearningEvent): Promise<OptimizationTrigger | null> {
-    const { leadId } = event;
-
-    // Get recent performance for this lead
-    const recent = await supabase
-      .from('ai_message_feedback')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (!recent.data || recent.data.length < 3) return null;
-
-    const negativeCount = recent.data.filter(f => f.feedback_type === 'negative').length;
-    const positiveCount = recent.data.filter(f => f.feedback_type === 'positive').length;
-
-    // Trigger if performance is poor
-    if (negativeCount >= 3) {
-      return {
-        id: `poor_performance_${leadId}_${Date.now()}`,
-        triggerType: 'poor_performance',
-        leadId,
-        confidence: 0.9,
-        action: 'modify_template',
-        data: { negativeCount, recentFeedback: recent.data }
-      };
-    }
-
-    // Trigger if performance is excellent
-    if (positiveCount >= 4) {
-      return {
-        id: `high_success_${leadId}_${Date.now()}`,
-        triggerType: 'high_success',
-        leadId,
-        confidence: 0.95,
-        action: 'adjust_timing',
-        data: { positiveCount, pattern: 'success_pattern' }
-      };
-    }
-
-    return null;
-  }
-
-  // Execute optimization based on trigger
-  private async executeOptimization(trigger: OptimizationTrigger) {
-    console.log('Executing optimization:', trigger);
-
+  private async handleSingleEvent(event: LearningEvent): Promise<void> {
     try {
-      switch (trigger.action) {
-        case 'modify_template':
-          await this.optimizeMessageTemplate(trigger);
+      switch (event.type) {
+        case 'message_sent':
+          await this.handleMessageSent(event);
           break;
-        case 'adjust_timing':
-          await this.optimizeMessageTiming(trigger);
+        case 'response_received':
+          await this.handleResponseReceived(event);
           break;
-        case 'change_frequency':
-          await this.optimizeMessageFrequency(trigger);
+        case 'feedback_submitted':
+          await this.handleFeedbackSubmitted(event);
           break;
-        case 'escalate_human':
-          await this.escalateToHuman(trigger);
+        case 'appointment_booked':
+          await this.handleAppointmentBooked(event);
+          break;
+        case 'conversation_analyzed':
+          await this.handleConversationAnalyzed(event);
           break;
       }
+      
+      // Update learning metrics
+      await this.updateLearningMetrics(event);
+      
     } catch (error) {
-      console.error('Error executing optimization:', error);
+      console.error(`❌ Error handling learning event ${event.type}:`, error);
     }
   }
 
-  // Track message performance metrics
-  private async trackMessagePerformance(event: LearningEvent) {
+  private async handleMessageSent(event: LearningEvent): Promise<void> {
     const { leadId, data } = event;
+    
+    // Track template usage
+    if (data.content) {
+      await supabase
+        .from('ai_template_performance')
+        .upsert({
+          template_content: data.content,
+          template_variant: 'default',
+          usage_count: 1,
+          last_used_at: event.timestamp.toISOString()
+        }, {
+          onConflict: 'template_content,template_variant',
+          ignoreDuplicates: false
+        });
+    }
 
-    await supabase.from('ai_message_analytics').insert({
-      lead_id: leadId,
-      message_content: data.content,
-      message_stage: data.stage,
-      template_id: data.templateId,
-      sent_at: event.timestamp.toISOString(),
-      hour_of_day: event.timestamp.getHours(),
-      day_of_week: event.timestamp.getDay()
+    // Update lead response patterns
+    await this.updateLeadResponsePatterns(leadId, {
+      last_interaction_type: 'message_sent',
+      message_content: data.content
     });
   }
 
-  // Update response patterns for lead
-  private async updateResponsePatterns(event: LearningEvent) {
+  private async handleResponseReceived(event: LearningEvent): Promise<void> {
     const { leadId, data } = event;
+    
+    // Update response patterns
+    await this.updateLeadResponsePatterns(leadId, {
+      total_responses: 1,
+      response_time_hours: data.responseTimeHours || 0,
+      last_response_at: event.timestamp.toISOString()
+    });
 
-    await supabase
-      .from('lead_response_patterns')
-      .upsert({
-        lead_id: leadId,
-        total_responses: data.totalResponses || 1,
-        avg_response_time_hours: data.responseTimeHours,
-        best_response_hours: data.bestHours || [],
-        updated_at: new Date().toISOString()
-      });
-  }
-
-  // Record successful conversion
-  private async recordConversionSuccess(event: LearningEvent) {
-    const { leadId, data } = event;
-
+    // Track learning outcome
     await aiLearningService.trackLearningOutcome({
       leadId,
-      messageId: data.messageId,
-      outcomeType: data.conversionType,
-      outcomeValue: data.value,
-      messageCharacteristics: data.messageCharacteristics,
-      leadCharacteristics: data.leadCharacteristics
+      outcomeType: 'response_received',
+      messageCharacteristics: {
+        responseTime: data.responseTimeHours,
+        messageLength: data.messageLength
+      }
     });
   }
 
-  // Incorporate user feedback
-  private async incorporateFeedback(event: LearningEvent) {
+  private async handleFeedbackSubmitted(event: LearningEvent): Promise<void> {
     const { leadId, data } = event;
-
+    
+    // Submit feedback through learning service
     await aiLearningService.submitMessageFeedback({
       leadId,
       messageContent: data.messageContent,
       feedbackType: data.feedbackType,
       rating: data.rating,
-      improvementSuggestions: data.suggestions,
-      conversationId: data.conversationId
+      improvementSuggestions: data.suggestions
+    });
+
+    // Generate insights based on feedback
+    await this.generateFeedbackInsights(leadId, data);
+  }
+
+  private async handleAppointmentBooked(event: LearningEvent): Promise<void> {
+    const { leadId, data } = event;
+    
+    await aiLearningService.trackLearningOutcome({
+      leadId,
+      outcomeType: 'appointment_booked',
+      outcomeValue: 1,
+      leadCharacteristics: data.leadCharacteristics
+    });
+
+    // Generate high-impact insight
+    await this.createLearningInsight({
+      type: 'performance',
+      title: 'Appointment Booked',
+      description: 'Lead successfully converted to appointment',
+      confidence: 0.95,
+      impact: 'high',
+      actionable: true,
+      leadId,
+      data: { appointmentType: data.appointmentType }
     });
   }
 
-  // Optimize message template based on poor performance
-  private async optimizeMessageTemplate(trigger: OptimizationTrigger) {
-    if (!trigger.leadId) return;
+  private async handleConversationAnalyzed(event: LearningEvent): Promise<void> {
+    const { leadId, data } = event;
+    
+    // Create analysis insights
+    if (data.insights) {
+      for (const insight of data.insights) {
+        await this.createLearningInsight({
+          type: 'pattern',
+          title: insight.title,
+          description: insight.description,
+          confidence: insight.confidence,
+          impact: insight.impact,
+          actionable: insight.actionable,
+          leadId,
+          data: insight.data
+        });
+      }
+    }
+  }
 
-    // Get lead preferences
-    const { data: patterns } = await supabase
-      .from('lead_communication_patterns')
-      .select('*')
-      .eq('lead_id', trigger.leadId)
-      .single();
+  private async updateLeadResponsePatterns(leadId: string, updates: any): Promise<void> {
+    try {
+      await supabase
+        .from('lead_response_patterns')
+        .upsert({
+          lead_id: leadId,
+          ...updates,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'lead_id'
+        });
+    } catch (error) {
+      console.error('❌ Error updating lead response patterns:', error);
+    }
+  }
 
-    // Update communication pattern with learned preferences
-    if (patterns) {
-      const currentPreferences = patterns.content_preferences;
-      const updatedPreferences = {
-        ...(typeof currentPreferences === 'object' && currentPreferences !== null ? currentPreferences : {}),
-        avoid_negative_triggers: true,
-        preferred_tone: 'consultative',
-        last_optimization: new Date().toISOString()
+  private async createLearningInsight(insight: Omit<OptimizationInsight, 'id'>): Promise<void> {
+    try {
+      await supabase
+        .from('ai_learning_insights')
+        .insert({
+          insight_type: insight.type,
+          insight_title: insight.title,
+          insight_description: insight.description,
+          confidence_score: insight.confidence,
+          impact_level: insight.impact,
+          actionable: insight.actionable,
+          lead_id: insight.leadId,
+          insight_data: insight.data || {},
+          applies_globally: !insight.leadId
+        });
+    } catch (error) {
+      console.error('❌ Error creating learning insight:', error);
+    }
+  }
+
+  private async generateFeedbackInsights(leadId: string, feedbackData: any): Promise<void> {
+    // Generate insights based on feedback patterns
+    if (feedbackData.feedbackType === 'negative' && feedbackData.rating <= 2) {
+      await this.createLearningInsight({
+        type: 'optimization',
+        title: 'Message Quality Issue Detected',
+        description: `Low-rated message needs improvement: ${feedbackData.suggestions || 'No specific suggestions provided'}`,
+        confidence: 0.8,
+        impact: 'medium',
+        actionable: true,
+        leadId,
+        data: { 
+          originalMessage: feedbackData.messageContent,
+          rating: feedbackData.rating,
+          suggestions: feedbackData.suggestions
+        }
+      });
+    }
+
+    if (feedbackData.feedbackType === 'positive' && feedbackData.rating >= 4) {
+      await this.createLearningInsight({
+        type: 'pattern',
+        title: 'High-Performing Message Pattern',
+        description: 'Message received positive feedback and should be used as template',
+        confidence: 0.9,
+        impact: 'medium',
+        actionable: true,
+        leadId,
+        data: {
+          successfulMessage: feedbackData.messageContent,
+          rating: feedbackData.rating
+        }
+      });
+    }
+  }
+
+  private async updateLearningMetrics(event: LearningEvent): Promise<void> {
+    try {
+      // Get today's metrics
+      const { data: todayMetrics } = await supabase
+        .from('ai_learning_metrics')
+        .select('*')
+        .eq('metric_date', new Date().toISOString().split('T')[0])
+        .single();
+
+      const updates: any = {
+        learning_events_processed: (todayMetrics?.learning_events_processed || 0) + 1
       };
 
-      await supabase
-        .from('lead_communication_patterns')
-        .update({
-          content_preferences: updatedPreferences,
-          learning_confidence: Math.min(1.0, (patterns.learning_confidence || 0) + 0.1)
-        })
-        .eq('lead_id', trigger.leadId);
-    }
-  }
+      if (event.type === 'message_sent') {
+        updates.total_interactions = (todayMetrics?.total_interactions || 0) + 1;
+      }
 
-  // Optimize message timing
-  private async optimizeMessageTiming(trigger: OptimizationTrigger) {
-    if (!trigger.leadId) return;
+      if (event.type === 'feedback_submitted' && event.data.feedbackType === 'positive') {
+        updates.successful_interactions = (todayMetrics?.successful_interactions || 0) + 1;
+      }
 
-    const { data: responseTimes } = await supabase
-      .from('ai_message_analytics')
-      .select('hour_of_day, response_time_hours')
-      .eq('lead_id', trigger.leadId)
-      .not('response_time_hours', 'is', null);
-
-    if (responseTimes && responseTimes.length > 0) {
-      // Find optimal hours based on response times
-      const optimalHours = responseTimes
-        .filter(r => r.response_time_hours < 2) // Quick responses
-        .map(r => r.hour_of_day);
+      if (event.type === 'appointment_booked') {
+        updates.optimization_triggers = (todayMetrics?.optimization_triggers || 0) + 1;
+      }
 
       await supabase
-        .from('lead_contact_timing')
+        .from('ai_learning_metrics')
         .upsert({
-          lead_id: trigger.leadId,
-          best_contact_hours: optimalHours,
-          last_optimal_contact: new Date().toISOString()
+          metric_date: new Date().toISOString().split('T')[0],
+          ...updates,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'metric_date'
         });
+    } catch (error) {
+      console.error('❌ Error updating learning metrics:', error);
     }
   }
 
-  // Optimize message frequency
-  private async optimizeMessageFrequency(trigger: OptimizationTrigger) {
-    // Implementation for frequency optimization
-    console.log('Optimizing message frequency for trigger:', trigger);
+  async getOptimizationInsights(leadId?: string): Promise<{
+    insights: OptimizationInsight[];
+    activeOptimizations: any[];
+    learningMetrics: any;
+  }> {
+    try {
+      // Get insights
+      let insightsQuery = supabase
+        .from('ai_learning_insights')
+        .select('*')
+        .eq('actionable', true)
+        .order('confidence_score', { ascending: false })
+        .limit(10);
+
+      if (leadId) {
+        insightsQuery = insightsQuery.or(`lead_id.eq.${leadId},applies_globally.eq.true`);
+      }
+
+      const { data: insightsData } = await insightsQuery;
+
+      // Get active optimizations
+      const { data: optimizationsData } = await supabase
+        .from('ai_template_performance')
+        .select('*')
+        .gt('usage_count', 0)
+        .order('performance_score', { ascending: false })
+        .limit(5);
+
+      // Get learning metrics
+      const { data: metricsData } = await supabase
+        .from('ai_learning_metrics')
+        .select('*')
+        .order('metric_date', { ascending: false })
+        .limit(7);
+
+      const insights: OptimizationInsight[] = (insightsData || []).map(insight => ({
+        id: insight.id,
+        type: insight.insight_type,
+        title: insight.insight_title,
+        description: insight.insight_description,
+        confidence: insight.confidence_score,
+        impact: insight.impact_level,
+        actionable: insight.actionable,
+        leadId: insight.lead_id,
+        data: insight.insight_data
+      }));
+
+      return {
+        insights,
+        activeOptimizations: optimizationsData || [],
+        learningMetrics: metricsData || []
+      };
+    } catch (error) {
+      console.error('❌ Error getting optimization insights:', error);
+      return {
+        insights: [],
+        activeOptimizations: [],
+        learningMetrics: []
+      };
+    }
   }
 
-  // Escalate to human when AI performance is consistently poor
-  private async escalateToHuman(trigger: OptimizationTrigger) {
-    if (!trigger.leadId) return;
+  async getLeadLearningProfile(leadId: string): Promise<any> {
+    try {
+      const [responsePatterns, insights, outcomes] = await Promise.all([
+        supabase
+          .from('lead_response_patterns')
+          .select('*')
+          .eq('lead_id', leadId)
+          .single(),
+        supabase
+          .from('ai_learning_insights')
+          .select('*')
+          .eq('lead_id', leadId)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('ai_learning_outcomes')
+          .select('*')
+          .eq('lead_id', leadId)
+          .order('created_at', { ascending: false })
+          .limit(10)
+      ]);
 
-    await supabase.from('leads').update({
-      ai_sequence_paused: true,
-      notes: `AI learning escalation: ${trigger.triggerType} detected. Requires human intervention.`
-    }).eq('id', trigger.leadId);
-  }
-
-  // Get optimization insights
-  async getOptimizationInsights(timeframe: 'hour' | 'day' | 'week' = 'day') {
-    const hours = timeframe === 'hour' ? 1 : timeframe === 'day' ? 24 : 168;
-    const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-
-    const { data: feedback } = await supabase
-      .from('ai_message_feedback')
-      .select('*')
-      .gte('created_at', since);
-
-    const { data: outcomes } = await supabase
-      .from('ai_learning_outcomes')
-      .select('*')
-      .gte('created_at', since);
-
-    return {
-      totalOptimizations: this.optimizationQueue.length,
-      recentFeedback: feedback || [],
-      recentOutcomes: outcomes || [],
-      activeOptimizations: this.optimizationQueue.filter(t => 
-        new Date(Date.now() - 60 * 60 * 1000) < new Date()
-      )
-    };
+      return {
+        responsePatterns: responsePatterns.data,
+        insights: insights.data || [],
+        outcomes: outcomes.data || []
+      };
+    } catch (error) {
+      console.error('❌ Error getting lead learning profile:', error);
+      return {
+        responsePatterns: null,
+        insights: [],
+        outcomes: []
+      };
+    }
   }
 }
 

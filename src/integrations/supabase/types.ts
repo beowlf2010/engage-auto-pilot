@@ -148,6 +148,107 @@ export type Database = {
           },
         ]
       }
+      ai_learning_insights: {
+        Row: {
+          actionable: boolean
+          applies_globally: boolean
+          confidence_score: number
+          created_at: string
+          expires_at: string | null
+          id: string
+          impact_level: string
+          implemented: boolean
+          insight_data: Json | null
+          insight_description: string
+          insight_title: string
+          insight_type: string
+          last_validated_at: string | null
+          lead_id: string | null
+        }
+        Insert: {
+          actionable?: boolean
+          applies_globally?: boolean
+          confidence_score?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          impact_level?: string
+          implemented?: boolean
+          insight_data?: Json | null
+          insight_description: string
+          insight_title: string
+          insight_type: string
+          last_validated_at?: string | null
+          lead_id?: string | null
+        }
+        Update: {
+          actionable?: boolean
+          applies_globally?: boolean
+          confidence_score?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          impact_level?: string
+          implemented?: boolean
+          insight_data?: Json | null
+          insight_description?: string
+          insight_title?: string
+          insight_type?: string
+          last_validated_at?: string | null
+          lead_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_learning_insights_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_learning_metrics: {
+        Row: {
+          average_confidence_score: number | null
+          conversion_rate_improvement: number | null
+          created_at: string
+          id: string
+          learning_events_processed: number
+          metric_date: string
+          optimization_triggers: number
+          response_rate_improvement: number | null
+          successful_interactions: number
+          template_improvements: number
+          total_interactions: number
+        }
+        Insert: {
+          average_confidence_score?: number | null
+          conversion_rate_improvement?: number | null
+          created_at?: string
+          id?: string
+          learning_events_processed?: number
+          metric_date?: string
+          optimization_triggers?: number
+          response_rate_improvement?: number | null
+          successful_interactions?: number
+          template_improvements?: number
+          total_interactions?: number
+        }
+        Update: {
+          average_confidence_score?: number | null
+          conversion_rate_improvement?: number | null
+          created_at?: string
+          id?: string
+          learning_events_processed?: number
+          metric_date?: string
+          optimization_triggers?: number
+          response_rate_improvement?: number | null
+          successful_interactions?: number
+          template_improvements?: number
+          total_interactions?: number
+        }
+        Relationships: []
+      }
       ai_learning_outcomes: {
         Row: {
           conversation_quality_score: number | null
@@ -4713,6 +4814,10 @@ export type Database = {
       }
       update_daily_kpis: {
         Args: { target_date?: string }
+        Returns: undefined
+      }
+      update_daily_learning_metrics: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
       update_inventory_days: {
