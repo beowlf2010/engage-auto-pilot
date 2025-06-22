@@ -1,6 +1,13 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+interface MessageCharacteristics {
+  message_content?: string;
+  message_length?: number;
+  sent_hour?: number;
+  response_time_hours?: number;
+}
+
 export class LearningDataBackfillService {
   
   // Backfill historical learning data from existing conversations
@@ -225,7 +232,8 @@ export class LearningDataBackfillService {
       const templatePerformance = new Map();
 
       for (const outcome of messageOutcomes || []) {
-        const messageContent = outcome.message_characteristics?.message_content;
+        const messageCharacteristics = outcome.message_characteristics as MessageCharacteristics;
+        const messageContent = messageCharacteristics?.message_content;
         if (!messageContent) continue;
 
         if (!templatePerformance.has(messageContent)) {
