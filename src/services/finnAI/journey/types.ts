@@ -12,9 +12,9 @@ export interface CustomerJourney {
 
 export interface Touchpoint {
   id: string;
-  type: 'website_visit' | 'email_open' | 'sms_reply' | 'phone_call' | 'appointment' | 'test_drive';
+  type: 'website_visit' | 'email_open' | 'sms_reply' | 'phone_call' | 'appointment' | 'test_drive' | 'customer_message' | 'agent_message' | 'ai_analysis' | 'behavior_update';
   timestamp: Date;
-  channel: 'web' | 'email' | 'sms' | 'phone' | 'in_person';
+  channel: 'web' | 'email' | 'sms' | 'phone' | 'in_person' | 'system';
   data: any;
   engagement_score: number; // 0-1
   outcome?: 'positive' | 'neutral' | 'negative';

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { enhancedContextEngine } from './finnAI/context/contextEngine';
 import { customerJourneyTracker } from './finnAI/customerJourneyTracker';
@@ -91,6 +90,7 @@ class RealTimeContextSyncService {
 
       // Broadcast context update
       await this.broadcastContextUpdate(leadId, {
+        leadId,
         eventType: message.direction === 'in' ? 'message_received' : 'message_sent',
         eventData: {
           messageId: message.id,
@@ -125,6 +125,7 @@ class RealTimeContextSyncService {
 
       // Broadcast memory update
       await this.broadcastContextUpdate(leadId, {
+        leadId,
         eventType: 'journey_update',
         eventData: {
           memoryType: memoryData.memory_type,
@@ -164,6 +165,7 @@ class RealTimeContextSyncService {
 
         // Broadcast AI analysis results
         await this.broadcastContextUpdate(leadId, {
+          leadId,
           eventType: 'ai_analysis',
           eventData: {
             insights,

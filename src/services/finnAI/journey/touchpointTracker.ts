@@ -33,6 +33,22 @@ export class TouchpointTracker {
       case 'test_drive':
         baseScore = 0.95;
         break;
+      case 'customer_message':
+        baseScore = 0.6;
+        if (data.messageLength > 30) baseScore += 0.2;
+        break;
+      case 'agent_message':
+        baseScore = 0.5;
+        if (data.aiGenerated) baseScore += 0.1;
+        break;
+      case 'ai_analysis':
+        baseScore = 0.4;
+        if (data.confidence > 0.8) baseScore += 0.3;
+        break;
+      case 'behavior_update':
+        baseScore = 0.3;
+        if (data.confidence > 0.7) baseScore += 0.2;
+        break;
     }
 
     if (outcome === 'positive') baseScore += 0.2;
