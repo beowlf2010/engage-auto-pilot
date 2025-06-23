@@ -2,17 +2,22 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
+import { useInboxFilters } from '@/hooks/useInboxFilters';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { MessageCircle, Users, Clock, Zap, Brain, Sparkles } from 'lucide-react';
+import { MessageCircle, Users, Clock, Zap, Brain, Sparkles, Filter, Search } from 'lucide-react';
 import EnhancedConversationListItem from './EnhancedConversationListItem';
 import EnhancedMessageBubble from './EnhancedMessageBubble';
 import InventoryAwareMessageInput from './InventoryAwareMessageInput';
 import ConnectionStatusIndicator from './ConnectionStatusIndicator';
 import LeadContextPanel from './LeadContextPanel';
+import EnhancedConversationHeader from './EnhancedConversationHeader';
+import QuickFilters from './QuickFilters';
+import SmartFilters from './SmartFilters';
+import AILearningInsightsPanel from './AILearningInsightsPanel';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 import { useEnhancedConnectionManager } from '@/hooks/useEnhancedConnectionManager';
@@ -29,12 +34,23 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'thread'>('list');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'priority'>('newest');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set());
+  const [showAIInsights, setShowAIInsights] = useState(false);
+  const [aiInsights, setAIInsights] = useState<any>(null);
+  const [aiOptimizationQueue, setAIOptimizationQueue] = useState<any[]>([]);
+  const [isAILearning, setIsAILearning] = useState(false);
 
   // Use the passed user prop or fall back to profile from auth
   const currentUser = user || (profile ? { id: profile.id, role: profile.role } : null);
 
+  // Initialize filters
+  const { filters, updateFilter, clearFilters, hasActiveFilters, applyFilters } = useInboxFilters(currentUser?.id);
+
   const {
-    conversations,
+    conversations: rawConversations,
     messages,
     loading,
     sendingMessage,
@@ -58,10 +74,67 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
     onUnreadCountUpdate: manualRefresh
   });
 
+  // Apply filters and search to conversations
+  const filteredConversations = useMemo(() => {
+    let filtered = applyFilters(rawConversations);
+    
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(conv => 
+        conv.leadName.toLowerCase().includes(query) ||
+        conv.vehicleInterest.toLowerCase().includes(query) ||
+        conv.leadPhone.includes(query) ||
+        conv.lastMessage.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply quick filters
+    if (activeQuickFilters.has('unread')) {
+      filtered = filtered.filter(conv => conv.unreadCount > 0);
+    }
+    if (activeQuickFilters.has('urgent')) {
+      filtered = filtered.filter(conv => conv.unreadCount > 3);
+    }
+    if (activeQuickFilters.has('action_required')) {
+      filtered = filtered.filter(conv => conv.lastMessageDirection === 'in' && conv.unreadCount > 0);
+    }
+    if (activeQuickFilters.has('incoming')) {
+      filtered = filtered.filter(conv => conv.lastMessageDirection === 'in');
+    }
+    if (activeQuickFilters.has('outgoing')) {
+      filtered = filtered.filter(conv => conv.lastMessageDirection === 'out');
+    }
+
+    // Apply sorting
+    return filtered.sort((a, b) => {
+      switch (sortOrder) {
+        case 'oldest':
+          return (a.lastMessageDate?.getTime() || 0) - (b.lastMessageDate?.getTime() || 0);
+        case 'priority':
+          return b.unreadCount - a.unreadCount;
+        case 'newest':
+        default:
+          return (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0);
+      }
+    });
+  }, [rawConversations, applyFilters, searchQuery, activeQuickFilters, sortOrder]);
+
+  // Calculate filter counts
+  const filterCounts = useMemo(() => {
+    return {
+      unread: rawConversations.filter(c => c.unreadCount > 0).length,
+      urgent: rawConversations.filter(c => c.unreadCount > 3).length,
+      actionRequired: rawConversations.filter(c => c.lastMessageDirection === 'in' && c.unreadCount > 0).length,
+      aiGenerated: rawConversations.filter(c => c.aiMessagesSent && c.aiMessagesSent > 0).length
+    };
+  }, [rawConversations]);
+
   // Load messages when conversation is selected
   useEffect(() => {
     if (selectedConversation) {
       loadMessages(selectedConversation.leadId);
+      setShowAIInsights(true);
     }
   }, [selectedConversation, loadMessages]);
 
@@ -124,38 +197,81 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
     }));
   }, [messages, selectedConversation]);
 
+  const handleQuickFilterToggle = useCallback((filterId: string) => {
+    setActiveQuickFilters(prev => {
+      const updated = new Set(prev);
+      if (updated.has(filterId)) {
+        updated.delete(filterId);
+      } else {
+        updated.add(filterId);
+      }
+      return updated;
+    });
+  }, []);
+
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+
+  const handleProcessOptimizations = useCallback(() => {
+    console.log('Processing AI optimizations...');
+    setIsAILearning(true);
+    // Simulate processing
+    setTimeout(() => {
+      setIsAILearning(false);
+      setAIOptimizationQueue([]);
+    }, 2000);
+  }, []);
+
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
-      {/* Left Sidebar - Conversations List */}
+      {/* Left Sidebar - Conversations List with Enhanced Header */}
       <div className="w-1/3 border-r bg-white flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b bg-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-blue-600" />
-              <h2 className="text-lg font-semibold">Smart Inbox</h2>
-              <Badge variant="outline" className="bg-purple-100 text-purple-700">
-                <Brain className="h-3 w-3 mr-1" />
-                AI Enhanced
-              </Badge>
-            </div>
-            <ConnectionStatusIndicator 
-              connectionState={connectionState} 
-              onReconnect={forceReconnect}
-              onForceSync={forceSync}
+        {/* Enhanced Header */}
+        <EnhancedConversationHeader
+          totalCount={rawConversations.length}
+          filteredCount={filteredConversations.length}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          sortOrder={sortOrder}
+          onSortChange={setSortOrder}
+          searchQuery={searchQuery}
+          onSearch={handleSearch}
+          onClearSearch={handleClearSearch}
+          activeFilters={activeQuickFilters}
+          onFilterToggle={handleQuickFilterToggle}
+          urgentCount={filterCounts.urgent}
+          unreadCount={filterCounts.unread}
+          actionRequiredCount={filterCounts.actionRequired}
+          aiGeneratedCount={filterCounts.aiGenerated}
+        />
+
+        {/* Smart Filters */}
+        {hasActiveFilters && (
+          <div className="px-4 pb-4">
+            <SmartFilters
+              filters={filters}
+              onFiltersChange={(newFilters) => {
+                Object.entries(newFilters).forEach(([key, value]) => {
+                  updateFilter(key as any, value);
+                });
+              }}
+              conversations={rawConversations}
             />
           </div>
+        )}
 
-          <div className="flex items-center gap-4 text-sm text-gray-600">
-            <div className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              <span>{conversations.length} conversations</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span>Real-time updates</span>
-            </div>
-          </div>
+        {/* Connection Status */}
+        <div className="px-4 pb-2">
+          <ConnectionStatusIndicator 
+            connectionState={connectionState} 
+            onReconnect={forceReconnect}
+            onForceSync={forceSync}
+          />
         </div>
 
         {/* Conversations List */}
@@ -164,13 +280,27 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
             <div className="flex items-center justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : conversations.length === 0 ? (
+          ) : filteredConversations.length === 0 ? (
             <div className="text-center p-8 text-gray-500">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No conversations found</p>
+              {(searchQuery || hasActiveFilters || activeQuickFilters.size > 0) && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => {
+                    handleClearSearch();
+                    clearFilters();
+                    setActiveQuickFilters(new Set());
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
             </div>
           ) : (
-            conversations.map((conversation) => (
+            filteredConversations.map((conversation) => (
               <EnhancedConversationListItem
                 key={conversation.leadId}
                 conversation={conversation}
@@ -205,6 +335,12 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
                   <Badge variant="outline">
                     {selectedConversation.status}
                   </Badge>
+                  {selectedConversation.aiOptIn && (
+                    <Badge variant="outline" className="bg-purple-100 text-purple-700">
+                      <Brain className="h-3 w-3 mr-1" />
+                      AI Enabled
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -246,13 +382,26 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
 
       {/* Right Sidebar - Lead Context Panel with AI Integration */}
       {selectedConversation && (
-        <div className="w-80 border-l bg-white">
+        <div className="w-80 border-l bg-white flex flex-col">
           <LeadContextPanel
             conversation={selectedConversation}
             onScheduleAppointment={() => {
               console.log('Schedule appointment for:', selectedConversation.leadName);
             }}
           />
+          
+          {/* AI Learning Insights */}
+          {showAIInsights && (
+            <div className="border-t">
+              <AILearningInsightsPanel
+                leadId={selectedConversation.leadId}
+                insights={aiInsights}
+                optimizationQueue={aiOptimizationQueue}
+                isLearning={isAILearning}
+                onProcessOptimizations={handleProcessOptimizations}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
