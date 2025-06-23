@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
@@ -101,6 +100,16 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
     // Refresh conversations list to update unread counts
     setTimeout(manualRefresh, 500);
   }, [selectedConversation?.leadId, sendMessage, manualRefresh]);
+
+  // Create a wrapper function that matches SmartFilters expected interface
+  const handleFiltersChange = useCallback((newFilters: any) => {
+    // If it's a complete filter object, replace all filters
+    if (typeof newFilters === 'object' && newFilters !== null) {
+      Object.keys(newFilters).forEach(key => {
+        updateFilter(key as any, newFilters[key]);
+      });
+    }
+  }, [updateFilter]);
 
   const stats = useMemo(() => {
     const unreadConversations = filteredConversations.filter(c => c.unreadCount > 0).length;
@@ -217,7 +226,7 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
           <div className="mt-4">
             <SmartFilters
               filters={filters}
-              onFiltersChange={updateFilter}
+              onFiltersChange={handleFiltersChange}
               onClearFilters={clearFilters}
               userRole={profile?.role}
               stats={stats}
