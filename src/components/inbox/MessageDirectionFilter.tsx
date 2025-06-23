@@ -58,7 +58,7 @@ const MessageDirectionFilter: React.FC<MessageDirectionFilterProps> = ({
           </span>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {filterOptions.map((option) => {
             const Icon = option.icon;
             const isActive = activeFilter === option.key;
@@ -69,15 +69,15 @@ const MessageDirectionFilter: React.FC<MessageDirectionFilterProps> = ({
                 variant={isActive ? option.variant : "outline"}
                 size="sm"
                 onClick={() => onFilterChange(option.key)}
-                className={`flex items-center gap-2 ${
+                className={`flex items-center gap-2 flex-shrink-0 ${
                   isActive ? 'ring-2 ring-blue-200' : ''
                 }`}
               >
                 <Icon className="h-3 w-3" />
-                <span>{option.label}</span>
+                <span className="whitespace-nowrap">{option.label}</span>
                 <Badge 
                   variant={isActive ? "secondary" : "outline"}
-                  className="ml-1 text-xs"
+                  className="text-xs flex-shrink-0"
                 >
                   {option.count}
                 </Badge>
