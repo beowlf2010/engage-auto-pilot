@@ -3,7 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, MessageSquare, User } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid, parseISO } from 'date-fns';
 import AIInsightIndicator from './AIInsightIndicator';
 
 interface EnhancedConversationListItemProps {
@@ -53,8 +53,38 @@ const EnhancedConversationListItem: React.FC<EnhancedConversationListItemProps> 
     }
   };
 
-  const formatTime = (timestamp: string) => {
-    return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+  const formatTime = (timestamp: string | null | undefined) => {
+    if (!timestamp) {
+      return 'Unknown time';
+    }
+
+    try {
+      // Try to parse the timestamp
+      let date: Date;
+      
+      if (typeof timestamp === 'string') {
+        // Try parsing as ISO string first
+        date = parseISO(timestamp);
+        
+        // If that fails, try creating a new Date
+        if (!isValid(date)) {
+          date = new Date(timestamp);
+        }
+      } else {
+        date = new Date(timestamp);
+      }
+
+      // Check if the date is valid
+      if (!isValid(date)) {
+        console.warn('Invalid date timestamp:', timestamp);
+        return 'Invalid date';
+      }
+
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch (error) {
+      console.warn('Error formatting time for timestamp:', timestamp, error);
+      return 'Time error';
+    }
   };
 
   const handleClick = () => {
