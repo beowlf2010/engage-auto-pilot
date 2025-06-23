@@ -1,6 +1,6 @@
 
 import React from 'react';
-import SmartInboxWithEnhancedAI from './SmartInboxWithEnhancedAI';
+import SmartInboxWithAILearning from './SmartInboxWithAILearning';
 
 interface SmartInboxMainProps {
   onLeadsRefresh?: () => void;
@@ -23,9 +23,12 @@ interface SmartInboxMainProps {
   [key: string]: any; // Allow additional props to pass through
 }
 
-const SmartInboxMain: React.FC<SmartInboxMainProps> = ({ onLeadsRefresh, user, ...otherProps }) => {
-  // Pass only the props that SmartInboxWithEnhancedAI actually needs
-  return <SmartInboxWithEnhancedAI onLeadsRefresh={onLeadsRefresh} />;
+const SmartInboxMain: React.FC<SmartInboxMainProps> = ({ user, ...otherProps }) => {
+  // If user is not provided, create a mock user to prevent crashes
+  const safeUser = user || { role: 'admin', id: 'mock-user' };
+  
+  // Pass through to the full-featured AI learning component instead of the basic one
+  return <SmartInboxWithAILearning user={safeUser} {...otherProps} />;
 };
 
 export default SmartInboxMain;

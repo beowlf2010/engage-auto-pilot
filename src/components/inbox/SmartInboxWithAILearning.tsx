@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
 import { useUnifiedAIScheduler } from '@/hooks/useUnifiedAIScheduler';
@@ -5,7 +6,7 @@ import { useLeads } from '@/hooks/useLeads';
 import { useMarkAsRead } from '@/hooks/inbox/useMarkAsRead';
 import { realtimeLearningService } from '@/services/realtimeLearningService';
 import { aiEmergencyService } from '@/services/aiEmergencyService';
-import SmartInboxMain from './SmartInboxMain';
+import SmartInboxWithEnhancedAI from './SmartInboxWithEnhancedAI';
 import AILearningDashboard from '@/components/ai/AILearningDashboard';
 import AILearningMessageWrapper from './AILearningMessageWrapper';
 import AIEmergencyToggle from '@/components/ai/AIEmergencyToggle';
@@ -22,10 +23,42 @@ interface SmartInboxWithAILearningProps {
     role: string;
     id: string;
   };
+  // Accept potential enhanced props if passed from above
+  conversations?: any[];
+  messages?: any[];
+  sendingMessage?: boolean;
+  loading?: boolean;
+  loadMessages?: (leadId: string) => Promise<void>;
+  sendMessage?: (leadId: string, message: string) => Promise<void>;
+  setError?: (error: string | null) => void;
+  debugPanelOpen?: boolean;
+  setDebugPanelOpen?: (open: boolean) => void;
+  markAsRead?: (leadId: string) => Promise<void>;
+  markingAsRead?: string | null;
+  getLeadIdFromUrl?: () => string | null;
+  onLeadsRefresh?: () => void;
+  [key: string]: any;
 }
 
-const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ user }) => {
-  const [debugPanelOpen, setDebugPanelOpen] = useState(false);
+const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ 
+  user, 
+  // Extract enhanced props if provided
+  conversations: propConversations,
+  messages: propMessages,
+  sendingMessage: propSendingMessage,
+  loading: propLoading,
+  loadMessages: propLoadMessages,
+  sendMessage: propSendMessage,
+  setError: propSetError,
+  debugPanelOpen: propDebugPanelOpen,
+  setDebugPanelOpen: propSetDebugPanelOpen,
+  markAsRead: propMarkAsRead,
+  markingAsRead: propMarkingAsRead,
+  getLeadIdFromUrl: propGetLeadIdFromUrl,
+  onLeadsRefresh,
+  ...otherProps
+}) => {
+  const [debugPanelOpen, setDebugPanelOpen] = useState(propDebugPanelOpen || false);
   const [showLearningDashboard, setShowLearningDashboard] = useState(false);
   const [showAIMessageWrapper, setShowAIMessageWrapper] = useState(false);
   const [predictiveInsightsOpen, setPredictiveInsightsOpen] = useState(false);
@@ -36,21 +69,25 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   useUnifiedAIScheduler();
   const { forceRefresh: refreshLeads } = useLeads();
 
-  // Use the stable optimized inbox hook instead of the complex enhanced one
-  const { 
-    conversations, 
-    messages, 
-    loading, 
-    error,
-    sendingMessage,
-    totalConversations,
-    loadMessages, 
-    sendMessage: baseSendMessage, 
-    manualRefresh,
-    setError
-  } = useOptimizedInbox({
-    onLeadsRefresh: refreshLeads
+  // Use enhanced props if provided, otherwise fall back to hooks
+  const shouldUseEnhancedProps = propConversations !== undefined;
+
+  // Use the stable optimized inbox hook only if props aren't provided
+  const hookData = useOptimizedInbox({
+    onLeadsRefresh: onLeadsRefresh || refreshLeads
   });
+
+  // Choose data source based on what's available
+  const conversations = shouldUseEnhancedProps ? (propConversations || []) : hookData.conversations;
+  const messages = shouldUseEnhancedProps ? (propMessages || []) : hookData.messages;
+  const loading = shouldUseEnhancedProps ? (propLoading || false) : hookData.loading;
+  const error = shouldUseEnhancedProps ? null : hookData.error;
+  const sendingMessage = shouldUseEnhancedProps ? (propSendingMessage || false) : hookData.sendingMessage;
+  const totalConversations = shouldUseEnhancedProps ? conversations.length : hookData.totalConversations;
+  const loadMessages = shouldUseEnhancedProps ? (propLoadMessages || (() => Promise.resolve())) : hookData.loadMessages;
+  const baseSendMessage = shouldUseEnhancedProps ? (propSendMessage || (() => Promise.resolve())) : hookData.sendMessage;
+  const manualRefresh = shouldUseEnhancedProps ? (() => {}) : hookData.manualRefresh;
+  const setError = shouldUseEnhancedProps ? (propSetError || (() => {})) : hookData.setError;
 
   // Initialize enhanced learning service
   useEffect(() => {
@@ -84,6 +121,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
 
   // Mark as read functionality
   const { markAsRead, markingAsRead } = useMarkAsRead(manualRefresh);
+  const finalMarkAsRead = shouldUseEnhancedProps ? (propMarkAsRead || markAsRead) : markAsRead;
+  const finalMarkingAsRead = shouldUseEnhancedProps ? (propMarkingAsRead || null) : markingAsRead;
 
   // Initialize AI emergency service with error handling
   useEffect(() => {
@@ -236,7 +275,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     hasError: !!error,
     showLearningDashboard,
     selectedLead,
-    aiDisabled
+    aiDisabled,
+    shouldUseEnhancedProps
   });
 
   const shouldShowStatus = error || (loading && filteredConversations.length === 0);
@@ -255,6 +295,16 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
           onToggle={() => setDebugPanelOpen(!debugPanelOpen)}
         />
       </>
+    );
+  }
+
+  // If enhanced props are provided, render the enhanced AI inbox directly
+  if (shouldUseEnhancedProps) {
+    return (
+      <SmartInboxWithEnhancedAI 
+        onLeadsRefresh={onLeadsRefresh || refreshLeads}
+        {...otherProps}
+      />
     );
   }
 
@@ -351,26 +401,10 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                 </div>
               )}
 
-              {/* Main Inbox Content */}
+              {/* Main Inbox Content - Use Enhanced AI Component */}
               <div className="flex-1">
-                <SmartInboxMain
-                  user={user}
-                  conversations={filteredConversations}
-                  messages={messages}
-                  sendingMessage={sendingMessage}
-                  loading={loading}
-                  loadMessages={enhancedLoadMessages}
-                  sendMessage={sendMessage}
-                  setError={setError}
-                  debugPanelOpen={debugPanelOpen}
-                  setDebugPanelOpen={setDebugPanelOpen}
-                  markAsRead={markAsRead}
-                  markingAsRead={markingAsRead}
-                  getLeadIdFromUrl={() => {
-                    const searchParams = new URLSearchParams(window.location.search);
-                    return searchParams.get('leadId');
-                  }}
-                  {...stateProps}
+                <SmartInboxWithEnhancedAI
+                  onLeadsRefresh={onLeadsRefresh || refreshLeads}
                 />
               </div>
             </div>
