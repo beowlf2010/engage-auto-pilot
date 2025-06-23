@@ -9,6 +9,7 @@ export interface InboxFilters {
   search: string;
   unreadOnly: boolean;
   myLeadsOnly: boolean;
+  inboundOnly: boolean;
 }
 
 const defaultFilters: InboxFilters = {
@@ -18,7 +19,8 @@ const defaultFilters: InboxFilters = {
   assigned: null,
   search: '',
   unreadOnly: false,
-  myLeadsOnly: false
+  myLeadsOnly: false,
+  inboundOnly: false
 };
 
 export const useInboxFilters = (profileId?: string) => {
@@ -42,7 +44,8 @@ export const useInboxFilters = (profileId?: string) => {
            filters.assigned !== null ||
            filters.search.length > 0 ||
            filters.unreadOnly ||
-           filters.myLeadsOnly;
+           filters.myLeadsOnly ||
+           filters.inboundOnly;
   }, [filters]);
 
   const applyFilters = useCallback((conversations: any[]) => {
@@ -75,6 +78,11 @@ export const useInboxFilters = (profileId?: string) => {
 
       // My leads only filter
       if (filters.myLeadsOnly && profileId && conv.salespersonId !== profileId) {
+        return false;
+      }
+
+      // Inbound messages only filter
+      if (filters.inboundOnly && !conv.hasInboundMessages) {
         return false;
       }
 
