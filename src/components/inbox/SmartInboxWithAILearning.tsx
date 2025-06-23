@@ -1,22 +1,21 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
+import { useSimplifiedRealtimeInbox } from '@/hooks/useSimplifiedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { MessageCircle, Users, Clock, Zap, Brain, Sparkles } from 'lucide-react';
+import { MessageCircle, Users, Clock, Brain, Filter, Search } from 'lucide-react';
 import EnhancedConversationListItem from './EnhancedConversationListItem';
 import EnhancedMessageBubble from './EnhancedMessageBubble';
 import InventoryAwareMessageInput from './InventoryAwareMessageInput';
-import ConnectionStatusIndicator from './ConnectionStatusIndicator';
+import SimpleConnectionStatus from './SimpleConnectionStatus';
 import LeadContextPanel from './LeadContextPanel';
+import UnifiedSearchBar from './UnifiedSearchBar';
+import QuickFilters from './QuickFilters';
+import MessageDirectionFilter from './MessageDirectionFilter';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
-import { useEnhancedConnectionManager } from '@/hooks/useEnhancedConnectionManager';
-import { useOptimisticUnreadCounts } from '@/hooks/useOptimisticUnreadCounts';
-import { useDebouncedRefresh } from '@/hooks/useDebouncedRefresh';
 
 interface SmartInboxWithAILearningProps {
   onLeadsRefresh?: () => void;
@@ -32,41 +31,107 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
 }) => {
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
-  const [messageText, setMessageText] = useState('');
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const [messageFilter, setMessageFilter] = useState<'all' | 'inbound' | 'sent' | 'unread'>('all');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   const {
     conversations,
     messages,
     loading,
     sendingMessage,
+    connectionState,
     loadMessages,
     sendMessage,
     retryMessage,
     manualRefresh
-  } = useEnhancedRealtimeInbox({ onLeadsRefresh });
+  } = useSimplifiedRealtimeInbox({ onLeadsRefresh });
 
-  // Enhanced connection manager for better status handling
-  const { connectionState, forceReconnect, forceSync } = useEnhancedConnectionManager({
-    onMessageUpdate: (leadId: string) => {
-      if (selectedConversation?.leadId === leadId) {
-        loadMessages(leadId);
+  // Filter conversations based on search and filters
+  const filteredConversations = useMemo(() => {
+    let filtered = [...conversations];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(conv => 
+        conv.leadName.toLowerCase().includes(query) ||
+        conv.vehicleInterest.toLowerCase().includes(query) ||
+        conv.leadPhone.includes(query)
+      );
+    }
+
+    // Apply message direction filter
+    switch (messageFilter) {
+      case 'unread':
+        filtered = filtered.filter(conv => conv.unreadCount > 0);
+        break;
+      case 'inbound':
+        // Show conversations with recent inbound messages
+        break;
+      case 'sent':
+        // Show conversations with recent outbound messages
+        break;
+    }
+
+    // Apply quick filters
+    if (activeFilters.has('urgent')) {
+      filtered = filtered.filter(conv => conv.unreadCount > 3);
+    }
+    if (activeFilters.has('unread')) {
+      filtered = filtered.filter(conv => conv.unreadCount > 0);
+    }
+    if (activeFilters.has('recent')) {
+      // Filter for conversations with activity in last 24 hours
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      // This would need more sophisticated filtering based on actual timestamps
+    }
+
+    return filtered;
+  }, [conversations, searchQuery, messageFilter, activeFilters]);
+
+  // Calculate filter counts
+  const filterCounts = useMemo(() => {
+    const unreadCount = conversations.filter(c => c.unreadCount > 0).length;
+    const urgentCount = conversations.filter(c => c.unreadCount > 3).length;
+    
+    return {
+      total: conversations.length,
+      unread: unreadCount,
+      urgent: urgentCount,
+      inbound: 0, // Would need message direction analysis
+      sent: 0 // Would need message direction analysis
+    };
+  }, [conversations]);
+
+  // Handle search
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (query.trim() && !recentSearches.includes(query)) {
+      setRecentSearches(prev => [query, ...prev.slice(0, 4)]);
+    }
+  }, [recentSearches]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+
+  // Handle quick filters
+  const handleFilterToggle = useCallback((filterId: string) => {
+    setActiveFilters(prev => {
+      const newFilters = new Set(prev);
+      if (newFilters.has(filterId)) {
+        newFilters.delete(filterId);
+      } else {
+        newFilters.add(filterId);
       }
-    },
-    onConversationUpdate: manualRefresh,
-    onUnreadCountUpdate: manualRefresh
-  });
-
-  // Optimistic unread counts management
-  const {
-    updateOptimisticUnreadCount,
-    markAsReadOptimistically,
-    getEffectiveUnreadCount,
-    clearOptimisticCount,
-    isMarking
-  } = useOptimisticUnreadCounts();
-
-  // Debounced refresh for performance
-  const { debouncedRefresh } = useDebouncedRefresh(manualRefresh, 300);
+      return newFilters;
+    });
+  }, []);
 
   // Load messages when conversation is selected
   useEffect(() => {
@@ -80,7 +145,6 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
 
     try {
       await sendMessage(selectedConversation.leadId, messageContent.trim());
-      setMessageText('');
       
       toast({
         title: "Message Sent",
@@ -123,9 +187,9 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
       {/* Left Sidebar - Conversations List */}
       <div className="w-1/3 border-r bg-white flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b bg-white">
-          <div className="flex items-center justify-between mb-4">
+        {/* Header with Search and Filters */}
+        <div className="p-4 border-b bg-white space-y-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-blue-600" />
               <h2 className="text-lg font-semibold">Smart Inbox</h2>
@@ -134,17 +198,45 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                 AI Enhanced
               </Badge>
             </div>
-            <ConnectionStatusIndicator 
+            <SimpleConnectionStatus 
               connectionState={connectionState} 
-              onReconnect={forceReconnect}
-              onForceSync={forceSync}
+              onReconnect={manualRefresh}
+              onForceSync={manualRefresh}
             />
           </div>
+
+          {/* Search Bar */}
+          <UnifiedSearchBar
+            searchQuery={searchQuery}
+            onSearch={handleSearch}
+            onClearSearch={handleClearSearch}
+            recentSearches={recentSearches}
+            searchResultsCount={filteredConversations.length}
+          />
+
+          {/* Quick Filters */}
+          <QuickFilters
+            activeFilters={activeFilters}
+            onFilterToggle={handleFilterToggle}
+            urgentCount={filterCounts.urgent}
+            unreadCount={filterCounts.unread}
+          />
+
+          {/* Message Direction Filter */}
+          <MessageDirectionFilter
+            activeFilter={messageFilter}
+            onFilterChange={setMessageFilter}
+            inboundCount={filterCounts.inbound}
+            sentCount={filterCounts.sent}
+            totalCount={filterCounts.total}
+            unreadCount={filterCounts.unread}
+            type="conversations"
+          />
 
           <div className="flex items-center gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-1">
               <Users className="h-4 w-4" />
-              <span>{conversations.length} conversations</span>
+              <span>{filteredConversations.length} conversations</span>
             </div>
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
@@ -159,13 +251,27 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
             <div className="flex items-center justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : conversations.length === 0 ? (
+          ) : filteredConversations.length === 0 ? (
             <div className="text-center p-8 text-gray-500">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No conversations found</p>
+              {(searchQuery || activeFilters.size > 0) && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setSearchQuery('');
+                    setActiveFilters(new Set());
+                    setMessageFilter('all');
+                  }}
+                  className="mt-2"
+                >
+                  Clear filters
+                </Button>
+              )}
             </div>
           ) : (
-            conversations.map((conversation) => (
+            filteredConversations.map((conversation) => (
               <EnhancedConversationListItem
                 key={conversation.leadId}
                 conversation={conversation}
@@ -200,6 +306,15 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                   <Badge variant="outline">
                     {selectedConversation.status}
                   </Badge>
+                  {connectionState.isConnected ? (
+                    <Badge variant="outline" className="bg-green-50 text-green-700">
+                      Connected
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive">
+                      {connectionState.status}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
