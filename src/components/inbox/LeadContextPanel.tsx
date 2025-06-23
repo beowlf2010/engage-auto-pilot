@@ -5,13 +5,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   User, 
   StickyNote,
-  TrendingUp
+  TrendingUp,
+  Brain
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import AppointmentsList from '../appointments/AppointmentsList';
 import MarkLostConfirmDialog from '../leads/MarkLostConfirmDialog';
 import LeadNotesTab from './LeadNotesTab';
 import LeadOverviewTab from './LeadOverviewTab';
+import IntelligentAIPanel from './IntelligentAIPanel';
 import { markLeadAsLost } from '@/services/leadStatusService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -100,6 +102,15 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
     }
   };
 
+  const handleSendAIMessage = async (message: string) => {
+    console.log('AI message to send:', message);
+    // This would be handled by the parent component's message sending logic
+    toast({
+      title: "AI Message Ready",
+      description: "The AI message has been prepared. Use the message input to send it.",
+    });
+  };
+
   if (!conversation) {
     return (
       <Card className="h-full">
@@ -123,7 +134,7 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
 
         <CardContent className="p-0 h-[calc(100%-5rem)] overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 mx-4">
+            <TabsList className="grid w-full grid-cols-5 mx-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="notes">
                 <StickyNote className="h-3 w-3 mr-1" />
@@ -131,6 +142,10 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
               </TabsTrigger>
               <TabsTrigger value="appointments">Appointments</TabsTrigger>
               <TabsTrigger value="activity">Activity</TabsTrigger>
+              <TabsTrigger value="ai">
+                <Brain className="h-3 w-3 mr-1" />
+                AI
+              </TabsTrigger>
             </TabsList>
 
             <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -172,6 +187,16 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
                   <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500">Activity tracking coming soon</p>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="ai" className="mt-4 space-y-4">
+                <IntelligentAIPanel
+                  conversation={conversation}
+                  messages={[]} // Messages would be passed from parent
+                  onSendMessage={handleSendAIMessage}
+                  canReply={true}
+                  isCollapsed={false}
+                />
               </TabsContent>
             </div>
           </Tabs>

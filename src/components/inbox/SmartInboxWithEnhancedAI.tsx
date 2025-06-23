@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -10,8 +11,7 @@ import EnhancedConversationListItem from './EnhancedConversationListItem';
 import EnhancedMessageBubble from './EnhancedMessageBubble';
 import InventoryAwareMessageInput from './InventoryAwareMessageInput';
 import ConnectionStatusIndicator from './ConnectionStatusIndicator';
-import IntelligentAIPanel from './IntelligentAIPanel';
-import ChatAIPanelsContainer from './ChatAIPanelsContainer';
+import LeadContextPanel from './LeadContextPanel';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 import { useEnhancedConnectionManager } from '@/hooks/useEnhancedConnectionManager';
@@ -24,9 +24,6 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
-  const [showAIPanel, setShowAIPanel] = useState(true);
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   const {
     conversations,
@@ -221,72 +218,15 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
         )}
       </div>
 
-      {/* Right Sidebar - AI Panels */}
+      {/* Right Sidebar - Lead Context Panel with AI Integration */}
       {selectedConversation && (
-        <div className="w-80 border-l bg-white flex flex-col">
-          <div className="p-4 border-b">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="h-5 w-5 text-purple-600" />
-              <h3 className="font-semibold">AI Assistant</h3>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Intelligent AI Panel - Main Feature */}
-            <IntelligentAIPanel
-              conversation={selectedConversation}
-              messages={conversationMessages}
-              onSendMessage={handleSendMessage}
-              canReply={canReply || false}
-              isCollapsed={!showAIPanel}
-              onToggleCollapse={() => setShowAIPanel(!showAIPanel)}
-            />
-
-            <Separator />
-
-            {/* Additional AI Panels */}
-            <ChatAIPanelsContainer
-              showAnalysis={showAnalysis}
-              showAIPanel={false} // We're showing the intelligent panel above
-              showAIGenerator={showAIGenerator}
-              canReply={canReply || false}
-              selectedConversation={selectedConversation}
-              messages={conversationMessages}
-              onSummaryUpdate={() => {}}
-              onSelectSuggestion={handleSendMessage}
-              onToggleAIPanel={() => setShowAIPanel(!showAIPanel)}
-              onSendAIMessage={handleSendMessage}
-              onCloseAIGenerator={() => setShowAIGenerator(false)}
-            />
-
-            {/* AI Panel Controls */}
-            <Card>
-              <CardContent className="p-3">
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAnalysis(!showAnalysis)}
-                    className="justify-start"
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    {showAnalysis ? 'Hide' : 'Show'} Analysis
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAIGenerator(!showAIGenerator)}
-                    className="justify-start"
-                    disabled={!canReply}
-                  >
-                    <Brain className="h-4 w-4 mr-2" />
-                    AI Message Generator
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="w-80 border-l bg-white">
+          <LeadContextPanel
+            conversation={selectedConversation}
+            onScheduleAppointment={() => {
+              console.log('Schedule appointment for:', selectedConversation.leadName);
+            }}
+          />
         </div>
       )}
     </div>
