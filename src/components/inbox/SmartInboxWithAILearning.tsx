@@ -17,20 +17,18 @@ import UnifiedSearchBar from './UnifiedSearchBar';
 import QuickFilters from './QuickFilters';
 import MessageDirectionFilter from './MessageDirectionFilter';
 import AIResponseIndicator from './AIResponseIndicator';
+import AIResponsePreview from './AIResponsePreview';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 
 interface SmartInboxWithAILearningProps {
+  user: { role: string; id: string };
   onLeadsRefresh?: () => void;
-  user?: {
-    role: string;
-    id: string;
-  };
 }
 
 const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ 
-  onLeadsRefresh,
-  user 
+  user, 
+  onLeadsRefresh 
 }) => {
   const { profile } = useAuth();
   const { markAsRead, isMarkingAsRead } = useMarkAsRead();
@@ -56,7 +54,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
 
   // Initialize auto AI responses
   const { manualTrigger: triggerAIResponse, isProcessing: aiProcessing } = useAutoAIResponses({
-    profileId: profile?.id || '',
+    profileId: user.id,
     onResponseGenerated: (leadId, response) => {
       console.log('🤖 AI response generated for lead:', leadId);
       // Refresh messages if this is the selected conversation
@@ -65,6 +63,17 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
       }
       // Refresh conversations to update last message
       manualRefresh();
+    }
+  });
+
+  // Add AI response preview handling
+  const { manualTrigger } = useAutoAIResponses({
+    profileId: user.id,
+    onResponsePreview: (leadId: string, preview: any) => {
+      setAiResponsePreviews(prev => ({
+        ...prev,
+        [leadId]: preview
+      }));
     }
   });
 
@@ -220,6 +229,25 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
     }
   }, [selectedConversation, triggerAIResponse]);
 
+  const [aiResponsePreviews, setAiResponsePreviews] = useState<Record<string, any>>({});
+
+  const handleDismissPreview = (leadId: string) => {
+    setAiResponsePreviews(prev => {
+      const updated = { ...prev };
+      delete updated[leadId];
+      return updated;
+    });
+  };
+
+  const handlePreviewSent = (leadId: string) => {
+    handleDismissPreview(leadId);
+    if (selectedConversation?.leadId === leadId) {
+      loadMessages(leadId);
+    }
+    manualRefresh();
+    onLeadsRefresh?.();
+  };
+
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
       {/* Left Sidebar - Conversations List */}
@@ -365,6 +393,23 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* AI Response Preview */}
+            {aiResponsePreviews[selectedConversation.leadId] && (
+              <div className="p-4 border-b bg-white">
+                <AIResponsePreview
+                  leadId={selectedConversation.leadId}
+                  preview={aiResponsePreviews[selectedConversation.leadId]}
+                  profileId={user.id}
+                  onSent={() => handlePreviewSent(selectedConversation.leadId)}
+                  onDismiss={() => handleDismissPreview(selectedConversation.leadId)}
+                  onFeedback={(feedback, notes) => {
+                    console.log('AI Response feedback:', feedback, notes);
+                    // Could capture this feedback for learning
+                  }}
+                />
+              </div>
+            )}
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">

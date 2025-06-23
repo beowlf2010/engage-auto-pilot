@@ -2,18 +2,22 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Brain, Loader2, Zap } from 'lucide-react';
+import { Brain, Loader2, Zap, Eye } from 'lucide-react';
 
 interface AIResponseIndicatorProps {
   isGenerating?: boolean;
   onManualTrigger?: () => void;
   canTrigger?: boolean;
+  hasPreview?: boolean;
+  onViewPreview?: () => void;
 }
 
 const AIResponseIndicator: React.FC<AIResponseIndicatorProps> = ({
   isGenerating = false,
   onManualTrigger,
-  canTrigger = false
+  canTrigger = false,
+  hasPreview = false,
+  onViewPreview
 }) => {
   if (isGenerating) {
     return (
@@ -21,6 +25,20 @@ const AIResponseIndicator: React.FC<AIResponseIndicatorProps> = ({
         <Loader2 className="h-3 w-3 mr-1 animate-spin" />
         Finn is thinking...
       </Badge>
+    );
+  }
+
+  if (hasPreview && onViewPreview) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onViewPreview}
+        className="h-6 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+      >
+        <Eye className="h-3 w-3 mr-1" />
+        View Response
+      </Button>
     );
   }
 

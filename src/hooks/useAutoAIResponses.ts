@@ -2,15 +2,15 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse, shouldGenerateResponse } from '@/services/intelligentConversationAI';
-import { consolidatedSendMessage } from '@/services/consolidatedMessagesService';
 import { toast } from '@/hooks/use-toast';
 
 interface UseAutoAIResponsesProps {
   profileId: string;
-  onResponseGenerated?: (leadId: string, response: string) => void;
+  onResponseGenerated?: (leadId: string, response: string, context: any) => void;
+  onResponsePreview?: (leadId: string, preview: any) => void;
 }
 
-export const useAutoAIResponses = ({ profileId, onResponseGenerated }: UseAutoAIResponsesProps) => {
+export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponsePreview }: UseAutoAIResponsesProps) => {
   const processedMessages = useRef(new Set<string>());
   const isProcessing = useRef(false);
 
@@ -23,7 +23,7 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated }: UseAutoAI
     isProcessing.current = true;
 
     try {
-      console.log('🤖 [AUTO AI] Processing incoming message for AI response:', leadId);
+      console.log('🤖 [AUTO AI] Processing incoming message for AI preview:', leadId);
 
       // Get lead and conversation data
       const { data: lead } = await supabase
@@ -71,7 +71,7 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated }: UseAutoAI
         return;
       }
 
-      // Generate AI response
+      // Generate AI response PREVIEW (don't send)
       const aiResponse = await generateEnhancedIntelligentResponse(context);
       
       if (!aiResponse?.message) {
@@ -79,41 +79,37 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated }: UseAutoAI
         return;
       }
 
-      console.log('🤖 [AUTO AI] Generated response:', aiResponse.message);
+      console.log('🤖 [AUTO AI] Generated response preview:', aiResponse.message);
 
-      // Send the AI response
-      const result = await consolidatedSendMessage({
-        leadId,
-        messageBody: aiResponse.message,
-        profileId,
-        isAIGenerated: true
-      });
-
-      if (result.success) {
-        console.log('✅ [AUTO AI] AI response sent successfully for:', leadId);
-        onResponseGenerated?.(leadId, aiResponse.message);
-        
-        toast({
-          title: "Finn Responded",
-          description: `AI generated and sent a response to ${lead.first_name}`,
+      // Show preview instead of auto-sending
+      if (onResponsePreview) {
+        onResponsePreview(leadId, {
+          message: aiResponse.message,
+          confidence: aiResponse.confidence,
+          reasoning: aiResponse.reasoning,
+          leadName: lead.first_name,
+          context: context
         });
-      } else {
-        console.error('❌ [AUTO AI] Failed to send AI response:', result.error);
       }
 
+      toast({
+        title: "Finn Generated Response",
+        description: `AI response ready for review for ${lead.first_name}`,
+      });
+
     } catch (error) {
-      console.error('❌ [AUTO AI] Error processing message for AI response:', error);
+      console.error('❌ [AUTO AI] Error processing message for AI preview:', error);
     } finally {
       isProcessing.current = false;
     }
-  }, [profileId, onResponseGenerated]);
+  }, [profileId, onResponseGenerated, onResponsePreview]);
 
   // Subscribe to new incoming messages
   useEffect(() => {
-    console.log('🤖 [AUTO AI] Setting up real-time subscription for AI responses');
+    console.log('🤖 [AUTO AI] Setting up real-time subscription for AI previews');
 
     const channel = supabase
-      .channel('ai-auto-responses')
+      .channel('ai-auto-previews')
       .on(
         'postgres_changes',
         {
@@ -135,7 +131,7 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated }: UseAutoAI
       .subscribe();
 
     return () => {
-      console.log('🤖 [AUTO AI] Cleaning up AI response subscription');
+      console.log('🤖 [AUTO AI] Cleaning up AI preview subscription');
       supabase.removeChannel(channel);
     };
   }, [processIncomingMessage]);

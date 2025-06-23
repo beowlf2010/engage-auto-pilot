@@ -1,7 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse, shouldGenerateResponse } from './intelligentConversationAI';
-import { consolidatedSendMessage } from './consolidatedMessagesService';
 
 class BackgroundAIProcessor {
   private isRunning = false;
@@ -11,11 +10,11 @@ class BackgroundAIProcessor {
     if (this.isRunning) return;
     
     this.isRunning = true;
-    console.log('🤖 [BACKGROUND AI] Starting background AI processor');
+    console.log('🤖 [BACKGROUND AI] Starting background AI processor (PREVIEW MODE)');
 
-    // Process every 30 seconds
+    // Process every 30 seconds - but only for previews now
     this.intervalId = setInterval(() => {
-      this.processLeadsNeedingAI(profileId);
+      this.processLeadsForPreviews(profileId);
     }, 30000);
   }
 
@@ -28,9 +27,9 @@ class BackgroundAIProcessor {
     console.log('🤖 [BACKGROUND AI] Stopped background AI processor');
   }
 
-  private async processLeadsNeedingAI(profileId: string) {
+  private async processLeadsForPreviews(profileId: string) {
     try {
-      console.log('🤖 [BACKGROUND AI] Checking for leads needing AI responses');
+      console.log('🤖 [BACKGROUND AI] Checking for leads needing AI response previews');
 
       // Find leads with recent inbound messages that haven't been responded to
       const { data: leadsNeedingResponse } = await supabase
@@ -50,24 +49,24 @@ class BackgroundAIProcessor {
         .eq('ai_opt_in', true)
         .eq('conversations.direction', 'in')
         .gte('conversations.sent_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
-        .limit(10);
+        .limit(5); // Reduced limit for preview mode
 
       if (!leadsNeedingResponse || leadsNeedingResponse.length === 0) {
         return;
       }
 
       for (const lead of leadsNeedingResponse) {
-        await this.processLeadForAI(lead, profileId);
+        await this.generatePreviewForLead(lead, profileId);
         // Small delay between processing
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
 
     } catch (error) {
-      console.error('❌ [BACKGROUND AI] Error in background processing:', error);
+      console.error('❌ [BACKGROUND AI] Error in background preview processing:', error);
     }
   }
 
-  private async processLeadForAI(lead: any, profileId: string) {
+  private async generatePreviewForLead(lead: any, profileId: string) {
     try {
       // Get full conversation history
       const { data: conversations } = await supabase
@@ -102,29 +101,20 @@ class BackgroundAIProcessor {
         return;
       }
 
-      // Generate AI response
+      // Generate AI response PREVIEW (don't send)
       const aiResponse = await generateEnhancedIntelligentResponse(context);
       
       if (!aiResponse?.message) {
         return;
       }
 
-      console.log(`🤖 [BACKGROUND AI] Generated response for ${lead.first_name}:`, aiResponse.message);
-
-      // Send the AI response
-      const result = await consolidatedSendMessage({
-        leadId: lead.id,
-        messageBody: aiResponse.message,
-        profileId,
-        isAIGenerated: true
-      });
-
-      if (result.success) {
-        console.log(`✅ [BACKGROUND AI] Sent AI response to ${lead.first_name}`);
-      }
+      console.log(`🤖 [BACKGROUND AI] Generated preview for ${lead.first_name}:`, aiResponse.message);
+      
+      // In a real implementation, this would trigger a notification or update the UI
+      // For now, we just log that a preview is ready
 
     } catch (error) {
-      console.error(`❌ [BACKGROUND AI] Error processing lead ${lead.id}:`, error);
+      console.error(`❌ [BACKGROUND AI] Error generating preview for lead ${lead.id}:`, error);
     }
   }
 }
