@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -14,26 +15,23 @@ import IntelligentAIPanel from './IntelligentAIPanel';
 import ChatAIPanelsContainer from './ChatAIPanelsContainer';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
-import MessageDirectionFilter from './MessageDirectionFilter';
-import CollapsibleAIPanels from './CollapsibleAIPanels';
-import AIResponseSuggestionPanel from './AIResponseSuggestionPanel';
-import AIEmergencyToggle from '@/components/ai/AIEmergencyToggle';
+import { useEnhancedConnectionManager } from '@/hooks/useEnhancedConnectionManager';
 
 interface SmartInboxWithAILearningProps {
-  user: {
-    id: string;
+  onLeadsRefresh?: () => void;
+  user?: {
     role: string;
+    id: string;
   };
 }
 
-const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ user }) => {
+const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onLeadsRefresh, user }) => {
+  const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
-  const [showLearningDashboard, setShowLearningDashboard] = useState(false);
-  const [showPredictiveInsights, setShowPredictiveInsights] = useState(false);
-  const [conversationFilter, setConversationFilter] = useState<'all' | 'inbound' | 'sent' | 'unread'>('all');
-  const [messageFilter, setMessageFilter] = useState<'all' | 'inbound' | 'sent' | 'unread'>('all');
-  const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
+  const [showAIPanel, setShowAIPanel] = useState(true);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   const {
     conversations,
@@ -43,87 +41,21 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     loadMessages,
     sendMessage,
     retryMessage,
-    connectionState,
     manualRefresh
-  } = useEnhancedRealtimeInbox();
+  } = useEnhancedRealtimeInbox({ onLeadsRefresh });
 
-  const totalConversations = conversations.length;
-  const unreadCount = conversations.reduce((acc, conv) => acc + conv.unreadCount, 0);
-
-  // Auto-switch to unread filter when there are unread messages and no filter is set
-  useEffect(() => {
-    if (conversationFilter === 'all' && unreadCount > 0 && conversations.length > 0) {
-      const hasUnreadConversations = conversations.some(conv => conv.unreadCount > 0);
-      if (hasUnreadConversations) {
-        setConversationFilter('unread');
+  // Enhanced connection manager for better status handling
+  const { connectionState, forceReconnect, forceSync } = useEnhancedConnectionManager({
+    onMessageUpdate: (leadId: string) => {
+      if (selectedConversation?.leadId === leadId) {
+        loadMessages(leadId);
       }
-    }
-  }, [conversations, unreadCount, conversationFilter]);
+    },
+    onConversationUpdate: manualRefresh,
+    onUnreadCountUpdate: manualRefresh
+  });
 
-  const filteredConversations = useMemo(() => {
-    if (conversationFilter === 'all') {
-      return conversations;
-    }
-
-    const filtered = conversations.filter(conversation => {
-      if (conversationFilter === 'inbound') {
-        return conversation.lastMessageDirection === 'in';
-      } else if (conversationFilter === 'sent') {
-        return conversation.lastMessageDirection === 'out';
-      } else if (conversationFilter === 'unread') {
-        return conversation.unreadCount > 0;
-      }
-      return true;
-    });
-
-    // Sort unread conversations by priority
-    if (conversationFilter === 'unread') {
-      return filtered.sort((a, b) => {
-        if (a.unreadCount !== b.unreadCount) {
-          return b.unreadCount - a.unreadCount;
-        }
-        return (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0);
-      });
-    }
-
-    return filtered;
-  }, [conversations, conversationFilter]);
-
-  const conversationCounts = useMemo(() => {
-    const inboundCount = conversations.filter(conv => conv.lastMessageDirection === 'in').length;
-    const sentCount = conversations.filter(conv => conv.lastMessageDirection === 'out').length;
-    const unreadCount = conversations.filter(conv => conv.unreadCount > 0).length;
-    const totalCount = conversations.length;
-
-    return { inboundCount, sentCount, unreadCount, totalCount };
-  }, [conversations]);
-
-  const filteredMessages = useMemo(() => {
-    if (messageFilter === 'all') {
-      return messages;
-    }
-
-    return messages.filter(message => {
-      if (messageFilter === 'inbound') {
-        return message.direction === 'in';
-      } else if (messageFilter === 'sent') {
-        return message.direction === 'out';
-      } else if (messageFilter === 'unread') {
-        return !message.readAt;
-      }
-      return true;
-    });
-  }, [messages, messageFilter]);
-
-  const messageCounts = useMemo(() => {
-    const inboundCount = messages.filter(msg => msg.direction === 'in').length;
-    const sentCount = messages.filter(msg => msg.direction === 'out').length;
-    const unreadCount = messages.filter(msg => !msg.readAt).length;
-    const totalCount = messages.length;
-
-    return { inboundCount, sentCount, unreadCount, totalCount };
-  }, [messages]);
-
+  // Load messages when conversation is selected
   useEffect(() => {
     if (selectedConversation) {
       loadMessages(selectedConversation.leadId);
@@ -136,7 +68,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     try {
       await sendMessage(selectedConversation.leadId, messageContent.trim());
       setMessageText('');
-
+      
       toast({
         title: "Message Sent",
         description: "Your message has been sent successfully",
@@ -156,227 +88,212 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   }, []);
 
   const canReply = useMemo(() => {
-    return selectedConversation &&
-      (selectedConversation.salespersonId === user.id ||
-        selectedConversation.salespersonId === null);
-  }, [selectedConversation, user.id]);
+    return selectedConversation && 
+           (selectedConversation.salespersonId === profile?.id || 
+            selectedConversation.salespersonId === null);
+  }, [selectedConversation, profile?.id]);
 
-  // Simple mark as read handler without using markConversationAsRead
-  const handleMarkAsRead = useCallback(async (leadId: string) => {
-    setMarkingAsRead(prev => new Set(prev.add(leadId)));
-    try {
-      // For now, just refresh manually after a short delay
-      setTimeout(() => {
-        manualRefresh();
-        setMarkingAsRead(prev => {
-          const next = new Set(prev);
-          next.delete(leadId);
-          return next;
-        });
-      }, 1000);
-    } catch (error) {
-      console.error('Error marking as read:', error);
-      setMarkingAsRead(prev => {
-        const next = new Set(prev);
-        next.delete(leadId);
-        return next;
-      });
-    }
-  }, [manualRefresh]);
+  const conversationMessages = useMemo(() => {
+    return messages.map(msg => ({
+      ...msg,
+      leadName: selectedConversation?.leadName || '',
+      vehicleInterest: selectedConversation?.vehicleInterest || ''
+    }));
+  }, [messages, selectedConversation]);
+
+  // Mock functions to satisfy EnhancedConversationListItem props
+  const mockMarkAsRead = async (leadId: string) => {
+    console.log('Mark as read:', leadId);
+  };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+    <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
+      {/* Left Sidebar - Conversations List */}
+      <div className="w-1/3 border-r bg-white flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b bg-white">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <MessageCircle className="h-6 w-6 text-blue-600" />
-              <h1 className="text-xl font-semibold text-gray-900">Smart Inbox</h1>
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+              <MessageCircle className="h-5 w-5 text-blue-600" />
+              <h2 className="text-lg font-semibold">Smart Inbox</h2>
+              <Badge variant="outline" className="bg-purple-100 text-purple-700">
                 <Brain className="h-3 w-3 mr-1" />
-                AI Enhanced
+                AI Learning
               </Badge>
             </div>
-            
-            <div className="flex items-center gap-4 text-sm text-gray-600">
-              <div className="flex items-center gap-1">
-                <Users className="h-4 w-4" />
-                <span>{totalConversations} conversations</span>
-              </div>
-              {unreadCount > 0 && (
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  <span className="font-medium text-red-600">{unreadCount} unread</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <AIEmergencyToggle userId={user.id} />
             <ConnectionStatusIndicator 
               connectionState={connectionState} 
-              onReconnect={() => manualRefresh()}
-              className="flex-shrink-0"
+              onReconnect={forceReconnect}
+              onForceSync={forceSync}
             />
           </div>
+
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              <span>{conversations.length} conversations</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span>Real-time updates</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="text-center p-8 text-gray-500">
+              <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <p>No conversations found</p>
+            </div>
+          ) : (
+            conversations.map((conversation) => (
+              <EnhancedConversationListItem
+                key={conversation.leadId}
+                conversation={conversation}
+                isSelected={selectedConversation?.leadId === conversation.leadId}
+                onSelect={() => handleConversationSelect(conversation)}
+                canReply={canReply || false}
+                markAsRead={mockMarkAsRead}
+                isMarkingAsRead={false}
+              />
+            ))
+          )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar - Conversations */}
-        <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
-          {/* Conversations Header */}
-          <div className="p-4 border-b border-gray-200">
-            <MessageDirectionFilter
-              activeFilter={conversationFilter}
-              onFilterChange={setConversationFilter}
-              inboundCount={conversationCounts.inboundCount}
-              sentCount={conversationCounts.sentCount}
-              totalCount={conversationCounts.totalCount}
-              unreadCount={conversationCounts.unreadCount}
-              type="conversations"
-            />
-          </div>
-
-          {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            ) : filteredConversations.length === 0 ? (
-              <div className="text-center p-8 text-gray-500">
-                <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>No {conversationFilter === 'unread' ? 'unread ' : ''}conversations found</p>
-                {conversationFilter === 'unread' && (
-                  <p className="text-sm mt-2">All caught up! 🎉</p>
-                )}
-              </div>
-            ) : (
-              filteredConversations.map((conversation) => (
-                <EnhancedConversationListItem
-                  key={conversation.leadId}
-                  conversation={conversation}
-                  isSelected={selectedConversation?.leadId === conversation.leadId}
-                  onSelect={() => handleConversationSelect(conversation)}
-                  canReply={canReply || false}
-                  markAsRead={handleMarkAsRead}
-                  isMarkingAsRead={markingAsRead.has(conversation.leadId)}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {selectedConversation ? (
-            <>
-              {/* Chat Header */}
-              <div className="p-4 border-b border-gray-200 bg-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-lg">{selectedConversation.leadName}</h3>
-                    <p className="text-sm text-gray-600">{selectedConversation.vehicleInterest}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {selectedConversation.unreadCount > 0 && (
-                      <Badge variant="destructive" className="animate-pulse">
-                        {selectedConversation.unreadCount} unread
-                      </Badge>
-                    )}
-                    <Badge variant="outline">
-                      {selectedConversation.status}
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {selectedConversation ? (
+          <>
+            {/* Chat Header */}
+            <div className="p-4 border-b bg-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg">{selectedConversation.leadName}</h3>
+                  <p className="text-sm text-gray-600">{selectedConversation.vehicleInterest}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedConversation.unreadCount > 0 && (
+                    <Badge variant="destructive">
+                      {selectedConversation.unreadCount} unread
                     </Badge>
-                  </div>
+                  )}
+                  <Badge variant="outline">
+                    {selectedConversation.status}
+                  </Badge>
                 </div>
-
-                {/* Message Filter */}
-                <div className="mt-4">
-                  <MessageDirectionFilter
-                    activeFilter={messageFilter}
-                    onFilterChange={setMessageFilter}
-                    inboundCount={messageCounts.inboundCount}
-                    sentCount={messageCounts.sentCount}
-                    totalCount={messageCounts.totalCount}
-                    unreadCount={messageCounts.unreadCount}
-                    type="messages"
-                  />
-                </div>
-              </div>
-
-              {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {filteredMessages.map((message) => (
-                  <EnhancedMessageBubble
-                    key={message.id}
-                    message={message}
-                    onRetry={message.smsStatus === 'failed' ? () => retryMessage(selectedConversation.leadId, message.id) : undefined}
-                  />
-                ))}
-              </div>
-
-              {/* Message Input */}
-              {canReply && (
-                <div className="p-4 border-t border-gray-200 bg-white">
-                  <InventoryAwareMessageInput
-                    leadId={selectedConversation.leadId}
-                    conversationHistory={filteredMessages.map(m => `${m.direction === 'in' ? 'Customer' : 'Sales'}: ${m.body}`).join('\n')}
-                    onSendMessage={handleSendMessage}
-                    disabled={sendingMessage}
-                    placeholder="Type your message..."
-                  />
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
-                <p>Choose a conversation from the left to start messaging</p>
-                {conversationFilter === 'unread' && unreadCount > 0 && (
-                  <p className="text-sm mt-2 text-red-600 font-medium">
-                    You have {unreadCount} unread messages waiting
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Sidebar - AI Panels */}
-        {selectedConversation && (
-          <div className="w-80 border-l border-gray-200 bg-white flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="h-5 w-5 text-purple-600" />
-                <h3 className="font-semibold">AI Assistant</h3>
               </div>
             </div>
 
+            {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <CollapsibleAIPanels
-                showLearningDashboard={showLearningDashboard}
-                showPredictiveInsights={showPredictiveInsights}
-                onToggleLearningDashboard={() => setShowLearningDashboard(!showLearningDashboard)}
-                onTogglePredictiveInsights={() => setShowPredictiveInsights(!showPredictiveInsights)}
-                selectedConversation={selectedConversation}
-              />
+              {conversationMessages.map((message) => (
+                <EnhancedMessageBubble
+                  key={message.id}
+                  message={message}
+                  onRetry={message.smsStatus === 'failed' ? () => retryMessage(selectedConversation.leadId, message.id) : undefined}
+                />
+              ))}
+            </div>
 
-              <AIResponseSuggestionPanel
-                selectedConversation={selectedConversation}
-                messages={filteredMessages}
-                onSendMessage={handleSendMessage}
-                canReply={canReply || false}
-              />
+            {/* Message Input */}
+            {canReply && (
+              <div className="p-4 border-t bg-white">
+                <InventoryAwareMessageInput
+                  leadId={selectedConversation.leadId}
+                  conversationHistory={conversationMessages.map(m => `${m.direction === 'in' ? 'Customer' : 'Sales'}: ${m.body}`).join('\n')}
+                  onSendMessage={handleSendMessage}
+                  disabled={sendingMessage}
+                  placeholder="Type your message..."
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
+              <p>Choose a conversation from the left to start messaging</p>
             </div>
           </div>
         )}
       </div>
+
+      {/* Right Sidebar - AI Panels */}
+      {selectedConversation && (
+        <div className="w-80 border-l bg-white flex flex-col">
+          <div className="p-4 border-b">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h3 className="font-semibold">AI Learning Assistant</h3>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Intelligent AI Panel - Main Feature */}
+            <IntelligentAIPanel
+              conversation={selectedConversation}
+              messages={conversationMessages}
+              onSendMessage={handleSendMessage}
+              canReply={canReply || false}
+              isCollapsed={!showAIPanel}
+              onToggleCollapse={() => setShowAIPanel(!showAIPanel)}
+            />
+
+            <Separator />
+
+            {/* Additional AI Panels */}
+            <ChatAIPanelsContainer
+              showAnalysis={showAnalysis}
+              showAIPanel={false} // We're showing the intelligent panel above
+              showAIGenerator={showAIGenerator}
+              canReply={canReply || false}
+              selectedConversation={selectedConversation}
+              messages={conversationMessages}
+              onSummaryUpdate={() => {}}
+              onSelectSuggestion={handleSendMessage}
+              onToggleAIPanel={() => setShowAIPanel(!showAIPanel)}
+              onSendAIMessage={handleSendMessage}
+              onCloseAIGenerator={() => setShowAIGenerator(false)}
+            />
+
+            {/* AI Panel Controls */}
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAnalysis(!showAnalysis)}
+                    className="justify-start"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    {showAnalysis ? 'Hide' : 'Show'} Analysis
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAIGenerator(!showAIGenerator)}
+                    className="justify-start"
+                    disabled={!canReply}
+                  >
+                    <Brain className="h-4 w-4 mr-2" />
+                    AI Message Generator
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
