@@ -1,33 +1,22 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
-import { useAutoAIResponses } from '@/hooks/useAutoAIResponses';
 import { useInboxFilters } from '@/hooks/useInboxFilters';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useAutoAIResponses } from '@/hooks/useAutoAIResponses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { 
-  MessageCircle, 
-  Users, 
-  Clock, 
-  Zap, 
-  Brain, 
-  Sparkles, 
-  Search,
-  Filter,
-  Eye,
-  Bot,
-  ChevronDown,
-  ChevronUp,
-  MessageSquareMore,
-  ArrowDownLeft
-} from 'lucide-react';
+import { MessageCircle, Users, Clock, Search, Filter, RefreshCw, Zap, Brain, Sparkles, X } from 'lucide-react';
 import EnhancedConversationListItem from './EnhancedConversationListItem';
-import AIResponsePreview from './AIResponsePreview';
+import EnhancedMessageBubble from './EnhancedMessageBubble';
+import InventoryAwareMessageInput from './InventoryAwareMessageInput';
+import ConnectionStatusIndicator from './ConnectionStatusIndicator';
+import LeadContextPanel from './LeadContextPanel';
 import AIResponseIndicator from './AIResponseIndicator';
+import AIResponsePreview from './AIResponsePreview';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 
@@ -36,49 +25,28 @@ interface SmartInboxWithAILearningProps {
     id: string;
     role: string;
   };
-  onLeadsRefresh?: () => void;
 }
 
-const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ 
-  user, 
-  onLeadsRefresh 
-}) => {
+const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ user }) => {
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
   const [aiPreviews, setAiPreviews] = useState<Map<string, any>>(new Map());
-  const [searchTerm, setSearchTerm] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const {
     conversations,
     messages,
     loading,
+    error,
+    sendingMessage,
+    totalConversations,
     loadMessages,
     sendMessage,
-    retryMessage,
-    markConversationRead,
-    updateConversationStatus
-  } = useOptimizedInbox({ 
-    profileId: user.id,
-    onLeadsRefresh: () => {
-      console.log('Leads refreshed');
-      onLeadsRefresh?.();
-    }
-  });
+    manualRefresh,
+    setError
+  } = useOptimizedInbox();
 
-  const { manualTrigger } = useAutoAIResponses({
-    profileId: user.id,
-    onResponsePreview: (leadId, preview) => {
-      setAiPreviews(prev => {
-        const next = new Map(prev);
-        next.set(leadId, preview);
-        return next;
-      });
-    }
-  });
-
-  // Initialize filters with profile ID
   const {
     filters,
     updateFilter,
@@ -87,11 +55,24 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
     applyFilters
   } = useInboxFilters(profile?.id);
 
-  useEffect(() => {
-    if (profile?.id) {
-      loadMessages();
+  const { manualTrigger: triggerAI } = useAutoAIResponses({
+    profileId: profile?.id || '',
+    onResponsePreview: (leadId: string, preview: any) => {
+      setAiPreviews(prev => new Map(prev.set(leadId, preview)));
     }
-  }, [profile?.id, loadMessages]);
+  });
+
+  // Apply filters to conversations
+  const filteredConversations = useMemo(() => {
+    return applyFilters(conversations);
+  }, [conversations, applyFilters]);
+
+  // Load messages when conversation is selected
+  useEffect(() => {
+    if (selectedConversation) {
+      loadMessages(selectedConversation.leadId);
+    }
+  }, [selectedConversation, loadMessages]);
 
   const handleSendMessage = useCallback(async (messageContent: string) => {
     if (!selectedConversation || !messageContent.trim()) return;
@@ -114,10 +95,9 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
     }
   }, [selectedConversation, sendMessage]);
 
-  const handleConversationSelect = useCallback(async (conversation: ConversationListItem) => {
+  const handleConversationSelect = useCallback((conversation: ConversationListItem) => {
     setSelectedConversation(conversation);
-    await loadMessages(conversation.leadId);
-  }, [loadMessages]);
+  }, []);
 
   const canReply = useMemo(() => {
     return selectedConversation && 
@@ -133,57 +113,38 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
     }));
   }, [messages, selectedConversation]);
 
+  const handleAITrigger = useCallback(async (leadId: string) => {
+    try {
+      await triggerAI(leadId);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to trigger AI response",
+        variant: "destructive"
+      });
+    }
+  }, [triggerAI]);
+
+  const handleAIPreviewSent = useCallback((leadId: string) => {
+    setAiPreviews(prev => {
+      const updated = new Map(prev);
+      updated.delete(leadId);
+      return updated;
+    });
+    manualRefresh();
+  }, [manualRefresh]);
+
+  const handleAIPreviewDismiss = useCallback((leadId: string) => {
+    setAiPreviews(prev => {
+      const updated = new Map(prev);
+      updated.delete(leadId);
+      return updated;
+    });
+  }, []);
+
   const mockMarkAsRead = async (leadId: string) => {
-    try {
-      await markConversationRead(leadId);
-      toast({
-        title: "Marked as Read",
-        description: "Conversation marked as read successfully",
-      });
-    } catch (error) {
-      console.error('Failed to mark as read:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to mark as read",
-        variant: "destructive"
-      });
-    }
+    console.log('Mark as read:', leadId);
   };
-
-  const handleStatusUpdate = async (leadId: string, newStatus: string) => {
-    try {
-      await updateConversationStatus(leadId, newStatus);
-      toast({
-        title: "Status Updated",
-        description: `Conversation status updated to ${newStatus}`,
-      });
-    } catch (error) {
-      console.error('Failed to update status:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update status",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Apply filters to conversations
-  const filteredConversations = useMemo(() => {
-    let filtered = conversations;
-    
-    // Apply search term
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(conv => 
-        conv.leadName.toLowerCase().includes(searchLower) ||
-        conv.vehicleInterest.toLowerCase().includes(searchLower) ||
-        conv.leadPhone.includes(searchTerm)
-      );
-    }
-    
-    // Apply other filters
-    return applyFilters(filtered);
-  }, [conversations, searchTerm, applyFilters]);
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
@@ -200,15 +161,18 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                 AI Enhanced
               </Badge>
             </div>
+            <Button onClick={manualRefresh} variant="ghost" size="sm">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
 
-          {/* Search Bar */}
+          {/* Search */}
           <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search conversations..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={filters.search}
+              onChange={(e) => updateFilter('search', e.target.value)}
               className="pl-10"
             />
           </div>
@@ -219,140 +183,120 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
               variant={filters.unreadOnly ? "default" : "outline"}
               size="sm"
               onClick={() => updateFilter('unreadOnly', !filters.unreadOnly)}
-              className="text-xs"
             >
-              <Eye className="h-3 w-3 mr-1" />
               Unread Only
             </Button>
-            
             <Button
               variant={filters.myLeadsOnly ? "default" : "outline"}
               size="sm"
               onClick={() => updateFilter('myLeadsOnly', !filters.myLeadsOnly)}
-              className="text-xs"
             >
-              <Users className="h-3 w-3 mr-1" />
               My Leads
             </Button>
-
             <Button
               variant={filters.inboundOnly ? "default" : "outline"}
               size="sm"
               onClick={() => updateFilter('inboundOnly', !filters.inboundOnly)}
-              className="text-xs"
             >
-              <ArrowDownLeft className="h-3 w-3 mr-1" />
               Inbound Messages
-            </Button>
-
-            <Button
-              variant={filters.aiOptIn === true ? "default" : "outline"}
-              size="sm"
-              onClick={() => updateFilter('aiOptIn', filters.aiOptIn === true ? null : true)}
-              className="text-xs"
-            >
-              <Bot className="h-3 w-3 mr-1" />
-              AI Enabled
             </Button>
           </div>
 
           {/* Advanced Filters Toggle */}
-          <Collapsible open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full justify-between text-xs">
-                <div className="flex items-center gap-1">
-                  <Filter className="h-3 w-3" />
-                  Advanced Filters
-                  {hasActiveFilters && (
-                    <Badge variant="secondary" className="ml-1 text-xs px-1">
-                      Active
-                    </Badge>
-                  )}
-                </div>
-                {showAdvancedFilters ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="text-sm"
+            >
+              <Filter className="h-4 w-4 mr-1" />
+              Advanced Filters
+            </Button>
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="text-sm text-red-600 hover:text-red-700"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
               </Button>
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent className="space-y-2 mt-2">
-              {/* Status Filter */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700">Status</label>
-                <div className="flex flex-wrap gap-1">
-                  {['new', 'engaged', 'qualified', 'closed'].map(status => (
-                    <Button
-                      key={status}
-                      variant={filters.status.includes(status) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        const newStatuses = filters.status.includes(status)
-                          ? filters.status.filter(s => s !== status)
-                          : [...filters.status, status];
-                        updateFilter('status', newStatuses);
-                      }}
-                      className="text-xs capitalize"
-                    >
-                      {status}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+            )}
+          </div>
 
-              {/* Priority Filter */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700">Priority</label>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    { value: 'high', label: 'High Priority' },
-                    { value: 'unread', label: 'Has Unread' },
-                    { value: 'responded', label: 'Responded' }
-                  ].map(priority => (
-                    <Button
-                      key={priority.value}
-                      variant={filters.priority === priority.value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => updateFilter('priority', filters.priority === priority.value ? null : priority.value)}
-                      className="text-xs"
-                    >
-                      {priority.label}
-                    </Button>
-                  ))}
+          {/* Advanced Filters Panel */}
+          {showAdvancedFilters && (
+            <Card className="mt-3">
+              <CardContent className="p-3 space-y-3">
+                {/* Status Filter */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+                  <div className="flex flex-wrap gap-1">
+                    {['new', 'active', 'engaged', 'qualified', 'lost'].map(status => (
+                      <Button
+                        key={status}
+                        variant={filters.status.includes(status) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          const currentStatus = filters.status;
+                          const newStatus = currentStatus.includes(status)
+                            ? currentStatus.filter(s => s !== status)
+                            : [...currentStatus, status];
+                          updateFilter('status', newStatus);
+                        }}
+                        className="text-xs h-6 px-2"
+                      >
+                        {status}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Assignment Filter */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700">Assignment</label>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    { value: 'assigned', label: 'Assigned' },
-                    { value: 'unassigned', label: 'Unassigned' },
-                    { value: 'mine', label: 'Mine' }
-                  ].map(assignment => (
+                {/* AI Opt-in Filter */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">AI Enabled</label>
+                  <div className="flex gap-1">
                     <Button
-                      key={assignment.value}
-                      variant={filters.assigned === assignment.value ? "default" : "outline"}
+                      variant={filters.aiOptIn === true ? "default" : "outline"}
                       size="sm"
-                      onClick={() => updateFilter('assigned', filters.assigned === assignment.value ? null : assignment.value)}
-                      className="text-xs"
+                      onClick={() => updateFilter('aiOptIn', filters.aiOptIn === true ? null : true)}
+                      className="text-xs h-6 px-2"
                     >
-                      {assignment.label}
+                      AI On
                     </Button>
-                  ))}
+                    <Button
+                      variant={filters.aiOptIn === false ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => updateFilter('aiOptIn', filters.aiOptIn === false ? null : false)}
+                      className="text-xs h-6 px-2"
+                    >
+                      AI Off
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              {hasActiveFilters && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="w-full text-xs text-gray-500 hover:text-gray-700"
-                >
-                  Clear All Filters
-                </Button>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
+                {/* Priority Filter */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Priority</label>
+                  <div className="flex gap-1">
+                    {['high', 'unread', 'responded'].map(priority => (
+                      <Button
+                        key={priority}
+                        variant={filters.priority === priority ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => updateFilter('priority', filters.priority === priority ? null : priority)}
+                        className="text-xs h-6 px-2"
+                      >
+                        {priority}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex items-center gap-4 text-sm text-gray-600 mt-3">
             <div className="flex items-center gap-1">
@@ -361,7 +305,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
             </div>
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
-              <span>Real-time</span>
+              <span>Real-time updates</span>
             </div>
           </div>
         </div>
@@ -377,66 +321,55 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No conversations found</p>
               {hasActiveFilters && (
-                <p className="text-sm mt-2">Try adjusting your filters</p>
+                <Button onClick={clearFilters} variant="link" className="mt-2">
+                  Clear filters to see all conversations
+                </Button>
               )}
             </div>
           ) : (
-            filteredConversations.map((conversation) => (
-              <div key={conversation.leadId} className="relative">
-                <EnhancedConversationListItem
-                  conversation={conversation}
-                  isSelected={selectedConversation?.leadId === conversation.leadId}
-                  onSelect={() => handleConversationSelect(conversation)}
-                  canReply={canReply || false}
-                  markAsRead={mockMarkAsRead}
-                  isMarkingAsRead={false}
-                />
-                
-                {/* AI Response Indicator */}
-                <div className="absolute top-2 right-2">
-                  <AIResponseIndicator
-                    isGenerating={false}
-                    hasPreview={aiPreviews.has(conversation.leadId)}
-                    canTrigger={true}
-                    onManualTrigger={() => manualTrigger(conversation.leadId)}
+            <div className="space-y-1">
+              {filteredConversations.map((conversation) => (
+                <div key={conversation.leadId} className="relative">
+                  <EnhancedConversationListItem
+                    conversation={conversation}
+                    isSelected={selectedConversation?.leadId === conversation.leadId}
+                    onSelect={() => handleConversationSelect(conversation)}
+                    canReply={canReply || false}
+                    markAsRead={mockMarkAsRead}
+                    isMarkingAsRead={false}
                   />
+                  
+                  {/* AI Preview Banner */}
+                  {aiPreviews.has(conversation.leadId) && (
+                    <div className="mx-2 mb-2">
+                      <AIResponsePreview
+                        leadId={conversation.leadId}
+                        preview={aiPreviews.get(conversation.leadId)!}
+                        profileId={profile?.id || ''}
+                        onSent={() => handleAIPreviewSent(conversation.leadId)}
+                        onDismiss={() => handleAIPreviewDismiss(conversation.leadId)}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* AI Status Indicator */}
+                  <div className="absolute top-2 right-2">
+                    <AIResponseIndicator
+                      isGenerating={false}
+                      canTrigger={!aiPreviews.has(conversation.leadId)}
+                      hasPreview={aiPreviews.has(conversation.leadId)}
+                      onManualTrigger={() => handleAITrigger(conversation.leadId)}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </div>
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
-        {/* AI Preview Section */}
-        {Array.from(aiPreviews.entries()).map(([leadId, preview]) => (
-          <AIResponsePreview
-            key={leadId}
-            leadId={leadId}
-            preview={preview}
-            profileId={profile?.id || ''}
-            onSent={() => {
-              setAiPreviews(prev => {
-                const next = new Map(prev);
-                next.delete(leadId);
-                return next;
-              });
-              loadMessages();
-            }}
-            onDismiss={() => {
-              setAiPreviews(prev => {
-                const next = new Map(prev);
-                next.delete(leadId);
-                return next;
-              });
-            }}
-            onFeedback={(feedback, notes) => {
-              console.log('Feedback:', feedback, notes);
-            }}
-          />
-        ))}
-
         {selectedConversation ? (
           <>
             {/* Chat Header */}
@@ -452,49 +385,54 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                       {selectedConversation.unreadCount} unread
                     </Badge>
                   )}
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      const statuses = ['new', 'engaged', 'qualified', 'closed'];
-                      const currentIndex = statuses.indexOf(selectedConversation.status);
-                      const nextIndex = (currentIndex + 1) % statuses.length;
-                      handleStatusUpdate(selectedConversation.leadId, statuses[nextIndex]);
-                    }}
-                  >
+                  <Badge variant="outline">
                     {selectedConversation.status}
-                  </Button>
+                  </Badge>
+                  
+                  {/* AI Status for Selected Conversation */}
+                  <AIResponseIndicator
+                    isGenerating={false}
+                    canTrigger={!aiPreviews.has(selectedConversation.leadId)}
+                    hasPreview={aiPreviews.has(selectedConversation.leadId)}
+                    onManualTrigger={() => handleAITrigger(selectedConversation.leadId)}
+                  />
                 </div>
               </div>
             </div>
 
+            {/* AI Preview for Selected Conversation */}
+            {aiPreviews.has(selectedConversation.leadId) && (
+              <div className="p-4 border-b bg-blue-50">
+                <AIResponsePreview
+                  leadId={selectedConversation.leadId}
+                  preview={aiPreviews.get(selectedConversation.leadId)!}
+                  profileId={profile?.id || ''}
+                  onSent={() => handleAIPreviewSent(selectedConversation.leadId)}
+                  onDismiss={() => handleAIPreviewDismiss(selectedConversation.leadId)}
+                />
+              </div>
+            )}
+
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {conversationMessages.map((message) => (
-                <div key={message.id}>
-                  {message.body}
-                </div>
+                <EnhancedMessageBubble
+                  key={message.id}
+                  message={message}
+                />
               ))}
             </div>
 
             {/* Message Input */}
             {canReply && (
               <div className="p-4 border-t bg-white">
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="text"
-                    placeholder="Type your message..."
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage(messageText);
-                      }
-                    }}
-                  />
-                  <Button onClick={() => handleSendMessage(messageText)}>Send</Button>
-                </div>
+                <InventoryAwareMessageInput
+                  leadId={selectedConversation.leadId}
+                  conversationHistory={conversationMessages.map(m => `${m.direction === 'in' ? 'Customer' : 'Sales'}: ${m.body}`).join('\n')}
+                  onSendMessage={handleSendMessage}
+                  disabled={sendingMessage}
+                  placeholder="Type your message..."
+                />
               </div>
             )}
           </>
@@ -508,6 +446,18 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
           </div>
         )}
       </div>
+
+      {/* Right Sidebar - Lead Context Panel with AI Integration */}
+      {selectedConversation && (
+        <div className="w-80 border-l bg-white">
+          <LeadContextPanel
+            conversation={selectedConversation}
+            onScheduleAppointment={() => {
+              console.log('Schedule appointment for:', selectedConversation.leadName);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
