@@ -9,7 +9,7 @@ export interface InboxFilters {
   search: string;
   unreadOnly: boolean;
   myLeadsOnly: boolean;
-  inboundOnly: boolean;
+  unrepliedInboundOnly: boolean;
 }
 
 const defaultFilters: InboxFilters = {
@@ -20,7 +20,7 @@ const defaultFilters: InboxFilters = {
   search: '',
   unreadOnly: false,
   myLeadsOnly: false,
-  inboundOnly: false
+  unrepliedInboundOnly: false
 };
 
 export const useInboxFilters = (profileId?: string) => {
@@ -45,11 +45,14 @@ export const useInboxFilters = (profileId?: string) => {
            filters.search.length > 0 ||
            filters.unreadOnly ||
            filters.myLeadsOnly ||
-           filters.inboundOnly;
+           filters.unrepliedInboundOnly;
   }, [filters]);
 
   const applyFilters = useCallback((conversations: any[]) => {
-    return conversations.filter(conv => {
+    console.log('🔍 [INBOX FILTERS] Applying filters:', filters);
+    console.log('🔍 [INBOX FILTERS] Total conversations before filtering:', conversations.length);
+    
+    const filtered = conversations.filter(conv => {
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -66,7 +69,6 @@ export const useInboxFilters = (profileId?: string) => {
 
       // AI opt-in filter
       if (filters.aiOptIn !== null) {
-        // This would need to be added to conversation data
         if (filters.aiOptIn && !conv.aiOptIn) return false;
         if (!filters.aiOptIn && conv.aiOptIn) return false;
       }
@@ -81,8 +83,8 @@ export const useInboxFilters = (profileId?: string) => {
         return false;
       }
 
-      // Inbound messages only filter
-      if (filters.inboundOnly && !conv.hasInboundMessages) {
+      // Unreplied inbound messages filter - conversations where customer sent the last message
+      if (filters.unrepliedInboundOnly && !conv.hasUnrepliedInbound) {
         return false;
       }
 
@@ -118,6 +120,13 @@ export const useInboxFilters = (profileId?: string) => {
 
       return true;
     });
+
+    console.log('🔍 [INBOX FILTERS] Conversations after filtering:', filtered.length);
+    if (filters.unrepliedInboundOnly) {
+      console.log('🔍 [INBOX FILTERS] Unreplied inbound filter active - showing conversations where customer sent last message');
+    }
+    
+    return filtered;
   }, [filters, profileId]);
 
   return {

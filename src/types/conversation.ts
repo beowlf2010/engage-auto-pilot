@@ -39,6 +39,7 @@ export interface ConversationListItem {
   messageIntensity?: string;
   incomingCount?: number;
   outgoingCount?: number;
+  hasUnrepliedInbound?: boolean; // NEW: Added this property
 }
 
 export interface MessageData {

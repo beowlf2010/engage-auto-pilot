@@ -85,6 +85,10 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
         const unreadMessages = conversations.filter(c => 
           c.direction === 'in' && !c.read_at
         );
+
+        // NEW: Calculate if this conversation has unreplied inbound messages
+        // This means the last message direction is 'in' (customer sent the last message)
+        const hasUnrepliedInbound = lastMessage?.direction === 'in';
         
         const result = {
           leadId: lead.id,
@@ -99,12 +103,13 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           lastMessage: lastMessage?.body || '',
           lastMessageDate: new Date(lastMessage?.sent_at || lead.created_at),
           unreadCount: unreadMessages.length,
-          messageCount: conversations.length
+          messageCount: conversations.length,
+          hasUnrepliedInbound // NEW: Add this property
         };
         
-        // Add debugging for unread messages
-        if (unreadMessages.length > 0) {
-          console.log(`📬 [OPTIMIZED INBOX] Lead ${lead.first_name} ${lead.last_name} has ${unreadMessages.length} unread messages, last message direction: ${result.lastMessageDirection}`);
+        // Add debugging for unreplied inbound messages
+        if (hasUnrepliedInbound) {
+          console.log(`📬 [OPTIMIZED INBOX] Lead ${lead.first_name} ${lead.last_name} has unreplied inbound message`);
         }
         
         return result;
@@ -120,11 +125,11 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       
       // Add summary logging for debugging
       const unreadConversations = transformedConversations.filter(c => c.unreadCount > 0);
-      const incomingConversations = transformedConversations.filter(c => c.lastMessageDirection === 'in');
+      const unrepliedInboundConversations = transformedConversations.filter(c => c.hasUnrepliedInbound);
       
       console.log(`✅ [OPTIMIZED INBOX] Loaded ${transformedConversations.length} conversations`);
       console.log(`📮 [OPTIMIZED INBOX] ${unreadConversations.length} conversations with unread messages`);
-      console.log(`📥 [OPTIMIZED INBOX] ${incomingConversations.length} conversations with incoming last message`);
+      console.log(`📥 [OPTIMIZED INBOX] ${unrepliedInboundConversations.length} conversations with unreplied inbound messages`);
 
     } catch (err) {
       console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', err);
