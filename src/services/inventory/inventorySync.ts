@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { updateInventoryLeadsCount } from './leadInteractionService';
 import { performInventoryCleanup } from './core/inventoryCleanupService';
+import { uploadSessionService } from './uploadSessionService';
 
 export const markMissingVehiclesSold = async (uploadId: string) => {
   // This function is deprecated - we no longer mark vehicles as sold from inventory uploads
@@ -14,6 +15,9 @@ export const markMissingVehiclesSold = async (uploadId: string) => {
 export const syncInventoryData = async (uploadId: string) => {
   try {
     console.log('Starting enhanced inventory data sync for upload:', uploadId);
+    
+    // Update session activity
+    uploadSessionService.updateSessionActivity(uploadId);
     
     // Check if this is a GM Global upload (should not trigger cleanup)
     const { data: uploadInfo, error: uploadError } = await supabase
@@ -35,6 +39,18 @@ export const syncInventoryData = async (uploadId: string) => {
 
     // Update leads count and other metadata
     await updateInventoryLeadsCount();
+    
+    // Check if we should skip automatic cleanup due to active upload session
+    const shouldSkipCleanup = uploadSessionService.shouldSkipAutoCleanup();
+    
+    if (shouldSkipCleanup) {
+      console.log('📁 [UPLOAD SESSION] Skipping automatic cleanup - upload session is active');
+      toast({
+        title: "Inventory uploaded",
+        description: "File processed successfully. Automatic cleanup is disabled during multi-file uploads.",
+      });
+      return;
+    }
     
     // Only run cleanup for actual inventory uploads (not GM Global orders or preliminary data)
     if (!isGMGlobalUpload && !isPreliminaryData) {

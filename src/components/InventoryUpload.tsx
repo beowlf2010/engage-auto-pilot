@@ -14,6 +14,7 @@ import SheetSelector from "./inventory-upload/SheetSelector";
 import DragDropFileQueue from "./inventory-upload/DragDropFileQueue";
 import EnhancedBatchUploadResult from "./inventory-upload/EnhancedBatchUploadResult";
 import VehicleScraper from "./inventory-upload/VehicleScraper";
+import UploadSessionControls from "./inventory-upload/UploadSessionControls";
 import type { QueuedFile } from "./inventory-upload/DragDropFileQueue";
 
 interface InventoryUploadProps {

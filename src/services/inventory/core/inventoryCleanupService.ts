@@ -1,8 +1,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { uploadSessionService } from "../uploadSessionService";
 
-export const getLatestUploads = async (count: number = 2) => {
+export const getLatestUploads = async (count: number = 5) => {
   try {
     const { data, error } = await supabase
       .from('inventory')
@@ -50,8 +51,14 @@ export const cleanupInventoryData = async () => {
   try {
     console.log('Starting enhanced inventory cleanup to maintain current inventory...');
     
-    // Get today's uploads first, then fall back to recent ones
-    const recentUploadIds = await getLatestUploads(2);
+    // Check if cleanup should be skipped due to active upload session
+    if (uploadSessionService.shouldSkipAutoCleanup()) {
+      console.log('📁 [UPLOAD SESSION] Skipping cleanup - upload session is active');
+      return { success: true, message: 'Cleanup skipped - upload session active' };
+    }
+    
+    // Get today's uploads first, then fall back to recent ones (increased from 2 to 5)
+    const recentUploadIds = await getLatestUploads(5);
     
     if (recentUploadIds.length === 0) {
       console.log('No recent uploads found, skipping cleanup');
