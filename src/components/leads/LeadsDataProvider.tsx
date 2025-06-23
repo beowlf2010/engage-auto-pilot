@@ -40,13 +40,17 @@ const LeadsDataProvider = ({
       <MultiFileLeadUploadModal
         isOpen={isMultiFileModalOpen}
         onClose={() => setIsMultiFileModalOpen(false)}
-        onUploadComplete={refetch}
+        onSuccess={() => {
+          if (refetch) refetch();
+        }}
       />
 
       <VINImportModal
         isOpen={isVINImportModalOpen}
         onClose={() => setIsVINImportModalOpen(false)}
-        onUploadComplete={refetch}
+        onImportSuccess={() => {
+          if (refetch) refetch();
+        }}
       />
     </div>
   );

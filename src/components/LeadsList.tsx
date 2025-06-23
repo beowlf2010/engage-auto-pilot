@@ -42,7 +42,7 @@ const LeadsList = () => {
       <MultiFileLeadUploadModal
         isOpen={isMultiFileModalOpen}
         onClose={() => setIsMultiFileModalOpen(false)}
-        onUploadComplete={() => {
+        onSuccess={() => {
           // Refresh would happen via the main leads hook
         }}
       />
@@ -50,7 +50,7 @@ const LeadsList = () => {
       <VINImportModal
         isOpen={isVINImportModalOpen}
         onClose={() => setIsVINImportModalOpen(false)}
-        onUploadComplete={() => {
+        onImportSuccess={() => {
           // Refresh would happen via the main leads hook
         }}
       />

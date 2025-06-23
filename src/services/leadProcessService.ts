@@ -30,10 +30,10 @@ class LeadProcessService {
           description: process.description,
           aggression_level: process.aggressionLevel,
           is_active: process.isActive,
-          message_sequence: process.messageSequence,
-          escalation_rules: process.escalationRules,
-          success_criteria: process.successCriteria,
-          performance_metrics: process.performanceMetrics
+          message_sequence: process.messageSequence as any,
+          escalation_rules: process.escalationRules as any,
+          success_criteria: process.successCriteria as any,
+          performance_metrics: process.performanceMetrics as any
         })
         .select()
         .single();
@@ -138,7 +138,7 @@ class LeadProcessService {
       await supabase
         .from('lead_processes')
         .update({
-          performance_metrics: performance,
+          performance_metrics: performance as any,
           updated_at: new Date().toISOString()
         })
         .eq('id', processId);
