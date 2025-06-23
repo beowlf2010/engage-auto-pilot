@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
 import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
@@ -25,6 +24,13 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
+
+  // Debug logging for profile data
+  console.log('🔍 [SMART INBOX ENHANCED] Profile data:', {
+    id: profile?.id,
+    role: profile?.role,
+    email: profile?.email
+  });
 
   // Use the optimized inbox hook with proper role information
   const {
@@ -81,6 +87,7 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
   }, [selectedConversation, sendMessage]);
 
   const handleConversationSelect = useCallback((conversation: ConversationListItem) => {
+    console.log('🔍 [SMART INBOX ENHANCED] Selecting conversation:', conversation.leadName);
     setSelectedConversation(conversation);
   }, []);
 
@@ -106,7 +113,25 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
   // Debug information for admin users
   const unreadConversations = conversations.filter(c => c.unreadCount > 0);
   const lostStatusConversations = conversations.filter(c => c.status === 'lost');
+  const unassignedConversations = conversations.filter(c => !c.salespersonId);
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
+
+  console.log('🔍 [SMART INBOX ENHANCED] Current stats:', {
+    totalConversations: conversations.length,
+    unreadConversations: unreadConversations.length,
+    lostStatusConversations: lostStatusConversations.length,
+    unassignedConversations: unassignedConversations.length,
+    isAdmin,
+    userRole: profile?.role
+  });
+
+  // Show specific leads we're looking for in debug
+  if (isAdmin) {
+    console.log('🔍 [SMART INBOX ENHANCED] Looking for:', {
+      'Steven Wood': conversations.find(c => c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')) ? '✅ Found' : '❌ Missing',
+      'Jackson Caldwell': conversations.find(c => c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')) ? '✅ Found' : '❌ Missing'
+    });
+  }
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
@@ -149,7 +174,7 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
           {/* Debug information for admin users */}
           {isAdmin && (
             <div className="mt-2 text-xs text-gray-500 space-y-1">
-              <div>🔍 Debug Info: {unreadConversations.length} unread, {lostStatusConversations.length} lost status</div>
+              <div>🔍 Debug: {unreadConversations.length} unread, {lostStatusConversations.length} lost, {unassignedConversations.length} unassigned</div>
               <div>👤 Role: {profile?.role}, ID: {profile?.id?.slice(0, 8)}...</div>
             </div>
           )}
@@ -170,17 +195,26 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
               )}
             </div>
           ) : (
-            conversations.map((conversation) => (
-              <EnhancedConversationListItem
-                key={conversation.leadId}
-                conversation={conversation}
-                isSelected={selectedConversation?.leadId === conversation.leadId}
-                onSelect={() => handleConversationSelect(conversation)}
-                canReply={canReply || false}
-                markAsRead={mockMarkAsRead}
-                isMarkingAsRead={false}
-              />
-            ))
+            <>
+              {/* Show specific leads we're looking for in debug */}
+              {isAdmin && (
+                <div className="p-2 bg-yellow-50 text-xs text-yellow-800 border-b">
+                  Looking for: Steven Wood ({conversations.find(c => c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')) ? '✅ Found' : '❌ Missing'})
+                  , Jackson Caldwell ({conversations.find(c => c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')) ? '✅ Found' : '❌ Missing'})
+                </div>
+              )}
+              {conversations.map((conversation) => (
+                <EnhancedConversationListItem
+                  key={conversation.leadId}
+                  conversation={conversation}
+                  isSelected={selectedConversation?.leadId === conversation.leadId}
+                  onSelect={() => handleConversationSelect(conversation)}
+                  canReply={canReply || false}
+                  markAsRead={mockMarkAsRead}
+                  isMarkingAsRead={false}
+                />
+              ))}
+            </>
           )}
         </div>
       </div>

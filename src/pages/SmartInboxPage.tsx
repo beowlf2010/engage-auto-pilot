@@ -1,6 +1,6 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import SmartInboxWithAILearning from "@/components/inbox/SmartInboxWithAILearning";
+import SmartInboxWithEnhancedAI from "@/components/inbox/SmartInboxWithEnhancedAI";
 import { Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { backgroundAIProcessor } from "@/services/backgroundAIProcessor";
@@ -48,12 +48,13 @@ const SmartInboxPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  const user = {
+  console.log('🔍 [SMART INBOX PAGE] Profile data:', {
     id: profile.id,
-    role: profile.role
-  };
+    role: profile.role,
+    email: profile.email
+  });
 
-  return <SmartInboxWithAILearning user={user} />;
+  return <SmartInboxWithEnhancedAI onLeadsRefresh={() => {}} />;
 };
 
 export default SmartInboxPage;
