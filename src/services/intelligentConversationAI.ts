@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { unknownMessageLearning } from './unknownMessageLearning';
+import { unknownMessageLearning, UnknownMessageContext } from './unknownMessageLearning';
 import { leadSourceStrategy } from './leadSourceStrategy';
 import { LeadSourceData } from '@/types/leadSource';
 
@@ -45,6 +45,25 @@ const analyzeConversationalSignals = (message: string): boolean => {
   ];
   
   return conversationalPatterns.some(pattern => pattern.test(text));
+};
+
+const convertContextToUnknownMessageContext = (context: ConversationContext): UnknownMessageContext => {
+  const recentMessages = context.messages
+    .slice(-10)
+    .map(msg => `${msg.direction === 'in' ? 'Customer' : 'Sales'}: ${msg.body}`)
+    .join('\n');
+
+  const lastCustomerMessage = context.messages
+    .filter(msg => msg.direction === 'in')
+    .slice(-1)[0];
+
+  return {
+    conversationHistory: recentMessages,
+    leadName: context.leadName,
+    vehicleInterest: context.vehicleInterest,
+    hasConversationalSignals: lastCustomerMessage ? analyzeConversationalSignals(lastCustomerMessage.body) : false,
+    leadSource: context.leadSource
+  };
 };
 
 export const generateEnhancedIntelligentResponse = async (context: ConversationContext): Promise<AIResponse | null> => {
@@ -140,18 +159,13 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
     if (error || !data?.response) {
       console.error('❌ Error from AI function:', error);
       
-      // Capture this as an unknown message scenario (only if capture is available)
+      // Capture this as an unknown message scenario using proper context type
       try {
+        const unknownContext = convertContextToUnknownMessageContext(context);
         await unknownMessageLearning.captureUnknownMessage(
           context.leadId,
           lastCustomerMessage.body,
-          {
-            conversationHistory: recentMessages,
-            leadName: context.leadName,
-            vehicleInterest: context.vehicleInterest,
-            hasConversationalSignals,
-            leadSource: context.leadSource
-          },
+          unknownContext,
           `AI function error: ${error?.message || 'No response generated'}`
         );
       } catch (captureError) {
@@ -188,10 +202,11 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
       
     if (lastCustomerMessage) {
       try {
+        const unknownContext = convertContextToUnknownMessageContext(context);
         await unknownMessageLearning.captureUnknownMessage(
           context.leadId,
           lastCustomerMessage.body,
-          context,
+          unknownContext,
           `System error: ${error instanceof Error ? error.message : 'Unknown error'}`
         );
       } catch (captureError) {

@@ -1,11 +1,16 @@
-import { supabase } from '@/integrations/supabase/client';
-
 export interface UnknownMessageContext {
   conversationHistory: string;
   leadName: string;
   vehicleInterest: string;
   hasConversationalSignals: boolean;
   leadSource?: string;
+}
+
+interface UnknownMessageStats {
+  totalUnknown: number;
+  recentUnknown: number;
+  resolvedCount: number;
+  learnedPatterns: number;
 }
 
 class UnknownMessageLearning {
@@ -18,27 +23,46 @@ class UnknownMessageLearning {
     try {
       console.log('📝 [UNKNOWN MESSAGE LEARNING] Capturing unknown message scenario');
       
-      // Try to store in database, but don't fail if database is unavailable
-      const { error } = await supabase
-        .from('ai_unknown_messages')
-        .insert({
-          lead_id: leadId,
-          message_body: messageBody,
-          context_data: context,
-          failure_reason: reason,
-          resolved: false
-        });
-
-      if (error) {
-        console.warn('⚠️ [UNKNOWN MESSAGE LEARNING] Could not store unknown message (database may be unavailable):', error);
-        // Store in local storage as fallback
-        this.storeLocalFallback(leadId, messageBody, context, reason);
-      } else {
-        console.log('✅ [UNKNOWN MESSAGE LEARNING] Unknown message captured successfully');
-      }
+      // Store in local storage as primary method (database tables don't exist)
+      this.storeLocalFallback(leadId, messageBody, context, reason);
+      console.log('✅ [UNKNOWN MESSAGE LEARNING] Unknown message captured successfully');
     } catch (error) {
       console.warn('⚠️ [UNKNOWN MESSAGE LEARNING] Error capturing unknown message:', error);
-      this.storeLocalFallback(leadId, messageBody, context, reason);
+    }
+  }
+
+  async captureHumanResponse(
+    leadId: string,
+    originalMessage: string,
+    humanResponse: string,
+    originalMessageId?: string
+  ): Promise<void> {
+    try {
+      console.log('🧠 [UNKNOWN MESSAGE LEARNING] Capturing human response for learning');
+      
+      const learningEntry = {
+        leadId,
+        originalMessage,
+        humanResponse,
+        originalMessageId,
+        timestamp: new Date().toISOString(),
+        type: 'human_intervention'
+      };
+
+      // Store in local learning storage
+      const learningKey = 'finn_human_learning_data';
+      const existing = JSON.parse(localStorage.getItem(learningKey) || '[]');
+      existing.push(learningEntry);
+
+      // Keep only the last 100 entries
+      if (existing.length > 100) {
+        existing.splice(0, existing.length - 100);
+      }
+
+      localStorage.setItem(learningKey, JSON.stringify(existing));
+      console.log('✅ [UNKNOWN MESSAGE LEARNING] Human response captured for learning');
+    } catch (error) {
+      console.warn('⚠️ [UNKNOWN MESSAGE LEARNING] Error capturing human response:', error);
     }
   }
 
@@ -75,45 +99,39 @@ class UnknownMessageLearning {
   async checkForLearnedPatterns(messageBody: string): Promise<string | null> {
     try {
       console.log('🔍 [UNKNOWN MESSAGE LEARNING] Checking for learned patterns');
-      
-      // Query the database for learned responses
-      const { data, error } = await supabase
-        .from('ai_learned_responses')
-        .select('*')
-        .eq('resolved', true)
-        .ilike('message_pattern', `%${messageBody.substring(0, 50)}%`)
-        .limit(1)
-        .single();
-
-      if (error) {
-        console.warn('⚠️ [UNKNOWN MESSAGE LEARNING] Could not query learned patterns (database may be unavailable):', error);
-        return this.checkLocalFallback(messageBody);
-      }
-
-      if (data && data.learned_response) {
-        console.log('🎯 [UNKNOWN MESSAGE LEARNING] Found learned pattern');
-        return data.learned_response;
-      }
-
-      return null;
+      return this.checkLocalFallback(messageBody);
     } catch (error) {
       console.warn('⚠️ [UNKNOWN MESSAGE LEARNING] Error checking learned patterns:', error);
-      return this.checkLocalFallback(messageBody);
+      return null;
     }
   }
 
   private checkLocalFallback(messageBody: string): string | null {
     try {
-      const fallbackKey = 'finn_learned_responses_fallback';
-      const learned = JSON.parse(localStorage.getItem(fallbackKey) || '[]');
+      // Check human learning data first
+      const learningKey = 'finn_human_learning_data';
+      const learned = JSON.parse(localStorage.getItem(learningKey) || '[]');
       
-      const match = learned.find((response: any) => 
-        messageBody.toLowerCase().includes(response.pattern.toLowerCase())
+      const match = learned.find((entry: any) => 
+        messageBody.toLowerCase().includes(entry.originalMessage.toLowerCase().substring(0, 30))
       );
 
       if (match) {
+        console.log('💾 [UNKNOWN MESSAGE LEARNING] Found learned pattern from human responses');
+        return match.humanResponse;
+      }
+
+      // Check fallback learned responses
+      const fallbackKey = 'finn_learned_responses_fallback';
+      const fallbackLearned = JSON.parse(localStorage.getItem(fallbackKey) || '[]');
+      
+      const fallbackMatch = fallbackLearned.find((response: any) => 
+        messageBody.toLowerCase().includes(response.pattern.toLowerCase())
+      );
+
+      if (fallbackMatch) {
         console.log('💾 [UNKNOWN MESSAGE LEARNING] Found learned pattern in local fallback');
-        return match.response;
+        return fallbackMatch.response;
       }
 
       return null;
@@ -123,22 +141,53 @@ class UnknownMessageLearning {
     }
   }
 
+  async getUnknownMessageStats(): Promise<UnknownMessageStats> {
+    try {
+      const fallbackKey = 'finn_unknown_messages_fallback';
+      const unknownMessages = JSON.parse(localStorage.getItem(fallbackKey) || '[]');
+      
+      const learningKey = 'finn_human_learning_data';
+      const learnedResponses = JSON.parse(localStorage.getItem(learningKey) || '[]');
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const recentUnknown = unknownMessages.filter((msg: any) => 
+        new Date(msg.timestamp) > sevenDaysAgo
+      ).length;
+
+      return {
+        totalUnknown: unknownMessages.length,
+        recentUnknown,
+        resolvedCount: learnedResponses.length,
+        learnedPatterns: learnedResponses.length
+      };
+    } catch (error) {
+      console.warn('⚠️ [UNKNOWN MESSAGE LEARNING] Error getting stats:', error);
+      return {
+        totalUnknown: 0,
+        recentUnknown: 0,
+        resolvedCount: 0,
+        learnedPatterns: 0
+      };
+    }
+  }
+
   async markAsResolved(messageId: string, learnedResponse: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('ai_unknown_messages')
-        .update({ 
-          resolved: true, 
-          learned_response: learnedResponse,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', messageId);
+      // For local storage implementation, we'll add to learned responses
+      const learnedKey = 'finn_learned_responses_fallback';
+      const existing = JSON.parse(localStorage.getItem(learnedKey) || '[]');
+      
+      existing.push({
+        id: messageId,
+        pattern: messageId, // Use messageId as pattern identifier
+        response: learnedResponse,
+        timestamp: new Date().toISOString()
+      });
 
-      if (error) {
-        console.warn('⚠️ [UNKNOWN MESSAGE LEARNING] Could not mark as resolved:', error);
-      } else {
-        console.log('✅ [UNKNOWN MESSAGE LEARNING] Message marked as resolved');
-      }
+      localStorage.setItem(learnedKey, JSON.stringify(existing));
+      console.log('✅ [UNKNOWN MESSAGE LEARNING] Message marked as resolved in local storage');
     } catch (error) {
       console.warn('⚠️ [UNKNOWN MESSAGE LEARNING] Error marking as resolved:', error);
     }

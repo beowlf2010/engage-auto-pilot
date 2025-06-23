@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -101,7 +100,10 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
                 AI Enhanced
               </Badge>
             </div>
-            <ConnectionStatusIndicator connectionState={connectionState} />
+            <ConnectionStatusIndicator 
+              connectionState={connectionState} 
+              onReconnect={() => manualRefresh()}
+            />
           </div>
 
           <div className="flex items-center gap-4 text-sm text-gray-600">
@@ -133,7 +135,7 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
                 key={conversation.leadId}
                 conversation={conversation}
                 isSelected={selectedConversation?.leadId === conversation.leadId}
-                onClick={() => handleConversationSelect(conversation)}
+                onSelect={() => handleConversationSelect(conversation)}
               />
             ))
           )}
@@ -179,10 +181,10 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
             {canReply && (
               <div className="p-4 border-t bg-white">
                 <InventoryAwareMessageInput
-                  value={messageText}
-                  onChange={setMessageText}
-                  onSend={() => handleSendMessage(messageText)}
-                  disabled={sendingMessage}
+                  messageContent={messageText}
+                  onMessageChange={setMessageText}
+                  onSendMessage={() => handleSendMessage(messageText)}
+                  isLoading={sendingMessage}
                   leadId={selectedConversation.leadId}
                   placeholder="Type your message..."
                 />
