@@ -19,10 +19,17 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface LeadContextPanelProps {
   conversation: any;
+  messages: any[]; // Add messages prop
+  onSendMessage: (message: string) => Promise<void>; // Add onSendMessage prop
   onScheduleAppointment?: () => void;
 }
 
-const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPanelProps) => {
+const LeadContextPanel = ({ 
+  conversation, 
+  messages = [], // Default to empty array
+  onSendMessage, // Accept the send message function
+  onScheduleAppointment 
+}: LeadContextPanelProps) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showMarkLostDialog, setShowMarkLostDialog] = useState(false);
   const [isMarkingLost, setIsMarkingLost] = useState(false);
@@ -103,12 +110,22 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
   };
 
   const handleSendAIMessage = async (message: string) => {
-    console.log('AI message to send:', message);
-    // This would be handled by the parent component's message sending logic
-    toast({
-      title: "AI Message Ready",
-      description: "The AI message has been prepared. Use the message input to send it.",
-    });
+    try {
+      console.log('🤖 [LEAD CONTEXT] Sending AI message via parent:', message);
+      await onSendMessage(message);
+      
+      toast({
+        title: "AI Message Sent",
+        description: "Finn's response has been sent successfully",
+      });
+    } catch (error) {
+      console.error('❌ [LEAD CONTEXT] Failed to send AI message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send AI message",
+        variant: "destructive"
+      });
+    }
   };
 
   if (!conversation) {
@@ -192,8 +209,8 @@ const LeadContextPanel = ({ conversation, onScheduleAppointment }: LeadContextPa
               <TabsContent value="ai" className="mt-4 space-y-4">
                 <IntelligentAIPanel
                   conversation={conversation}
-                  messages={[]} // Messages would be passed from parent
-                  onSendMessage={handleSendAIMessage}
+                  messages={messages} // Pass actual messages from parent
+                  onSendMessage={handleSendAIMessage} // Connect to parent's send function
                   canReply={true}
                   isCollapsed={false}
                 />
