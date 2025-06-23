@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
@@ -88,6 +89,12 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
     if (conversation.unreadCount > 0) {
       console.log('📖 [SMART INBOX] Auto-marking conversation as read');
       await markAsRead(conversation.leadId);
+      
+      // Force refresh of global unread count after marking as read
+      console.log('🔄 [SMART INBOX] Triggering global unread count refresh after mark as read');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('unread-count-changed'));
+      }, 1000);
     }
   }, [loadMessages, markAsRead]);
 
@@ -115,11 +122,13 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
     const unreadConversations = filteredConversations.filter(c => c.unreadCount > 0).length;
     const lostStatusConversations = conversations.filter(c => c.status === 'lost').length;
     const unassignedConversations = conversations.filter(c => !c.salespersonId).length;
+    const totalUnreadMessages = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
     
     console.log('🔍 [SMART INBOX ENHANCED] UNREAD-FIRST loading stats:', {
       totalConversations: conversations.length,
       filteredConversations: filteredConversations.length,
       unreadConversations,
+      totalUnreadMessages,
       lostStatusConversations,
       unassignedConversations,
       isAdmin: profile?.role === 'admin' || profile?.role === 'manager',
@@ -135,6 +144,18 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
       unassigned: unassignedConversations
     };
   }, [filteredConversations, conversations, profile?.role, hasActiveFilters, searchQuery]);
+
+  // Force refresh global unread count when component mounts
+  useEffect(() => {
+    const refreshGlobalCount = () => {
+      console.log('🔄 [SMART INBOX] Forcing global unread count refresh on mount');
+      window.dispatchEvent(new CustomEvent('unread-count-changed'));
+    };
+    
+    // Delay to ensure conversations are loaded
+    const timer = setTimeout(refreshGlobalCount, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   if (loading) {
     return (
@@ -229,7 +250,6 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
               onFiltersChange={handleFiltersChange}
               onClearFilters={clearFilters}
               userRole={profile?.role}
-              stats={stats}
               conversations={conversations}
               filteredConversations={filteredConversations}
               hasActiveFilters={hasActiveFilters}
