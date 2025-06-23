@@ -90,10 +90,10 @@ const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
         <TooltipTrigger asChild>
           <Badge 
             variant={statusInfo.variant}
-            className={`flex items-center gap-1 cursor-help ${statusInfo.color}`}
+            className={`flex items-center gap-1 cursor-help h-6 ${statusInfo.color}`}
           >
             {statusInfo.icon}
-            <span className="text-xs">{statusInfo.text}</span>
+            <span className="text-xs leading-none">{statusInfo.text}</span>
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
@@ -109,7 +109,7 @@ const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
           variant="ghost"
           size="sm"
           onClick={onReconnect}
-          className="h-6 px-2 text-xs"
+          className="h-6 px-2 text-xs leading-none"
           disabled={reconnectAttempts > 0 && reconnectAttempts < maxReconnectAttempts}
         >
           <RefreshCw className="w-3 h-3 mr-1" />
