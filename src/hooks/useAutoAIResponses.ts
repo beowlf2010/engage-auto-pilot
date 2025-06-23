@@ -13,9 +13,11 @@ interface UseAutoAIResponsesProps {
 export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponsePreview }: UseAutoAIResponsesProps) => {
   const processedMessages = useRef(new Set<string>());
   const isProcessing = useRef(false);
+  const channelRef = useRef<any>(null);
 
   const processIncomingMessage = useCallback(async (messageId: string, leadId: string) => {
     if (processedMessages.current.has(messageId) || isProcessing.current) {
+      console.log('🤖 [AUTO AI] Skipping already processed message:', messageId);
       return;
     }
 
@@ -45,7 +47,10 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
         .order('sent_at', { ascending: true })
         .limit(20);
 
-      if (!conversations) return;
+      if (!conversations) {
+        console.log('🤖 [AUTO AI] No conversations found for lead:', leadId);
+        return;
+      }
 
       // Create context for AI
       const context = {
@@ -71,6 +76,8 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
         return;
       }
 
+      console.log('🤖 [AUTO AI] Generating AI response preview for:', leadId);
+
       // Generate AI response PREVIEW (don't send)
       const aiResponse = await generateEnhancedIntelligentResponse(context);
       
@@ -92,11 +99,6 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
         });
       }
 
-      toast({
-        title: "Finn Generated Response",
-        description: `AI response ready for review for ${lead.first_name}`,
-      });
-
     } catch (error) {
       console.error('❌ [AUTO AI] Error processing message for AI preview:', error);
     } finally {
@@ -106,10 +108,17 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
 
   // Subscribe to new incoming messages
   useEffect(() => {
+    // Clean up existing channel if it exists
+    if (channelRef.current) {
+      console.log('🤖 [AUTO AI] Cleaning up existing channel');
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
     console.log('🤖 [AUTO AI] Setting up real-time subscription for AI previews');
 
     const channel = supabase
-      .channel('ai-auto-previews')
+      .channel(`ai-auto-previews-${profileId}`)
       .on(
         'postgres_changes',
         {
@@ -128,15 +137,24 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
           }, 1000);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('🤖 [AUTO AI] Subscription status:', status);
+      });
+
+    channelRef.current = channel;
 
     return () => {
       console.log('🤖 [AUTO AI] Cleaning up AI preview subscription');
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [processIncomingMessage]);
+  }, [processIncomingMessage, profileId]);
 
   const manualTrigger = useCallback(async (leadId: string) => {
+    console.log('🤖 [AUTO AI] Manual trigger requested for lead:', leadId);
+    
     // Get the latest message for this lead
     const { data: latestMessage } = await supabase
       .from('conversations')
@@ -148,7 +166,15 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
       .single();
 
     if (latestMessage) {
+      console.log('🤖 [AUTO AI] Processing latest message:', latestMessage.id);
       await processIncomingMessage(latestMessage.id, leadId);
+    } else {
+      console.log('🤖 [AUTO AI] No inbound messages found for lead:', leadId);
+      toast({
+        title: "No Recent Messages",
+        description: "No recent inbound messages to respond to",
+        variant: "destructive"
+      });
     }
   }, [processIncomingMessage]);
 
