@@ -13,7 +13,7 @@ class LeadProcessService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map(this.mapProcessFromDb);
     } catch (error) {
       console.error('Error fetching lead processes:', error);
       return [];

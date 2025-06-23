@@ -1,364 +1,222 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
-import { Lead } from '@/types/lead';
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { useLeads } from '@/hooks/useLeads';
+import { useLeadsSelection } from './useLeadsSelection';
+import { useLeadsSorting } from './useLeadsSorting';
 import LeadsStatsCards from './LeadsStatsCards';
-import EnhancedLeadSearch from './EnhancedLeadSearch';
-import LeadsBulkActionsHandler from './LeadsBulkActionsHandler';
 import LeadsStatusTabs from './LeadsStatusTabs';
-import LeadQuickView from './LeadQuickView';
+import LeadsFiltersBar from './LeadsFiltersBar';
+import LeadsTableHeader from './LeadsTableHeader';
+import LeadsTableRow from './LeadsTableRow';
+import LeadsTableEmptyState from './LeadsTableEmptyState';
+import LeadsLoadingState from './LeadsLoadingState';
+import EnhancedBulkActionsPanel from './EnhancedBulkActionsPanel';
+import ProcessManagementPanel from './ProcessManagementPanel';
+import MultiFileLeadUploadModal from './MultiFileLeadUploadModal';
 import VINImportModal from './VINImportModal';
+import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface LeadsDataProviderProps {
   isVINImportModalOpen: boolean;
   setIsVINImportModalOpen: (open: boolean) => void;
-  showFreshLeadsOnly?: boolean;
+  showFreshLeadsOnly: boolean;
 }
-
-const LoadingProgressDisplay = ({ progress, onRetry }: { progress: any[], onRetry: () => void }) => {
-  const hasError = progress.some(p => p.error);
-  
-  return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium">Loading Leads</h3>
-          {hasError && (
-            <Button variant="outline" size="sm" onClick={onRetry}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Retry
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {progress.map((step, index) => (
-          <div key={index} className="flex items-center space-x-3">
-            {step.error ? (
-              <AlertCircle className="w-4 h-4 text-red-500" />
-            ) : step.completed ? (
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-            ) : (
-              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-            )}
-            <span className={`text-sm ${step.error ? 'text-red-600' : step.completed ? 'text-green-600' : 'text-gray-600'}`}>
-              {step.step}
-            </span>
-            {step.error && (
-              <span className="text-xs text-red-500">({step.error})</span>
-            )}
-          </div>
-        ))}
-        {hasError && (
-          <Alert className="mt-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              There was an issue loading your leads. This could be due to a network connection problem or server timeout. Please try refreshing the page or check your internet connection.
-            </AlertDescription>
-          </Alert>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
 
 const LeadsDataProvider = ({ 
   isVINImportModalOpen, 
-  setIsVINImportModalOpen,
-  showFreshLeadsOnly = false
+  setIsVINImportModalOpen, 
+  showFreshLeadsOnly 
 }: LeadsDataProviderProps) => {
+  const { profile } = useAuth();
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isMultiFileModalOpen, setIsMultiFileModalOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
+  const [selectedDateRange, setSelectedDateRange] = useState<string | null>(null);
+
   const {
-    leads: allLeads,
+    leads,
+    totalLeads,
     loading,
     error,
-    loadingProgress,
-    retry,
+    refetch
+  } = useLeads({
+    status: selectedStatus,
+    source: selectedSource,
+    vehicle: selectedVehicle,
+    dateRange: selectedDateRange,
+    freshLeadsOnly: showFreshLeadsOnly
+  });
+
+  const {
     selectedLeads,
-    quickViewLead,
-    statusFilter,
-    searchFilters,
-    savedPresets,
-    refetch,
-    getEngagementScore,
-    setStatusFilter,
-    setSearchFilters,
-    savePreset,
-    loadPreset,
-    selectAllFiltered,
-    clearSelection,
-    toggleLeadSelection,
-    showQuickView,
-    hideQuickView
-  } = useAdvancedLeads();
+    setSelectedLeads,
+    selectAllLeads,
+    clearSelection
+  } = useLeadsSelection(leads);
 
-  const { profile } = useAuth();
-  const canEdit = profile?.role === 'manager' || profile?.role === 'admin';
+  const {
+    sortConfig,
+    handleSort
+  } = useLeadsSorting();
 
-  // Track active stats card filter
-  const [activeStatsFilter, setActiveStatsFilter] = useState<string | null>(null);
+  const leadsData = useMemo(() => {
+    let filteredLeads = [...leads];
 
-  // Get the final filtered leads
-  const leads = showFreshLeadsOnly ? allLeads.filter(lead => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const leadDate = new Date(lead.createdAt);
-    leadDate.setHours(0, 0, 0, 0);
-    return leadDate.getTime() === today.getTime();
-  }) : allLeads;
-
-  // Show loading with progress if still loading
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <LoadingProgressDisplay progress={loadingProgress} onRetry={retry} />
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state if there's an error
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Card className="w-full max-w-md mx-auto">
-            <CardHeader>
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="w-5 h-5 text-red-500" />
-                <h3 className="text-lg font-medium text-red-600">Failed to Load Leads</h3>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-              <div className="space-y-2">
-                <Button onClick={retry} className="w-full">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Try Again
-                </Button>
-                <Button variant="outline" onClick={() => window.location.reload()} className="w-full">
-                  Refresh Page
-                </Button>
-              </div>
-              <div className="text-xs text-gray-500 space-y-1">
-                <p>If this problem persists:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Check your internet connection</li>
-                  <li>Try refreshing the page</li>
-                  <li>Contact support if the issue continues</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Handle stats card clicks with proper filtering
-  const handleStatsCardClick = (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled') => {
-    setActiveStatsFilter(filterType);
-    
-    // Force a refresh to get the latest data from database
-    console.log('🔄 [LEADS DATA] Forcing refresh for stats card click:', filterType);
-    refetch();
-    
-    switch (filterType) {
-      case 'fresh':
-        setSearchFilters({ ...searchFilters, dateFilter: 'today', contactStatus: undefined });
-        setStatusFilter('all');
-        break;
-      case 'all':
-        setSearchFilters({ ...searchFilters, dateFilter: 'all', contactStatus: undefined });
-        setStatusFilter('all');
-        break;
-      case 'no_contact':
-        setSearchFilters({ ...searchFilters, contactStatus: 'no_contact', dateFilter: 'all' });
-        setStatusFilter('all');
-        break;
-      case 'contact_attempted':
-        setSearchFilters({ ...searchFilters, contactStatus: 'contact_attempted', dateFilter: 'all' });
-        setStatusFilter('all');
-        break;
-      case 'response_received':
-        setSearchFilters({ ...searchFilters, contactStatus: 'response_received', dateFilter: 'all' });
-        setStatusFilter('all');
-        break;
-      case 'ai_enabled':
-        setSearchFilters({ ...searchFilters, aiOptIn: true, contactStatus: undefined, dateFilter: 'all' });
-        setStatusFilter('all');
-        break;
+    if (searchQuery) {
+      const lowerCaseQuery = searchQuery.toLowerCase();
+      filteredLeads = filteredLeads.filter(lead =>
+        lead.first_name?.toLowerCase().includes(lowerCaseQuery) ||
+        lead.last_name?.toLowerCase().includes(lowerCaseQuery) ||
+        lead.phone?.includes(searchQuery) ||
+        lead.email?.toLowerCase().includes(lowerCaseQuery) ||
+        lead.vehicle_of_interest?.toLowerCase().includes(lowerCaseQuery)
+      );
     }
-  };
 
-  const handleAiOptInChange = async (leadId: string, value: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ ai_opt_in: value })
-        .eq('id', leadId);
+    if (activeTab !== 'all') {
+      filteredLeads = filteredLeads.filter(lead => lead.status === activeTab);
+    }
 
-      if (error) throw error;
+    if (sortConfig !== null) {
+      filteredLeads.sort((a: any, b: any) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
 
-      toast({
-        title: "Lead updated",
-        description: `Finn AI ${value ? 'enabled' : 'disabled'} for this lead`,
-      });
+        if (aValue === null || aValue === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (bValue === null || bValue === undefined) return sortConfig.direction === 'ascending' ? 1 : -1;
 
-      // Force refresh to get updated data
-      console.log('🔄 [LEADS DATA] Forcing refresh after AI opt-in change');
-      refetch();
-    } catch (error) {
-      console.error('Error updating lead:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update lead",
-        variant: "destructive",
+        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
       });
     }
+
+    return filteredLeads;
+  }, [leads, activeTab, searchQuery, sortConfig]);
+
+  const handleStatusChange = (status: string | null) => {
+    setSelectedStatus(status);
   };
 
-  const handleDoNotContactChange = async (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => {
-    try {
-      const updateData = {
-        [field === 'doNotCall' ? 'do_not_call' : field === 'doNotEmail' ? 'do_not_email' : 'do_not_mail']: value
-      };
-
-      const { error } = await supabase
-        .from('leads')
-        .update(updateData)
-        .eq('id', leadId);
-
-      if (error) throw error;
-
-      const actionText = value ? 'enabled' : 'disabled';
-      const restrictionType = field === 'doNotCall' ? 'call' : field === 'doNotEmail' ? 'email' : 'mail';
-
-      toast({
-        title: "Contact restriction updated",
-        description: `Do not ${restrictionType} ${actionText} for this lead`,
-      });
-
-      // Force refresh to get updated data
-      console.log('🔄 [LEADS DATA] Forcing refresh after do-not-contact change');
-      refetch();
-    } catch (error) {
-      console.error('Error updating lead contact restrictions:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update contact restrictions",
-        variant: "destructive",
-      });
-    }
+  const handleSourceChange = (source: string | null) => {
+    setSelectedSource(source);
   };
 
-  const handleMessage = (lead: Lead) => {
-    window.location.href = `/inbox?leadId=${lead.id}`;
+  const handleVehicleChange = (vehicle: string | null) => {
+    setSelectedVehicle(vehicle);
   };
 
-  const handleCall = (phoneNumber: string) => {
-    window.open(`tel:${phoneNumber}`);
-  };
-
-  const handleSchedule = (lead: Lead) => {
-    window.location.href = `/appointments/schedule?leadId=${lead.id}`;
-  };
-
-  const handleVINImportSuccess = () => {
-    console.log('🔄 [LEADS DATA] Forcing refresh after VIN import');
-    refetch();
-    toast({
-      title: "Import successful",
-      description: "VIN data has been imported and leads have been updated",
-    });
-  };
-
-  // Calculate stats from all leads (not filtered) including fresh count
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const stats = {
-    total: allLeads.length,
-    noContact: allLeads.filter(l => l.contactStatus === 'no_contact').length,
-    contacted: allLeads.filter(l => l.contactStatus === 'contact_attempted').length,
-    responded: allLeads.filter(l => l.contactStatus === 'response_received').length,
-    aiEnabled: allLeads.filter(l => l.aiOptIn).length,
-    fresh: allLeads.filter(l => {
-      const leadDate = new Date(l.createdAt);
-      leadDate.setHours(0, 0, 0, 0);
-      return leadDate.getTime() === today.getTime();
-    }).length
+  const handleDateRangeChange = (dateRange: string | null) => {
+    setSelectedDateRange(dateRange);
   };
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards with Fresh Leads */}
-      <LeadsStatsCards 
-        stats={stats} 
-        onCardClick={handleStatsCardClick}
-        activeFilter={activeStatsFilter}
+      <LeadsStatsCards totalLeads={totalLeads} leadsData={leadsData} />
+
+      <LeadsStatusTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      <LeadsFiltersBar
+        onStatusChange={handleStatusChange}
+        onSourceChange={handleSourceChange}
+        onVehicleChange={handleVehicleChange}
+        onDateRangeChange={handleDateRangeChange}
+        onSearch={setSearchQuery}
       />
 
-      {/* Enhanced Search & Filters */}
-      <EnhancedLeadSearch
-        onFiltersChange={setSearchFilters}
-        savedPresets={savedPresets}
-        onSavePreset={savePreset}
-        onLoadPreset={loadPreset}
-        totalResults={leads.length}
-        isLoading={loading}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Main content area */}
+        <div className="lg:col-span-3">
+          <EnhancedBulkActionsPanel
+            selectedLeads={selectedLeads}
+            setSelectedLeads={setSelectedLeads}
+            selectAllLeads={selectAllLeads}
+            clearSelection={clearSelection}
+            onMultiFileImportClick={() => setIsMultiFileModalOpen(true)}
+            onRefresh={refetch}
+          />
+
+          <Card>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500"
+                        onChange={(e) => selectAllLeads(e.target.checked)}
+                        checked={selectedLeads.length === leadsData.length && leadsData.length > 0}
+                        disabled={leadsData.length === 0}
+                      />
+                    </TableHead>
+                    <LeadsTableHeader label="Name" key="first_name" sortKey="first_name" sortConfig={sortConfig} handleSort={handleSort} />
+                    <LeadsTableHeader label="Phone" key="phone" sortKey="phone" sortConfig={sortConfig} handleSort={handleSort} />
+                    <LeadsTableHeader label="Email" key="email" sortKey="email" sortConfig={sortConfig} handleSort={handleSort} />
+                    <LeadsTableHeader label="Vehicle of Interest" key="vehicle_of_interest" sortKey="vehicle_of_interest" sortConfig={sortConfig} handleSort={handleSort} />
+                    <LeadsTableHeader label="Status" key="status" sortKey="status" sortConfig={sortConfig} handleSort={handleSort} />
+                    <LeadsTableHeader label="Source" key="source" sortKey="source" sortConfig={sortConfig} handleSort={handleSort} />
+                    <LeadsTableHeader label="Created At" key="created_at" sortKey="created_at" sortConfig={sortConfig} handleSort={handleSort} />
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <LeadsLoadingState />
+                  ) : leadsData.length === 0 ? (
+                    <LeadsTableEmptyState />
+                  ) : (
+                    leadsData.map((lead) => (
+                      <LeadsTableRow
+                        key={lead.id}
+                        lead={lead}
+                        selectedLeads={selectedLeads}
+                        setSelectedLeads={setSelectedLeads}
+                        refetch={refetch}
+                      />
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right sidebar with process management */}
+        <div className="lg:col-span-1">
+          <ProcessManagementPanel 
+            selectedLeadIds={selectedLeads}
+            onProcessAssigned={() => {
+              // Refresh leads data after process assignment
+              if (refetch) refetch();
+              clearSelection();
+            }}
+          />
+        </div>
+      </div>
+
+      <MultiFileLeadUploadModal
+        isOpen={isMultiFileModalOpen}
+        onClose={() => setIsMultiFileModalOpen(false)}
+        onUploadComplete={refetch}
       />
 
-      {/* Bulk Actions Panel */}
-      <LeadsBulkActionsHandler
-        selectedLeads={selectedLeads}
-        leads={leads}
-        clearSelection={clearSelection}
-        refetch={refetch}
-      />
-
-      {/* Status Filter Tabs */}
-      <LeadsStatusTabs
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        finalFilteredLeads={leads}
-        loading={loading}
-        selectedLeads={selectedLeads}
-        selectAllFiltered={selectAllFiltered}
-        toggleLeadSelection={toggleLeadSelection}
-        handleAiOptInChange={handleAiOptInChange}
-        handleDoNotContactChange={handleDoNotContactChange}
-        canEdit={canEdit}
-        searchTerm={searchFilters.searchTerm}
-        onQuickView={showQuickView}
-        getEngagementScore={getEngagementScore}
-      />
-
-      {/* Quick View Modal */}
-      {quickViewLead && (
-        <LeadQuickView
-          lead={quickViewLead}
-          onClose={hideQuickView}
-          onMessage={handleMessage}
-          onCall={handleCall}
-          onSchedule={handleSchedule}
-        />
-      )}
-
-      {/* VIN Import Modal */}
       <VINImportModal
         isOpen={isVINImportModalOpen}
         onClose={() => setIsVINImportModalOpen(false)}
-        onImportSuccess={handleVINImportSuccess}
+        onUploadComplete={refetch}
       />
     </div>
   );

@@ -2717,6 +2717,96 @@ export type Database = {
           },
         ]
       }
+      lead_process_assignments: {
+        Row: {
+          assigned_at: string
+          current_stage: number
+          id: string
+          lead_id: string
+          next_message_at: string | null
+          performance_notes: string | null
+          process_id: string
+          status: Database["public"]["Enums"]["process_assignment_status"]
+        }
+        Insert: {
+          assigned_at?: string
+          current_stage?: number
+          id?: string
+          lead_id: string
+          next_message_at?: string | null
+          performance_notes?: string | null
+          process_id: string
+          status?: Database["public"]["Enums"]["process_assignment_status"]
+        }
+        Update: {
+          assigned_at?: string
+          current_stage?: number
+          id?: string
+          lead_id?: string
+          next_message_at?: string | null
+          performance_notes?: string | null
+          process_id?: string
+          status?: Database["public"]["Enums"]["process_assignment_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_process_assignments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_process_assignments_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "lead_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_processes: {
+        Row: {
+          aggression_level: Database["public"]["Enums"]["aggression_level"]
+          created_at: string
+          description: string | null
+          escalation_rules: Json | null
+          id: string
+          is_active: boolean
+          message_sequence: Json | null
+          name: string
+          performance_metrics: Json | null
+          success_criteria: Json | null
+          updated_at: string
+        }
+        Insert: {
+          aggression_level: Database["public"]["Enums"]["aggression_level"]
+          created_at?: string
+          description?: string | null
+          escalation_rules?: Json | null
+          id?: string
+          is_active?: boolean
+          message_sequence?: Json | null
+          name: string
+          performance_metrics?: Json | null
+          success_criteria?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          aggression_level?: Database["public"]["Enums"]["aggression_level"]
+          created_at?: string
+          description?: string | null
+          escalation_rules?: Json | null
+          id?: string
+          is_active?: boolean
+          message_sequence?: Json | null
+          name?: string
+          performance_metrics?: Json | null
+          success_criteria?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lead_response_patterns: {
         Row: {
           avg_response_time_hours: number | null
@@ -4930,7 +5020,13 @@ export type Database = {
       }
     }
     Enums: {
+      aggression_level:
+        | "gentle"
+        | "moderate"
+        | "aggressive"
+        | "super_aggressive"
       app_role: "admin" | "manager" | "sales" | "user"
+      process_assignment_status: "active" | "paused" | "completed" | "escalated"
       source_report_type:
         | "new_car_main_view"
         | "merch_inv_view"
@@ -5051,7 +5147,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      aggression_level: [
+        "gentle",
+        "moderate",
+        "aggressive",
+        "super_aggressive",
+      ],
       app_role: ["admin", "manager", "sales", "user"],
+      process_assignment_status: ["active", "paused", "completed", "escalated"],
       source_report_type: [
         "new_car_main_view",
         "merch_inv_view",
