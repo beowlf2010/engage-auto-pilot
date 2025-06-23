@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 import { analyzeConversationalContext, generateConversationalResponse } from './conversationalAwareness.ts'
@@ -74,19 +73,9 @@ serve(async (req) => {
       );
     }
 
-    // Simple intent detection
-    const hasQuestion = /\?/.test(messageBody) || 
-      /\b(what|how|when|where|why|can you|could you|would you|do you|are you|is there)\b/i.test(messageBody);
-
-    if (!hasQuestion) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'No question detected' }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
+    // CHANGED: Remove the restrictive question-only check
+    // Previous code blocked non-question messages, now we attempt to respond to ALL messages
+    console.log('🤖 Attempting to generate response for any customer message');
 
     // Generate source-aware response using OpenAI
     const response = await generateSourceAwareResponse(
@@ -153,7 +142,8 @@ ${sourceContext}`;
     prompt += `\n\nRecent conversation:\n${conversationHistory}`;
   }
 
-  prompt += `\n\nRespond helpfully and professionally in under 160 characters. ${getSourceSpecificInstructions(leadSourceData?.sourceCategory)}`;
+  // ENHANCED: Updated prompt to handle all message types, not just questions
+  prompt += `\n\nRespond helpfully and professionally in under 160 characters. Even if the customer isn't asking a direct question, acknowledge their message and provide value. ${getSourceSpecificInstructions(leadSourceData?.sourceCategory)}`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -164,7 +154,7 @@ ${sourceContext}`;
     body: JSON.stringify({
       model: 'gpt-3.5-turbo',
       messages: [
-        { role: 'system', content: 'You are a helpful automotive sales assistant specialized in adapting to different customer sources and needs.' },
+        { role: 'system', content: 'You are a helpful automotive sales assistant who responds to every customer message with care and professionalism, even if they are not asking questions.' },
         { role: 'user', content: prompt }
       ],
       max_tokens: 100,
@@ -177,7 +167,7 @@ ${sourceContext}`;
   }
 
   const data = await response.json();
-  return data.choices[0]?.message?.content?.trim() || 'I apologize, but I encountered an issue. Please call us at (251) 368-4053!';
+  return data.choices[0]?.message?.content?.trim() || 'I appreciate you reaching out. Please call us at (251) 368-4053 and we can help you with whatever you need!';
 }
 
 function getSourceContext(leadSourceData: any): string {

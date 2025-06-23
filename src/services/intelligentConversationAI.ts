@@ -128,7 +128,7 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
       }
     }
 
-    // First, check if we've learned how to handle this type of message
+    // Check for learned patterns
     let learnedResponse: string | null = null;
     try {
       learnedResponse = await unknownMessageLearning.checkForLearnedPatterns(lastCustomerMessage.body);
@@ -258,11 +258,7 @@ export const shouldGenerateResponse = (context: ConversationContext): boolean =>
 
   if (messagesAfterCustomer.length > 0) return false;
 
-  // Check for questions or conversational signals
-  const hasDirectQuestion = /\?/.test(lastCustomerMessage.body) || 
-    /\b(what|how|when|where|why|can you|could you|would you|do you|are you|is there)\b/i.test(lastCustomerMessage.body);
-
-  const hasConversationalSignals = analyzeConversationalSignals(lastCustomerMessage.body);
-  
-  return hasDirectQuestion || hasConversationalSignals;
+  // CHANGED: Always attempt to respond to ANY inbound customer message
+  // This removes the previous restrictive logic that only responded to questions
+  return true;
 };
