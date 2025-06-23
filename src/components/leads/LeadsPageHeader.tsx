@@ -1,60 +1,64 @@
 
-import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Plus, Upload, Files, Clock } from "lucide-react";
-import MultiFileLeadUploadModal from './MultiFileLeadUploadModal';
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Upload, Search, Zap } from 'lucide-react';
 
 interface LeadsPageHeaderProps {
   canImport: boolean;
   onVINImportClick: () => void;
-  onFreshLeadsClick?: () => void;
+  onFreshLeadsClick: () => void;
+  searchTerm?: string;
+  onSearchChange?: (term: string) => void;
 }
 
-const LeadsPageHeader = ({ canImport, onVINImportClick, onFreshLeadsClick }: LeadsPageHeaderProps) => {
-  const [isMultiFileModalOpen, setIsMultiFileModalOpen] = useState(false);
-
+const LeadsPageHeader = ({ 
+  canImport, 
+  onVINImportClick, 
+  onFreshLeadsClick,
+  searchTerm = '',
+  onSearchChange
+}: LeadsPageHeaderProps) => {
   return (
-    <>
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Leads</h1>
-        <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            onClick={onFreshLeadsClick}
-            className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-          >
-            <Clock className="w-4 h-4 mr-2" />
-            Fresh Leads (Today)
-          </Button>
-          {canImport && (
-            <>
-              <Button variant="outline" onClick={onVINImportClick}>
-                <Upload className="w-4 h-4 mr-2" />
-                Import from VIN
-              </Button>
-              <Button variant="outline" onClick={() => setIsMultiFileModalOpen(true)}>
-                <Files className="w-4 h-4 mr-2" />
-                Multi-File Upload
-              </Button>
-            </>
-          )}
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Lead
-          </Button>
-        </div>
+    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold">Leads</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onFreshLeadsClick}
+          className="flex items-center gap-2"
+        >
+          <Zap className="w-4 h-4" />
+          Fresh Leads
+        </Button>
       </div>
 
-      <MultiFileLeadUploadModal
-        isOpen={isMultiFileModalOpen}
-        onClose={() => setIsMultiFileModalOpen(false)}
-        onSuccess={() => {
-          setIsMultiFileModalOpen(false);
-          // Refresh the leads list
-          window.location.reload();
-        }}
-      />
-    </>
+      <div className="flex items-center gap-4">
+        {/* Search Input */}
+        {onSearchChange && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search leads..."
+              value={searchTerm}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="pl-10 w-64"
+            />
+          </div>
+        )}
+
+        {canImport && (
+          <Button
+            onClick={onVINImportClick}
+            className="flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Import VINs
+          </Button>
+        )}
+      </div>
+    </div>
   );
 };
 
