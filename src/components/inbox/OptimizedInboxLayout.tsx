@@ -82,6 +82,8 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
               lastMessageTime: selectedConversation.lastMessageTime,
               salespersonId: selectedConversation.salespersonId
             }}
+            messages={messages}
+            onSendMessage={onSendMessage}
           />
         </div>
       )}

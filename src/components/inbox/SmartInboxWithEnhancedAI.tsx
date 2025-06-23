@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
@@ -74,13 +75,11 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
   }, [conversations, searchQuery, applyFilters]);
 
   const selectedConversation = selectedConversationId 
-    ? conversations.find(c => c.id === selectedConversationId) || conversations.find(c => c.leadId === selectedConversationId)
+    ? conversations.find(c => c.leadId === selectedConversationId)
     : null;
 
-  // ... keep existing code (stats calculation, effects, handlers)
-
   const handleConversationSelect = useCallback(async (conversation: any) => {
-    const conversationId = conversation.id || conversation.leadId;
+    const conversationId = conversation.leadId;
     setSelectedConversationId(conversationId);
     
     console.log('📱 [SMART INBOX] Loading messages for conversation:', conversationId);
@@ -128,7 +127,34 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
     };
   }, [filteredConversations, conversations, profile?.role, hasActiveFilters, searchQuery]);
 
-  // ... keep existing code (loading and error states)
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Smart Inbox</h3>
+          <p className="text-gray-500">Please wait while we load your conversations...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <Card className="w-96">
+          <CardContent className="p-6 text-center">
+            <WifiOff className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Connection Error</h3>
+            <p className="text-gray-500 mb-4">{error}</p>
+            <Button onClick={manualRefresh}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -191,10 +217,14 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
           <div className="mt-4">
             <SmartFilters
               filters={filters}
-              onFilterChange={updateFilter}
+              onFiltersChange={updateFilter}
               onClearFilters={clearFilters}
               userRole={profile?.role}
               stats={stats}
+              conversations={conversations}
+              filteredConversations={filteredConversations}
+              hasActiveFilters={hasActiveFilters}
+              filterSummary={getFilterSummary()}
             />
           </div>
         )}
@@ -257,8 +287,8 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
               <div className="w-80 border-l border-gray-200 bg-white">
                 <LeadContextPanel
                   conversation={selectedConversation}
-                  messages={messages} // Pass actual messages
-                  onSendMessage={handleSendMessage} // Pass send message function
+                  messages={messages}
+                  onSendMessage={handleSendMessage}
                   onScheduleAppointment={() => setShowScheduleModal(true)}
                 />
               </div>
