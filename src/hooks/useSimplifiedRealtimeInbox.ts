@@ -289,8 +289,10 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
       }, (payload) => {
         console.log('📨 [SIMPLIFIED INBOX] Real-time update:', payload.eventType);
         
-        // Handle different payload structures safely
-        const leadId = payload.new?.lead_id || payload.old?.lead_id;
+        // Handle different payload structures safely with proper type checking
+        const newData = payload.new as Record<string, any> | null;
+        const oldData = payload.old as Record<string, any> | null;
+        const leadId = newData?.lead_id || oldData?.lead_id;
         
         // Debounced refresh
         setTimeout(() => {
