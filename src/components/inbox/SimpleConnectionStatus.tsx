@@ -3,7 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Wifi, WifiOff, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface ConnectionState {
   isConnected: boolean;
@@ -27,7 +27,7 @@ const SimpleConnectionStatus: React.FC<SimpleConnectionStatusProps> = ({
   const getStatusIcon = () => {
     switch (connectionState.status) {
       case 'connected':
-        return <Wifi className="h-3 w-3" />;
+        return <CheckCircle className="h-3 w-3" />;
       case 'connecting':
       case 'reconnecting':
         return <RefreshCw className="h-3 w-3 animate-spin" />;
@@ -43,6 +43,7 @@ const SimpleConnectionStatus: React.FC<SimpleConnectionStatusProps> = ({
       case 'connected':
         return 'bg-green-100 text-green-800 border-green-300';
       case 'connecting':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'reconnecting':
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'offline':
@@ -52,13 +53,28 @@ const SimpleConnectionStatus: React.FC<SimpleConnectionStatusProps> = ({
     }
   };
 
+  const getStatusText = () => {
+    switch (connectionState.status) {
+      case 'connected':
+        return 'Live';
+      case 'connecting':
+        return 'Connecting';
+      case 'reconnecting':
+        return `Retry ${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts}`;
+      case 'offline':
+        return 'Offline';
+      default:
+        return 'Unknown';
+    }
+  };
+
   return (
     <div className="flex items-center gap-2">
       <Tooltip>
         <TooltipTrigger asChild>
           <Badge className={`flex items-center gap-1 ${getStatusColor()}`}>
             {getStatusIcon()}
-            {connectionState.status}
+            {getStatusText()}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
@@ -68,7 +84,10 @@ const SimpleConnectionStatus: React.FC<SimpleConnectionStatusProps> = ({
               <p>Last connected: {connectionState.lastConnected.toLocaleTimeString()}</p>
             )}
             {connectionState.reconnectAttempts > 0 && (
-              <p>Reconnect attempts: {connectionState.reconnectAttempts}</p>
+              <p>Reconnect attempts: {connectionState.reconnectAttempts}/{connectionState.maxReconnectAttempts}</p>
+            )}
+            {connectionState.status === 'offline' && (
+              <p className="text-red-600 font-medium">Click refresh to retry</p>
             )}
           </div>
         </TooltipContent>
@@ -80,6 +99,7 @@ const SimpleConnectionStatus: React.FC<SimpleConnectionStatusProps> = ({
           size="sm"
           onClick={onReconnect}
           className="h-6 px-2"
+          title="Reconnect"
         >
           <RefreshCw className="h-3 w-3" />
         </Button>

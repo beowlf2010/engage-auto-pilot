@@ -1,8 +1,8 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { unknownMessageLearning, UnknownMessageContext } from './unknownMessageLearning';
 import { leadSourceStrategy } from './leadSourceStrategy';
 import { LeadSourceData } from '@/types/leadSource';
+import { detectObjectionSignals, generateObjectionResponse } from './objectionHandlingService';
 
 export interface ConversationContext {
   leadId: string;
@@ -92,6 +92,24 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
     if (messagesAfterCustomer.length > 0) {
       console.log('🤖 Already responded to this customer message');
       return null;
+    }
+
+    // First, check for objections and handle them directly
+    const objectionSignals = detectObjectionSignals(lastCustomerMessage.body);
+    if (objectionSignals.length > 0) {
+      console.log('🛡️ Objection detected, generating specific response');
+      const objectionResponse = generateObjectionResponse(objectionSignals, context.leadName.split(' ')[0]);
+      
+      if (objectionResponse) {
+        return {
+          message: objectionResponse,
+          confidence: 0.9,
+          reasoning: `Objection handling response for: ${objectionSignals[0].type}`,
+          customerIntent: null,
+          answerGuidance: null,
+          sourceStrategy: 'objection_handling'
+        };
+      }
     }
 
     // Get lead source data if available

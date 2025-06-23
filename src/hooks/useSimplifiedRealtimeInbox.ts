@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,12 +20,14 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
     status: 'connecting' as 'connecting' | 'connected' | 'reconnecting' | 'offline',
     lastConnected: null as Date | null,
     reconnectAttempts: 0,
-    maxReconnectAttempts: 3
+    maxReconnectAttempts: 5
   });
 
   const currentLeadRef = useRef<string | null>(null);
   const channelRef = useRef<any>(null);
   const optimisticMessagesRef = useRef<Map<string, MessageData[]>>(new Map());
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load conversations with proper error handling
   const loadConversations = useCallback(async () => {
@@ -274,11 +275,17 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
     }
   }, [sendMessage]);
 
-  // Setup real-time subscription
+  // Enhanced realtime subscription with better error handling
   const setupRealtimeSubscription = useCallback(() => {
-    if (!profile || channelRef.current) return;
+    if (!profile) return;
 
-    console.log('🔗 [SIMPLIFIED INBOX] Setting up real-time subscription');
+    // Clean up existing subscription
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    console.log('🔗 [SIMPLIFIED INBOX] Setting up enhanced real-time subscription');
 
     const channel = supabase
       .channel('simplified-inbox-updates')
@@ -294,8 +301,9 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
         const oldData = payload.old as Record<string, any> | null;
         const leadId = newData?.lead_id || oldData?.lead_id;
         
-        // Debounced refresh
-        setTimeout(() => {
+        // Debounced refresh to prevent too many calls
+        clearTimeout(reconnectTimeoutRef.current!);
+        reconnectTimeoutRef.current = setTimeout(() => {
           loadConversations();
           if (leadId === currentLeadRef.current) {
             loadMessages(currentLeadRef.current);
@@ -306,28 +314,98 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
       .subscribe((status) => {
         console.log('📡 [SIMPLIFIED INBOX] Subscription status:', status);
         
-        setConnectionState(prev => ({
-          ...prev,
-          isConnected: status === 'SUBSCRIBED',
-          status: status === 'SUBSCRIBED' ? 'connected' : 'connecting',
-          lastConnected: status === 'SUBSCRIBED' ? new Date() : prev.lastConnected
-        }));
+        setConnectionState(prev => {
+          let newState = { ...prev };
+          
+          switch (status) {
+            case 'SUBSCRIBED':
+              newState = {
+                ...prev,
+                isConnected: true,
+                status: 'connected',
+                lastConnected: new Date(),
+                reconnectAttempts: 0
+              };
+              // Start heartbeat
+              if (heartbeatIntervalRef.current) {
+                clearInterval(heartbeatIntervalRef.current);
+              }
+              heartbeatIntervalRef.current = setInterval(() => {
+                // Simple heartbeat check
+                if (channel.state === 'closed') {
+                  console.log('💔 [SIMPLIFIED INBOX] Connection lost, attempting reconnect');
+                  setupRealtimeSubscription();
+                }
+              }, 30000);
+              break;
+              
+            case 'CHANNEL_ERROR':
+            case 'TIMED_OUT':
+              newState = {
+                ...prev,
+                isConnected: false,
+                status: prev.reconnectAttempts < prev.maxReconnectAttempts ? 'reconnecting' : 'offline',
+                reconnectAttempts: prev.reconnectAttempts + 1
+              };
+              
+              // Retry connection with exponential backoff
+              if (newState.reconnectAttempts < newState.maxReconnectAttempts) {
+                const delay = Math.min(1000 * Math.pow(2, newState.reconnectAttempts), 30000);
+                console.log(`🔄 [SIMPLIFIED INBOX] Reconnecting in ${delay}ms (attempt ${newState.reconnectAttempts})`);
+                
+                setTimeout(() => {
+                  setupRealtimeSubscription();
+                }, delay);
+              } else {
+                console.log('❌ [SIMPLIFIED INBOX] Max reconnection attempts reached');
+              }
+              break;
+              
+            case 'CLOSED':
+              newState = {
+                ...prev,
+                isConnected: false,
+                status: 'offline'
+              };
+              break;
+              
+            default:
+              newState = {
+                ...prev,
+                isConnected: false,
+                status: 'connecting'
+              };
+          }
+          
+          return newState;
+        });
       });
 
     channelRef.current = channel;
   }, [profile, loadConversations, loadMessages, onLeadsRefresh]);
 
-  // Manual refresh
+  // Enhanced manual refresh with connection reset
   const manualRefresh = useCallback(() => {
     console.log('🔄 [SIMPLIFIED INBOX] Manual refresh triggered');
+    
+    // Reset connection state and try again
+    setConnectionState(prev => ({
+      ...prev,
+      reconnectAttempts: 0,
+      status: 'connecting'
+    }));
+    
     loadConversations();
     if (currentLeadRef.current) {
       loadMessages(currentLeadRef.current);
     }
     if (onLeadsRefresh) onLeadsRefresh();
-  }, [loadConversations, loadMessages, onLeadsRefresh]);
+    
+    // Restart realtime subscription
+    setupRealtimeSubscription();
+  }, [loadConversations, loadMessages, onLeadsRefresh, setupRealtimeSubscription]);
 
-  // Initialize
+  // Initialize and cleanup
   useEffect(() => {
     if (profile) {
       loadConversations();
@@ -335,6 +413,15 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
     }
 
     return () => {
+      // Cleanup all timeouts and intervals
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
+      
+      // Remove channel
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
