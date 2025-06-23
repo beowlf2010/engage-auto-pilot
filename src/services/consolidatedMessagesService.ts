@@ -14,7 +14,7 @@ export interface MessageResult {
   error?: string;
 }
 
-// Consolidated message sending service with proper error handling
+// Consolidated message sending service with proper error handling and phone fallback
 export const consolidatedSendMessage = async (params: SendMessageParams): Promise<MessageResult> => {
   const { leadId, messageBody, profileId, isAIGenerated = false } = params;
 
@@ -38,16 +38,34 @@ export const consolidatedSendMessage = async (params: SendMessageParams): Promis
       throw new Error(`Failed to fetch lead data: ${leadError.message}`);
     }
 
-    // Get primary phone number for the lead
-    const { data: phoneData, error: phoneError } = await supabase
+    // Get phone number for the lead with fallback logic
+    console.log(`📱 [CONSOLIDATED] Looking for phone numbers for lead: ${leadId}`);
+    
+    // First try to get primary phone number
+    let { data: phoneData, error: phoneError } = await supabase
       .from('phone_numbers')
       .select('number')
       .eq('lead_id', leadId)
       .eq('is_primary', true)
       .maybeSingle();
 
+    // If no primary phone found, get any phone number
+    if (!phoneData && !phoneError) {
+      console.log(`📱 [CONSOLIDATED] No primary phone found, trying any phone number`);
+      const { data: anyPhoneData, error: anyPhoneError } = await supabase
+        .from('phone_numbers')
+        .select('number')
+        .eq('lead_id', leadId)
+        .order('priority', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      phoneData = anyPhoneData;
+      phoneError = anyPhoneError;
+    }
+
     if (phoneError || !phoneData) {
-      throw new Error('No primary phone number found for this lead');
+      throw new Error('No phone number found for this lead');
     }
 
     console.log(`📱 [CONSOLIDATED] Using phone: ${phoneData.number}`);

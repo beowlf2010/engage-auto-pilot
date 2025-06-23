@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSimplifiedRealtimeInbox } from '@/hooks/useSimplifiedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useMarkAsRead } from '@/hooks/useMarkAsRead';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +32,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
   user 
 }) => {
   const { profile } = useAuth();
+  const { markAsRead, isMarkingAsRead } = useMarkAsRead();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   
   // Search and filter states
@@ -164,6 +167,12 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
     setSelectedConversation(conversation);
   }, []);
 
+  const handleMarkAsRead = useCallback(async (leadId: string) => {
+    await markAsRead(leadId);
+    // Refresh conversations to update unread counts
+    manualRefresh();
+  }, [markAsRead, manualRefresh]);
+
   const canReply = useMemo(() => {
     return selectedConversation && 
            (selectedConversation.salespersonId === profile?.id || 
@@ -177,11 +186,6 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
       vehicleInterest: selectedConversation?.vehicleInterest || ''
     }));
   }, [messages, selectedConversation]);
-
-  // Mock functions to satisfy EnhancedConversationListItem props
-  const mockMarkAsRead = async (leadId: string) => {
-    console.log('Mark as read:', leadId);
-  };
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
@@ -278,8 +282,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                 isSelected={selectedConversation?.leadId === conversation.leadId}
                 onSelect={() => handleConversationSelect(conversation)}
                 canReply={canReply || false}
-                markAsRead={mockMarkAsRead}
-                isMarkingAsRead={false}
+                markAsRead={handleMarkAsRead}
+                isMarkingAsRead={isMarkingAsRead}
               />
             ))
           )}
