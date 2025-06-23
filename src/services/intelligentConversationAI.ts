@@ -61,6 +61,7 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
       .slice(-1)[0];
 
     if (!lastCustomerMessage) {
+      console.log('🤖 No customer message found to respond to');
       return null;
     }
 
@@ -70,6 +71,7 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
     );
 
     if (messagesAfterCustomer.length > 0) {
+      console.log('🤖 Already responded to this customer message');
       return null;
     }
 
@@ -78,15 +80,25 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
     let sourceStrategy: string = 'general';
     
     if (context.leadSource) {
-      leadSourceData = leadSourceStrategy.getLeadSourceData(context.leadSource);
-      const strategy = leadSourceStrategy.getConversationStrategy(leadSourceData.sourceCategory);
-      sourceStrategy = `${strategy.category} strategy`;
-      
-      console.log(`🎯 Using ${sourceStrategy} for source: ${context.leadSource}`);
+      try {
+        leadSourceData = leadSourceStrategy.getLeadSourceData(context.leadSource);
+        const strategy = leadSourceStrategy.getConversationStrategy(leadSourceData.sourceCategory);
+        sourceStrategy = `${strategy.category} strategy`;
+        
+        console.log(`🎯 Using ${sourceStrategy} for source: ${context.leadSource}`);
+      } catch (error) {
+        console.warn('⚠️ Error getting lead source strategy, using general approach:', error);
+      }
     }
 
     // First, check if we've learned how to handle this type of message
-    const learnedResponse = await unknownMessageLearning.checkForLearnedPatterns(lastCustomerMessage.body);
+    let learnedResponse: string | null = null;
+    try {
+      learnedResponse = await unknownMessageLearning.checkForLearnedPatterns(lastCustomerMessage.body);
+    } catch (error) {
+      console.warn('⚠️ Error checking learned patterns (continuing with AI generation):', error);
+    }
+    
     if (learnedResponse) {
       console.log('🎯 Using learned pattern for response');
       return {
@@ -102,37 +114,59 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
     // Check for conversational signals
     const hasConversationalSignals = analyzeConversationalSignals(lastCustomerMessage.body);
 
-    const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
-      body: {
-        leadId: context.leadId,
-        leadName: context.leadName,
-        messageBody: lastCustomerMessage.body,
-        conversationHistory: recentMessages,
-        hasConversationalSignals,
-        leadSource: context.leadSource,
-        leadSourceData: leadSourceData,
-        vehicleInterest: context.vehicleInterest
-      }
-    });
+    // Call the AI function with enhanced error handling
+    let data, error;
+    try {
+      const response = await supabase.functions.invoke('intelligent-conversation-ai', {
+        body: {
+          leadId: context.leadId,
+          leadName: context.leadName,
+          messageBody: lastCustomerMessage.body,
+          conversationHistory: recentMessages,
+          hasConversationalSignals,
+          leadSource: context.leadSource,
+          leadSourceData: leadSourceData,
+          vehicleInterest: context.vehicleInterest
+        }
+      });
+      
+      data = response.data;
+      error = response.error;
+    } catch (fetchError) {
+      console.error('❌ Network error calling AI function:', fetchError);
+      error = { message: 'Network connection error' };
+    }
 
     if (error || !data?.response) {
       console.error('❌ Error from AI function:', error);
       
-      // Capture this as an unknown message scenario
-      await unknownMessageLearning.captureUnknownMessage(
-        context.leadId,
-        lastCustomerMessage.body,
-        {
-          conversationHistory: recentMessages,
-          leadName: context.leadName,
-          vehicleInterest: context.vehicleInterest,
-          hasConversationalSignals,
-          leadSource: context.leadSource
-        },
-        `AI function error: ${error?.message || 'No response generated'}`
-      );
+      // Capture this as an unknown message scenario (only if capture is available)
+      try {
+        await unknownMessageLearning.captureUnknownMessage(
+          context.leadId,
+          lastCustomerMessage.body,
+          {
+            conversationHistory: recentMessages,
+            leadName: context.leadName,
+            vehicleInterest: context.vehicleInterest,
+            hasConversationalSignals,
+            leadSource: context.leadSource
+          },
+          `AI function error: ${error?.message || 'No response generated'}`
+        );
+      } catch (captureError) {
+        console.warn('⚠️ Could not capture unknown message (database may be unavailable):', captureError);
+      }
       
-      return null;
+      // Return a helpful fallback message instead of null
+      return {
+        message: "Thanks for your message! I'll review this and get back to you shortly with the information you need.",
+        confidence: 0.5,
+        reasoning: `Fallback response due to AI function error: ${error?.message || 'No response generated'}`,
+        customerIntent: null,
+        answerGuidance: null,
+        sourceStrategy: sourceStrategy
+      };
     }
 
     return {
@@ -147,21 +181,33 @@ export const generateEnhancedIntelligentResponse = async (context: ConversationC
   } catch (error) {
     console.error('❌ Error generating response:', error);
     
-    // Capture this as an unknown message scenario
+    // Capture this as an unknown message scenario if possible
     const lastCustomerMessage = context.messages
       .filter(msg => msg.direction === 'in')
       .slice(-1)[0];
       
     if (lastCustomerMessage) {
-      await unknownMessageLearning.captureUnknownMessage(
-        context.leadId,
-        lastCustomerMessage.body,
-        context,
-        `System error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      try {
+        await unknownMessageLearning.captureUnknownMessage(
+          context.leadId,
+          lastCustomerMessage.body,
+          context,
+          `System error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      } catch (captureError) {
+        console.warn('⚠️ Could not capture unknown message (database may be unavailable):', captureError);
+      }
     }
     
-    return null;
+    // Return a helpful fallback instead of null
+    return {
+      message: "I see your message and want to make sure I give you the best response. Let me get the right information for you.",
+      confidence: 0.3,
+      reasoning: `Fallback response due to system error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      customerIntent: null,
+      answerGuidance: null,
+      sourceStrategy: 'fallback'
+    };
   }
 };
 

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Brain, Loader2, Send, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Brain, Loader2, Send, Sparkles, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { generateEnhancedIntelligentResponse, shouldGenerateResponse, type ConversationContext } from '@/services/intelligentConversationAI';
 import { toast } from '@/hooks/use-toast';
 
@@ -26,6 +26,7 @@ const IntelligentAIPanel = ({
 }: IntelligentAIPanelProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastAIResponse, setLastAIResponse] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   if (!conversation || !canReply) return null;
 
@@ -47,19 +48,23 @@ const IntelligentAIPanel = ({
     .slice(-1)[0];
 
   const handleGenerateResponse = async () => {
+    if (isGenerating) return;
+    
     setIsGenerating(true);
+    setError(null);
     
     try {
       console.log('🤖 Generating QUESTION-FIRST intelligent AI response...');
       const response = await generateEnhancedIntelligentResponse(context);
       
-      if (response) {
+      if (response && response.message) {
         setLastAIResponse(response.message);
         toast({
           title: "AI Response Generated",
           description: "Finn has analyzed the conversation and generated a QUESTION-FIRST response",
         });
       } else {
+        setError("Finn determined no response is needed at this time");
         toast({
           title: "No Response Needed",
           description: "Finn determined no response is needed at this time",
@@ -68,9 +73,12 @@ const IntelligentAIPanel = ({
       }
     } catch (error) {
       console.error('❌ Error generating QUESTION-FIRST AI response:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate AI response';
+      setError(errorMessage);
+      
       toast({
         title: "Error",
-        description: "Failed to generate AI response",
+        description: "Failed to generate AI response. This may be due to database connectivity issues.",
         variant: "destructive"
       });
     } finally {
@@ -79,21 +87,22 @@ const IntelligentAIPanel = ({
   };
 
   const handleSendAIResponse = async () => {
-    if (lastAIResponse) {
-      try {
-        await onSendMessage(lastAIResponse);
-        setLastAIResponse(null);
-        toast({
-          title: "AI Response Sent",
-          description: "Finn's QUESTION-FIRST response has been sent to the customer",
-        });
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to send AI response",
-          variant: "destructive"
-        });
-      }
+    if (!lastAIResponse) return;
+    
+    try {
+      await onSendMessage(lastAIResponse);
+      setLastAIResponse(null);
+      setError(null);
+      toast({
+        title: "AI Response Sent",
+        description: "Finn's QUESTION-FIRST response has been sent to the customer",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send AI response",
+        variant: "destructive"
+      });
     }
   };
 
@@ -111,15 +120,23 @@ const IntelligentAIPanel = ({
                   Ready to help
                 </Badge>
               )}
+              {error && (
+                <Badge variant="outline" className="bg-red-100 text-red-700 text-xs">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Error
+                </Badge>
+              )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onToggleCollapse}
-              className="h-6 w-6 p-0"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </Button>
+            {onToggleCollapse && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleCollapse}
+                className="h-6 w-6 p-0"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </CardHeader>
       </Card>
@@ -137,19 +154,35 @@ const IntelligentAIPanel = ({
               Question-First
             </Badge>
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggleCollapse}
-            className="h-6 w-6 p-0"
-          >
-            <ChevronUp className="h-4 w-4" />
-          </Button>
+          {onToggleCollapse && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleCollapse}
+              className="h-6 w-6 p-0"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </CardHeader>
       
       <CardContent className="space-y-3">
-        {lastCustomerMessage && shouldGenerate && (
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-800">Error:</p>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Customer Question Display */}
+        {lastCustomerMessage && shouldGenerate && !error && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <Sparkles className="h-4 w-4 text-blue-600 mt-0.5" />
@@ -163,7 +196,8 @@ const IntelligentAIPanel = ({
           </div>
         )}
 
-        {lastAIResponse && (
+        {/* AI Response Display */}
+        {lastAIResponse && !error && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <Brain className="h-4 w-4 text-green-600 mt-0.5" />
@@ -177,10 +211,11 @@ const IntelligentAIPanel = ({
           </div>
         )}
 
+        {/* Action Buttons */}
         <div className="flex gap-2">
           <Button
             onClick={handleGenerateResponse}
-            disabled={isGenerating || !shouldGenerate}
+            disabled={isGenerating || (!shouldGenerate && !error)}
             size="sm"
             variant="outline"
             className="flex-1"
@@ -190,10 +225,10 @@ const IntelligentAIPanel = ({
             ) : (
               <Brain className="h-4 w-4 mr-2" />
             )}
-            {isGenerating ? 'Thinking...' : 'Generate Response'}
+            {isGenerating ? 'Thinking...' : error ? 'Retry' : 'Generate Response'}
           </Button>
 
-          {lastAIResponse && (
+          {lastAIResponse && !error && (
             <Button
               onClick={handleSendAIResponse}
               size="sm"
@@ -205,11 +240,17 @@ const IntelligentAIPanel = ({
           )}
         </div>
 
-        {!shouldGenerate && !lastAIResponse && (
+        {/* Status Message */}
+        {!shouldGenerate && !lastAIResponse && !error && (
           <p className="text-xs text-slate-500 text-center">
             Finn is monitoring for questions to answer...
           </p>
         )}
+
+        {/* Learning Note */}
+        <div className="text-xs text-purple-600 bg-purple-100 rounded p-2">
+          💡 Finn learns from every interaction to improve responses over time
+        </div>
       </CardContent>
     </Card>
   );
