@@ -1,0 +1,163 @@
+
+import { useEffect, useRef, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { generateEnhancedIntelligentResponse, shouldGenerateResponse } from '@/services/intelligentConversationAI';
+import { consolidatedSendMessage } from '@/services/consolidatedMessagesService';
+import { toast } from '@/hooks/use-toast';
+
+interface UseAutoAIResponsesProps {
+  profileId: string;
+  onResponseGenerated?: (leadId: string, response: string) => void;
+}
+
+export const useAutoAIResponses = ({ profileId, onResponseGenerated }: UseAutoAIResponsesProps) => {
+  const processedMessages = useRef(new Set<string>());
+  const isProcessing = useRef(false);
+
+  const processIncomingMessage = useCallback(async (messageId: string, leadId: string) => {
+    if (processedMessages.current.has(messageId) || isProcessing.current) {
+      return;
+    }
+
+    processedMessages.current.add(messageId);
+    isProcessing.current = true;
+
+    try {
+      console.log('🤖 [AUTO AI] Processing incoming message for AI response:', leadId);
+
+      // Get lead and conversation data
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('first_name, last_name, vehicle_interest, ai_opt_in')
+        .eq('id', leadId)
+        .single();
+
+      if (!lead || !lead.ai_opt_in) {
+        console.log('🤖 [AUTO AI] Lead not found or AI not enabled for:', leadId);
+        return;
+      }
+
+      // Get conversation history
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: true })
+        .limit(20);
+
+      if (!conversations) return;
+
+      // Create context for AI
+      const context = {
+        leadId,
+        leadName: `${lead.first_name} ${lead.last_name}`,
+        vehicleInterest: lead.vehicle_interest || '',
+        messages: conversations.map(msg => ({
+          id: msg.id,
+          body: msg.body,
+          direction: msg.direction as 'in' | 'out',
+          sentAt: msg.sent_at,
+          aiGenerated: msg.ai_generated
+        })),
+        leadInfo: {
+          phone: '',
+          status: 'active'
+        }
+      };
+
+      // Check if we should generate a response
+      if (!shouldGenerateResponse(context)) {
+        console.log('🤖 [AUTO AI] No response needed for:', leadId);
+        return;
+      }
+
+      // Generate AI response
+      const aiResponse = await generateEnhancedIntelligentResponse(context);
+      
+      if (!aiResponse?.message) {
+        console.log('🤖 [AUTO AI] No AI response generated for:', leadId);
+        return;
+      }
+
+      console.log('🤖 [AUTO AI] Generated response:', aiResponse.message);
+
+      // Send the AI response
+      const result = await consolidatedSendMessage({
+        leadId,
+        messageBody: aiResponse.message,
+        profileId,
+        isAIGenerated: true
+      });
+
+      if (result.success) {
+        console.log('✅ [AUTO AI] AI response sent successfully for:', leadId);
+        onResponseGenerated?.(leadId, aiResponse.message);
+        
+        toast({
+          title: "Finn Responded",
+          description: `AI generated and sent a response to ${lead.first_name}`,
+        });
+      } else {
+        console.error('❌ [AUTO AI] Failed to send AI response:', result.error);
+      }
+
+    } catch (error) {
+      console.error('❌ [AUTO AI] Error processing message for AI response:', error);
+    } finally {
+      isProcessing.current = false;
+    }
+  }, [profileId, onResponseGenerated]);
+
+  // Subscribe to new incoming messages
+  useEffect(() => {
+    console.log('🤖 [AUTO AI] Setting up real-time subscription for AI responses');
+
+    const channel = supabase
+      .channel('ai-auto-responses')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+          filter: 'direction=eq.in'
+        },
+        (payload) => {
+          console.log('🤖 [AUTO AI] New incoming message detected:', payload.new);
+          const newMessage = payload.new as any;
+          
+          // Process after a short delay to ensure message is fully inserted
+          setTimeout(() => {
+            processIncomingMessage(newMessage.id, newMessage.lead_id);
+          }, 1000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🤖 [AUTO AI] Cleaning up AI response subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [processIncomingMessage]);
+
+  const manualTrigger = useCallback(async (leadId: string) => {
+    // Get the latest message for this lead
+    const { data: latestMessage } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('direction', 'in')
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (latestMessage) {
+      await processIncomingMessage(latestMessage.id, leadId);
+    }
+  }, [processIncomingMessage]);
+
+  return {
+    manualTrigger,
+    isProcessing: isProcessing.current
+  };
+};

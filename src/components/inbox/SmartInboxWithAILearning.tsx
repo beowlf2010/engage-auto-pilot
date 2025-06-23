@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSimplifiedRealtimeInbox } from '@/hooks/useSimplifiedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
+import { useAutoAIResponses } from '@/hooks/useAutoAIResponses';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import LeadContextPanel from './LeadContextPanel';
 import UnifiedSearchBar from './UnifiedSearchBar';
 import QuickFilters from './QuickFilters';
 import MessageDirectionFilter from './MessageDirectionFilter';
+import AIResponseIndicator from './AIResponseIndicator';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 
@@ -52,6 +53,20 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
     retryMessage,
     manualRefresh
   } = useSimplifiedRealtimeInbox({ onLeadsRefresh });
+
+  // Initialize auto AI responses
+  const { manualTrigger: triggerAIResponse, isProcessing: aiProcessing } = useAutoAIResponses({
+    profileId: profile?.id || '',
+    onResponseGenerated: (leadId, response) => {
+      console.log('🤖 AI response generated for lead:', leadId);
+      // Refresh messages if this is the selected conversation
+      if (selectedConversation?.leadId === leadId) {
+        loadMessages(leadId);
+      }
+      // Refresh conversations to update last message
+      manualRefresh();
+    }
+  });
 
   // Filter conversations based on search and filters
   const filteredConversations = useMemo(() => {
@@ -187,6 +202,24 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
     }));
   }, [messages, selectedConversation]);
 
+  // Check if current conversation needs AI response
+  const needsAIResponse = useMemo(() => {
+    if (!selectedConversation || !conversationMessages.length) return false;
+    
+    const lastMessage = conversationMessages[conversationMessages.length - 1];
+    const hasUnreadInbound = conversationMessages.some(msg => 
+      msg.direction === 'in' && !msg.readAt
+    );
+    
+    return lastMessage?.direction === 'in' && hasUnreadInbound;
+  }, [selectedConversation, conversationMessages]);
+
+  const handleTriggerAI = useCallback(() => {
+    if (selectedConversation) {
+      triggerAIResponse(selectedConversation.leadId);
+    }
+  }, [selectedConversation, triggerAIResponse]);
+
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
       {/* Left Sidebar - Conversations List */}
@@ -202,11 +235,14 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                 AI Enhanced
               </Badge>
             </div>
-            <SimpleConnectionStatus 
-              connectionState={connectionState} 
-              onReconnect={manualRefresh}
-              onForceSync={manualRefresh}
-            />
+            <div className="flex items-center gap-2">
+              <AIResponseIndicator isGenerating={aiProcessing} />
+              <SimpleConnectionStatus 
+                connectionState={connectionState} 
+                onReconnect={manualRefresh}
+                onForceSync={manualRefresh}
+              />
+            </div>
           </div>
 
           {/* Search Bar */}
@@ -302,6 +338,13 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                   <p className="text-sm text-gray-600">{selectedConversation.vehicleInterest}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {needsAIResponse && (
+                    <AIResponseIndicator
+                      isGenerating={aiProcessing}
+                      onManualTrigger={handleTriggerAI}
+                      canTrigger={!aiProcessing}
+                    />
+                  )}
                   {selectedConversation.unreadCount > 0 && (
                     <Badge variant="destructive">
                       {selectedConversation.unreadCount} unread
@@ -353,6 +396,12 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
               <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
               <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
               <p>Choose a conversation from the left to start messaging</p>
+              <div className="mt-4 p-3 bg-purple-50 rounded-lg">
+                <Brain className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+                <p className="text-sm text-purple-700">
+                  Finn will automatically respond to new customer messages
+                </p>
+              </div>
             </div>
           </div>
         )}

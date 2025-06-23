@@ -3,6 +3,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import SmartInboxWithAILearning from "@/components/inbox/SmartInboxWithAILearning";
 import { Navigate } from "react-router-dom";
 import { useEffect } from "react";
+import { backgroundAIProcessor } from "@/services/backgroundAIProcessor";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
@@ -18,6 +19,19 @@ const SmartInboxPage = () => {
 
     requestNotificationPermission();
   }, []);
+
+  // Start background AI processor when profile is available
+  useEffect(() => {
+    if (profile?.id) {
+      console.log('🤖 Starting background AI processor for profile:', profile.id);
+      backgroundAIProcessor.start(profile.id);
+
+      return () => {
+        console.log('🤖 Stopping background AI processor');
+        backgroundAIProcessor.stop();
+      };
+    }
+  }, [profile?.id]);
 
   if (loading) {
     return (
