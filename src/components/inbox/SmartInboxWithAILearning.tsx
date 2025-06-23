@@ -19,9 +19,13 @@ import { toast } from '@/hooks/use-toast';
 
 interface SmartInboxWithAILearningProps {
   onLeadsRefresh?: () => void;
+  user?: {
+    id: string;
+    role: string;
+  };
 }
 
-const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onLeadsRefresh }) => {
+const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onLeadsRefresh, user }) => {
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
