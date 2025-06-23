@@ -11,11 +11,16 @@ const UnreadMessageBanner = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Debug logs
+  console.log('🔴 [UNREAD BANNER] Component rendering - unreadCount:', unreadCount, 'isDismissed:', isDismissed, 'currentPath:', location.pathname);
+
   // Don't show banner on inbox pages, dashboard, or when no unread messages
   const isInboxPage = location.pathname.includes('/inbox') || 
                      location.pathname.includes('/smart-inbox') || 
                      location.pathname === '/dashboard';
   const shouldShow = unreadCount > 0 && !isDismissed && !isInboxPage;
+
+  console.log('🔴 [UNREAD BANNER] shouldShow:', shouldShow, 'isInboxPage:', isInboxPage);
 
   // Reset dismissal when unread count changes
   useEffect(() => {
