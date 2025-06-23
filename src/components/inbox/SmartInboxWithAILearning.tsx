@@ -19,12 +19,19 @@ import { useEnhancedConnectionManager } from '@/hooks/useEnhancedConnectionManag
 
 interface SmartInboxWithEnhancedAIProps {
   onLeadsRefresh?: () => void;
+  user?: {
+    role: string;
+    id: string;
+  };
 }
 
-const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onLeadsRefresh }) => {
+const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onLeadsRefresh, user }) => {
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
+
+  // Use the passed user prop or fall back to profile from auth
+  const currentUser = user || (profile ? { id: profile.id, role: profile.role } : null);
 
   const {
     conversations,
@@ -103,10 +110,11 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
   }, [markAsRead, manualRefresh, onLeadsRefresh]);
 
   const canReply = useMemo(() => {
+    const userId = currentUser?.id || profile?.id;
     return selectedConversation && 
-           (selectedConversation.salespersonId === profile?.id || 
+           (selectedConversation.salespersonId === userId || 
             selectedConversation.salespersonId === null);
-  }, [selectedConversation, profile?.id]);
+  }, [selectedConversation, currentUser?.id, profile?.id]);
 
   const conversationMessages = useMemo(() => {
     return messages.map(msg => ({
