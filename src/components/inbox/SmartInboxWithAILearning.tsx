@@ -13,9 +13,12 @@ import InventoryAwareMessageInput from './InventoryAwareMessageInput';
 import ConnectionStatusIndicator from './ConnectionStatusIndicator';
 import IntelligentAIPanel from './IntelligentAIPanel';
 import ChatAIPanelsContainer from './ChatAIPanelsContainer';
+import MessageDirectionFilter from './MessageDirectionFilter';
+import { useMessageFiltering } from './useMessageFiltering';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 import { useEnhancedConnectionManager } from '@/hooks/useEnhancedConnectionManager';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SmartInboxWithAILearningProps {
   onLeadsRefresh?: () => void;
@@ -32,6 +35,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
   const [showAIPanel, setShowAIPanel] = useState(true);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [markingAsRead, setMarkingAsRead] = useState<string | null>(null);
 
   const {
     conversations,
@@ -55,12 +59,72 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
     onUnreadCountUpdate: manualRefresh
   });
 
+  // Message filtering functionality
+  const {
+    conversationFilter,
+    setConversationFilter,
+    getFilteredConversations,
+    getConversationCounts
+  } = useMessageFiltering();
+
+  // Apply filtering to conversations
+  const filteredConversations = useMemo(() => {
+    return getFilteredConversations(conversations);
+  }, [getFilteredConversations, conversations]);
+
+  // Get conversation counts for filter badges
+  const conversationCounts = useMemo(() => {
+    return getConversationCounts(conversations);
+  }, [getConversationCounts, conversations]);
+
+  // Mark conversation as read
+  const markAsRead = useCallback(async (leadId: string) => {
+    if (markingAsRead) return;
+
+    try {
+      setMarkingAsRead(leadId);
+      
+      const { error } = await supabase
+        .from('conversations')
+        .update({ read_at: new Date().toISOString() })
+        .eq('lead_id', leadId)
+        .is('read_at', null);
+
+      if (error) {
+        throw error;
+      }
+
+      // Refresh conversations to update unread counts
+      manualRefresh();
+      
+      toast({
+        title: "Messages marked as read",
+        description: "All messages for this conversation have been marked as read.",
+      });
+      
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark messages as read. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setMarkingAsRead(null);
+    }
+  }, [markingAsRead, manualRefresh]);
+
   // Load messages when conversation is selected
   useEffect(() => {
     if (selectedConversation) {
       loadMessages(selectedConversation.leadId);
+      
+      // Auto mark as read when conversation is selected
+      if (selectedConversation.unreadCount > 0) {
+        markAsRead(selectedConversation.leadId);
+      }
     }
-  }, [selectedConversation, loadMessages]);
+  }, [selectedConversation, loadMessages, markAsRead]);
 
   const handleSendMessage = useCallback(async (messageContent: string) => {
     if (!selectedConversation || !messageContent.trim()) return;
@@ -68,6 +132,11 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
     try {
       await sendMessage(selectedConversation.leadId, messageContent.trim());
       setMessageText('');
+      
+      // Auto mark as read when user sends a message
+      if (selectedConversation.unreadCount > 0) {
+        markAsRead(selectedConversation.leadId);
+      }
       
       toast({
         title: "Message Sent",
@@ -81,7 +150,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
         variant: "destructive"
       });
     }
-  }, [selectedConversation, sendMessage]);
+  }, [selectedConversation, sendMessage, markAsRead]);
 
   const handleConversationSelect = useCallback((conversation: ConversationListItem) => {
     setSelectedConversation(conversation);
@@ -101,10 +170,20 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
     }));
   }, [messages, selectedConversation]);
 
-  // Mock functions to satisfy EnhancedConversationListItem props
-  const mockMarkAsRead = async (leadId: string) => {
-    console.log('Mark as read:', leadId);
-  };
+  // Auto-select next unread conversation when current one becomes read
+  useEffect(() => {
+    if (conversationFilter === 'unread' && selectedConversation && selectedConversation.unreadCount === 0) {
+      const nextUnread = filteredConversations.find(conv => 
+        conv.unreadCount > 0 && conv.leadId !== selectedConversation.leadId
+      );
+      
+      if (nextUnread) {
+        setSelectedConversation(nextUnread);
+      } else if (filteredConversations.length === 0) {
+        setSelectedConversation(null);
+      }
+    }
+  }, [conversationFilter, selectedConversation, filteredConversations]);
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
@@ -140,27 +219,50 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
           </div>
         </div>
 
+        {/* Message Direction Filter */}
+        <div className="p-4 border-b">
+          <MessageDirectionFilter
+            activeFilter={conversationFilter}
+            onFilterChange={setConversationFilter}
+            inboundCount={conversationCounts.inboundCount}
+            sentCount={conversationCounts.sentCount}
+            totalCount={conversationCounts.totalCount}
+            unreadCount={conversationCounts.unreadCount}
+            type="conversations"
+          />
+        </div>
+
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : conversations.length === 0 ? (
+          ) : filteredConversations.length === 0 ? (
             <div className="text-center p-8 text-gray-500">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No conversations found</p>
+              {conversationFilter !== 'all' && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setConversationFilter('all')}
+                  className="mt-2"
+                >
+                  Show all conversations
+                </Button>
+              )}
             </div>
           ) : (
-            conversations.map((conversation) => (
+            filteredConversations.map((conversation) => (
               <EnhancedConversationListItem
                 key={conversation.leadId}
                 conversation={conversation}
                 isSelected={selectedConversation?.leadId === conversation.leadId}
                 onSelect={() => handleConversationSelect(conversation)}
                 canReply={canReply || false}
-                markAsRead={mockMarkAsRead}
-                isMarkingAsRead={false}
+                markAsRead={markAsRead}
+                isMarkingAsRead={markingAsRead === conversation.leadId}
               />
             ))
           )}
@@ -221,6 +323,16 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
               <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
               <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
               <p>Choose a conversation from the left to start messaging</p>
+              {conversationFilter !== 'all' && filteredConversations.length === 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setConversationFilter('all')}
+                  className="mt-4"
+                >
+                  Show all conversations
+                </Button>
+              )}
             </div>
           </div>
         )}
