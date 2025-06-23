@@ -3,9 +3,9 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Filter, MessageSquare, Send, Inbox } from 'lucide-react';
+import { Filter, MessageSquare, Send, Inbox, AlertCircle } from 'lucide-react';
 
-type FilterType = 'all' | 'inbound' | 'sent';
+type FilterType = 'all' | 'inbound' | 'sent' | 'unread';
 
 interface MessageDirectionFilterProps {
   activeFilter: FilterType;
@@ -13,6 +13,7 @@ interface MessageDirectionFilterProps {
   inboundCount: number;
   sentCount: number;
   totalCount: number;
+  unreadCount: number;
   type: 'conversations' | 'messages';
 }
 
@@ -22,6 +23,7 @@ const MessageDirectionFilter: React.FC<MessageDirectionFilterProps> = ({
   inboundCount,
   sentCount,
   totalCount,
+  unreadCount,
   type
 }) => {
   const filterOptions = [
@@ -31,6 +33,13 @@ const MessageDirectionFilter: React.FC<MessageDirectionFilterProps> = ({
       icon: Inbox,
       count: totalCount,
       variant: 'outline' as const
+    },
+    {
+      key: 'unread' as const,
+      label: 'Unread',
+      icon: AlertCircle,
+      count: unreadCount,
+      variant: 'destructive' as const
     },
     {
       key: 'inbound' as const,
@@ -71,13 +80,15 @@ const MessageDirectionFilter: React.FC<MessageDirectionFilterProps> = ({
                 onClick={() => onFilterChange(option.key)}
                 className={`flex items-center gap-2 flex-shrink-0 ${
                   isActive ? 'ring-2 ring-blue-200' : ''
-                }`}
+                } ${option.key === 'unread' && option.count > 0 ? 'animate-pulse' : ''}`}
               >
                 <Icon className="h-3 w-3" />
                 <span className="whitespace-nowrap">{option.label}</span>
                 <Badge 
                   variant={isActive ? "secondary" : "outline"}
-                  className="text-xs flex-shrink-0"
+                  className={`text-xs flex-shrink-0 ${
+                    option.key === 'unread' && option.count > 0 ? 'bg-red-100 text-red-800 border-red-300' : ''
+                  }`}
                 >
                   {option.count}
                 </Badge>
@@ -88,7 +99,11 @@ const MessageDirectionFilter: React.FC<MessageDirectionFilterProps> = ({
         
         {activeFilter !== 'all' && (
           <div className="mt-2 text-xs text-gray-500">
-            Showing {activeFilter === 'inbound' ? inboundCount : sentCount} of {totalCount} {type}
+            Showing {
+              activeFilter === 'inbound' ? inboundCount : 
+              activeFilter === 'sent' ? sentCount :
+              activeFilter === 'unread' ? unreadCount : totalCount
+            } of {totalCount} {type}
           </div>
         )}
       </CardContent>

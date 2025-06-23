@@ -31,8 +31,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   const [messageText, setMessageText] = useState('');
   const [showLearningDashboard, setShowLearningDashboard] = useState(false);
   const [showPredictiveInsights, setShowPredictiveInsights] = useState(false);
-  const [conversationFilter, setConversationFilter] = useState<'all' | 'inbound' | 'sent'>('all');
-  const [messageFilter, setMessageFilter] = useState<'all' | 'inbound' | 'sent'>('all');
+  const [conversationFilter, setConversationFilter] = useState<'all' | 'inbound' | 'sent' | 'unread'>('all');
+  const [messageFilter, setMessageFilter] = useState<'all' | 'inbound' | 'sent' | 'unread'>('all');
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
 
   const {
@@ -50,27 +50,52 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   const totalConversations = conversations.length;
   const unreadCount = conversations.reduce((acc, conv) => acc + conv.unreadCount, 0);
 
+  // Auto-switch to unread filter when there are unread messages and no filter is set
+  useEffect(() => {
+    if (conversationFilter === 'all' && unreadCount > 0 && conversations.length > 0) {
+      const hasUnreadConversations = conversations.some(conv => conv.unreadCount > 0);
+      if (hasUnreadConversations) {
+        setConversationFilter('unread');
+      }
+    }
+  }, [conversations, unreadCount, conversationFilter]);
+
   const filteredConversations = useMemo(() => {
     if (conversationFilter === 'all') {
       return conversations;
     }
 
-    return conversations.filter(conversation => {
+    const filtered = conversations.filter(conversation => {
       if (conversationFilter === 'inbound') {
         return conversation.lastMessageDirection === 'in';
       } else if (conversationFilter === 'sent') {
         return conversation.lastMessageDirection === 'out';
+      } else if (conversationFilter === 'unread') {
+        return conversation.unreadCount > 0;
       }
       return true;
     });
+
+    // Sort unread conversations by priority
+    if (conversationFilter === 'unread') {
+      return filtered.sort((a, b) => {
+        if (a.unreadCount !== b.unreadCount) {
+          return b.unreadCount - a.unreadCount;
+        }
+        return (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0);
+      });
+    }
+
+    return filtered;
   }, [conversations, conversationFilter]);
 
   const conversationCounts = useMemo(() => {
     const inboundCount = conversations.filter(conv => conv.lastMessageDirection === 'in').length;
     const sentCount = conversations.filter(conv => conv.lastMessageDirection === 'out').length;
+    const unreadCount = conversations.filter(conv => conv.unreadCount > 0).length;
     const totalCount = conversations.length;
 
-    return { inboundCount, sentCount, totalCount };
+    return { inboundCount, sentCount, unreadCount, totalCount };
   }, [conversations]);
 
   const filteredMessages = useMemo(() => {
@@ -83,6 +108,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
         return message.direction === 'in';
       } else if (messageFilter === 'sent') {
         return message.direction === 'out';
+      } else if (messageFilter === 'unread') {
+        return !message.readAt;
       }
       return true;
     });
@@ -91,9 +118,10 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   const messageCounts = useMemo(() => {
     const inboundCount = messages.filter(msg => msg.direction === 'in').length;
     const sentCount = messages.filter(msg => msg.direction === 'out').length;
+    const unreadCount = messages.filter(msg => !msg.readAt).length;
     const totalCount = messages.length;
 
-    return { inboundCount, sentCount, totalCount };
+    return { inboundCount, sentCount, unreadCount, totalCount };
   }, [messages]);
 
   useEffect(() => {
@@ -179,7 +207,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
               {unreadCount > 0 && (
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
-                  <span>{unreadCount} unread</span>
+                  <span className="font-medium text-red-600">{unreadCount} unread</span>
                 </div>
               )}
             </div>
@@ -208,6 +236,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
               inboundCount={conversationCounts.inboundCount}
               sentCount={conversationCounts.sentCount}
               totalCount={conversationCounts.totalCount}
+              unreadCount={conversationCounts.unreadCount}
               type="conversations"
             />
           </div>
@@ -221,7 +250,10 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
             ) : filteredConversations.length === 0 ? (
               <div className="text-center p-8 text-gray-500">
                 <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>No conversations found</p>
+                <p>No {conversationFilter === 'unread' ? 'unread ' : ''}conversations found</p>
+                {conversationFilter === 'unread' && (
+                  <p className="text-sm mt-2">All caught up! 🎉</p>
+                )}
               </div>
             ) : (
               filteredConversations.map((conversation) => (
@@ -252,7 +284,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                   </div>
                   <div className="flex items-center gap-2">
                     {selectedConversation.unreadCount > 0 && (
-                      <Badge variant="destructive">
+                      <Badge variant="destructive" className="animate-pulse">
                         {selectedConversation.unreadCount} unread
                       </Badge>
                     )}
@@ -270,6 +302,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                     inboundCount={messageCounts.inboundCount}
                     sentCount={messageCounts.sentCount}
                     totalCount={messageCounts.totalCount}
+                    unreadCount={messageCounts.unreadCount}
                     type="messages"
                   />
                 </div>
@@ -305,6 +338,11 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                 <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                 <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
                 <p>Choose a conversation from the left to start messaging</p>
+                {conversationFilter === 'unread' && unreadCount > 0 && (
+                  <p className="text-sm mt-2 text-red-600 font-medium">
+                    You have {unreadCount} unread messages waiting
+                  </p>
+                )}
               </div>
             </div>
           )}
