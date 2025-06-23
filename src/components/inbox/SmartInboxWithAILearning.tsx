@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -12,13 +13,13 @@ import InventoryAwareMessageInput from './InventoryAwareMessageInput';
 import ConnectionStatusIndicator from './ConnectionStatusIndicator';
 import IntelligentAIPanel from './IntelligentAIPanel';
 import ChatAIPanelsContainer from './ChatAIPanelsContainer';
+import AIResponseSuggestionPanel from './AIResponseSuggestionPanel';
+import CollapsibleAIPanels from './CollapsibleAIPanels';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 
 // AI Learning Dashboard imports
-import AILearningDashboard from '@/components/ai-monitor/AILearningDashboard';
 import AIEmergencyToggle from '@/components/ai/AIEmergencyToggle';
-import PredictiveInsightsPanel from './PredictiveInsightsPanel';
 
 interface SmartInboxWithAILearningProps {
   onLeadsRefresh?: () => void;
@@ -53,18 +54,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showLearningDashboard, setShowLearningDashboard] = useState(false);
-  const [showPredictiveInsights, setShowPredictiveInsights] = useState(true);
-
-  // Mock AI Learning data for development
-  const [aiLearningData, setAiLearningData] = useState({
-    insights: [],
-    decisions: [],
-    loading: false,
-    lastUpdated: new Date(),
-    loadInsights: async () => {},
-    processDecisions: async () => {},
-    getLeadPrediction: async (leadId: string) => ({ shouldPreload: false, priority: 'normal' })
-  });
+  const [showPredictiveInsights, setShowPredictiveInsights] = useState(false);
 
   const {
     conversations,
@@ -131,8 +121,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
 
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
-      {/* Left Sidebar - Conversations List */}
-      <div className="w-1/3 border-r bg-white flex flex-col">
+      {/* Left Sidebar - Conversations List - Fixed Width */}
+      <div className="w-80 flex-shrink-0 border-r bg-white flex flex-col">
         {/* Enhanced Header with AI Learning Controls */}
         <div className="p-4 border-b bg-white">
           <div className="flex items-center justify-between mb-4">
@@ -153,27 +143,6 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
             </div>
           </div>
 
-          {/* AI Learning Dashboard Controls */}
-          <div className="flex items-center gap-2 mb-4">
-            <Button
-              variant={showLearningDashboard ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowLearningDashboard(!showLearningDashboard)}
-            >
-              <Activity className="h-3 w-3 mr-1" />
-              Learning Dashboard
-            </Button>
-            
-            <Button
-              variant={showPredictiveInsights ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowPredictiveInsights(!showPredictiveInsights)}
-            >
-              <BarChart3 className="h-3 w-3 mr-1" />
-              Predictions
-            </Button>
-          </div>
-
           <div className="flex items-center gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-1">
               <Users className="h-4 w-4" />
@@ -186,24 +155,16 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
           </div>
         </div>
 
-        {/* AI Learning Dashboard */}
-        {showLearningDashboard && (
-          <div className="p-4 border-b bg-blue-50">
-            <AILearningDashboard />
-          </div>
-        )}
-
-        {/* Predictive Insights */}
-        {showPredictiveInsights && selectedConversation && (
-          <div className="p-4 border-b bg-green-50">
-            <PredictiveInsightsPanel
-              isOpen={showPredictiveInsights}
-              onToggle={() => setShowPredictiveInsights(!showPredictiveInsights)}
-              predictions={[]}
-              insights={{}}
-            />
-          </div>
-        )}
+        {/* Collapsible AI Panels */}
+        <div className="px-4 py-2">
+          <CollapsibleAIPanels
+            showLearningDashboard={showLearningDashboard}
+            showPredictiveInsights={showPredictiveInsights}
+            onToggleLearningDashboard={() => setShowLearningDashboard(!showLearningDashboard)}
+            onTogglePredictiveInsights={() => setShowPredictiveInsights(!showPredictiveInsights)}
+            selectedConversation={selectedConversation}
+          />
+        </div>
 
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
@@ -232,8 +193,8 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      {/* Main Chat Area - Flexible Width */}
+      <div className="flex-1 min-w-0 flex flex-col">
         {selectedConversation ? (
           <>
             {/* Chat Header */}
@@ -295,9 +256,9 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
         )}
       </div>
 
-      {/* Right Sidebar - Enhanced AI Panels */}
+      {/* Right Sidebar - Enhanced AI Panels - Fixed Width */}
       {selectedConversation && (
-        <div className="w-80 border-l bg-white flex flex-col">
+        <div className="w-96 flex-shrink-0 border-l bg-white flex flex-col">
           <div className="p-4 border-b">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-5 w-5 text-purple-600" />
@@ -306,6 +267,16 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* AI Response Suggestion Panel - Primary Feature */}
+            <AIResponseSuggestionPanel
+              selectedConversation={selectedConversation}
+              messages={conversationMessages}
+              onSendMessage={handleSendMessage}
+              canReply={canReply || false}
+            />
+
+            <Separator />
+
             {/* Intelligent AI Panel - Main Feature */}
             <IntelligentAIPanel
               conversation={selectedConversation}
@@ -356,16 +327,6 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
                   >
                     <Brain className="h-4 w-4 mr-2" />
                     AI Learning Generator
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowLearningDashboard(!showLearningDashboard)}
-                    className="justify-start"
-                  >
-                    <Activity className="h-4 w-4 mr-2" />
-                    Learning Metrics
                   </Button>
                 </div>
               </CardContent>
