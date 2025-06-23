@@ -43,13 +43,67 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
       if (!append) setLoading(true);
       setError(null);
       
-      console.log('🔄 [OPTIMIZED INBOX] Loading conversations with AGGRESSIVE admin bypass logic...');
+      console.log('🔄 [OPTIMIZED INBOX] Loading conversations with UNREAD-FIRST strategy...');
       console.log('👤 [OPTIMIZED INBOX] User role:', userRole, 'Profile ID:', profileId);
       
       const isAdmin = userRole === 'admin' || userRole === 'manager';
       
-      // AGGRESSIVE ADMIN BYPASS: Build query with admin considerations
-      let query = supabase
+      // STRATEGY: Load conversations in TWO phases to ensure unread messages are always visible
+      // Phase 1: Load ALL conversations with unread messages first
+      // Phase 2: Load remaining conversations to fill up to a reasonable limit
+      
+      let allConversations: ConversationListItem[] = [];
+      
+      // PHASE 1: Get ALL conversations with unread messages (no limit)
+      console.log('📬 [PHASE 1] Loading ALL conversations with unread messages...');
+      
+      let unreadQuery = supabase
+        .from('leads')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          status,
+          source,
+          vehicle_interest,
+          created_at,
+          salesperson_id,
+          conversations!inner (
+            id,
+            body,
+            direction,
+            sent_at,
+            read_at
+          )
+        `)
+        .not('conversations.read_at', 'is', null) // Only leads with conversations
+        .eq('conversations.direction', 'in') // Only incoming messages
+        .is('conversations.read_at', null); // That are unread
+
+      // Apply admin bypass for unread query
+      if (!isAdmin) {
+        unreadQuery = unreadQuery.not('status', 'in', '("lost")');
+        console.log('👥 [PHASE 1] Regular user - excluding lost leads from unread');
+      } else {
+        console.log('👑 [PHASE 1] ADMIN USER - INCLUDING ALL STATUSES for unread messages');
+      }
+
+      const { data: unreadData, error: unreadError } = await unreadQuery
+        .order('created_at', { ascending: false });
+
+      if (unreadError) throw unreadError;
+
+      console.log(`📊 [PHASE 1] Found ${unreadData?.length || 0} leads with unread messages`);
+
+      // PHASE 2: Get remaining conversations to fill up to a higher limit (200 total)
+      const TOTAL_CONVERSATION_LIMIT = 200;
+      const remainingLimit = Math.max(0, TOTAL_CONVERSATION_LIMIT - (unreadData?.length || 0));
+      
+      console.log(`📄 [PHASE 2] Loading up to ${remainingLimit} additional conversations...`);
+      
+      let remainingQuery = supabase
         .from('leads')
         .select(`
           id,
@@ -72,40 +126,48 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
         `)
         .order('created_at', { ascending: false });
 
-      // CONSERVATIVE FIX: Only apply status restrictions for non-admin users
-      if (!isAdmin) {
-        // Regular users: exclude lost leads
-        query = query.not('status', 'in', '("lost")');
-        console.log('👥 [OPTIMIZED INBOX] Regular user - excluding lost leads');
-      } else {
-        // ADMIN BYPASS: Include ALL statuses including "lost"
-        console.log('👑 [OPTIMIZED INBOX] ADMIN USER - INCLUDING ALL LEAD STATUSES (including lost)');
+      // Exclude leads already loaded in phase 1
+      if (unreadData && unreadData.length > 0) {
+        const unreadLeadIds = unreadData.map(lead => lead.id);
+        remainingQuery = remainingQuery.not('id', 'in', `(${unreadLeadIds.map(id => `"${id}"`).join(',')})`);
       }
 
-      const { data, error } = await query.range(page * 50, (page + 1) * 50 - 1);
+      // Apply admin bypass for remaining query
+      if (!isAdmin) {
+        remainingQuery = remainingQuery.not('status', 'in', '("lost")');
+        console.log('👥 [PHASE 2] Regular user - excluding lost leads from remaining');
+      } else {
+        console.log('👑 [PHASE 2] ADMIN USER - INCLUDING ALL STATUSES for remaining conversations');
+      }
 
-      if (error) throw error;
+      const { data: remainingData, error: remainingError } = await remainingQuery
+        .range(0, remainingLimit - 1);
 
-      console.log(`📊 [OPTIMIZED INBOX] Raw leads loaded for ${isAdmin ? 'ADMIN' : 'USER'}:`, data?.length || 0);
+      if (remainingError) throw remainingError;
+
+      console.log(`📊 [PHASE 2] Found ${remainingData?.length || 0} additional conversations`);
+
+      // COMBINE: Merge unread (priority) + remaining conversations
+      const combinedData = [...(unreadData || []), ...(remainingData || [])];
+      console.log(`📊 [COMBINED] Total conversations loaded: ${combinedData.length}`);
 
       // Transform to ConversationListItem format with proper sorting
-      const transformedConversations: ConversationListItem[] = (data || []).map(lead => {
+      const transformedConversations: ConversationListItem[] = combinedData.map(lead => {
         const conversations = lead.conversations || [];
         
-        // CRITICAL FIX: Sort conversations by sent_at to get the actual last message
+        // Sort conversations by sent_at to get the actual last message
         const sortedConversations = [...conversations].sort((a, b) => 
           new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
         );
         
         const lastMessage = sortedConversations[sortedConversations.length - 1];
         
-        // CRITICAL FIX: Count unread messages correctly (incoming messages without read_at)
+        // Count unread messages correctly (incoming messages without read_at)
         const unreadMessages = conversations.filter(c => 
           c.direction === 'in' && !c.read_at
         );
 
-        // NEW: Calculate if this conversation has unreplied inbound messages
-        // This means the last message direction is 'in' (customer sent the last message)
+        // Calculate if this conversation has unreplied inbound messages
         const hasUnrepliedInbound = lastMessage?.direction === 'in';
         
         const result = {
@@ -122,31 +184,31 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
           lastMessageDate: new Date(lastMessage?.sent_at || lead.created_at),
           unreadCount: unreadMessages.length,
           messageCount: conversations.length,
-          hasUnrepliedInbound // NEW: Add this property
+          hasUnrepliedInbound
         };
-        
-        // ADMIN DEBUG: Log conversations with unread messages for admin users
-        if (isAdmin && unreadMessages.length > 0) {
-          console.log(`📬 [ADMIN DEBUG] Unread messages for ${lead.first_name} ${lead.last_name}:`, {
-            status: lead.status,
-            unreadCount: unreadMessages.length,
-            salespersonId: lead.salesperson_id,
-            hasUnrepliedInbound,
-            isLost: lead.status === 'lost',
-            isUnassigned: !lead.salesperson_id
-          });
-        }
         
         return result;
       });
       
-      // ADMIN DEBUGGING: Additional filtering for debugging
-      const unreadConversations = transformedConversations.filter(c => c.unreadCount > 0);
-      const lostStatusConversations = transformedConversations.filter(c => c.status === 'lost');
-      const unassignedConversations = transformedConversations.filter(c => !c.salespersonId);
+      // Sort conversations: Unread first, then by last message time
+      const sortedConversations = transformedConversations.sort((a, b) => {
+        // Unread messages get highest priority
+        if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+        if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+        
+        // If both have unread or both don't, sort by last message time
+        const aTime = a.lastMessageDate?.getTime() || 0;
+        const bTime = b.lastMessageDate?.getTime() || 0;
+        return bTime - aTime;
+      });
       
-      console.log(`📊 [OPTIMIZED INBOX] Conversation stats for ${isAdmin ? 'ADMIN' : 'USER'}:`, {
-        total: transformedConversations.length,
+      // Debug information for admin users
+      const unreadConversations = sortedConversations.filter(c => c.unreadCount > 0);
+      const lostStatusConversations = sortedConversations.filter(c => c.status === 'lost');
+      const unassignedConversations = sortedConversations.filter(c => !c.salespersonId);
+      
+      console.log(`📊 [OPTIMIZED INBOX] Final conversation stats for ${isAdmin ? 'ADMIN' : 'USER'}:`, {
+        total: sortedConversations.length,
         withUnreadMessages: unreadConversations.length,
         lostStatus: lostStatusConversations.length,
         unassigned: unassignedConversations.length,
@@ -156,21 +218,31 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
       
       // ADMIN DEBUG: Log specific leads we're looking for
       if (isAdmin) {
-        const stevenWood = transformedConversations.find(c => 
+        const stevenWood = sortedConversations.find(c => 
           c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')
         );
-        const jacksonCaldwell = transformedConversations.find(c => 
+        const jacksonCaldwell = sortedConversations.find(c => 
           c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')
         );
         
         if (stevenWood) {
-          console.log('✅ [ADMIN DEBUG] Found Steven Wood:', stevenWood);
+          console.log('✅ [ADMIN DEBUG] Found Steven Wood:', {
+            name: stevenWood.leadName,
+            unreadCount: stevenWood.unreadCount,
+            status: stevenWood.status,
+            lastMessage: stevenWood.lastMessage?.substring(0, 50) + '...'
+          });
         } else {
           console.log('❌ [ADMIN DEBUG] Steven Wood not found in results');
         }
         
         if (jacksonCaldwell) {
-          console.log('✅ [ADMIN DEBUG] Found Jackson Caldwell:', jacksonCaldwell);
+          console.log('✅ [ADMIN DEBUG] Found Jackson Caldwell:', {
+            name: jacksonCaldwell.leadName,
+            unreadCount: jacksonCaldwell.unreadCount,
+            status: jacksonCaldwell.status,
+            lastMessage: jacksonCaldwell.lastMessage?.substring(0, 50) + '...'
+          });
         } else {
           console.log('❌ [ADMIN DEBUG] Jackson Caldwell not found in results');
         }
@@ -187,14 +259,14 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
       }
       
       if (append) {
-        setConversations(prev => [...prev, ...transformedConversations]);
+        setConversations(prev => [...prev, ...sortedConversations]);
       } else {
-        setConversations(transformedConversations);
+        setConversations(sortedConversations);
       }
       
-      setTotalConversations(transformedConversations.length);
+      setTotalConversations(sortedConversations.length);
       
-      console.log(`✅ [OPTIMIZED INBOX] Loaded ${transformedConversations.length} conversations for ${isAdmin ? 'ADMIN' : 'USER'}`);
+      console.log(`✅ [OPTIMIZED INBOX] Loaded ${sortedConversations.length} conversations for ${isAdmin ? 'ADMIN' : 'USER'} with UNREAD-FIRST strategy`);
 
     } catch (err) {
       console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', err);
@@ -319,7 +391,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
 
   // Initialize conversations on mount
   useEffect(() => {
-    console.log('🚀 [OPTIMIZED INBOX] Initializing optimized Smart Inbox with AGGRESSIVE admin role awareness...');
+    console.log('🚀 [OPTIMIZED INBOX] Initializing optimized Smart Inbox with UNREAD-FIRST strategy...');
     loadConversations(0, {}, false);
   }, [loadConversations]);
 

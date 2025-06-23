@@ -110,26 +110,40 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
     console.log('Mark as read:', leadId);
   };
 
-  // Debug information for admin users
+  // Enhanced debug information for admin users
   const unreadConversations = conversations.filter(c => c.unreadCount > 0);
   const lostStatusConversations = conversations.filter(c => c.status === 'lost');
   const unassignedConversations = conversations.filter(c => !c.salespersonId);
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
 
-  console.log('🔍 [SMART INBOX ENHANCED] Current stats:', {
+  console.log('🔍 [SMART INBOX ENHANCED] UNREAD-FIRST loading stats:', {
     totalConversations: conversations.length,
     unreadConversations: unreadConversations.length,
     lostStatusConversations: lostStatusConversations.length,
     unassignedConversations: unassignedConversations.length,
     isAdmin,
-    userRole: profile?.role
+    userRole: profile?.role,
+    unreadConversationNames: unreadConversations.map(c => c.leadName)
   });
 
   // Show specific leads we're looking for in debug
   if (isAdmin) {
-    console.log('🔍 [SMART INBOX ENHANCED] Looking for:', {
-      'Steven Wood': conversations.find(c => c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')) ? '✅ Found' : '❌ Missing',
-      'Jackson Caldwell': conversations.find(c => c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')) ? '✅ Found' : '❌ Missing'
+    const stevenWood = conversations.find(c => c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood'));
+    const jacksonCaldwell = conversations.find(c => c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell'));
+    
+    console.log('🔍 [SMART INBOX ENHANCED] Target leads check:', {
+      'Steven Wood': stevenWood ? { 
+        found: '✅ Found', 
+        unreadCount: stevenWood.unreadCount, 
+        status: stevenWood.status,
+        position: conversations.findIndex(c => c.leadId === stevenWood.leadId) + 1
+      } : '❌ Missing',
+      'Jackson Caldwell': jacksonCaldwell ? { 
+        found: '✅ Found', 
+        unreadCount: jacksonCaldwell.unreadCount, 
+        status: jacksonCaldwell.status,
+        position: conversations.findIndex(c => c.leadId === jacksonCaldwell.leadId) + 1
+      } : '❌ Missing'
     });
   }
 
@@ -166,16 +180,17 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
               <span>{conversations.length} conversations</span>
             </div>
             <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span>Real-time updates</span>
+              <Zap className="h-4 w-4" />
+              <span>Unread-first loading</span>
             </div>
           </div>
 
-          {/* Debug information for admin users */}
+          {/* Enhanced debug information for admin users */}
           {isAdmin && (
             <div className="mt-2 text-xs text-gray-500 space-y-1">
-              <div>🔍 Debug: {unreadConversations.length} unread, {lostStatusConversations.length} lost, {unassignedConversations.length} unassigned</div>
+              <div>🔍 Loaded: {conversations.length} total, {unreadConversations.length} unread, {lostStatusConversations.length} lost, {unassignedConversations.length} unassigned</div>
               <div>👤 Role: {profile?.role}, ID: {profile?.id?.slice(0, 8)}...</div>
+              <div>⚡ Strategy: Unread messages loaded first, then recent conversations</div>
             </div>
           )}
         </div>
@@ -191,16 +206,16 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No conversations found</p>
               {isAdmin && (
-                <p className="text-xs mt-2">Admin: Including all statuses and assignments</p>
+                <p className="text-xs mt-2">Admin: Including all statuses and assignments with unread-first loading</p>
               )}
             </div>
           ) : (
             <>
               {/* Show specific leads we're looking for in debug */}
               {isAdmin && (
-                <div className="p-2 bg-yellow-50 text-xs text-yellow-800 border-b">
-                  Looking for: Steven Wood ({conversations.find(c => c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')) ? '✅ Found' : '❌ Missing'})
-                  , Jackson Caldwell ({conversations.find(c => c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')) ? '✅ Found' : '❌ Missing'})
+                <div className="p-2 bg-green-50 text-xs text-green-800 border-b">
+                  ⚡ UNREAD-FIRST LOADING: Steven Wood ({conversations.find(c => c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')) ? '✅ Loaded' : '❌ Missing'})
+                  , Jackson Caldwell ({conversations.find(c => c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')) ? '✅ Loaded' : '❌ Missing'})
                 </div>
               )}
               {conversations.map((conversation) => (
@@ -279,7 +294,10 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
               <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
               <p>Choose a conversation from the left to start messaging</p>
               {isAdmin && (
-                <p className="text-xs mt-2 text-blue-600">Admin: You can see all conversations including unassigned and lost leads</p>
+                <div className="text-xs mt-2 text-blue-600 space-y-1">
+                  <p>Admin: You can see all conversations including unassigned and lost leads</p>
+                  <p>⚡ Unread messages are loaded first for immediate visibility</p>
+                </div>
               )}
             </div>
           </div>
