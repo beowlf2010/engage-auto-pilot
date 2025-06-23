@@ -40,26 +40,26 @@ const UnreadMessageBanner = () => {
   if (!shouldShow) return null;
 
   return (
-    <div className="bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg animate-in slide-in-from-top-2 duration-300">
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg animate-in slide-in-from-top-2 duration-300">
       <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between min-h-[48px]">
           <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-full">
+            <div className="bg-white/20 p-2 rounded-full flex-shrink-0">
               <Bell className="h-5 w-5 animate-pulse" />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
               <span className="font-semibold">
                 {unreadCount === 1 
                   ? 'You have 1 unread message' 
                   : `You have ${unreadCount} unread messages`
                 }
               </span>
-              <span className="text-red-100 text-sm">•</span>
-              <span className="text-red-100 text-sm">Click to view now</span>
+              <span className="text-red-100 text-sm hidden sm:inline">•</span>
+              <span className="text-red-100 text-sm hidden sm:inline">Click to view now</span>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Button
               onClick={handleViewMessages}
               variant="secondary"
@@ -67,7 +67,8 @@ const UnreadMessageBanner = () => {
               className="bg-white text-red-600 hover:bg-red-50 font-medium"
             >
               <MessageCircle className="h-4 w-4 mr-2" />
-              View Messages
+              <span className="hidden sm:inline">View Messages</span>
+              <span className="sm:hidden">View</span>
             </Button>
             <Button
               onClick={handleDismiss}
