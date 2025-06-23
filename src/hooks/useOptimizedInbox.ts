@@ -13,9 +13,11 @@ interface ConversationFilters {
 
 interface UseOptimizedInboxProps {
   onLeadsRefresh?: () => void;
+  userRole?: string;
+  profileId?: string;
 }
 
-export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {}) => {
+export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOptimizedInboxProps = {}) => {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,10 +43,13 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       if (!append) setLoading(true);
       setError(null);
       
-      console.log('🔄 [OPTIMIZED INBOX] Loading conversations with optimized service...');
+      console.log('🔄 [OPTIMIZED INBOX] Loading conversations with admin bypass logic...');
+      console.log('👤 [OPTIMIZED INBOX] User role:', userRole, 'Profile ID:', profileId);
       
-      // Load conversations from Supabase directly
-      const { data, error } = await supabase
+      const isAdmin = userRole === 'admin' || userRole === 'manager';
+      
+      // Build query with admin considerations
+      let query = supabase
         .from('leads')
         .select(`
           id,
@@ -65,10 +70,22 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
             read_at
           )
         `)
-        .order('created_at', { ascending: false })
-        .range(page * 50, (page + 1) * 50 - 1);
+        .order('created_at', { ascending: false });
+
+      // For admin users, include ALL statuses (including "lost")
+      // For regular users, exclude certain statuses
+      if (!isAdmin) {
+        query = query.not('status', 'in', '("lost")');
+        console.log('👥 [OPTIMIZED INBOX] Regular user - excluding lost leads');
+      } else {
+        console.log('👑 [OPTIMIZED INBOX] Admin user - including ALL lead statuses');
+      }
+
+      const { data, error } = await query.range(page * 50, (page + 1) * 50 - 1);
 
       if (error) throw error;
+
+      console.log(`📊 [OPTIMIZED INBOX] Raw leads loaded:`, data?.length || 0);
 
       // Transform to ConversationListItem format with proper sorting
       const transformedConversations: ConversationListItem[] = (data || []).map(lead => {
@@ -107,13 +124,52 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           hasUnrepliedInbound // NEW: Add this property
         };
         
-        // Add debugging for unreplied inbound messages
-        if (hasUnrepliedInbound) {
-          console.log(`📬 [OPTIMIZED INBOX] Lead ${lead.first_name} ${lead.last_name} has unreplied inbound message`);
+        // Debug logging for unread messages
+        if (unreadMessages.length > 0) {
+          console.log(`📬 [OPTIMIZED INBOX] Unread messages for ${lead.first_name} ${lead.last_name}:`, {
+            status: lead.status,
+            unreadCount: unreadMessages.length,
+            salespersonId: lead.salesperson_id,
+            hasUnrepliedInbound
+          });
         }
         
         return result;
       });
+      
+      // Additional filtering for debugging
+      const unreadConversations = transformedConversations.filter(c => c.unreadCount > 0);
+      const lostStatusConversations = transformedConversations.filter(c => c.status === 'lost');
+      const unassignedConversations = transformedConversations.filter(c => !c.salespersonId);
+      
+      console.log(`📊 [OPTIMIZED INBOX] Conversation stats:`, {
+        total: transformedConversations.length,
+        withUnreadMessages: unreadConversations.length,
+        lostStatus: lostStatusConversations.length,
+        unassigned: unassignedConversations.length,
+        userRole,
+        isAdmin
+      });
+      
+      // Log specific leads we're looking for
+      const stevenWood = transformedConversations.find(c => 
+        c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')
+      );
+      const jacksonCaldwell = transformedConversations.find(c => 
+        c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')
+      );
+      
+      if (stevenWood) {
+        console.log('🎯 [OPTIMIZED INBOX] Found Steven Wood:', stevenWood);
+      } else {
+        console.log('❌ [OPTIMIZED INBOX] Steven Wood not found in results');
+      }
+      
+      if (jacksonCaldwell) {
+        console.log('🎯 [OPTIMIZED INBOX] Found Jackson Caldwell:', jacksonCaldwell);
+      } else {
+        console.log('❌ [OPTIMIZED INBOX] Jackson Caldwell not found in results');
+      }
       
       if (append) {
         setConversations(prev => [...prev, ...transformedConversations]);
@@ -123,13 +179,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       
       setTotalConversations(transformedConversations.length);
       
-      // Add summary logging for debugging
-      const unreadConversations = transformedConversations.filter(c => c.unreadCount > 0);
-      const unrepliedInboundConversations = transformedConversations.filter(c => c.hasUnrepliedInbound);
-      
       console.log(`✅ [OPTIMIZED INBOX] Loaded ${transformedConversations.length} conversations`);
-      console.log(`📮 [OPTIMIZED INBOX] ${unreadConversations.length} conversations with unread messages`);
-      console.log(`📥 [OPTIMIZED INBOX] ${unrepliedInboundConversations.length} conversations with unreplied inbound messages`);
 
     } catch (err) {
       console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', err);
@@ -146,7 +196,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [userRole, profileId]);
 
   const loadMessages = useCallback(async (leadId: string) => {
     if (loadingMessagesRef.current) {
@@ -254,7 +304,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
 
   // Initialize conversations on mount
   useEffect(() => {
-    console.log('🚀 [OPTIMIZED INBOX] Initializing optimized Smart Inbox...');
+    console.log('🚀 [OPTIMIZED INBOX] Initializing optimized Smart Inbox with role awareness...');
     loadConversations(0, {}, false);
   }, [loadConversations]);
 

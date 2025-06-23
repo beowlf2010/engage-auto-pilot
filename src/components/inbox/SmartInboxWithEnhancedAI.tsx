@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
+import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
 
+  // Use the optimized inbox hook with proper role information
   const {
     conversations,
     messages,
@@ -32,9 +34,12 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
     sendingMessage,
     loadMessages,
     sendMessage,
-    retryMessage,
     manualRefresh
-  } = useEnhancedRealtimeInbox({ onLeadsRefresh });
+  } = useOptimizedInbox({ 
+    onLeadsRefresh,
+    userRole: profile?.role,
+    profileId: profile?.id
+  });
 
   // Enhanced connection manager for better status handling
   const { connectionState, forceReconnect, forceSync } = useEnhancedConnectionManager({
@@ -98,6 +103,11 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
     console.log('Mark as read:', leadId);
   };
 
+  // Debug information for admin users
+  const unreadConversations = conversations.filter(c => c.unreadCount > 0);
+  const lostStatusConversations = conversations.filter(c => c.status === 'lost');
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
+
   return (
     <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
       {/* Left Sidebar - Conversations List */}
@@ -112,6 +122,11 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
                 <Brain className="h-3 w-3 mr-1" />
                 AI Enhanced
               </Badge>
+              {isAdmin && (
+                <Badge variant="outline" className="bg-green-100 text-green-700">
+                  Admin View
+                </Badge>
+              )}
             </div>
             <ConnectionStatusIndicator 
               connectionState={connectionState} 
@@ -130,6 +145,14 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
               <span>Real-time updates</span>
             </div>
           </div>
+
+          {/* Debug information for admin users */}
+          {isAdmin && (
+            <div className="mt-2 text-xs text-gray-500 space-y-1">
+              <div>🔍 Debug Info: {unreadConversations.length} unread, {lostStatusConversations.length} lost status</div>
+              <div>👤 Role: {profile?.role}, ID: {profile?.id?.slice(0, 8)}...</div>
+            </div>
+          )}
         </div>
 
         {/* Conversations List */}
@@ -142,6 +165,9 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
             <div className="text-center p-8 text-gray-500">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No conversations found</p>
+              {isAdmin && (
+                <p className="text-xs mt-2">Admin: Including all statuses and assignments</p>
+              )}
             </div>
           ) : (
             conversations.map((conversation) => (
@@ -179,6 +205,11 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
                   <Badge variant="outline">
                     {selectedConversation.status}
                   </Badge>
+                  {!selectedConversation.salespersonId && (
+                    <Badge variant="secondary">
+                      Unassigned
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -189,7 +220,7 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
                 <EnhancedMessageBubble
                   key={message.id}
                   message={message}
-                  onRetry={message.smsStatus === 'failed' ? () => retryMessage(selectedConversation.leadId, message.id) : undefined}
+                  onRetry={message.smsStatus === 'failed' ? () => console.log('Retry message:', message.id) : undefined}
                 />
               ))}
             </div>
@@ -213,6 +244,9 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
               <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
               <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
               <p>Choose a conversation from the left to start messaging</p>
+              {isAdmin && (
+                <p className="text-xs mt-2 text-blue-600">Admin: You can see all conversations including unassigned and lost leads</p>
+              )}
             </div>
           </div>
         )}
