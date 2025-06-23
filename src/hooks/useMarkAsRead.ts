@@ -28,6 +28,10 @@ export const useMarkAsRead = () => {
 
       console.log('✅ [MARK AS READ] Successfully marked messages as read');
       
+      // Trigger global unread count refresh
+      console.log('🔄 [MARK AS READ] Triggering global unread count refresh');
+      window.dispatchEvent(new CustomEvent('unread-count-changed'));
+      
       toast({
         title: "Messages marked as read",
         description: "All unread messages have been marked as read",

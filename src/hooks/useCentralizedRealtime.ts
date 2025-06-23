@@ -52,12 +52,19 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
             }, profile.id);
 
             // Also fire the unread count update event
+            console.log('🔄 [CENTRALIZED REALTIME] Triggering unread count refresh for new message');
             window.dispatchEvent(new CustomEvent('unread-count-changed'));
           }
         }
       } catch (error) {
         console.error('Error getting lead details for notification:', error);
       }
+    }
+
+    // Handle read_at updates (messages marked as read)
+    if (payload.eventType === 'UPDATE' && payload.new?.read_at && !payload.old?.read_at) {
+      console.log('🔄 [CENTRALIZED REALTIME] Message marked as read, triggering unread count refresh');
+      window.dispatchEvent(new CustomEvent('unread-count-changed'));
     }
 
     // Call the current callbacks

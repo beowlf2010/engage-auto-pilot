@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Bell, X, MessageCircle } from 'lucide-react';
+import { Bell, X, MessageCircle, RefreshCw } from 'lucide-react';
 import { useGlobalUnreadCount } from '@/hooks/useGlobalUnreadCount';
 
 const UnreadMessageBanner = () => {
   const [isDismissed, setIsDismissed] = useState(false);
-  const { unreadCount } = useGlobalUnreadCount();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { unreadCount, refreshUnreadCount } = useGlobalUnreadCount();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,6 +38,18 @@ const UnreadMessageBanner = () => {
     setIsDismissed(true);
   };
 
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    console.log('🔄 [UNREAD BANNER] Manual refresh triggered');
+    try {
+      await refreshUnreadCount();
+    } catch (error) {
+      console.error('❌ [UNREAD BANNER] Manual refresh failed:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (!shouldShow) return null;
 
   return (
@@ -60,6 +73,16 @@ const UnreadMessageBanner = () => {
           </div>
           
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              onClick={handleManualRefresh}
+              variant="ghost"
+              size="sm"
+              disabled={isRefreshing}
+              className="text-white hover:bg-white/10"
+              title="Refresh unread count"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
             <Button
               onClick={handleViewMessages}
               variant="secondary"
