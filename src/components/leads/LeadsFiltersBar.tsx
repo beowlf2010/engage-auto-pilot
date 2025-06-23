@@ -2,12 +2,14 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 
+type LeadStatusFilter = "all" | "new" | "engaged" | "paused" | "closed" | "lost" | "ai_paused" | "replied_not_opted_in";
+
 interface Props {
-  filter: string;
-  setFilter: (val: string) => void;
+  filter: LeadStatusFilter;
+  setFilter: (val: LeadStatusFilter) => void;
 }
 
-export default function LeadFiltersBar({ filter, setFilter }: Props) {
+export default function LeadsFiltersBar({ filter, setFilter }: Props) {
   return (
     <div className="flex gap-2 mb-4">
       <Button variant={filter === "all" ? "default" : "outline"} onClick={() => setFilter("all")}>All</Button>
