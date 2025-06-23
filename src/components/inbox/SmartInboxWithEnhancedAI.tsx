@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -15,6 +14,7 @@ import IntelligentAIPanel from './IntelligentAIPanel';
 import ChatAIPanelsContainer from './ChatAIPanelsContainer';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
+import { useEnhancedConnectionManager } from '@/hooks/useEnhancedConnectionManager';
 
 interface SmartInboxWithEnhancedAIProps {
   onLeadsRefresh?: () => void;
@@ -35,10 +35,20 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
     sendingMessage,
     loadMessages,
     sendMessage,
-    connectionState,
     retryMessage,
     manualRefresh
   } = useEnhancedRealtimeInbox({ onLeadsRefresh });
+
+  // Enhanced connection manager for better status handling
+  const { connectionState, forceReconnect, forceSync } = useEnhancedConnectionManager({
+    onMessageUpdate: (leadId: string) => {
+      if (selectedConversation?.leadId === leadId) {
+        loadMessages(leadId);
+      }
+    },
+    onConversationUpdate: manualRefresh,
+    onUnreadCountUpdate: manualRefresh
+  });
 
   // Load messages when conversation is selected
   useEffect(() => {
@@ -108,7 +118,8 @@ const SmartInboxWithEnhancedAI: React.FC<SmartInboxWithEnhancedAIProps> = ({ onL
             </div>
             <ConnectionStatusIndicator 
               connectionState={connectionState} 
-              onReconnect={() => manualRefresh()}
+              onReconnect={forceReconnect}
+              onForceSync={forceSync}
             />
           </div>
 

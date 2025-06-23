@@ -99,8 +99,7 @@ class MessageStatusReconciliationService {
 
         if (data && data.length > 0) {
           const dbMessage = data[0];
-          const status = dbMessage.sms_status === 'sent' ? 'sent' : 
-                        dbMessage.sms_status === 'failed' ? 'failed' : 'sending';
+          const status = dbMessage.sms_status === 'sent' ? 'sent' : 'failed';
           
           this.updateMessageStatus(message.id, status);
         } else {
