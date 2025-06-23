@@ -50,7 +50,7 @@ export const useInboxFilters = (profileId?: string, userRole?: string) => {
   }, [filters, userRole]);
 
   const applyFilters = useCallback((conversations: any[]) => {
-    console.log('🔍 [INBOX FILTERS] Applying filters:', filters);
+    console.log('🔍 [INBOX FILTERS] Applying filters with AGGRESSIVE admin bypass:', filters);
     console.log('🔍 [INBOX FILTERS] User role:', userRole);
     console.log('🔍 [INBOX FILTERS] Total conversations before filtering:', conversations.length);
     
@@ -77,11 +77,11 @@ export const useInboxFilters = (profileId?: string, userRole?: string) => {
         if (!filters.aiOptIn && conv.aiOptIn) return false;
       }
 
-      // Admin bypass: Admins see all conversations unless explicitly filtered
+      // AGGRESSIVE ADMIN BYPASS: Admins see ALL conversations unless explicitly filtered
       if (isAdmin) {
-        console.log('👑 [INBOX FILTERS] Admin user - bypassing assignment restrictions');
+        console.log('👑 [INBOX FILTERS] AGGRESSIVE ADMIN BYPASS - minimal filtering applied');
         
-        // Only apply explicit filters for admins
+        // Only apply explicit user-requested filters for admins
         if (filters.unreadOnly && conv.unreadCount === 0) {
           return false;
         }
@@ -124,6 +124,7 @@ export const useInboxFilters = (profileId?: string, userRole?: string) => {
           }
         }
 
+        // ADMIN BYPASS: Return true for all other cases (including lost and unassigned)
         return true;
       }
 
@@ -174,6 +175,19 @@ export const useInboxFilters = (profileId?: string, userRole?: string) => {
     const hiddenCount = conversations.length - filtered.length;
     console.log('🔍 [INBOX FILTERS] Conversations after filtering:', filtered.length);
     console.log('🔍 [INBOX FILTERS] Hidden conversations:', hiddenCount);
+    
+    if (isAdmin) {
+      console.log('👑 [INBOX FILTERS] ADMIN VIEW - should see lost and unassigned leads');
+      
+      // Debug admin-specific filtering
+      const lostLeads = conversations.filter(c => c.status === 'lost');
+      const unassignedLeads = conversations.filter(c => !c.salespersonId);
+      const filteredLostLeads = filtered.filter(c => c.status === 'lost');
+      const filteredUnassignedLeads = filtered.filter(c => !c.salespersonId);
+      
+      console.log('📊 [ADMIN DEBUG] Lost leads: total', lostLeads.length, 'filtered', filteredLostLeads.length);
+      console.log('📊 [ADMIN DEBUG] Unassigned leads: total', unassignedLeads.length, 'filtered', filteredUnassignedLeads.length);
+    }
     
     if (filters.unrepliedInboundOnly) {
       console.log('🔍 [INBOX FILTERS] Unreplied inbound filter active - showing conversations where customer sent last message');

@@ -43,12 +43,12 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
       if (!append) setLoading(true);
       setError(null);
       
-      console.log('🔄 [OPTIMIZED INBOX] Loading conversations with admin bypass logic...');
+      console.log('🔄 [OPTIMIZED INBOX] Loading conversations with AGGRESSIVE admin bypass logic...');
       console.log('👤 [OPTIMIZED INBOX] User role:', userRole, 'Profile ID:', profileId);
       
       const isAdmin = userRole === 'admin' || userRole === 'manager';
       
-      // Build query with admin considerations
+      // AGGRESSIVE ADMIN BYPASS: Build query with admin considerations
       let query = supabase
         .from('leads')
         .select(`
@@ -72,20 +72,21 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
         `)
         .order('created_at', { ascending: false });
 
-      // For admin users, include ALL statuses (including "lost")
-      // For regular users, exclude certain statuses
+      // CONSERVATIVE FIX: Only apply status restrictions for non-admin users
       if (!isAdmin) {
+        // Regular users: exclude lost leads
         query = query.not('status', 'in', '("lost")');
         console.log('👥 [OPTIMIZED INBOX] Regular user - excluding lost leads');
       } else {
-        console.log('👑 [OPTIMIZED INBOX] Admin user - including ALL lead statuses');
+        // ADMIN BYPASS: Include ALL statuses including "lost"
+        console.log('👑 [OPTIMIZED INBOX] ADMIN USER - INCLUDING ALL LEAD STATUSES (including lost)');
       }
 
       const { data, error } = await query.range(page * 50, (page + 1) * 50 - 1);
 
       if (error) throw error;
 
-      console.log(`📊 [OPTIMIZED INBOX] Raw leads loaded:`, data?.length || 0);
+      console.log(`📊 [OPTIMIZED INBOX] Raw leads loaded for ${isAdmin ? 'ADMIN' : 'USER'}:`, data?.length || 0);
 
       // Transform to ConversationListItem format with proper sorting
       const transformedConversations: ConversationListItem[] = (data || []).map(lead => {
@@ -124,25 +125,27 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
           hasUnrepliedInbound // NEW: Add this property
         };
         
-        // Debug logging for unread messages
-        if (unreadMessages.length > 0) {
-          console.log(`📬 [OPTIMIZED INBOX] Unread messages for ${lead.first_name} ${lead.last_name}:`, {
+        // ADMIN DEBUG: Log conversations with unread messages for admin users
+        if (isAdmin && unreadMessages.length > 0) {
+          console.log(`📬 [ADMIN DEBUG] Unread messages for ${lead.first_name} ${lead.last_name}:`, {
             status: lead.status,
             unreadCount: unreadMessages.length,
             salespersonId: lead.salesperson_id,
-            hasUnrepliedInbound
+            hasUnrepliedInbound,
+            isLost: lead.status === 'lost',
+            isUnassigned: !lead.salesperson_id
           });
         }
         
         return result;
       });
       
-      // Additional filtering for debugging
+      // ADMIN DEBUGGING: Additional filtering for debugging
       const unreadConversations = transformedConversations.filter(c => c.unreadCount > 0);
       const lostStatusConversations = transformedConversations.filter(c => c.status === 'lost');
       const unassignedConversations = transformedConversations.filter(c => !c.salespersonId);
       
-      console.log(`📊 [OPTIMIZED INBOX] Conversation stats:`, {
+      console.log(`📊 [OPTIMIZED INBOX] Conversation stats for ${isAdmin ? 'ADMIN' : 'USER'}:`, {
         total: transformedConversations.length,
         withUnreadMessages: unreadConversations.length,
         lostStatus: lostStatusConversations.length,
@@ -151,24 +154,36 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
         isAdmin
       });
       
-      // Log specific leads we're looking for
-      const stevenWood = transformedConversations.find(c => 
-        c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')
-      );
-      const jacksonCaldwell = transformedConversations.find(c => 
-        c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')
-      );
-      
-      if (stevenWood) {
-        console.log('🎯 [OPTIMIZED INBOX] Found Steven Wood:', stevenWood);
-      } else {
-        console.log('❌ [OPTIMIZED INBOX] Steven Wood not found in results');
-      }
-      
-      if (jacksonCaldwell) {
-        console.log('🎯 [OPTIMIZED INBOX] Found Jackson Caldwell:', jacksonCaldwell);
-      } else {
-        console.log('❌ [OPTIMIZED INBOX] Jackson Caldwell not found in results');
+      // ADMIN DEBUG: Log specific leads we're looking for
+      if (isAdmin) {
+        const stevenWood = transformedConversations.find(c => 
+          c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')
+        );
+        const jacksonCaldwell = transformedConversations.find(c => 
+          c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')
+        );
+        
+        if (stevenWood) {
+          console.log('✅ [ADMIN DEBUG] Found Steven Wood:', stevenWood);
+        } else {
+          console.log('❌ [ADMIN DEBUG] Steven Wood not found in results');
+        }
+        
+        if (jacksonCaldwell) {
+          console.log('✅ [ADMIN DEBUG] Found Jackson Caldwell:', jacksonCaldwell);
+        } else {
+          console.log('❌ [ADMIN DEBUG] Jackson Caldwell not found in results');
+        }
+
+        // List all conversations with unread messages for admin
+        console.log('📋 [ADMIN DEBUG] All conversations with unread messages:', 
+          unreadConversations.map(c => ({
+            name: c.leadName,
+            unreadCount: c.unreadCount,
+            status: c.status,
+            assigned: !!c.salespersonId
+          }))
+        );
       }
       
       if (append) {
@@ -179,7 +194,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
       
       setTotalConversations(transformedConversations.length);
       
-      console.log(`✅ [OPTIMIZED INBOX] Loaded ${transformedConversations.length} conversations`);
+      console.log(`✅ [OPTIMIZED INBOX] Loaded ${transformedConversations.length} conversations for ${isAdmin ? 'ADMIN' : 'USER'}`);
 
     } catch (err) {
       console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', err);
@@ -304,7 +319,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
 
   // Initialize conversations on mount
   useEffect(() => {
-    console.log('🚀 [OPTIMIZED INBOX] Initializing optimized Smart Inbox with role awareness...');
+    console.log('🚀 [OPTIMIZED INBOX] Initializing optimized Smart Inbox with AGGRESSIVE admin role awareness...');
     loadConversations(0, {}, false);
   }, [loadConversations]);
 
