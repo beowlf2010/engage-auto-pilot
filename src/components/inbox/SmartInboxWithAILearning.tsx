@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -198,10 +197,10 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({
         {showPredictiveInsights && selectedConversation && (
           <div className="p-4 border-b bg-green-50">
             <PredictiveInsightsPanel
-              conversation={selectedConversation}
-              messages={conversationMessages}
-              onSendMessage={handleSendMessage}
-              canReply={canReply || false}
+              isOpen={showPredictiveInsights}
+              onToggle={() => setShowPredictiveInsights(!showPredictiveInsights)}
+              predictions={[]}
+              insights={{}}
             />
           </div>
         )}
