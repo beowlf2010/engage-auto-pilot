@@ -1,29 +1,31 @@
 
-import React, { useState, useEffect } from 'react';
-import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
-import { useUnifiedAIScheduler } from '@/hooks/useUnifiedAIScheduler';
-import { useLeads } from '@/hooks/useLeads';
-import { useMarkAsRead } from '@/hooks/inbox/useMarkAsRead';
-import { realtimeLearningService } from '@/services/realtimeLearningService';
-import { aiEmergencyService } from '@/services/aiEmergencyService';
-import SmartInboxWithEnhancedAI from './SmartInboxWithEnhancedAI';
-import AILearningDashboard from '@/components/ai/AILearningDashboard';
-import AILearningMessageWrapper from './AILearningMessageWrapper';
-import AIEmergencyToggle from '@/components/ai/AIEmergencyToggle';
-import InboxStateManager from './InboxStateManager';
-import InboxStatusDisplay from './InboxStatusDisplay';
-import MessageDebugPanel from '../debug/MessageDebugPanel';
-import PredictiveInsightsPanel from './PredictiveInsightsPanel';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useStableConversationOperations } from '@/hooks/useStableConversationOperations';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Brain, BarChart3, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { MessageCircle, Users, Clock, Zap, Brain, Sparkles, Settings, TrendingUp, Activity } from 'lucide-react';
+import EnhancedConversationListItem from './EnhancedConversationListItem';
+import EnhancedMessageBubble from './EnhancedMessageBubble';
+import InventoryAwareMessageInput from './InventoryAwareMessageInput';
+import ConnectionStatusIndicator from './ConnectionStatusIndicator';
+import IntelligentAIPanel from './IntelligentAIPanel';
+import ChatAIPanelsContainer from './ChatAIPanelsContainer';
+import AIMessageWithLearning from './AIMessageWithLearning';
+import PredictiveInsightsPanel from './PredictiveInsightsPanel';
+import { ConversationListItem, MessageData } from '@/types/conversation';
+import { toast } from '@/hooks/use-toast';
+import { useRealtimeLearning } from '@/hooks/useRealtimeLearning';
+import { usePredictiveAnalytics } from '@/hooks/usePredictiveAnalytics';
 
 interface SmartInboxWithAILearningProps {
-  user: {
+  user?: {
     role: string;
     id: string;
   };
-  // Accept potential enhanced props if passed from above
+  onLeadsRefresh?: () => void;
   conversations?: any[];
   messages?: any[];
   sendingMessage?: boolean;
@@ -36,406 +38,396 @@ interface SmartInboxWithAILearningProps {
   markAsRead?: (leadId: string) => Promise<void>;
   markingAsRead?: string | null;
   getLeadIdFromUrl?: () => string | null;
-  onLeadsRefresh?: () => void;
   [key: string]: any;
 }
 
 const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ 
   user, 
-  // Extract enhanced props if provided
-  conversations: propConversations,
-  messages: propMessages,
-  sendingMessage: propSendingMessage,
-  loading: propLoading,
-  loadMessages: propLoadMessages,
-  sendMessage: propSendMessage,
-  setError: propSetError,
-  debugPanelOpen: propDebugPanelOpen,
-  setDebugPanelOpen: propSetDebugPanelOpen,
-  markAsRead: propMarkAsRead,
-  markingAsRead: propMarkingAsRead,
-  getLeadIdFromUrl: propGetLeadIdFromUrl,
   onLeadsRefresh,
-  ...otherProps
+  ...otherProps 
 }) => {
-  const [debugPanelOpen, setDebugPanelOpen] = useState(propDebugPanelOpen || false);
+  const { profile } = useAuth();
+  const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [showAIPanel, setShowAIPanel] = useState(true);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showLearningDashboard, setShowLearningDashboard] = useState(false);
-  const [showAIMessageWrapper, setShowAIMessageWrapper] = useState(false);
-  const [predictiveInsightsOpen, setPredictiveInsightsOpen] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<string | null>(null);
-  const [aiDisabled, setAiDisabled] = useState(false);
-  const [aiDisableInfo, setAiDisableInfo] = useState<any>(null);
+  const [showPredictiveInsights, setShowPredictiveInsights] = useState(false);
+  const [aiEmergencyMode, setAiEmergencyMode] = useState(false);
 
-  useUnifiedAIScheduler();
-  const { forceRefresh: refreshLeads } = useLeads();
+  // Use stable conversation operations for reliable data management
+  const {
+    conversations,
+    messages,
+    loading,
+    error,
+    sendingMessage,
+    loadMessages,
+    sendMessage,
+    manualRefresh,
+    markAsRead,
+    markingAsRead
+  } = useStableConversationOperations({ onLeadsRefresh });
 
-  // Use enhanced props if provided, otherwise fall back to hooks
-  const shouldUseEnhancedProps = propConversations !== undefined;
-
-  // Use the stable optimized inbox hook only if props aren't provided
-  const hookData = useOptimizedInbox({
-    onLeadsRefresh: onLeadsRefresh || refreshLeads
-  });
-
-  // Choose data source based on what's available
-  const conversations = shouldUseEnhancedProps ? (propConversations || []) : hookData.conversations;
-  const messages = shouldUseEnhancedProps ? (propMessages || []) : hookData.messages;
-  const loading = shouldUseEnhancedProps ? (propLoading || false) : hookData.loading;
-  const error = shouldUseEnhancedProps ? null : hookData.error;
-  const sendingMessage = shouldUseEnhancedProps ? (propSendingMessage || false) : hookData.sendingMessage;
-  const totalConversations = shouldUseEnhancedProps ? conversations.length : hookData.totalConversations;
-  const loadMessages = shouldUseEnhancedProps ? (propLoadMessages || (() => Promise.resolve())) : hookData.loadMessages;
-  const baseSendMessage = shouldUseEnhancedProps ? (propSendMessage || (() => Promise.resolve())) : hookData.sendMessage;
-  const manualRefresh = shouldUseEnhancedProps ? (() => {}) : hookData.manualRefresh;
-  const setError = shouldUseEnhancedProps ? (propSetError || (() => {})) : hookData.setError;
-
-  // Initialize enhanced learning service
-  useEffect(() => {
-    const initializeLearning = async () => {
-      try {
-        const { enhancedRealtimeLearningService } = await import('@/services/enhancedRealtimeLearningService');
-        await enhancedRealtimeLearningService.initialize();
-        console.log('✅ [SMART INBOX] Enhanced learning service initialized');
-      } catch (error) {
-        console.warn('⚠️ [SMART INBOX] Failed to initialize learning service:', error);
-      }
-    };
-
-    initializeLearning();
-  }, []);
-
-  // Mock data for enhanced features to prevent UI breaking
-  const mockPredictions = [];
-  const mockSearchResults = [];
-  const mockSearchQuery = '';
-  
-  // Mock insights function
-  const getMockPredictionInsights = () => ({
-    totalPredictions: 0,
-    highConfidencePredictions: 0,
-    avgConfidence: 0,
-    performanceMetrics: {},
-    userActivity: {},
-    activityPatterns: []
-  });
-
-  // Mark as read functionality
-  const { markAsRead, markingAsRead } = useMarkAsRead(manualRefresh);
-  const finalMarkAsRead = shouldUseEnhancedProps ? (propMarkAsRead || markAsRead) : markAsRead;
-  const finalMarkingAsRead = shouldUseEnhancedProps ? (propMarkingAsRead || null) : markingAsRead;
-
-  // Initialize AI emergency service with error handling
-  useEffect(() => {
-    const initializeEmergencyService = async () => {
-      try {
-        await aiEmergencyService.initialize();
-        setAiDisabled(aiEmergencyService.isAIDisabled());
-        setAiDisableInfo(aiEmergencyService.getDisableInfo());
-
-        const unsubscribe = aiEmergencyService.onStatusChange((disabled) => {
-          setAiDisabled(disabled);
-          setAiDisableInfo(aiEmergencyService.getDisableInfo());
-        });
-
-        return unsubscribe;
-      } catch (error) {
-        console.warn('AI Emergency service initialization failed:', error);
-        // Continue without AI emergency features
-      }
-    };
-
-    let unsubscribe: (() => void) | undefined;
-    initializeEmergencyService().then((unsub) => {
-      unsubscribe = unsub;
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, []);
-
-  // Enhanced send message with AI safety checks and learning integration
-  const sendMessage = async (leadId: string, messageContent: string) => {
-    // AI Safety Check with error handling
-    try {
-      const canProceed = await aiEmergencyService.checkBeforeAIAction('send_message');
-      if (!canProceed) {
-        throw new Error('AI messaging is currently disabled for safety reasons');
-      }
-    } catch (error) {
-      console.warn('AI safety check failed, proceeding anyway:', error);
-    }
-
-    try {
-      console.log('🧠 Enhanced AI Learning: Sending message with learning integration');
-      
-      await baseSendMessage(leadId, messageContent);
-      
-      // Process learning event with enhanced service
-      try {
-        const { enhancedRealtimeLearningService } = await import('@/services/enhancedRealtimeLearningService');
-        await enhancedRealtimeLearningService.processLearningEvent({
-          type: 'message_sent',
-          leadId,
-          data: {
-            content: messageContent,
-            messageLength: messageContent.length,
-            timestamp: new Date().toISOString(),
-            aiGenerated: false
-          },
-          timestamp: new Date()
-        });
-      } catch (learningError) {
-        console.warn('Learning event processing failed:', learningError);
-        // Continue without learning features
-      }
-
-      console.log('✅ Enhanced AI Learning: Message sent and learning event processed');
-      
-    } catch (error) {
-      console.error('❌ Enhanced AI Learning: Error in send message:', error);
-      throw error;
-    }
-  };
-
-  const enhancedLoadMessages = async (leadId: string) => {
-    setSelectedLead(leadId);
-    await loadMessages(leadId);
-    
-    // Process learning event with enhanced service
-    setTimeout(async () => {
-      try {
-        const conversationHistory = messages
-          .map(m => `${m.direction === 'in' ? 'Customer' : 'Agent'}: ${m.body}`)
-          .join('\n');
-        
-        if (conversationHistory) {
-          const { enhancedRealtimeLearningService } = await import('@/services/enhancedRealtimeLearningService');
-          await enhancedRealtimeLearningService.processLearningEvent({
-            type: 'conversation_analyzed',
-            leadId,
-            data: {
-              messageCount: messages.length,
-              conversationLength: conversationHistory.length,
-              lastMessageDirection: messages[messages.length - 1]?.direction
-            },
-            timestamp: new Date()
-          });
-        }
-      } catch (error) {
-        console.warn('Conversation analysis failed:', error);
-        // Continue without analysis
-      }
-    }, 1000);
-  };
-
-  // Response time tracking with enhanced service
-  useEffect(() => {
-    if (messages.length > 0 && selectedLead) {
-      try {
-        const incomingMessages = messages.filter(m => m.direction === 'in');
-        const lastIncoming = incomingMessages[incomingMessages.length - 1];
-        
-        if (lastIncoming) {
-          const outgoingMessages = messages.filter(m => m.direction === 'out' && new Date(m.sentAt) < new Date(lastIncoming.sentAt));
-          const lastOutgoing = outgoingMessages[outgoingMessages.length - 1];
-          
-          if (lastOutgoing) {
-            const responseTimeHours = (new Date(lastIncoming.sentAt).getTime() - new Date(lastOutgoing.sentAt).getTime()) / (1000 * 60 * 60);
-            
-            import('@/services/enhancedRealtimeLearningService').then(({ enhancedRealtimeLearningService }) => {
-              enhancedRealtimeLearningService.processLearningEvent({
-                type: 'response_received',
-                leadId: selectedLead,
-                data: {
-                  responseTimeHours,
-                  messageLength: lastIncoming.body.length
-                },
-                timestamp: new Date(lastIncoming.sentAt)
-              }).catch(error => {
-                console.warn('Response time tracking failed:', error);
-              });
-            });
-          }
-        }
-      } catch (error) {
-        console.warn('Response time analysis failed:', error);
-      }
-    }
-  }, [messages, selectedLead]);
-
-  const filteredConversations = conversations.filter(conv => 
-    user.role === "manager" || user.role === "admin" || conv.salespersonId === user.id || !conv.salespersonId
+  // AI Learning capabilities
+  const { learningInsights, isLearning, trackMessageOutcome } = useRealtimeLearning(
+    selectedConversation?.leadId || ''
   );
 
-  console.log('🧠 [SMART INBOX AI LEARNING] Render state:', {
-    loading,
-    conversationsCount: filteredConversations.length,
-    totalConversations,
-    hasError: !!error,
-    showLearningDashboard,
-    selectedLead,
-    aiDisabled,
-    shouldUseEnhancedProps
-  });
+  // Predictive analytics
+  const { predictions, insights, isLoading: predictiveLoading } = usePredictiveAnalytics();
 
-  const shouldShowStatus = error || (loading && filteredConversations.length === 0);
+  // Load messages when conversation is selected
+  useEffect(() => {
+    if (selectedConversation) {
+      loadMessages(selectedConversation.leadId);
+    }
+  }, [selectedConversation, loadMessages]);
 
-  if (shouldShowStatus) {
-    return (
-      <>
-        <InboxStatusDisplay
-          loading={loading}
-          error={error}
-          conversationsCount={filteredConversations.length}
-          onRetry={manualRefresh}
-        />
-        <MessageDebugPanel
-          isOpen={debugPanelOpen}
-          onToggle={() => setDebugPanelOpen(!debugPanelOpen)}
-        />
-      </>
-    );
-  }
+  const handleSendMessage = useCallback(async (messageContent: string) => {
+    if (!selectedConversation || !messageContent.trim()) return;
 
-  // If enhanced props are provided, render the enhanced AI inbox directly
-  if (shouldUseEnhancedProps) {
-    return (
-      <SmartInboxWithEnhancedAI 
-        onLeadsRefresh={onLeadsRefresh || refreshLeads}
-        {...otherProps}
-      />
-    );
-  }
+    try {
+      await sendMessage(selectedConversation.leadId, messageContent.trim());
+      setMessageText('');
+      
+      // Track learning outcome
+      if (selectedConversation.leadId) {
+        await trackMessageOutcome(messageContent, 'sent');
+      }
+      
+      toast({
+        title: "Message Sent",
+        description: "Your message has been sent successfully",
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send message",
+        variant: "destructive"
+      });
+    }
+  }, [selectedConversation, sendMessage, trackMessageOutcome]);
+
+  const handleConversationSelect = useCallback((conversation: ConversationListItem) => {
+    setSelectedConversation(conversation);
+  }, []);
+
+  const canReply = useMemo(() => {
+    return selectedConversation && 
+           (selectedConversation.salespersonId === profile?.id || 
+            selectedConversation.salespersonId === null);
+  }, [selectedConversation, profile?.id]);
+
+  const conversationMessages = useMemo(() => {
+    return messages.map(msg => ({
+      ...msg,
+      leadName: selectedConversation?.leadName || '',
+      vehicleInterest: selectedConversation?.vehicleInterest || ''
+    }));
+  }, [messages, selectedConversation]);
 
   return (
-    <div className="flex h-screen">
-      <div className={`flex-1 ${showLearningDashboard ? 'mr-2' : ''}`}>
-        <InboxStateManager>
-          {(stateProps) => (
-            <div className="h-full flex flex-col">
-              {/* AI Emergency Warning Banner */}
-              {aiDisabled && (
-                <Alert className="border-red-500 bg-red-50 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-800">
-                    <strong>AI EMERGENCY SHUTDOWN ACTIVE:</strong> {aiDisableInfo?.reason || 'AI messaging disabled'}
-                    {aiDisableInfo?.disabledAt && (
-                      <div className="text-sm mt-1">
-                        Disabled at: {new Date(aiDisableInfo.disabledAt).toLocaleString()}
-                      </div>
-                    )}
-                  </AlertDescription>
-                </Alert>
+    <div className="h-[calc(100vh-8rem)] flex bg-gray-50">
+      {/* Left Sidebar - Conversations List */}
+      <div className="w-1/3 border-r bg-white flex flex-col">
+        {/* Enhanced Header with AI Learning Controls */}
+        <div className="p-4 border-b bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-blue-600" />
+              <h2 className="text-lg font-semibold">Smart Inbox</h2>
+              <Badge variant="outline" className="bg-purple-100 text-purple-700">
+                <Brain className="h-3 w-3 mr-1" />
+                AI Learning
+              </Badge>
+              {isLearning && (
+                <Badge variant="outline" className="bg-green-100 text-green-700">
+                  <Activity className="h-3 w-3 mr-1 animate-pulse" />
+                  Learning
+                </Badge>
               )}
+            </div>
+            <div className="flex items-center gap-2">
+              <ConnectionStatusIndicator 
+                connectionState="connected" 
+                onReconnect={manualRefresh}
+              />
+              <Button
+                variant={aiEmergencyMode ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => setAiEmergencyMode(!aiEmergencyMode)}
+                className="text-xs"
+              >
+                {aiEmergencyMode ? "Emergency ON" : "AI Control"}
+              </Button>
+            </div>
+          </div>
 
-              {/* Enhanced Header with Learning Status */}
-              <div className="border-b bg-white p-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Brain className="w-6 h-6 text-blue-600" />
-                  <div>
-                    <h1 className="text-xl font-semibold">Smart Inbox with AI Learning</h1>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>
-                        {totalConversations} total conversations • {filteredConversations.length} loaded
-                      </span>
-                      <span className="text-green-600 flex items-center gap-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        AI Learning Active
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {/* Emergency AI Toggle - Always Visible */}
-                  <AIEmergencyToggle 
-                    userId={user.id} 
-                    size="sm"
-                    showStatus={false}
-                  />
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPredictiveInsightsOpen(!predictiveInsightsOpen)}
-                    className={predictiveInsightsOpen ? 'bg-blue-50 border-blue-300' : ''}
-                  >
-                    <TrendingUp className="w-4 h-4 mr-1" />
-                    Insights
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAIMessageWrapper(!showAIMessageWrapper)}
-                    className={showAIMessageWrapper ? 'bg-blue-50 border-blue-300' : ''}
-                    disabled={aiDisabled}
-                  >
-                    <Brain className="w-4 h-4 mr-1" />
-                    AI Assistant
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowLearningDashboard(!showLearningDashboard)}
-                    className={showLearningDashboard ? 'bg-blue-50 border-blue-300' : ''}
-                  >
-                    <BarChart3 className="w-4 h-4 mr-1" />
-                    Learning Dashboard
-                  </Button>
-                </div>
+          {/* AI Learning Dashboard Toggle */}
+          <div className="flex items-center gap-2 mb-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowLearningDashboard(!showLearningDashboard)}
+              className="text-xs"
+            >
+              <Brain className="h-3 w-3 mr-1" />
+              {showLearningDashboard ? 'Hide' : 'Show'} Learning Dashboard
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPredictiveInsights(!showPredictiveInsights)}
+              className="text-xs"
+            >
+              <TrendingUp className="h-3 w-3 mr-1" />
+              Predictive Insights
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              <span>{conversations.length} conversations</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span>Real-time updates</span>
+            </div>
+            {learningInsights && (
+              <div className="flex items-center gap-1">
+                <Sparkles className="h-4 w-4" />
+                <span>{learningInsights.length} insights</span>
               </div>
+            )}
+          </div>
+        </div>
 
-              {/* AI Message Wrapper */}
-              {showAIMessageWrapper && selectedLead && !aiDisabled && (
-                <div className="border-b bg-blue-50 p-4">
-                  <AILearningMessageWrapper
-                    leadId={selectedLead}
-                    leadName={stateProps.selectedConversation?.leadName || 'Unknown Lead'}
-                    messageContent="Hi! I wanted to follow up on your interest in our vehicles. Do you have any questions I can help answer?"
-                    onSendMessage={(message) => sendMessage(selectedLead, message)}
-                    showLearningInsights={true}
-                  />
+        {/* AI Learning Dashboard */}
+        {showLearningDashboard && (
+          <div className="border-b bg-blue-50 p-3">
+            <div className="text-sm">
+              <div className="font-medium mb-2">AI Learning Status</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-gray-600">Active Learning:</span>
+                  <span className={`ml-1 ${isLearning ? 'text-green-600' : 'text-gray-400'}`}>
+                    {isLearning ? 'ON' : 'OFF'}
+                  </span>
                 </div>
-              )}
-
-              {/* Main Inbox Content - Use Enhanced AI Component */}
-              <div className="flex-1">
-                <SmartInboxWithEnhancedAI
-                  onLeadsRefresh={onLeadsRefresh || refreshLeads}
-                />
+                <div>
+                  <span className="text-gray-600">Insights:</span>
+                  <span className="ml-1 text-blue-600">{learningInsights?.length || 0}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Emergency Mode:</span>
+                  <span className={`ml-1 ${aiEmergencyMode ? 'text-red-600' : 'text-green-600'}`}>
+                    {aiEmergencyMode ? 'ACTIVE' : 'Normal'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Predictions:</span>
+                  <span className="ml-1 text-purple-600">{predictions?.length || 0}</span>
+                </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="text-center p-8 text-gray-500">
+              <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <p>No conversations found</p>
+            </div>
+          ) : (
+            conversations.map((conversation) => (
+              <EnhancedConversationListItem
+                key={conversation.leadId}
+                conversation={conversation}
+                isSelected={selectedConversation?.leadId === conversation.leadId}
+                onSelect={() => handleConversationSelect(conversation)}
+                canReply={canReply || false}
+                markAsRead={markAsRead}
+                isMarkingAsRead={markingAsRead === conversation.leadId}
+              />
+            ))
           )}
-        </InboxStateManager>
+        </div>
       </div>
 
-      {/* Learning Dashboard Sidebar */}
-      {showLearningDashboard && (
-        <div className="w-96 border-l bg-white overflow-y-auto">
-          <div className="p-4">
-            <AILearningDashboard
-              leadId={selectedLead || undefined}
-              compact={false}
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {selectedConversation ? (
+          <>
+            {/* Chat Header */}
+            <div className="p-4 border-b bg-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg">{selectedConversation.leadName}</h3>
+                  <p className="text-sm text-gray-600">{selectedConversation.vehicleInterest}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedConversation.unreadCount > 0 && (
+                    <Badge variant="destructive">
+                      {selectedConversation.unreadCount} unread
+                    </Badge>
+                  )}
+                  <Badge variant="outline">
+                    {selectedConversation.status}
+                  </Badge>
+                  {isLearning && (
+                    <Badge variant="outline" className="bg-green-100 text-green-700">
+                      <Brain className="h-3 w-3 mr-1" />
+                      AI Learning Active
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {conversationMessages.map((message) => (
+                <EnhancedMessageBubble
+                  key={message.id}
+                  message={message}
+                  onRetry={message.smsStatus === 'failed' ? () => {
+                    console.log('Retrying message:', message.id);
+                  } : undefined}
+                />
+              ))}
+            </div>
+
+            {/* Message Input */}
+            {canReply && (
+              <div className="p-4 border-t bg-white">
+                <InventoryAwareMessageInput
+                  leadId={selectedConversation.leadId}
+                  conversationHistory={conversationMessages.map(m => `${m.direction === 'in' ? 'Customer' : 'Sales'}: ${m.body}`).join('\n')}
+                  onSendMessage={handleSendMessage}
+                  disabled={sendingMessage}
+                  placeholder="Type your message..."
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
+              <p>Choose a conversation from the left to start messaging with AI learning</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right Sidebar - AI Panels */}
+      {selectedConversation && (
+        <div className="w-80 border-l bg-white flex flex-col">
+          <div className="p-4 border-b">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h3 className="font-semibold">AI Assistant & Learning</h3>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* AI Message with Learning */}
+            <AIMessageWithLearning
+              leadId={selectedConversation.leadId}
+              leadName={selectedConversation.leadName}
+              messageContent="AI-generated message based on learning insights"
+              onSendMessage={handleSendMessage}
+              showInsights={true}
             />
+
+            <Separator />
+
+            {/* Intelligent AI Panel - Main Feature */}
+            <IntelligentAIPanel
+              conversation={selectedConversation}
+              messages={conversationMessages}
+              onSendMessage={handleSendMessage}
+              canReply={canReply || false}
+              isCollapsed={!showAIPanel}
+              onToggleCollapse={() => setShowAIPanel(!showAIPanel)}
+            />
+
+            <Separator />
+
+            {/* Additional AI Panels */}
+            <ChatAIPanelsContainer
+              showAnalysis={showAnalysis}
+              showAIPanel={false}
+              showAIGenerator={showAIGenerator}
+              canReply={canReply || false}
+              selectedConversation={selectedConversation}
+              messages={conversationMessages}
+              onSummaryUpdate={() => {}}
+              onSelectSuggestion={handleSendMessage}
+              onToggleAIPanel={() => setShowAIPanel(!showAIPanel)}
+              onSendAIMessage={handleSendMessage}
+              onCloseAIGenerator={() => setShowAIGenerator(false)}
+            />
+
+            {/* AI Panel Controls */}
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAnalysis(!showAnalysis)}
+                    className="justify-start"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    {showAnalysis ? 'Hide' : 'Show'} Analysis
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAIGenerator(!showAIGenerator)}
+                    className="justify-start"
+                    disabled={!canReply}
+                  >
+                    <Brain className="h-4 w-4 mr-2" />
+                    AI Message Generator
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAiEmergencyMode(!aiEmergencyMode)}
+                    className={`justify-start ${aiEmergencyMode ? 'bg-red-50 text-red-700' : ''}`}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    {aiEmergencyMode ? 'Disable Emergency' : 'Emergency Mode'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
 
-      {/* Predictive Insights Panel with mock data */}
+      {/* Predictive Insights Panel */}
       <PredictiveInsightsPanel
-        isOpen={predictiveInsightsOpen}
-        onToggle={() => setPredictiveInsightsOpen(!predictiveInsightsOpen)}
-        predictions={mockPredictions}
-        insights={getMockPredictionInsights()}
-      />
-
-      <MessageDebugPanel
-        isOpen={debugPanelOpen}
-        onToggle={() => setDebugPanelOpen(!debugPanelOpen)}
-        leadId={selectedLead || undefined}
+        isOpen={showPredictiveInsights}
+        onToggle={() => setShowPredictiveInsights(!showPredictiveInsights)}
+        predictions={predictions || []}
+        insights={insights}
       />
     </div>
   );
