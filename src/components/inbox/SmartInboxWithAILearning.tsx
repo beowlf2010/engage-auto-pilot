@@ -2,11 +2,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useInboxFilters } from '@/hooks/useInboxFilters';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { MessageCircle, Users, Clock, Zap, Brain, Sparkles } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MessageCircle, Users, Clock, Zap, Brain, Sparkles, Search, Filter } from 'lucide-react';
 import EnhancedConversationListItem from './EnhancedConversationListItem';
 import EnhancedMessageBubble from './EnhancedMessageBubble';
 import InventoryAwareMessageInput from './InventoryAwareMessageInput';
@@ -14,6 +16,7 @@ import ConnectionStatusIndicator from './ConnectionStatusIndicator';
 import LeadContextPanel from './LeadContextPanel';
 import AIResponseIndicator from './AIResponseIndicator';
 import AIResponsePreview from './AIResponsePreview';
+import SmartFilters from './SmartFilters';
 import { ConversationListItem, MessageData } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 import { useAutoAIResponses } from '@/hooks/useAutoAIResponses';
@@ -31,6 +34,10 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [messageText, setMessageText] = useState('');
   const [aiResponsePreviews, setAiResponsePreviews] = useState<Map<string, any>>(new Map());
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter hook
+  const { filters, updateFilter, clearFilters, hasActiveFilters, applyFilters } = useInboxFilters(profile?.id);
 
   const {
     conversations,
@@ -42,6 +49,11 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
     manualRefresh,
     setError
   } = useOptimizedInbox({ onLeadsRefresh });
+
+  // Apply filters to conversations
+  const filteredConversations = useMemo(() => {
+    return applyFilters(conversations);
+  }, [conversations, applyFilters]);
 
   // Single consolidated AI responses hook
   const { manualTrigger, isProcessing } = useAutoAIResponses({
@@ -168,12 +180,75 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
                 AI Enhanced
               </Badge>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className={hasActiveFilters ? 'bg-blue-50 border-blue-300' : ''}
+            >
+              <Filter className="h-4 w-4 mr-1" />
+              Filters
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  Active
+                </Badge>
+              )}
+            </Button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative mb-3">
+            <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
+            <Input
+              placeholder="Search conversations..."
+              value={filters.search}
+              onChange={(e) => updateFilter('search', e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Quick Filter Buttons */}
+          <div className="flex flex-wrap gap-2 mb-3">
+            <Button
+              variant={filters.unreadOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => updateFilter('unreadOnly', !filters.unreadOnly)}
+              className="text-xs"
+            >
+              Unread Only
+            </Button>
+            <Button
+              variant={filters.myLeadsOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => updateFilter('myLeadsOnly', !filters.myLeadsOnly)}
+              className="text-xs"
+            >
+              My Leads
+            </Button>
+            <Button
+              variant={filters.aiOptIn === true ? "default" : "outline"}
+              size="sm"
+              onClick={() => updateFilter('aiOptIn', filters.aiOptIn === true ? null : true)}
+              className="text-xs"
+            >
+              AI Enabled
+            </Button>
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="text-xs text-red-600"
+              >
+                Clear All
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-1">
               <Users className="h-4 w-4" />
-              <span>{conversations.length} conversations</span>
+              <span>{filteredConversations.length} of {conversations.length}</span>
             </div>
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
@@ -182,19 +257,43 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ use
           </div>
         </div>
 
+        {/* Advanced Filters Panel */}
+        {showFilters && (
+          <div className="border-b bg-gray-50">
+            <SmartFilters
+              filters={filters}
+              onFiltersChange={(newFilters) => {
+                Object.keys(newFilters).forEach(key => {
+                  updateFilter(key as keyof typeof filters, newFilters[key]);
+                });
+              }}
+              conversations={conversations}
+            />
+          </div>
+        )}
+
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : conversations.length === 0 ? (
+          ) : filteredConversations.length === 0 ? (
             <div className="text-center p-8 text-gray-500">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>No conversations found</p>
+              {hasActiveFilters ? (
+                <div>
+                  <p>No conversations match your filters</p>
+                  <Button variant="link" onClick={clearFilters} className="text-blue-600">
+                    Clear filters to see all conversations
+                  </Button>
+                </div>
+              ) : (
+                <p>No conversations found</p>
+              )}
             </div>
           ) : (
-            conversations.map((conversation) => {
+            filteredConversations.map((conversation) => {
               const hasPreview = aiResponsePreviews.has(conversation.leadId);
               
               return (
