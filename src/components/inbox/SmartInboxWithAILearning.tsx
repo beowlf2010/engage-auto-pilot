@@ -2,18 +2,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
 import { useInboxFilters } from '@/hooks/useInboxFilters';
+import { useRealtimeLearning } from '@/hooks/useRealtimeLearning';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, Users, Clock, Search, Filter, X, RefreshCw, Inbox, MessageSquare, User } from 'lucide-react';
+import { MessageCircle, Users, Clock, Search, Filter, X, RefreshCw, Inbox, MessageSquare, User, Brain, Sparkles } from 'lucide-react';
 import EnhancedConversationListItem from './EnhancedConversationListItem';
 import EnhancedMessageBubble from './EnhancedMessageBubble';
 import InventoryAwareMessageInput from './InventoryAwareMessageInput';
 import ConnectionStatusIndicator from './ConnectionStatusIndicator';
 import LeadContextPanel from './LeadContextPanel';
+import AILearningInsightsPanel from './AILearningInsightsPanel';
 import { ConversationListItem } from '@/types/conversation';
 import { toast } from '@/hooks/use-toast';
 
@@ -56,6 +58,18 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
     applyFilters
   } = useInboxFilters(profile?.id);
 
+  // NEW: AI Learning Integration
+  const {
+    learningInsights,
+    optimizationQueue,
+    loading: learningLoading,
+    isLearning,
+    trackMessageOutcome,
+    processOptimizationQueue,
+    submitRealtimeFeedback,
+    trackResponseReceived
+  } = useRealtimeLearning(selectedConversation?.leadId);
+
   // Apply filters to conversations
   const filteredConversations = useMemo(() => {
     let filtered = conversations;
@@ -86,12 +100,29 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
     updateFilter('search', searchQuery);
   }, [searchQuery, updateFilter]);
 
+  // NEW: Track when responses are received
+  useEffect(() => {
+    if (selectedConversation && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.direction === 'in') {
+        // Customer responded - track it for learning
+        const messageTime = new Date(lastMessage.sentAt);
+        const now = new Date();
+        const responseTimeHours = (now.getTime() - messageTime.getTime()) / (1000 * 60 * 60);
+        trackResponseReceived(responseTimeHours);
+      }
+    }
+  }, [messages, selectedConversation, trackResponseReceived]);
+
   const handleSendMessage = useCallback(async (messageContent: string) => {
     if (!selectedConversation || !messageContent.trim()) return;
 
     try {
       await sendMessage(selectedConversation.leadId, messageContent.trim());
       setMessageText('');
+      
+      // NEW: Track message outcome for AI learning
+      await trackMessageOutcome(messageContent.trim(), 'message_sent');
       
       toast({
         title: "Message Sent",
@@ -105,7 +136,27 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
         variant: "destructive"
       });
     }
-  }, [selectedConversation, sendMessage]);
+  }, [selectedConversation, sendMessage, trackMessageOutcome]);
+
+  // NEW: Handle message feedback for AI learning
+  const handleMessageFeedback = useCallback(async (
+    messageContent: string,
+    feedbackType: 'positive' | 'negative' | 'neutral',
+    rating?: number,
+    suggestions?: string
+  ) => {
+    if (!selectedConversation) return;
+    
+    try {
+      await submitRealtimeFeedback(messageContent, feedbackType, rating, suggestions);
+      toast({
+        title: "Feedback Submitted",
+        description: "Your feedback helps improve AI responses",
+      });
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+    }
+  }, [selectedConversation, submitRealtimeFeedback]);
 
   const handleConversationSelect = useCallback((conversation: ConversationListItem) => {
     setSelectedConversation(conversation);
@@ -180,8 +231,15 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
               <MessageCircle className="h-5 w-5 text-blue-600" />
               <h2 className="text-lg font-semibold">Smart Inbox</h2>
               <Badge variant="outline" className="bg-green-100 text-green-700">
+                <Brain className="h-3 w-3 mr-1" />
                 AI Learning
               </Badge>
+              {isLearning && (
+                <Badge variant="outline" className="bg-purple-100 text-purple-700 animate-pulse">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Learning
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -333,6 +391,12 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
                   <Badge variant="outline">
                     {selectedConversation.status}
                   </Badge>
+                  {learningInsights && (
+                    <Badge variant="outline" className="bg-purple-100 text-purple-700">
+                      <Brain className="h-3 w-3 mr-1" />
+                      AI Active
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -347,6 +411,7 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
                     leadName: selectedConversation.leadName,
                     vehicleInterest: selectedConversation.vehicleInterest
                   }}
+                  onFeedback={handleMessageFeedback}
                 />
               ))}
             </div>
@@ -375,15 +440,26 @@ const SmartInboxWithAILearning: React.FC<SmartInboxWithAILearningProps> = ({ onL
         )}
       </div>
 
-      {/* Right Sidebar - Lead Context Panel */}
+      {/* Right Sidebar - Lead Context Panel with AI Learning */}
       {selectedConversation && (
-        <div className="w-80 border-l bg-white">
+        <div className="w-80 border-l bg-white flex flex-col">
           <LeadContextPanel
             conversation={selectedConversation}
             onScheduleAppointment={() => {
               console.log('Schedule appointment for:', selectedConversation.leadName);
             }}
           />
+          
+          {/* AI Learning Insights Panel */}
+          <div className="border-t">
+            <AILearningInsightsPanel
+              leadId={selectedConversation.leadId}
+              insights={learningInsights}
+              optimizationQueue={optimizationQueue}
+              isLearning={isLearning}
+              onProcessOptimizations={processOptimizationQueue}
+            />
+          </div>
         </div>
       )}
     </div>

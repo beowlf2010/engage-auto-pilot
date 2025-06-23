@@ -1,122 +1,147 @@
 
-import React from 'react';
+import React, { useState } from 'react';
+import { format } from 'date-fns';
+import { Bot, ThumbsUp, ThumbsDown, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Clock, AlertTriangle, RefreshCw, Send } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { MessageData } from '@/types/conversation';
 
 interface EnhancedMessageBubbleProps {
-  message: MessageData;
-  isOptimistic?: boolean;
-  onRetry?: (messageId: string) => void;
-  className?: string;
+  message: MessageData & {
+    leadName?: string;
+    vehicleInterest?: string;
+  };
+  onRetry?: () => void;
+  onFeedback?: (
+    messageContent: string,
+    feedbackType: 'positive' | 'negative' | 'neutral',
+    rating?: number,
+    suggestions?: string
+  ) => void;
 }
 
-const EnhancedMessageBubble: React.FC<EnhancedMessageBubbleProps> = ({
-  message,
-  isOptimistic = false,
+const EnhancedMessageBubble: React.FC<EnhancedMessageBubbleProps> = ({ 
+  message, 
   onRetry,
-  className = ""
+  onFeedback 
 }) => {
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  
   const isOutgoing = message.direction === 'out';
-  const isFailed = message.smsStatus === 'failed' || message.smsStatus === 'error';
-  const isPending = message.smsStatus === 'sending' || message.smsStatus === 'pending';
-  const isSent = message.smsStatus === 'sent' || message.smsStatus === 'delivered';
-
+  const timestamp = new Date(message.sentAt);
+  
   const getStatusIcon = () => {
-    if (isFailed) return <AlertTriangle className="w-3 h-3 text-red-500" />;
-    if (isPending) return <Clock className="w-3 h-3 text-yellow-500" />;
-    if (isSent) return <CheckCircle className="w-3 h-3 text-green-500" />;
-    return null;
+    if (message.direction === 'in') {
+      return <CheckCircle className="w-3 h-3 text-green-500" />;
+    }
+    
+    switch (message.smsStatus) {
+      case 'sent':
+      case 'delivered':
+        return <CheckCircle className="w-3 h-3 text-green-500" />;
+      case 'pending':
+        return <Clock className="w-3 h-3 text-yellow-500 animate-pulse" />;
+      case 'failed':
+        return <AlertTriangle className="w-3 h-3 text-red-500" />;
+      default:
+        return <CheckCircle className="w-3 h-3 text-green-500" />;
+    }
   };
 
-  const getStatusText = () => {
-    if (isFailed) return "Failed";
-    if (isPending) return "Sending...";
-    if (isSent) return "Sent";
-    return "";
-  };
-
-  const formatTime = (timestamp: string) => {
-    try {
-      return new Date(timestamp).toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-    } catch {
-      return '';
+  const handleFeedback = (feedbackType: 'positive' | 'negative') => {
+    if (onFeedback) {
+      onFeedback(message.body, feedbackType);
+      setFeedbackSubmitted(true);
+      setShowFeedback(false);
     }
   };
 
   return (
-    <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-4 ${className}`}>
-      <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative ${
-        isOutgoing
-          ? isFailed 
-            ? 'bg-red-100 border border-red-300'
-            : isPending
-            ? 'bg-blue-100 border border-blue-300'
-            : 'bg-blue-500 text-white'
-          : 'bg-gray-200 text-gray-800'
-      } ${isOptimistic ? 'opacity-80' : ''}`}>
+    <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-4`}>
+      <div className={`max-w-xs lg:max-w-md relative ${
+        isOutgoing 
+          ? 'bg-blue-600 text-white rounded-l-lg rounded-tr-lg' 
+          : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg'
+      } px-4 py-2`}>
         
-        {/* Message content */}
-        <div className="text-sm mb-1">
+        {/* AI Generated Badge */}
+        {message.aiGenerated && (
+          <div className="flex items-center gap-1 mb-1">
+            <Bot className="w-3 h-3" />
+            <Badge variant="secondary" className="text-xs py-0 px-1">
+              AI Generated
+            </Badge>
+          </div>
+        )}
+        
+        {/* Message Text */}
+        <div className="break-words mb-2">
           {message.body}
         </div>
-
-        {/* Message footer with timestamp and status */}
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className={`${isOutgoing && !isFailed && !isPending ? 'text-blue-100' : 'text-gray-500'}`}>
-            {formatTime(message.sentAt)}
-            {message.aiGenerated && (
-              <Badge variant="outline" className="ml-1 text-xs">
-                AI
-              </Badge>
-            )}
-          </span>
-
-          {/* Status indicator for outgoing messages */}
-          {isOutgoing && (
-            <div className="flex items-center gap-1">
-              {getStatusIcon()}
-              {getStatusText() && (
-                <span className={`text-xs ${
-                  isFailed ? 'text-red-600' : 
-                  isPending ? 'text-yellow-600' : 
-                  'text-gray-500'
-                }`}>
-                  {getStatusText()}
-                </span>
-              )}
-            </div>
-          )}
+        
+        {/* Message Status and Timestamp */}
+        <div className={`flex items-center justify-between gap-2 ${
+          isOutgoing ? 'text-blue-100' : 'text-gray-500'
+        }`}>
+          <div className="text-xs">
+            {format(timestamp, 'HH:mm')}
+          </div>
+          <div className="flex items-center gap-1">
+            {getStatusIcon()}
+          </div>
         </div>
 
-        {/* Error message and retry button */}
-        {isFailed && message.smsError && (
-          <div className="mt-2 pt-2 border-t border-red-200">
-            <p className="text-xs text-red-600 mb-2">
-              {message.smsError}
-            </p>
-            {onRetry && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onRetry(message.id)}
-                className="h-6 px-2 text-xs bg-white"
-              >
-                <RefreshCw className="w-3 h-3 mr-1" />
-                Retry
-              </Button>
+        {/* AI Message Feedback for Outgoing AI Messages */}
+        {isOutgoing && message.aiGenerated && onFeedback && (
+          <div className="mt-2 pt-2 border-t border-blue-500/20">
+            {!feedbackSubmitted ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-blue-100">Rate this AI message:</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleFeedback('positive')}
+                  className="h-6 w-6 p-0 text-blue-100 hover:text-green-400 hover:bg-blue-700"
+                >
+                  <ThumbsUp className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleFeedback('negative')}
+                  className="h-6 w-6 p-0 text-blue-100 hover:text-red-400 hover:bg-blue-700"
+                >
+                  <ThumbsDown className="w-3 h-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <CheckCircle className="w-3 h-3 text-green-400" />
+                <span className="text-xs text-blue-100">Feedback submitted</span>
+              </div>
             )}
           </div>
         )}
 
-        {/* Optimistic indicator */}
-        {isOptimistic && isPending && (
-          <div className="absolute -top-1 -right-1">
-            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+        {/* Error State with Retry */}
+        {message.smsStatus === 'failed' && onRetry && (
+          <div className="mt-2 pt-2 border-t border-red-500/20">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-red-100">Failed to send</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onRetry}
+                className="h-6 text-xs text-red-100 hover:text-white hover:bg-red-600"
+              >
+                Retry
+              </Button>
+            </div>
+            {message.smsError && (
+              <p className="text-xs text-red-200 mt-1">{message.smsError}</p>
+            )}
           </div>
         )}
       </div>
