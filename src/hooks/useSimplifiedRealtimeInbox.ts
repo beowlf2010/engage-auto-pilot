@@ -39,6 +39,9 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
         .from('conversations')
         .select(`
           lead_id,
+          body,
+          direction,
+          sent_at,
           leads!inner(
             id,
             first_name,
@@ -53,10 +56,29 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
 
       if (error) throw error;
 
+      // Group conversations by lead_id and process
+      const conversationsByLead = new Map();
+      
+      data?.forEach((conv: any) => {
+        const leadId = conv.lead_id;
+        if (!conversationsByLead.has(leadId)) {
+          conversationsByLead.set(leadId, {
+            lead: conv.leads,
+            messages: []
+          });
+        }
+        conversationsByLead.get(leadId).messages.push({
+          body: conv.body,
+          direction: conv.direction,
+          sent_at: conv.sent_at
+        });
+      });
+
       // Process conversations with unread counts
       const processedConversations = await Promise.all(
-        data?.map(async (conv: any) => {
-          const lead = conv.leads;
+        Array.from(conversationsByLead.entries()).map(async ([leadId, convData]: [string, any]) => {
+          const lead = convData.lead;
+          const messages = convData.messages;
           const primaryPhone = lead.phone_numbers.find((p: any) => p.is_primary)?.number || 
                               lead.phone_numbers[0]?.number || '';
 
@@ -64,31 +86,32 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
           const { count: unreadCount } = await supabase
             .from('conversations')
             .select('*', { count: 'exact', head: true })
-            .eq('lead_id', lead.id)
+            .eq('lead_id', leadId)
             .eq('direction', 'in')
             .is('read_at', null);
 
-          // Get last message time
-          const { data: lastMessage } = await supabase
-            .from('conversations')
-            .select('sent_at')
-            .eq('lead_id', lead.id)
-            .order('sent_at', { ascending: false })
-            .limit(1)
-            .single();
+          // Get last message details
+          const lastMessage = messages[0] || { body: 'No messages', direction: null, sent_at: new Date().toISOString() };
+          const lastMessageDate = new Date(lastMessage.sent_at);
 
           return {
-            leadId: lead.id,
+            leadId,
             leadName: `${lead.first_name} ${lead.last_name}`.trim(),
+            primaryPhone,
             leadPhone: primaryPhone,
+            lastMessage: lastMessage.body,
+            lastMessageTime: lastMessageDate.toLocaleString(),
+            lastMessageDirection: lastMessage.direction as 'in' | 'out' | null,
+            unreadCount: unreadCount || 0,
+            messageCount: messages.length,
+            salespersonId: lead.salesperson_id,
             vehicleInterest: lead.vehicle_interest || 'No vehicle specified',
             status: lead.status || 'new',
-            salespersonId: lead.salesperson_id,
-            unreadCount: unreadCount || 0,
-            lastMessageTime: lastMessage?.sent_at ? 
-              new Date(lastMessage.sent_at).toLocaleString() : 'No messages'
-          };
-        }) || []
+            lastMessageDate,
+            aiOptIn: false,
+            leadSource: 'unknown'
+          } as ConversationListItem;
+        })
       );
 
       // Remove duplicates and sort
@@ -198,7 +221,7 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
         throw new Error(result.error || 'Failed to send message');
       }
 
-      // Remove optimistic message and refresh
+      // Remove optimistic message and refresh after successful send
       setTimeout(() => {
         optimisticMessagesRef.current.delete(leadId);
         loadMessages(leadId);
@@ -209,7 +232,7 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
     } catch (error) {
       console.error('❌ [SIMPLIFIED INBOX] Send message failed:', error);
       
-      // Update optimistic message to failed
+      // Update optimistic message to failed status
       const current = optimisticMessagesRef.current.get(leadId) || [];
       const updated = current.map(msg => 
         msg.smsStatus === 'sending' 
@@ -266,10 +289,13 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
       }, (payload) => {
         console.log('📨 [SIMPLIFIED INBOX] Real-time update:', payload.eventType);
         
+        // Handle different payload structures safely
+        const leadId = payload.new?.lead_id || payload.old?.lead_id;
+        
         // Debounced refresh
         setTimeout(() => {
           loadConversations();
-          if (payload.new?.lead_id === currentLeadRef.current) {
+          if (leadId === currentLeadRef.current) {
             loadMessages(currentLeadRef.current);
           }
           if (onLeadsRefresh) onLeadsRefresh();
