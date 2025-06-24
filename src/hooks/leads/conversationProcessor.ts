@@ -51,7 +51,7 @@ export const processConversations = (
   const outgoingCount = leadConversations.filter(c => c.direction === 'out').length;
   const incomingCount = leadConversations.filter(c => c.direction === 'in').length;
   const unreadCount = leadConversations.filter(c => c.direction === 'in' && !c.read_at).length;
-  const lastMessageDirection = latestConversation?.direction || null;
+  const lastMessageDirection = latestConversation?.direction as 'in' | 'out' | null || null;
 
   // Calculate unreplied count
   const chronologicalConversations = [...leadConversations].sort(
