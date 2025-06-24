@@ -1,7 +1,6 @@
-
 import React, { useCallback, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
 import { Upload, Plus, Trash2, AlertCircle, FileText } from 'lucide-react';
 import { useMultiFileLeadUpload } from '@/hooks/useMultiFileLeadUpload';
 import LeadFileQueue from './LeadFileQueue';
@@ -79,21 +78,18 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
     if (files && files.length > 0) {
       setFileErrors([]);
       
-      // Check for VIN Solutions files or unsupported formats
       const errors: string[] = [];
       const validFiles: File[] = [];
       
       Array.from(files).forEach(file => {
         const fileName = file.name.toLowerCase();
         
-        // Check if it looks like a VIN Solutions export
         if (fileName.includes('vinsolutions') || fileName.includes('vin_solutions') || 
             fileName.includes('message') && (fileName.includes('export') || fileName.includes('log'))) {
           errors.push(`"${file.name}" appears to be a VIN Solutions message export. Please use the Message Import feature instead.`);
           return;
         }
         
-        // Check file extension
         const validExtensions = ['.csv', '.xlsx', '.xls'];
         const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
         
@@ -124,7 +120,6 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
 
   const handleProcessAll = async () => {
     const result = await processBatch();
-    // Call onSuccess if ANY leads were successfully imported, not just when all files succeed
     if (result.successfulLeads > 0 && onSuccess) {
       onSuccess();
     }
@@ -139,7 +134,6 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
   };
 
   const handleViewLeads = () => {
-    // Trigger another refresh when user clicks "View Imported Leads"
     if (onSuccess) {
       onSuccess();
     }

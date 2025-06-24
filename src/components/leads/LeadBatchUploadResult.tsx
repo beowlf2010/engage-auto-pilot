@@ -1,10 +1,11 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, AlertTriangle, FileText, Users } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, AlertTriangle, XCircle, FileText, Users, Eye } from 'lucide-react';
 
-interface BatchLeadUploadResult {
+interface BatchUploadResult {
   totalFiles: number;
   successfulFiles: number;
   failedFiles: number;
@@ -21,107 +22,158 @@ interface BatchLeadUploadResult {
 }
 
 interface LeadBatchUploadResultProps {
-  result: BatchLeadUploadResult;
+  result: BatchUploadResult;
   onClose: () => void;
-  onViewLeads?: () => void;
+  onViewLeads: () => void;
 }
 
 const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUploadResultProps) => {
   const hasErrors = result.failedFiles > 0 || result.failedLeads > 0;
-  const hasDuplicates = result.duplicateLeads > 0;
-  
-  return (
-    <Card className={`${
-      hasErrors ? 'bg-red-50 border-red-200' : 
-      hasDuplicates ? 'bg-yellow-50 border-yellow-200' : 
-      'bg-green-50 border-green-200'
-    }`}>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          {hasErrors ? (
-            <AlertTriangle className="h-5 w-5 text-red-600" />
-          ) : (
-            <CheckCircle className="h-5 w-5 text-green-600" />
-          )}
-          <span className={hasErrors ? 'text-red-800' : hasDuplicates ? 'text-yellow-800' : 'text-green-800'}>
-            {hasErrors ? 'Batch upload completed with errors' : 
-             hasDuplicates ? 'Batch upload completed with duplicates' : 
-             'Batch upload completed successfully!'}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-white rounded-lg border">
-            <FileText className="h-6 w-6 mx-auto mb-1 text-blue-500" />
-            <div className="text-2xl font-bold text-gray-900">{result.totalFiles}</div>
-            <div className="text-xs text-gray-600">Total Files</div>
-          </div>
-          
-          <div className="text-center p-3 bg-white rounded-lg border">
-            <Users className="h-6 w-6 mx-auto mb-1 text-green-500" />
-            <div className="text-2xl font-bold text-gray-900">{result.successfulLeads}</div>
-            <div className="text-xs text-gray-600">Leads Imported</div>
-          </div>
-          
-          {result.failedLeads > 0 && (
-            <div className="text-center p-3 bg-white rounded-lg border">
-              <AlertTriangle className="h-6 w-6 mx-auto mb-1 text-red-500" />
-              <div className="text-2xl font-bold text-gray-900">{result.failedLeads}</div>
-              <div className="text-xs text-gray-600">Failed Leads</div>
-            </div>
-          )}
-          
-          {result.duplicateLeads > 0 && (
-            <div className="text-center p-3 bg-white rounded-lg border">
-              <AlertTriangle className="h-6 w-6 mx-auto mb-1 text-yellow-500" />
-              <div className="text-2xl font-bold text-gray-900">{result.duplicateLeads}</div>
-              <div className="text-xs text-gray-600">Duplicates Skipped</div>
-            </div>
-          )}
-        </div>
+  const hasSuccesses = result.successfulFiles > 0 && result.successfulLeads > 0;
 
-        {/* File Results */}
-        <div className="space-y-2">
-          <h4 className="font-medium text-gray-900">File Processing Results:</h4>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {result.results.map((file, index) => (
-              <div key={index} className="flex items-center justify-between p-2 bg-white rounded border text-sm">
-                <div className="flex items-center space-x-2">
-                  {file.status === 'success' ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                  )}
-                  <span className="font-medium truncate">{file.fileName}</span>
+  return (
+    <div className="space-y-6">
+      {/* Overall Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            {hasErrors && !hasSuccesses ? (
+              <XCircle className="h-5 w-5 text-red-500" />
+            ) : hasErrors ? (
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+            ) : (
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            )}
+            <span>
+              {hasErrors && !hasSuccesses 
+                ? 'Upload Failed' 
+                : hasErrors 
+                ? 'Upload Completed with Issues' 
+                : 'Upload Completed Successfully'
+              }
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{result.totalFiles}</div>
+              <div className="text-sm text-gray-600">Total Files</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{result.successfulLeads}</div>
+              <div className="text-sm text-gray-600">Leads Imported</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">{result.duplicateLeads}</div>
+              <div className="text-sm text-gray-600">Duplicates Skipped</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">{result.failedFiles}</div>
+              <div className="text-sm text-gray-600">Failed Files</div>
+            </div>
+          </div>
+
+          {hasSuccesses && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+              <div className="flex items-center space-x-2 text-green-800">
+                <CheckCircle className="h-4 w-4" />
+                <span className="font-medium">
+                  Successfully imported {result.successfulLeads} leads from {result.successfulFiles} files
+                </span>
+              </div>
+            </div>
+          )}
+
+          {hasErrors && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2 text-red-800">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="font-medium">
+                  {result.failedFiles} files failed to process
+                </span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* File-by-File Results */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <FileText className="h-5 w-5" />
+            <span>File Processing Details</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {result.results.map((fileResult, index) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    {fileResult.status === 'success' ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <FileText className="h-4 w-4 text-gray-400" />
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {fileResult.fileName}
+                    </p>
+                    {fileResult.status === 'success' && fileResult.records && (
+                      <p className="text-xs text-green-600">
+                        {fileResult.records} leads imported
+                      </p>
+                    )}
+                    {fileResult.status === 'error' && fileResult.error && (
+                      <p className="text-xs text-red-600">
+                        {fileResult.error}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-600">
-                  {file.status === 'success' ? (
-                    `${file.records} leads imported`
-                  ) : (
-                    file.error || 'Failed'
-                  )}
+
+                <div>
+                  <Badge 
+                    variant={fileResult.status === 'success' ? 'default' : 'destructive'}
+                    className={fileResult.status === 'success' ? 'bg-green-100 text-green-700' : ''}
+                  >
+                    {fileResult.status === 'success' ? 'Success' : 'Failed'}
+                  </Badge>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Actions */}
-        <div className="flex justify-end space-x-2">
+      {/* Actions */}
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-gray-600">
+          <div className="flex items-center space-x-4">
+            <span>✓ Duplicate detection applied</span>
+            <span>✓ AI strategy calculated</span>
+            <span>✓ Upload history tracked</span>
+          </div>
+        </div>
+        
+        <div className="flex space-x-2">
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
-          {result.successfulLeads > 0 && (
-            <Button onClick={onViewLeads || onClose}>
+          {hasSuccesses && (
+            <Button onClick={onViewLeads} className="bg-blue-600 hover:bg-blue-700">
+              <Users className="h-4 w-4 mr-2" />
               View Imported Leads
             </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

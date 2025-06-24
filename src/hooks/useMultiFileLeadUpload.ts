@@ -1,8 +1,11 @@
 
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from '@/hooks/use-toast';
+import { parseEnhancedInventoryFile } from '@/utils/enhancedFileParsingUtils';
+import { processLeadsEnhanced } from '@/components/upload-leads/enhancedProcessLeads';
+import { insertLeadsToDatabase } from '@/utils/supabaseLeadOperations';
+import { parseCSV } from '@/components/upload-leads/csvParsingUtils';
 
 interface QueuedFile {
   id: string;
@@ -27,6 +30,36 @@ interface BatchUploadResult {
     error?: string;
   }>;
 }
+
+// Default field mapping for lead files
+const DEFAULT_LEAD_MAPPING = {
+  firstName: 'first_name',
+  lastName: 'last_name',
+  middleName: 'middle_name',
+  email: 'email',
+  emailAlt: 'email_alt',
+  cellphone: 'cellphone',
+  dayphone: 'dayphone',
+  evephone: 'evephone',
+  address: 'address',
+  city: 'city',
+  state: 'state',
+  postalCode: 'postal_code',
+  vehicleYear: 'vehicle_year',
+  vehicleMake: 'vehicle_make',
+  vehicleModel: 'vehicle_model',
+  vehicleVIN: 'vehicle_vin',
+  source: 'source',
+  status: 'status',
+  salesPersonFirstName: 'salesperson_first_name',
+  salesPersonLastName: 'salesperson_last_name',
+  doNotCall: 'do_not_call',
+  doNotEmail: 'do_not_email',
+  doNotMail: 'do_not_mail',
+  leadstatustypename: 'lead_status_type_name',
+  LeadTypeName: 'lead_type_name',
+  leadsourcename: 'lead_source_name'
+};
 
 export const useMultiFileLeadUpload = () => {
   const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
@@ -62,118 +95,67 @@ export const useMultiFileLeadUpload = () => {
         f.id === queuedFile.id ? { ...f, status: 'processing' } : f
       ));
 
-      const formData = new FormData();
-      formData.append('file', queuedFile.file);
-
-      const response = await fetch('/api/upload-leads', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Upload failed: ${errorText}`);
+      // Parse the file using existing enhanced parsing
+      let parsedData;
+      try {
+        if (queuedFile.file.name.toLowerCase().endsWith('.csv')) {
+          const text = await queuedFile.file.text();
+          parsedData = parseCSV(text);
+        } else {
+          // For Excel files, use the enhanced parser
+          parsedData = await parseEnhancedInventoryFile(queuedFile.file);
+        }
+      } catch (parseError) {
+        throw new Error(`File parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`);
       }
 
-      const result = await response.json();
-      
-      if (result.success && result.leads && result.leads.length > 0) {
-        // Insert leads into database with AI strategy calculation
-        const { data: insertedLeads, error: insertError } = await supabase
-          .from('leads')
-          .insert(
-            result.leads.map((lead: any) => ({
-              first_name: lead.firstName,
-              last_name: lead.lastName,
-              middle_name: lead.middleName,
-              email: lead.email,
-              email_alt: lead.emailAlt,
-              address: lead.address,
-              city: lead.city,
-              state: lead.state,
-              postal_code: lead.postalCode,
-              vehicle_interest: lead.vehicleInterest,
-              vehicle_vin: lead.vehicleVIN,
-              source: lead.source,
-              status: lead.status,
-              do_not_call: lead.doNotCall,
-              do_not_email: lead.doNotEmail,
-              do_not_mail: lead.doNotMail,
-              salesperson_id: profile?.id,
-              // New lead factors for AI strategy
-              lead_status_type_name: lead.leadStatusTypeName,
-              lead_type_name: lead.leadTypeName,
-              lead_source_name: lead.leadSourceName || lead.source,
-            }))
-          )
-          .select('id, lead_status_type_name, lead_type_name, lead_source_name');
-
-        if (insertError) {
-          console.error('❌ [MULTI UPLOAD] Database insert error:', insertError);
-          throw new Error(`Database insert failed: ${insertError.message}`);
-        }
-
-        // Insert phone numbers for each lead
-        if (insertedLeads && insertedLeads.length > 0) {
-          const phoneNumberInserts: any[] = [];
-          
-          insertedLeads.forEach((insertedLead, index) => {
-            const leadData = result.leads[index];
-            if (leadData.phoneNumbers && leadData.phoneNumbers.length > 0) {
-              leadData.phoneNumbers.forEach((phone: any) => {
-                phoneNumberInserts.push({
-                  lead_id: insertedLead.id,
-                  number: phone.number,
-                  type: phone.type,
-                  priority: phone.priority,
-                  status: phone.status,
-                  is_primary: phone.isPrimary
-                });
-              });
-            }
-          });
-
-          if (phoneNumberInserts.length > 0) {
-            const { error: phoneError } = await supabase
-              .from('phone_numbers')
-              .insert(phoneNumberInserts);
-
-            if (phoneError) {
-              console.error('❌ [MULTI UPLOAD] Phone numbers insert error:', phoneError);
-              // Don't fail the whole upload for phone number errors
-            }
-          }
-
-          // Trigger AI strategy calculation for each lead that has factors
-          for (const insertedLead of insertedLeads) {
-            if (insertedLead.lead_status_type_name || insertedLead.lead_type_name || insertedLead.lead_source_name) {
-              try {
-                await supabase.rpc('calculate_ai_strategy_for_lead', {
-                  p_lead_id: insertedLead.id,
-                  p_lead_status_type_name: insertedLead.lead_status_type_name,
-                  p_lead_type_name: insertedLead.lead_type_name,
-                  p_lead_source_name: insertedLead.lead_source_name
-                });
-                console.log(`✅ [MULTI UPLOAD] AI strategy calculated for lead ${insertedLead.id}`);
-              } catch (error) {
-                console.error('❌ [MULTI UPLOAD] AI strategy calculation error:', error);
-                // Don't fail the upload for AI strategy errors
-              }
-            }
-          }
-        }
-
-        console.log(`✅ [MULTI UPLOAD] Successfully processed ${result.leads.length} leads from ${queuedFile.file.name}`);
-        
-        // Update file status to completed
-        setQueuedFiles(prev => prev.map(f => 
-          f.id === queuedFile.id ? { ...f, status: 'completed', result } : f
-        ));
-
-        return { success: true, records: result.leads.length };
-      } else {
-        throw new Error(result.error || 'No leads processed');
+      if (!parsedData || !parsedData.rows || parsedData.rows.length === 0) {
+        throw new Error('No data found in file or file is empty');
       }
+
+      console.log(`📊 [MULTI UPLOAD] Parsed ${parsedData.rows.length} rows from ${queuedFile.file.name}`);
+
+      // Process leads using enhanced processing with upload history
+      const processingResult = await processLeadsEnhanced(
+        parsedData,
+        DEFAULT_LEAD_MAPPING,
+        queuedFile.file.name,
+        queuedFile.file.size,
+        queuedFile.file.type || 'application/octet-stream'
+      );
+
+      console.log(`⚙️ [MULTI UPLOAD] Processed ${processingResult.validLeads.length} valid leads, ${processingResult.duplicates.length} duplicates, ${processingResult.errors.length} errors`);
+
+      if (processingResult.validLeads.length === 0) {
+        throw new Error(`No valid leads found. ${processingResult.errors.length} processing errors, ${processingResult.duplicates.length} duplicates detected.`);
+      }
+
+      // Insert leads to database using existing enhanced insertion
+      const insertResult = await insertLeadsToDatabase(
+        processingResult.validLeads,
+        processingResult.uploadHistoryId
+      );
+
+      console.log(`💾 [MULTI UPLOAD] Database insertion: ${insertResult.successfulInserts} successful, ${insertResult.errors.length} errors`);
+
+      // Update file status to completed
+      setQueuedFiles(prev => prev.map(f => 
+        f.id === queuedFile.id ? { 
+          ...f, 
+          status: 'completed', 
+          result: {
+            totalRows: parsedData.rows.length,
+            successfulImports: insertResult.successfulInserts,
+            errors: insertResult.errors.length,
+            duplicates: insertResult.duplicates.length + processingResult.duplicates.length
+          }
+        } : f
+      ));
+
+      return { 
+        success: true, 
+        records: insertResult.successfulInserts 
+      };
 
     } catch (error) {
       console.error(`❌ [MULTI UPLOAD] Error processing ${queuedFile.file.name}:`, error);
@@ -192,6 +174,10 @@ export const useMultiFileLeadUpload = () => {
   const processBatch = async (): Promise<BatchUploadResult> => {
     if (queuedFiles.length === 0) {
       throw new Error('No files to process');
+    }
+
+    if (!profile) {
+      throw new Error('User profile not found. Please ensure you are logged in.');
     }
 
     setProcessing(true);
@@ -231,7 +217,7 @@ export const useMultiFileLeadUpload = () => {
           });
         }
 
-        // Add a small delay between files to prevent rate limiting
+        // Add a small delay between files to prevent overwhelming the system
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
