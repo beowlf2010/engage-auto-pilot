@@ -2,11 +2,12 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Search, Zap } from 'lucide-react';
+import { Upload, Search, Zap, FileSpreadsheet } from 'lucide-react';
 
 interface LeadsPageHeaderProps {
   canImport: boolean;
   onVINImportClick: () => void;
+  onLeadUploadClick: () => void;
   onFreshLeadsClick: () => void;
   searchTerm?: string;
   onSearchChange?: (term: string) => void;
@@ -14,7 +15,8 @@ interface LeadsPageHeaderProps {
 
 const LeadsPageHeader = ({ 
   canImport, 
-  onVINImportClick, 
+  onVINImportClick,
+  onLeadUploadClick,
   onFreshLeadsClick,
   searchTerm = '',
   onSearchChange
@@ -49,13 +51,25 @@ const LeadsPageHeader = ({
         )}
 
         {canImport && (
-          <Button
-            onClick={onVINImportClick}
-            className="flex items-center gap-2"
-          >
-            <Upload className="w-4 h-4" />
-            Import VINs
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={onLeadUploadClick}
+              className="flex items-center gap-2"
+              variant="default"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Upload Leads
+            </Button>
+            
+            <Button
+              onClick={onVINImportClick}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Import VINs
+            </Button>
+          </div>
         )}
       </div>
     </div>

@@ -79,13 +79,14 @@ const LeadsList = () => {
         </div>
       </div>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
       <LeadsPageHeader 
         canImport={canImport}
         onVINImportClick={() => setIsVINImportModalOpen(true)}
+        onLeadUploadClick={() => setIsMultiFileModalOpen(true)}
         onFreshLeadsClick={handleFreshLeadsClick}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
