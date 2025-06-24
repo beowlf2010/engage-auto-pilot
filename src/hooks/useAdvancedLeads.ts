@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { Lead } from '@/types/lead';
 import { useLeads } from '@/hooks/useLeads';
@@ -25,7 +26,7 @@ export interface SavedPreset {
 }
 
 export const useAdvancedLeads = () => {
-  const { leads, loading, error, loadingProgress, refetch, retry } = useLeads();
+  const { leads, loading, error, refetch } = useLeads();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>([]);
@@ -268,7 +269,7 @@ export const useAdvancedLeads = () => {
     leads: filteredLeads,
     loading,
     error,
-    loadingProgress,
+    loadingProgress: 0, // Add default value for compatibility
     selectedLeads,
     quickViewLead,
     savedPresets,
@@ -287,7 +288,7 @@ export const useAdvancedLeads = () => {
     showQuickView,
     hideQuickView,
     refetch,
-    retry,
+    retry: refetch, // Map refetch to retry for compatibility
     
     // Utilities
     getEngagementScore

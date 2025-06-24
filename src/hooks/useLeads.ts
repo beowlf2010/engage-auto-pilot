@@ -37,10 +37,17 @@ export const useLeads = () => {
       const transformedLeads: Lead[] = data?.map(lead => {
         // Get primary phone number
         const primaryPhone = lead.phone_numbers?.find((p: any) => p.is_primary)?.number || 
-                            lead.phone_numbers?.[0]?.number || null;
+                            lead.phone_numbers?.[0]?.number || '';
 
-        // Get all phone numbers for the lead
-        const phoneNumbers = lead.phone_numbers || [];
+        // Transform phone numbers to match PhoneNumber interface
+        const phoneNumbers = lead.phone_numbers?.map((phone: any) => ({
+          id: phone.id,
+          number: phone.number,
+          type: phone.type as 'cell' | 'day' | 'eve',
+          priority: phone.priority,
+          status: phone.status as 'active' | 'failed' | 'opted_out',
+          isPrimary: phone.is_primary,
+        })) || [];
 
         const transformedLead: Lead = {
           id: lead.id,
@@ -58,15 +65,15 @@ export const useLeads = () => {
           vehicleInterest: lead.vehicle_interest || '',
           vehicleVIN: lead.vehicle_vin || '',
           source: lead.source || 'Unknown',
-          status: lead.status || 'new',
-          contactStatus: lead.contact_status || 'no_contact',
+          status: (lead.status as 'new' | 'engaged' | 'paused' | 'closed' | 'lost') || 'new',
+          contactStatus: (lead.contact_status as 'no_contact' | 'contact_attempted' | 'response_received') || 'no_contact',
           salesPersonName: [lead.salesperson_first_name, lead.salesperson_last_name].filter(Boolean).join(' ') || '',
           doNotCall: lead.do_not_call || false,
           doNotEmail: lead.do_not_email || false,
           doNotMail: lead.do_not_mail || false,
           aiOptIn: lead.ai_opt_in || false,
           aiSequencePaused: lead.ai_sequence_paused || false,
-          messageIntensity: lead.message_intensity || 'gentle',
+          messageIntensity: (lead.message_intensity as 'gentle' | 'standard' | 'aggressive') || 'gentle',
           aiMessagesSent: lead.ai_messages_sent || 0,
           aiStage: lead.ai_stage || null,
           aiStrategyBucket: lead.ai_strategy_bucket || null,
@@ -80,14 +87,20 @@ export const useLeads = () => {
           lastMessage: null,
           lastMessageTime: null,
           lastMessageDirection: null,
-          // Engagement metrics
+          // Engagement metrics with fallbacks
           incomingCount: lead.incoming_count || 0,
           outgoingCount: lead.outgoing_count || 0,
           unrepliedCount: lead.unreplied_count || 0,
           // Enhanced AI strategy fields - now properly mapped from database
           leadTypeName: lead.lead_type_name || null,
           leadStatusTypeName: lead.lead_status_type_name || null,
-          leadSourceName: lead.lead_source_name || null
+          leadSourceName: lead.lead_source_name || null,
+          // Required Lead properties for compatibility
+          salesperson: [lead.salesperson_first_name, lead.salesperson_last_name].filter(Boolean).join(' ') || '',
+          salespersonId: lead.salesperson_id || '',
+          first_name: lead.first_name || '',
+          last_name: lead.last_name || '',
+          created_at: lead.created_at,
         };
 
         // Log AI strategy fields for debugging
@@ -113,10 +126,16 @@ export const useLeads = () => {
     queryClient.invalidateQueries({ queryKey: ['leads'] });
   };
 
+  const refetch = () => {
+    return queryClient.invalidateQueries({ queryKey: ['leads'] });
+  };
+
   return {
     leads,
+    loading: isLoading, // Map isLoading to loading for compatibility
     isLoading,
     error,
-    invalidateLeads
+    invalidateLeads,
+    refetch
   };
 };
