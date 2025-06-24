@@ -1,8 +1,10 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
 import { useLeadFilters } from '@/hooks/useLeadFilters';
+import { Lead } from '@/types/lead';
 import LeadsPageHeader from './leads/LeadsPageHeader';
 import ProcessManagementPanel from './leads/ProcessManagementPanel';
 import MultiFileLeadUploadModal from './leads/MultiFileLeadUploadModal';
@@ -14,6 +16,7 @@ import ShowHiddenLeadsToggle from './leads/ShowHiddenLeadsToggle';
 
 const LeadsList = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [isVINImportModalOpen, setIsVINImportModalOpen] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [isMultiFileModalOpen, setIsMultiFileModalOpen] = useState(false);
@@ -30,7 +33,9 @@ const LeadsList = () => {
     showHidden, 
     setShowHidden, 
     hiddenCount,
-    toggleLeadHidden 
+    toggleLeadHidden,
+    updateAiOptIn,
+    updateDoNotContact
   } = useLeads();
 
   // Use filters hook
@@ -64,6 +69,10 @@ const LeadsList = () => {
         ? prev.filter(id => id !== leadId)
         : [...prev, leadId]
     );
+  };
+
+  const handleLeadClick = (lead: Lead) => {
+    navigate(`/leads/${lead.id}`);
   };
 
   const handleProcessAssigned = () => {
@@ -136,6 +145,9 @@ const LeadsList = () => {
           onLeadSelect={handleLeadSelect}
           searchTerm={searchTerm}
           onToggleHidden={toggleLeadHidden}
+          onLeadClick={handleLeadClick}
+          onAiOptInChange={updateAiOptIn}
+          onDoNotContactChange={updateDoNotContact}
         />
       )}
 

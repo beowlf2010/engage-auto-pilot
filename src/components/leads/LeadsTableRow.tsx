@@ -63,6 +63,11 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
 
   const doNotContactReasons = getDoNotContactReasons();
 
+  const handleNameClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onQuickView(lead);
+  };
+
   return (
     <TableRow 
       className={`hover:bg-gray-50 ${isFresh ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''} ${
@@ -94,7 +99,10 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
             </Badge>
           )}
           <div>
-            <div className="font-medium">
+            <div 
+              className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer hover:underline"
+              onClick={handleNameClick}
+            >
               {lead.firstName} {lead.lastName}
             </div>
             <div className="text-sm text-gray-500">

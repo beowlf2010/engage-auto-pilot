@@ -16,6 +16,9 @@ interface LeadsTableWithSelectionProps {
   onLeadSelect: (leadId: string) => void;
   searchTerm?: string;
   onToggleHidden?: (leadId: string, hidden: boolean) => void;
+  onLeadClick?: (lead: Lead) => void;
+  onAiOptInChange?: (leadId: string, value: boolean) => void;
+  onDoNotContactChange?: (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => void;
 }
 
 const LeadsTableWithSelection = ({
@@ -24,7 +27,10 @@ const LeadsTableWithSelection = ({
   selectedLeads,
   onLeadSelect,
   searchTerm = "",
-  onToggleHidden
+  onToggleHidden,
+  onLeadClick,
+  onAiOptInChange,
+  onDoNotContactChange
 }: LeadsTableWithSelectionProps) => {
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -76,10 +82,10 @@ const LeadsTableWithSelection = ({
                 lead={lead}
                 selectedLeads={selectedLeads}
                 onLeadSelect={onLeadSelect}
-                onAiOptInChange={() => {}} // Not needed for process management
-                onDoNotContactChange={() => {}} // Not needed for process management
+                onAiOptInChange={onAiOptInChange || (() => {})}
+                onDoNotContactChange={onDoNotContactChange || (() => {})}
                 canEdit={true}
-                onQuickView={() => {}} // Not needed for process management
+                onQuickView={onLeadClick || (() => {})}
                 getEngagementScore={getEngagementScore}
                 isFresh={isFresh}
                 onToggleHidden={onToggleHidden}
