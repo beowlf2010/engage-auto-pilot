@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +20,7 @@ interface StreamlinedLeadDetailProps {
   showMessageComposer: boolean;
   setShowMessageComposer: (show: boolean) => void;
   onPhoneSelect: (phone: any) => void;
+  onStatusChanged?: () => void;
 }
 
 const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
@@ -31,7 +31,8 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
   primaryPhone,
   showMessageComposer,
   setShowMessageComposer,
-  onPhoneSelect
+  onPhoneSelect,
+  onStatusChanged
 }) => {
   const { messages, messagesLoading, loadMessages } = useConversationData();
   const { profile } = useAuth();
@@ -120,6 +121,8 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
   // Use the messages from the conversation hook if available, otherwise use lead conversations
   const conversationMessages = messages.length > 0 ? messages : lead.conversations;
 
+  const isLeadClosed = lead.status === 'closed' || lead.status === 'lost';
+
   return (
     <div className="h-[calc(100vh-8rem)] flex space-x-6">
       {/* Main Chat Area - matches inbox layout */}
@@ -139,16 +142,26 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
           newMessage={newMessage}
           setNewMessage={setNewMessage}
           onSendMessage={handleSendMessage}
-          isSending={isSending}
+          isSending={isSending || isLeadClosed}
           unreadCount={transformedLead.unreadCount}
         />
+        
+        {isLeadClosed && (
+          <div className="bg-gray-100 border rounded-lg p-4 text-center">
+            <p className="text-gray-600">
+              This lead has been marked as <strong>{lead.status === 'closed' ? 'SOLD' : 'LOST'}</strong>. 
+              Messaging has been disabled.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Right Sidebar - Enhanced with Process Selection */}
+      {/* Right Sidebar - Enhanced with Process Selection and Status Actions */}
       <LeadDetailSidebar
         lead={lead}
         onAIOptInChange={handleAIOptInChange}
         onMessageSent={() => loadMessages(lead.id)}
+        onStatusChanged={onStatusChanged}
       />
     </div>
   );

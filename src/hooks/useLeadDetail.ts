@@ -26,11 +26,19 @@ export const useLeadDetail = () => {
     enabled: !!leadId,
   });
 
-  // Function to refresh lead data (useful after sending messages)
+  // Function to refresh lead data (useful after sending messages or status changes)
   const refreshLeadData = () => {
     if (leadId) {
       queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+      // Also invalidate the leads list if needed
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
     }
+  };
+
+  // Handle status changes (sold/lost)
+  const handleStatusChanged = () => {
+    console.log('Lead status changed, refreshing data...');
+    refreshLeadData();
   };
 
   // Transform phone numbers for PhoneNumberDisplay component (PhoneNumber interface)
@@ -114,6 +122,7 @@ export const useLeadDetail = () => {
     showMessageComposer,
     setShowMessageComposer,
     handlePhoneSelect,
-    refreshLeadData
+    refreshLeadData,
+    handleStatusChanged
   };
 };

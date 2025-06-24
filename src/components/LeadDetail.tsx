@@ -14,7 +14,8 @@ const LeadDetail = () => {
     error,
     showMessageComposer,
     setShowMessageComposer,
-    handlePhoneSelect
+    handlePhoneSelect,
+    handleStatusChanged
   } = useLeadDetail();
 
   if (isLoading) {
@@ -51,6 +52,7 @@ const LeadDetail = () => {
           showMessageComposer={showMessageComposer}
           setShowMessageComposer={setShowMessageComposer}
           onPhoneSelect={handlePhoneSelect}
+          onStatusChanged={handleStatusChanged}
         />
       </div>
     </div>

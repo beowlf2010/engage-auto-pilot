@@ -7,18 +7,21 @@ import { Brain, Settings, Target, MessageSquare, User, Phone, Mail, Calendar } f
 import { format } from 'date-fns';
 import EnhancedProcessSelector from '@/components/processes/EnhancedProcessSelector';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import LeadStatusActions from '@/components/leads/detail/LeadStatusActions';
 import type { LeadDetailData } from '@/services/leadDetailService';
 
 interface LeadDetailSidebarProps {
   lead: LeadDetailData;
   onAIOptInChange: (enabled: boolean) => void;
   onMessageSent: () => void;
+  onStatusChanged?: () => void;
 }
 
 const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   lead,
   onAIOptInChange,
-  onMessageSent
+  onMessageSent,
+  onStatusChanged
 }) => {
   const [showProcessSelector, setShowProcessSelector] = useState(false);
 
@@ -28,8 +31,21 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
     onMessageSent(); // Refresh data
   };
 
+  const handleStatusChanged = () => {
+    if (onStatusChanged) {
+      onStatusChanged();
+    }
+    onMessageSent(); // Also refresh message data
+  };
+
   return (
     <div className="w-80 space-y-4">
+      {/* Lead Status Actions Card */}
+      <LeadStatusActions
+        lead={lead}
+        onStatusChanged={handleStatusChanged}
+      />
+
       {/* Enhanced Process Card */}
       <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50">
         <CardHeader className="pb-3">
@@ -51,7 +67,10 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
 
           <Sheet open={showProcessSelector} onOpenChange={setShowProcessSelector}>
             <SheetTrigger asChild>
-              <Button className="w-full bg-purple-600 hover:bg-purple-700">
+              <Button 
+                className="w-full bg-purple-600 hover:bg-purple-700"
+                disabled={lead.status === 'closed' || lead.status === 'lost'}
+              >
                 <Target className="h-4 w-4 mr-2" />
                 Assign Enhanced Process
               </Button>
@@ -199,9 +218,16 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
             size="sm" 
             className="w-full"
             onClick={() => onAIOptInChange(!lead.aiOptIn)}
+            disabled={lead.status === 'closed' || lead.status === 'lost'}
           >
             {lead.aiOptIn ? 'Disable' : 'Enable'} AI
           </Button>
+          
+          {(lead.status === 'closed' || lead.status === 'lost') && (
+            <div className="text-xs text-gray-500 text-center">
+              AI controls disabled for {lead.status} leads
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
