@@ -112,7 +112,7 @@ export const transformLeadData = (leadData: LeadData, conversationsData: Convers
     aiSequencePaused: leadData.ai_sequence_paused || false,
     aiPauseReason: leadData.ai_pause_reason || undefined,
     aiResumeAt: leadData.ai_resume_at || undefined,
-    // New unified AI strategy fields
+    // Enhanced unified AI strategy fields - ensuring proper fallbacks
     leadStatusTypeName: leadData.lead_status_type_name || undefined,
     leadTypeName: leadData.lead_type_name || undefined,
     leadSourceName: leadData.lead_source_name || undefined,
