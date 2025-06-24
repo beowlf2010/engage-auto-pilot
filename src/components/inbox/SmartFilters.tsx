@@ -13,6 +13,7 @@ interface SmartFiltersProps {
     aiOptIn: boolean | null;
     priority: string | null;
     assigned: string | null;
+    messageDirection: string | null;
   };
   onFiltersChange: (filters: any) => void;
   conversations: any[];
@@ -45,13 +46,15 @@ const SmartFilters = ({
       status: [],
       aiOptIn: null,
       priority: null,
-      assigned: null
+      assigned: null,
+      messageDirection: null
     });
     if (onClearFilters) onClearFilters();
   };
 
   const localHasActiveFilters = filters.status.length > 0 || filters.aiOptIn !== null || 
-                                filters.priority !== null || filters.assigned !== null;
+                                filters.priority !== null || filters.assigned !== null ||
+                                filters.messageDirection !== null;
 
   const hiddenCount = conversations.length - filteredConversations.length;
 
@@ -83,7 +86,7 @@ const SmartFilters = ({
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-5 gap-4">
             {/* Lead Status Filter */}
             <div>
               <label className="text-xs font-medium text-slate-600 mb-2 block">Status</label>
@@ -132,6 +135,22 @@ const SmartFilters = ({
               </Select>
             </div>
 
+            {/* Message Direction Filter - NEW */}
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-2 block">Message Direction</label>
+              <Select onValueChange={(value) => updateFilter('messageDirection', value === 'all' ? null : value)}>
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="All messages" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All messages</SelectItem>
+                  <SelectItem value="inbound">All Inbound</SelectItem>
+                  <SelectItem value="outbound">All Outbound</SelectItem>
+                  <SelectItem value="needs_response">Needs Response</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Assignment Filter */}
             <div>
               <label className="text-xs font-medium text-slate-600 mb-2 block">Assignment</label>
@@ -169,6 +188,12 @@ const SmartFilters = ({
                 <Badge variant="secondary" className="text-xs">
                   Assignment: {filters.assigned}
                   <X className="h-3 w-3 ml-1 cursor-pointer" onClick={() => updateFilter('assigned', null)} />
+                </Badge>
+              )}
+              {filters.messageDirection && (
+                <Badge variant="secondary" className="text-xs">
+                  Direction: {filters.messageDirection}
+                  <X className="h-3 w-3 ml-1 cursor-pointer" onClick={() => updateFilter('messageDirection', null)} />
                 </Badge>
               )}
             </div>

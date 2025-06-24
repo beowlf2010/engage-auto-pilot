@@ -61,13 +61,29 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
     // Apply advanced filters
     filtered = applyFilters(filtered);
 
+    // Debug logging for unread messages
+    const unreadFiltered = filtered.filter(c => c.unreadCount > 0);
+    console.log('🔍 [CONSOLIDATED SMART INBOX] Filter debug:', {
+      totalConversations: conversations.length,
+      afterSearchFilter: filtered.length,
+      unreadInFiltered: unreadFiltered.length,
+      unreadConversations: unreadFiltered.map(c => ({
+        leadId: c.leadId,
+        leadName: c.leadName,
+        unreadCount: c.unreadCount,
+        lastMessage: c.lastMessage,
+        lastMessageDirection: c.lastMessageDirection
+      })),
+      currentFilters: filters
+    });
+
     // Sort by newest first (most recent activity)
     return filtered.sort((a, b) => {
       const aTime = new Date(a.lastMessageTime || a.lastMessageDate).getTime();
       const bTime = new Date(b.lastMessageTime || b.lastMessageDate).getTime();
       return bTime - aTime; // Newest first
     });
-  }, [conversations, searchQuery, applyFilters]);
+  }, [conversations, searchQuery, applyFilters, filters]);
 
   const selectedConversation = selectedConversationId 
     ? conversations.find(c => c.leadId === selectedConversationId)

@@ -17,6 +17,7 @@ export interface InboxFilters {
   aiOptIn: boolean | null;
   priority: string | null;
   assigned: string | null;
+  messageDirection: string | null; // New filter for message direction
 }
 
 const defaultFilters: InboxFilters = {
@@ -32,7 +33,8 @@ const defaultFilters: InboxFilters = {
   status: [],
   aiOptIn: null,
   priority: null,
-  assigned: null
+  assigned: null,
+  messageDirection: null, // New filter
 };
 
 export const useInboxFilters = (userId?: string, userRole?: string) => {
@@ -55,7 +57,7 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
       if (key === 'dateRange') return filters[key] !== 'all';
       if (key === 'leadSource' || key === 'vehicleType') return filters[key] !== '';
       if (key === 'status') return (filters[key] as string[]).length > 0;
-      if (key === 'aiOptIn' || key === 'priority' || key === 'assigned') return filters[key] !== null;
+      if (key === 'aiOptIn' || key === 'priority' || key === 'assigned' || key === 'messageDirection') return filters[key] !== null;
       return filters[key as keyof InboxFilters] === true;
     });
   }, [filters]);
@@ -115,6 +117,30 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
         filtered = filtered.filter(conv => conv.salespersonId);
       } else if (filters.assigned === 'unassigned') {
         filtered = filtered.filter(conv => !conv.salespersonId);
+      }
+    }
+
+    // Apply priority filter with improved unread handling
+    if (filters.priority) {
+      if (filters.priority === 'unread') {
+        filtered = filtered.filter(conv => conv.unreadCount > 0);
+      } else if (filters.priority === 'high') {
+        filtered = filtered.filter(conv => conv.unreadCount > 2 || conv.status === 'engaged');
+      } else if (filters.priority === 'responded') {
+        filtered = filtered.filter(conv => conv.lastMessageDirection === 'out');
+      }
+    }
+
+    // Apply new message direction filter
+    if (filters.messageDirection) {
+      if (filters.messageDirection === 'inbound') {
+        filtered = filtered.filter(conv => conv.lastMessageDirection === 'in');
+      } else if (filters.messageDirection === 'outbound') {
+        filtered = filtered.filter(conv => conv.lastMessageDirection === 'out');
+      } else if (filters.messageDirection === 'needs_response') {
+        filtered = filtered.filter(conv => 
+          conv.lastMessageDirection === 'in' && conv.unreadCount > 0
+        );
       }
     }
 
@@ -178,6 +204,7 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
     if (filters.aiOptIn !== null) summary.push(`AI: ${filters.aiOptIn ? 'Enabled' : 'Disabled'}`);
     if (filters.priority) summary.push(`Priority: ${filters.priority}`);
     if (filters.assigned) summary.push(`Assigned: ${filters.assigned}`);
+    if (filters.messageDirection) summary.push(`Direction: ${filters.messageDirection}`);
     if (filters.sortBy !== 'newest') summary.push(`Sort: ${filters.sortBy}`);
     
     return summary;
