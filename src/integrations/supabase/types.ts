@@ -2947,6 +2947,7 @@ export type Database = {
           has_trade_vehicle: boolean | null
           human_response_deadline: string | null
           id: string
+          is_hidden: boolean | null
           last_name: string
           last_prediction_update: string | null
           last_reply_at: string | null
@@ -3024,6 +3025,7 @@ export type Database = {
           has_trade_vehicle?: boolean | null
           human_response_deadline?: string | null
           id?: string
+          is_hidden?: boolean | null
           last_name: string
           last_prediction_update?: string | null
           last_reply_at?: string | null
@@ -3101,6 +3103,7 @@ export type Database = {
           has_trade_vehicle?: boolean | null
           human_response_deadline?: string | null
           id?: string
+          is_hidden?: boolean | null
           last_name?: string
           last_prediction_update?: string | null
           last_reply_at?: string | null

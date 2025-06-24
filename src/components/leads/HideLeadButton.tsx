@@ -24,7 +24,7 @@ const HideLeadButton: React.FC<HideLeadButtonProps> = ({
     try {
       const { error } = await supabase
         .from('leads')
-        .update({ is_hidden: !isHidden })
+        .update({ is_hidden: !isHidden } as any)
         .eq('id', leadId);
 
       if (error) throw error;

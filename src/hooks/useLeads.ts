@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Lead } from '@/types/lead';
@@ -89,7 +88,7 @@ export const useLeads = () => {
           postalCode: leadData.postal_code,
           vehicleInterest: leadData.vehicle_interest || '',
           source: leadData.source || '',
-          status: leadData.status || 'new',
+          status: (leadData.status as 'new' | 'engaged' | 'paused' | 'closed' | 'lost') || 'new',
           salesperson: leadData.profiles ? 
             `${leadData.profiles.first_name} ${leadData.profiles.last_name}`.trim() : '',
           salespersonId: leadData.salesperson_id || '',
