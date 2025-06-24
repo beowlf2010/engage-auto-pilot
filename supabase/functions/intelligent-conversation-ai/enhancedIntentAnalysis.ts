@@ -1,198 +1,153 @@
 
-// Enhanced intent analysis with pricing discrepancy detection
-import { analyzeTowingRequest, validateTowingCapability, generateSafeTowingResponse } from './vehicleSpecifications.ts';
-import { detectEnhancedObjectionSignals, detectVehicleNicknames } from './enhancedObjectionDetection.ts';
+// Enhanced intent analysis with better context awareness and customer message understanding
 
-export const analyzeCustomerIntent = (conversationHistory: string, lastCustomerMessage: string) => {
-  const history = conversationHistory.toLowerCase();
-  const lastMessage = lastCustomerMessage.toLowerCase();
-  
-  // Parse conversation into structured messages
-  const conversationLines = conversationHistory.split('\n').filter(line => line.trim());
-  const salesMessages = conversationLines.filter(line => line.startsWith('Sales:') || line.startsWith('You:'));
-  const customerMessages = conversationLines.filter(line => line.startsWith('Customer:'));
-  
-  // ENHANCED: Use new objection detection system
-  const enhancedObjections = detectEnhancedObjectionSignals(lastCustomerMessage, conversationHistory);
-  
-  // ENHANCED: Detect vehicle nicknames
-  const vehicleNicknames = detectVehicleNicknames(lastCustomerMessage);
-  
-  // ENHANCED: Analyze towing requests
-  const towingAnalysis = analyzeTowingRequest(lastCustomerMessage);
-  
-  // Detect question types in the last customer message
-  const questionPatterns = {
-    inventory_availability: /\b(do you have|available|in stock|have any|show me|can you find|looking for|interested in|want to see)\b/,
-    pricing: /\b(price|cost|how much|payment|monthly|finance|financing|afford|payments)\b/,
-    pricing_discrepancy: /\b(different price|price.*different|online.*price|website.*price).*\b(called|phone)\b/,
-    features: /\b(features|options|specs|specifications|tell me about|what does|include|comes with)\b/,
-    scheduling: /\b(schedule|appointment|visit|come in|see|test drive|when|time|available)\b/,
-    comparison: /\b(compare|versus|vs|difference|better|which)\b/,
-    trade: /\b(trade|trade-in|worth|value|owe|payoff)\b/,
-    towing: /\b(tow|pull|haul|drag|trailer|hitch|capacity)\b/,
-    general_inquiry: /\?|what|how|when|where|why|can you|could you|would you/
+export interface EnhancedIntentAnalysis {
+  primaryIntent: 'vehicle_inquiry' | 'expressing_interest' | 'asking_question' | 'providing_info' | 'objection' | 'ready_to_buy' | 'general';
+  confidence: number;
+  customerContext: {
+    mentionedVehicle: string | null;
+    isFollowUp: boolean;
+    emotionalTone: 'positive' | 'neutral' | 'negative' | 'excited';
+    urgencyLevel: 'low' | 'medium' | 'high';
   };
+  responseStrategy: 'acknowledge_and_engage' | 'provide_info' | 'ask_discovery' | 'address_concern' | 'move_to_action';
+  suggestedResponse: string | null;
+}
 
-  // Detect specific question types
-  const detectedQuestions = [];
-  for (const [type, pattern] of Object.entries(questionPatterns)) {
-    if (pattern.test(lastMessage)) {
-      detectedQuestions.push(type);
-    }
+export const analyzeEnhancedCustomerIntent = (
+  customerMessage: string,
+  conversationHistory: string,
+  vehicleInterest: string,
+  leadName: string
+): EnhancedIntentAnalysis => {
+  const message = customerMessage.toLowerCase().trim();
+  const history = conversationHistory.toLowerCase();
+  
+  // Extract mentioned vehicles from the message
+  const vehicleKeywords = ['silverado', 'tahoe', 'suburban', 'blazer', 'equinox', 'traverse', 'camaro', 'corvette', 'malibu'];
+  const mentionedVehicle = vehicleKeywords.find(v => message.includes(v)) || 
+    (vehicleInterest && vehicleInterest.toLowerCase().includes('chevrolet') ? vehicleInterest : null);
+
+  // Detect if this is a follow-up to previous conversation
+  const isFollowUp = history.includes('finn') || history.includes('jason pilger') || 
+    conversationHistory.split('\n').filter(line => line.trim()).length > 2;
+
+  // Analyze emotional tone
+  let emotionalTone: 'positive' | 'neutral' | 'negative' | 'excited' = 'neutral';
+  const positiveWords = ['great', 'love', 'excellent', 'perfect', 'amazing', 'interested', 'yes', 'thanks', 'awesome'];
+  const negativeWords = ['bad', 'hate', 'terrible', 'awful', 'no', 'not interested', 'cancel', 'stop'];
+  const excitedWords = ['!', 'wow', 'fantastic', 'definitely', 'absolutely'];
+  
+  if (positiveWords.some(word => message.includes(word))) emotionalTone = 'positive';
+  if (negativeWords.some(word => message.includes(word))) emotionalTone = 'negative';
+  if (excitedWords.some(word => message.includes(word)) || customerMessage.includes('!')) emotionalTone = 'excited';
+
+  // Determine primary intent with better context awareness
+  let primaryIntent: EnhancedIntentAnalysis['primaryIntent'] = 'general';
+  let confidence = 0.5;
+  let responseStrategy: EnhancedIntentAnalysis['responseStrategy'] = 'acknowledge_and_engage';
+
+  // Vehicle inquiry detection
+  if (mentionedVehicle || message.includes('truck') || message.includes('car') || message.includes('suv')) {
+    primaryIntent = 'vehicle_inquiry';
+    confidence = 0.8;
+    responseStrategy = 'acknowledge_and_engage';
   }
 
-  const isDirectQuestion = detectedQuestions.length > 0 || 
-    lastMessage.includes('?') ||
-    /^(what|how|when|where|why|can|could|would|do|does|is|are)\b/.test(lastMessage);
+  // Interest expression detection
+  if (message.includes('interested') || message.includes('looking for') || message.includes('want') || 
+      message.includes('need') || emotionalTone === 'positive') {
+    primaryIntent = 'expressing_interest';
+    confidence = 0.85;
+    responseStrategy = 'acknowledge_and_engage';
+  }
 
-  // ENHANCED: Detect if customer is frustrated about pricing
-  const isPricingFrustration = enhancedObjections.some(obj => 
-    ['pricing_discrepancy', 'pricing_shock', 'online_vs_call_price', 'upgrade_costs'].includes(obj.type)
+  // Question detection
+  if (message.includes('?') || message.startsWith('what') || message.startsWith('how') || 
+      message.startsWith('when') || message.startsWith('where') || message.includes('tell me')) {
+    primaryIntent = 'asking_question';
+    confidence = 0.9;
+    responseStrategy = 'provide_info';
+  }
+
+  // Ready to buy signals
+  if (message.includes('buy') || message.includes('purchase') || message.includes('financing') || 
+      message.includes('payment') || message.includes('schedule') || message.includes('appointment')) {
+    primaryIntent = 'ready_to_buy';
+    confidence = 0.9;
+    responseStrategy = 'move_to_action';
+  }
+
+  // Objection detection
+  if (message.includes('expensive') || message.includes('think about') || message.includes('not sure') ||
+      emotionalTone === 'negative') {
+    primaryIntent = 'objection';
+    confidence = 0.8;
+    responseStrategy = 'address_concern';
+  }
+
+  // Determine urgency level
+  let urgencyLevel: 'low' | 'medium' | 'high' = 'medium';
+  if (primaryIntent === 'ready_to_buy' || message.includes('today') || message.includes('asap')) urgencyLevel = 'high';
+  if (primaryIntent === 'objection' || emotionalTone === 'negative') urgencyLevel = 'low';
+
+  // Generate contextual suggested response
+  const suggestedResponse = generateContextualResponse(
+    primaryIntent,
+    mentionedVehicle,
+    leadName,
+    vehicleInterest,
+    emotionalTone,
+    responseStrategy
   );
 
-  // ENHANCED: Check for explicit frustration indicators
-  const explicitFrustrationIndicators = /\b(but you didn't answer|i asked you|you never responded|i told you|you ignored|my question was|why didn't you|you missed my|still waiting|i'm still asking|hello\?|are you there)\b/;
-  const repeatIndicators = /\b(again|i said|like i said|as i mentioned|i already|i repeat)\b/;
-  
-  const showingFrustration = explicitFrustrationIndicators.test(lastMessage) || 
-    (repeatIndicators.test(lastMessage) && isDirectQuestion) ||
-    isPricingFrustration;
-
-  // Extract topic with nickname detection
-  let questionTopic = null;
-  if (isDirectQuestion || isPricingFrustration) {
-    // First check for vehicle nicknames
-    if (vehicleNicknames.length > 0) {
-      questionTopic = vehicleNicknames[0].actualVehicle;
-    } else {
-      // Try to extract vehicle mentions
-      const vehicleMatch = lastMessage.match(/\b(tesla|model [sy3x]|chevy|chevrolet|bolt|equinox|honda|toyota|ford|bmw|mercedes|audi|2026|2025|2024|sedan|suv|truck|trailblazer|silverado|tahoe|equinox)\b/i);
-      if (vehicleMatch) {
-        questionTopic = vehicleMatch[0];
-      }
-    }
-    
-    // Extract general topics
-    if (!questionTopic) {
-      const topicMatch = lastMessage.match(/\b(electric|ev|hybrid|tow|towing|package|class 5|leather|seats|white|red|color)\b/i);
-      if (topicMatch) {
-        questionTopic = topicMatch[0];
-      }
-    }
-  }
-
-  // ENHANCED: Pricing concerns require immediate response
-  const requiresUrgentResponse = isPricingFrustration || showingFrustration;
-
   return {
-    isDirectQuestion,
-    questionTypes: detectedQuestions,
-    questionTopic,
-    showingFrustration,
-    requiresDirectAnswer: isDirectQuestion || isPricingFrustration,
-    primaryQuestionType: detectedQuestions[0] || (isPricingFrustration ? 'pricing_discrepancy' : 'general_inquiry'),
-    towingAnalysis,
-    // ENHANCED: Objection analysis with pricing focus
-    hasObjections: enhancedObjections.length > 0,
-    detectedObjections: enhancedObjections,
-    hasPricingConcerns: isPricingFrustration,
-    requiresUrgentResponse,
-    vehicleNicknames,
-    conversationContext: {
-      lastSalesMessage: salesMessages[salesMessages.length - 1]?.replace(/^(Sales:|You:)/, '').trim().toLowerCase() || '',
-      customerMessageCount: customerMessages.length,
-      salesMessageCount: salesMessages.length,
-      hasBeenIgnored: showingFrustration,
-      needsApology: showingFrustration,
-      needsImmediateResponse: requiresUrgentResponse
-    }
+    primaryIntent,
+    confidence,
+    customerContext: {
+      mentionedVehicle,
+      isFollowUp,
+      emotionalTone,
+      urgencyLevel
+    },
+    responseStrategy,
+    suggestedResponse
   };
 };
 
-// Enhanced answer guidance with pricing focus
-export const generateAnswerGuidance = (intentAnalysis: any, inventoryStatus: any) => {
-  const { 
-    questionTypes, 
-    questionTopic, 
-    primaryQuestionType, 
-    conversationContext, 
-    towingAnalysis, 
-    detectedObjections,
-    hasPricingConcerns,
-    requiresUrgentResponse,
-    vehicleNicknames
-  } = intentAnalysis;
-  
-  if (!intentAnalysis.requiresDirectAnswer && detectedObjections.length === 0) {
-    return null;
-  }
+const generateContextualResponse = (
+  intent: EnhancedIntentAnalysis['primaryIntent'],
+  mentionedVehicle: string | null,
+  leadName: string,
+  vehicleInterest: string,
+  tone: 'positive' | 'neutral' | 'negative' | 'excited',
+  strategy: EnhancedIntentAnalysis['responseStrategy']
+): string => {
+  const vehicle = mentionedVehicle || vehicleInterest || 'the vehicle you\'re interested in';
+  const cleanVehicle = vehicle.replace(/"/g, '').trim();
 
-  const guidance = {
-    mustAnswerFirst: true,
-    answerType: primaryQuestionType,
-    specificGuidance: '',
-    inventoryContext: inventoryStatus,
-    urgencyLevel: requiresUrgentResponse ? 'critical' : conversationContext.needsApology ? 'high' : 'normal',
-    needsApology: conversationContext.needsApology && !hasPricingConcerns, // Don't apologize for pricing concerns, just address them
-    towingValidation: null as any,
-    // ENHANCED: Pricing and objection handling
-    hasPricingConcerns,
-    objectionsDetected: detectedObjections,
-    vehicleNicknames,
-    requiresImmediateResponse: requiresUrgentResponse
-  };
-
-  // PRIORITY 1: Handle pricing concerns first
-  if (hasPricingConcerns) {
-    const pricingObjection = detectedObjections.find(obj => 
-      ['pricing_discrepancy', 'pricing_shock', 'online_vs_call_price', 'upgrade_costs'].includes(obj.type)
-    );
-    
-    if (pricingObjection) {
-      switch (pricingObjection.type) {
-        case 'pricing_discrepancy':
-        case 'online_vs_call_price':
-          guidance.specificGuidance = 'CRITICAL: Customer experienced pricing discrepancy between online and phone quotes. Acknowledge confusion immediately, explain online pricing limitations, and offer transparent breakdown. Use empathetic tone and take responsibility for clarity.';
-          break;
-        case 'upgrade_costs':
-          guidance.specificGuidance = 'CRITICAL: Customer concerned about upgrade costs. Explain value of packages, offer alternatives, and ask about their budget priorities. Be transparent about what\'s included.';
-          break;
-        case 'pricing_shock':
-          guidance.specificGuidance = 'CRITICAL: Customer experiencing price shock. Show empathy, acknowledge their surprise, and work collaboratively on budget solutions. Focus on finding alternatives within their comfort zone.';
-          break;
+  switch (strategy) {
+    case 'acknowledge_and_engage':
+      if (intent === 'vehicle_inquiry') {
+        return `Hi ${leadName}! I see you're interested in the ${cleanVehicle}. That's a fantastic choice! What aspects are most important to you - performance, features, or pricing?`;
       }
-      return guidance;
-    }
+      if (intent === 'expressing_interest') {
+        return `That's great to hear, ${leadName}! The ${cleanVehicle} is really popular right now. What drew you to this particular model?`;
+      }
+      break;
+
+    case 'provide_info':
+      return `Great question about the ${cleanVehicle}, ${leadName}! I'd be happy to provide those details. Are you most interested in specs, pricing, or availability?`;
+
+    case 'move_to_action':
+      return `Perfect timing, ${leadName}! I can definitely help you move forward with the ${cleanVehicle}. When would be a good time for you to take a look in person?`;
+
+    case 'address_concern':
+      return `I understand your concerns about the ${cleanVehicle}, ${leadName}. What's your main hesitation? I'm here to help address any questions you might have.`;
+
+    default:
+      return `Hi ${leadName}! Thanks for reaching out about the ${cleanVehicle}. I'm here to help make your car shopping experience as smooth as possible. What would be most helpful for you to know?`;
   }
 
-  // PRIORITY 2: Handle other objections
-  if (detectedObjections.length > 0) {
-    const primaryObjection = detectedObjections[0];
-    guidance.specificGuidance = `Address customer's ${primaryObjection.type} concern directly and empathetically.`;
-    return guidance;
-  }
-
-  // PRIORITY 3: Handle direct questions
-  if (primaryQuestionType === 'towing' && towingAnalysis?.hasTowingRequest) {
-    guidance.specificGuidance = 'CRITICAL: Validate towing claim carefully. Ask for specific vehicle and equipment details before making capacity claims.';
-  } else {
-    switch (primaryQuestionType) {
-      case 'pricing_discrepancy':
-        guidance.specificGuidance = 'CRITICAL: Address pricing discrepancy immediately with empathy and transparency.';
-        break;
-      case 'pricing':
-        guidance.specificGuidance = `Provide clear pricing information for ${questionTopic || 'the vehicle'}. Be transparent and ask about budget comfort zone.`;
-        break;
-      case 'inventory_availability':
-        guidance.specificGuidance = inventoryStatus.hasActualInventory ?
-          `Show them the available vehicles that match their request.` :
-          `Be honest about availability and offer alternatives.`;
-        break;
-      default:
-        guidance.specificGuidance = 'Answer their question directly and completely, then ask a follow-up question.';
-    }
-  }
-
-  return guidance;
+  return `Hi ${leadName}! I'm here to help with the ${cleanVehicle}. What would be most helpful for you to know?`;
 };

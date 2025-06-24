@@ -1,243 +1,160 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
-import { analyzeConversationalContext, generateConversationalResponse } from './conversationalAwareness.ts'
-import { analyzeConversationMemory, generateConversationGuidance } from './conversationMemory.ts'
-import { buildEnhancedSystemPrompt, buildEnhancedUserPrompt } from './enhancedPromptBuilder.ts'
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+// Import our enhanced modules
+import { analyzeEnhancedCustomerIntent } from './enhancedIntentAnalysis.ts';
+import { buildContextualPrompt } from './contextualPrompts.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
+
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { 
-      leadId, 
-      leadName, 
-      messageBody, 
-      conversationHistory, 
-      hasConversationalSignals,
-      leadSource,
-      leadSourceData,
-      vehicleInterest
-    } = await req.json()
-    
-    console.log('🤖 Processing ENHANCED conversation-aware message for', leadName + ':', `"${messageBody}"`);
-    console.log('📍 Lead source:', leadSource, 'Category:', leadSourceData?.sourceCategory);
-    
-    // Check for empty messages
-    if (!messageBody || messageBody.trim() === '') {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const {
+      leadId,
+      leadName,
+      vehicleInterest,
+      conversationHistory,
+      leadInfo,
+      conversationLength = 0,
+      inventoryStatus,
+      isInitialContact = false,
+      salespersonName = 'Finn',
+      dealershipName = 'Jason Pilger Chevrolet',
+      dataQuality,
+      context
+    } = await req.json();
+
+    console.log(`🤖 [ENHANCED AI] Processing message for ${leadName} about ${vehicleInterest}`);
+
+    // Get the last customer message for analysis
+    const conversationLines = conversationHistory.split('\n').filter(line => line.trim());
+    const customerMessages = conversationLines.filter(line => line.startsWith('Customer:'));
+    const lastCustomerMessage = customerMessages[customerMessages.length - 1]?.replace('Customer:', '').trim() || '';
+
+    if (!lastCustomerMessage) {
+      console.log('❌ [ENHANCED AI] No customer message found to respond to');
+      return new Response(
+        JSON.stringify({ 
+          message: null,
+          confidence: 0,
+          reasoning: 'No customer message to respond to'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-      
-      const { data: phoneData } = await supabase
-        .from('phone_numbers')
-        .select('number')
-        .eq('lead_id', leadId)
-        .eq('is_primary', true)
-        .single();
-      
-      if (!phoneData || phoneData.number === '+15551234567') {
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'No valid phone number for lead',
-            skipMessage: true
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
     }
 
-    // CRITICAL: Use enhanced conversation memory system to prevent re-introductions
-    const conversationMemory = analyzeConversationMemory(conversationHistory || '');
-    console.log('🧠 CRITICAL Conversation memory analysis:', {
-      hasIntroduced: conversationMemory.hasIntroduced,
-      isEstablishedConversation: conversationMemory.isEstablishedConversation,
-      lastSalesMessageType: conversationMemory.lastSalesMessageType,
-      introductionCount: conversationMemory.introductionCount,
-      hasRepetitiveIntroductions: conversationMemory.hasRepetitiveIntroductions,
-      discussedTopics: conversationMemory.discussedTopics
+    console.log(`📝 [ENHANCED AI] Analyzing customer message: "${lastCustomerMessage}"`);
+
+    // Perform enhanced intent analysis
+    const intentAnalysis = analyzeEnhancedCustomerIntent(
+      lastCustomerMessage,
+      conversationHistory,
+      vehicleInterest,
+      leadName
+    );
+
+    console.log(`🧠 [ENHANCED AI] Intent analysis:`, {
+      intent: intentAnalysis.primaryIntent,
+      confidence: intentAnalysis.confidence,
+      strategy: intentAnalysis.responseStrategy,
+      vehicle: intentAnalysis.customerContext.mentionedVehicle,
+      tone: intentAnalysis.customerContext.emotionalTone
     });
 
-    // ENHANCED: Detect conversation repair needs (customer confusion)
-    const confusionSignals = /\b(who is this|who are you|i don't know you|do i know you|have we talked)\b/i;
-    const customerNeedsRepair = confusionSignals.test(messageBody) && conversationMemory.hasIntroduced;
-    
-    if (customerNeedsRepair) {
-      console.log('🔧 CONVERSATION REPAIR: Customer seems confused despite previous introduction');
+    // Check if we should generate a response
+    if (intentAnalysis.confidence < 0.3) {
+      console.log('⚠️ [ENHANCED AI] Low confidence intent analysis, using fallback');
     }
 
-    // CRITICAL: Restrict simple conversational response to only genuine handoffs
-    const conversationalContext = analyzeConversationalContext(messageBody);
-    console.log('🗣️ Conversational context:', conversationalContext);
+    // Build contextual prompts
+    const { systemPrompt, userPrompt } = buildContextualPrompt(
+      leadName,
+      vehicleInterest,
+      lastCustomerMessage,
+      conversationHistory,
+      intentAnalysis,
+      context
+    );
 
-    // ENHANCED: Only use simple response for very specific handoff scenarios, not confusion
-    const isGenuineHandoff = conversationalContext.warrantsAcknowledgment && 
-                            conversationalContext.responseType === 'handoff' && 
-                            !customerNeedsRepair;
+    console.log(`🎯 [ENHANCED AI] Using strategy: ${intentAnalysis.responseStrategy}`);
 
-    if (isGenuineHandoff) {
-      console.log('🤝 Genuine handoff detected, using simple acknowledgment');
-      const response = generateConversationalResponse(conversationalContext, leadName);
-      
+    // Generate AI response with enhanced context
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 150,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiMessage = data.choices[0]?.message?.content?.trim();
+
+    if (!aiMessage) {
+      console.log('❌ [ENHANCED AI] No response generated from OpenAI');
       return new Response(
-        JSON.stringify({ success: true, response }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({
+          message: null,
+          confidence: 0,
+          reasoning: 'No response generated'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // CRITICAL: All other responses MUST go through conversation-aware system
-    console.log('🤖 Using ENHANCED conversation-aware prompt system');
+    console.log(`✅ [ENHANCED AI] Generated enhanced response: "${aiMessage}"`);
 
-    // Mock inventory and business hours for the enhanced system
-    const inventoryStatus = {
-      hasActualInventory: true,
-      validatedCount: 15,
-      warning: null
-    };
-
-    const businessHours = {
-      isOpen: true,
-      hours: { start: '8:00 AM', end: '6:00 PM' }
-    };
-
-    // CRITICAL: Generate conversation guidance that enforces conversation state
-    const conversationGuidance = generateConversationGuidance(conversationMemory, inventoryStatus, businessHours);
-    console.log('📋 CRITICAL Conversation guidance:', conversationGuidance);
-
-    // ENHANCED: Ensure conversation memory controls prompt generation
-    const conversationLength = conversationHistory ? conversationHistory.split('\n').length : 0;
-    const promptData = buildEnhancedSystemPrompt(
-      leadName,
-      vehicleInterest || '',
-      conversationLength,
-      conversationHistory || '',
-      inventoryStatus,
-      businessHours,
-      conversationGuidance,
-      messageBody
-    );
-
-    const userPrompt = buildEnhancedUserPrompt(
-      messageBody,
-      conversationHistory || '',
-      null, // requestedCategory
-      { isEstablishedConversation: conversationMemory.isEstablishedConversation },
-      conversationMemory,
-      conversationGuidance,
-      promptData.customerIntent,
-      promptData.answerGuidance,
-      promptData.appointmentIntent,
-      promptData.tradeIntent
-    );
-
-    console.log('📝 Using conversation-aware system prompt with anti-introduction safeguards');
-
-    // CRITICAL: Log conversation state for debugging
-    if (conversationMemory.hasIntroduced) {
-      console.log('🚨 REMINDER: Customer has been introduced to Finn. DO NOT re-introduce.');
-    }
-    if (conversationMemory.hasRepetitiveIntroductions) {
-      console.log('🔥 WARNING: Multiple introductions detected in history. System must prevent further re-introductions.');
-    }
-
-    // Generate response using conversation-aware system
-    const response = await generateEnhancedResponse(
-      promptData.systemPrompt,
-      userPrompt,
-      leadSource,
-      leadSourceData
-    );
-    
     return new Response(
-      JSON.stringify({ success: true, response }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+      JSON.stringify({
+        message: aiMessage,
+        confidence: Math.min(0.95, intentAnalysis.confidence + 0.1),
+        reasoning: `Enhanced contextual response - Intent: ${intentAnalysis.primaryIntent}, Strategy: ${intentAnalysis.responseStrategy}`,
+        intentAnalysis: {
+          intent: intentAnalysis.primaryIntent,
+          confidence: intentAnalysis.confidence,
+          strategy: intentAnalysis.responseStrategy,
+          mentionedVehicle: intentAnalysis.customerContext.mentionedVehicle
+        }
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ [ENHANCED AI] Error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        message: null,
+        confidence: 0
+      }),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    )
+    );
   }
-})
-
-async function generateEnhancedResponse(
-  systemPrompt: string,
-  userPrompt: string,
-  leadSource?: string, 
-  leadSourceData?: any
-) {
-  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-  
-  if (!openaiApiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
-  // Add source-specific instructions to the system prompt
-  let enhancedSystemPrompt = systemPrompt;
-  if (leadSource && leadSourceData) {
-    enhancedSystemPrompt += `\n\nSOURCE-SPECIFIC GUIDANCE: ${getSourceSpecificInstructions(leadSourceData?.sourceCategory)}`;
-  }
-
-  console.log('🚀 Generating response with conversation-aware anti-introduction system using GPT-4.1');
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14', // Updated to use the latest GPT-4.1 model
-      messages: [
-        { role: 'system', content: enhancedSystemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      max_tokens: 100,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0]?.message?.content?.trim() || 'I appreciate you reaching out. Please call us at (251) 368-4053 and we can help you with whatever you need!';
-}
-
-function getSourceSpecificInstructions(sourceCategory?: string): string {
-  const instructions: Record<string, string> = {
-    'high_intent_digital': 'Be direct about availability and competitive pricing. This customer is actively shopping.',
-    'value_focused': 'Focus on value proposition and cost savings. Address pricing concerns upfront.',
-    'credit_ready': 'Emphasize financing solutions and payment options. Be reassuring about approval.',
-    'direct_inquiry': 'Provide personalized attention and detailed information. Build the relationship.',
-    'social_discovery': 'Keep it friendly and low-pressure. Make the process seem easy and approachable.',
-    'referral_based': 'Acknowledge the referral and provide VIP treatment. Live up to the recommendation.',
-    'service_related': 'Appreciate their loyalty and leverage the existing relationship.',
-  };
-  
-  return instructions[sourceCategory || ''] || 'Adapt your response based on customer needs.';
-}
+});
