@@ -1,213 +1,149 @@
 
 import { useState, useCallback, useMemo } from 'react';
+import type { ConversationListItem } from '@/types/conversation';
 
 export interface InboxFilters {
-  status: string[];
-  aiOptIn: boolean | null;
-  priority: string | null;
-  assigned: string | null;
-  search: string;
   unreadOnly: boolean;
-  myLeadsOnly: boolean;
-  unrepliedInboundOnly: boolean;
+  assignedToMe: boolean;
+  unassigned: boolean;
+  lostLeads: boolean;
+  aiPaused: boolean;
+  dateRange: 'today' | 'week' | 'month' | 'all';
+  leadSource: string;
+  vehicleType: string;
+  sortBy: 'newest' | 'oldest' | 'unread' | 'activity';
 }
 
-const getDefaultFilters = (userRole?: string): InboxFilters => ({
-  status: [],
-  aiOptIn: null,
-  priority: null,
-  assigned: userRole === 'admin' || userRole === 'manager' ? null : null, // Show all for admins
-  search: '',
+const defaultFilters: InboxFilters = {
   unreadOnly: false,
-  myLeadsOnly: false,
-  unrepliedInboundOnly: false
-});
+  assignedToMe: false,
+  unassigned: false,
+  lostLeads: false,
+  aiPaused: false,
+  dateRange: 'all',
+  leadSource: '',
+  vehicleType: '',
+  sortBy: 'newest' // Default to newest first
+};
 
-export const useInboxFilters = (profileId?: string, userRole?: string) => {
-  const [filters, setFilters] = useState<InboxFilters>(getDefaultFilters(userRole));
+export const useInboxFilters = (userId?: string, userRole?: string) => {
+  const [filters, setFilters] = useState<InboxFilters>(defaultFilters);
 
-  const updateFilter = useCallback((key: keyof InboxFilters, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
+  const updateFilter = useCallback(<K extends keyof InboxFilters>(
+    key: K,
+    value: InboxFilters[K]
+  ) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
   const clearFilters = useCallback(() => {
-    setFilters(getDefaultFilters(userRole));
-  }, [userRole]);
+    setFilters({ ...defaultFilters, sortBy: 'newest' }); // Keep newest first as default
+  }, []);
 
   const hasActiveFilters = useMemo(() => {
-    const defaultFilters = getDefaultFilters(userRole);
-    return filters.status.length > 0 || 
-           filters.aiOptIn !== null || 
-           filters.priority !== null || 
-           filters.assigned !== defaultFilters.assigned ||
-           filters.search.length > 0 ||
-           filters.unreadOnly ||
-           filters.myLeadsOnly ||
-           filters.unrepliedInboundOnly;
-  }, [filters, userRole]);
+    return Object.keys(filters).some(key => {
+      if (key === 'sortBy') return filters[key] !== 'newest'; // Default is newest
+      if (key === 'dateRange') return filters[key] !== 'all';
+      if (key === 'leadSource' || key === 'vehicleType') return filters[key] !== '';
+      return filters[key as keyof InboxFilters] === true;
+    });
+  }, [filters]);
 
-  const applyFilters = useCallback((conversations: any[]) => {
-    console.log('🔍 [INBOX FILTERS] Applying filters with AGGRESSIVE admin bypass:', filters);
-    console.log('🔍 [INBOX FILTERS] User role:', userRole);
-    console.log('🔍 [INBOX FILTERS] Total conversations before filtering:', conversations.length);
-    
-    const isAdmin = userRole === 'admin' || userRole === 'manager';
-    
-    const filtered = conversations.filter(conv => {
-      // Search filter (always applied)
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        const matchesSearch = conv.leadName.toLowerCase().includes(searchLower) ||
-                             conv.vehicleInterest.toLowerCase().includes(searchLower) ||
-                             conv.leadPhone.includes(filters.search);
-        if (!matchesSearch) return false;
+  const applyFilters = useCallback((conversations: ConversationListItem[]) => {
+    let filtered = [...conversations];
+
+    // Apply filters
+    if (filters.unreadOnly) {
+      filtered = filtered.filter(conv => conv.unreadCount > 0);
+    }
+
+    if (filters.assignedToMe && userId) {
+      filtered = filtered.filter(conv => conv.salespersonId === userId);
+    }
+
+    if (filters.unassigned) {
+      filtered = filtered.filter(conv => !conv.salespersonId);
+    }
+
+    if (filters.lostLeads) {
+      filtered = filtered.filter(conv => conv.status === 'lost');
+    }
+
+    if (filters.aiPaused) {
+      filtered = filtered.filter(conv => conv.aiSequencePaused);
+    }
+
+    if (filters.leadSource) {
+      filtered = filtered.filter(conv => 
+        conv.leadSource?.toLowerCase().includes(filters.leadSource.toLowerCase())
+      );
+    }
+
+    if (filters.vehicleType) {
+      filtered = filtered.filter(conv => 
+        conv.vehicleInterest?.toLowerCase().includes(filters.vehicleType.toLowerCase())
+      );
+    }
+
+    // Apply date range filter
+    if (filters.dateRange !== 'all') {
+      const now = new Date();
+      const startDate = new Date();
+      
+      switch (filters.dateRange) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          startDate.setDate(now.getDate() - 30);
+          break;
       }
+      
+      filtered = filtered.filter(conv => {
+        const convDate = new Date(conv.lastMessageTime || conv.lastMessageDate);
+        return convDate >= startDate;
+      });
+    }
 
-      // Status filter (always applied)
-      if (filters.status.length > 0 && !filters.status.includes(conv.status)) {
-        return false;
+    // Apply sorting
+    filtered.sort((a, b) => {
+      const aTime = new Date(a.lastMessageTime || a.lastMessageDate).getTime();
+      const bTime = new Date(b.lastMessageTime || b.lastMessageDate).getTime();
+      
+      switch (filters.sortBy) {
+        case 'newest':
+          return bTime - aTime; // Newest first (default)
+        case 'oldest':
+          return aTime - bTime;
+        case 'unread':
+          return (b.unreadCount || 0) - (a.unreadCount || 0);
+        case 'activity':
+          return bTime - aTime; // Same as newest for now
+        default:
+          return bTime - aTime; // Default to newest first
       }
-
-      // AI opt-in filter (always applied)
-      if (filters.aiOptIn !== null) {
-        if (filters.aiOptIn && !conv.aiOptIn) return false;
-        if (!filters.aiOptIn && conv.aiOptIn) return false;
-      }
-
-      // AGGRESSIVE ADMIN BYPASS: Admins see ALL conversations unless explicitly filtered
-      if (isAdmin) {
-        console.log('👑 [INBOX FILTERS] AGGRESSIVE ADMIN BYPASS - minimal filtering applied');
-        
-        // Only apply explicit user-requested filters for admins
-        if (filters.unreadOnly && conv.unreadCount === 0) {
-          return false;
-        }
-
-        if (filters.myLeadsOnly && conv.salespersonId !== profileId) {
-          return false;
-        }
-
-        if (filters.unrepliedInboundOnly && !conv.hasUnrepliedInbound) {
-          return false;
-        }
-
-        // Apply priority filter
-        if (filters.priority) {
-          switch (filters.priority) {
-            case 'high':
-              if (conv.unreadCount < 3) return false;
-              break;
-            case 'unread':
-              if (conv.unreadCount === 0) return false;
-              break;
-            case 'responded':
-              if (conv.lastMessageDirection !== 'out') return false;
-              break;
-          }
-        }
-
-        // Apply assignment filter only if explicitly set
-        if (filters.assigned) {
-          switch (filters.assigned) {
-            case 'assigned':
-              if (!conv.salespersonId) return false;
-              break;
-            case 'unassigned':
-              if (conv.salespersonId) return false;
-              break;
-            case 'mine':
-              if (conv.salespersonId !== profileId) return false;
-              break;
-          }
-        }
-
-        // ADMIN BYPASS: Return true for all other cases (including lost and unassigned)
-        return true;
-      }
-
-      // Regular user filtering (existing logic)
-      if (filters.unreadOnly && conv.unreadCount === 0) {
-        return false;
-      }
-
-      if (filters.myLeadsOnly && profileId && conv.salespersonId !== profileId) {
-        return false;
-      }
-
-      if (filters.unrepliedInboundOnly && !conv.hasUnrepliedInbound) {
-        return false;
-      }
-
-      if (filters.priority) {
-        switch (filters.priority) {
-          case 'high':
-            if (conv.unreadCount < 3) return false;
-            break;
-          case 'unread':
-            if (conv.unreadCount === 0) return false;
-            break;
-          case 'responded':
-            if (conv.lastMessageDirection !== 'out') return false;
-            break;
-        }
-      }
-
-      if (filters.assigned) {
-        switch (filters.assigned) {
-          case 'assigned':
-            if (!conv.salespersonId) return false;
-            break;
-          case 'unassigned':
-            if (conv.salespersonId) return false;
-            break;
-          case 'mine':
-            if (conv.salespersonId !== profileId) return false;
-            break;
-        }
-      }
-
-      return true;
     });
 
-    const hiddenCount = conversations.length - filtered.length;
-    console.log('🔍 [INBOX FILTERS] Conversations after filtering:', filtered.length);
-    console.log('🔍 [INBOX FILTERS] Hidden conversations:', hiddenCount);
-    
-    if (isAdmin) {
-      console.log('👑 [INBOX FILTERS] ADMIN VIEW - should see lost and unassigned leads');
-      
-      // Debug admin-specific filtering
-      const lostLeads = conversations.filter(c => c.status === 'lost');
-      const unassignedLeads = conversations.filter(c => !c.salespersonId);
-      const filteredLostLeads = filtered.filter(c => c.status === 'lost');
-      const filteredUnassignedLeads = filtered.filter(c => !c.salespersonId);
-      
-      console.log('📊 [ADMIN DEBUG] Lost leads: total', lostLeads.length, 'filtered', filteredLostLeads.length);
-      console.log('📊 [ADMIN DEBUG] Unassigned leads: total', unassignedLeads.length, 'filtered', filteredUnassignedLeads.length);
-    }
-    
-    if (filters.unrepliedInboundOnly) {
-      console.log('🔍 [INBOX FILTERS] Unreplied inbound filter active - showing conversations where customer sent last message');
-    }
-    
     return filtered;
-  }, [filters, profileId, userRole]);
+  }, [filters, userId]);
 
   const getFilterSummary = useCallback(() => {
-    const activeFilters = [];
-    if (filters.status.length > 0) activeFilters.push(`Status: ${filters.status.join(', ')}`);
-    if (filters.aiOptIn !== null) activeFilters.push(`AI: ${filters.aiOptIn ? 'Enabled' : 'Disabled'}`);
-    if (filters.priority) activeFilters.push(`Priority: ${filters.priority}`);
-    if (filters.assigned) activeFilters.push(`Assignment: ${filters.assigned}`);
-    if (filters.search) activeFilters.push(`Search: "${filters.search}"`);
-    if (filters.unreadOnly) activeFilters.push('Unread only');
-    if (filters.myLeadsOnly) activeFilters.push('My leads only');
-    if (filters.unrepliedInboundOnly) activeFilters.push('Unreplied inbound only');
+    const summary: string[] = [];
     
-    return activeFilters;
+    if (filters.unreadOnly) summary.push('Unread only');
+    if (filters.assignedToMe) summary.push('Assigned to me');
+    if (filters.unassigned) summary.push('Unassigned');
+    if (filters.lostLeads) summary.push('Lost leads');
+    if (filters.aiPaused) summary.push('AI paused');
+    if (filters.dateRange !== 'all') summary.push(`Last ${filters.dateRange}`);
+    if (filters.leadSource) summary.push(`Source: ${filters.leadSource}`);
+    if (filters.vehicleType) summary.push(`Vehicle: ${filters.vehicleType}`);
+    if (filters.sortBy !== 'newest') summary.push(`Sort: ${filters.sortBy}`);
+    
+    return summary;
   }, [filters]);
 
   return {
