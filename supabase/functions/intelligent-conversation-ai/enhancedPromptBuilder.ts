@@ -1,5 +1,7 @@
-import { analyzeCustomerIntent, generateAnswerGuidance, needsConversationRepair } from './enhancedIntentAnalysis.ts';
+
+import { analyzeCustomerIntent, generateAnswerGuidance } from './enhancedIntentAnalysis.ts';
 import { buildSalesProgressionPrompt } from './salesProgressionPrompts.ts';
+import { analyzeConversationMemory } from './conversationMemory.ts';
 
 // Enhanced prompt builder to create context-rich prompts for the OpenAI API
 // This function takes lead information, conversation history, and inventory status as input
@@ -19,20 +21,30 @@ export const buildEnhancedUserPrompt = (
 ) => {
   let userPrompt = `The customer sent this message: "${lastCustomerMessage}"`;
 
-  // ENHANCED: Add conversation continuity context
+  // ENHANCED: Add conversation continuity context with anti-introduction logic
   if (conversationContext.isEstablishedConversation && conversationMemory?.hasIntroduced) {
     userPrompt += `
 
-IMPORTANT: This is an ongoing conversation where you have already introduced yourself as Finn from Jason Pilger Chevrolet. 
-Continue naturally without re-introducing yourself. Build on the existing conversation flow.`;
+CRITICAL CONVERSATION CONTINUITY: This is an ongoing conversation where you have ALREADY introduced yourself as Finn from Jason Pilger Chevrolet. 
+DO NOT introduce yourself again. Continue naturally from the existing conversation flow. The customer knows who you are.`;
   } else if (conversationContext.isEstablishedConversation) {
     userPrompt += `
 
-This is an ongoing conversation. Use the conversation history to provide relevant and helpful responses.`;
+This is an ongoing conversation. Use the conversation history to provide relevant and helpful responses without redundant introductions.`;
   } else {
     userPrompt += `
 
 This is a new conversation. Introduce yourself and offer assistance.`;
+  }
+
+  // ENHANCED: Detect customer confusion and provide repair guidance
+  const confusionSignals = /\b(who is this|who are you|i don't know you|do i know you|have we talked)\b/i;
+  if (confusionSignals.test(lastCustomerMessage) && conversationMemory?.hasIntroduced) {
+    userPrompt += `
+
+CONVERSATION REPAIR NEEDED: Customer seems confused about who you are despite previous introduction. 
+Politely remind them: "This is Finn from Jason Pilger Chevrolet - we were discussing [topic from conversation history]."
+Do NOT provide a full re-introduction, just a brief reminder and continue the conversation.`;
   }
 
   // NEW: Add objection handling guidance
@@ -65,7 +77,7 @@ The customer is interested in scheduling an appointment. Offer available times a
 The customer is interested in trading in their current vehicle. Ask for details about their vehicle.`;
   }
 
-  // FIXED: Only add discussed topics if they were actually mentioned by the customer
+  // ENHANCED: Only add discussed topics if they were actually mentioned by the customer
   if (conversationMemory?.discussedTopics?.length > 0) {
     userPrompt += `
 
@@ -92,14 +104,20 @@ export const buildEnhancedSystemPrompt = (
   conversationGuidance: any,
   lastCustomerMessage: string
 ) => {
+  // CRITICAL: Analyze conversation memory to prevent re-introductions
+  const conversationMemory = analyzeConversationMemory(conversationHistory);
+  
+  console.log('🧠 Conversation memory in prompt builder:', {
+    hasIntroduced: conversationMemory.hasIntroduced,
+    isEstablishedConversation: conversationMemory.isEstablishedConversation,
+    lastSalesMessageType: conversationMemory.lastSalesMessageType
+  });
+
   // NEW: Check if we should use sales progression system
   const shouldUseSalesProgression = conversationLength > 0 && lastCustomerMessage;
   
   if (shouldUseSalesProgression) {
     console.log('🎯 Using SALES PROGRESSION system for objection handling and forward movement');
-    
-    // Get conversation memory for better context
-    const conversationMemory = analyzeConversationMemory(conversationHistory);
     
     const salesPromptData = buildSalesProgressionPrompt(
       leadName,
@@ -131,9 +149,8 @@ export const buildEnhancedSystemPrompt = (
   // Fallback to original logic for initial contacts
   const customerIntent = analyzeCustomerIntent(conversationHistory, lastCustomerMessage);
   const answerGuidance = generateAnswerGuidance(customerIntent, inventoryStatus);
-  const needsRepair = needsConversationRepair(customerIntent);
 
-  // Enhanced system prompt with conversation continuity focus
+  // ENHANCED: Build conversation-aware system prompt
   let systemPrompt = `You are Finn, a professional automotive sales assistant at Jason Pilger Chevrolet. You help customers find the right vehicle through genuine, helpful conversations.
 
 CORE GUIDELINES:
@@ -150,17 +167,26 @@ CURRENT CONTEXT:
 - Inventory Available: ${inventoryStatus.hasActualInventory ? 'YES' : 'LIMITED'}
 - Conversation Stage: ${conversationLength > 0 ? 'Ongoing conversation' : 'Initial contact'}`;
 
-  // ENHANCED: Add conversation continuity guidance
-  if (conversationLength > 0) {
+  // CRITICAL: Add conversation state awareness to prevent re-introductions
+  if (conversationMemory.hasIntroduced && conversationMemory.isEstablishedConversation) {
+    systemPrompt += `
+
+🚨 CRITICAL CONVERSATION STATE:
+- You have ALREADY introduced yourself to ${leadName} as Finn from Jason Pilger Chevrolet
+- This is an ESTABLISHED conversation (${conversationMemory.salesMessageCount} previous exchanges)
+- DO NOT introduce yourself again under any circumstances
+- Continue the conversation naturally as if you know each other
+- Reference previous conversation context when appropriate
+- If customer seems confused, provide brief reminder, not full re-introduction`;
+  } else if (conversationLength > 0) {
     systemPrompt += `
 
 CONVERSATION CONTINUITY RULES:
 - This is NOT the first message in this conversation
-- Do NOT introduce yourself again if you already have
-- Reference previous conversation naturally
 - Build on what has already been discussed
 - Avoid starting with "Hi [Name]! I'm Finn..." if already introduced
-- Continue the conversation flow naturally`;
+- Continue the conversation flow naturally
+- Reference previous exchanges when relevant`;
   }
 
   // CRITICAL: Add anti-hallucination guidance
@@ -173,6 +199,27 @@ CRITICAL - PREVENT TOPIC HALLUCINATION:
 - Focus ONLY on what the customer actually said and requested
 - If customer mentions a specific vehicle (like Trailblazer), stick to that vehicle type`;
 
+  // ENHANCED: Add conversation guidance enforcement
+  if (conversationGuidance && conversationGuidance.length > 0) {
+    systemPrompt += `
+
+CONVERSATION GUIDANCE (MUST FOLLOW):
+${conversationGuidance.map(guidance => `- ${guidance}`).join('\n')}`;
+  }
+
+  // ENHANCED: Add conversation repair detection
+  const confusionSignals = /\b(who is this|who are you|i don't know you|do i know you|have we talked)\b/i;
+  if (confusionSignals.test(lastCustomerMessage) && conversationMemory.hasIntroduced) {
+    systemPrompt += `
+
+🔧 CONVERSATION REPAIR MODE:
+- Customer seems confused about your identity despite previous introduction
+- Provide BRIEF reminder: "This is Finn from Jason Pilger Chevrolet - we were discussing [relevant topic]"
+- Do NOT provide full re-introduction
+- Immediately continue with helpful response to their needs
+- Keep the reminder short and transition quickly to assistance`;
+  }
+
   // ENHANCED: Add towing safety guidelines
   systemPrompt += `
 
@@ -184,28 +231,8 @@ CRITICAL TOWING SAFETY RULES:
 - When in doubt about towing, say "I'd need to verify the specific towing requirements and vehicle capabilities"
 - Heavy construction equipment requires specialized commercial transport, not passenger vehicles`;
 
-  // Add specific conversation guidance from memory analysis
-  if (conversationGuidance && conversationGuidance.length > 0) {
-    systemPrompt += `
-
-CRITICAL GUIDANCE:
-${conversationGuidance.join('\n')}`;
-  }
-
-  // ENHANCED: Add towing validation guidance
-  if (answerGuidance?.towingValidation) {
-    systemPrompt += `
-
-⚠️ TOWING VALIDATION REQUIRED:
-- Customer is asking about towing capability
-- Validation Result: ${answerGuidance.towingValidation.canTow ? 'SAFE' : 'UNSAFE/IMPOSSIBLE'}
-- Reason: ${answerGuidance.towingValidation.reason}
-- You MUST use this exact response: "${answerGuidance.specificGuidance}"
-- Do NOT deviate from this validated response`;
-  }
-
   // Only add conversation repair guidance when there's actual evidence of being ignored
-  if (needsRepair && answerGuidance?.needsApology) {
+  if (answerGuidance?.needsApology && !conversationMemory.hasIntroduced) {
     systemPrompt += `
 
 ⚠️ CONVERSATION REPAIR NEEDED:
@@ -250,13 +277,14 @@ RESPONSE REQUIREMENTS:
 - Suggest next steps when appropriate
 - Maintain conversation continuity and avoid redundant information
 - NEVER mention vehicle types not specifically requested by the customer
-- NEVER make unverified claims about towing capacity or vehicle capabilities`;
+- NEVER make unverified claims about towing capacity or vehicle capabilities
+- RESPECT established conversation state and avoid re-introductions`;
 
   return {
     systemPrompt,
     customerIntent,
     answerGuidance,
-    needsRepair,
+    needsRepair: false,
     appointmentIntent: null,
     tradeIntent: null,
     requestedCategory: null

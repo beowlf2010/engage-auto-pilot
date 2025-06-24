@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 import { analyzeConversationalContext, generateConversationalResponse } from './conversationalAwareness.ts'
@@ -26,7 +27,7 @@ serve(async (req) => {
       vehicleInterest
     } = await req.json()
     
-    console.log('🤖 Processing ENHANCED source-aware message for', leadName + ':', `"${messageBody}"`);
+    console.log('🤖 Processing ENHANCED conversation-aware message for', leadName + ':', `"${messageBody}"`);
     console.log('📍 Lead source:', leadSource, 'Category:', leadSourceData?.sourceCategory);
     
     // Check for empty messages
@@ -58,21 +59,36 @@ serve(async (req) => {
       }
     }
 
-    // ENHANCED: Use existing conversation memory system
+    // CRITICAL: Use enhanced conversation memory system to prevent re-introductions
     const conversationMemory = analyzeConversationMemory(conversationHistory || '');
-    console.log('🧠 Conversation memory analysis:', {
+    console.log('🧠 CRITICAL Conversation memory analysis:', {
       hasIntroduced: conversationMemory.hasIntroduced,
       isEstablishedConversation: conversationMemory.isEstablishedConversation,
       lastSalesMessageType: conversationMemory.lastSalesMessageType,
+      introductionCount: conversationMemory.introductionCount,
+      hasRepetitiveIntroductions: conversationMemory.hasRepetitiveIntroductions,
       discussedTopics: conversationMemory.discussedTopics
     });
 
-    // Simple conversational analysis (keeping existing logic)
+    // ENHANCED: Detect conversation repair needs (customer confusion)
+    const confusionSignals = /\b(who is this|who are you|i don't know you|do i know you|have we talked)\b/i;
+    const customerNeedsRepair = confusionSignals.test(messageBody) && conversationMemory.hasIntroduced;
+    
+    if (customerNeedsRepair) {
+      console.log('🔧 CONVERSATION REPAIR: Customer seems confused despite previous introduction');
+    }
+
+    // CRITICAL: Restrict simple conversational response to only genuine handoffs
     const conversationalContext = analyzeConversationalContext(messageBody);
     console.log('🗣️ Conversational context:', conversationalContext);
 
-    // Check if message warrants acknowledgment (keeping existing logic)
-    if (conversationalContext.warrantsAcknowledgment) {
+    // ENHANCED: Only use simple response for very specific handoff scenarios, not confusion
+    const isGenuineHandoff = conversationalContext.warrantsAcknowledgment && 
+                            conversationalContext.responseType === 'handoff' && 
+                            !customerNeedsRepair;
+
+    if (isGenuineHandoff) {
+      console.log('🤝 Genuine handoff detected, using simple acknowledgment');
       const response = generateConversationalResponse(conversationalContext, leadName);
       
       return new Response(
@@ -84,8 +100,8 @@ serve(async (req) => {
       );
     }
 
-    // ENHANCED: Use existing sophisticated prompt building system
-    console.log('🤖 Using ENHANCED prompt system with conversation memory');
+    // CRITICAL: All other responses MUST go through conversation-aware system
+    console.log('🤖 Using ENHANCED conversation-aware prompt system');
 
     // Mock inventory and business hours for the enhanced system
     const inventoryStatus = {
@@ -99,11 +115,11 @@ serve(async (req) => {
       hours: { start: '8:00 AM', end: '6:00 PM' }
     };
 
-    // Generate conversation guidance using existing system
+    // CRITICAL: Generate conversation guidance that enforces conversation state
     const conversationGuidance = generateConversationGuidance(conversationMemory, inventoryStatus, businessHours);
-    console.log('📋 Conversation guidance:', conversationGuidance);
+    console.log('📋 CRITICAL Conversation guidance:', conversationGuidance);
 
-    // Use existing enhanced prompt builder
+    // ENHANCED: Ensure conversation memory controls prompt generation
     const conversationLength = conversationHistory ? conversationHistory.split('\n').length : 0;
     const promptData = buildEnhancedSystemPrompt(
       leadName,
@@ -129,9 +145,17 @@ serve(async (req) => {
       promptData.tradeIntent
     );
 
-    console.log('📝 Using enhanced system prompt with conversation awareness');
+    console.log('📝 Using conversation-aware system prompt with anti-introduction safeguards');
 
-    // Generate response using existing sophisticated system
+    // CRITICAL: Log conversation state for debugging
+    if (conversationMemory.hasIntroduced) {
+      console.log('🚨 REMINDER: Customer has been introduced to Finn. DO NOT re-introduce.');
+    }
+    if (conversationMemory.hasRepetitiveIntroductions) {
+      console.log('🔥 WARNING: Multiple introductions detected in history. System must prevent further re-introductions.');
+    }
+
+    // Generate response using conversation-aware system
     const response = await generateEnhancedResponse(
       promptData.systemPrompt,
       userPrompt,
@@ -177,7 +201,7 @@ async function generateEnhancedResponse(
     enhancedSystemPrompt += `\n\nSOURCE-SPECIFIC GUIDANCE: ${getSourceSpecificInstructions(leadSourceData?.sourceCategory)}`;
   }
 
-  console.log('🚀 Generating response with enhanced conversation-aware system');
+  console.log('🚀 Generating response with conversation-aware anti-introduction system');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

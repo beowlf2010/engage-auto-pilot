@@ -11,18 +11,32 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
   const customerRequests = new Set<string>();
   const customerAgreements = new Set<string>();
   
-  // IMPROVED: Track conversation state and introductions
+  // ENHANCED: More robust introduction detection
   let hasIntroduced = false;
   let hasEstablishedRapport = false;
   let lastSalesMessageType = 'unknown';
+  let introductionCount = 0;
   
   // Analyze sales messages for offers and introductions
   salesMessages.forEach((msg, index) => {
     const content = msg.replace(/^(Sales:|You:)/, '').trim().toLowerCase();
     
-    // Check for introductions
-    if (content.includes("i'm finn") || content.includes("finn from") || content.includes("finn with")) {
+    // ENHANCED: More comprehensive introduction detection
+    const introductionPatterns = [
+      /\bi'm finn\b/,
+      /finn\s+(from|with|at)\s+jason\s+pilger/,
+      /this is finn/,
+      /my name is finn/,
+      /i'm\s+\w+\s+from\s+jason\s+pilger/,
+      /\w+\s+from\s+jason\s+pilger\s+chevrolet/
+    ];
+    
+    const isIntroductionMessage = introductionPatterns.some(pattern => pattern.test(content));
+    
+    if (isIntroductionMessage) {
       hasIntroduced = true;
+      introductionCount++;
+      console.log(`🔍 Introduction detected in message ${index + 1}: "${content.substring(0, 50)}..."`);
     }
     
     // Check for established rapport
@@ -36,7 +50,7 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
         lastSalesMessageType = 'scheduling';
       } else if (content.includes('have') && content.includes('stock')) {
         lastSalesMessageType = 'inventory';
-      } else if (content.includes("i'm finn") || content.includes('from jason pilger')) {
+      } else if (isIntroductionMessage) {
         lastSalesMessageType = 'introduction';
       } else {
         lastSalesMessageType = 'follow_up';
@@ -55,7 +69,7 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
     }
   });
   
-  // FIXED: Analyze customer messages for ACTUAL topics mentioned - be more precise
+  // ENHANCED: Analyze customer messages for ACTUAL topics mentioned - be more precise
   customerMessages.forEach(msg => {
     const content = msg.replace('Customer:', '').trim().toLowerCase();
     
@@ -65,7 +79,7 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
       if (content.includes('tesla')) customerRequests.add('tesla_details');
     }
     
-    // FIXED: Only add topics that are explicitly mentioned by the customer
+    // ENHANCED: Only add topics that are explicitly mentioned by the customer
     if (content.includes('electric') || content.includes(' ev ') || content.includes('hybrid')) {
       discussedTopics.add('electric_vehicles');
     }
@@ -88,6 +102,20 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
     }
   });
   
+  // ENHANCED: More sophisticated conversation state detection
+  const isEstablishedConversation = hasIntroduced && (salesMessages.length > 1 || customerMessages.length > 1);
+  const needsIntroduction = !hasIntroduced && salesMessages.length === 0;
+  const hasRepetitiveIntroductions = introductionCount > 1;
+  
+  console.log(`🧠 Conversation Memory Analysis:
+    - Has introduced: ${hasIntroduced}
+    - Introduction count: ${introductionCount}
+    - Is established: ${isEstablishedConversation}
+    - Sales messages: ${salesMessages.length}
+    - Customer messages: ${customerMessages.length}
+    - Last message type: ${lastSalesMessageType}
+    - Repetitive introductions: ${hasRepetitiveIntroductions}`);
+  
   return {
     offeredItems: Array.from(offeredItems),
     discussedTopics: Array.from(discussedTopics),
@@ -98,12 +126,14 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
     customerMessageCount: customerMessages.length,
     lastSalesMessage: salesMessages[salesMessages.length - 1] || '',
     lastCustomerMessage: customerMessages[customerMessages.length - 1] || '',
-    // NEW: Conversation state tracking
+    // ENHANCED: Conversation state tracking with introduction analysis
     hasIntroduced,
     hasEstablishedRapport,
     lastSalesMessageType,
-    isEstablishedConversation: hasIntroduced && salesMessages.length > 1,
-    needsIntroduction: !hasIntroduced && salesMessages.length === 0
+    isEstablishedConversation,
+    needsIntroduction,
+    introductionCount,
+    hasRepetitiveIntroductions
   };
 };
 
@@ -111,13 +141,18 @@ export const analyzeConversationMemory = (conversationHistory: string) => {
 export const generateConversationGuidance = (memory: any, inventoryValidation: any, businessHours: any) => {
   const guidance = [];
   
-  // CRITICAL: Prevent redundant introductions
+  // CRITICAL: Prevent redundant introductions with stronger language
   if (memory.hasIntroduced && memory.isEstablishedConversation) {
-    guidance.push('ESTABLISHED CONVERSATION - Do NOT introduce yourself again. Continue naturally from previous conversation.');
+    guidance.push('🚨 ESTABLISHED CONVERSATION - You have ALREADY introduced yourself. DO NOT introduce yourself again. Continue naturally from previous conversation.');
   }
   
   if (memory.lastSalesMessageType === 'introduction') {
-    guidance.push('PREVIOUS MESSAGE WAS INTRODUCTION - Follow up naturally, do not re-introduce.');
+    guidance.push('🚨 PREVIOUS MESSAGE WAS INTRODUCTION - Your last message was an introduction. Follow up naturally, do NOT re-introduce.');
+  }
+  
+  // CRITICAL: Detect and prevent repetitive introduction loops
+  if (memory.hasRepetitiveIntroductions) {
+    guidance.push('🔥 CRITICAL: Multiple introductions detected in conversation history. This indicates a system problem. DO NOT introduce yourself again under any circumstances.');
   }
   
   // CRITICAL: Prevent topic hallucinations
@@ -148,7 +183,7 @@ export const generateConversationGuidance = (memory: any, inventoryValidation: a
     guidance.push('LIMITED INVENTORY - Be honest about current availability and offer alternatives.');
   }
   
-  if (inventoryValidation.hasRealInventory && inventoryValidation.actualVehicles.length > 0) {
+  if (inventoryValidation.hasRealInventory && inventoryValidation.actualVehicles?.length > 0) {
     const actualVehicles = inventoryValidation.actualVehicles.slice(0, 3).map(v => `${v.year} ${v.make} ${v.model}`).join(', ');
     guidance.push(`ACTUAL INVENTORY AVAILABLE: ${actualVehicles} and ${inventoryValidation.validatedCount - 3} more vehicles - Reference specific vehicles when relevant.`);
   }
