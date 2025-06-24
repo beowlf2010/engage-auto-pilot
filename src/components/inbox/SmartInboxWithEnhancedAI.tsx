@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
@@ -126,6 +127,13 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
     setDismissedRestoration(true);
   }, [clearFilters]);
 
+  // Handle unread badge click to toggle unread filter
+  const handleUnreadBadgeClick = useCallback(() => {
+    const newUnreadOnlyValue = !filters.unreadOnly;
+    updateFilter('unreadOnly', newUnreadOnlyValue);
+    console.log(`🔧 [SMART INBOX] Toggled unread filter: ${newUnreadOnlyValue}`);
+  }, [filters.unreadOnly, updateFilter]);
+
   const stats = useMemo(() => {
     const unreadConversations = filteredConversations.filter(c => c.unreadCount > 0).length;
     const lostStatusConversations = conversations.filter(c => c.status === 'lost').length;
@@ -215,9 +223,28 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
                 {stats.total} conversations
               </Badge>
               {stats.unread > 0 && (
-                <Badge variant="destructive">
-                  {stats.unread} unread
-                </Badge>
+                <Button
+                  onClick={handleUnreadBadgeClick}
+                  variant="ghost"
+                  size="sm"
+                  className={`h-auto p-0 hover:bg-transparent ${
+                    filters.unreadOnly 
+                      ? 'ring-2 ring-red-400 ring-offset-1' 
+                      : ''
+                  }`}
+                  title={filters.unreadOnly ? 'Click to show all messages' : 'Click to filter unread messages'}
+                >
+                  <Badge 
+                    variant="destructive" 
+                    className={`cursor-pointer transition-all hover:bg-red-600 ${
+                      filters.unreadOnly 
+                        ? 'bg-red-600 shadow-md' 
+                        : 'bg-red-500'
+                    }`}
+                  >
+                    {stats.unread} unread
+                  </Badge>
+                </Button>
               )}
             </div>
           </div>
