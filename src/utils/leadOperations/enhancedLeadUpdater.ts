@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { LeadInsertResult } from './types';
@@ -109,7 +108,12 @@ export const updateExistingLead = async (
     // Add update tracking fields
     if (Object.keys(updates).length > 0) {
       updates.upload_history_id = newLeadData.uploadHistoryId;
-      const existingRawData = existingLead.raw_upload_data || {};
+      
+      // Safely handle raw_upload_data spreading
+      const existingRawData = existingLead.raw_upload_data && typeof existingLead.raw_upload_data === 'object' 
+        ? existingLead.raw_upload_data as Record<string, any>
+        : {};
+      
       updates.raw_upload_data = {
         ...existingRawData,
         latest_update: newLeadData.rawUploadData
