@@ -27,6 +27,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
   const [csvData, setCsvData] = useState<{headers: string[], rows: any[], sample: Record<string, string>} | null>(null);
   const [showMapper, setShowMapper] = useState(false);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [updateExistingLeads, setUpdateExistingLeads] = useState(false);
   const { toast } = useToast();
 
   // Check permissions
@@ -87,14 +88,16 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
     
     try {
       console.log('Starting enhanced lead processing with mapping:', mapping);
+      console.log('Update mode:', updateExistingLeads ? 'enabled' : 'disabled');
       
-      // Process the data with enhanced data preservation
+      // Process the data with enhanced data preservation and update option
       const processingResult = await processLeadsEnhanced(
         csvData, 
         mapping,
         currentFile.name,
         currentFile.size,
-        currentFile.type
+        currentFile.type,
+        { updateExistingLeads }
       );
       
       console.log('Enhanced processing complete:', {
@@ -104,13 +107,14 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
         uploadHistoryId: processingResult.uploadHistoryId
       });
 
-      // Insert leads to database with upload history tracking
+      // Insert leads to database with upload history tracking and update support
       const insertResult = await insertLeadsToDatabase(
         processingResult.validLeads,
-        processingResult.uploadHistoryId
+        processingResult.uploadHistoryId,
+        { updateExistingLeads }
       );
       
-      console.log('Enhanced database insertion complete:', insertResult);
+      console.log('Enhanced database operation complete:', insertResult);
 
       // Combine duplicates
       const allDuplicates = [
@@ -131,6 +135,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       const result = {
         totalRows: csvData.rows.length,
         successfulImports: insertResult.successfulInserts,
+        successfulUpdates: insertResult.successfulUpdates || 0,
         errors: processingResult.errors.length + insertResult.errors.length,
         duplicates: allDuplicates.length,
         fileName: currentFile.name,
@@ -155,7 +160,12 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       
       console.log('Enhanced upload process complete:', result);
       
-      if (allDuplicates.length > 0) {
+      if (updateExistingLeads && insertResult.successfulUpdates && insertResult.successfulUpdates > 0) {
+        toast({
+          title: "Upload and update completed!",
+          description: `${insertResult.successfulInserts} leads imported, ${insertResult.successfulUpdates} leads updated`,
+        });
+      } else if (allDuplicates.length > 0) {
         toast({
           title: "Upload completed with duplicates detected",
           description: `${insertResult.successfulInserts} leads imported, ${allDuplicates.length} duplicates skipped`,
@@ -169,9 +179,9 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       }
 
       if (insertResult.errors.length > 0) {
-        console.error('Database insertion errors:', insertResult.errors);
+        console.error('Database operation errors:', insertResult.errors);
         toast({
-          title: "Some leads failed to import",
+          title: "Some leads failed to process",
           description: `${insertResult.errors.length} leads failed due to database errors`,
           variant: "destructive"
         });
@@ -206,6 +216,26 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
               Configure how your file columns map to our system fields
             </p>
           </div>
+        </div>
+
+        {/* Update Existing Leads Option */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="updateExistingLeadsMapper"
+              checked={updateExistingLeads}
+              onChange={(e) => setUpdateExistingLeads(e.target.checked)}
+              disabled={uploading}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="updateExistingLeadsMapper" className="text-sm font-medium text-blue-900">
+              Update existing leads with new information
+            </label>
+          </div>
+          <p className="text-xs text-blue-700 mt-2 ml-7">
+            When enabled, leads that match existing records will be updated with any missing information from the upload.
+          </p>
         </div>
         
         <CSVFieldMapper 

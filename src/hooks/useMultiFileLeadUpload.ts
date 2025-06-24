@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from '@/hooks/use-toast';
@@ -23,10 +22,12 @@ interface BatchUploadResult {
   successfulLeads: number;
   failedLeads: number;
   duplicateLeads: number;
+  updatedLeads: number;
   results: Array<{
     fileName: string;
     status: 'success' | 'error';
     records?: number;
+    updates?: number;
     error?: string;
   }>;
 }
@@ -65,6 +66,7 @@ export const useMultiFileLeadUpload = () => {
   const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
   const [processing, setProcessing] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchUploadResult | null>(null);
+  const [updateExistingLeads, setUpdateExistingLeads] = useState(false);
   const { profile } = useAuth();
 
   const addFiles = useCallback((files: FileList) => {
@@ -86,7 +88,7 @@ export const useMultiFileLeadUpload = () => {
     setBatchResult(null);
   }, []);
 
-  const processFile = async (queuedFile: QueuedFile): Promise<{ success: boolean; records?: number; error?: string }> => {
+  const processFile = async (queuedFile: QueuedFile): Promise<{ success: boolean; records?: number; updates?: number; error?: string }> => {
     try {
       console.log(`📤 [MULTI UPLOAD] Processing file: ${queuedFile.file.name}`);
       
@@ -115,13 +117,14 @@ export const useMultiFileLeadUpload = () => {
 
       console.log(`📊 [MULTI UPLOAD] Parsed ${parsedData.rows.length} rows from ${queuedFile.file.name}`);
 
-      // Process leads using enhanced processing with upload history
+      // Process leads using enhanced processing with upload history and update option
       const processingResult = await processLeadsEnhanced(
         parsedData,
         DEFAULT_LEAD_MAPPING,
         queuedFile.file.name,
         queuedFile.file.size,
-        queuedFile.file.type || 'application/octet-stream'
+        queuedFile.file.type || 'application/octet-stream',
+        { updateExistingLeads }
       );
 
       console.log(`⚙️ [MULTI UPLOAD] Processed ${processingResult.validLeads.length} valid leads, ${processingResult.duplicates.length} duplicates, ${processingResult.errors.length} errors`);
@@ -130,13 +133,14 @@ export const useMultiFileLeadUpload = () => {
         throw new Error(`No valid leads found. ${processingResult.errors.length} processing errors, ${processingResult.duplicates.length} duplicates detected.`);
       }
 
-      // Insert leads to database using existing enhanced insertion
+      // Insert leads to database using existing enhanced insertion with update support
       const insertResult = await insertLeadsToDatabase(
         processingResult.validLeads,
-        processingResult.uploadHistoryId
+        processingResult.uploadHistoryId,
+        { updateExistingLeads }
       );
 
-      console.log(`💾 [MULTI UPLOAD] Database insertion: ${insertResult.successfulInserts} successful, ${insertResult.errors.length} errors`);
+      console.log(`💾 [MULTI UPLOAD] Database operation: ${insertResult.successfulInserts} inserted, ${insertResult.successfulUpdates || 0} updated, ${insertResult.errors.length} errors`);
 
       // Update file status to completed
       setQueuedFiles(prev => prev.map(f => 
@@ -146,6 +150,7 @@ export const useMultiFileLeadUpload = () => {
           result: {
             totalRows: parsedData.rows.length,
             successfulImports: insertResult.successfulInserts,
+            successfulUpdates: insertResult.successfulUpdates || 0,
             errors: insertResult.errors.length,
             duplicates: insertResult.duplicates.length + processingResult.duplicates.length
           }
@@ -154,7 +159,8 @@ export const useMultiFileLeadUpload = () => {
 
       return { 
         success: true, 
-        records: insertResult.successfulInserts 
+        records: insertResult.successfulInserts,
+        updates: insertResult.successfulUpdates || 0
       };
 
     } catch (error) {
@@ -190,6 +196,7 @@ export const useMultiFileLeadUpload = () => {
       successfulLeads: 0,
       failedLeads: 0,
       duplicateLeads: 0,
+      updatedLeads: 0,
       results: []
     };
 
@@ -203,10 +210,12 @@ export const useMultiFileLeadUpload = () => {
         if (fileResult.success) {
           result.successfulFiles++;
           result.successfulLeads += fileResult.records || 0;
+          result.updatedLeads += fileResult.updates || 0;
           result.results.push({
             fileName: queuedFile.file.name,
             status: 'success',
-            records: fileResult.records
+            records: fileResult.records,
+            updates: fileResult.updates
           });
         } else {
           result.failedFiles++;
@@ -245,6 +254,8 @@ export const useMultiFileLeadUpload = () => {
     queuedFiles,
     processing,
     batchResult,
+    updateExistingLeads,
+    setUpdateExistingLeads,
     addFiles,
     removeFile,
     clearQueue,

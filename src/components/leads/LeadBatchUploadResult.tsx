@@ -13,10 +13,12 @@ interface BatchUploadResult {
   successfulLeads: number;
   failedLeads: number;
   duplicateLeads: number;
+  updatedLeads?: number;
   results: Array<{
     fileName: string;
     status: 'success' | 'error';
     records?: number;
+    updates?: number;
     error?: string;
   }>;
 }
@@ -30,6 +32,7 @@ interface LeadBatchUploadResultProps {
 const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUploadResultProps) => {
   const hasErrors = result.failedFiles > 0 || result.failedLeads > 0;
   const hasSuccesses = result.successfulFiles > 0 && result.successfulLeads > 0;
+  const hasUpdates = (result.updatedLeads || 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -55,7 +58,7 @@ const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUpload
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{result.totalFiles}</div>
               <div className="text-sm text-gray-600">Total Files</div>
@@ -64,6 +67,12 @@ const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUpload
               <div className="text-2xl font-bold text-green-600">{result.successfulLeads}</div>
               <div className="text-sm text-gray-600">Leads Imported</div>
             </div>
+            {hasUpdates && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{result.updatedLeads || 0}</div>
+                <div className="text-sm text-gray-600">Leads Updated</div>
+              </div>
+            )}
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">{result.duplicateLeads}</div>
               <div className="text-sm text-gray-600">Duplicates Skipped</div>
@@ -79,7 +88,8 @@ const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUpload
               <div className="flex items-center space-x-2 text-green-800">
                 <CheckCircle className="h-4 w-4" />
                 <span className="font-medium">
-                  Successfully imported {result.successfulLeads} leads from {result.successfulFiles} files
+                  Successfully imported {result.successfulLeads} leads
+                  {hasUpdates && ` and updated ${result.updatedLeads} existing leads`} from {result.successfulFiles} files
                 </span>
               </div>
             </div>
@@ -124,9 +134,10 @@ const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUpload
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {fileResult.fileName}
                     </p>
-                    {fileResult.status === 'success' && fileResult.records && (
+                    {fileResult.status === 'success' && (
                       <p className="text-xs text-green-600">
-                        {fileResult.records} leads imported
+                        {fileResult.records || 0} leads imported
+                        {(fileResult.updates || 0) > 0 && `, ${fileResult.updates} updated`}
                       </p>
                     )}
                     {fileResult.status === 'error' && fileResult.error && (
@@ -158,6 +169,7 @@ const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUpload
             <span>✓ Duplicate detection applied</span>
             <span>✓ AI strategy calculated</span>
             <span>✓ Upload history tracked</span>
+            {hasUpdates && <span>✓ Existing leads updated</span>}
           </div>
         </div>
         
@@ -168,7 +180,7 @@ const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUpload
           {hasSuccesses && (
             <Button onClick={onViewLeads} className="bg-blue-600 hover:bg-blue-700">
               <Users className="h-4 w-4 mr-2" />
-              View Imported Leads
+              View {hasUpdates ? 'Imported & Updated' : 'Imported'} Leads
             </Button>
           )}
         </div>

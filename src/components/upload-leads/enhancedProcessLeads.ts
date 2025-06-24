@@ -1,4 +1,3 @@
-
 import { createPhoneNumbers, getPrimaryPhone } from "@/utils/phoneUtils";
 import { checkForDuplicate, ProcessedLead } from "./duplicateDetection";
 import { createUploadHistory, updateUploadHistory } from "@/utils/leadOperations/uploadHistoryService";
@@ -17,6 +16,10 @@ export interface EnhancedProcessingResult {
     rawData?: Record<string, any>;
   }>;
   uploadHistoryId: string;
+}
+
+export interface EnhancedProcessingOptions {
+  updateExistingLeads?: boolean;
 }
 
 // Enhanced status mapping with complete audit trail
@@ -83,7 +86,8 @@ export const processLeadsEnhanced = async (
   mapping: any,
   fileName: string,
   fileSize: number,
-  fileType: string
+  fileType: string,
+  options: EnhancedProcessingOptions = {}
 ): Promise<EnhancedProcessingResult> => {
   // Create upload history record
   const uploadHistoryId = await createUploadHistory(fileName, fileSize, fileType, mapping);
@@ -91,8 +95,14 @@ export const processLeadsEnhanced = async (
   const validLeads: ProcessedLead[] = [];
   const duplicates: EnhancedProcessingResult['duplicates'] = [];
   const errors: EnhancedProcessingResult['errors'] = [];
+  const updates: Array<{
+    leadId: string;
+    updatedFields: string[];
+    rowIndex: number;
+  }> = [];
 
   console.log('Processing leads with enhanced data preservation. Sample row:', csvData.sample);
+  console.log('Update mode:', options.updateExistingLeads ? 'enabled' : 'disabled');
 
   for (let index = 0; index < csvData.rows.length; index++) {
     const row = csvData.rows[index];
@@ -186,13 +196,24 @@ export const processLeadsEnhanced = async (
       const duplicateCheck = checkForDuplicate(newLead, validLeads);
       
       if (duplicateCheck.isDuplicate && duplicateCheck.conflictingLead) {
-        duplicates.push({
-          lead: newLead,
-          duplicateType: duplicateCheck.duplicateType!,
-          conflictingLead: duplicateCheck.conflictingLead,
-          rowIndex: index + 1
-        });
-        console.log(`Duplicate found at row ${index + 1}: ${duplicateCheck.duplicateType} conflict`);
+        if (options.updateExistingLeads) {
+          // In update mode, we still track within-file duplicates but don't update them
+          duplicates.push({
+            lead: newLead,
+            duplicateType: duplicateCheck.duplicateType!,
+            conflictingLead: duplicateCheck.conflictingLead,
+            rowIndex: index + 1
+          });
+          console.log(`Within-file duplicate found at row ${index + 1}: ${duplicateCheck.duplicateType} conflict`);
+        } else {
+          duplicates.push({
+            lead: newLead,
+            duplicateType: duplicateCheck.duplicateType!,
+            conflictingLead: duplicateCheck.conflictingLead,
+            rowIndex: index + 1
+          });
+          console.log(`Duplicate found at row ${index + 1}: ${duplicateCheck.duplicateType} conflict`);
+        }
       } else {
         validLeads.push(newLead);
         console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status})`);
@@ -221,6 +242,7 @@ export const processLeadsEnhanced = async (
     validLeads,
     duplicates,
     errors,
-    uploadHistoryId
+    uploadHistoryId,
+    updates: updates as any // Add updates to the result
   };
 };
