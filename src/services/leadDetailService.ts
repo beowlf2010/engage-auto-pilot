@@ -166,7 +166,7 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
         ),
         upload_history!upload_history_id (
           id,
-          file_name,
+          original_filename,
           upload_type,
           created_at
         )
