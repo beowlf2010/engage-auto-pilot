@@ -48,7 +48,7 @@ export const useLeads = () => {
       // Get conversation counts for each lead
       const { data: conversationCounts, error: countError } = await supabase
         .from('conversations')
-        .select('lead_id, direction, read_at')
+        .select('lead_id, direction, read_at, body, sent_at')
         .order('sent_at', { ascending: false });
 
       if (countError) throw countError;
@@ -75,9 +75,9 @@ export const useLeads = () => {
           phoneNumbers: leadData.phone_numbers?.map(p => ({
             id: p.id,
             number: p.number,
-            type: p.type,
+            type: (p.type as 'cell' | 'day' | 'eve') || 'cell',
             priority: p.priority,
-            status: p.status,
+            status: (p.status as 'active' | 'failed' | 'opted_out') || 'active',
             isPrimary: p.is_primary
           })) || [],
           primaryPhone,
@@ -108,7 +108,7 @@ export const useLeads = () => {
           vehicleMake: leadData.vehicle_make,
           vehicleModel: leadData.vehicle_model,
           vehicleVIN: leadData.vehicle_vin,
-          contactStatus: leadData.contact_status || 'no_contact',
+          contactStatus: (leadData.contact_status as 'no_contact' | 'contact_attempted' | 'response_received') || 'no_contact',
           incomingCount,
           outgoingCount,
           unrepliedCount,
