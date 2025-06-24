@@ -20,7 +20,7 @@ const LeadsList = () => {
 
   const canImport = profile?.role === 'manager' || profile?.role === 'admin';
 
-  // Use the leads hook to fetch data
+  // Use the enhanced leads hook to fetch data with message counts
   const { leads, loading, error, refetch } = useLeads();
 
   // Use filters hook
@@ -95,6 +95,7 @@ const LeadsList = () => {
       <LeadsFiltersBar 
         filter={filter}
         setFilter={setFilter}
+        leads={leads} // Pass all leads for count calculation
       />
 
       {/* Process Management Panel - only show when leads are selected */}

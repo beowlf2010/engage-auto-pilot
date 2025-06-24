@@ -9,9 +9,10 @@ export const useLeads = () => {
   const { data: leads = [], isLoading, error } = useQuery({
     queryKey: ['leads'],
     queryFn: async (): Promise<Lead[]> => {
-      console.log('🔍 [LEADS FETCH] Fetching leads with enhanced AI strategy fields...');
+      console.log('🔍 [LEADS FETCH] Fetching leads with conversation data...');
       
-      const { data, error } = await supabase
+      // Fetch leads with phone numbers
+      const { data: leadsData, error: leadsError } = await supabase
         .from('leads')
         .select(`
           *,
@@ -26,24 +27,26 @@ export const useLeads = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('❌ [LEADS FETCH] Error fetching leads:', error);
-        throw error;
+      if (leadsError) {
+        console.error('❌ [LEADS FETCH] Error fetching leads:', leadsError);
+        throw leadsError;
       }
 
-      console.log(`🔍 [LEADS FETCH] Raw leads data count: ${data?.length || 0}`);
-      if (data && data.length > 0) {
-        console.log('🔍 [LEADS FETCH] Sample raw lead with AI fields:', {
-          id: data[0].id,
-          name: `${data[0].first_name} ${data[0].last_name}`,
-          lead_type_name: data[0].lead_type_name,
-          lead_status_type_name: data[0].lead_status_type_name,
-          lead_source_name: data[0].lead_source_name
-        });
+      // Fetch all conversations to calculate message counts
+      const { data: conversationsData, error: conversationsError } = await supabase
+        .from('conversations')
+        .select('lead_id, direction, sent_at, read_at');
+
+      if (conversationsError) {
+        console.error('❌ [LEADS FETCH] Error fetching conversations:', conversationsError);
+        throw conversationsError;
       }
+
+      console.log(`🔍 [LEADS FETCH] Raw leads data count: ${leadsData?.length || 0}`);
+      console.log(`📨 [LEADS FETCH] Conversations data count: ${conversationsData?.length || 0}`);
 
       // Transform the data to match Lead interface
-      const transformedLeads: Lead[] = data?.map(lead => {
+      const transformedLeads: Lead[] = leadsData?.map(lead => {
         // Get primary phone number
         const primaryPhone = lead.phone_numbers?.find((p: any) => p.is_primary)?.number || 
                             lead.phone_numbers?.[0]?.number || '';
@@ -58,6 +61,45 @@ export const useLeads = () => {
           isPrimary: phone.is_primary,
         })) || [];
 
+        // Calculate message counts for this lead
+        const leadConversations = conversationsData?.filter(conv => conv.lead_id === lead.id) || [];
+        const incomingCount = leadConversations.filter(msg => msg.direction === 'in').length;
+        const outgoingCount = leadConversations.filter(msg => msg.direction === 'out').length;
+        const unreadCount = leadConversations.filter(msg => 
+          msg.direction === 'in' && !msg.read_at
+        ).length;
+
+        // Calculate unreplied count - incoming messages that don't have an outgoing response after them
+        let unrepliedCount = 0;
+        const sortedConversations = leadConversations.sort((a, b) => 
+          new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
+        );
+        
+        for (let i = 0; i < sortedConversations.length; i++) {
+          const msg = sortedConversations[i];
+          if (msg.direction === 'in') {
+            const hasReply = sortedConversations.slice(i + 1).some(laterMsg => 
+              laterMsg.direction === 'out'
+            );
+            if (!hasReply) {
+              unrepliedCount++;
+            }
+          }
+        }
+
+        // Get the most recent message
+        const lastMessage = leadConversations.sort((a, b) => 
+          new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
+        )[0];
+
+        // Determine contact status based on message data
+        let contactStatus: 'no_contact' | 'contact_attempted' | 'response_received' = 'no_contact';
+        if (incomingCount > 0) {
+          contactStatus = 'response_received';
+        } else if (outgoingCount > 0) {
+          contactStatus = 'contact_attempted';
+        }
+
         // Map status with proper type checking
         const mapStatus = (status: string): 'new' | 'engaged' | 'paused' | 'closed' | 'lost' => {
           const validStatuses = ['new', 'engaged', 'paused', 'closed', 'lost'];
@@ -69,9 +111,6 @@ export const useLeads = () => {
           const validIntensities = ['gentle', 'standard', 'aggressive'];
           return validIntensities.includes(intensity) ? intensity as 'gentle' | 'standard' | 'aggressive' : 'gentle';
         };
-
-        // Determine contact status based on available data
-        const contactStatus: 'no_contact' | 'contact_attempted' | 'response_received' = 'no_contact';
 
         const transformedLead: Lead = {
           id: lead.id,
@@ -104,17 +143,17 @@ export const useLeads = () => {
           aiAggressionLevel: lead.ai_aggression_level || 1,
           nextAiSendAt: lead.next_ai_send_at || null,
           createdAt: lead.created_at,
-          // Message tracking - provide defaults since these fields may not exist in DB
-          messageCount: 0,
-          unreadCount: 0,
-          lastMessage: null,
-          lastMessageTime: null,
-          lastMessageDirection: null,
-          // Engagement metrics with fallbacks - these fields may not exist in the current schema
-          incomingCount: 0,
-          outgoingCount: 0,
-          unrepliedCount: 0,
-          // Enhanced AI strategy fields - properly mapped from database with logging
+          // Enhanced message tracking with actual data
+          messageCount: leadConversations.length,
+          unreadCount,
+          lastMessage: lastMessage?.body || null,
+          lastMessageTime: lastMessage ? new Date(lastMessage.sent_at).toLocaleString() : null,
+          lastMessageDirection: lastMessage?.direction as 'in' | 'out' | null || null,
+          // Accurate engagement metrics
+          incomingCount,
+          outgoingCount,
+          unrepliedCount,
+          // Enhanced AI strategy fields
           leadTypeName: lead.lead_type_name || null,
           leadStatusTypeName: lead.lead_status_type_name || null,
           leadSourceName: lead.lead_source_name || null,
@@ -125,21 +164,10 @@ export const useLeads = () => {
           created_at: lead.created_at,
         };
 
-        // Log AI strategy fields for debugging with enhanced detail
-        if (lead.lead_type_name || lead.lead_status_type_name || lead.lead_source_name) {
-          console.log(`🧠 [LEADS FETCH] Lead ${lead.id} (${lead.first_name} ${lead.last_name}) AI Strategy:`, {
-            leadTypeName: lead.lead_type_name,
-            leadStatusTypeName: lead.lead_status_type_name,
-            leadSourceName: lead.lead_source_name,
-            source: lead.source
-          });
-        }
-
         return transformedLead;
       }) || [];
 
-      const aiFieldsCount = transformedLeads.filter(l => l.leadTypeName || l.leadStatusTypeName || l.leadSourceName).length;
-      console.log(`✅ [LEADS FETCH] Transformed ${transformedLeads.length} leads, ${aiFieldsCount} with AI strategy data`);
+      console.log(`✅ [LEADS FETCH] Transformed ${transformedLeads.length} leads with message data`);
       
       return transformedLeads;
     },
@@ -156,7 +184,7 @@ export const useLeads = () => {
 
   return {
     leads,
-    loading: isLoading, // Map isLoading to loading for compatibility
+    loading: isLoading,
     isLoading,
     error,
     invalidateLeads,
