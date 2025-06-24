@@ -49,6 +49,21 @@ export const useLeads = () => {
           isPrimary: phone.is_primary,
         })) || [];
 
+        // Map status with proper type checking
+        const mapStatus = (status: string): 'new' | 'engaged' | 'paused' | 'closed' | 'lost' => {
+          const validStatuses = ['new', 'engaged', 'paused', 'closed', 'lost'];
+          return validStatuses.includes(status) ? status as 'new' | 'engaged' | 'paused' | 'closed' | 'lost' : 'new';
+        };
+
+        // Map message intensity with proper type checking
+        const mapMessageIntensity = (intensity: string): 'gentle' | 'standard' | 'aggressive' => {
+          const validIntensities = ['gentle', 'standard', 'aggressive'];
+          return validIntensities.includes(intensity) ? intensity as 'gentle' | 'standard' | 'aggressive' : 'gentle';
+        };
+
+        // Determine contact status based on available data
+        const contactStatus: 'no_contact' | 'contact_attempted' | 'response_received' = 'no_contact';
+
         const transformedLead: Lead = {
           id: lead.id,
           firstName: lead.first_name || '',
@@ -65,15 +80,15 @@ export const useLeads = () => {
           vehicleInterest: lead.vehicle_interest || '',
           vehicleVIN: lead.vehicle_vin || '',
           source: lead.source || 'Unknown',
-          status: (lead.status as 'new' | 'engaged' | 'paused' | 'closed' | 'lost') || 'new',
-          contactStatus: (lead.contact_status as 'no_contact' | 'contact_attempted' | 'response_received') || 'no_contact',
-          salesPersonName: [lead.salesperson_first_name, lead.salesperson_last_name].filter(Boolean).join(' ') || '',
+          status: mapStatus(lead.status || 'new'),
+          contactStatus,
+          salesperson: [lead.salesperson_first_name, lead.salesperson_last_name].filter(Boolean).join(' ') || '',
           doNotCall: lead.do_not_call || false,
           doNotEmail: lead.do_not_email || false,
           doNotMail: lead.do_not_mail || false,
           aiOptIn: lead.ai_opt_in || false,
           aiSequencePaused: lead.ai_sequence_paused || false,
-          messageIntensity: (lead.message_intensity as 'gentle' | 'standard' | 'aggressive') || 'gentle',
+          messageIntensity: mapMessageIntensity(lead.message_intensity || 'gentle'),
           aiMessagesSent: lead.ai_messages_sent || 0,
           aiStage: lead.ai_stage || null,
           aiStrategyBucket: lead.ai_strategy_bucket || null,
@@ -81,22 +96,21 @@ export const useLeads = () => {
           nextAiSendAt: lead.next_ai_send_at || null,
           createdAt: lead.created_at,
           updatedAt: lead.updated_at || lead.created_at,
-          // Message tracking
-          messageCount: 0, // This will be populated by a separate query if needed
+          // Message tracking - provide defaults since these fields may not exist in DB
+          messageCount: 0,
           unreadCount: 0,
           lastMessage: null,
           lastMessageTime: null,
           lastMessageDirection: null,
-          // Engagement metrics with fallbacks
-          incomingCount: lead.incoming_count || 0,
-          outgoingCount: lead.outgoing_count || 0,
-          unrepliedCount: lead.unreplied_count || 0,
+          // Engagement metrics with fallbacks - these fields may not exist in the current schema
+          incomingCount: 0,
+          outgoingCount: 0,
+          unrepliedCount: 0,
           // Enhanced AI strategy fields - now properly mapped from database
           leadTypeName: lead.lead_type_name || null,
           leadStatusTypeName: lead.lead_status_type_name || null,
           leadSourceName: lead.lead_source_name || null,
           // Required Lead properties for compatibility
-          salesperson: [lead.salesperson_first_name, lead.salesperson_last_name].filter(Boolean).join(' ') || '',
           salespersonId: lead.salesperson_id || '',
           first_name: lead.first_name || '',
           last_name: lead.last_name || '',
