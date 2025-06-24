@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
@@ -36,6 +37,8 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
     loading,
     error,
     sendingMessage,
+    totalUnreadCount,
+    loadingUnreadCount,
     loadMessages,
     sendMessage,
     manualRefresh
@@ -66,6 +69,7 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
       totalConversations: conversations.length,
       afterSearchFilter: filtered.length,
       unreadInFiltered: unreadFiltered.length,
+      totalUnreadCount: totalUnreadCount,
       unreadConversations: unreadFiltered.map(c => ({
         leadId: c.leadId,
         leadName: c.leadName,
@@ -82,7 +86,7 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
       const bTime = new Date(b.lastMessageTime || b.lastMessageDate).getTime();
       return bTime - aTime; // Newest first
     });
-  }, [conversations, searchQuery, applyFilters, filters]);
+  }, [conversations, searchQuery, applyFilters, filters, totalUnreadCount]);
 
   const selectedConversation = selectedConversationId 
     ? conversations.find(c => c.leadId === selectedConversationId)
@@ -112,9 +116,10 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
       // Force refresh of global unread count after marking as read
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('unread-count-changed'));
+        manualRefresh(); // Refresh to update totalUnreadCount
       }, 1000);
     }
-  }, [loadMessages, markAsRead]);
+  }, [loadMessages, markAsRead, manualRefresh]);
 
   const handleSendMessage = useCallback(async (messageContent: string) => {
     if (!selectedConversation?.leadId) return;
@@ -134,7 +139,7 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
     }
   }, [updateFilter]);
 
-  // Stats calculation
+  // Stats calculation - use totalUnreadCount for accurate global count
   const stats = useMemo(() => {
     const unreadConversations = filteredAndSortedConversations.filter(c => c.unreadCount > 0).length;
     const lostStatusConversations = conversations.filter(c => c.status === 'lost').length;
@@ -143,10 +148,11 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
     return {
       total: filteredAndSortedConversations.length,
       unread: unreadConversations,
+      totalUnread: totalUnreadCount, // Use the accurate total unread count
       lost: lostStatusConversations,
       unassigned: unassignedConversations
     };
-  }, [filteredAndSortedConversations, conversations]);
+  }, [filteredAndSortedConversations, conversations, totalUnreadCount]);
 
   // Force refresh global unread count when component mounts
   useEffect(() => {
@@ -199,9 +205,16 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
                 <Users className="h-3 w-3 mr-1" />
                 {stats.total} conversations
               </Badge>
-              {stats.unread > 0 && (
+              {(loadingUnreadCount ? stats.unread : stats.totalUnread) > 0 && (
                 <Badge variant="destructive">
-                  {stats.unread} unread
+                  {loadingUnreadCount ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      {stats.unread} unread
+                    </>
+                  ) : (
+                    `${stats.totalUnread} unread`
+                  )}
                 </Badge>
               )}
             </div>
@@ -349,6 +362,11 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
                 <p className="text-sm text-gray-400 mt-2">
                   Sorted by newest activity first
                 </p>
+                {!loadingUnreadCount && stats.totalUnread > stats.unread && (
+                  <p className="text-xs text-orange-600 mt-2">
+                    Note: {stats.totalUnread - stats.unread} additional unread messages beyond displayed conversations
+                  </p>
+                )}
               </div>
             </div>
           )}

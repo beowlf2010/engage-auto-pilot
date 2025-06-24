@@ -18,11 +18,78 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
   const [error, setError] = useState<string | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [totalConversations, setTotalConversations] = useState(0);
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const [loadingUnreadCount, setLoadingUnreadCount] = useState(false);
   
   // Debouncing refs
   const loadConversationsDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const loadMessagesDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const loadUnreadCountDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastLoadTimeRef = useRef<number>(0);
+
+  // Load total unread count across ALL conversations
+  const loadTotalUnreadCount = useCallback(async () => {
+    // Clear any pending debounced calls
+    if (loadUnreadCountDebounceRef.current) {
+      clearTimeout(loadUnreadCountDebounceRef.current);
+    }
+
+    // Debounce rapid calls
+    loadUnreadCountDebounceRef.current = setTimeout(async () => {
+      if (!profile?.id) return;
+
+      try {
+        setLoadingUnreadCount(true);
+        
+        // Build query based on user role - count ALL unread messages
+        let query = supabase
+          .from('leads')
+          .select(`
+            id,
+            salesperson_id,
+            conversations!inner(
+              direction,
+              read_at
+            )
+          `, { count: 'exact' });
+
+        // Apply role-based filtering
+        if (profile.role === 'sales') {
+          query = query.or(`salesperson_id.eq.${profile.id},salesperson_id.is.null`);
+        }
+
+        const { data: leadsData, error: leadsError } = await query;
+
+        if (leadsError) throw leadsError;
+
+        if (!leadsData) {
+          setTotalUnreadCount(0);
+          return;
+        }
+
+        // Count ALL unread messages across ALL conversations
+        let totalUnread = 0;
+        leadsData.forEach(lead => {
+          if (lead.conversations && lead.conversations.length > 0) {
+            const unreadCount = lead.conversations.filter(
+              msg => msg.direction === 'in' && !msg.read_at
+            ).length;
+            totalUnread += unreadCount;
+          }
+        });
+
+        setTotalUnreadCount(totalUnread);
+
+        console.log('✅ [OPTIMIZED INBOX] Total unread count loaded:', totalUnread);
+
+      } catch (error) {
+        console.error('❌ [OPTIMIZED INBOX] Error loading total unread count:', error);
+        setTotalUnreadCount(0);
+      } finally {
+        setLoadingUnreadCount(false);
+      }
+    }, 100); // 100ms debounce
+  }, [profile?.id, profile?.role]);
 
   // Debounced load conversations
   const loadConversations = useCallback(async () => {
@@ -130,13 +197,16 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       console.log('✅ [OPTIMIZED INBOX] Loaded conversations:', conversationsArray.length);
       console.log('🔍 [OPTIMIZED INBOX] Unread conversations found:', conversationsArray.filter(c => c.unreadCount > 0).length);
 
+      // Load total unread count separately
+      loadTotalUnreadCount();
+
     } catch (error) {
       console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', error);
       setError(error instanceof Error ? error.message : 'Failed to load conversations');
     } finally {
       setLoading(false);
     }
-  }, [profile?.id, profile?.role]);
+  }, [profile?.id, profile?.role, loadTotalUnreadCount]);
 
   // Debounced load messages
   const loadMessages = useCallback(async (leadId: string) => {
@@ -254,6 +324,9 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       if (loadMessagesDebounceRef.current) {
         clearTimeout(loadMessagesDebounceRef.current);
       }
+      if (loadUnreadCountDebounceRef.current) {
+        clearTimeout(loadUnreadCountDebounceRef.current);
+      }
     };
   }, []);
 
@@ -264,6 +337,8 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
     error,
     sendingMessage,
     totalConversations,
+    totalUnreadCount,
+    loadingUnreadCount,
     loadMessages,
     sendMessage,
     manualRefresh,
