@@ -12,6 +12,11 @@ export interface InboxFilters {
   leadSource: string;
   vehicleType: string;
   sortBy: 'newest' | 'oldest' | 'unread' | 'activity';
+  // Add properties that SmartFilters expects
+  status: string[];
+  aiOptIn: boolean;
+  priority: string;
+  assigned: string;
 }
 
 const defaultFilters: InboxFilters = {
@@ -23,7 +28,11 @@ const defaultFilters: InboxFilters = {
   dateRange: 'all',
   leadSource: '',
   vehicleType: '',
-  sortBy: 'newest' // Default to newest first
+  sortBy: 'newest', // Default to newest first
+  status: [],
+  aiOptIn: false,
+  priority: '',
+  assigned: ''
 };
 
 export const useInboxFilters = (userId?: string, userRole?: string) => {
@@ -44,7 +53,8 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
     return Object.keys(filters).some(key => {
       if (key === 'sortBy') return filters[key] !== 'newest'; // Default is newest
       if (key === 'dateRange') return filters[key] !== 'all';
-      if (key === 'leadSource' || key === 'vehicleType') return filters[key] !== '';
+      if (key === 'leadSource' || key === 'vehicleType' || key === 'priority' || key === 'assigned') return filters[key] !== '';
+      if (key === 'status') return (filters[key] as string[]).length > 0;
       return filters[key as keyof InboxFilters] === true;
     });
   }, [filters]);
@@ -83,6 +93,21 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
       filtered = filtered.filter(conv => 
         conv.vehicleInterest?.toLowerCase().includes(filters.vehicleType.toLowerCase())
       );
+    }
+
+    // Apply new filter properties
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(conv => 
+        filters.status.includes(conv.status || '')
+      );
+    }
+
+    if (filters.assigned) {
+      if (filters.assigned === 'assigned') {
+        filtered = filtered.filter(conv => conv.salespersonId);
+      } else if (filters.assigned === 'unassigned') {
+        filtered = filtered.filter(conv => !conv.salespersonId);
+      }
     }
 
     // Apply date range filter
@@ -141,6 +166,8 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
     if (filters.dateRange !== 'all') summary.push(`Last ${filters.dateRange}`);
     if (filters.leadSource) summary.push(`Source: ${filters.leadSource}`);
     if (filters.vehicleType) summary.push(`Vehicle: ${filters.vehicleType}`);
+    if (filters.status.length > 0) summary.push(`Status: ${filters.status.join(', ')}`);
+    if (filters.assigned) summary.push(`Assigned: ${filters.assigned}`);
     if (filters.sortBy !== 'newest') summary.push(`Sort: ${filters.sortBy}`);
     
     return summary;
