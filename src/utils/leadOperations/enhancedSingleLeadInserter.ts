@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { LeadInsertResult } from './types';
@@ -27,7 +26,7 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
     const salesPersonFirstName = salesPersonParts.length > 0 ? salesPersonParts[0] : null;
     const salesPersonLastName = salesPersonParts.length > 1 ? salesPersonParts.slice(1).join(' ') : null;
 
-    // Insert the lead with enhanced data preservation
+    // Insert the lead with enhanced data preservation and AI enabled by default
     const { data: leadData, error: leadError } = await supabase
       .from('leads')
       .insert({
@@ -56,11 +55,14 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
         salesperson_first_name: salesPersonFirstName,
         salesperson_last_name: salesPersonLastName,
         data_source_quality_score: qualityScore,
-        // New AI strategy fields - ensure they're not undefined
+        // AI strategy fields - ensure they're not undefined
         lead_status_type_name: (lead as any).leadStatusTypeName || null,
         lead_type_name: (lead as any).leadTypeName || null,
         lead_source_name: (lead as any).leadSourceName || null,
-        // Initialize AI strategy fields with safe defaults
+        // Enable AI by default for uploaded leads with proper strategy defaults
+        ai_opt_in: true,
+        ai_contact_enabled: true,
+        ai_replies_enabled: true,
         message_intensity: 'gentle',
         ai_strategy_bucket: 'other_unknown',
         ai_aggression_level: 3
