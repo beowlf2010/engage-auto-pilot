@@ -201,7 +201,7 @@ async function generateEnhancedResponse(
     enhancedSystemPrompt += `\n\nSOURCE-SPECIFIC GUIDANCE: ${getSourceSpecificInstructions(leadSourceData?.sourceCategory)}`;
   }
 
-  console.log('🚀 Generating response with conversation-aware anti-introduction system');
+  console.log('🚀 Generating response with conversation-aware anti-introduction system using GPT-4.1');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -210,7 +210,7 @@ async function generateEnhancedResponse(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4.1-2025-04-14', // Updated to use the latest GPT-4.1 model
       messages: [
         { role: 'system', content: enhancedSystemPrompt },
         { role: 'user', content: userPrompt }
