@@ -144,7 +144,7 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
         />
       </div>
 
-      {/* Right Sidebar - matches inbox layout */}
+      {/* Right Sidebar - Enhanced with Process Selection */}
       <LeadDetailSidebar
         lead={lead}
         onAIOptInChange={handleAIOptInChange}
