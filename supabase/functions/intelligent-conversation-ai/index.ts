@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 import { analyzeConversationalContext, generateConversationalResponse } from './conversationalAwareness.ts'
+import { analyzeConversationMemory, generateConversationGuidance } from './conversationMemory.ts'
+import { buildEnhancedSystemPrompt, buildEnhancedUserPrompt } from './enhancedPromptBuilder.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +26,7 @@ serve(async (req) => {
       vehicleInterest
     } = await req.json()
     
-    console.log('🤖 Processing source-aware message for', leadName + ':', `"${messageBody}"`);
+    console.log('🤖 Processing ENHANCED source-aware message for', leadName + ':', `"${messageBody}"`);
     console.log('📍 Lead source:', leadSource, 'Category:', leadSourceData?.sourceCategory);
     
     // Check for empty messages
@@ -56,11 +58,20 @@ serve(async (req) => {
       }
     }
 
-    // Simple conversational analysis
+    // ENHANCED: Use existing conversation memory system
+    const conversationMemory = analyzeConversationMemory(conversationHistory || '');
+    console.log('🧠 Conversation memory analysis:', {
+      hasIntroduced: conversationMemory.hasIntroduced,
+      isEstablishedConversation: conversationMemory.isEstablishedConversation,
+      lastSalesMessageType: conversationMemory.lastSalesMessageType,
+      discussedTopics: conversationMemory.discussedTopics
+    });
+
+    // Simple conversational analysis (keeping existing logic)
     const conversationalContext = analyzeConversationalContext(messageBody);
     console.log('🗣️ Conversational context:', conversationalContext);
 
-    // Check if message warrants acknowledgment
+    // Check if message warrants acknowledgment (keeping existing logic)
     if (conversationalContext.warrantsAcknowledgment) {
       const response = generateConversationalResponse(conversationalContext, leadName);
       
@@ -73,18 +84,59 @@ serve(async (req) => {
       );
     }
 
-    // CHANGED: Remove the restrictive question-only check
-    // Previous code blocked non-question messages, now we attempt to respond to ALL messages
-    console.log('🤖 Attempting to generate response for any customer message');
+    // ENHANCED: Use existing sophisticated prompt building system
+    console.log('🤖 Using ENHANCED prompt system with conversation memory');
 
-    // Generate source-aware response using OpenAI
-    const response = await generateSourceAwareResponse(
-      leadName, 
-      messageBody, 
-      leadSource, 
-      leadSourceData, 
-      vehicleInterest,
-      conversationHistory
+    // Mock inventory and business hours for the enhanced system
+    const inventoryStatus = {
+      hasActualInventory: true,
+      validatedCount: 15,
+      warning: null
+    };
+
+    const businessHours = {
+      isOpen: true,
+      hours: { start: '8:00 AM', end: '6:00 PM' }
+    };
+
+    // Generate conversation guidance using existing system
+    const conversationGuidance = generateConversationGuidance(conversationMemory, inventoryStatus, businessHours);
+    console.log('📋 Conversation guidance:', conversationGuidance);
+
+    // Use existing enhanced prompt builder
+    const conversationLength = conversationHistory ? conversationHistory.split('\n').length : 0;
+    const promptData = buildEnhancedSystemPrompt(
+      leadName,
+      vehicleInterest || '',
+      conversationLength,
+      conversationHistory || '',
+      inventoryStatus,
+      businessHours,
+      conversationGuidance,
+      messageBody
+    );
+
+    const userPrompt = buildEnhancedUserPrompt(
+      messageBody,
+      conversationHistory || '',
+      null, // requestedCategory
+      { isEstablishedConversation: conversationMemory.isEstablishedConversation },
+      conversationMemory,
+      conversationGuidance,
+      promptData.customerIntent,
+      promptData.answerGuidance,
+      promptData.appointmentIntent,
+      promptData.tradeIntent
+    );
+
+    console.log('📝 Using enhanced system prompt with conversation awareness');
+
+    // Generate response using existing sophisticated system
+    const response = await generateEnhancedResponse(
+      promptData.systemPrompt,
+      userPrompt,
+      leadSource,
+      leadSourceData
     );
     
     return new Response(
@@ -107,13 +159,11 @@ serve(async (req) => {
   }
 })
 
-async function generateSourceAwareResponse(
-  leadName: string, 
-  message: string, 
+async function generateEnhancedResponse(
+  systemPrompt: string,
+  userPrompt: string,
   leadSource?: string, 
-  leadSourceData?: any,
-  vehicleInterest?: string,
-  conversationHistory?: string
+  leadSourceData?: any
 ) {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
   
@@ -121,29 +171,13 @@ async function generateSourceAwareResponse(
     throw new Error('OpenAI API key not configured');
   }
 
-  // Generate source-aware prompt
-  let prompt = `You are Finn, a helpful AI assistant for Jason Pilger Chevrolet in Atmore, AL.
-
-Customer: ${leadName}
-Vehicle Interest: ${vehicleInterest || 'Not specified'}
-Message: "${message}"`;
-
-  // Add source-specific context if available
+  // Add source-specific instructions to the system prompt
+  let enhancedSystemPrompt = systemPrompt;
   if (leadSource && leadSourceData) {
-    const sourceContext = getSourceContext(leadSourceData);
-    prompt += `\n\nLEAD SOURCE CONTEXT:
-Source: ${leadSource}
-Category: ${leadSourceData.sourceCategory}
-${sourceContext}`;
+    enhancedSystemPrompt += `\n\nSOURCE-SPECIFIC GUIDANCE: ${getSourceSpecificInstructions(leadSourceData?.sourceCategory)}`;
   }
 
-  // Add conversation history if available
-  if (conversationHistory) {
-    prompt += `\n\nRecent conversation:\n${conversationHistory}`;
-  }
-
-  // ENHANCED: Updated prompt to handle all message types, not just questions
-  prompt += `\n\nRespond helpfully and professionally in under 160 characters. Even if the customer isn't asking a direct question, acknowledge their message and provide value. ${getSourceSpecificInstructions(leadSourceData?.sourceCategory)}`;
+  console.log('🚀 Generating response with enhanced conversation-aware system');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -154,8 +188,8 @@ ${sourceContext}`;
     body: JSON.stringify({
       model: 'gpt-3.5-turbo',
       messages: [
-        { role: 'system', content: 'You are a helpful automotive sales assistant who responds to every customer message with care and professionalism, even if they are not asking questions.' },
-        { role: 'user', content: prompt }
+        { role: 'system', content: enhancedSystemPrompt },
+        { role: 'user', content: userPrompt }
       ],
       max_tokens: 100,
       temperature: 0.7,
@@ -168,15 +202,6 @@ ${sourceContext}`;
 
   const data = await response.json();
   return data.choices[0]?.message?.content?.trim() || 'I appreciate you reaching out. Please call us at (251) 368-4053 and we can help you with whatever you need!';
-}
-
-function getSourceContext(leadSourceData: any): string {
-  if (!leadSourceData) return '';
-  
-  return `Priority: ${leadSourceData.urgencyLevel}
-Communication Style: ${leadSourceData.communicationStyle}
-Expected Response Time: ${leadSourceData.expectedResponseTime} hours
-Conversion Probability: ${Math.round(leadSourceData.conversionProbability * 100)}%`;
 }
 
 function getSourceSpecificInstructions(sourceCategory?: string): string {
