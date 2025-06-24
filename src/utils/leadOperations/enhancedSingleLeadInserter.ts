@@ -47,16 +47,18 @@ export const insertEnhancedLead = async (leadData: EnhancedLeadData): Promise<Le
       original_status: leadData.originalStatus,
       status_mapping_log: leadData.statusMappingLog,
       data_source_quality_score: qualityScore,
-      // AI strategy fields - properly mapped to database columns
-      lead_type_name: leadData.leadTypeName,
-      lead_status_type_name: leadData.leadStatusTypeName,
-      lead_source_name: leadData.leadSourceName
+      // AI strategy fields - ensure they're properly saved
+      lead_type_name: leadData.leadTypeName || null,
+      lead_status_type_name: leadData.leadStatusTypeName || null,
+      lead_source_name: leadData.leadSourceName || null
     };
 
     console.log('Inserting lead with AI strategy fields:', {
       lead_type_name: leadInsert.lead_type_name,
       lead_status_type_name: leadInsert.lead_status_type_name,
-      lead_source_name: leadInsert.lead_source_name
+      lead_source_name: leadInsert.lead_source_name,
+      firstName: leadInsert.first_name,
+      lastName: leadInsert.last_name
     });
 
     // Insert the lead
@@ -70,6 +72,8 @@ export const insertEnhancedLead = async (leadData: EnhancedLeadData): Promise<Le
       console.error('Lead insertion error:', leadError);
       return { success: false, error: leadError.message };
     }
+
+    console.log(`Successfully inserted lead ${lead.id} with AI strategy fields`);
 
     // Insert phone numbers
     if (leadData.phoneNumbers && leadData.phoneNumbers.length > 0) {

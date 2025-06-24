@@ -87,6 +87,43 @@ const mapStatusToSystemStatus = (inputStatus: string, rowIndex: number): {
   };
 };
 
+// Function to safely extract AI strategy fields from CSV row
+const extractAIStrategyFields = (row: Record<string, any>) => {
+  console.log('Extracting AI strategy fields from row. Available keys:', Object.keys(row));
+  
+  // Define possible column name variations for each field
+  const leadTypeNameFields = ['LeadTypeName', 'leadTypeName', 'lead_type_name', 'Lead Type Name'];
+  const leadStatusTypeNameFields = ['leadstatustypename', 'LeadStatusTypeName', 'lead_status_type_name', 'Lead Status Type Name'];
+  const leadSourceNameFields = ['leadsourcename', 'leadSourceName', 'lead_source_name', 'Lead Source Name'];
+  
+  // Helper function to find first matching field
+  const findFieldValue = (fieldVariations: string[]) => {
+    for (const field of fieldVariations) {
+      if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
+        console.log(`Found value for ${field}:`, row[field]);
+        return row[field];
+      }
+    }
+    return null;
+  };
+  
+  const leadTypeName = findFieldValue(leadTypeNameFields);
+  const leadStatusTypeName = findFieldValue(leadStatusTypeNameFields);
+  const leadSourceName = findFieldValue(leadSourceNameFields);
+  
+  console.log('Extracted AI strategy fields:', {
+    leadTypeName,
+    leadStatusTypeName,
+    leadSourceName
+  });
+  
+  return {
+    leadTypeName,
+    leadStatusTypeName,
+    leadSourceName
+  };
+};
+
 export const processLeadsEnhanced = async (
   csvData: any, 
   mapping: any,
@@ -152,32 +189,8 @@ export const processLeadsEnhanced = async (
       const doNotCall = row[mapping.doNotCall]?.toLowerCase() === 'true';
       const doNotEmail = row[mapping.doNotEmail]?.toLowerCase() === 'true';
 
-      // Extract AI strategy fields from CSV columns directly
-      // Try multiple possible column name variations to be flexible
-      const leadTypeName = row['LeadTypeName'] || 
-                          row['leadTypeName'] || 
-                          row['lead_type_name'] || 
-                          row[mapping.LeadTypeName] || 
-                          null;
-                          
-      const leadStatusTypeName = row['leadstatustypename'] || 
-                                row['LeadStatusTypeName'] || 
-                                row['lead_status_type_name'] || 
-                                row[mapping.leadstatustypename] || 
-                                null;
-                                
-      const leadSourceName = row['leadsourcename'] || 
-                            row['leadSourceName'] || 
-                            row['lead_source_name'] || 
-                            row[mapping.leadsourcename] || 
-                            null;
-
-      console.log(`Row ${index + 1} AI Strategy Fields:`, {
-        leadTypeName,
-        leadStatusTypeName, 
-        leadSourceName,
-        availableKeys: Object.keys(row)
-      });
+      // Extract AI strategy fields using improved logic
+      const aiStrategyFields = extractAIStrategyFields(row);
 
       const newLead: ProcessedLead & {
         uploadHistoryId: string;
@@ -214,10 +227,10 @@ export const processLeadsEnhanced = async (
         rawUploadData,
         originalStatus: row[mapping.status] || '',
         statusMappingLog: statusMapping.mappingLog,
-        // AI strategy fields - directly extracted from CSV
-        leadStatusTypeName,
-        leadTypeName,
-        leadSourceName
+        // AI strategy fields - properly extracted
+        leadStatusTypeName: aiStrategyFields.leadStatusTypeName,
+        leadTypeName: aiStrategyFields.leadTypeName,
+        leadSourceName: aiStrategyFields.leadSourceName
       };
 
       // Check for duplicates against already processed leads
@@ -244,7 +257,7 @@ export const processLeadsEnhanced = async (
         }
       } else {
         validLeads.push(newLead);
-        console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status}) AI Fields: ${leadTypeName}|${leadStatusTypeName}|${leadSourceName}`);
+        console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status}) AI Fields: ${aiStrategyFields.leadTypeName}|${aiStrategyFields.leadStatusTypeName}|${aiStrategyFields.leadSourceName}`);
       }
 
     } catch (error) {
