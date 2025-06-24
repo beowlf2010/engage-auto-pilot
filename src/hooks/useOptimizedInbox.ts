@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -91,7 +90,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
     }, 100); // 100ms debounce
   }, [profile?.id, profile?.role]);
 
-  // Debounced load conversations
+  // Debounced load conversations - NOW SORTED BY MESSAGE ACTIVITY
   const loadConversations = useCallback(async () => {
     // Clear any pending debounced calls
     if (loadConversationsDebounceRef.current) {
@@ -135,15 +134,15 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
             read_at,
             ai_generated
           )
-        `)
-        .order('created_at', { ascending: false });
+        `);
 
       // Apply role-based filtering
       if (profile.role === 'sales') {
         query = query.or(`salesperson_id.eq.${profile.id},salesperson_id.is.null`);
       }
 
-      const { data: leadsData, error: leadsError } = await query.limit(100);
+      // Remove the limit and order to get all conversations, then we'll sort by activity
+      const { data: leadsData, error: leadsError } = await query;
 
       if (leadsError) throw leadsError;
 
@@ -153,7 +152,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
         return;
       }
 
-      // Process conversations
+      // Process conversations and sort by last message activity
       const conversationMap = new Map<string, ConversationListItem>();
 
       leadsData.forEach(lead => {
@@ -190,11 +189,18 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
         });
       });
 
-      const conversationsArray = Array.from(conversationMap.values());
+      // Convert to array and sort by last message activity (most recent first)
+      const conversationsArray = Array.from(conversationMap.values())
+        .sort((a, b) => {
+          // Sort by last message date, most recent first
+          return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
+        })
+        .slice(0, 150); // Increase limit slightly to ensure we catch active conversations
+
       setConversations(conversationsArray);
       setTotalConversations(conversationsArray.length);
 
-      console.log('✅ [OPTIMIZED INBOX] Loaded conversations:', conversationsArray.length);
+      console.log('✅ [OPTIMIZED INBOX] Loaded conversations sorted by activity:', conversationsArray.length);
       console.log('🔍 [OPTIMIZED INBOX] Unread conversations found:', conversationsArray.filter(c => c.unreadCount > 0).length);
 
       // Load total unread count separately
