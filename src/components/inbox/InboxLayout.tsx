@@ -3,7 +3,7 @@ import React from 'react';
 import EnhancedInboxTabs from './EnhancedInboxTabs';
 import EnhancedChatView from './EnhancedChatView';
 import ConversationMemory from '../ConversationMemory';
-import type { ConversationListItem, MessageData } from '@/hooks/conversation/conversationTypes';
+import type { ConversationListItem, MessageData } from '@/types/conversation';
 
 interface InboxLayoutProps {
   conversations: ConversationListItem[];
