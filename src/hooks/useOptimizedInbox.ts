@@ -44,7 +44,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
     try {
       setError(null);
       
-      // Build query based on user role
+      // Build query based on user role - using only existing columns
       let query = supabase
         .from('leads')
         .select(`
@@ -54,8 +54,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           phone,
           email,
           vehicle_interest,
-          lead_source,
-          lead_type,
+          source,
           status,
           salesperson_id,
           ai_opt_in,
@@ -104,18 +103,21 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           leadId: lead.id,
           leadName: `${lead.first_name} ${lead.last_name}`,
           leadPhone: lead.phone || '',
+          primaryPhone: lead.phone || '',
           leadEmail: lead.email || '',
           vehicleInterest: lead.vehicle_interest || '',
-          leadSource: lead.lead_source || '',
-          leadType: lead.lead_type || '',
+          leadSource: lead.source || '',
+          leadType: '',
           status: lead.status || 'new',
           salespersonId: lead.salesperson_id,
           aiOptIn: lead.ai_opt_in || false,
           messageIntensity: lead.message_intensity || 'standard',
           lastMessage: lastMessage?.body || '',
           lastMessageTime: lastMessage ? new Date(lastMessage.sent_at).toLocaleString() : '',
-          lastMessageDate: lastMessage?.sent_at || lead.created_at,
+          lastMessageDate: new Date(lastMessage?.sent_at || lead.created_at),
+          lastMessageDirection: lastMessage?.direction as 'in' | 'out' | null,
           unreadCount,
+          messageCount: lead.conversations.length,
           isAiGenerated: lastMessage?.ai_generated || false
         });
       });
