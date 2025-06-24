@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { uploadSessionService } from "../uploadSessionService";
@@ -135,9 +136,9 @@ export const cleanupInventoryData = async () => {
 
       console.log(`Found ${yesterdayVehicles.length} available vehicles from yesterday`);
 
-      // Create sets for efficient comparison
-      const todayVINs = new Set(todayVehicles.map(v => v.vin).filter(Boolean));
-      const todayStockNumbers = new Set(todayVehicles.map(v => v.stock_number).filter(Boolean));
+      // Create sets for efficient comparison - properly type the arrays
+      const todayVINs = new Set(todayVehicles.map(v => v.vin).filter((vin): vin is string => Boolean(vin)));
+      const todayStockNumbers = new Set(todayVehicles.map(v => v.stock_number).filter((stock): stock is string => Boolean(stock)));
 
       // Find vehicles from yesterday that are not in today's upload
       vehiclesToMarkSold = yesterdayVehicles.filter(vehicle => {
