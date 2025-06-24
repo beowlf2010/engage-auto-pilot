@@ -167,12 +167,13 @@ serve(async (req) => {
     const personalizedName = usePersonalName ? formatProperName(leadData.first_name) : null;
     const personalizedVehicle = useVehicleInterest ? leadData.vehicle_interest : 'the right vehicle';
     
-    const salespersonName = salespersonProfile?.first_name || 'Finn';
+    // Always use "Finn the Internet Sales Specialist" branding
+    const salespersonName = 'Finn the Internet Sales Specialist';
 
     console.log(`📝 [AI MESSAGE] Personalization - Name: ${personalizedName || 'generic'}, Vehicle: ${personalizedVehicle}`);
 
-    // Build system prompt based on decisions
-    const systemPrompt = `You are a professional automotive sales assistant named ${salespersonName} from Jason Pilger Chevrolet.
+    // Build system prompt based on decisions - UPDATED WITH PROPER BRANDING
+    const systemPrompt = `You are Finn the Internet Sales Specialist from Jason Pilger Chevrolet.
 
 PERSONALIZATION RULES:
 - Customer name: ${usePersonalName ? `Use "${personalizedName}" naturally` : 'Do NOT use any name - use generic greeting'}
@@ -185,10 +186,11 @@ IMPORTANT RULES:
 - Always end with a clear call to action
 - If no personal name approved, use "Hi!" or "Hello!" instead
 - If no vehicle approved, use generic vehicle language
+- ALWAYS introduce yourself as "Finn the Internet Sales Specialist" on initial contact
 
 Generate a ${isInitialContact ? 'warm introduction' : 'follow-up'} message that respects the personalization decisions.`;
 
-    // Build user prompt with context
+    // Build user prompt with context - UPDATED WITH INTRODUCTION REQUIREMENT
     const userPrompt = `Generate a personalized message for this lead:
     
 LEAD CONTEXT:
@@ -200,11 +202,12 @@ CONVERSATION HISTORY:
 ${conversations?.map(c => `${c.direction === 'in' ? 'Customer' : 'You'}: ${c.body}`).join('\n') || 'No previous conversations'}
 
 Generate a message that:
-1. ${usePersonalName ? `Opens with "Hi ${personalizedName}!"` : 'Opens with "Hi!" or "Hello!"'}
-2. ${useVehicleInterest ? `References their interest in "${personalizedVehicle}"` : 'Uses generic vehicle language'}
-3. Includes a clear next step or question
-4. Stays under 160 characters
-5. Feels natural and conversational`;
+1. ${isInitialContact ? 'MUST introduce yourself as "Finn the Internet Sales Specialist from Jason Pilger Chevrolet"' : 'Continue the existing conversation naturally'}
+2. ${usePersonalName ? `Opens with "Hi ${personalizedName}!"` : 'Opens with "Hi!" or "Hello!"'}
+3. ${useVehicleInterest ? `References their interest in "${personalizedVehicle}"` : 'Uses generic vehicle language'}
+4. Includes a clear next step or question
+5. Stays under 160 characters
+6. Feels natural and conversational`;
 
     // List of models to try in order of preference
     const modelsToTry = [
@@ -291,12 +294,12 @@ Generate a message that:
       }
     }
 
-    // If all models failed, return the last error with fallback (USING FORMATTED NAME)
+    // If all models failed, return the last error with fallback (USING FORMATTED NAME AND PROPER BRANDING)
     console.error('❌ [AI MESSAGE] All models failed. Last error:', lastError);
     
     const fallbackMessage = usePersonalName 
-      ? `Hi ${personalizedName}! I'm ${salespersonName} with Jason Pilger Chevrolet. I'd love to help you find ${personalizedVehicle}. What questions can I answer?`
-      : `Hi! I'm ${salespersonName} with Jason Pilger Chevrolet. I'd love to help you find the right vehicle. What questions can I answer?`;
+      ? `Hi ${personalizedName}! I'm Finn the Internet Sales Specialist with Jason Pilger Chevrolet. I'd love to help you find ${personalizedVehicle}. What questions can I answer?`
+      : `Hi! I'm Finn the Internet Sales Specialist with Jason Pilger Chevrolet. I'd love to help you find the right vehicle. What questions can I answer?`;
     
     return new Response(JSON.stringify({ 
       success: false,
@@ -311,8 +314,8 @@ Generate a message that:
   } catch (error) {
     console.error('❌ [AI MESSAGE] Unexpected error:', error);
     
-    // Provide fallback message
-    const fallbackMessage = "Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?";
+    // Provide fallback message with proper branding
+    const fallbackMessage = "Hi! I'm Finn the Internet Sales Specialist with Jason Pilger Chevrolet. I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?";
     
     return new Response(JSON.stringify({ 
       success: false,
