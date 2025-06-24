@@ -120,11 +120,24 @@ export interface LeadDetailData {
   tradePayoffAmount?: number;
   // Primary phone for easy access
   primaryPhone: string;
+  // NEW: Original upload data fields
+  rawUploadData?: Record<string, any>;
+  leadTypeName?: string;
+  leadStatusTypeName?: string;
+  leadSourceName?: string;
+  originalStatus?: string;
+  statusMappingLog?: Record<string, any>;
+  dataSourceQualityScore?: number;
+  uploadHistoryId?: string;
+  originalRowIndex?: number;
+  aiStrategyBucket?: string;
+  aiAggressionLevel?: number;
+  aiStrategyLastUpdated?: string;
 }
 
 export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | null> => {
   try {
-    // Get lead details with phone numbers, trade vehicles, and salesperson info
+    // Get lead details with phone numbers, trade vehicles, salesperson info, and upload data
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select(`
@@ -147,6 +160,12 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
         profiles!salesperson_id (
           first_name,
           last_name
+        ),
+        upload_history!upload_history_id (
+          id,
+          file_name,
+          upload_type,
+          created_at
         )
       `)
       .eq('id', leadId)
@@ -219,19 +238,19 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       vehicleInterest: lead.vehicle_interest,
       vehicleMake: lead.vehicle_make,
       vehicleModel: lead.vehicle_model,
-      vehicleYear: lead.vehicle_year ? parseInt(lead.vehicle_year) : undefined, // Convert string to number
+      vehicleYear: lead.vehicle_year ? parseInt(lead.vehicle_year) : undefined,
       vehicleVin: lead.vehicle_vin,
       createdAt: lead.created_at,
       lastReplyAt: lead.last_reply_at,
       preferredPriceMin: lead.preferred_price_min,
       preferredPriceMax: lead.preferred_price_max,
-      notes: '', // Default empty string since notes column doesn't exist
+      notes: '',
       phoneNumbers: (lead.phone_numbers || []).map((phone: any) => ({
         id: phone.id,
         number: phone.number,
         isPrimary: phone.is_primary,
         type: phone.type,
-        status: 'active' // Default status since it's not in the database
+        status: 'active'
       })),
       tradeVehicles: (lead.trade_vehicles || []).map((trade: any) => ({
         id: trade.id,
@@ -241,9 +260,9 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
         vin: trade.vin,
         mileage: trade.mileage,
         condition: trade.condition,
-        estimatedValue: 0, // Default value since column doesn't exist
-        owedAmount: 0, // Default value since column doesn't exist
-        description: '' // Default empty string since description column doesn't exist
+        estimatedValue: 0,
+        owedAmount: 0,
+        description: ''
       })),
       conversations: (conversations || []).map((conv: any) => ({
         id: conv.id,
@@ -273,42 +292,55 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : undefined,
       temperatureScore: lead.temperature_score,
       hasTradeVehicle: lead.has_trade_vehicle || false,
-      lastContactedAt: undefined, // Field doesn't exist in schema
+      lastContactedAt: undefined,
       totalMessages: messageCount || 0,
-      averageResponseTime: undefined, // Field doesn't exist in schema
-      preferredContactMethod: undefined, // Field doesn't exist in schema
-      timezone: undefined, // Field doesn't exist in schema
-      bestContactHours: undefined, // Field doesn't exist in schema
-      lastActivityAt: undefined, // Field doesn't exist in schema
-      leadScore: undefined, // Field doesn't exist in schema
-      convertedAt: undefined, // Field doesn't exist in schema
-      conversionValue: undefined, // Field doesn't exist in schema
+      averageResponseTime: undefined,
+      preferredContactMethod: undefined,
+      timezone: undefined,
+      bestContactHours: undefined,
+      lastActivityAt: undefined,
+      leadScore: undefined,
+      convertedAt: undefined,
+      conversionValue: undefined,
       appointmentBooked: (appointments && appointments.length > 0) || false,
       lastAppointmentAt: appointments?.[0]?.created_at,
       emailOptIn: lead.email_opt_in ?? true,
-      smsOptIn: true, // Default since column doesn't exist
-      callOptIn: true, // Default since column doesn't exist
-      unsubscribed: false, // Default since column doesn't exist
-      doNotContact: false, // Default since column doesn't exist
-      aiSequenceStartedAt: undefined, // Field doesn't exist in schema
-      aiLastMessageAt: undefined, // Field doesn't exist in schema
-      manuallyAssigned: false, // Default since column doesn't exist
-      campaignSource: undefined, // Field doesn't exist in schema
-      referralSource: undefined, // Field doesn't exist in schema
-      utmSource: undefined, // Field doesn't exist in schema
-      utmMedium: undefined, // Field doesn't exist in schema
-      utmCampaign: undefined, // Field doesn't exist in schema
-      landingPage: undefined, // Field doesn't exist in schema
-      deviceType: undefined, // Field doesn't exist in schema
-      browserType: undefined, // Field doesn't exist in schema
-      ipAddress: undefined, // Field doesn't exist in schema
-      geoLocation: undefined, // Field doesn't exist in schema
+      smsOptIn: true,
+      callOptIn: true,
+      unsubscribed: false,
+      doNotContact: false,
+      aiSequenceStartedAt: undefined,
+      aiLastMessageAt: undefined,
+      manuallyAssigned: false,
+      campaignSource: undefined,
+      referralSource: undefined,
+      utmSource: undefined,
+      utmMedium: undefined,
+      utmCampaign: undefined,
+      landingPage: undefined,
+      deviceType: undefined,
+      browserType: undefined,
+      ipAddress: undefined,
+      geoLocation: undefined,
       // AI takeover settings
       aiTakeoverEnabled: lead.ai_takeover_enabled || false,
       aiTakeoverDelayMinutes: lead.ai_takeover_delay_minutes,
-      // Additional trade fields - provide safe defaults
-      tradeInVehicle: undefined, // Will be computed from trade vehicles if they exist
-      tradePayoffAmount: 0 // Default since owed_amount doesn't exist
+      // Additional trade fields
+      tradeInVehicle: undefined,
+      tradePayoffAmount: 0,
+      // NEW: Original upload data fields
+      rawUploadData: lead.raw_upload_data || {},
+      leadTypeName: lead.lead_type_name,
+      leadStatusTypeName: lead.lead_status_type_name,
+      leadSourceName: lead.lead_source_name,
+      originalStatus: lead.original_status,
+      statusMappingLog: lead.status_mapping_log || {},
+      dataSourceQualityScore: lead.data_source_quality_score || 0,
+      uploadHistoryId: lead.upload_history_id,
+      originalRowIndex: lead.original_row_index,
+      aiStrategyBucket: lead.ai_strategy_bucket,
+      aiAggressionLevel: lead.ai_aggression_level,
+      aiStrategyLastUpdated: lead.ai_strategy_last_updated
     };
 
     return leadDetail;

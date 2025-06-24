@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import UnifiedAIControls from "../UnifiedAIControls";
 import MarkLostConfirmDialog from "../../MarkLostConfirmDialog";
 import MarkSoldConfirmDialog from "../../MarkSoldConfirmDialog";
+import OriginalUploadDataCard from "./OriginalUploadDataCard";
 import { markLeadAsLost, markLeadAsSold } from "@/services/leadStatusService";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
@@ -146,6 +146,9 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
             </div>
           </CardContent>
         </Card>
+
+        {/* NEW: Original Upload Data Card */}
+        <OriginalUploadDataCard lead={lead} />
 
         {/* Unified AI Controls */}
         <UnifiedAIControls
