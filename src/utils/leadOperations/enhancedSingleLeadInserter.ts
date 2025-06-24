@@ -20,7 +20,7 @@ export const insertEnhancedLead = async (leadData: EnhancedLeadData): Promise<Le
     // Calculate data quality score
     const qualityScore = calculateDataQualityScore(leadData);
 
-    // Prepare lead data for insertion
+    // Prepare lead data for insertion - ensure AI strategy fields are included
     const leadInsert = {
       first_name: leadData.firstName,
       last_name: leadData.lastName,
@@ -47,33 +47,37 @@ export const insertEnhancedLead = async (leadData: EnhancedLeadData): Promise<Le
       original_status: leadData.originalStatus,
       status_mapping_log: leadData.statusMappingLog,
       data_source_quality_score: qualityScore,
-      // AI strategy fields - ensure they're properly saved
-      lead_type_name: leadData.leadTypeName || null,
-      lead_status_type_name: leadData.leadStatusTypeName || null,
-      lead_source_name: leadData.leadSourceName || null
+      // AI strategy fields - ensure they're properly saved with validation
+      lead_type_name: leadData.leadTypeName && leadData.leadTypeName.trim() !== '' ? leadData.leadTypeName.trim() : null,
+      lead_status_type_name: leadData.leadStatusTypeName && leadData.leadStatusTypeName.trim() !== '' ? leadData.leadStatusTypeName.trim() : null,
+      lead_source_name: leadData.leadSourceName && leadData.leadSourceName.trim() !== '' ? leadData.leadSourceName.trim() : null
     };
 
-    console.log('Inserting lead with AI strategy fields:', {
+    console.log('💾 [DATABASE INSERT] Inserting lead with AI strategy fields:', {
+      firstName: leadInsert.first_name,
+      lastName: leadInsert.last_name,
       lead_type_name: leadInsert.lead_type_name,
       lead_status_type_name: leadInsert.lead_status_type_name,
-      lead_source_name: leadInsert.lead_source_name,
-      firstName: leadInsert.first_name,
-      lastName: leadInsert.last_name
+      lead_source_name: leadInsert.lead_source_name
     });
 
     // Insert the lead
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .insert(leadInsert)
-      .select('id')
+      .select('id, lead_type_name, lead_status_type_name, lead_source_name')
       .single();
 
     if (leadError) {
-      console.error('Lead insertion error:', leadError);
+      console.error('❌ [DATABASE INSERT] Lead insertion error:', leadError);
       return { success: false, error: leadError.message };
     }
 
-    console.log(`Successfully inserted lead ${lead.id} with AI strategy fields`);
+    console.log(`✅ [DATABASE INSERT] Successfully inserted lead ${lead.id} with AI strategy fields:`, {
+      lead_type_name: lead.lead_type_name,
+      lead_status_type_name: lead.lead_status_type_name,
+      lead_source_name: lead.lead_source_name
+    });
 
     // Insert phone numbers
     if (leadData.phoneNumbers && leadData.phoneNumbers.length > 0) {
@@ -91,14 +95,14 @@ export const insertEnhancedLead = async (leadData: EnhancedLeadData): Promise<Le
         .insert(phoneInserts);
 
       if (phoneError) {
-        console.error('Phone number insertion error:', phoneError);
+        console.error('⚠️ [DATABASE INSERT] Phone number insertion error:', phoneError);
         // Don't fail the whole operation for phone errors
       }
     }
 
     return { success: true, leadId: lead.id };
   } catch (error) {
-    console.error('Enhanced lead insertion error:', error);
+    console.error('❌ [DATABASE INSERT] Enhanced lead insertion error:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -125,9 +129,12 @@ const calculateDataQualityScore = (lead: EnhancedLeadData): number => {
   if (lead.vehicleInterest && lead.vehicleInterest !== 'finding the right vehicle for your needs') score += 10;
   if (lead.vehicleVIN) score += 10;
   
-  // Additional data (10 points total)
-  if (lead.salesPersonName) score += 5;
-  if (lead.source && lead.source !== 'CSV Import') score += 5;
+  // Additional data and AI strategy fields (10 points total)
+  if (lead.salesPersonName) score += 2;
+  if (lead.source && lead.source !== 'CSV Import') score += 2;
+  if (lead.leadTypeName) score += 2;
+  if (lead.leadStatusTypeName) score += 2;
+  if (lead.leadSourceName) score += 2;
   
   return Math.min(score, 100);
 };

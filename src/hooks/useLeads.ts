@@ -9,7 +9,7 @@ export const useLeads = () => {
   const { data: leads = [], isLoading, error } = useQuery({
     queryKey: ['leads'],
     queryFn: async (): Promise<Lead[]> => {
-      console.log('Fetching leads with enhanced AI strategy fields...');
+      console.log('🔍 [LEADS FETCH] Fetching leads with enhanced AI strategy fields...');
       
       const { data, error } = await supabase
         .from('leads')
@@ -27,11 +27,20 @@ export const useLeads = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching leads:', error);
+        console.error('❌ [LEADS FETCH] Error fetching leads:', error);
         throw error;
       }
 
-      console.log('Raw leads data sample:', data?.[0]);
+      console.log(`🔍 [LEADS FETCH] Raw leads data count: ${data?.length || 0}`);
+      if (data && data.length > 0) {
+        console.log('🔍 [LEADS FETCH] Sample raw lead with AI fields:', {
+          id: data[0].id,
+          name: `${data[0].first_name} ${data[0].last_name}`,
+          lead_type_name: data[0].lead_type_name,
+          lead_status_type_name: data[0].lead_status_type_name,
+          lead_source_name: data[0].lead_source_name
+        });
+      }
 
       // Transform the data to match Lead interface
       const transformedLeads: Lead[] = data?.map(lead => {
@@ -105,7 +114,7 @@ export const useLeads = () => {
           incomingCount: 0,
           outgoingCount: 0,
           unrepliedCount: 0,
-          // Enhanced AI strategy fields - now properly mapped from database
+          // Enhanced AI strategy fields - properly mapped from database with logging
           leadTypeName: lead.lead_type_name || null,
           leadStatusTypeName: lead.lead_status_type_name || null,
           leadSourceName: lead.lead_source_name || null,
@@ -116,19 +125,21 @@ export const useLeads = () => {
           created_at: lead.created_at,
         };
 
-        // Log AI strategy fields for debugging
+        // Log AI strategy fields for debugging with enhanced detail
         if (lead.lead_type_name || lead.lead_status_type_name || lead.lead_source_name) {
-          console.log(`Lead ${lead.id} AI Strategy:`, {
+          console.log(`🧠 [LEADS FETCH] Lead ${lead.id} (${lead.first_name} ${lead.last_name}) AI Strategy:`, {
             leadTypeName: lead.lead_type_name,
             leadStatusTypeName: lead.lead_status_type_name,
-            leadSourceName: lead.lead_source_name
+            leadSourceName: lead.lead_source_name,
+            source: lead.source
           });
         }
 
         return transformedLead;
       }) || [];
 
-      console.log(`Fetched ${transformedLeads.length} leads with AI strategy data`);
+      const aiFieldsCount = transformedLeads.filter(l => l.leadTypeName || l.leadStatusTypeName || l.leadSourceName).length;
+      console.log(`✅ [LEADS FETCH] Transformed ${transformedLeads.length} leads, ${aiFieldsCount} with AI strategy data`);
       
       return transformedLeads;
     },

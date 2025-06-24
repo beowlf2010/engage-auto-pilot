@@ -32,7 +32,7 @@ interface BatchUploadResult {
   }>;
 }
 
-// Default field mapping for lead files - Updated to include AI strategy fields
+// Updated field mapping for lead files with corrected AI strategy field mappings
 const DEFAULT_LEAD_MAPPING = {
   firstName: 'first_name',
   lastName: 'last_name',
@@ -57,9 +57,9 @@ const DEFAULT_LEAD_MAPPING = {
   doNotCall: 'do_not_call',
   doNotEmail: 'do_not_email',
   doNotMail: 'do_not_mail',
-  // AI Strategy fields - map directly to the CSV column names
+  // Updated AI Strategy field mappings to match actual CSV column variations
   leadStatusTypeName: 'leadstatustypename',
-  leadTypeName: 'LeadTypeName', 
+  leadTypeName: 'leadtypename', 
   leadSourceName: 'leadsourcename'
 };
 

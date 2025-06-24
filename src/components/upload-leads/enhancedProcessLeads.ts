@@ -1,3 +1,4 @@
+
 import { createPhoneNumbers, getPrimaryPhone } from "@/utils/phoneUtils";
 import { checkForDuplicate, ProcessedLead } from "./duplicateDetection";
 import { createUploadHistory, updateUploadHistory } from "@/utils/leadOperations/uploadHistoryService";
@@ -96,10 +97,13 @@ const extractAIStrategyFields = (row: Record<string, any>, mapping: any) => {
     leadSourceName: mapping.leadSourceName
   });
   
-  // Use the mapping to get the correct CSV column names
-  const leadStatusTypeName = mapping.leadStatusTypeName ? row[mapping.leadStatusTypeName] : null;
-  const leadTypeName = mapping.leadTypeName ? row[mapping.leadTypeName] : null;
-  const leadSourceName = mapping.leadSourceName ? row[mapping.leadSourceName] : null;
+  // Extract values using the mapping configuration
+  const leadStatusTypeName = mapping.leadStatusTypeName && row[mapping.leadStatusTypeName] ? 
+    String(row[mapping.leadStatusTypeName]).trim() : null;
+  const leadTypeName = mapping.leadTypeName && row[mapping.leadTypeName] ? 
+    String(row[mapping.leadTypeName]).trim() : null;
+  const leadSourceName = mapping.leadSourceName && row[mapping.leadSourceName] ? 
+    String(row[mapping.leadSourceName]).trim() : null;
   
   console.log('🧠 [AI STRATEGY] Extracted values:', {
     leadStatusTypeName,

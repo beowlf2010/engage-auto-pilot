@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -107,32 +106,36 @@ const LeadsTableRow = ({
         </div>
       </TableCell>
 
-      {/* Enhanced Source with Lead Type, Status, and Source Name */}
+      {/* Enhanced Source with Lead Type, Status, and Source Name - Fixed Display Logic */}
       <TableCell>
         <div className="space-y-1">
-          {/* Primary Source Display */}
+          {/* Primary Source Display - Use leadSourceName if available, fallback to source */}
           <Badge variant="outline" className="text-xs">
-            {lead.leadSourceName || lead.source}
+            {lead.leadSourceName || lead.source || 'Unknown'}
           </Badge>
           
-          {/* Secondary Info Row */}
+          {/* Secondary Info Row - AI Strategy Fields */}
           <div className="flex flex-wrap gap-1">
             {lead.leadTypeName && (
               <Badge variant="secondary" className="text-xs py-0">
-                {lead.leadTypeName}
-              </Badge>
-            )}
-            {lead.status && (
-              <Badge variant={getStatusVariant(lead.status)} className="text-xs py-0">
-                {lead.status.toUpperCase()}
+                Type: {lead.leadTypeName}
               </Badge>
             )}
             {lead.leadStatusTypeName && (
               <Badge variant="outline" className="text-xs py-0">
-                {lead.leadStatusTypeName}
+                Status: {lead.leadStatusTypeName}
               </Badge>
             )}
           </div>
+          
+          {/* System Status Badge */}
+          {lead.status && (
+            <div className="flex items-center gap-1">
+              <Badge variant={getStatusVariant(lead.status)} className="text-xs py-0">
+                {lead.status.toUpperCase()}
+              </Badge>
+            </div>
+          )}
           
           {/* AI Strategy Info */}
           {lead.aiStrategyBucket && (
