@@ -32,10 +32,10 @@ export const useLeads = () => {
         throw leadsError;
       }
 
-      // Fetch all conversations to calculate message counts
+      // Fetch all conversations to calculate message counts - INCLUDING body field
       const { data: conversationsData, error: conversationsError } = await supabase
         .from('conversations')
-        .select('lead_id, direction, sent_at, read_at');
+        .select('lead_id, direction, sent_at, read_at, body');
 
       if (conversationsError) {
         console.error('❌ [LEADS FETCH] Error fetching conversations:', conversationsError);
