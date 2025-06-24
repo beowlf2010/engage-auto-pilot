@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
@@ -49,6 +48,7 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
           id,
           first_name,
           last_name,
+          email,
           vehicle_interest,
           status,
           salesperson_id,
@@ -128,8 +128,10 @@ export const useStableConversationOperations = ({ onLeadsRefresh }: Conversation
             leadName: `${lead.first_name} ${lead.last_name}`,
             leadPhone: phoneNumber || 'No phone',
             primaryPhone: phoneNumber || 'No phone',
+            leadEmail: lead.email || '',
             vehicleInterest: lead.vehicle_interest || 'Unknown',
             leadSource: lead.source || 'Unknown',
+            leadType: '',
             unreadCount: unreadCount || 0,
             messageCount: incomingCount + outgoingCount,
             lastMessage: latestConversation?.body || 'No messages yet',
