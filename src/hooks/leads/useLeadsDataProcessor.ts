@@ -73,7 +73,7 @@ export const processLeadData = (
       leadStatusTypeName: leadData.lead_status_type_name,
       leadTypeName: leadData.lead_type_name,
       leadSourceName: leadData.lead_source_name,
-      messageIntensity: leadData.message_intensity,
+      messageIntensity: (leadData.message_intensity as 'gentle' | 'standard' | 'aggressive') || 'gentle',
       aiStrategyBucket: leadData.ai_strategy_bucket,
       aiAggressionLevel: leadData.ai_aggression_level,
       aiStrategyLastUpdated: leadData.ai_strategy_last_updated,
