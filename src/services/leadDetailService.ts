@@ -137,7 +137,10 @@ export interface LeadDetailData {
 
 export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | null> => {
   try {
+    console.log('🔍 [LEAD DETAIL] Fetching lead with ID:', leadId);
+
     // Get lead details with phone numbers, trade vehicles, salesperson info, and upload data
+    // Using LEFT JOIN for salesperson to handle leads without assigned salespeople
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select(`
@@ -157,7 +160,7 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
           mileage,
           condition
         ),
-        profiles!salesperson_id (
+        profiles:salesperson_id (
           first_name,
           last_name
         ),
@@ -169,16 +172,19 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
         )
       `)
       .eq('id', leadId)
-      .single();
+      .maybeSingle();
 
     if (leadError) {
-      console.error('Error fetching lead detail:', leadError);
+      console.error('❌ [LEAD DETAIL] Error fetching lead detail:', leadError);
       return null;
     }
 
     if (!lead) {
+      console.log('❌ [LEAD DETAIL] No lead found with ID:', leadId);
       return null;
     }
+
+    console.log('✅ [LEAD DETAIL] Found lead:', lead.first_name, lead.last_name);
 
     // Get conversations for this lead
     const { data: conversations } = await supabase
@@ -234,6 +240,11 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       }
       return {};
     };
+
+    // Handle salesperson data - it might be null due to LEFT JOIN
+    const salespersonName = lead.profiles 
+      ? `${lead.profiles.first_name} ${lead.profiles.last_name}` 
+      : 'Unassigned';
 
     // Transform the data to match our interface
     const leadDetail: LeadDetailData = {
@@ -303,7 +314,7 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       doNotMail: lead.do_not_mail || false,
       // Other fields with safe defaults
       salespersonId: lead.salesperson_id,
-      salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : undefined,
+      salespersonName: salespersonName,
       temperatureScore: lead.temperature_score,
       hasTradeVehicle: lead.has_trade_vehicle || false,
       lastContactedAt: undefined,
@@ -357,10 +368,11 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       aiStrategyLastUpdated: lead.ai_strategy_last_updated
     };
 
+    console.log('✅ [LEAD DETAIL] Successfully transformed lead data');
     return leadDetail;
 
   } catch (error) {
-    console.error('Error in getLeadDetail:', error);
+    console.error('❌ [LEAD DETAIL] Error in getLeadDetail:', error);
     return null;
   }
 };
