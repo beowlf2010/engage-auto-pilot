@@ -1,8 +1,9 @@
 
 import { LucideIcon, User, Phone, Mail, MapPin, Car, Briefcase, Settings, Brain } from "lucide-react";
+import { FieldMapping } from './types';
 
 export interface FieldDefinition {
-  key: string;
+  key: keyof FieldMapping;
   label: string;
   required?: boolean;
 }
