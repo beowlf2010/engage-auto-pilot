@@ -5,13 +5,13 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MessageSquare, Phone, Calendar, Eye } from "lucide-react";
+import { MessageSquare, Phone, Calendar, Eye, ArrowDown, ArrowUp } from "lucide-react";
 import { Lead } from "@/types/lead";
 import LeadStatusBadge from "./LeadStatusBadge";
 import LeadContactStatusBadge from "./LeadContactStatusBadge";
 import FreshLeadBadge from "./FreshLeadBadge";
 import AIPreviewPopout from "./AIPreviewPopout";
-import DoNotContactControls from "./DoNotContactControls";
+import EnhancedAIStatusDisplay from "./EnhancedAIStatusDisplay";
 
 interface LeadsTableRowProps {
   lead: Lead;
@@ -54,18 +54,6 @@ const LeadsTableRow = ({
     navigate(`/lead/${leadId}`);
   };
 
-  const handleAIToggle = (checked: boolean) => {
-    // If disabling AI, use simple toggle
-    if (!checked) {
-      onAiOptInChange(lead.id.toString(), false);
-    }
-    // If enabling AI, it will be handled by AIPreviewPopout
-  };
-
-  const handleAIEnabled = () => {
-    onAiOptInChange(lead.id.toString(), true);
-  };
-
   const engagementScore = getEngagementScore(lead);
 
   return (
@@ -77,6 +65,7 @@ const LeadsTableRow = ({
         />
       </TableCell>
       
+      {/* Lead Name with Fresh Badge */}
       <TableCell>
         <div className="flex items-center space-x-2">
           {isFresh && (
@@ -94,39 +83,88 @@ const LeadsTableRow = ({
               {lead.firstName} {lead.lastName}
             </button>
             {lead.email && (
-              <div className="text-sm text-gray-500">{lead.email}</div>
+              <div className="text-sm text-gray-500 truncate max-w-32">{lead.email}</div>
             )}
           </div>
         </div>
       </TableCell>
 
+      {/* Source */}
+      <TableCell>
+        <Badge variant="outline" className="text-xs">
+          {lead.source}
+        </Badge>
+      </TableCell>
+
+      {/* Status */}
+      <TableCell>
+        <div className="space-y-1">
+          <LeadStatusBadge status={lead.status} />
+          <LeadContactStatusBadge contactStatus={lead.contactStatus || 'no_contact'} />
+        </div>
+      </TableCell>
+
+      {/* Vehicle Interest */}
+      <TableCell>
+        <div className="text-sm">{lead.vehicleInterest || 'Not specified'}</div>
+      </TableCell>
+
+      {/* AI Process - Enhanced Display */}
+      <TableCell>
+        <div className="space-y-1">
+          {canEdit && !lead.aiOptIn ? (
+            <AIPreviewPopout
+              lead={lead}
+              onAIOptInChange={onAiOptInChange}
+            >
+              <div className="cursor-pointer">
+                <EnhancedAIStatusDisplay
+                  aiOptIn={false}
+                  size="sm"
+                />
+              </div>
+            </AIPreviewPopout>
+          ) : (
+            <EnhancedAIStatusDisplay
+              aiOptIn={lead.aiOptIn}
+              messageIntensity={lead.messageIntensity || 'gentle'}
+              aiMessagesSent={lead.aiMessagesSent}
+              aiSequencePaused={lead.aiSequencePaused}
+              incomingCount={lead.incomingCount}
+              outgoingCount={lead.outgoingCount}
+              unrepliedCount={lead.unrepliedCount}
+              size="sm"
+              showDetailed={true}
+            />
+          )}
+          
+          {/* AI Stage and Next Message Info */}
+          {lead.aiOptIn && (
+            <div className="text-xs text-gray-500 space-y-1">
+              {lead.aiStage && (
+                <div>Stage: {lead.aiStage}</div>
+              )}
+              {lead.nextAiSendAt && (
+                <div>Next: {new Date(lead.nextAiSendAt).toLocaleDateString()} {new Date(lead.nextAiSendAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+              )}
+            </div>
+          )}
+        </div>
+      </TableCell>
+
+      {/* Contact Info */}
       <TableCell>
         <div className="space-y-1">
           {lead.primaryPhone && (
             <div className="text-sm">{lead.primaryPhone}</div>
           )}
-          <LeadContactStatusBadge contactStatus={lead.contactStatus || 'no_contact'} />
+          <div className="text-xs text-gray-500">
+            {new Date(lead.createdAt).toLocaleDateString()}
+          </div>
         </div>
       </TableCell>
 
-      <TableCell>
-        <LeadStatusBadge status={lead.status} />
-      </TableCell>
-
-      <TableCell>
-        <div className="text-sm">{lead.vehicleInterest || 'Not specified'}</div>
-      </TableCell>
-
-      <TableCell>
-        <Badge variant="outline">{lead.source}</Badge>
-      </TableCell>
-
-      <TableCell>
-        <div className="text-sm text-gray-500">
-          {new Date(lead.createdAt).toLocaleDateString()}
-        </div>
-      </TableCell>
-
+      {/* Engagement Score */}
       <TableCell>
         <Badge 
           variant={engagementScore > 70 ? "default" : engagementScore > 40 ? "secondary" : "outline"}
@@ -135,55 +173,43 @@ const LeadsTableRow = ({
         </Badge>
       </TableCell>
 
+      {/* Messages */}
       <TableCell>
-        <div className="space-y-1">
-          {canEdit && (
-            <div className="flex items-center gap-2">
-              {!lead.aiOptIn ? (
-                // Show preview modal when enabling AI
-                <AIPreviewPopout
-                  lead={lead}
-                  onAIOptInChange={onAiOptInChange}
-                >
-                  <div className="cursor-pointer">
-                    <Checkbox
-                      checked={false}
-                      onCheckedChange={() => {}}
-                    />
-                  </div>
-                </AIPreviewPopout>
-              ) : (
-                // Show simple checkbox when disabling AI
-                <Checkbox
-                  checked={true}
-                  onCheckedChange={handleAIToggle}
-                />
-              )}
-            </div>
-          )}
-          {!canEdit && (
-            <Badge variant={lead.aiOptIn ? "default" : "outline"}>
-              {lead.aiOptIn ? "On" : "Off"}
+        <div className="text-center space-y-1">
+          <div className="font-medium">{lead.messageCount || 0}</div>
+          {lead.unreadCount > 0 && (
+            <Badge variant="destructive" className="text-xs">
+              {lead.unreadCount} new
             </Badge>
           )}
-          {/* Show next message schedule if AI is enabled */}
-          {lead.aiOptIn && lead.nextAiSendAt && (
-            <div className="text-xs text-gray-500">
-              Next: {new Date(lead.nextAiSendAt).toLocaleDateString()} {new Date(lead.nextAiSendAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {lead.lastMessage && (
+            <div className="text-xs text-gray-500 space-y-1">
+              <div className="flex items-center gap-1 justify-center">
+                {lead.lastMessageDirection && (
+                  <Badge 
+                    variant={lead.lastMessageDirection === 'in' ? 'default' : 'secondary'}
+                    className={`text-xs px-1 py-0 ${
+                      lead.lastMessageDirection === 'in' 
+                        ? 'bg-green-100 text-green-700 border-green-200' 
+                        : 'bg-blue-100 text-blue-700 border-blue-200'
+                    }`}
+                  >
+                    {lead.lastMessageDirection === 'in' ? (
+                      <ArrowDown className="w-3 h-3" />
+                    ) : (
+                      <ArrowUp className="w-3 h-3" />
+                    )}
+                  </Badge>
+                )}
+              </div>
+              <div className="truncate max-w-24">{lead.lastMessage}</div>
+              <div>{lead.lastMessageTime}</div>
             </div>
           )}
         </div>
       </TableCell>
 
-      <TableCell>
-        <DoNotContactControls
-          lead={lead}
-          onDoNotContactChange={onDoNotContactChange}
-          canEdit={canEdit}
-          size="sm"
-        />
-      </TableCell>
-
+      {/* Actions */}
       <TableCell>
         <div className="flex items-center space-x-1">
           <Button
