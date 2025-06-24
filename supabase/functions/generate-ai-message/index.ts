@@ -16,7 +16,23 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    
+    console.log('🔑 [AI MESSAGE] Checking API key availability...');
+    
+    if (!openAIApiKey) {
+      console.error('❌ [AI MESSAGE] No OpenAI API key found');
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'OpenAI API key not configured',
+        message: 'Please configure OPENAI_API_KEY in your Supabase project settings'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('✅ [AI MESSAGE] API key found, length:', openAIApiKey.length);
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
@@ -87,6 +103,8 @@ Generate a message that:
 4. Stays under 160 characters
 5. Feels natural and conversational`;
 
+    console.log('🚀 [AI MESSAGE] Making OpenAI API call...');
+
     // Generate message with OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -105,10 +123,57 @@ Generate a message that:
       }),
     });
 
-    const aiResponse = await response.json();
+    console.log('📡 [AI MESSAGE] OpenAI response status:', response.status);
+    console.log('📡 [AI MESSAGE] OpenAI response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [AI MESSAGE] OpenAI API error:', response.status, errorText);
+      
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: `OpenAI API error: ${response.status}`,
+        details: errorText,
+        message: 'Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const responseText = await response.text();
+    console.log('📄 [AI MESSAGE] Raw OpenAI response:', responseText.substring(0, 200) + '...');
+
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ [AI MESSAGE] JSON parse error:', parseError);
+      console.error('❌ [AI MESSAGE] Response text that failed to parse:', responseText);
+      
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Failed to parse OpenAI response',
+        rawResponse: responseText.substring(0, 500),
+        message: 'Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     if (!aiResponse.choices || !aiResponse.choices[0]) {
-      throw new Error('Invalid response from OpenAI');
+      console.error('❌ [AI MESSAGE] Invalid OpenAI response structure:', aiResponse);
+      
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Invalid response structure from OpenAI',
+        response: aiResponse,
+        message: 'Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     
     const generatedMessage = aiResponse.choices[0].message.content;
@@ -129,7 +194,7 @@ Generate a message that:
     });
 
   } catch (error) {
-    console.error('❌ [AI MESSAGE] Error:', error);
+    console.error('❌ [AI MESSAGE] Unexpected error:', error);
     
     // Provide fallback message
     const fallbackMessage = "Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?";
@@ -137,6 +202,7 @@ Generate a message that:
     return new Response(JSON.stringify({ 
       success: false,
       error: error.message,
+      stack: error.stack,
       message: fallbackMessage 
     }), {
       status: 500,
