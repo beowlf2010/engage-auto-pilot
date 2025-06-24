@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -6,6 +5,68 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Name formatting utility functions (copied from src/utils/nameFormatter.ts)
+const capitalizeSegment = (segment: string): string => {
+  if (!segment) return '';
+  return segment.charAt(0).toUpperCase() + segment.slice(1);
+};
+
+const formatNamePart = (part: string): string => {
+  if (!part) return '';
+  
+  // Convert to lowercase first
+  const lower = part.toLowerCase();
+  
+  // Handle hyphenated names (e.g., "mary-ann")
+  if (lower.includes('-')) {
+    return lower
+      .split('-')
+      .map(segment => capitalizeSegment(segment))
+      .join('-');
+  }
+  
+  // Handle apostrophe names (e.g., "o'connor")
+  if (lower.includes("'")) {
+    return lower
+      .split("'")
+      .map((segment, index) => {
+        if (index === 0) return capitalizeSegment(segment);
+        // Special handling for common patterns like O'Connor, McDonald
+        if (segment.toLowerCase().startsWith('mc') || segment.toLowerCase().startsWith('mac')) {
+          return capitalizeSegment(segment);
+        }
+        return capitalizeSegment(segment);
+      })
+      .join("'");
+  }
+  
+  // Handle "Mc" and "Mac" prefixes
+  if (lower.startsWith('mc') && lower.length > 2) {
+    return 'Mc' + capitalizeSegment(lower.slice(2));
+  }
+  
+  if (lower.startsWith('mac') && lower.length > 3) {
+    return 'Mac' + capitalizeSegment(lower.slice(3));
+  }
+  
+  // Standard capitalization
+  return capitalizeSegment(lower);
+};
+
+const formatProperName = (name: string): string => {
+  if (!name || typeof name !== 'string') return '';
+  
+  // Trim whitespace
+  const trimmed = name.trim();
+  if (!trimmed) return '';
+  
+  // Split by spaces to handle multiple names
+  return trimmed
+    .split(' ')
+    .map(part => formatNamePart(part))
+    .join(' ');
 };
 
 serve(async (req) => {
@@ -98,11 +159,12 @@ serve(async (req) => {
     const hasConversation = conversations && conversations.length > 0;
     const isInitialContact = !hasConversation;
 
-    // Prepare personalization based on user decisions
+    // Prepare personalization based on user decisions - FORMAT THE NAME!
     const usePersonalName = nameDecision === 'approved' && leadData?.first_name;
     const useVehicleInterest = vehicleDecision === 'approved' && leadData?.vehicle_interest;
     
-    const personalizedName = usePersonalName ? leadData.first_name : null;
+    // Apply name formatting to normalize the name (BRADLEY -> Bradley, mcdonald -> McDonald, etc.)
+    const personalizedName = usePersonalName ? formatProperName(leadData.first_name) : null;
     const personalizedVehicle = useVehicleInterest ? leadData.vehicle_interest : 'the right vehicle';
     
     const salespersonName = salespersonProfile?.first_name || 'Finn';
@@ -229,7 +291,7 @@ Generate a message that:
       }
     }
 
-    // If all models failed, return the last error with fallback
+    // If all models failed, return the last error with fallback (USING FORMATTED NAME)
     console.error('❌ [AI MESSAGE] All models failed. Last error:', lastError);
     
     const fallbackMessage = usePersonalName 
