@@ -6,15 +6,14 @@ import { performInventoryCleanup } from './core/inventoryCleanupService';
 import { uploadSessionService } from './uploadSessionService';
 
 export const markMissingVehiclesSold = async (uploadId: string) => {
-  // This function is deprecated - we no longer mark vehicles as sold from inventory uploads
-  // Only financial data should mark vehicles as sold
-  console.log('Skipping automatic sold marking - only financial data should mark vehicles as sold');
+  // This function is deprecated - we now use "today vs yesterday" comparison logic
+  console.log('Skipping legacy sold marking - using new "today vs yesterday" logic');
   return;
 };
 
 export const syncInventoryData = async (uploadId: string) => {
   try {
-    console.log('Starting enhanced inventory data sync for upload:', uploadId);
+    console.log('Starting enhanced inventory data sync with "today vs yesterday" logic for upload:', uploadId);
     
     // Update session activity
     uploadSessionService.updateSessionActivity(uploadId);
@@ -54,15 +53,15 @@ export const syncInventoryData = async (uploadId: string) => {
     
     // Only run cleanup for actual inventory uploads (not GM Global orders or preliminary data)
     if (!isGMGlobalUpload && !isPreliminaryData) {
-      console.log('Running automatic inventory cleanup to keep only current vehicles...');
+      console.log('Running "today vs yesterday" inventory cleanup...');
       try {
         await performInventoryCleanup();
-        console.log('Automatic cleanup completed - only current inventory is now marked as available');
+        console.log('"Today vs Yesterday" cleanup completed - vehicles from yesterday not in today marked as sold');
       } catch (cleanupError) {
-        console.error('Automatic cleanup failed:', cleanupError);
+        console.error('"Today vs Yesterday" cleanup failed:', cleanupError);
         toast({
           title: "Cleanup Warning",
-          description: "Inventory uploaded successfully but automatic cleanup had issues",
+          description: "Inventory uploaded successfully but cleanup had issues",
           variant: "default"
         });
       }
@@ -70,11 +69,11 @@ export const syncInventoryData = async (uploadId: string) => {
       console.log('Skipping cleanup for GM Global/preliminary data upload');
     }
     
-    console.log('Enhanced inventory data sync completed successfully');
+    console.log('Enhanced inventory data sync with "today vs yesterday" logic completed successfully');
     
     toast({
       title: "Inventory synced",
-      description: isGMGlobalUpload ? "GM Global orders updated" : "Current inventory updated and old vehicles marked as sold",
+      description: isGMGlobalUpload ? "GM Global orders updated" : "Current inventory updated using today vs yesterday comparison",
     });
   } catch (error) {
     console.error('Error syncing inventory data:', error);
