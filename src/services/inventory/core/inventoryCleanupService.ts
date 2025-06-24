@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { uploadSessionService } from "../uploadSessionService";
@@ -18,14 +19,14 @@ export const getTodayAndYesterdayUploads = async () => {
 
     if (error) throw error;
 
-    const todayUploads = new Set();
-    const yesterdayUploads = new Set();
+    const todayUploads = new Set<string>();
+    const yesterdayUploads = new Set<string>();
 
     for (const row of data || []) {
       const uploadDate = row.created_at.split('T')[0];
-      if (uploadDate === today) {
+      if (uploadDate === today && row.upload_history_id) {
         todayUploads.add(row.upload_history_id);
-      } else if (uploadDate === yesterday) {
+      } else if (uploadDate === yesterday && row.upload_history_id) {
         yesterdayUploads.add(row.upload_history_id);
       }
     }
@@ -61,7 +62,7 @@ export const restoreRecentUsedInventory = async () => {
       return { restored: 0 };
     }
 
-    const uploadIds = recentUploads.map(u => u.id);
+    const uploadIds = recentUploads.map(u => u.id) as string[];
     console.log('Found recent upload IDs:', uploadIds);
 
     // Restore vehicles from these uploads that are currently marked as sold
@@ -114,7 +115,7 @@ export const cleanupInventoryData = async () => {
     const { data: todayVehicles, error: todayError } = await supabase
       .from('inventory')
       .select('id, vin, stock_number')
-      .in('upload_history_id', todayUploadIds);
+      .in('upload_history_id', todayUploadIds as string[]);
 
     if (todayError) throw todayError;
 
@@ -127,7 +128,7 @@ export const cleanupInventoryData = async () => {
       const { data: yesterdayVehicles, error: yesterdayError } = await supabase
         .from('inventory')
         .select('id, vin, stock_number, make, model, year, source_report')
-        .in('upload_history_id', yesterdayUploadIds)
+        .in('upload_history_id', yesterdayUploadIds as string[])
         .eq('status', 'available')
         .neq('source_report', 'orders_all'); // Don't mark GM Global orders as sold
 
