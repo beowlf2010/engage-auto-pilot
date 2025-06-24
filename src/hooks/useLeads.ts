@@ -126,7 +126,15 @@ export const useLeads = () => {
 
       const transformedLeads = leadsData?.map(lead => {
         try {
-          return transformLeadData(lead as LeadData, conversationsData as ConversationData[]);
+          // Convert vehicle_year to number if it's a string
+          const processedLead = {
+            ...lead,
+            vehicle_year: typeof lead.vehicle_year === 'string' ? 
+              (lead.vehicle_year ? parseInt(lead.vehicle_year, 10) : undefined) : 
+              lead.vehicle_year
+          };
+          
+          return transformLeadData(processedLead as LeadData, conversationsData as ConversationData[]);
         } catch (error) {
           console.error('❌ [LEADS] Error transforming lead:', lead.id, error);
           // Return a basic lead object if transformation fails

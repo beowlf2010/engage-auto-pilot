@@ -1,11 +1,21 @@
 
 import { LeadData, ConversationData } from './types';
 import { Lead } from '@/types/lead';
-import { getPhoneNumbers, getPrimaryPhone } from '@/utils/phoneUtils';
+import { createPhoneNumbers, getPrimaryPhone } from '@/utils/phoneUtils';
 
 export const transformLeadData = (leadData: LeadData, conversationsData: ConversationData[]): Lead => {
   // Create phone numbers from the phone_numbers relationship
-  const phoneNumbers = getPhoneNumbers(leadData.phone_numbers || []);
+  const phoneNumbers = leadData.phone_numbers ? 
+    leadData.phone_numbers.map(pn => ({
+      id: pn.id,
+      number: pn.number,
+      type: pn.type as 'cell' | 'day' | 'eve',
+      priority: pn.priority,
+      status: pn.status as 'active' | 'failed' | 'opted_out',
+      isPrimary: pn.is_primary,
+      lastAttempt: pn.last_attempt
+    })) : [];
+
   const primaryPhone = getPrimaryPhone(phoneNumbers);
 
   // Filter conversations for this lead
