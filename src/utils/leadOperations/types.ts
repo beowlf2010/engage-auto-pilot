@@ -5,11 +5,13 @@ export interface LeadInsertResult {
   success: boolean;
   leadId?: string;
   error?: string;
+  updated?: boolean;
 }
 
 export interface BulkInsertResult {
   totalProcessed: number;
   successfulInserts: number;
+  successfulUpdates: number;
   errors: Array<{
     leadData: ProcessedLead;
     error: string;

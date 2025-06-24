@@ -140,7 +140,7 @@ export const useMultiFileLeadUpload = () => {
         { updateExistingLeads }
       );
 
-      console.log(`💾 [MULTI UPLOAD] Database operation: ${insertResult.successfulInserts} inserted, ${insertResult.successfulUpdates || 0} updated, ${insertResult.errors.length} errors`);
+      console.log(`💾 [MULTI UPLOAD] Database operation: ${insertResult.successfulInserts} inserted, ${insertResult.successfulUpdates} updated, ${insertResult.errors.length} errors`);
 
       // Update file status to completed
       setQueuedFiles(prev => prev.map(f => 
@@ -150,7 +150,7 @@ export const useMultiFileLeadUpload = () => {
           result: {
             totalRows: parsedData.rows.length,
             successfulImports: insertResult.successfulInserts,
-            successfulUpdates: insertResult.successfulUpdates || 0,
+            successfulUpdates: insertResult.successfulUpdates,
             errors: insertResult.errors.length,
             duplicates: insertResult.duplicates.length + processingResult.duplicates.length
           }
@@ -160,7 +160,7 @@ export const useMultiFileLeadUpload = () => {
       return { 
         success: true, 
         records: insertResult.successfulInserts,
-        updates: insertResult.successfulUpdates || 0
+        updates: insertResult.successfulUpdates
       };
 
     } catch (error) {

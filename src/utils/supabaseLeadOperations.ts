@@ -1,4 +1,4 @@
-
+import { supabase } from '@/integrations/supabase/client';
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { BulkInsertResult } from './leadOperations/types';
 import { checkExistingDuplicates } from './leadOperations/duplicateChecker';

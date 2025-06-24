@@ -16,6 +16,11 @@ export interface EnhancedProcessingResult {
     rawData?: Record<string, any>;
   }>;
   uploadHistoryId: string;
+  updates: Array<{
+    leadId: string;
+    updatedFields: string[];
+    rowIndex: number;
+  }>;
 }
 
 export interface EnhancedProcessingOptions {
@@ -243,6 +248,6 @@ export const processLeadsEnhanced = async (
     duplicates,
     errors,
     uploadHistoryId,
-    updates: updates as any // Add updates to the result
+    updates
   };
 };

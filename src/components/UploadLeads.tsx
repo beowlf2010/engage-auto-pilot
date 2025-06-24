@@ -135,7 +135,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       const result = {
         totalRows: csvData.rows.length,
         successfulImports: insertResult.successfulInserts,
-        successfulUpdates: insertResult.successfulUpdates || 0,
+        successfulUpdates: insertResult.successfulUpdates,
         errors: processingResult.errors.length + insertResult.errors.length,
         duplicates: allDuplicates.length,
         fileName: currentFile.name,
@@ -160,7 +160,7 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       
       console.log('Enhanced upload process complete:', result);
       
-      if (updateExistingLeads && insertResult.successfulUpdates && insertResult.successfulUpdates > 0) {
+      if (updateExistingLeads && insertResult.successfulUpdates > 0) {
         toast({
           title: "Upload and update completed!",
           description: `${insertResult.successfulInserts} leads imported, ${insertResult.successfulUpdates} leads updated`,

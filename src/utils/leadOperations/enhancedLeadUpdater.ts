@@ -109,8 +109,9 @@ export const updateExistingLead = async (
     // Add update tracking fields
     if (Object.keys(updates).length > 0) {
       updates.upload_history_id = newLeadData.uploadHistoryId;
+      const existingRawData = existingLead.raw_upload_data || {};
       updates.raw_upload_data = {
-        ...existingLead.raw_upload_data,
+        ...existingRawData,
         latest_update: newLeadData.rawUploadData
       };
       updates.updated_at = new Date().toISOString();
