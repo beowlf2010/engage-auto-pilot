@@ -23,9 +23,10 @@ interface BatchLeadUploadResult {
 interface LeadBatchUploadResultProps {
   result: BatchLeadUploadResult;
   onClose: () => void;
+  onViewLeads?: () => void;
 }
 
-const LeadBatchUploadResult = ({ result, onClose }: LeadBatchUploadResultProps) => {
+const LeadBatchUploadResult = ({ result, onClose, onViewLeads }: LeadBatchUploadResultProps) => {
   const hasErrors = result.failedFiles > 0 || result.failedLeads > 0;
   const hasDuplicates = result.duplicateLeads > 0;
   
@@ -113,9 +114,11 @@ const LeadBatchUploadResult = ({ result, onClose }: LeadBatchUploadResultProps) 
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
-          <Button onClick={() => window.location.reload()}>
-            View Imported Leads
-          </Button>
+          {result.successfulLeads > 0 && (
+            <Button onClick={onViewLeads || onClose}>
+              View Imported Leads
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

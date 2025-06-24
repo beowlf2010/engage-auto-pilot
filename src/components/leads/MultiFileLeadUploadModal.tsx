@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -123,7 +124,8 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
 
   const handleProcessAll = async () => {
     const result = await processBatch();
-    if (result.failedFiles === 0 && onSuccess) {
+    // Call onSuccess if ANY leads were successfully imported, not just when all files succeed
+    if (result.successfulLeads > 0 && onSuccess) {
       onSuccess();
     }
   };
@@ -134,6 +136,14 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
       setFileErrors([]);
       onClose();
     }
+  };
+
+  const handleViewLeads = () => {
+    // Trigger another refresh when user clicks "View Imported Leads"
+    if (onSuccess) {
+      onSuccess();
+    }
+    handleClose();
   };
 
   // Show results if batch processing is complete
@@ -148,6 +158,7 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
             <LeadBatchUploadResult
               result={batchResult}
               onClose={handleClose}
+              onViewLeads={handleViewLeads}
             />
           </div>
         </DialogContent>
