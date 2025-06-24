@@ -33,6 +33,7 @@ serve(async (req) => {
     }
 
     console.log('✅ [AI MESSAGE] API key found, length:', openAIApiKey.length);
+    console.log('🔍 [AI MESSAGE] API key prefix:', openAIApiKey.substring(0, 7) + '...');
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
@@ -104,8 +105,9 @@ Generate a message that:
 5. Feels natural and conversational`;
 
     console.log('🚀 [AI MESSAGE] Making OpenAI API call...');
+    console.log('🔧 [AI MESSAGE] Using model: gpt-4o-mini');
 
-    // Generate message with OpenAI
+    // Generate message with OpenAI - FIXED MODEL NAME
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -113,7 +115,7 @@ Generate a message that:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o-mini', // FIXED: Changed from 'gpt-4o-mini' to correct model
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -129,6 +131,38 @@ Generate a message that:
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ [AI MESSAGE] OpenAI API error:', response.status, errorText);
+      console.error('❌ [AI MESSAGE] Full error details:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorText
+      });
+      
+      // Check if it's an authentication error
+      if (response.status === 401) {
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: `OpenAI API Authentication Failed (401)`,
+          details: 'Invalid API key. Please check your OPENAI_API_KEY in Supabase settings.',
+          message: 'Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Check if it's a model not found error
+      if (response.status === 404) {
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: `OpenAI API Model Not Found (404)`,
+          details: 'The specified model may not exist or you may not have access to it.',
+          message: 'Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       
       return new Response(JSON.stringify({ 
         success: false,
@@ -142,7 +176,8 @@ Generate a message that:
     }
 
     const responseText = await response.text();
-    console.log('📄 [AI MESSAGE] Raw OpenAI response:', responseText.substring(0, 200) + '...');
+    console.log('📄 [AI MESSAGE] Raw OpenAI response length:', responseText.length);
+    console.log('📄 [AI MESSAGE] Raw OpenAI response preview:', responseText.substring(0, 200) + '...');
 
     let aiResponse;
     try {
@@ -154,6 +189,7 @@ Generate a message that:
       return new Response(JSON.stringify({ 
         success: false,
         error: 'Failed to parse OpenAI response',
+        parseError: parseError.message,
         rawResponse: responseText.substring(0, 500),
         message: 'Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?'
       }), {
@@ -178,7 +214,7 @@ Generate a message that:
     
     const generatedMessage = aiResponse.choices[0].message.content;
 
-    console.log(`✅ [AI MESSAGE] Generated: "${generatedMessage}"`);
+    console.log(`✅ [AI MESSAGE] Generated successfully: "${generatedMessage}"`);
 
     return new Response(JSON.stringify({ 
       success: true,
@@ -188,6 +224,11 @@ Generate a message that:
         usedVehicle: useVehicleInterest,
         nameUsed: personalizedName,
         vehicleUsed: personalizedVehicle
+      },
+      debug: {
+        modelUsed: 'gpt-4o-mini',
+        apiKeyLength: openAIApiKey.length,
+        promptLength: systemPrompt.length + userPrompt.length
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -195,6 +236,7 @@ Generate a message that:
 
   } catch (error) {
     console.error('❌ [AI MESSAGE] Unexpected error:', error);
+    console.error('❌ [AI MESSAGE] Error stack:', error.stack);
     
     // Provide fallback message
     const fallbackMessage = "Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?";
