@@ -61,13 +61,6 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
     console.log('✅ [LEAD DETAIL] Message sent successfully via fixed service');
   };
 
-  // Watch for newMessage changes and send if it's set
-  useEffect(() => {
-    if (newMessage.trim() && !isSending) {
-      handleSendMessage();
-    }
-  }, [newMessage]);
-
   const handleSendMessage = async () => {
     if (!newMessage.trim() || isSending) return;
     
