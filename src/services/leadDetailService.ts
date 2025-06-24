@@ -221,6 +221,20 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       }))
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+    // Helper function to safely parse JSON fields
+    const parseJsonField = (field: any): Record<string, any> => {
+      if (!field) return {};
+      if (typeof field === 'object' && field !== null) return field as Record<string, any>;
+      if (typeof field === 'string') {
+        try {
+          return JSON.parse(field);
+        } catch {
+          return {};
+        }
+      }
+      return {};
+    };
+
     // Transform the data to match our interface
     const leadDetail: LeadDetailData = {
       id: lead.id,
@@ -328,13 +342,13 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
       // Additional trade fields
       tradeInVehicle: undefined,
       tradePayoffAmount: 0,
-      // NEW: Original upload data fields
-      rawUploadData: lead.raw_upload_data || {},
+      // NEW: Original upload data fields with proper type casting
+      rawUploadData: parseJsonField(lead.raw_upload_data),
       leadTypeName: lead.lead_type_name,
       leadStatusTypeName: lead.lead_status_type_name,
       leadSourceName: lead.lead_source_name,
       originalStatus: lead.original_status,
-      statusMappingLog: lead.status_mapping_log || {},
+      statusMappingLog: parseJsonField(lead.status_mapping_log),
       dataSourceQualityScore: lead.data_source_quality_score || 0,
       uploadHistoryId: lead.upload_history_id,
       originalRowIndex: lead.original_row_index,
