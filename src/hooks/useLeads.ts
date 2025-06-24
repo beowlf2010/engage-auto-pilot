@@ -1,79 +1,17 @@
 
-import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { LeadData, ConversationData } from './leads/types';
-import { Lead } from '@/types/lead';
-import { transformLeadData } from './leads/leadDataProcessor';
-import { sortLeads } from './leads/leadSorter';
-
-interface LoadingProgress {
-  step: string;
-  completed: boolean;
-  error?: string;
-}
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Lead } from "@/types/lead";
 
 export const useLeads = () => {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingProgress, setLoadingProgress] = useState<LoadingProgress[]>([]);
-  const { profile } = useAuth();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const queryClient = useQueryClient();
 
-  const updateProgress = (step: string, completed: boolean, error?: string) => {
-    console.log(`🔄 [LEADS PROGRESS] ${step}: ${completed ? 'completed' : 'starting'}${error ? ` - ERROR: ${error}` : ''}`);
-    setLoadingProgress(prev => {
-      const existing = prev.find(p => p.step === step);
-      if (existing) {
-        return prev.map(p => p.step === step ? { ...p, completed, error } : p);
-      }
-      return [...prev, { step, completed, error }];
-    });
-  };
-
-  const fetchLeads = async () => {
-    if (!profile) {
-      console.log('❌ [LEADS] No profile found, skipping fetch');
-      setLoading(false);
-      return;
-    }
-
-    // Reset state
-    setLoading(true);
-    setError(null);
-    setLoadingProgress([]);
-
-    // Set up timeout protection (30 seconds)
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    
-    timeoutRef.current = setTimeout(() => {
-      console.error('⏰ [LEADS] Fetch timeout after 30 seconds');
-      setError('Loading timeout - please try refreshing the page');
-      setLoading(false);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    }, 30000);
-
-    // Set up abort controller for canceling requests
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    try {
-      console.log('🔄 [LEADS] Starting fetch process...');
-      updateProgress('Initializing', true);
-
-      // Step 1: Fetch leads with phone numbers and AI strategy data
-      updateProgress('Fetching leads data', false);
-      console.log('📊 [LEADS] Fetching leads with phone numbers and AI strategy...');
+  const { data: leads = [], isLoading, error } = useQuery({
+    queryKey: ['leads'],
+    queryFn: async (): Promise<Lead[]> => {
+      console.log('Fetching leads with enhanced AI strategy fields...');
       
-      const { data: leadsData, error: leadsError } = await supabase
+      const { data, error } = await supabase
         .from('leads')
         .select(`
           *,
@@ -82,164 +20,103 @@ export const useLeads = () => {
             number,
             type,
             priority,
-            status,
             is_primary,
-            last_attempt
-          ),
-          profiles (
-            first_name,
-            last_name
+            status
           )
         `)
-        .order('created_at', { ascending: false })
-        .abortSignal(abortControllerRef.current.signal);
+        .order('created_at', { ascending: false });
 
-      if (leadsError) {
-        console.error('❌ [LEADS] Error fetching leads:', leadsError);
-        throw new Error(`Failed to fetch leads: ${leadsError.message}`);
+      if (error) {
+        console.error('Error fetching leads:', error);
+        throw error;
       }
 
-      console.log('✅ [LEADS] Successfully fetched', leadsData?.length || 0, 'leads');
-      updateProgress('Fetching leads data', true);
+      console.log('Raw leads data sample:', data?.[0]);
 
-      // Step 2: Fetch conversation data
-      updateProgress('Fetching conversations', false);
-      console.log('💬 [LEADS] Fetching conversation data...');
+      // Transform the data to match Lead interface
+      const transformedLeads: Lead[] = data?.map(lead => {
+        // Get primary phone number
+        const primaryPhone = lead.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+                            lead.phone_numbers?.[0]?.number || null;
 
-      const { data: conversationsData, error: conversationsError } = await supabase
-        .from('conversations')
-        .select('lead_id, body, sent_at, direction, read_at, sms_status')
-        .order('sent_at', { ascending: false })
-        .abortSignal(abortControllerRef.current.signal);
+        // Get all phone numbers for the lead
+        const phoneNumbers = lead.phone_numbers || [];
 
-      if (conversationsError) {
-        console.error('❌ [LEADS] Error fetching conversations:', conversationsError);
-        throw new Error(`Failed to fetch conversations: ${conversationsError.message}`);
-      }
+        const transformedLead: Lead = {
+          id: lead.id,
+          firstName: lead.first_name || '',
+          lastName: lead.last_name || '',
+          middleName: lead.middle_name || '',
+          email: lead.email || '',
+          emailAlt: lead.email_alt || '',
+          primaryPhone,
+          phoneNumbers,
+          address: lead.address || '',
+          city: lead.city || '',
+          state: lead.state || '',
+          postalCode: lead.postal_code || '',
+          vehicleInterest: lead.vehicle_interest || '',
+          vehicleVIN: lead.vehicle_vin || '',
+          source: lead.source || 'Unknown',
+          status: lead.status || 'new',
+          contactStatus: lead.contact_status || 'no_contact',
+          salesPersonName: [lead.salesperson_first_name, lead.salesperson_last_name].filter(Boolean).join(' ') || '',
+          doNotCall: lead.do_not_call || false,
+          doNotEmail: lead.do_not_email || false,
+          doNotMail: lead.do_not_mail || false,
+          aiOptIn: lead.ai_opt_in || false,
+          aiSequencePaused: lead.ai_sequence_paused || false,
+          messageIntensity: lead.message_intensity || 'gentle',
+          aiMessagesSent: lead.ai_messages_sent || 0,
+          aiStage: lead.ai_stage || null,
+          aiStrategyBucket: lead.ai_strategy_bucket || null,
+          aiAggressionLevel: lead.ai_aggression_level || 1,
+          nextAiSendAt: lead.next_ai_send_at || null,
+          createdAt: lead.created_at,
+          updatedAt: lead.updated_at || lead.created_at,
+          // Message tracking
+          messageCount: 0, // This will be populated by a separate query if needed
+          unreadCount: 0,
+          lastMessage: null,
+          lastMessageTime: null,
+          lastMessageDirection: null,
+          // Engagement metrics
+          incomingCount: lead.incoming_count || 0,
+          outgoingCount: lead.outgoing_count || 0,
+          unrepliedCount: lead.unreplied_count || 0,
+          // Enhanced AI strategy fields - now properly mapped from database
+          leadTypeName: lead.lead_type_name || null,
+          leadStatusTypeName: lead.lead_status_type_name || null,
+          leadSourceName: lead.lead_source_name || null
+        };
 
-      console.log('✅ [LEADS] Successfully fetched', conversationsData?.length || 0, 'conversations');
-      updateProgress('Fetching conversations', true);
-
-      // Step 3: Transform and process data
-      updateProgress('Processing data', false);
-      console.log('⚙️ [LEADS] Transforming lead data...');
-
-      const transformedLeads = leadsData?.map(lead => {
-        try {
-          // Convert vehicle_year to number if it's a string
-          const processedLead = {
-            ...lead,
-            vehicle_year: typeof lead.vehicle_year === 'string' ? 
-              (lead.vehicle_year ? parseInt(lead.vehicle_year, 10) : undefined) : 
-              lead.vehicle_year
-          };
-          
-          return transformLeadData(processedLead as LeadData, conversationsData as ConversationData[]);
-        } catch (error) {
-          console.error('❌ [LEADS] Error transforming lead:', lead.id, error);
-          // Return a basic lead object if transformation fails
-          return {
-            id: lead.id,
-            firstName: lead.first_name || 'Unknown',
-            lastName: lead.last_name || 'Unknown',
-            email: lead.email || '',
-            primaryPhone: '',
-            vehicleInterest: lead.vehicle_interest || '',
-            source: lead.source || '',
-            status: 'new' as const,
-            salesperson: 'Unassigned',
-            salespersonId: lead.salesperson_id || '',
-            aiOptIn: lead.ai_opt_in || false,
-            createdAt: lead.created_at,
-            unreadCount: 0,
-            doNotCall: lead.do_not_call || false,
-            doNotEmail: lead.do_not_email || false,
-            doNotMail: lead.do_not_mail || false,
-            contactStatus: 'no_contact' as const,
-            incomingCount: 0,
-            outgoingCount: 0,
-            unrepliedCount: 0,
-            phoneNumbers: [],
-            messageIntensity: (lead.message_intensity as 'gentle' | 'standard' | 'aggressive') || 'gentle',
-            aiStrategyBucket: lead.ai_strategy_bucket || undefined,
-            aiAggressionLevel: lead.ai_aggression_level || 3,
-            first_name: lead.first_name,
-            last_name: lead.last_name,
-            created_at: lead.created_at
-          } as Lead;
+        // Log AI strategy fields for debugging
+        if (lead.lead_type_name || lead.lead_status_type_name || lead.lead_source_name) {
+          console.log(`Lead ${lead.id} AI Strategy:`, {
+            leadTypeName: lead.lead_type_name,
+            leadStatusTypeName: lead.lead_status_type_name,
+            leadSourceName: lead.lead_source_name
+          });
         }
+
+        return transformedLead;
       }) || [];
 
-      console.log('✅ [LEADS] Successfully transformed', transformedLeads.length, 'leads');
-      updateProgress('Processing data', true);
-
-      // Step 4: Sort leads
-      updateProgress('Sorting leads', false);
-      console.log('📊 [LEADS] Sorting leads...');
+      console.log(`Fetched ${transformedLeads.length} leads with AI strategy data`);
       
-      const sortedLeads = sortLeads(transformedLeads);
-      console.log('✅ [LEADS] Successfully sorted leads');
-      updateProgress('Sorting leads', true);
+      return transformedLeads;
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
 
-      // Step 5: Update state
-      updateProgress('Finalizing', false);
-      setLeads(sortedLeads);
-      updateProgress('Finalizing', true);
-
-      console.log('🎉 [LEADS] Fetch process completed successfully:', sortedLeads.length, 'leads loaded');
-
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.log('🚫 [LEADS] Fetch was aborted');
-        return;
-      }
-      
-      console.error('❌ [LEADS] Error in fetch process:', error);
-      setError(error.message || 'Failed to load leads. Please try again.');
-      updateProgress('Error occurred', false, error.message);
-    } finally {
-      setLoading(false);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    }
+  const invalidateLeads = () => {
+    queryClient.invalidateQueries({ queryKey: ['leads'] });
   };
 
-  // Cleanup function
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (profile) {
-      fetchLeads();
-    }
-  }, [profile]);
-
-  const retryFetch = () => {
-    console.log('🔄 [LEADS] Manual retry triggered');
-    fetchLeads();
-  };
-
-  return { 
-    leads, 
-    loading, 
+  return {
+    leads,
+    isLoading,
     error,
-    loadingProgress,
-    refetch: fetchLeads,
-    retry: retryFetch,
-    // Expose a forced refresh function that others can call
-    forceRefresh: () => {
-      console.log('🔄 [LEADS] Force refresh triggered');
-      return fetchLeads();
-    }
+    invalidateLeads
   };
 };

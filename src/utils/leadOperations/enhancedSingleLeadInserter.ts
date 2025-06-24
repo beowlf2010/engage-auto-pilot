@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { LeadInsertResult } from './types';
@@ -9,64 +10,59 @@ export interface EnhancedLeadData extends ProcessedLead {
   originalStatus?: string;
   statusMappingLog?: Record<string, any>;
   dataSourceQualityScore?: number;
+  leadStatusTypeName?: string;
+  leadTypeName?: string;
+  leadSourceName?: string;
 }
 
-export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadInsertResult> => {
+export const insertEnhancedLead = async (leadData: EnhancedLeadData): Promise<LeadInsertResult> => {
   try {
-    // Calculate data quality score based on completeness
-    const qualityScore = calculateDataQualityScore(lead);
+    // Calculate data quality score
+    const qualityScore = calculateDataQualityScore(leadData);
 
-    // Ensure vehicle_interest is never null or empty
-    const vehicleInterest = lead.vehicleInterest && lead.vehicleInterest.trim() !== '' 
-      ? lead.vehicleInterest 
-      : 'finding the right vehicle for your needs';
+    // Prepare lead data for insertion
+    const leadInsert = {
+      first_name: leadData.firstName,
+      last_name: leadData.lastName,
+      middle_name: leadData.middleName,
+      email: leadData.email,
+      email_alt: leadData.emailAlt,
+      address: leadData.address,
+      city: leadData.city,
+      state: leadData.state,
+      postal_code: leadData.postalCode,
+      vehicle_interest: leadData.vehicleInterest,
+      vehicle_vin: leadData.vehicleVIN,
+      source: leadData.source,
+      status: leadData.status,
+      do_not_call: leadData.doNotCall,
+      do_not_email: leadData.doNotEmail,
+      do_not_mail: leadData.doNotMail,
+      salesperson_first_name: leadData.salesPersonName ? leadData.salesPersonName.split(' ')[0] : null,
+      salesperson_last_name: leadData.salesPersonName && leadData.salesPersonName.split(' ').length > 1 
+        ? leadData.salesPersonName.split(' ').slice(1).join(' ') : null,
+      // Enhanced preservation fields
+      upload_history_id: leadData.uploadHistoryId,
+      raw_upload_data: leadData.rawUploadData,
+      original_status: leadData.originalStatus,
+      status_mapping_log: leadData.statusMappingLog,
+      data_source_quality_score: qualityScore,
+      // AI strategy fields - properly mapped to database columns
+      lead_type_name: leadData.leadTypeName,
+      lead_status_type_name: leadData.leadStatusTypeName,
+      lead_source_name: leadData.leadSourceName
+    };
 
-    // Handle salesperson name safely
-    const salesPersonParts = lead.salesPersonName ? lead.salesPersonName.split(' ') : [];
-    const salesPersonFirstName = salesPersonParts.length > 0 ? salesPersonParts[0] : null;
-    const salesPersonLastName = salesPersonParts.length > 1 ? salesPersonParts.slice(1).join(' ') : null;
+    console.log('Inserting lead with AI strategy fields:', {
+      lead_type_name: leadInsert.lead_type_name,
+      lead_status_type_name: leadInsert.lead_status_type_name,
+      lead_source_name: leadInsert.lead_source_name
+    });
 
-    // Insert the lead with enhanced data preservation and AI enabled by default
-    const { data: leadData, error: leadError } = await supabase
+    // Insert the lead
+    const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .insert({
-        first_name: lead.firstName,
-        last_name: lead.lastName,
-        middle_name: lead.middleName || null,
-        email: lead.email || null,
-        email_alt: lead.emailAlt || null,
-        address: lead.address || null,
-        city: lead.city || null,
-        state: lead.state || null,
-        postal_code: lead.postalCode || null,
-        vehicle_interest: vehicleInterest,
-        vehicle_vin: lead.vehicleVIN || null,
-        source: lead.source,
-        do_not_call: lead.doNotCall,
-        do_not_email: lead.doNotEmail,
-        do_not_mail: lead.doNotMail,
-        status: lead.status || 'new',
-        // Enhanced data preservation fields
-        upload_history_id: lead.uploadHistoryId || null,
-        original_row_index: lead.originalRowIndex || null,
-        raw_upload_data: lead.rawUploadData || {},
-        original_status: lead.originalStatus || null,
-        status_mapping_log: lead.statusMappingLog || {},
-        salesperson_first_name: salesPersonFirstName,
-        salesperson_last_name: salesPersonLastName,
-        data_source_quality_score: qualityScore,
-        // AI strategy fields - ensure they're not undefined
-        lead_status_type_name: (lead as any).leadStatusTypeName || null,
-        lead_type_name: (lead as any).leadTypeName || null,
-        lead_source_name: (lead as any).leadSourceName || null,
-        // Enable AI by default for uploaded leads with proper strategy defaults
-        ai_opt_in: true,
-        ai_contact_enabled: true,
-        ai_replies_enabled: true,
-        message_intensity: 'gentle',
-        ai_strategy_bucket: 'other_unknown',
-        ai_aggression_level: 3
-      })
+      .insert(leadInsert)
       .select('id')
       .single();
 
@@ -75,12 +71,10 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
       return { success: false, error: leadError.message };
     }
 
-    const leadId = leadData.id;
-
     // Insert phone numbers
-    if (lead.phoneNumbers && lead.phoneNumbers.length > 0) {
-      const phoneInserts = lead.phoneNumbers.map(phone => ({
-        lead_id: leadId,
+    if (leadData.phoneNumbers && leadData.phoneNumbers.length > 0) {
+      const phoneInserts = leadData.phoneNumbers.map(phone => ({
+        lead_id: lead.id,
         number: phone.number,
         type: phone.type,
         priority: phone.priority,
@@ -94,13 +88,11 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
 
       if (phoneError) {
         console.error('Phone number insertion error:', phoneError);
-        // If phone insert fails, delete the lead and return error
-        await supabase.from('leads').delete().eq('id', leadId);
-        return { success: false, error: `Phone number error: ${phoneError.message}` };
+        // Don't fail the whole operation for phone errors
       }
     }
 
-    return { success: true, leadId };
+    return { success: true, leadId: lead.id };
   } catch (error) {
     console.error('Enhanced lead insertion error:', error);
     return { 
@@ -126,7 +118,7 @@ const calculateDataQualityScore = (lead: EnhancedLeadData): number => {
   if (lead.postalCode) score += 2;
   
   // Vehicle information (20 points total)
-  if (lead.vehicleInterest && lead.vehicleInterest !== 'Not specified') score += 10;
+  if (lead.vehicleInterest && lead.vehicleInterest !== 'finding the right vehicle for your needs') score += 10;
   if (lead.vehicleVIN) score += 10;
   
   // Additional data (10 points total)

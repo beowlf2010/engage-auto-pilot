@@ -107,12 +107,15 @@ const LeadsTableRow = ({
         </div>
       </TableCell>
 
-      {/* Enhanced Source with Lead Type and Status */}
+      {/* Enhanced Source with Lead Type, Status, and Source Name */}
       <TableCell>
         <div className="space-y-1">
+          {/* Primary Source Display */}
           <Badge variant="outline" className="text-xs">
-            {lead.source}
+            {lead.leadSourceName || lead.source}
           </Badge>
+          
+          {/* Secondary Info Row */}
           <div className="flex flex-wrap gap-1">
             {lead.leadTypeName && (
               <Badge variant="secondary" className="text-xs py-0">
@@ -130,6 +133,8 @@ const LeadsTableRow = ({
               </Badge>
             )}
           </div>
+          
+          {/* AI Strategy Info */}
           {lead.aiStrategyBucket && (
             <div className="text-xs text-gray-500">
               Strategy: {lead.aiStrategyBucket.replace(/_/g, ' ')}
