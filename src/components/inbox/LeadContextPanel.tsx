@@ -6,7 +6,8 @@ import {
   User, 
   StickyNote,
   TrendingUp,
-  Brain
+  Brain,
+  Calendar
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import AppointmentsList from '../appointments/AppointmentsList';
@@ -152,16 +153,20 @@ const LeadContextPanel = ({
         <CardContent className="p-0 h-[calc(100%-5rem)] overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <TabsList className="grid w-full grid-cols-5 mx-4">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="notes">
-                <StickyNote className="h-3 w-3 mr-1" />
-                Notes
+              <TabsTrigger value="overview" title="Overview">
+                <User className="h-4 w-4" />
               </TabsTrigger>
-              <TabsTrigger value="appointments">Appointments</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
-              <TabsTrigger value="ai">
-                <Brain className="h-3 w-3 mr-1" />
-                AI
+              <TabsTrigger value="notes" title="Notes">
+                <StickyNote className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger value="appointments" title="Appointments">
+                <Calendar className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger value="activity" title="Activity">
+                <TrendingUp className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger value="ai" title="AI">
+                <Brain className="h-4 w-4" />
               </TabsTrigger>
             </TabsList>
 
