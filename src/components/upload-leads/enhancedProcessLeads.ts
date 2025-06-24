@@ -127,7 +127,7 @@ export const processLeadsEnhanced = async (
         row[mapping.vehicleModel] || ''
       ].filter(Boolean);
       
-      const vehicleInterest = vehicleParts.length > 0 ? vehicleParts.join(' ') : 'Not specified';
+      const vehicleInterest = vehicleParts.length > 0 ? vehicleParts.join(' ') : 'finding the right vehicle for your needs';
 
       // Enhanced status mapping with audit trail
       const statusMapping = mapStatusToSystemStatus(row[mapping.status] || '', index + 1);
@@ -136,12 +136,20 @@ export const processLeadsEnhanced = async (
       const doNotCall = row[mapping.doNotCall]?.toLowerCase() === 'true';
       const doNotEmail = row[mapping.doNotEmail]?.toLowerCase() === 'true';
 
+      // Extract AI strategy fields safely
+      const leadStatusTypeName = row[mapping.leadstatustypename] || row[mapping.LeadStatusTypeName] || null;
+      const leadTypeName = row[mapping.LeadTypeName] || row[mapping.leadTypeName] || null;
+      const leadSourceName = row[mapping.leadsourcename] || row[mapping.leadSourceName] || null;
+
       const newLead: ProcessedLead & {
         uploadHistoryId: string;
         originalRowIndex: number;
         rawUploadData: Record<string, any>;
         originalStatus: string;
         statusMappingLog: Record<string, any>;
+        leadStatusTypeName?: string;
+        leadTypeName?: string;
+        leadSourceName?: string;
       } = {
         firstName: row[mapping.firstName] || '',
         lastName: row[mapping.lastName] || '',
@@ -167,7 +175,11 @@ export const processLeadsEnhanced = async (
         originalRowIndex: index + 1,
         rawUploadData,
         originalStatus: row[mapping.status] || '',
-        statusMappingLog: statusMapping.mappingLog
+        statusMappingLog: statusMapping.mappingLog,
+        // AI strategy fields
+        leadStatusTypeName,
+        leadTypeName,
+        leadSourceName
       };
 
       // Check for duplicates against already processed leads

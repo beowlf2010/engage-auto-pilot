@@ -17,6 +17,16 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
     // Calculate data quality score based on completeness
     const qualityScore = calculateDataQualityScore(lead);
 
+    // Ensure vehicle_interest is never null or empty
+    const vehicleInterest = lead.vehicleInterest && lead.vehicleInterest.trim() !== '' 
+      ? lead.vehicleInterest 
+      : 'finding the right vehicle for your needs';
+
+    // Handle salesperson name safely
+    const salesPersonParts = lead.salesPersonName ? lead.salesPersonName.split(' ') : [];
+    const salesPersonFirstName = salesPersonParts.length > 0 ? salesPersonParts[0] : null;
+    const salesPersonLastName = salesPersonParts.length > 1 ? salesPersonParts.slice(1).join(' ') : null;
+
     // Insert the lead with enhanced data preservation
     const { data: leadData, error: leadError } = await supabase
       .from('leads')
@@ -30,7 +40,7 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
         city: lead.city || null,
         state: lead.state || null,
         postal_code: lead.postalCode || null,
-        vehicle_interest: lead.vehicleInterest,
+        vehicle_interest: vehicleInterest,
         vehicle_vin: lead.vehicleVIN || null,
         source: lead.source,
         do_not_call: lead.doNotCall,
@@ -43,14 +53,23 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
         raw_upload_data: lead.rawUploadData || {},
         original_status: lead.originalStatus || null,
         status_mapping_log: lead.statusMappingLog || {},
-        salesperson_first_name: lead.salesPersonName?.split(' ')[0] || null,
-        salesperson_last_name: lead.salesPersonName?.split(' ').slice(1).join(' ') || null,
-        data_source_quality_score: qualityScore
+        salesperson_first_name: salesPersonFirstName,
+        salesperson_last_name: salesPersonLastName,
+        data_source_quality_score: qualityScore,
+        // New AI strategy fields - ensure they're not undefined
+        lead_status_type_name: (lead as any).leadStatusTypeName || null,
+        lead_type_name: (lead as any).leadTypeName || null,
+        lead_source_name: (lead as any).leadSourceName || null,
+        // Initialize AI strategy fields with safe defaults
+        message_intensity: 'gentle',
+        ai_strategy_bucket: 'other_unknown',
+        ai_aggression_level: 3
       })
       .select('id')
       .single();
 
     if (leadError) {
+      console.error('Lead insertion error:', leadError);
       return { success: false, error: leadError.message };
     }
 
@@ -72,6 +91,7 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
         .insert(phoneInserts);
 
       if (phoneError) {
+        console.error('Phone number insertion error:', phoneError);
         // If phone insert fails, delete the lead and return error
         await supabase.from('leads').delete().eq('id', leadId);
         return { success: false, error: `Phone number error: ${phoneError.message}` };
@@ -80,6 +100,7 @@ export const insertEnhancedLead = async (lead: EnhancedLeadData): Promise<LeadIn
 
     return { success: true, leadId };
   } catch (error) {
+    console.error('Enhanced lead insertion error:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
