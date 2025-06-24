@@ -1,25 +1,11 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import LeadsList from '@/components/LeadsList';
-import ProcessManagementPanel from '@/components/leads/ProcessManagementPanel';
-import EnhancedProcessPanel from '@/components/leads/EnhancedProcessPanel';
-import { Brain, Users, Settings, TrendingUp } from 'lucide-react';
+import StandaloneEnhancedProcessPanel from '@/components/leads/StandaloneEnhancedProcessPanel';
+import { Brain, Settings, TrendingUp } from 'lucide-react';
 
 const LeadsPage = () => {
-  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  const handleLeadSelection = (leadIds: string[]) => {
-    setSelectedLeadIds(leadIds);
-  };
-
-  const handleProcessAssigned = () => {
-    setSelectedLeadIds([]);
-    setRefreshTrigger(prev => prev + 1);
-  };
-
   return (
     <div className="container mx-auto py-6">
       <div className="mb-6">
@@ -30,10 +16,7 @@ const LeadsPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content - Leads List */}
         <div className="lg:col-span-3">
-          <LeadsList 
-            onLeadSelection={handleLeadSelection}
-            refreshTrigger={refreshTrigger}
-          />
+          <LeadsList />
         </div>
 
         {/* Right Sidebar - Process Management */}
@@ -51,17 +34,14 @@ const LeadsPage = () => {
             </TabsList>
 
             <TabsContent value="enhanced" className="mt-6">
-              <EnhancedProcessPanel
-                selectedLeadIds={selectedLeadIds}
-                onProcessAssigned={handleProcessAssigned}
-              />
+              <StandaloneEnhancedProcessPanel />
             </TabsContent>
 
             <TabsContent value="basic" className="mt-6">
-              <ProcessManagementPanel
-                selectedLeadIds={selectedLeadIds}
-                onProcessAssigned={handleProcessAssigned}
-              />
+              <div className="text-sm text-gray-600 p-4 border rounded-lg">
+                Basic process management is integrated into the leads table. 
+                Select leads and use the process panel that appears above the table.
+              </div>
             </TabsContent>
           </Tabs>
 
