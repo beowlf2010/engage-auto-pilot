@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { generateEnhancedIntelligentResponse } from '@/services/intelligentConversationAI';
+import { generateEnhancedIntelligentResponse, IntelligentAIResponse } from '@/services/intelligentConversationAI';
 import { messageQualityService } from '@/services/messageQualityService';
 import { intelligentSchedulingService } from '@/services/intelligentSchedulingService';
 

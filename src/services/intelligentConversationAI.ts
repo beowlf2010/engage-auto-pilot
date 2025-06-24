@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { LeadSourceData } from '@/types/leadSource';
+import { UnknownMessageContext } from '@/services/unknownMessageLearning';
 
 export interface ConversationContext {
   leadId: string;
@@ -67,6 +69,8 @@ export interface IntelligentAIResponse {
   confidence: number;
   reasoning: string;
   sourceStrategy?: string;
+  customerIntent?: any;
+  answerGuidance?: any;
 }
 
 export const generateEnhancedIntelligentResponse = async (
@@ -124,7 +128,9 @@ export const generateEnhancedIntelligentResponse = async (
         message: data.message,
         confidence: data.confidence || 0.8,
         reasoning: data.reasoning || 'Enhanced contextual AI response',
-        sourceStrategy: data.intentAnalysis?.strategy
+        sourceStrategy: data.intentAnalysis?.strategy,
+        customerIntent: data.customerIntent,
+        answerGuidance: data.answerGuidance
       };
     }
 
