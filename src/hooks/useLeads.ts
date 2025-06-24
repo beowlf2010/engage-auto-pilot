@@ -95,7 +95,6 @@ export const useLeads = () => {
           aiAggressionLevel: lead.ai_aggression_level || 1,
           nextAiSendAt: lead.next_ai_send_at || null,
           createdAt: lead.created_at,
-          updatedAt: lead.updated_at || lead.created_at,
           // Message tracking - provide defaults since these fields may not exist in DB
           messageCount: 0,
           unreadCount: 0,
