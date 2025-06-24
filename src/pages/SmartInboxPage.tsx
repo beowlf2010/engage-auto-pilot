@@ -20,7 +20,7 @@ const SmartInboxPage = () => {
     requestNotificationPermission();
   }, []);
 
-  // Start background AI processor when profile is available
+  // Start background AI processor when profile is available (reduced frequency)
   useEffect(() => {
     if (profile?.id) {
       console.log('🤖 Starting background AI processor for profile:', profile.id);
@@ -48,12 +48,6 @@ const SmartInboxPage = () => {
   if (!profile) {
     return <Navigate to="/auth" replace />;
   }
-
-  console.log('🔍 [SMART INBOX PAGE] Profile data:', {
-    id: profile.id,
-    role: profile.role,
-    email: profile.email
-  });
 
   return <ConsolidatedSmartInbox onLeadsRefresh={() => {}} />;
 };

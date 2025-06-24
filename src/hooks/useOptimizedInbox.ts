@@ -1,399 +1,256 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { enhancedPredictiveService } from '@/services/enhancedPredictiveService';
-import { messageCacheService } from '@/services/messageCacheService';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { ConversationListItem, MessageData } from '@/types/conversation';
-import { errorHandlingService } from '@/services/errorHandlingService';
-
-interface ConversationFilters {
-  unreadOnly?: boolean;
-  incomingOnly?: boolean;
-  search?: string;
-}
+import { messageCacheService } from '@/services/messageCacheService';
+import { toast } from '@/hooks/use-toast';
 
 interface UseOptimizedInboxProps {
   onLeadsRefresh?: () => void;
-  userRole?: string;
-  profileId?: string;
 }
 
-export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOptimizedInboxProps = {}) => {
+export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {}) => {
+  const { profile } = useAuth();
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sendingMessage, setSendingMessage] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [totalConversations, setTotalConversations] = useState(0);
   
-  const loadingRef = useRef(false);
-  const loadingMessagesRef = useRef(false);
+  // Debouncing refs
+  const loadConversationsDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const loadMessagesDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLoadTimeRef = useRef<number>(0);
 
-  const loadConversations = useCallback(async (
-    page = 0, 
-    filters: ConversationFilters = {},
-    append = false
-  ) => {
-    if (loadingRef.current) {
-      console.log('⏳ [OPTIMIZED INBOX] Already loading conversations, skipping');
-      return;
+  // Debounced load conversations
+  const loadConversations = useCallback(async () => {
+    // Clear any pending debounced calls
+    if (loadConversationsDebounceRef.current) {
+      clearTimeout(loadConversationsDebounceRef.current);
     }
 
+    // Debounce rapid calls (minimum 500ms between calls)
+    const now = Date.now();
+    if (now - lastLoadTimeRef.current < 500) {
+      loadConversationsDebounceRef.current = setTimeout(loadConversations, 500);
+      return;
+    }
+    lastLoadTimeRef.current = now;
+
+    if (!profile?.id) return;
+
     try {
-      loadingRef.current = true;
-      if (!append) setLoading(true);
       setError(null);
       
-      console.log('🔄 [OPTIMIZED INBOX] Loading conversations with UNREAD-FIRST strategy...');
-      console.log('👤 [OPTIMIZED INBOX] User role:', userRole, 'Profile ID:', profileId);
-      
-      const isAdmin = userRole === 'admin' || userRole === 'manager';
-      
-      // STRATEGY: Load conversations in TWO phases to ensure unread messages are always visible
-      // Phase 1: Load ALL conversations with unread messages first
-      // Phase 2: Load remaining conversations to fill up to a reasonable limit
-      
-      let allConversations: ConversationListItem[] = [];
-      
-      // PHASE 1: Get ALL conversations with unread messages (no limit)
-      console.log('📬 [PHASE 1] Loading ALL conversations with unread messages...');
-      
-      let unreadQuery = supabase
+      // Build query based on user role
+      let query = supabase
         .from('leads')
         .select(`
           id,
           first_name,
           last_name,
-          email,
           phone,
-          status,
-          source,
+          email,
           vehicle_interest,
-          created_at,
+          lead_source,
+          lead_type,
+          status,
           salesperson_id,
-          conversations!inner (
+          ai_opt_in,
+          message_intensity,
+          created_at,
+          conversations!inner(
             id,
             body,
             direction,
             sent_at,
-            read_at
-          )
-        `)
-        .not('conversations.read_at', 'is', null) // Only leads with conversations
-        .eq('conversations.direction', 'in') // Only incoming messages
-        .is('conversations.read_at', null); // That are unread
-
-      // Apply admin bypass for unread query
-      if (!isAdmin) {
-        unreadQuery = unreadQuery.not('status', 'in', '("lost")');
-        console.log('👥 [PHASE 1] Regular user - excluding lost leads from unread');
-      } else {
-        console.log('👑 [PHASE 1] ADMIN USER - INCLUDING ALL STATUSES for unread messages');
-      }
-
-      const { data: unreadData, error: unreadError } = await unreadQuery
-        .order('created_at', { ascending: false });
-
-      if (unreadError) throw unreadError;
-
-      console.log(`📊 [PHASE 1] Found ${unreadData?.length || 0} leads with unread messages`);
-
-      // PHASE 2: Get remaining conversations to fill up to a higher limit (200 total)
-      const TOTAL_CONVERSATION_LIMIT = 200;
-      const remainingLimit = Math.max(0, TOTAL_CONVERSATION_LIMIT - (unreadData?.length || 0));
-      
-      console.log(`📄 [PHASE 2] Loading up to ${remainingLimit} additional conversations...`);
-      
-      let remainingQuery = supabase
-        .from('leads')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          status,
-          source,
-          vehicle_interest,
-          created_at,
-          salesperson_id,
-          conversations (
-            id,
-            body,
-            direction,
-            sent_at,
-            read_at
+            ai_generated
           )
         `)
         .order('created_at', { ascending: false });
 
-      // Exclude leads already loaded in phase 1
-      if (unreadData && unreadData.length > 0) {
-        const unreadLeadIds = unreadData.map(lead => lead.id);
-        remainingQuery = remainingQuery.not('id', 'in', `(${unreadLeadIds.map(id => `"${id}"`).join(',')})`);
+      // Apply role-based filtering
+      if (profile.role === 'sales') {
+        query = query.or(`salesperson_id.eq.${profile.id},salesperson_id.is.null`);
       }
 
-      // Apply admin bypass for remaining query
-      if (!isAdmin) {
-        remainingQuery = remainingQuery.not('status', 'in', '("lost")');
-        console.log('👥 [PHASE 2] Regular user - excluding lost leads from remaining');
-      } else {
-        console.log('👑 [PHASE 2] ADMIN USER - INCLUDING ALL STATUSES for remaining conversations');
+      const { data: leadsData, error: leadsError } = await query.limit(100);
+
+      if (leadsError) throw leadsError;
+
+      if (!leadsData) {
+        setConversations([]);
+        setTotalConversations(0);
+        return;
       }
 
-      const { data: remainingData, error: remainingError } = await remainingQuery
-        .range(0, remainingLimit - 1);
+      // Process conversations
+      const conversationMap = new Map<string, ConversationListItem>();
 
-      if (remainingError) throw remainingError;
+      leadsData.forEach(lead => {
+        if (!lead.conversations || lead.conversations.length === 0) return;
 
-      console.log(`📊 [PHASE 2] Found ${remainingData?.length || 0} additional conversations`);
+        const lastMessage = lead.conversations
+          .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0];
 
-      // COMBINE: Merge unread (priority) + remaining conversations
-      const combinedData = [...(unreadData || []), ...(remainingData || [])];
-      console.log(`📊 [COMBINED] Total conversations loaded: ${combinedData.length}`);
+        const unreadCount = lead.conversations.filter(
+          msg => msg.direction === 'in' && 
+          new Date(msg.sent_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+        ).length;
 
-      // Transform to ConversationListItem format with proper sorting
-      const transformedConversations: ConversationListItem[] = combinedData.map(lead => {
-        const conversations = lead.conversations || [];
-        
-        // Sort conversations by sent_at to get the actual last message
-        const sortedConversations = [...conversations].sort((a, b) => 
-          new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
-        );
-        
-        const lastMessage = sortedConversations[sortedConversations.length - 1];
-        
-        // Count unread messages correctly (incoming messages without read_at)
-        const unreadMessages = conversations.filter(c => 
-          c.direction === 'in' && !c.read_at
-        );
-
-        // Calculate if this conversation has unreplied inbound messages
-        const hasUnrepliedInbound = lastMessage?.direction === 'in';
-        
-        const result = {
+        conversationMap.set(lead.id, {
           leadId: lead.id,
           leadName: `${lead.first_name} ${lead.last_name}`,
           leadPhone: lead.phone || '',
-          primaryPhone: lead.phone || '',
-          vehicleInterest: lead.vehicle_interest || 'Unknown',
-          status: lead.status || 'active',
+          leadEmail: lead.email || '',
+          vehicleInterest: lead.vehicle_interest || '',
+          leadSource: lead.lead_source || '',
+          leadType: lead.lead_type || '',
+          status: lead.status || 'new',
           salespersonId: lead.salesperson_id,
-          lastMessageTime: lastMessage?.sent_at || lead.created_at,
-          lastMessageDirection: lastMessage?.direction as 'in' | 'out' | null || null,
+          aiOptIn: lead.ai_opt_in || false,
+          messageIntensity: lead.message_intensity || 'standard',
           lastMessage: lastMessage?.body || '',
-          lastMessageDate: new Date(lastMessage?.sent_at || lead.created_at),
-          unreadCount: unreadMessages.length,
-          messageCount: conversations.length,
-          hasUnrepliedInbound
-        };
-        
-        return result;
+          lastMessageTime: lastMessage ? new Date(lastMessage.sent_at).toLocaleString() : '',
+          lastMessageDate: lastMessage?.sent_at || lead.created_at,
+          unreadCount,
+          isAiGenerated: lastMessage?.ai_generated || false
+        });
       });
-      
-      // Sort conversations: Unread first, then by last message time
-      const sortedConversations = transformedConversations.sort((a, b) => {
-        // Unread messages get highest priority
-        if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
-        if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
-        
-        // If both have unread or both don't, sort by last message time
-        const aTime = a.lastMessageDate?.getTime() || 0;
-        const bTime = b.lastMessageDate?.getTime() || 0;
-        return bTime - aTime;
-      });
-      
-      // Debug information for admin users
-      const unreadConversations = sortedConversations.filter(c => c.unreadCount > 0);
-      const lostStatusConversations = sortedConversations.filter(c => c.status === 'lost');
-      const unassignedConversations = sortedConversations.filter(c => !c.salespersonId);
-      
-      console.log(`📊 [OPTIMIZED INBOX] Final conversation stats for ${isAdmin ? 'ADMIN' : 'USER'}:`, {
-        total: sortedConversations.length,
-        withUnreadMessages: unreadConversations.length,
-        lostStatus: lostStatusConversations.length,
-        unassigned: unassignedConversations.length,
-        userRole,
-        isAdmin
-      });
-      
-      // ADMIN DEBUG: Log specific leads we're looking for
-      if (isAdmin) {
-        const stevenWood = sortedConversations.find(c => 
-          c.leadName.toLowerCase().includes('steven') && c.leadName.toLowerCase().includes('wood')
-        );
-        const jacksonCaldwell = sortedConversations.find(c => 
-          c.leadName.toLowerCase().includes('jackson') && c.leadName.toLowerCase().includes('caldwell')
-        );
-        
-        if (stevenWood) {
-          console.log('✅ [ADMIN DEBUG] Found Steven Wood:', {
-            name: stevenWood.leadName,
-            unreadCount: stevenWood.unreadCount,
-            status: stevenWood.status,
-            lastMessage: stevenWood.lastMessage?.substring(0, 50) + '...'
-          });
-        } else {
-          console.log('❌ [ADMIN DEBUG] Steven Wood not found in results');
-        }
-        
-        if (jacksonCaldwell) {
-          console.log('✅ [ADMIN DEBUG] Found Jackson Caldwell:', {
-            name: jacksonCaldwell.leadName,
-            unreadCount: jacksonCaldwell.unreadCount,
-            status: jacksonCaldwell.status,
-            lastMessage: jacksonCaldwell.lastMessage?.substring(0, 50) + '...'
-          });
-        } else {
-          console.log('❌ [ADMIN DEBUG] Jackson Caldwell not found in results');
-        }
 
-        // List all conversations with unread messages for admin
-        console.log('📋 [ADMIN DEBUG] All conversations with unread messages:', 
-          unreadConversations.map(c => ({
-            name: c.leadName,
-            unreadCount: c.unreadCount,
-            status: c.status,
-            assigned: !!c.salespersonId
-          }))
-        );
-      }
-      
-      if (append) {
-        setConversations(prev => [...prev, ...sortedConversations]);
-      } else {
-        setConversations(sortedConversations);
-      }
-      
-      setTotalConversations(sortedConversations.length);
-      
-      console.log(`✅ [OPTIMIZED INBOX] Loaded ${sortedConversations.length} conversations for ${isAdmin ? 'ADMIN' : 'USER'} with UNREAD-FIRST strategy`);
+      const conversationsArray = Array.from(conversationMap.values());
+      setConversations(conversationsArray);
+      setTotalConversations(conversationsArray.length);
 
-    } catch (err) {
-      console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', err);
-      errorHandlingService.handleError(err, {
-        operation: 'loadOptimizedConversations'
-      });
-      
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unexpected error occurred.');
-      }
+      console.log('✅ [OPTIMIZED INBOX] Loaded conversations:', conversationsArray.length);
+
+    } catch (error) {
+      console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load conversations');
     } finally {
-      loadingRef.current = false;
       setLoading(false);
     }
-  }, [userRole, profileId]);
+  }, [profile?.id, profile?.role]);
 
+  // Debounced load messages
   const loadMessages = useCallback(async (leadId: string) => {
-    if (loadingMessagesRef.current) {
-      console.log('⏳ [OPTIMIZED INBOX] Messages already loading, skipping');
-      return;
+    // Clear any pending debounced calls
+    if (loadMessagesDebounceRef.current) {
+      clearTimeout(loadMessagesDebounceRef.current);
     }
 
     // Check cache first
     const cachedMessages = messageCacheService.getCachedMessages(leadId);
     if (cachedMessages) {
-      console.log('📋 [OPTIMIZED INBOX] Using cached messages for lead:', leadId);
       setMessages(cachedMessages);
       return;
     }
 
-    try {
-      loadingMessagesRef.current = true;
-      setError(null);
+    // Debounce rapid calls
+    loadMessagesDebounceRef.current = setTimeout(async () => {
+      try {
+        setError(null);
 
-      console.log('📬 [OPTIMIZED INBOX] Loading messages for lead:', leadId);
-      
-      // Use enhanced predictive service for loading messages
-      const messagesWithContext = await enhancedPredictiveService.loadMessagesFromDatabase(leadId);
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('lead_id', leadId)
+          .order('sent_at', { ascending: true });
 
-      setMessages(messagesWithContext);
-      messageCacheService.cacheMessages(leadId, messagesWithContext);
-      console.log('✅ [OPTIMIZED INBOX] Messages loaded successfully:', messagesWithContext.length);
-    } catch (err) {
-      console.error('❌ [OPTIMIZED INBOX] Error loading messages:', err);
-      errorHandlingService.handleError(err, {
-        operation: 'loadMessages',
-        leadId
-      });
-      
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unexpected error occurred.');
+        if (messagesError) throw messagesError;
+
+        const formattedMessages: MessageData[] = (messagesData || []).map(msg => ({
+          id: msg.id,
+          leadId: msg.lead_id,
+          direction: msg.direction as 'in' | 'out',
+          body: msg.body,
+          sentAt: msg.sent_at,
+          aiGenerated: msg.ai_generated || false,
+          smsStatus: msg.sms_status,
+          smsError: msg.sms_error
+        }));
+
+        // Cache messages
+        messageCacheService.cacheMessages(leadId, formattedMessages);
+        setMessages(formattedMessages);
+
+        console.log('✅ [OPTIMIZED INBOX] Loaded messages for lead:', leadId, formattedMessages.length);
+
+      } catch (error) {
+        console.error('❌ [OPTIMIZED INBOX] Error loading messages:', error);
+        setError(error instanceof Error ? error.message : 'Failed to load messages');
       }
-    } finally {
-      loadingMessagesRef.current = false;
-    }
+    }, 100); // 100ms debounce
   }, []);
 
-  const sendMessage = useCallback(async (leadId: string, message: string) => {
-    if (sendingMessage) {
-      console.log('⏳ [OPTIMIZED INBOX] Already sending message, ignoring');
-      return;
-    }
-
+  // Send message
+  const sendMessage = useCallback(async (leadId: string, messageContent: string) => {
     setSendingMessage(true);
-    setError(null);
-
     try {
-      console.log('📤 [OPTIMIZED INBOX] Sending message to lead:', leadId);
-      
-      // Use existing send message logic but with optimized refresh
-      const { error } = await supabase.from('conversations').insert({
-        lead_id: leadId,
-        direction: 'out',
-        body: message,
-        ai_generated: false
-      });
+      const { error: insertError } = await supabase
+        .from('conversations')
+        .insert({
+          lead_id: leadId,
+          direction: 'out',
+          body: messageContent.trim(),
+          sent_at: new Date().toISOString(),
+          ai_generated: false
+        });
 
-      if (error) {
-        throw error;
-      }
+      if (insertError) throw insertError;
 
-      // Invalidate relevant caches
+      // Invalidate cache and reload
       messageCacheService.invalidateLeadCache(leadId);
-      
-      // Reload messages and conversations
       await Promise.all([
         loadMessages(leadId),
-        loadConversations(0, {}, false)
+        loadConversations()
       ]);
-      
-      if (onLeadsRefresh) {
-        onLeadsRefresh();
-      }
-      
+
       console.log('✅ [OPTIMIZED INBOX] Message sent successfully');
-    } catch (err) {
-      console.error('❌ [OPTIMIZED INBOX] Error sending message:', err);
-      errorHandlingService.handleError(err, {
-        operation: 'sendMessage',
-        leadId
+
+    } catch (error) {
+      console.error('❌ [OPTIMIZED INBOX] Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive"
       });
-      
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unexpected error occurred.');
-      }
+      throw error;
     } finally {
       setSendingMessage(false);
     }
-  }, [loadMessages, loadConversations, onLeadsRefresh, sendingMessage]);
+  }, [loadMessages, loadConversations]);
 
+  // Manual refresh
   const manualRefresh = useCallback(() => {
     console.log('🔄 [OPTIMIZED INBOX] Manual refresh triggered');
-    messageCacheService.clearAll();
-    loadConversations(0, {}, false);
-  }, [loadConversations]);
+    setLoading(true);
+    loadConversations();
+    if (onLeadsRefresh) {
+      onLeadsRefresh();
+    }
+  }, [loadConversations, onLeadsRefresh]);
 
-  // Initialize conversations on mount
+  // Initial load
   useEffect(() => {
-    console.log('🚀 [OPTIMIZED INBOX] Initializing optimized Smart Inbox with UNREAD-FIRST strategy...');
-    loadConversations(0, {}, false);
-  }, [loadConversations]);
+    if (profile?.id) {
+      loadConversations();
+    }
+  }, [profile?.id, loadConversations]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (loadConversationsDebounceRef.current) {
+        clearTimeout(loadConversationsDebounceRef.current);
+      }
+      if (loadMessagesDebounceRef.current) {
+        clearTimeout(loadMessagesDebounceRef.current);
+      }
+    };
+  }, []);
 
   return {
     conversations,
@@ -402,7 +259,6 @@ export const useOptimizedInbox = ({ onLeadsRefresh, userRole, profileId }: UseOp
     error,
     sendingMessage,
     totalConversations,
-    loadConversations,
     loadMessages,
     sendMessage,
     manualRefresh,

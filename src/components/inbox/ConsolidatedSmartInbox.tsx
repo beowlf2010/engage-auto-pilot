@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
+import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
 import { useInboxFilters } from '@/hooks/useInboxFilters';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
 import InboxConversationsList from './InboxConversationsList';
@@ -14,7 +14,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, Filter, MessageSquare, Users, Loader2, WifiOff, Brain } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import ConnectionStatus from './ConnectionStatus';
 
 const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => void }) => {
   const { profile } = useAuth();
@@ -22,12 +21,6 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showAISuggestions, setShowAISuggestions] = useState(true);
-
-  console.log('🔍 [CONSOLIDATED SMART INBOX] Profile data:', {
-    id: profile?.id,
-    role: profile?.role,
-    email: profile?.email
-  });
 
   const {
     filters,
@@ -44,14 +37,10 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
     loading,
     error,
     sendingMessage,
-    totalConversations,
     loadMessages,
     sendMessage,
-    manualRefresh,
-    connectionState,
-    reconnect,
-    isConnected
-  } = useEnhancedRealtimeInbox({ onLeadsRefresh });
+    manualRefresh
+  } = useOptimizedInbox({ onLeadsRefresh });
 
   const { markAsRead, isMarkingAsRead } = useMarkAsRead();
 
@@ -135,7 +124,6 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
     const unreadConversations = filteredAndSortedConversations.filter(c => c.unreadCount > 0).length;
     const lostStatusConversations = conversations.filter(c => c.status === 'lost').length;
     const unassignedConversations = conversations.filter(c => !c.salespersonId).length;
-    const totalUnreadMessages = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
     
     return {
       total: filteredAndSortedConversations.length,
@@ -183,16 +171,11 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header with connection status */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-2xl font-bold text-gray-900">Smart Inbox</h1>
-            <ConnectionStatus 
-              isConnected={isConnected}
-              connectionState={connectionState}
-              onReconnect={reconnect}
-            />
           </div>
           
           <div className="flex items-center space-x-4">

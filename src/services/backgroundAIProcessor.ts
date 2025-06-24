@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse, shouldGenerateResponse } from './intelligentConversationAI';
 
@@ -10,12 +9,12 @@ class BackgroundAIProcessor {
     if (this.isRunning) return;
     
     this.isRunning = true;
-    console.log('🤖 [BACKGROUND AI] Starting background AI processor (PREVIEW MODE)');
+    console.log('🤖 [BACKGROUND AI] Starting background AI processor (PREVIEW MODE - reduced frequency)');
 
-    // Process every 30 seconds - but only for previews now
+    // Process every 3 minutes instead of 30 seconds to reduce load
     this.intervalId = setInterval(() => {
       this.processLeadsForPreviews(profileId);
-    }, 30000);
+    }, 180000); // 3 minutes
   }
 
   stop() {
@@ -49,7 +48,7 @@ class BackgroundAIProcessor {
         .eq('ai_opt_in', true)
         .eq('conversations.direction', 'in')
         .gte('conversations.sent_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
-        .limit(5); // Reduced limit for preview mode
+        .limit(3); // Reduced limit for less load
 
       if (!leadsNeedingResponse || leadsNeedingResponse.length === 0) {
         return;
@@ -57,8 +56,8 @@ class BackgroundAIProcessor {
 
       for (const lead of leadsNeedingResponse) {
         await this.generatePreviewForLead(lead, profileId);
-        // Small delay between processing
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Longer delay between processing to reduce load
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
     } catch (error) {
