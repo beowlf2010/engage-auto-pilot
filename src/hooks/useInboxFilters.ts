@@ -12,11 +12,11 @@ export interface InboxFilters {
   leadSource: string;
   vehicleType: string;
   sortBy: 'newest' | 'oldest' | 'unread' | 'activity';
-  // Add properties that SmartFilters expects
+  // Properties that SmartFilters expects
   status: string[];
-  aiOptIn: boolean;
-  priority: string;
-  assigned: string;
+  aiOptIn: boolean | null;
+  priority: string | null;
+  assigned: string | null;
 }
 
 const defaultFilters: InboxFilters = {
@@ -30,9 +30,9 @@ const defaultFilters: InboxFilters = {
   vehicleType: '',
   sortBy: 'newest', // Default to newest first
   status: [],
-  aiOptIn: false,
-  priority: '',
-  assigned: ''
+  aiOptIn: null,
+  priority: null,
+  assigned: null
 };
 
 export const useInboxFilters = (userId?: string, userRole?: string) => {
@@ -53,8 +53,9 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
     return Object.keys(filters).some(key => {
       if (key === 'sortBy') return filters[key] !== 'newest'; // Default is newest
       if (key === 'dateRange') return filters[key] !== 'all';
-      if (key === 'leadSource' || key === 'vehicleType' || key === 'priority' || key === 'assigned') return filters[key] !== '';
+      if (key === 'leadSource' || key === 'vehicleType') return filters[key] !== '';
       if (key === 'status') return (filters[key] as string[]).length > 0;
+      if (key === 'aiOptIn' || key === 'priority' || key === 'assigned') return filters[key] !== null;
       return filters[key as keyof InboxFilters] === true;
     });
   }, [filters]);
@@ -99,6 +100,13 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
     if (filters.status.length > 0) {
       filtered = filtered.filter(conv => 
         filters.status.includes(conv.status || '')
+      );
+    }
+
+    if (filters.aiOptIn !== null) {
+      // Filter based on AI opt-in status if specified
+      filtered = filtered.filter(conv => 
+        Boolean(conv.aiOptIn) === filters.aiOptIn
       );
     }
 
@@ -167,6 +175,8 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
     if (filters.leadSource) summary.push(`Source: ${filters.leadSource}`);
     if (filters.vehicleType) summary.push(`Vehicle: ${filters.vehicleType}`);
     if (filters.status.length > 0) summary.push(`Status: ${filters.status.join(', ')}`);
+    if (filters.aiOptIn !== null) summary.push(`AI: ${filters.aiOptIn ? 'Enabled' : 'Disabled'}`);
+    if (filters.priority) summary.push(`Priority: ${filters.priority}`);
     if (filters.assigned) summary.push(`Assigned: ${filters.assigned}`);
     if (filters.sortBy !== 'newest') summary.push(`Sort: ${filters.sortBy}`);
     
