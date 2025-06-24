@@ -56,6 +56,14 @@ export interface Lead {
   aiSequencePaused?: boolean;
   aiPauseReason?: string;
   aiResumeAt?: string;
+  // New unified AI strategy fields
+  leadStatusTypeName?: string;
+  leadTypeName?: string;
+  leadSourceName?: string;
+  messageIntensity?: 'gentle' | 'standard' | 'aggressive';
+  aiStrategyBucket?: string;
+  aiAggressionLevel?: number;
+  aiStrategyLastUpdated?: string;
   // Additional required Lead properties
   first_name: string;
   last_name: string;

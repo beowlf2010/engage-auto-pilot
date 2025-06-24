@@ -69,9 +69,9 @@ export const useLeads = () => {
       console.log('🔄 [LEADS] Starting fetch process...');
       updateProgress('Initializing', true);
 
-      // Step 1: Fetch leads with phone numbers
+      // Step 1: Fetch leads with phone numbers and AI strategy data
       updateProgress('Fetching leads data', false);
-      console.log('📊 [LEADS] Fetching leads with phone numbers...');
+      console.log('📊 [LEADS] Fetching leads with phone numbers and AI strategy...');
       
       const { data: leadsData, error: leadsError } = await supabase
         .from('leads')
@@ -152,6 +152,9 @@ export const useLeads = () => {
             outgoingCount: 0,
             unrepliedCount: 0,
             phoneNumbers: [],
+            messageIntensity: (lead.message_intensity as 'gentle' | 'standard' | 'aggressive') || 'gentle',
+            aiStrategyBucket: lead.ai_strategy_bucket || undefined,
+            aiAggressionLevel: lead.ai_aggression_level || 3,
             first_name: lead.first_name,
             last_name: lead.last_name,
             created_at: lead.created_at

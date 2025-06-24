@@ -1,24 +1,18 @@
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
-import { processLeadsEnhanced } from "@/components/upload-leads/enhancedProcessLeads";
-import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
-import { handleFileSelection } from "@/utils/fileUploadHandlers";
 
-interface QueuedLeadFile {
+import { useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { toast } from '@/hooks/use-toast';
+
+interface QueuedFile {
   id: string;
   file: File;
   status: 'pending' | 'processing' | 'completed' | 'error';
+  result?: any;
   error?: string;
-  results?: {
-    totalRows: number;
-    successfulImports: number;
-    errors: number;
-    duplicates: number;
-  };
 }
 
-interface BatchLeadUploadResult {
+interface BatchUploadResult {
   totalFiles: number;
   successfulFiles: number;
   failedFiles: number;
@@ -35,244 +29,227 @@ interface BatchLeadUploadResult {
 }
 
 export const useMultiFileLeadUpload = () => {
+  const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
   const [processing, setProcessing] = useState(false);
-  const [queuedFiles, setQueuedFiles] = useState<QueuedLeadFile[]>([]);
-  const [batchResult, setBatchResult] = useState<BatchLeadUploadResult | null>(null);
-  const { toast } = useToast();
+  const [batchResult, setBatchResult] = useState<BatchUploadResult | null>(null);
+  const { profile } = useAuth();
 
-  const addFiles = (files: FileList | File[]) => {
-    const fileArray = Array.from(files);
-    const newFiles: QueuedLeadFile[] = fileArray.map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
+  const addFiles = useCallback((files: FileList) => {
+    const newFiles: QueuedFile[] = Array.from(files).map(file => ({
+      id: `${Date.now()}-${Math.random()}`,
       file,
       status: 'pending'
     }));
-    
+
     setQueuedFiles(prev => [...prev, ...newFiles]);
-  };
+  }, []);
 
-  const removeFile = (fileId: string) => {
+  const removeFile = useCallback((fileId: string) => {
     setQueuedFiles(prev => prev.filter(f => f.id !== fileId));
-  };
+  }, []);
 
-  const clearQueue = () => {
+  const clearQueue = useCallback(() => {
     setQueuedFiles([]);
     setBatchResult(null);
-  };
+  }, []);
 
-  const updateFileStatus = (fileId: string, status: QueuedLeadFile['status'], error?: string, results?: any) => {
-    setQueuedFiles(prev => prev.map(f => 
-      f.id === fileId 
-        ? { ...f, status, error, results }
-        : f
-    ));
-  };
-
-  // Create flexible field mapping based on common CSV headers
-  const createFlexibleMapping = (headers: string[]) => {
-    console.log('Available CSV headers:', headers);
-    
-    // Check if this looks like a VIN Solutions message export
-    const vinSolutionsIndicators = [
-      'message_content', 'message_direction', 'customer_name', 
-      'conversation_id', 'lead_name', 'message_body', 'timestamp'
-    ];
-    
-    const hasVinSolutionsHeaders = vinSolutionsIndicators.some(indicator => 
-      headers.some(header => header.toLowerCase().includes(indicator.toLowerCase()))
-    );
-    
-    if (hasVinSolutionsHeaders) {
-      throw new Error('This appears to be a VIN Solutions message export file. Please use the Message Import feature for VIN Solutions files.');
-    }
-    
-    const findHeader = (possibleNames: string[]): string => {
-      for (const name of possibleNames) {
-        const found = headers.find(h => 
-          h.toLowerCase().trim() === name.toLowerCase() ||
-          h.toLowerCase().replace(/[^a-z]/g, '') === name.toLowerCase().replace(/[^a-z]/g, '')
-        );
-        if (found) {
-          console.log(`Mapped ${possibleNames[0]} to "${found}"`);
-          return found;
-        }
-      }
-      console.log(`No mapping found for ${possibleNames[0]}`);
-      return '';
-    };
-
-    const mapping = {
-      firstName: findHeader(['firstname', 'first_name', 'fname', 'FirstName']),
-      lastName: findHeader(['lastname', 'last_name', 'lname', 'LastName']),
-      middleName: findHeader(['middlename', 'middle_name', 'mname', 'MiddleName']),
-      email: findHeader(['email', 'emailaddress', 'email_address', 'Email']),
-      emailAlt: findHeader(['email_alt', 'emailalt', 'alternate_email', 'Email2']),
-      cellphone: findHeader(['cellphone', 'cell_phone', 'mobile', 'cell', 'CellPhone']),
-      dayphone: findHeader(['dayphone', 'day_phone', 'homephone', 'home_phone', 'DayPhone']),
-      evephone: findHeader(['evephone', 'evening_phone', 'eveningphone', 'EvePhone']),
-      address: findHeader(['address', 'street', 'Address', 'StreetAddress']),
-      city: findHeader(['city', 'City']),
-      state: findHeader(['state', 'State']),
-      postalCode: findHeader(['postalcode', 'postal_code', 'zip', 'zipcode', 'PostalCode']),
-      vehicleYear: findHeader(['vehicleyear', 'vehicle_year', 'year', 'Year']),
-      vehicleMake: findHeader(['vehiclemake', 'vehicle_make', 'make', 'Make']),
-      vehicleModel: findHeader(['vehiclemodel', 'vehicle_model', 'model', 'Model']),
-      vehicleVIN: findHeader(['vin', 'VIN', 'vehicle_vin']),
-      source: findHeader(['source', 'Source', 'lead_source']),
-      salesPersonFirstName: findHeader(['salespersonfirstname', 'salesperson_first_name', 'SalesPersonFirstName', 'sales_person_first_name']),
-      salesPersonLastName: findHeader(['salespersonlastname', 'salesperson_last_name', 'SalesPersonLastName', 'sales_person_last_name']),
-      doNotCall: findHeader(['donotcall', 'do_not_call', 'DoNotCall']),
-      doNotEmail: findHeader(['donotemail', 'do_not_email', 'DoNotEmail']),
-      doNotMail: findHeader(['donotmail', 'do_not_mail', 'DoNotMail']),
-      status: findHeader(['status', 'Status', 'lead_status', 'LeadStatus'])
-    };
-
-    console.log('Created mapping:', mapping);
-    return mapping;
-  };
-
-  const processFile = async (queuedFile: QueuedLeadFile): Promise<void> => {
+  const processFile = async (queuedFile: QueuedFile): Promise<{ success: boolean; records?: number; error?: string }> => {
     try {
-      updateFileStatus(queuedFile.id, 'processing');
+      console.log(`📤 [MULTI UPLOAD] Processing file: ${queuedFile.file.name}`);
       
-      // Check if file needs sheet selection
-      const fileSelectionResult = await handleFileSelection(queuedFile.file);
-      
-      if (fileSelectionResult.shouldShowSheetSelector) {
-        throw new Error('Multi-sheet Excel files require individual processing. Please save each sheet as a separate file or use the single-file upload with sheet selection.');
-      }
-      
-      // Parse the file
-      const parsed = await parseEnhancedInventoryFile(queuedFile.file);
-      console.log(`Parsed lead file with ${parsed.rows.length} rows and headers:`, parsed.headers);
-      
-      if (parsed.rows.length === 0) {
-        throw new Error('No data rows found in file');
-      }
+      // Update file status to processing
+      setQueuedFiles(prev => prev.map(f => 
+        f.id === queuedFile.id ? { ...f, status: 'processing' } : f
+      ));
 
-      // Create flexible field mapping with VIN Solutions detection
-      const flexibleMapping = createFlexibleMapping(parsed.headers);
-      
-      // Process leads with enhanced data preservation
-      const processingResult = await processLeadsEnhanced(
-        parsed, 
-        flexibleMapping,
-        queuedFile.file.name,
-        queuedFile.file.size,
-        queuedFile.file.type
-      );
-      
-      console.log(`Processing result: ${processingResult.validLeads.length} valid leads, ${processingResult.errors.length} errors, ${processingResult.duplicates.length} duplicates`);
-      
-      if (processingResult.validLeads.length === 0) {
-        console.error('Processing errors:', processingResult.errors);
-        throw new Error(`No valid leads could be processed. Common issues: ${processingResult.errors.slice(0, 3).map(e => e.error).join(', ')}`);
-      }
-      
-      // Insert leads to database with upload history tracking
-      const insertResult = await insertLeadsToDatabase(
-        processingResult.validLeads,
-        processingResult.uploadHistoryId
-      );
-      
-      console.log(`Insert result: ${insertResult.successfulInserts} successful, ${insertResult.errors.length} errors`);
-      
-      updateFileStatus(queuedFile.id, 'completed', undefined, {
-        totalRows: parsed.rows.length,
-        successfulImports: insertResult.successfulInserts,
-        errors: processingResult.errors.length + insertResult.errors.length,
-        duplicates: processingResult.duplicates.length + insertResult.duplicates.length
+      const formData = new FormData();
+      formData.append('file', queuedFile.file);
+
+      const response = await fetch('/api/upload-leads', {
+        method: 'POST',
+        body: formData,
       });
 
-    } catch (error) {
-      console.error(`Enhanced upload error for ${queuedFile.file.name}:`, error);
-      
-      let errorMessage = error instanceof Error ? error.message : 'Processing failed';
-      
-      // Provide more helpful error messages
-      if (errorMessage.includes('VIN Solutions')) {
-        errorMessage = 'VIN Solutions message files detected. Please use the Message Import feature instead of the lead upload.';
-      } else if (errorMessage.includes('Multi-sheet')) {
-        errorMessage = 'Multi-sheet Excel file detected. Please save each sheet separately or use single-file upload with sheet selection.';
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Upload failed: ${errorText}`);
       }
+
+      const result = await response.json();
       
-      updateFileStatus(queuedFile.id, 'error', errorMessage);
+      if (result.success && result.leads && result.leads.length > 0) {
+        // Insert leads into database with AI strategy calculation
+        const { data: insertedLeads, error: insertError } = await supabase
+          .from('leads')
+          .insert(
+            result.leads.map((lead: any) => ({
+              first_name: lead.firstName,
+              last_name: lead.lastName,
+              middle_name: lead.middleName,
+              email: lead.email,
+              email_alt: lead.emailAlt,
+              address: lead.address,
+              city: lead.city,
+              state: lead.state,
+              postal_code: lead.postalCode,
+              vehicle_interest: lead.vehicleInterest,
+              vehicle_vin: lead.vehicleVIN,
+              source: lead.source,
+              status: lead.status,
+              do_not_call: lead.doNotCall,
+              do_not_email: lead.doNotEmail,
+              do_not_mail: lead.doNotMail,
+              salesperson_id: profile?.id,
+              // New lead factors for AI strategy
+              lead_status_type_name: lead.leadStatusTypeName,
+              lead_type_name: lead.leadTypeName,
+              lead_source_name: lead.leadSourceName || lead.source,
+            }))
+          )
+          .select('id, lead_status_type_name, lead_type_name, lead_source_name');
+
+        if (insertError) {
+          console.error('❌ [MULTI UPLOAD] Database insert error:', insertError);
+          throw new Error(`Database insert failed: ${insertError.message}`);
+        }
+
+        // Insert phone numbers for each lead
+        if (insertedLeads && insertedLeads.length > 0) {
+          const phoneNumberInserts: any[] = [];
+          
+          insertedLeads.forEach((insertedLead, index) => {
+            const leadData = result.leads[index];
+            if (leadData.phoneNumbers && leadData.phoneNumbers.length > 0) {
+              leadData.phoneNumbers.forEach((phone: any) => {
+                phoneNumberInserts.push({
+                  lead_id: insertedLead.id,
+                  number: phone.number,
+                  type: phone.type,
+                  priority: phone.priority,
+                  status: phone.status,
+                  is_primary: phone.isPrimary
+                });
+              });
+            }
+          });
+
+          if (phoneNumberInserts.length > 0) {
+            const { error: phoneError } = await supabase
+              .from('phone_numbers')
+              .insert(phoneNumberInserts);
+
+            if (phoneError) {
+              console.error('❌ [MULTI UPLOAD] Phone numbers insert error:', phoneError);
+              // Don't fail the whole upload for phone number errors
+            }
+          }
+
+          // Trigger AI strategy calculation for each lead that has factors
+          for (const insertedLead of insertedLeads) {
+            if (insertedLead.lead_status_type_name || insertedLead.lead_type_name || insertedLead.lead_source_name) {
+              try {
+                await supabase.rpc('calculate_ai_strategy_for_lead', {
+                  p_lead_id: insertedLead.id,
+                  p_lead_status_type_name: insertedLead.lead_status_type_name,
+                  p_lead_type_name: insertedLead.lead_type_name,
+                  p_lead_source_name: insertedLead.lead_source_name
+                });
+                console.log(`✅ [MULTI UPLOAD] AI strategy calculated for lead ${insertedLead.id}`);
+              } catch (error) {
+                console.error('❌ [MULTI UPLOAD] AI strategy calculation error:', error);
+                // Don't fail the upload for AI strategy errors
+              }
+            }
+          }
+        }
+
+        console.log(`✅ [MULTI UPLOAD] Successfully processed ${result.leads.length} leads from ${queuedFile.file.name}`);
+        
+        // Update file status to completed
+        setQueuedFiles(prev => prev.map(f => 
+          f.id === queuedFile.id ? { ...f, status: 'completed', result } : f
+        ));
+
+        return { success: true, records: result.leads.length };
+      } else {
+        throw new Error(result.error || 'No leads processed');
+      }
+
+    } catch (error) {
+      console.error(`❌ [MULTI UPLOAD] Error processing ${queuedFile.file.name}:`, error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Update file status to error
+      setQueuedFiles(prev => prev.map(f => 
+        f.id === queuedFile.id ? { ...f, status: 'error', error: errorMessage } : f
+      ));
+
+      return { success: false, error: errorMessage };
     }
   };
 
-  const processBatch = async (): Promise<BatchLeadUploadResult> => {
+  const processBatch = async (): Promise<BatchUploadResult> => {
+    if (queuedFiles.length === 0) {
+      throw new Error('No files to process');
+    }
+
     setProcessing(true);
     
-    const results: BatchLeadUploadResult['results'] = [];
-    let totalLeads = 0;
-    let successfulLeads = 0;
-    let failedLeads = 0;
-    let duplicateLeads = 0;
-    let successfulFiles = 0;
-    let failedFiles = 0;
+    const result: BatchUploadResult = {
+      totalFiles: queuedFiles.length,
+      successfulFiles: 0,
+      failedFiles: 0,
+      totalLeads: 0,
+      successfulLeads: 0,
+      failedLeads: 0,
+      duplicateLeads: 0,
+      results: []
+    };
 
     try {
-      for (const file of queuedFiles) {
-        try {
-          await processFile(file);
-          
-          if (file.results) {
-            totalLeads += file.results.totalRows;
-            successfulLeads += file.results.successfulImports;
-            failedLeads += file.results.errors;
-            duplicateLeads += file.results.duplicates;
-            successfulFiles++;
-            
-            results.push({
-              fileName: file.file.name,
-              status: 'success',
-              records: file.results.successfulImports
-            });
-          }
-        } catch (error) {
-          failedFiles++;
-          results.push({
-            fileName: file.file.name,
+      console.log(`🚀 [MULTI UPLOAD] Starting batch processing of ${queuedFiles.length} files`);
+
+      // Process files sequentially to avoid overwhelming the system
+      for (const queuedFile of queuedFiles) {
+        const fileResult = await processFile(queuedFile);
+        
+        if (fileResult.success) {
+          result.successfulFiles++;
+          result.successfulLeads += fileResult.records || 0;
+          result.results.push({
+            fileName: queuedFile.file.name,
+            status: 'success',
+            records: fileResult.records
+          });
+        } else {
+          result.failedFiles++;
+          result.results.push({
+            fileName: queuedFile.file.name,
             status: 'error',
-            error: error instanceof Error ? error.message : 'Processing failed'
+            error: fileResult.error
           });
         }
+
+        // Add a small delay between files to prevent rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      const batchResult: BatchLeadUploadResult = {
-        totalFiles: queuedFiles.length,
-        successfulFiles,
-        failedFiles,
-        totalLeads,
-        successfulLeads,
-        failedLeads,
-        duplicateLeads,
-        results
-      };
+      result.totalLeads = result.successfulLeads + result.failedLeads;
 
-      setBatchResult(batchResult);
+      console.log(`🎉 [MULTI UPLOAD] Batch processing completed:`, result);
 
-      if (failedFiles === 0) {
-        toast({
-          title: "Batch upload successful!",
-          description: `${successfulFiles} files processed, ${successfulLeads} leads imported`,
-        });
-      } else if (successfulFiles > 0) {
-        toast({
-          title: "Batch upload completed with some errors",
-          description: `${successfulFiles} files succeeded, ${failedFiles} files failed. Check results for details.`,
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: "Batch upload failed",
-          description: "All files failed to process. Please check the file formats and try again.",
-          variant: "destructive"
-        });
-      }
+      setBatchResult(result);
+      return result;
 
-      return batchResult;
-
+    } catch (error) {
+      console.error('❌ [MULTI UPLOAD] Batch processing failed:', error);
+      toast({
+        title: "Batch Upload Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+      throw error;
     } finally {
       setProcessing(false);
     }

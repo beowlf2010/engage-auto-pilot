@@ -2915,6 +2915,7 @@ export type Database = {
       leads: {
         Row: {
           address: string | null
+          ai_aggression_level: number | null
           ai_contact_enabled: boolean | null
           ai_enabled_at: string | null
           ai_last_message_stage: string | null
@@ -2925,6 +2926,8 @@ export type Database = {
           ai_resume_at: string | null
           ai_sequence_paused: boolean | null
           ai_stage: string | null
+          ai_strategy_bucket: string | null
+          ai_strategy_last_updated: string | null
           ai_takeover_delay_minutes: number | null
           ai_takeover_enabled: boolean | null
           city: string | null
@@ -2947,6 +2950,9 @@ export type Database = {
           last_name: string
           last_prediction_update: string | null
           last_reply_at: string | null
+          lead_source_name: string | null
+          lead_status_type_name: string | null
+          lead_type_name: string | null
           message_intensity: string | null
           middle_name: string | null
           next_ai_send_at: string | null
@@ -2986,6 +2992,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_aggression_level?: number | null
           ai_contact_enabled?: boolean | null
           ai_enabled_at?: string | null
           ai_last_message_stage?: string | null
@@ -2996,6 +3003,8 @@ export type Database = {
           ai_resume_at?: string | null
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
+          ai_strategy_bucket?: string | null
+          ai_strategy_last_updated?: string | null
           ai_takeover_delay_minutes?: number | null
           ai_takeover_enabled?: boolean | null
           city?: string | null
@@ -3018,6 +3027,9 @@ export type Database = {
           last_name: string
           last_prediction_update?: string | null
           last_reply_at?: string | null
+          lead_source_name?: string | null
+          lead_status_type_name?: string | null
+          lead_type_name?: string | null
           message_intensity?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
@@ -3057,6 +3069,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_aggression_level?: number | null
           ai_contact_enabled?: boolean | null
           ai_enabled_at?: string | null
           ai_last_message_stage?: string | null
@@ -3067,6 +3080,8 @@ export type Database = {
           ai_resume_at?: string | null
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
+          ai_strategy_bucket?: string | null
+          ai_strategy_last_updated?: string | null
           ai_takeover_delay_minutes?: number | null
           ai_takeover_enabled?: boolean | null
           city?: string | null
@@ -3089,6 +3104,9 @@ export type Database = {
           last_name?: string
           last_prediction_update?: string | null
           last_reply_at?: string | null
+          lead_source_name?: string | null
+          lead_status_type_name?: string | null
+          lead_type_name?: string | null
           message_intensity?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
@@ -4817,6 +4835,15 @@ export type Database = {
       book_appointment_slot: {
         Args: { p_date: string; p_time: string }
         Returns: boolean
+      }
+      calculate_ai_strategy_for_lead: {
+        Args: {
+          p_lead_id: string
+          p_lead_status_type_name?: string
+          p_lead_type_name?: string
+          p_lead_source_name?: string
+        }
+        Returns: undefined
       }
       calculate_delivery_variance: {
         Args: Record<PropertyKey, never>

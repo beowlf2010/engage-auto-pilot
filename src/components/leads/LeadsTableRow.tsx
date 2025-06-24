@@ -56,9 +56,6 @@ const LeadsTableRow = ({
 
   const engagementScore = getEngagementScore(lead);
 
-  // Get message intensity from available lead data or default to 'gentle'
-  const messageIntensity = 'gentle'; // Default since property doesn't exist on Lead type
-
   return (
     <TableRow key={lead.id} className="hover:bg-gray-50">
       <TableCell>
@@ -112,7 +109,7 @@ const LeadsTableRow = ({
         <div className="text-sm">{lead.vehicleInterest || 'Not specified'}</div>
       </TableCell>
 
-      {/* AI Process - Enhanced Display */}
+      {/* AI Process - Enhanced Display with Unified Strategy */}
       <TableCell>
         <div className="space-y-1">
           {canEdit && !lead.aiOptIn ? (
@@ -130,7 +127,7 @@ const LeadsTableRow = ({
           ) : (
             <EnhancedAIStatusDisplay
               aiOptIn={lead.aiOptIn}
-              messageIntensity={messageIntensity}
+              messageIntensity={lead.messageIntensity || 'gentle'}
               aiMessagesSent={lead.aiMessagesSent}
               aiSequencePaused={lead.aiSequencePaused}
               incomingCount={lead.incomingCount}
@@ -141,11 +138,17 @@ const LeadsTableRow = ({
             />
           )}
           
-          {/* AI Stage and Next Message Info */}
+          {/* AI Strategy Info */}
           {lead.aiOptIn && (
             <div className="text-xs text-gray-500 space-y-1">
               {lead.aiStage && (
                 <div>Stage: {lead.aiStage}</div>
+              )}
+              {lead.aiStrategyBucket && (
+                <div>Strategy: {lead.aiStrategyBucket}</div>
+              )}
+              {lead.aiAggressionLevel && (
+                <div>Level: {lead.aiAggressionLevel}/5</div>
               )}
               {lead.nextAiSendAt && (
                 <div>Next: {new Date(lead.nextAiSendAt).toLocaleDateString()} {new Date(lead.nextAiSendAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
@@ -241,7 +244,7 @@ const LeadsTableRow = ({
             onClick={() => handleScheduleClick(lead)}
             className="h-8 w-8 p-0"
           >
-            <Calendar className="h-8 w-8 p-0" />
+            <Calendar className="h-4 w-4" />
           </Button>
           
           <Button

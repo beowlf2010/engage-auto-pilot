@@ -105,6 +105,11 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
       // Map the status from CSV to our system status
       const mappedStatus = mapStatusToSystemStatus(row[mapping.status] || '');
 
+      // Capture lead factors for AI strategy
+      const leadStatusTypeName = row[mapping.leadstatustypename] || '';
+      const leadTypeName = row[mapping.LeadTypeName] || '';
+      const leadSourceName = row[mapping.leadsourcename] || row[mapping.source] || '';
+
       const newLead: ProcessedLead = {
         firstName: row[mapping.firstName] || '',
         lastName: row[mapping.lastName] || '',
@@ -124,7 +129,11 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
         doNotCall,
         doNotEmail,
         doNotMail: row[mapping.doNotMail]?.toLowerCase() === 'true',
-        status: mappedStatus
+        status: mappedStatus,
+        // New lead factors for AI strategy
+        leadStatusTypeName,
+        leadTypeName,
+        leadSourceName
       };
 
       // Check for duplicates against already processed leads
@@ -140,7 +149,7 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
         console.log(`Duplicate found at row ${index + 1}: ${duplicateCheck.duplicateType} conflict`);
       } else {
         validLeads.push(newLead);
-        console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status})`);
+        console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status}, Factors: ${leadStatusTypeName}/${leadTypeName}/${leadSourceName})`);
       }
 
     } catch (error) {
