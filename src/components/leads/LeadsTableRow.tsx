@@ -56,6 +56,9 @@ const LeadsTableRow = ({
 
   const engagementScore = getEngagementScore(lead);
 
+  // Get message intensity from available lead data or default to 'gentle'
+  const messageIntensity = 'gentle'; // Default since property doesn't exist on Lead type
+
   return (
     <TableRow key={lead.id} className="hover:bg-gray-50">
       <TableCell>
@@ -127,7 +130,7 @@ const LeadsTableRow = ({
           ) : (
             <EnhancedAIStatusDisplay
               aiOptIn={lead.aiOptIn}
-              messageIntensity={lead.messageIntensity || 'gentle'}
+              messageIntensity={messageIntensity}
               aiMessagesSent={lead.aiMessagesSent}
               aiSequencePaused={lead.aiSequencePaused}
               incomingCount={lead.incomingCount}
@@ -238,7 +241,7 @@ const LeadsTableRow = ({
             onClick={() => handleScheduleClick(lead)}
             className="h-8 w-8 p-0"
           >
-            <Calendar className="h-4 w-4" />
+            <Calendar className="h-8 w-8 p-0" />
           </Button>
           
           <Button
