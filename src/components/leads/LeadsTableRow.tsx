@@ -56,6 +56,24 @@ const LeadsTableRow = ({
 
   const engagementScore = getEngagementScore(lead);
 
+  // Get status color variant for badges
+  const getStatusVariant = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active':
+      case 'new':
+      case 'engaged':
+        return 'default';
+      case 'bad':
+      case 'lost':
+        return 'destructive';
+      case 'sold':
+      case 'closed':
+        return 'secondary';
+      default:
+        return 'outline';
+    }
+  };
+
   return (
     <TableRow key={lead.id} className="hover:bg-gray-50">
       <TableCell>
@@ -89,11 +107,35 @@ const LeadsTableRow = ({
         </div>
       </TableCell>
 
-      {/* Source */}
+      {/* Enhanced Source with Lead Type and Status */}
       <TableCell>
-        <Badge variant="outline" className="text-xs">
-          {lead.source}
-        </Badge>
+        <div className="space-y-1">
+          <Badge variant="outline" className="text-xs">
+            {lead.source}
+          </Badge>
+          <div className="flex flex-wrap gap-1">
+            {lead.leadTypeName && (
+              <Badge variant="secondary" className="text-xs py-0">
+                {lead.leadTypeName}
+              </Badge>
+            )}
+            {lead.status && (
+              <Badge variant={getStatusVariant(lead.status)} className="text-xs py-0">
+                {lead.status.toUpperCase()}
+              </Badge>
+            )}
+            {lead.leadStatusTypeName && (
+              <Badge variant="outline" className="text-xs py-0">
+                {lead.leadStatusTypeName}
+              </Badge>
+            )}
+          </div>
+          {lead.aiStrategyBucket && (
+            <div className="text-xs text-gray-500">
+              Strategy: {lead.aiStrategyBucket.replace(/_/g, ' ')}
+            </div>
+          )}
+        </div>
       </TableCell>
 
       {/* Status */}
@@ -144,8 +186,8 @@ const LeadsTableRow = ({
               {lead.aiStage && (
                 <div>Stage: {lead.aiStage}</div>
               )}
-              {lead.aiStrategyBucket && (
-                <div>Strategy: {lead.aiStrategyBucket}</div>
+              {lead.messageIntensity && (
+                <div>Intensity: {lead.messageIntensity}</div>
               )}
               {lead.aiAggressionLevel && (
                 <div>Level: {lead.aiAggressionLevel}/5</div>
