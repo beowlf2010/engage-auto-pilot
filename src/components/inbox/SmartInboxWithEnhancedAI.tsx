@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useEnhancedRealtimeInbox } from '@/hooks/useEnhancedRealtimeInbox';
@@ -8,6 +7,7 @@ import InboxConversationsList from './InboxConversationsList';
 import ConversationView from './ConversationView';
 import LeadContextPanel from './LeadContextPanel';
 import SmartFilters from './SmartFilters';
+import FilterRestorationBanner from './FilterRestorationBanner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,7 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [dismissedRestoration, setDismissedRestoration] = useState(false);
 
   console.log('🔍 [SMART INBOX ENHANCED] Profile data:', {
     id: profile?.id,
@@ -34,7 +35,9 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
     clearFilters,
     hasActiveFilters,
     applyFilters,
-    getFilterSummary
+    getFilterSummary,
+    isRestored,
+    filtersLoaded
   } = useInboxFilters(profile?.id, profile?.role);
 
   const {
@@ -117,6 +120,11 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
       });
     }
   }, [updateFilter]);
+
+  const handleClearFilters = useCallback(() => {
+    clearFilters();
+    setDismissedRestoration(true);
+  }, [clearFilters]);
 
   const stats = useMemo(() => {
     const unreadConversations = filteredConversations.filter(c => c.unreadCount > 0).length;
@@ -241,6 +249,17 @@ const SmartInboxWithEnhancedAI = ({ onLeadsRefresh }: { onLeadsRefresh?: () => v
             )}
           </Button>
         </div>
+
+        {/* Filter Restoration Banner */}
+        {filtersLoaded && isRestored && !dismissedRestoration && (
+          <div className="mt-4">
+            <FilterRestorationBanner
+              isRestored={true}
+              onClearFilters={handleClearFilters}
+              onDismiss={() => setDismissedRestoration(true)}
+            />
+          </div>
+        )}
 
         {/* Filter Panel */}
         {showFilters && (

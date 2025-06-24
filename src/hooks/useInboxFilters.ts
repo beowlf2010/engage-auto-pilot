@@ -1,5 +1,6 @@
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useFilterPersistence } from './useFilterPersistence';
 import type { ConversationListItem } from '@/types/conversation';
 
 export interface InboxFilters {
@@ -17,7 +18,7 @@ export interface InboxFilters {
   aiOptIn: boolean | null;
   priority: string | null;
   assigned: string | null;
-  messageDirection: string | null; // New filter for message direction
+  messageDirection: string | null;
 }
 
 const defaultFilters: InboxFilters = {
@@ -29,35 +30,77 @@ const defaultFilters: InboxFilters = {
   dateRange: 'all',
   leadSource: '',
   vehicleType: '',
-  sortBy: 'newest', // Default to newest first
+  sortBy: 'newest',
   status: [],
   aiOptIn: null,
   priority: null,
   assigned: null,
-  messageDirection: null, // New filter
+  messageDirection: null,
 };
 
 export const useInboxFilters = (userId?: string, userRole?: string) => {
+  const {
+    state: persistedFilters,
+    saveState: savePersistentFilters,
+    clearState: clearPersistentFilters,
+    isLoaded: filtersLoaded
+  } = useFilterPersistence(defaultFilters, 'inbox-filters-v1');
+
   const [filters, setFilters] = useState<InboxFilters>(defaultFilters);
+  const [isRestored, setIsRestored] = useState(false);
+
+  // Initialize filters from persisted state once loaded
+  useEffect(() => {
+    if (filtersLoaded) {
+      setFilters(persistedFilters);
+      
+      // Check if any filters were actually restored
+      const hasRestoredFilters = Object.keys(persistedFilters).some(key => {
+        if (key === 'sortBy') return persistedFilters[key] !== 'newest';
+        if (key === 'dateRange') return persistedFilters[key] !== 'all';
+        if (key === 'leadSource' || key === 'vehicleType') return persistedFilters[key] !== '';
+        if (key === 'status') return (persistedFilters[key] as string[]).length > 0;
+        if (key === 'aiOptIn' || key === 'priority' || key === 'assigned' || key === 'messageDirection') {
+          return persistedFilters[key] !== null;
+        }
+        return persistedFilters[key as keyof InboxFilters] === true;
+      });
+      
+      setIsRestored(hasRestoredFilters);
+      
+      if (hasRestoredFilters) {
+        console.log('🔄 [INBOX FILTERS] Restored saved filters:', persistedFilters);
+      }
+    }
+  }, [filtersLoaded, persistedFilters]);
 
   const updateFilter = useCallback(<K extends keyof InboxFilters>(
     key: K,
     value: InboxFilters[K]
   ) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  }, []);
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    savePersistentFilters(newFilters);
+    console.log(`🔧 [INBOX FILTERS] Updated filter ${key}:`, value);
+  }, [filters, savePersistentFilters]);
 
   const clearFilters = useCallback(() => {
-    setFilters({ ...defaultFilters, sortBy: 'newest' }); // Keep newest first as default
-  }, []);
+    const clearedFilters = { ...defaultFilters, sortBy: 'newest' as const };
+    setFilters(clearedFilters);
+    clearPersistentFilters();
+    setIsRestored(false);
+    console.log('🗑️ [INBOX FILTERS] Cleared all filters');
+  }, [clearPersistentFilters]);
 
   const hasActiveFilters = useMemo(() => {
     return Object.keys(filters).some(key => {
-      if (key === 'sortBy') return filters[key] !== 'newest'; // Default is newest
+      if (key === 'sortBy') return filters[key] !== 'newest';
       if (key === 'dateRange') return filters[key] !== 'all';
       if (key === 'leadSource' || key === 'vehicleType') return filters[key] !== '';
       if (key === 'status') return (filters[key] as string[]).length > 0;
-      if (key === 'aiOptIn' || key === 'priority' || key === 'assigned' || key === 'messageDirection') return filters[key] !== null;
+      if (key === 'aiOptIn' || key === 'priority' || key === 'assigned' || key === 'messageDirection') {
+        return filters[key] !== null;
+      }
       return filters[key as keyof InboxFilters] === true;
     });
   }, [filters]);
@@ -106,7 +149,6 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
     }
 
     if (filters.aiOptIn !== null) {
-      // Filter based on AI opt-in status if specified
       filtered = filtered.filter(conv => 
         Boolean(conv.aiOptIn) === filters.aiOptIn
       );
@@ -120,7 +162,6 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
       }
     }
 
-    // Apply priority filter with improved unread handling
     if (filters.priority) {
       if (filters.priority === 'unread') {
         filtered = filtered.filter(conv => conv.unreadCount > 0);
@@ -131,7 +172,6 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
       }
     }
 
-    // Apply new message direction filter
     if (filters.messageDirection) {
       if (filters.messageDirection === 'inbound') {
         filtered = filtered.filter(conv => conv.lastMessageDirection === 'in');
@@ -174,15 +214,15 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
       
       switch (filters.sortBy) {
         case 'newest':
-          return bTime - aTime; // Newest first (default)
+          return bTime - aTime;
         case 'oldest':
           return aTime - bTime;
         case 'unread':
           return (b.unreadCount || 0) - (a.unreadCount || 0);
         case 'activity':
-          return bTime - aTime; // Same as newest for now
+          return bTime - aTime;
         default:
-          return bTime - aTime; // Default to newest first
+          return bTime - aTime;
       }
     });
 
@@ -216,6 +256,8 @@ export const useInboxFilters = (userId?: string, userRole?: string) => {
     clearFilters,
     hasActiveFilters,
     applyFilters,
-    getFilterSummary
+    getFilterSummary,
+    isRestored,
+    filtersLoaded
   };
 };
