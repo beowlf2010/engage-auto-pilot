@@ -27,6 +27,12 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [lastInboundMessageId, setLastInboundMessageId] = useState<string | null>(null);
 
+  // Helper function to extract first name only
+  const getFirstName = (fullName: string) => {
+    if (!fullName) return 'there';
+    return fullName.split(' ')[0];
+  };
+
   // Generate AI response when new inbound message arrives
   useEffect(() => {
     if (!selectedConversation || !messages.length) return;
@@ -49,7 +55,7 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
       
       const lastMessage = messages[messages.length - 1];
       const customerMessage = lastMessage?.body?.toLowerCase() || '';
-      const leadName = selectedConversation?.leadName || 'there';
+      const firstName = getFirstName(selectedConversation?.leadName || '');
       const vehicleInterest = selectedConversation?.vehicleInterest || 'vehicle';
       
       let suggestion = '';
@@ -59,38 +65,38 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
 
       // Analyze customer message intent and generate appropriate response
       if (customerMessage.includes('price') || customerMessage.includes('cost') || customerMessage.includes('payment')) {
-        suggestion = `Hi ${leadName}! I understand you're interested in pricing for the ${vehicleInterest}. I'd be happy to go over our current pricing and available financing options with you. When would be a good time for a quick call to discuss the details?`;
+        suggestion = `Hi ${firstName}! I understand you're interested in pricing for the ${vehicleInterest}. I'd be happy to go over our current pricing and available financing options with you. When would be a good time for a quick call to discuss the details?`;
         suggestionReasoning = 'Customer inquired about pricing - providing helpful response and suggesting a call to discuss details';
         suggestionConfidence = 0.92;
         type = 'pricing';
       } else if (customerMessage.includes('available') || customerMessage.includes('stock') || customerMessage.includes('inventory')) {
-        suggestion = `Great question, ${leadName}! Yes, we currently have the ${vehicleInterest} available. I'd love to show you the specific options we have in stock and help you find the perfect match. Are you available for a quick call today to go over the details?`;
+        suggestion = `Great question, ${firstName}! Yes, we currently have the ${vehicleInterest} available. I'd love to show you the specific options we have in stock and help you find the perfect match. Are you available for a quick call today to go over the details?`;
         suggestionReasoning = 'Customer asking about availability - confirming stock and suggesting immediate follow-up';
         suggestionConfidence = 0.89;
         type = 'availability';
       } else if (customerMessage.includes('interested') || customerMessage.includes('looking') || customerMessage.includes('want')) {
-        suggestion = `That's fantastic, ${leadName}! I'm excited to help you with the ${vehicleInterest}. To make sure I find you the perfect vehicle, what specific features or options are most important to you? Color, trim level, any specific must-haves?`;
+        suggestion = `That's fantastic, ${firstName}! I'm excited to help you with the ${vehicleInterest}. To make sure I find you the perfect vehicle, what specific features or options are most important to you? Color, trim level, any specific must-haves?`;
         suggestionReasoning = 'Customer expressing interest - building rapport and gathering specific requirements';
         suggestionConfidence = 0.85;
         type = 'interest';
       } else if (customerMessage.includes('test drive') || customerMessage.includes('see') || customerMessage.includes('visit')) {
-        suggestion = `Absolutely, ${leadName}! I'd love to set up a test drive for you. The ${vehicleInterest} drives beautifully and I think you'll really enjoy it. What day and time works best for you this week? I can also prepare any specific models you'd like to see.`;
+        suggestion = `Absolutely, ${firstName}! I'd love to set up a test drive for you. The ${vehicleInterest} drives beautifully and I think you'll really enjoy it. What day and time works best for you this week? I can also prepare any specific models you'd like to see.`;
         suggestionReasoning = 'Customer wants to see/test drive vehicle - facilitating immediate scheduling';
         suggestionConfidence = 0.94;
         type = 'test_drive';
       } else if (customerMessage.includes('thank') || customerMessage.includes('thanks')) {
-        suggestion = `You're very welcome, ${leadName}! I'm here to help make this process as smooth as possible for you. Is there anything else about the ${vehicleInterest} you'd like to know, or would you like to take the next step and schedule a time to see it in person?`;
+        suggestion = `You're very welcome, ${firstName}! I'm here to help make this process as smooth as possible for you. Is there anything else about the ${vehicleInterest} you'd like to know, or would you like to take the next step and schedule a time to see it in person?`;
         suggestionReasoning = 'Customer expressing gratitude - maintaining positive momentum and suggesting next steps';
         suggestionConfidence = 0.87;
         type = 'gratitude';
       } else if (customerMessage.includes('no') || customerMessage.includes('not interested') || customerMessage.includes('stop')) {
-        suggestion = `I completely understand, ${leadName}. No pressure at all! If your situation changes in the future or you have any questions about the ${vehicleInterest}, please don't hesitate to reach out. Have a great day!`;
+        suggestion = `I completely understand, ${firstName}. No pressure at all! If your situation changes in the future or you have any questions about the ${vehicleInterest}, please don't hesitate to reach out. Have a great day!`;
         suggestionReasoning = 'Customer declining or showing disinterest - respectful acknowledgment with door left open';
         suggestionConfidence = 0.91;
         type = 'objection';
       } else {
         // General response for unclear messages
-        suggestion = `Hi ${leadName}! Thanks for your message about the ${vehicleInterest}. I want to make sure I give you the most helpful information. Could you let me know what specific questions you have or what would be most helpful for me to cover with you?`;
+        suggestion = `Hi ${firstName}! Thanks for your message about the ${vehicleInterest}. I want to make sure I give you the most helpful information. Could you let me know what specific questions you have or what would be most helpful for me to cover with you?`;
         suggestionReasoning = 'General response to unclear message - seeking clarification to provide better help';
         suggestionConfidence = 0.76;
         type = 'clarification';
@@ -158,7 +164,7 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
   if (!canReply) return null;
 
   return (
-    <Card className="shadow-sm border-blue-200">
+    <Card className="shadow-sm border-blue-200 bg-gradient-to-r from-blue-50 to-purple-50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -198,7 +204,7 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
       {isExpanded && (
         <CardContent className="pt-0">
           {isGenerating ? (
-            <div className="flex items-center justify-center py-6">
+            <div className="flex items-center justify-center py-4">
               <div className="text-center">
                 <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mx-auto mb-2" />
                 <span className="text-sm text-gray-600">Finn is analyzing the conversation...</span>
@@ -207,7 +213,7 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
             </div>
           ) : aiSuggestion ? (
             <div className="space-y-3">
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-white border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start gap-2 mb-3">
                   <Lightbulb className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
@@ -218,7 +224,7 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
                       {aiSuggestion}
                     </p>
                     
-                    <div className="text-xs text-gray-600 mb-3 p-2 bg-white/50 rounded border">
+                    <div className="text-xs text-gray-600 mb-3 p-2 bg-gray-50 rounded border">
                       <strong>AI Reasoning:</strong> {reasoning}
                     </div>
                     

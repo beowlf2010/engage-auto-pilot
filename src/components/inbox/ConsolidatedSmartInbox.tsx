@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useOptimizedInbox } from '@/hooks/useOptimizedInbox';
@@ -245,6 +244,18 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
           </Button>
         </div>
 
+        {/* AI Response Suggestion Panel - NEW TOP POSITION */}
+        {showAISuggestions && selectedConversation && canReply(selectedConversation) && messages.some(m => m.direction === 'in') && (
+          <div className="mt-4">
+            <AIResponseSuggestionPanel
+              selectedConversation={selectedConversation}
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              canReply={canReply(selectedConversation)}
+            />
+          </div>
+        )}
+
         {/* Filter Panel */}
         {showFilters && (
           <div className="mt-4">
@@ -313,18 +324,6 @@ const ConsolidatedSmartInbox = ({ onLeadsRefresh }: { onLeadsRefresh?: () => voi
                   onMarkAsRead={() => markAsRead(selectedConversation.leadId)}
                   canReply={canReply(selectedConversation)}
                 />
-
-                {/* AI Suggestions Panel - only show for conversations with inbound messages where user can reply */}
-                {showAISuggestions && canReply(selectedConversation) && messages.some(m => m.direction === 'in') && (
-                  <div className="border-t bg-gray-50 p-4">
-                    <AIResponseSuggestionPanel
-                      selectedConversation={selectedConversation}
-                      messages={messages}
-                      onSendMessage={handleSendMessage}
-                      canReply={canReply(selectedConversation)}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Right Sidebar - Lead Context */}
