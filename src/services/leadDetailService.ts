@@ -140,7 +140,7 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
     console.log('🔍 [LEAD DETAIL] Fetching lead with ID:', leadId);
 
     // Get lead details with phone numbers, trade vehicles, salesperson info, and upload data
-    // Using LEFT JOIN for salesperson to handle leads without assigned salespeople
+    // Using LEFT JOIN for both salesperson and upload_history to handle leads without these relationships
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select(`
@@ -164,7 +164,7 @@ export const getLeadDetail = async (leadId: string): Promise<LeadDetailData | nu
           first_name,
           last_name
         ),
-        upload_history!upload_history_id (
+        upload_history:upload_history_id (
           id,
           original_filename,
           upload_type,
