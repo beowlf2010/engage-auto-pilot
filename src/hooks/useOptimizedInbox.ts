@@ -44,7 +44,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
     try {
       setError(null);
       
-      // Build query based on user role - using only existing columns
+      // Build query based on user role - including read_at field
       let query = supabase
         .from('leads')
         .select(`
@@ -65,6 +65,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
             body,
             direction,
             sent_at,
+            read_at,
             ai_generated
           )
         `)
@@ -94,9 +95,9 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
         const lastMessage = lead.conversations
           .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0];
 
+        // Count ALL unread messages (where read_at IS NULL) regardless of age
         const unreadCount = lead.conversations.filter(
-          msg => msg.direction === 'in' && 
-          new Date(msg.sent_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+          msg => msg.direction === 'in' && !msg.read_at
         ).length;
 
         conversationMap.set(lead.id, {
@@ -127,6 +128,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
       setTotalConversations(conversationsArray.length);
 
       console.log('✅ [OPTIMIZED INBOX] Loaded conversations:', conversationsArray.length);
+      console.log('🔍 [OPTIMIZED INBOX] Unread conversations found:', conversationsArray.filter(c => c.unreadCount > 0).length);
 
     } catch (error) {
       console.error('❌ [OPTIMIZED INBOX] Error loading conversations:', error);
@@ -169,6 +171,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           direction: msg.direction as 'in' | 'out',
           body: msg.body,
           sentAt: msg.sent_at,
+          readAt: msg.read_at,
           aiGenerated: msg.ai_generated || false,
           smsStatus: msg.sms_status,
           smsError: msg.sms_error
