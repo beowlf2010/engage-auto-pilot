@@ -68,4 +68,6 @@ export interface Lead {
   first_name: string;
   last_name: string;
   created_at: string;
+  // Hidden functionality
+  is_hidden?: boolean;
 }

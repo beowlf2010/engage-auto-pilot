@@ -1,16 +1,14 @@
+
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MessageSquare, Phone, Calendar, Eye, ArrowDown, ArrowUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Eye, MessageCircle, Phone, Mail, Clock, Star } from "lucide-react";
 import { Lead } from "@/types/lead";
-import LeadStatusBadge from "./LeadStatusBadge";
-import LeadContactStatusBadge from "./LeadContactStatusBadge";
-import FreshLeadBadge from "./FreshLeadBadge";
-import AIPreviewPopout from "./AIPreviewPopout";
-import EnhancedAIStatusDisplay from "./EnhancedAIStatusDisplay";
+import { formatDistanceToNow } from "date-fns";
+import HideLeadButton from './HideLeadButton';
 
 interface LeadsTableRowProps {
   lead: Lead;
@@ -22,9 +20,10 @@ interface LeadsTableRowProps {
   onQuickView: (lead: Lead) => void;
   getEngagementScore: (lead: Lead) => number;
   isFresh: boolean;
+  onToggleHidden?: (leadId: string, hidden: boolean) => void;
 }
 
-const LeadsTableRow = ({
+const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
   lead,
   selectedLeads,
   onLeadSelect,
@@ -33,278 +32,181 @@ const LeadsTableRow = ({
   canEdit,
   onQuickView,
   getEngagementScore,
-  isFresh
-}: LeadsTableRowProps) => {
-  const navigate = useNavigate();
-
-  const handleMessageClick = (lead: Lead) => {
-    navigate(`/inbox?leadId=${lead.id}`);
-  };
-
-  const handleCallClick = (phoneNumber: string) => {
-    window.open(`tel:${phoneNumber}`);
-  };
-
-  const handleScheduleClick = (lead: Lead) => {
-    navigate(`/appointments/schedule?leadId=${lead.id}`);
-  };
-
-  const handleLeadClick = (leadId: string) => {
-    navigate(`/lead/${leadId}`);
-  };
-
+  isFresh,
+  onToggleHidden
+}) => {
   const engagementScore = getEngagementScore(lead);
+  const isSelected = selectedLeads.includes(lead.id.toString());
+  const hasUnrepliedMessages = lead.unrepliedCount > 0;
 
-  // Get status color variant for badges
-  const getStatusVariant = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'active':
-      case 'new':
-      case 'engaged':
-        return 'default';
-      case 'bad':
-      case 'lost':
-        return 'destructive';
-      case 'sold':
-      case 'closed':
-        return 'secondary';
-      default:
-        return 'outline';
+  const getEngagementColor = (score: number) => {
+    if (score >= 70) return 'text-green-600 bg-green-50';
+    if (score >= 40) return 'text-yellow-600 bg-yellow-50';
+    return 'text-red-600 bg-red-50';
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return 'Unknown';
     }
   };
 
+  const getDoNotContactReasons = () => {
+    const reasons = [];
+    if (lead.doNotCall) reasons.push('Call');
+    if (lead.doNotEmail) reasons.push('Email');
+    if (lead.doNotMail) reasons.push('Mail');
+    return reasons;
+  };
+
+  const doNotContactReasons = getDoNotContactReasons();
+
   return (
-    <TableRow key={lead.id} className="hover:bg-gray-50">
+    <TableRow 
+      className={`hover:bg-gray-50 ${isFresh ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''} ${
+        hasUnrepliedMessages ? 'bg-red-50 border-l-4 border-l-red-400' : ''
+      } ${lead.is_hidden ? 'opacity-60' : ''}`}
+    >
       <TableCell>
         <Checkbox
-          checked={selectedLeads.includes(lead.id.toString())}
+          checked={isSelected}
           onCheckedChange={() => onLeadSelect(lead.id.toString())}
         />
       </TableCell>
-      
-      {/* Lead Name with Fresh Badge */}
+
       <TableCell>
         <div className="flex items-center space-x-2">
           {isFresh && (
-            <FreshLeadBadge 
-              createdAt={lead.createdAt} 
-              aiOptIn={lead.aiOptIn}
-              nextAiSendAt={lead.nextAiSendAt}
-            />
+            <Badge variant="default" className="text-xs bg-blue-600">
+              Fresh
+            </Badge>
+          )}
+          {hasUnrepliedMessages && (
+            <Badge variant="destructive" className="text-xs">
+              {lead.unrepliedCount} unreplied
+            </Badge>
+          )}
+          {lead.is_hidden && (
+            <Badge variant="outline" className="text-xs text-gray-500">
+              Hidden
+            </Badge>
           )}
           <div>
-            <button
-              onClick={() => handleLeadClick(lead.id.toString())}
-              className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-            >
+            <div className="font-medium">
               {lead.firstName} {lead.lastName}
-            </button>
-            {lead.email && (
-              <div className="text-sm text-gray-500 truncate max-w-32">{lead.email}</div>
-            )}
+            </div>
+            <div className="text-sm text-gray-500">
+              {lead.primaryPhone}
+            </div>
           </div>
         </div>
       </TableCell>
 
-      {/* Enhanced Source with Lead Type, Status, and Source Name - Fixed Display Logic */}
       <TableCell>
-        <div className="space-y-1">
-          {/* Primary Source Display - Use leadSourceName if available, fallback to source */}
-          <Badge variant="outline" className="text-xs">
-            {lead.leadSourceName || lead.source || 'Unknown'}
-          </Badge>
-          
-          {/* Secondary Info Row - AI Strategy Fields */}
-          <div className="flex flex-wrap gap-1">
-            {lead.leadTypeName && (
-              <Badge variant="secondary" className="text-xs py-0">
-                Type: {lead.leadTypeName}
-              </Badge>
-            )}
-            {lead.leadStatusTypeName && (
-              <Badge variant="outline" className="text-xs py-0">
-                Status: {lead.leadStatusTypeName}
-              </Badge>
-            )}
-          </div>
-          
-          {/* System Status Badge */}
-          {lead.status && (
-            <div className="flex items-center gap-1">
-              <Badge variant={getStatusVariant(lead.status)} className="text-xs py-0">
-                {lead.status.toUpperCase()}
-              </Badge>
-            </div>
-          )}
-          
-          {/* AI Strategy Info */}
-          {lead.aiStrategyBucket && (
-            <div className="text-xs text-gray-500">
-              Strategy: {lead.aiStrategyBucket.replace(/_/g, ' ')}
-            </div>
+        <div className="text-sm">
+          <div>{lead.email}</div>
+          {lead.city && lead.state && (
+            <div className="text-gray-500">{lead.city}, {lead.state}</div>
           )}
         </div>
       </TableCell>
 
-      {/* Status */}
-      <TableCell>
-        <div className="space-y-1">
-          <LeadStatusBadge status={lead.status} />
-          <LeadContactStatusBadge contactStatus={lead.contactStatus || 'no_contact'} />
+      <TableCell className="max-w-xs">
+        <div className="truncate text-sm" title={lead.vehicleInterest}>
+          {lead.vehicleInterest}
         </div>
       </TableCell>
 
-      {/* Vehicle Interest */}
       <TableCell>
-        <div className="text-sm">{lead.vehicleInterest || 'Not specified'}</div>
-      </TableCell>
-
-      {/* AI Process - Enhanced Display with Unified Strategy */}
-      <TableCell>
-        <div className="space-y-1">
-          {canEdit && !lead.aiOptIn ? (
-            <AIPreviewPopout
-              lead={lead}
-              onAIOptInChange={onAiOptInChange}
-            >
-              <div className="cursor-pointer">
-                <EnhancedAIStatusDisplay
-                  aiOptIn={false}
-                  size="sm"
-                />
-              </div>
-            </AIPreviewPopout>
-          ) : (
-            <EnhancedAIStatusDisplay
-              aiOptIn={lead.aiOptIn}
-              messageIntensity={lead.messageIntensity || 'gentle'}
-              aiMessagesSent={lead.aiMessagesSent}
-              aiSequencePaused={lead.aiSequencePaused}
-              incomingCount={lead.incomingCount}
-              outgoingCount={lead.outgoingCount}
-              unrepliedCount={lead.unrepliedCount}
-              size="sm"
-              showDetailed={true}
-            />
-          )}
-          
-          {/* AI Strategy Info */}
-          {lead.aiOptIn && (
-            <div className="text-xs text-gray-500 space-y-1">
-              {lead.aiStage && (
-                <div>Stage: {lead.aiStage}</div>
-              )}
-              {lead.messageIntensity && (
-                <div>Intensity: {lead.messageIntensity}</div>
-              )}
-              {lead.aiAggressionLevel && (
-                <div>Level: {lead.aiAggressionLevel}/5</div>
-              )}
-              {lead.nextAiSendAt && (
-                <div>Next: {new Date(lead.nextAiSendAt).toLocaleDateString()} {new Date(lead.nextAiSendAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-              )}
-            </div>
-          )}
-        </div>
-      </TableCell>
-
-      {/* Contact Info */}
-      <TableCell>
-        <div className="space-y-1">
-          {lead.primaryPhone && (
-            <div className="text-sm">{lead.primaryPhone}</div>
-          )}
-          <div className="text-xs text-gray-500">
-            {new Date(lead.createdAt).toLocaleDateString()}
-          </div>
-        </div>
-      </TableCell>
-
-      {/* Engagement Score */}
-      <TableCell>
-        <Badge 
-          variant={engagementScore > 70 ? "default" : engagementScore > 40 ? "secondary" : "outline"}
-        >
-          {engagementScore}%
+        <Badge variant="outline" className="text-xs">
+          {lead.source}
         </Badge>
       </TableCell>
 
-      {/* Messages */}
       <TableCell>
-        <div className="text-center space-y-1">
-          <div className="font-medium">{lead.messageCount || 0}</div>
-          {lead.unreadCount > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              {lead.unreadCount} new
-            </Badge>
-          )}
-          {lead.lastMessage && (
-            <div className="text-xs text-gray-500 space-y-1">
-              <div className="flex items-center gap-1 justify-center">
-                {lead.lastMessageDirection && (
-                  <Badge 
-                    variant={lead.lastMessageDirection === 'in' ? 'default' : 'secondary'}
-                    className={`text-xs px-1 py-0 ${
-                      lead.lastMessageDirection === 'in' 
-                        ? 'bg-green-100 text-green-700 border-green-200' 
-                        : 'bg-blue-100 text-blue-700 border-blue-200'
-                    }`}
-                  >
-                    {lead.lastMessageDirection === 'in' ? (
-                      <ArrowDown className="w-3 h-3" />
-                    ) : (
-                      <ArrowUp className="w-3 h-3" />
-                    )}
-                  </Badge>
-                )}
-              </div>
-              <div className="truncate max-w-24">{lead.lastMessage}</div>
-              <div>{lead.lastMessageTime}</div>
-            </div>
-          )}
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1">
+            <MessageCircle className="h-4 w-4 text-blue-500" />
+            <span className="text-sm">{lead.incomingCount}</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <MessageCircle className="h-4 w-4 text-green-500" />
+            <span className="text-sm">{lead.outgoingCount}</span>
+          </div>
         </div>
       </TableCell>
 
-      {/* Actions */}
       <TableCell>
-        <div className="flex items-center space-x-1">
+        {lead.lastMessageTime && (
+          <div className="text-sm">
+            <div className="flex items-center space-x-1">
+              <Clock className="h-3 w-3" />
+              <span>{formatTimeAgo(lead.lastMessageTime)}</span>
+            </div>
+            <div className={`text-xs ${
+              lead.lastMessageDirection === 'in' ? 'text-blue-600' : 'text-green-600'
+            }`}>
+              {lead.lastMessageDirection === 'in' ? '← From customer' : '→ To customer'}
+            </div>
+          </div>
+        )}
+      </TableCell>
+
+      <TableCell>
+        <div className={`text-xs px-2 py-1 rounded ${getEngagementColor(engagementScore)}`}>
+          {engagementScore}%
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <Badge 
+          variant={lead.status === 'new' ? 'default' : 
+                   lead.status === 'engaged' ? 'secondary' : 
+                   lead.status === 'paused' ? 'outline' : 'destructive'}
+          className="text-xs"
+        >
+          {lead.status}
+        </Badge>
+      </TableCell>
+
+      <TableCell>
+        {canEdit && (
+          <Switch
+            checked={lead.aiOptIn}
+            onCheckedChange={(checked) => onAiOptInChange(lead.id.toString(), checked)}
+            className="data-[state=checked]:bg-green-600"
+          />
+        )}
+      </TableCell>
+
+      <TableCell>
+        {doNotContactReasons.length > 0 ? (
+          <Badge variant="outline" className="text-xs text-red-600 border-red-200">
+            DNC: {doNotContactReasons.join(', ')}
+          </Badge>
+        ) : (
+          <span className="text-gray-400 text-xs">-</span>
+        )}
+      </TableCell>
+
+      <TableCell>
+        <div className="flex items-center space-x-2">
           <Button
-            size="sm"
             variant="ghost"
-            onClick={() => handleMessageClick(lead)}
-            className="h-8 w-8 p-0"
-          >
-            <MessageSquare className="h-4 w-4" />
-          </Button>
-          
-          {lead.primaryPhone && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleCallClick(lead.primaryPhone)}
-              className="h-8 w-8 p-0"
-            >
-              <Phone className="h-4 w-4" />
-            </Button>
-          )}
-          
-          <Button
             size="sm"
-            variant="ghost"
-            onClick={() => handleScheduleClick(lead)}
-            className="h-8 w-8 p-0"
-          >
-            <Calendar className="h-4 w-4" />
-          </Button>
-          
-          <Button
-            size="sm"
-            variant="ghost"
             onClick={() => onQuickView(lead)}
-            className="h-8 w-8 p-0"
           >
             <Eye className="h-4 w-4" />
           </Button>
+          {onToggleHidden && (
+            <HideLeadButton
+              leadId={lead.id}
+              isHidden={lead.is_hidden || false}
+              onToggleHidden={onToggleHidden}
+            />
+          )}
         </div>
       </TableCell>
     </TableRow>

@@ -1,18 +1,23 @@
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Lead } from "@/types/lead";
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Lead } from '@/types/lead';
+import { useToast } from '@/hooks/use-toast';
 
 export const useLeads = () => {
-  const queryClient = useQueryClient();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
+  const { toast } = useToast();
 
-  const { data: leads = [], isLoading, error } = useQuery({
-    queryKey: ['leads'],
-    queryFn: async (): Promise<Lead[]> => {
-      console.log('🔍 [LEADS FETCH] Fetching leads with conversation data...');
-      
-      // Fetch leads with phone numbers
-      const { data: leadsData, error: leadsError } = await supabase
+  const fetchLeads = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Build the query based on whether to show hidden leads
+      let query = supabase
         .from('leads')
         .select(`
           *,
@@ -21,173 +26,207 @@ export const useLeads = () => {
             number,
             type,
             priority,
-            is_primary,
-            status
+            status,
+            is_primary
+          ),
+          profiles (
+            first_name,
+            last_name
           )
         `)
         .order('created_at', { ascending: false });
 
-      if (leadsError) {
-        console.error('❌ [LEADS FETCH] Error fetching leads:', leadsError);
-        throw leadsError;
+      // Filter out hidden leads if showHidden is false
+      if (!showHidden) {
+        query = query.or('is_hidden.is.null,is_hidden.eq.false');
       }
 
-      // Fetch all conversations to calculate message counts - INCLUDING body field
-      const { data: conversationsData, error: conversationsError } = await supabase
+      const { data: leadsData, error: leadsError } = await query;
+
+      if (leadsError) throw leadsError;
+
+      // Get conversation counts for each lead
+      const { data: conversationCounts, error: countError } = await supabase
         .from('conversations')
-        .select('lead_id, direction, sent_at, read_at, body');
+        .select('lead_id, direction, read_at')
+        .order('sent_at', { ascending: false });
 
-      if (conversationsError) {
-        console.error('❌ [LEADS FETCH] Error fetching conversations:', conversationsError);
-        throw conversationsError;
-      }
+      if (countError) throw countError;
 
-      console.log(`🔍 [LEADS FETCH] Raw leads data count: ${leadsData?.length || 0}`);
-      console.log(`📨 [LEADS FETCH] Conversations data count: ${conversationsData?.length || 0}`);
-
-      // Transform the data to match Lead interface
-      const transformedLeads: Lead[] = leadsData?.map(lead => {
-        // Get primary phone number
-        const primaryPhone = lead.phone_numbers?.find((p: any) => p.is_primary)?.number || 
-                            lead.phone_numbers?.[0]?.number || '';
-
-        // Transform phone numbers to match PhoneNumber interface
-        const phoneNumbers = lead.phone_numbers?.map((phone: any) => ({
-          id: phone.id,
-          number: phone.number,
-          type: phone.type as 'cell' | 'day' | 'eve',
-          priority: phone.priority,
-          status: phone.status as 'active' | 'failed' | 'opted_out',
-          isPrimary: phone.is_primary,
-        })) || [];
-
-        // Calculate message counts for this lead
-        const leadConversations = conversationsData?.filter(conv => conv.lead_id === lead.id) || [];
-        const incomingCount = leadConversations.filter(msg => msg.direction === 'in').length;
-        const outgoingCount = leadConversations.filter(msg => msg.direction === 'out').length;
-        const unreadCount = leadConversations.filter(msg => 
-          msg.direction === 'in' && !msg.read_at
+      // Process the data to create Lead objects
+      const processedLeads: Lead[] = leadsData?.map(leadData => {
+        const leadConversations = conversationCounts?.filter(conv => conv.lead_id === leadData.id) || [];
+        
+        const incomingCount = leadConversations.filter(conv => conv.direction === 'in').length;
+        const outgoingCount = leadConversations.filter(conv => conv.direction === 'out').length;
+        const unrepliedCount = leadConversations.filter(conv => 
+          conv.direction === 'in' && !conv.read_at
         ).length;
 
-        // Calculate unreplied count - incoming messages that don't have an outgoing response after them
-        let unrepliedCount = 0;
-        const sortedConversations = leadConversations.sort((a, b) => 
-          new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
-        );
-        
-        for (let i = 0; i < sortedConversations.length; i++) {
-          const msg = sortedConversations[i];
-          if (msg.direction === 'in') {
-            const hasReply = sortedConversations.slice(i + 1).some(laterMsg => 
-              laterMsg.direction === 'out'
-            );
-            if (!hasReply) {
-              unrepliedCount++;
-            }
-          }
-        }
+        const lastMessage = leadConversations[0];
+        const primaryPhone = leadData.phone_numbers?.find(p => p.is_primary)?.number || 
+                           leadData.phone_numbers?.[0]?.number || '';
 
-        // Get the most recent message
-        const lastMessage = leadConversations.sort((a, b) => 
-          new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
-        )[0];
-
-        // Determine contact status based on message data
-        let contactStatus: 'no_contact' | 'contact_attempted' | 'response_received' = 'no_contact';
-        if (incomingCount > 0) {
-          contactStatus = 'response_received';
-        } else if (outgoingCount > 0) {
-          contactStatus = 'contact_attempted';
-        }
-
-        // Map status with proper type checking
-        const mapStatus = (status: string): 'new' | 'engaged' | 'paused' | 'closed' | 'lost' => {
-          const validStatuses = ['new', 'engaged', 'paused', 'closed', 'lost'];
-          return validStatuses.includes(status) ? status as 'new' | 'engaged' | 'paused' | 'closed' | 'lost' : 'new';
-        };
-
-        // Map message intensity with proper type checking
-        const mapMessageIntensity = (intensity: string): 'gentle' | 'standard' | 'aggressive' => {
-          const validIntensities = ['gentle', 'standard', 'aggressive'];
-          return validIntensities.includes(intensity) ? intensity as 'gentle' | 'standard' | 'aggressive' : 'gentle';
-        };
-
-        const transformedLead: Lead = {
-          id: lead.id,
-          firstName: lead.first_name || '',
-          lastName: lead.last_name || '',
-          middleName: lead.middle_name || '',
-          email: lead.email || '',
-          emailAlt: lead.email_alt || '',
+        return {
+          id: leadData.id,
+          firstName: leadData.first_name || '',
+          lastName: leadData.last_name || '',
+          middleName: leadData.middle_name,
+          phoneNumbers: leadData.phone_numbers?.map(p => ({
+            id: p.id,
+            number: p.number,
+            type: p.type,
+            priority: p.priority,
+            status: p.status,
+            isPrimary: p.is_primary
+          })) || [],
           primaryPhone,
-          phoneNumbers,
-          address: lead.address || '',
-          city: lead.city || '',
-          state: lead.state || '',
-          postalCode: lead.postal_code || '',
-          vehicleInterest: lead.vehicle_interest || '',
-          vehicleVIN: lead.vehicle_vin || '',
-          source: lead.source || 'Unknown',
-          status: mapStatus(lead.status || 'new'),
-          contactStatus,
-          salesperson: [lead.salesperson_first_name, lead.salesperson_last_name].filter(Boolean).join(' ') || '',
-          doNotCall: lead.do_not_call || false,
-          doNotEmail: lead.do_not_email || false,
-          doNotMail: lead.do_not_mail || false,
-          aiOptIn: lead.ai_opt_in || false,
-          aiSequencePaused: lead.ai_sequence_paused || false,
-          messageIntensity: mapMessageIntensity(lead.message_intensity || 'gentle'),
-          aiMessagesSent: lead.ai_messages_sent || 0,
-          aiStage: lead.ai_stage || null,
-          aiStrategyBucket: lead.ai_strategy_bucket || null,
-          aiAggressionLevel: lead.ai_aggression_level || 1,
-          nextAiSendAt: lead.next_ai_send_at || null,
-          createdAt: lead.created_at,
-          // Enhanced message tracking with actual data
-          messageCount: leadConversations.length,
-          unreadCount,
-          lastMessage: lastMessage?.body || null,
-          lastMessageTime: lastMessage ? new Date(lastMessage.sent_at).toLocaleString() : null,
-          lastMessageDirection: lastMessage?.direction as 'in' | 'out' | null || null,
-          // Accurate engagement metrics
+          email: leadData.email || '',
+          emailAlt: leadData.email_alt,
+          address: leadData.address,
+          city: leadData.city,
+          state: leadData.state,
+          postalCode: leadData.postal_code,
+          vehicleInterest: leadData.vehicle_interest || '',
+          source: leadData.source || '',
+          status: leadData.status || 'new',
+          salesperson: leadData.profiles ? 
+            `${leadData.profiles.first_name} ${leadData.profiles.last_name}`.trim() : '',
+          salespersonId: leadData.salesperson_id || '',
+          aiOptIn: leadData.ai_opt_in || false,
+          aiStage: leadData.ai_stage,
+          nextAiSendAt: leadData.next_ai_send_at,
+          createdAt: leadData.created_at,
+          lastMessage: lastMessage?.body,
+          lastMessageTime: lastMessage?.sent_at,
+          lastMessageDirection: lastMessage?.direction,
+          unreadCount: unrepliedCount,
+          doNotCall: leadData.do_not_call || false,
+          doNotEmail: leadData.do_not_email || false,
+          doNotMail: leadData.do_not_mail || false,
+          vehicleYear: leadData.vehicle_year,
+          vehicleMake: leadData.vehicle_make,
+          vehicleModel: leadData.vehicle_model,
+          vehicleVIN: leadData.vehicle_vin,
+          contactStatus: leadData.contact_status || 'no_contact',
           incomingCount,
           outgoingCount,
           unrepliedCount,
-          // Enhanced AI strategy fields
-          leadTypeName: lead.lead_type_name || null,
-          leadStatusTypeName: lead.lead_status_type_name || null,
-          leadSourceName: lead.lead_source_name || null,
-          // Required Lead properties for compatibility
-          salespersonId: lead.salesperson_id || '',
-          first_name: lead.first_name || '',
-          last_name: lead.last_name || '',
-          created_at: lead.created_at,
+          messageCount: incomingCount + outgoingCount,
+          aiMessagesSent: leadData.ai_messages_sent || 0,
+          aiLastMessageStage: leadData.ai_last_message_stage,
+          aiSequencePaused: leadData.ai_sequence_paused || false,
+          aiPauseReason: leadData.ai_pause_reason,
+          aiResumeAt: leadData.ai_resume_at,
+          leadStatusTypeName: leadData.lead_status_type_name,
+          leadTypeName: leadData.lead_type_name,
+          leadSourceName: leadData.lead_source_name,
+          messageIntensity: leadData.message_intensity,
+          aiStrategyBucket: leadData.ai_strategy_bucket,
+          aiAggressionLevel: leadData.ai_aggression_level,
+          aiStrategyLastUpdated: leadData.ai_strategy_last_updated,
+          first_name: leadData.first_name || '',
+          last_name: leadData.last_name || '',
+          created_at: leadData.created_at,
+          is_hidden: leadData.is_hidden || false
         };
-
-        return transformedLead;
       }) || [];
 
-      console.log(`✅ [LEADS FETCH] Transformed ${transformedLeads.length} leads with message data`);
+      setLeads(processedLeads);
+    } catch (err) {
+      console.error('Error fetching leads:', err);
+      setError(err instanceof Error ? err : new Error('Failed to fetch leads'));
+    } finally {
+      setLoading(false);
+    }
+  }, [showHidden]);
+
+  const toggleLeadHidden = (leadId: string, hidden: boolean) => {
+    setLeads(prevLeads => 
+      prevLeads.map(lead => 
+        lead.id === leadId ? { ...lead, is_hidden: hidden } : lead
+      )
+    );
+  };
+
+  const updateAiOptIn = async (leadId: string, aiOptIn: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ ai_opt_in: aiOptIn })
+        .eq('id', leadId);
+
+      if (error) throw error;
+
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          lead.id === leadId ? { ...lead, aiOptIn } : lead
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: `AI messaging ${aiOptIn ? 'enabled' : 'disabled'} for lead`,
+      });
+    } catch (error) {
+      console.error('Error updating AI opt-in:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update AI settings",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateDoNotContact = async (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => {
+    try {
+      const dbField = field === 'doNotCall' ? 'do_not_call' : 
+                     field === 'doNotEmail' ? 'do_not_email' : 'do_not_mail';
       
-      return transformedLeads;
-    },
-    refetchInterval: 30000, // Refetch every 30 seconds
-  });
+      const { error } = await supabase
+        .from('leads')
+        .update({ [dbField]: value })
+        .eq('id', leadId);
 
-  const invalidateLeads = () => {
-    queryClient.invalidateQueries({ queryKey: ['leads'] });
+      if (error) throw error;
+
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          lead.id === leadId ? { ...lead, [field]: value } : lead
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: `Do not ${field.replace('doNot', '').toLowerCase()} ${value ? 'enabled' : 'disabled'}`,
+      });
+    } catch (error) {
+      console.error('Error updating do not contact:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update contact preferences",
+        variant: "destructive"
+      });
+    }
   };
 
-  const refetch = () => {
-    return queryClient.invalidateQueries({ queryKey: ['leads'] });
-  };
+  useEffect(() => {
+    fetchLeads();
+  }, [fetchLeads]);
+
+  // Calculate hidden count
+  const hiddenCount = leads.filter(lead => lead.is_hidden).length;
 
   return {
     leads,
-    loading: isLoading,
-    isLoading,
+    loading,
     error,
-    invalidateLeads,
-    refetch
+    refetch: fetchLeads,
+    updateAiOptIn,
+    updateDoNotContact,
+    showHidden,
+    setShowHidden,
+    hiddenCount,
+    toggleLeadHidden
   };
 };

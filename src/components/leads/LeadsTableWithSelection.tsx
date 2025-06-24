@@ -15,6 +15,7 @@ interface LeadsTableWithSelectionProps {
   selectedLeads: string[];
   onLeadSelect: (leadId: string) => void;
   searchTerm?: string;
+  onToggleHidden?: (leadId: string, hidden: boolean) => void;
 }
 
 const LeadsTableWithSelection = ({
@@ -22,7 +23,8 @@ const LeadsTableWithSelection = ({
   loading,
   selectedLeads,
   onLeadSelect,
-  searchTerm = ""
+  searchTerm = "",
+  onToggleHidden
 }: LeadsTableWithSelectionProps) => {
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -80,6 +82,7 @@ const LeadsTableWithSelection = ({
                 onQuickView={() => {}} // Not needed for process management
                 getEngagementScore={getEngagementScore}
                 isFresh={isFresh}
+                onToggleHidden={onToggleHidden}
               />
             );
           })}

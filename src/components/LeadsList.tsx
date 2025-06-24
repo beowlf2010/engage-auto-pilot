@@ -10,6 +10,7 @@ import VINImportModal from './leads/VINImportModal';
 import LeadsFiltersBar from './leads/LeadsFiltersBar';
 import LeadsTableWithSelection from './leads/LeadsTableWithSelection';
 import LeadsLoadingState from './leads/LeadsLoadingState';
+import ShowHiddenLeadsToggle from './leads/ShowHiddenLeadsToggle';
 
 const LeadsList = () => {
   const { profile } = useAuth();
@@ -20,8 +21,17 @@ const LeadsList = () => {
 
   const canImport = profile?.role === 'manager' || profile?.role === 'admin';
 
-  // Use the enhanced leads hook to fetch data with message counts
-  const { leads, loading, error, refetch } = useLeads();
+  // Use the enhanced leads hook to fetch data with message counts and hidden functionality
+  const { 
+    leads, 
+    loading, 
+    error, 
+    refetch, 
+    showHidden, 
+    setShowHidden, 
+    hiddenCount,
+    toggleLeadHidden 
+  } = useLeads();
 
   // Use filters hook
   const { filter, setFilter, filterLeads } = useLeadFilters();
@@ -92,11 +102,19 @@ const LeadsList = () => {
         onSearchChange={setSearchTerm}
       />
 
-      <LeadsFiltersBar 
-        filter={filter}
-        setFilter={setFilter}
-        leads={leads} // Pass all leads for count calculation
-      />
+      <div className="flex justify-between items-center">
+        <LeadsFiltersBar 
+          filter={filter}
+          setFilter={setFilter}
+          leads={leads} // Pass all leads for count calculation
+        />
+        
+        <ShowHiddenLeadsToggle
+          showHidden={showHidden}
+          onToggle={setShowHidden}
+          hiddenCount={hiddenCount}
+        />
+      </div>
 
       {/* Process Management Panel - only show when leads are selected */}
       {selectedLeads.length > 0 && (
@@ -117,6 +135,7 @@ const LeadsList = () => {
           selectedLeads={selectedLeads}
           onLeadSelect={handleLeadSelect}
           searchTerm={searchTerm}
+          onToggleHidden={toggleLeadHidden}
         />
       )}
 
