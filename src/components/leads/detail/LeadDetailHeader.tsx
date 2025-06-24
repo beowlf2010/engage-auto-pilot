@@ -2,13 +2,14 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Phone, MessageSquare, Mail, User, Calendar, MapPin, Car, UserX } from "lucide-react";
+import { Phone, MessageSquare, Mail, User, Calendar, MapPin, Car, UserX, Check } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import EmailComposer from "../../email/EmailComposer";
 import QuickControlsCard from "./QuickControlsCard";
 import MarkLostConfirmDialog from "../MarkLostConfirmDialog";
-import { markLeadAsLost } from "@/services/leadStatusService";
+import MarkSoldConfirmDialog from "../MarkSoldConfirmDialog";
+import { markLeadAsLost, markLeadAsSold } from "@/services/leadStatusService";
 
 interface Lead {
   id: string;
@@ -33,7 +34,9 @@ interface LeadDetailHeaderProps {
 const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange, onLeadUpdate }: LeadDetailHeaderProps) => {
   const [showEmailComposer, setShowEmailComposer] = useState(false);
   const [showMarkLostDialog, setShowMarkLostDialog] = useState(false);
+  const [showMarkSoldDialog, setShowMarkSoldDialog] = useState(false);
   const [isMarkingLost, setIsMarkingLost] = useState(false);
+  const [isMarkingSold, setIsMarkingSold] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -88,6 +91,39 @@ const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange, onLeadUpdate }
     } finally {
       setIsMarkingLost(false);
       setShowMarkLostDialog(false);
+    }
+  };
+
+  const handleMarkAsSold = async () => {
+    setIsMarkingSold(true);
+    try {
+      const result = await markLeadAsSold(lead.id);
+      
+      if (result.success) {
+        toast({
+          title: "Lead marked as sold",
+          description: `${lead.first_name} ${lead.last_name} has been marked as sold and removed from all automation.`,
+        });
+        
+        if (onLeadUpdate) {
+          onLeadUpdate();
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to mark lead as sold",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingSold(false);
+      setShowMarkSoldDialog(false);
     }
   };
 
@@ -153,6 +189,17 @@ const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange, onLeadUpdate }
               <Button 
                 size="sm" 
                 variant="outline"
+                onClick={() => setShowMarkSoldDialog(true)}
+                disabled={isMarkingSold || lead.status === 'closed'}
+                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Mark Sold
+              </Button>
+
+              <Button 
+                size="sm" 
+                variant="outline"
                 onClick={() => setShowMarkLostDialog(true)}
                 disabled={isMarkingLost || lead.status === 'lost'}
                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -180,6 +227,14 @@ const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange, onLeadUpdate }
         leadFirstName={lead.first_name}
         leadLastName={lead.last_name}
         vehicleInterest={lead.vehicle_interest}
+      />
+
+      <MarkSoldConfirmDialog
+        open={showMarkSoldDialog}
+        onOpenChange={setShowMarkSoldDialog}
+        onConfirm={handleMarkAsSold}
+        leadCount={1}
+        leadName={`${lead.first_name} ${lead.last_name}`}
       />
 
       <MarkLostConfirmDialog

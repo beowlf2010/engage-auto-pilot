@@ -3,22 +3,27 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   UserCheck,
-  UserX
+  UserX,
+  Check
 } from 'lucide-react';
 
 interface LeadActionsSectionProps {
   conversation: any;
   onMarkAsLost: () => void;
+  onMarkAsSold: () => void;
   onSlowerFollowup: () => void;
   isMarkingLost: boolean;
+  isMarkingSold: boolean;
   isSettingSlowerFollowup: boolean;
 }
 
 const LeadActionsSection: React.FC<LeadActionsSectionProps> = ({
   conversation,
   onMarkAsLost,
+  onMarkAsSold,
   onSlowerFollowup,
   isMarkingLost,
+  isMarkingSold,
   isSettingSlowerFollowup
 }) => {
   return (
@@ -29,11 +34,22 @@ const LeadActionsSection: React.FC<LeadActionsSectionProps> = ({
           variant="outline"
           size="sm"
           onClick={onSlowerFollowup}
-          disabled={isSettingSlowerFollowup || conversation.status === 'lost'}
+          disabled={isSettingSlowerFollowup || conversation.status === 'lost' || conversation.status === 'closed'}
           className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
         >
           <UserCheck className="w-4 h-4 mr-2" />
           {isSettingSlowerFollowup ? 'Setting Up...' : 'Weekly Follow-up'}
+        </Button>
+        
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={onMarkAsSold}
+          disabled={isMarkingSold || conversation.status === 'closed'}
+          className="w-full text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+        >
+          <Check className="w-4 h-4 mr-2" />
+          {isMarkingSold ? 'Marking Sold...' : 'Mark Sold'}
         </Button>
         
         <Button 

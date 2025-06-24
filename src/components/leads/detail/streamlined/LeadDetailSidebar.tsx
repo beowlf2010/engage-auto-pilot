@@ -3,11 +3,12 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, Mail, MapPin, Car, Calendar, Building, UserX } from "lucide-react";
+import { Phone, Mail, MapPin, Car, Calendar, Building, UserX, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import UnifiedAIControls from "../UnifiedAIControls";
 import MarkLostConfirmDialog from "../../MarkLostConfirmDialog";
-import { markLeadAsLost } from "@/services/leadStatusService";
+import MarkSoldConfirmDialog from "../../MarkSoldConfirmDialog";
+import { markLeadAsLost, markLeadAsSold } from "@/services/leadStatusService";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
 interface LeadDetailSidebarProps {
@@ -22,7 +23,9 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   onMessageSent
 }) => {
   const [showMarkLostDialog, setShowMarkLostDialog] = useState(false);
+  const [showMarkSoldDialog, setShowMarkSoldDialog] = useState(false);
   const [isMarkingLost, setIsMarkingLost] = useState(false);
+  const [isMarkingSold, setIsMarkingSold] = useState(false);
 
   const handleMarkAsLost = async () => {
     setIsMarkingLost(true);
@@ -53,6 +56,38 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
     } finally {
       setIsMarkingLost(false);
       setShowMarkLostDialog(false);
+    }
+  };
+
+  const handleMarkAsSold = async () => {
+    setIsMarkingSold(true);
+    try {
+      const result = await markLeadAsSold(lead.id);
+      
+      if (result.success) {
+        toast({
+          title: "Lead marked as sold",
+          description: `${lead.firstName} ${lead.lastName} has been marked as sold and removed from all automation.`,
+        });
+        
+        // Refresh the page or navigate back after successful marking
+        window.location.reload();
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to mark lead as sold",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingSold(false);
+      setShowMarkSoldDialog(false);
     }
   };
 
@@ -125,12 +160,23 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
           onUpdate={onMessageSent}
         />
 
-        {/* Mark Lost Action */}
+        {/* Lead Actions */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">Lead Actions</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-2">
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMarkSoldDialog(true)}
+              disabled={isMarkingSold || lead.status === 'closed'}
+              className="w-full text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              {isMarkingSold ? 'Marking Sold...' : 'Mark Sold'}
+            </Button>
+            
             <Button 
               variant="outline"
               size="sm"
@@ -144,6 +190,14 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
           </CardContent>
         </Card>
       </div>
+
+      <MarkSoldConfirmDialog
+        open={showMarkSoldDialog}
+        onOpenChange={setShowMarkSoldDialog}
+        onConfirm={handleMarkAsSold}
+        leadCount={1}
+        leadName={`${lead.firstName} ${lead.lastName}`}
+      />
 
       <MarkLostConfirmDialog
         open={showMarkLostDialog}
