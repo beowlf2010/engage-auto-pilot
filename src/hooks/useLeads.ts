@@ -103,7 +103,7 @@ export const useLeads = () => {
           doNotCall: leadData.do_not_call || false,
           doNotEmail: leadData.do_not_email || false,
           doNotMail: leadData.do_not_mail || false,
-          vehicleYear: leadData.vehicle_year,
+          vehicleYear: leadData.vehicle_year ? parseInt(leadData.vehicle_year) : undefined,
           vehicleMake: leadData.vehicle_make,
           vehicleModel: leadData.vehicle_model,
           vehicleVIN: leadData.vehicle_vin,
