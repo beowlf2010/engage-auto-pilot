@@ -16,16 +16,44 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    const supabase = createClient(supabaseUrl, supabaseKey);
     
-    console.log('🔑 [AI MESSAGE] Checking API key availability...');
+    console.log('🔑 [AI MESSAGE] Attempting to retrieve OpenAI API key...');
+    
+    // First try to get the API key from the database (where settings UI saves it)
+    let openAIApiKey = null;
+    
+    try {
+      const { data: settings, error: settingsError } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'OPENAI_API_KEY')
+        .single();
+
+      if (settingsError) {
+        console.log('📊 [AI MESSAGE] No API key found in database settings, checking environment...');
+      } else if (settings?.value) {
+        openAIApiKey = settings.value;
+        console.log('✅ [AI MESSAGE] API key retrieved from database settings');
+      }
+    } catch (dbError) {
+      console.log('⚠️ [AI MESSAGE] Database query failed, will try environment variables');
+    }
+    
+    // Fallback to environment variable if not found in database
+    if (!openAIApiKey) {
+      openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+      if (openAIApiKey) {
+        console.log('✅ [AI MESSAGE] API key retrieved from environment variables');
+      }
+    }
     
     if (!openAIApiKey) {
-      console.error('❌ [AI MESSAGE] No OpenAI API key found');
+      console.error('❌ [AI MESSAGE] No OpenAI API key found in database or environment');
       return new Response(JSON.stringify({ 
         success: false,
         error: 'OpenAI API key not configured',
-        message: 'Please configure OPENAI_API_KEY in your Supabase project settings',
+        message: 'Please configure OPENAI_API_KEY in your Settings page or Supabase project settings',
         fallback: 'Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?'
       }), {
         status: 500,
@@ -39,7 +67,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         success: false,
         error: 'Invalid OpenAI API key format',
-        message: 'API key should start with "sk-". Please check your OPENAI_API_KEY in Supabase settings.',
+        message: 'API key should start with "sk-". Please check your OPENAI_API_KEY in Settings.',
         fallback: 'Hi! I wanted to follow up on your interest in finding the right vehicle. What questions can I answer for you?'
       }), {
         status: 500,
@@ -48,8 +76,6 @@ serve(async (req) => {
     }
 
     console.log('✅ [AI MESSAGE] Valid API key found, length:', openAIApiKey.length);
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
     
     const { 
       leadId, 
@@ -185,6 +211,7 @@ Generate a message that:
           success: true,
           message: generatedMessage,
           modelUsed: model,
+          apiKeySource: openAIApiKey === Deno.env.get('OPENAI_API_KEY') ? 'environment' : 'database',
           personalization: {
             usedName: usePersonalName,
             usedVehicle: useVehicleInterest,
