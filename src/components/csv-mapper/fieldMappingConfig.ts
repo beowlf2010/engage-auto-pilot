@@ -1,16 +1,15 @@
 
-import { User, Phone, Mail, Car, Users, Shield, Activity } from "lucide-react";
-import { FieldMapping } from './types';
+import { LucideIcon, User, Phone, Mail, MapPin, Car, Briefcase, Settings, Brain } from "lucide-react";
 
 export interface FieldDefinition {
-  key: keyof FieldMapping;
+  key: string;
   label: string;
-  required: boolean;
+  required?: boolean;
 }
 
 export interface FieldSection {
   title: string;
-  icon: any;
+  icon?: LucideIcon;
   fields: FieldDefinition[];
 }
 
@@ -19,83 +18,71 @@ export const fieldSections: FieldSection[] = [
     title: "Required Fields",
     icon: User,
     fields: [
-      { key: 'firstName', label: 'First Name', required: true },
-      { key: 'lastName', label: 'Last Name', required: true },
-      { key: 'middleName', label: 'Middle Name', required: false }
-    ]
-  },
-  {
-    title: "Phone Numbers (Priority Order)",
-    icon: Phone,
-    fields: [
-      { key: 'cellphone', label: 'Cell Phone (Priority 1 - Primary)', required: false },
-      { key: 'dayphone', label: 'Day Phone (Priority 2 - Secondary)', required: false },
-      { key: 'evephone', label: 'Evening Phone (Priority 3 - Tertiary)', required: false }
+      { key: "firstName", label: "First Name", required: true },
+      { key: "lastName", label: "Last Name", required: true },
+      { key: "middleName", label: "Middle Name" }
     ]
   },
   {
     title: "Contact Information",
-    icon: Mail,
+    icon: Phone,
     fields: [
-      { key: 'email', label: 'Primary Email', required: false },
-      { key: 'emailAlt', label: 'Alternate Email', required: false }
+      { key: "cellphone", label: "Cell Phone" },
+      { key: "dayphone", label: "Day Phone" },
+      { key: "evephone", label: "Evening Phone" },
+      { key: "email", label: "Email" },
+      { key: "emailAlt", label: "Alternate Email" }
     ]
   },
   {
-    title: "Address Information",
-    icon: null,
+    title: "Address",
+    icon: MapPin,
     fields: [
-      { key: 'address', label: 'Street Address', required: false },
-      { key: 'city', label: 'City', required: false },
-      { key: 'state', label: 'State', required: false },
-      { key: 'postalCode', label: 'Postal Code', required: false }
+      { key: "address", label: "Street Address" },
+      { key: "city", label: "City" },
+      { key: "state", label: "State" },
+      { key: "postalCode", label: "Postal Code" }
     ]
   },
   {
     title: "Vehicle Information",
     icon: Car,
     fields: [
-      { key: 'vehicleYear', label: 'Vehicle Year', required: false },
-      { key: 'vehicleMake', label: 'Vehicle Make', required: false },
-      { key: 'vehicleModel', label: 'Vehicle Model', required: false },
-      { key: 'vehicleVIN', label: 'Vehicle VIN', required: false },
-      { key: 'vehicleStockNumber', label: 'Stock Number', required: false }
+      { key: "vehicleYear", label: "Vehicle Year" },
+      { key: "vehicleMake", label: "Vehicle Make" },
+      { key: "vehicleModel", label: "Vehicle Model" },
+      { key: "vehicleVIN", label: "Vehicle VIN" },
+      { key: "vehicleStockNumber", label: "Stock Number" }
     ]
   },
   {
-    title: "Lead Status & Assignment",
-    icon: Activity,
+    title: "AI Strategy Fields",
+    icon: Brain,
     fields: [
-      { key: 'status', label: 'Lead Status (Active/Sold/Bad/etc.)', required: false },
-      { key: 'salesPersonFirstName', label: 'Salesperson First Name', required: false },
-      { key: 'salesPersonLastName', label: 'Salesperson Last Name', required: false }
+      { key: "leadStatusTypeName", label: "Lead Status Type" },
+      { key: "leadTypeName", label: "Lead Type" },
+      { key: "leadSourceName", label: "Lead Source" }
     ]
   },
   {
-    title: "Contact Preferences & Lead Data",
-    icon: Shield,
+    title: "Sales Information",
+    icon: Briefcase,
     fields: [
-      { key: 'doNotCall', label: 'Do Not Call', required: false },
-      { key: 'doNotEmail', label: 'Do Not Email', required: false },
-      { key: 'doNotMail', label: 'Do Not Mail', required: false },
-      { key: 'source', label: 'Lead Source', required: false },
-      { key: 'leadType', label: 'Lead Type', required: false },
-      { key: 'dealerId', label: 'Dealer ID', required: false }
+      { key: "source", label: "Lead Source" },
+      { key: "status", label: "Lead Status" },
+      { key: "salesPersonFirstName", label: "Salesperson First Name" },
+      { key: "salesPersonLastName", label: "Salesperson Last Name" },
+      { key: "leadType", label: "Lead Type" },
+      { key: "dealerId", label: "Dealer ID" }
+    ]
+  },
+  {
+    title: "Preferences",
+    icon: Settings,
+    fields: [
+      { key: "doNotCall", label: "Do Not Call" },
+      { key: "doNotEmail", label: "Do Not Email" },
+      { key: "doNotMail", label: "Do Not Mail" }
     ]
   }
-];
-
-// Enhanced RPO categories for order bank matching
-export const rpoCategories = [
-  'engine', 'transmission', 'interior', 'exterior', 'package', 'option', 
-  'safety', 'technology', 'additional_options', 'performance', 'convenience',
-  'appearance', 'protection', 'towing', 'off_road', 'comfort', 'lighting',
-  'suspension', 'wheels_tires', 'audio', 'navigation', 'climate'
-];
-
-export const rpoFeatureTypes = [
-  'color', 'trim_level', 'engine_option', 'package_feature', 'safety_feature', 
-  'technology_feature', 'accessory', 'equipment', 'upgrade', 'deletion',
-  'performance_upgrade', 'convenience_feature', 'appearance_package',
-  'protection_feature', 'towing_equipment', 'off_road_equipment'
 ];

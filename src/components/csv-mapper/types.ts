@@ -26,4 +26,8 @@ export interface FieldMapping {
   leadType?: string;
   dealerId?: string;
   status?: string;
+  // AI Strategy Fields
+  leadStatusTypeName?: string;
+  leadTypeName?: string;
+  leadSourceName?: string;
 }

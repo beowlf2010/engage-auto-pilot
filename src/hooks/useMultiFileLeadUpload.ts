@@ -32,7 +32,7 @@ interface BatchUploadResult {
   }>;
 }
 
-// Default field mapping for lead files
+// Default field mapping for lead files - Updated to include AI strategy fields
 const DEFAULT_LEAD_MAPPING = {
   firstName: 'first_name',
   lastName: 'last_name',
@@ -57,9 +57,10 @@ const DEFAULT_LEAD_MAPPING = {
   doNotCall: 'do_not_call',
   doNotEmail: 'do_not_email',
   doNotMail: 'do_not_mail',
-  leadstatustypename: 'lead_status_type_name',
-  LeadTypeName: 'lead_type_name',
-  leadsourcename: 'lead_source_name'
+  // AI Strategy fields - map directly to the CSV column names
+  leadStatusTypeName: 'leadstatustypename',
+  leadTypeName: 'LeadTypeName', 
+  leadSourceName: 'leadsourcename'
 };
 
 export const useMultiFileLeadUpload = () => {
@@ -116,6 +117,8 @@ export const useMultiFileLeadUpload = () => {
       }
 
       console.log(`📊 [MULTI UPLOAD] Parsed ${parsedData.rows.length} rows from ${queuedFile.file.name}`);
+      console.log(`🔍 [MULTI UPLOAD] Sample CSV headers:`, parsedData.headers);
+      console.log(`🔍 [MULTI UPLOAD] Sample row data:`, parsedData.sample);
 
       // Process leads using enhanced processing with upload history and update option
       const processingResult = await processLeadsEnhanced(

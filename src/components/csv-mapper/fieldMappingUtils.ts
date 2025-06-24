@@ -1,107 +1,79 @@
 
 import { FieldMapping } from './types';
 
-export const normalizeFieldName = (name: string): string => {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+// Common patterns for field detection
+const fieldPatterns: Record<keyof FieldMapping, string[]> = {
+  firstName: ['first_name', 'firstname', 'first name', 'fname', 'given_name'],
+  lastName: ['last_name', 'lastname', 'last name', 'lname', 'surname', 'family_name'],
+  middleName: ['middle_name', 'middlename', 'middle name', 'mname', 'middle_initial', 'mi'],
+  cellphone: ['cellphone', 'cell_phone', 'cell phone', 'mobile', 'mobile_phone', 'primary_phone'],
+  dayphone: ['dayphone', 'day_phone', 'day phone', 'work_phone', 'business_phone', 'office_phone'],
+  evephone: ['evephone', 'eve_phone', 'evening_phone', 'home_phone', 'secondary_phone'],
+  email: ['email', 'email_address', 'primary_email', 'e_mail'],
+  emailAlt: ['email_alt', 'email2', 'secondary_email', 'alternate_email', 'email_secondary'],
+  address: ['address', 'street_address', 'street', 'address1', 'home_address'],
+  city: ['city', 'town', 'locality'],
+  state: ['state', 'province', 'region', 'state_province'],
+  postalCode: ['postal_code', 'zip_code', 'zip', 'postcode', 'postal'],
+  vehicleYear: ['vehicle_year', 'year', 'model_year', 'yr'],
+  vehicleMake: ['vehicle_make', 'make', 'manufacturer', 'brand'],
+  vehicleModel: ['vehicle_model', 'model', 'car_model'],
+  vehicleVIN: ['vehicle_vin', 'vin', 'vin_number', 'chassis_number'],
+  vehicleStockNumber: ['stock_number', 'stock_no', 'inventory_number', 'unit_number'],
+  source: ['source', 'lead_source', 'referral_source', 'campaign_source'],
+  salesPersonFirstName: ['salesperson_first_name', 'sales_first_name', 'rep_first_name', 'advisor_first_name'],
+  salesPersonLastName: ['salesperson_last_name', 'sales_last_name', 'rep_last_name', 'advisor_last_name'],
+  doNotCall: ['do_not_call', 'dnc', 'no_call', 'opt_out_call'],
+  doNotEmail: ['do_not_email', 'dne', 'no_email', 'opt_out_email'],
+  doNotMail: ['do_not_mail', 'dnm', 'no_mail', 'opt_out_mail'],
+  leadType: ['lead_type', 'type', 'customer_type', 'prospect_type'],
+  dealerId: ['dealer_id', 'dealership_id', 'location_id'],
+  status: ['status', 'lead_status', 'stage', 'disposition'],
+  // AI Strategy Fields - exact matches for CSV columns
+  leadStatusTypeName: ['leadstatustypename', 'lead_status_type_name', 'statustype', 'status_type'],
+  leadTypeName: ['leadtypename', 'lead_type_name', 'type_name'],
+  leadSourceName: ['leadsourcename', 'lead_source_name', 'source_name']
 };
 
-export const findBestMatch = (targetPatterns: string[], headers: string[]): string => {
-  console.log('Finding match for patterns:', targetPatterns, 'in headers:', headers);
+export const performAutoDetection = (headers: string[]): FieldMapping => {
+  const mapping: Partial<FieldMapping> = {};
   
-  // First try exact matches (case sensitive) - highest priority
-  for (const pattern of targetPatterns) {
-    for (const header of headers) {
-      if (header === pattern) {
-        console.log('Exact case-sensitive match found:', header, 'for pattern:', pattern);
-        return header;
-      }
-    }
-  }
+  // Convert headers to lowercase for comparison
+  const lowerHeaders = headers.map(h => h.toLowerCase());
   
-  // Then try exact matches (case insensitive)
-  for (const pattern of targetPatterns) {
-    for (const header of headers) {
-      if (header.toLowerCase() === pattern.toLowerCase()) {
-        console.log('Exact case-insensitive match found:', header, 'for pattern:', pattern);
-        return header;
-      }
-    }
-  }
-  
-  // Then try normalized matches
-  for (const pattern of targetPatterns) {
-    const normalizedPattern = normalizeFieldName(pattern);
-    for (const header of headers) {
-      const normalizedHeader = normalizeFieldName(header);
-      if (normalizedHeader === normalizedPattern) {
-        console.log('Normalized match found:', header, 'for pattern:', pattern);
-        return header;
-      }
-    }
-  }
-  
-  // Finally try partial matches
-  for (const pattern of targetPatterns) {
-    const normalizedPattern = normalizeFieldName(pattern);
-    for (const header of headers) {
-      const normalizedHeader = normalizeFieldName(header);
-      if (normalizedHeader.includes(normalizedPattern) || normalizedPattern.includes(normalizedHeader)) {
-        console.log('Partial match found:', header, 'for pattern:', pattern);
-        return header;
-      }
-    }
-  }
-  
-  return '';
-};
-
-export const performAutoDetection = (csvHeaders: string[]): FieldMapping => {
-  console.log('Starting auto-detection with headers:', csvHeaders);
-  
-  const autoMapping: FieldMapping = {
-    firstName: '',
-    lastName: ''
-  };
-
-  // Define comprehensive field mapping patterns with your exact headers first
-  const fieldPatterns: Record<keyof FieldMapping, string[]> = {
-    firstName: ['firstname', 'SalesPersonFirstName', 'first_name', 'fname', 'first name', 'first', 'given name'],
-    lastName: ['lastname', 'SalesPersonLastName', 'last_name', 'lname', 'last name', 'last', 'surname', 'family name'],
-    middleName: ['middlename', 'middle_name', 'mname', 'middle name', 'middle', 'middle initial'],
-    cellphone: ['cellphone', 'cell_phone', 'mobile', 'cell', 'cell phone', 'mobile phone', 'cellular'],
-    dayphone: ['dayphone', 'day_phone', 'workphone', 'work_phone', 'day phone', 'work phone', 'business phone'],
-    evephone: ['evephone', 'eve_phone', 'eveningphone', 'evening_phone', 'evening phone', 'home phone'],
-    email: ['email', 'emailaddress', 'email_address', 'email address', 'e-mail', 'primary email'],
-    emailAlt: ['emailalt', 'email_alt', 'alternatemail', 'secondary_email', 'email alt', 'alternate email', 'email2'],
-    address: ['address', 'street', 'streetaddress', 'street address', 'street_address', 'addr'],
-    city: ['city', 'town', 'municipality'],
-    state: ['state', 'province', 'region', 'st'],
-    postalCode: ['postalcode', 'postal_code', 'zipcode', 'zip_code', 'zip', 'postal code', 'zip code'],
-    vehicleYear: ['VehicleYear', 'vehicleyear', 'vehicle_year', 'year', 'vehicle year', 'model year', 'car year'],
-    vehicleMake: ['VehicleMake', 'vehiclemake', 'vehicle_make', 'make', 'vehicle make', 'car make', 'manufacturer'],
-    vehicleModel: ['VehicleModel', 'vehiclemodel', 'vehicle_model', 'model', 'vehicle model', 'car model'],
-    vehicleVIN: ['VehicleVIN', 'vehiclevin', 'vehicle_vin', 'vin', 'vehicle vin', 'vin number'],
-    vehicleStockNumber: ['VehicleStockNumber', 'vehiclestocknumber', 'vehicle_stock_number', 'stocknumber', 'stock_number', 'vehicle stock number', 'stock number', 'stock'],
-    source: ['leadsourcename', 'lead_source_name', 'source', 'lead_source', 'lead source name', 'lead source', 'referral source'],
-    salesPersonFirstName: ['SalesPersonFirstName', 'salespersonfirstname', 'salesperson_first_name', 'sales_first_name', 'salesperson first name', 'rep first name'],
-    salesPersonLastName: ['SalesPersonLastName', 'salespersonlastname', 'salesperson_last_name', 'sales_last_name', 'salesperson last name', 'rep last name'],
-    doNotCall: ['DoNotCall', 'donotcall', 'do_not_call', 'dnc', 'do not call', 'no call'],
-    doNotEmail: ['DoNotEmail', 'donotemail', 'do_not_email', 'dne', 'do not email', 'no email'],
-    doNotMail: ['DoNotMail', 'donotmail', 'do_not_mail', 'dnm', 'do not mail', 'no mail'],
-    leadType: ['LeadTypeName', 'leadtypename', 'lead_type_name', 'leadtype', 'lead_type', 'lead type name', 'lead type', 'type'],
-    dealerId: ['dealerid', 'dealer_id', 'dealer', 'dealer id', 'dealership id'],
-    status: ['status', 'leadstatus', 'lead_status', 'lead status', 'state', 'condition', 'active', 'sold', 'bad', 'lead_state']
-  };
-
-  // Apply pattern matching for each field
+  // Auto-detect each field
   Object.entries(fieldPatterns).forEach(([fieldKey, patterns]) => {
-    const match = findBestMatch(patterns, csvHeaders);
-    if (match) {
-      autoMapping[fieldKey as keyof FieldMapping] = match;
-      console.log(`Auto-detected ${fieldKey}:`, match);
+    for (const pattern of patterns) {
+      const headerIndex = lowerHeaders.findIndex(h => 
+        h === pattern || 
+        h.includes(pattern) || 
+        pattern.includes(h)
+      );
+      
+      if (headerIndex !== -1) {
+        mapping[fieldKey as keyof FieldMapping] = headers[headerIndex];
+        console.log(`Auto-detected ${fieldKey}: ${headers[headerIndex]}`);
+        break;
+      }
     }
   });
 
-  console.log('Final auto-mapping:', autoMapping);
-  return autoMapping;
+  return mapping as FieldMapping;
+};
+
+export const validateMapping = (mapping: FieldMapping): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (!mapping.firstName) {
+    errors.push('First Name is required');
+  }
+  
+  if (!mapping.lastName) {
+    errors.push('Last Name is required');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
 };

@@ -1,4 +1,3 @@
-
 import { createPhoneNumbers, getPrimaryPhone } from "@/utils/phoneUtils";
 import { checkForDuplicate, ProcessedLead } from "./duplicateDetection";
 import { createUploadHistory, updateUploadHistory } from "@/utils/leadOperations/uploadHistoryService";
@@ -87,40 +86,31 @@ const mapStatusToSystemStatus = (inputStatus: string, rowIndex: number): {
   };
 };
 
-// Function to safely extract AI strategy fields from CSV row
-const extractAIStrategyFields = (row: Record<string, any>) => {
-  console.log('Extracting AI strategy fields from row. Available keys:', Object.keys(row));
+// Function to safely extract AI strategy fields from CSV row with improved mapping
+const extractAIStrategyFields = (row: Record<string, any>, mapping: any) => {
+  console.log('🧠 [AI STRATEGY] Extracting AI strategy fields from row');
+  console.log('🧠 [AI STRATEGY] Available CSV columns:', Object.keys(row));
+  console.log('🧠 [AI STRATEGY] Field mapping:', {
+    leadStatusTypeName: mapping.leadStatusTypeName,
+    leadTypeName: mapping.leadTypeName,
+    leadSourceName: mapping.leadSourceName
+  });
   
-  // Define possible column name variations for each field
-  const leadTypeNameFields = ['LeadTypeName', 'leadTypeName', 'lead_type_name', 'Lead Type Name'];
-  const leadStatusTypeNameFields = ['leadstatustypename', 'LeadStatusTypeName', 'lead_status_type_name', 'Lead Status Type Name'];
-  const leadSourceNameFields = ['leadsourcename', 'leadSourceName', 'lead_source_name', 'Lead Source Name'];
+  // Use the mapping to get the correct CSV column names
+  const leadStatusTypeName = mapping.leadStatusTypeName ? row[mapping.leadStatusTypeName] : null;
+  const leadTypeName = mapping.leadTypeName ? row[mapping.leadTypeName] : null;
+  const leadSourceName = mapping.leadSourceName ? row[mapping.leadSourceName] : null;
   
-  // Helper function to find first matching field
-  const findFieldValue = (fieldVariations: string[]) => {
-    for (const field of fieldVariations) {
-      if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
-        console.log(`Found value for ${field}:`, row[field]);
-        return row[field];
-      }
-    }
-    return null;
-  };
-  
-  const leadTypeName = findFieldValue(leadTypeNameFields);
-  const leadStatusTypeName = findFieldValue(leadStatusTypeNameFields);
-  const leadSourceName = findFieldValue(leadSourceNameFields);
-  
-  console.log('Extracted AI strategy fields:', {
-    leadTypeName,
+  console.log('🧠 [AI STRATEGY] Extracted values:', {
     leadStatusTypeName,
+    leadTypeName,
     leadSourceName
   });
   
   return {
-    leadTypeName,
-    leadStatusTypeName,
-    leadSourceName
+    leadStatusTypeName: leadStatusTypeName || null,
+    leadTypeName: leadTypeName || null,
+    leadSourceName: leadSourceName || null
   };
 };
 
@@ -144,8 +134,10 @@ export const processLeadsEnhanced = async (
     rowIndex: number;
   }> = [];
 
-  console.log('Processing leads with enhanced data preservation. Sample row:', csvData.sample);
-  console.log('Update mode:', options.updateExistingLeads ? 'enabled' : 'disabled');
+  console.log('🔄 [ENHANCED PROCESSING] Starting enhanced lead processing with AI strategy field mapping');
+  console.log('🔄 [ENHANCED PROCESSING] Field mapping configuration:', mapping);
+  console.log('🔄 [ENHANCED PROCESSING] Sample row:', csvData.sample);
+  console.log('🔄 [ENHANCED PROCESSING] Update mode:', options.updateExistingLeads ? 'enabled' : 'disabled');
 
   for (let index = 0; index < csvData.rows.length; index++) {
     const row = csvData.rows[index];
@@ -189,8 +181,8 @@ export const processLeadsEnhanced = async (
       const doNotCall = row[mapping.doNotCall]?.toLowerCase() === 'true';
       const doNotEmail = row[mapping.doNotEmail]?.toLowerCase() === 'true';
 
-      // Extract AI strategy fields using improved logic
-      const aiStrategyFields = extractAIStrategyFields(row);
+      // Extract AI strategy fields using improved mapping-based logic
+      const aiStrategyFields = extractAIStrategyFields(row, mapping);
 
       const newLead: ProcessedLead & {
         uploadHistoryId: string;
@@ -227,11 +219,18 @@ export const processLeadsEnhanced = async (
         rawUploadData,
         originalStatus: row[mapping.status] || '',
         statusMappingLog: statusMapping.mappingLog,
-        // AI strategy fields - properly extracted
+        // AI strategy fields - properly extracted using mapping
         leadStatusTypeName: aiStrategyFields.leadStatusTypeName,
         leadTypeName: aiStrategyFields.leadTypeName,
         leadSourceName: aiStrategyFields.leadSourceName
       };
+
+      console.log(`🔍 [ROW ${index + 1}] Processed lead: ${newLead.firstName} ${newLead.lastName}`);
+      console.log(`🧠 [ROW ${index + 1}] AI Strategy Fields:`, {
+        leadStatusTypeName: newLead.leadStatusTypeName,
+        leadTypeName: newLead.leadTypeName,
+        leadSourceName: newLead.leadSourceName
+      });
 
       // Check for duplicates against already processed leads
       const duplicateCheck = checkForDuplicate(newLead, validLeads);
@@ -245,7 +244,7 @@ export const processLeadsEnhanced = async (
             conflictingLead: duplicateCheck.conflictingLead,
             rowIndex: index + 1
           });
-          console.log(`Within-file duplicate found at row ${index + 1}: ${duplicateCheck.duplicateType} conflict`);
+          console.log(`⚠️ [ROW ${index + 1}] Within-file duplicate found: ${duplicateCheck.duplicateType} conflict`);
         } else {
           duplicates.push({
             lead: newLead,
@@ -253,11 +252,11 @@ export const processLeadsEnhanced = async (
             conflictingLead: duplicateCheck.conflictingLead,
             rowIndex: index + 1
           });
-          console.log(`Duplicate found at row ${index + 1}: ${duplicateCheck.duplicateType} conflict`);
+          console.log(`⚠️ [ROW ${index + 1}] Duplicate found: ${duplicateCheck.duplicateType} conflict`);
         }
       } else {
         validLeads.push(newLead);
-        console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status}) AI Fields: ${aiStrategyFields.leadTypeName}|${aiStrategyFields.leadStatusTypeName}|${aiStrategyFields.leadSourceName}`);
+        console.log(`✅ [ROW ${index + 1}] Valid lead processed with AI fields`);
       }
 
     } catch (error) {
@@ -277,6 +276,13 @@ export const processLeadsEnhanced = async (
     duplicate_imports: duplicates.length,
     processing_errors: errors,
     upload_status: errors.length === csvData.rows.length ? 'failed' : 'completed'
+  });
+
+  console.log('🎉 [ENHANCED PROCESSING] Processing complete:', {
+    validLeads: validLeads.length,
+    duplicates: duplicates.length,
+    errors: errors.length,
+    aiFieldsExtracted: validLeads.filter(l => (l as any).leadTypeName || (l as any).leadStatusTypeName || (l as any).leadSourceName).length
   });
 
   return {
