@@ -2,17 +2,33 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { LeadInsertResult } from './types';
+import { validateRLSPermissions } from './enhancedRLSHandler';
 
 export interface DetailedLeadInsertResult extends LeadInsertResult {
   validationErrors?: string[];
   phoneNumbersInserted?: number;
   rawError?: any;
+  rlsValidation?: any;
 }
 
 export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHistoryId?: string): Promise<DetailedLeadInsertResult> => {
   console.log(`🔍 [LEAD INSERT] Starting insertion for: ${leadData.firstName || 'Unknown'} ${leadData.lastName || 'Lead'}`);
   
   try {
+    // Validate RLS permissions before attempting insertion
+    const rlsValidation = await validateRLSPermissions();
+    if (!rlsValidation.canInsert) {
+      console.error(`❌ [LEAD INSERT] RLS validation failed:`, rlsValidation.error);
+      return { 
+        success: false, 
+        error: `Permission denied: ${rlsValidation.error}`,
+        rlsValidation,
+        validationErrors: ['User lacks required permissions for lead insertion']
+      };
+    }
+
+    console.log(`✅ [LEAD INSERT] RLS validation passed for user with roles:`, rlsValidation.userRoles);
+
     // Validate required fields before insertion - more flexible approach
     const validationErrors: string[] = [];
     
@@ -80,13 +96,29 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
     if (leadError) {
       console.error(`❌ [LEAD INSERT] Lead insertion failed:`, {
         error: leadError,
-        leadData: leadInsert
+        leadData: leadInsert,
+        rlsValidation
       });
+
+      // Enhanced error handling for RLS issues
+      if (leadError.message.includes('row-level security') || 
+          leadError.message.includes('policy') ||
+          leadError.message.includes('recursive')) {
+        return { 
+          success: false, 
+          error: `Database security error: User permissions may have changed. Please refresh and try again.`,
+          validationErrors: ['Row-level security policy violation'],
+          rawError: leadError,
+          rlsValidation
+        };
+      }
+
       return { 
         success: false, 
         error: `Database insertion failed: ${leadError.message}`,
         validationErrors,
-        rawError: leadError
+        rawError: leadError,
+        rlsValidation
       };
     }
 
@@ -126,7 +158,8 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       success: true, 
       leadId: lead.id,
       validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
-      phoneNumbersInserted
+      phoneNumbersInserted,
+      rlsValidation
     };
 
   } catch (error) {
@@ -135,7 +168,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown database error',
       rawError: error,
-      validationErrors: ['Critical insertion error - please check data format']
+      validationErrors: ['Critical insertion error - please check data format and user permissions']
     };
   }
 };

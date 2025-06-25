@@ -6,6 +6,7 @@ import { useMultiFileLeadUpload } from '@/hooks/useMultiFileLeadUpload';
 import LeadFileQueue from './LeadFileQueue';
 import LeadBatchUploadResult from './LeadBatchUploadResult';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import EnhancedCSVUploadGuard from '@/components/ui/enhanced-csv-upload-guard';
 
 interface MultiFileLeadUploadModalProps {
   isOpen: boolean;
@@ -170,97 +171,101 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto space-y-6">
-          {/* Error Messages */}
-          {fileErrors.length > 0 && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+          {/* Enhanced Upload Guard */}
+          <EnhancedCSVUploadGuard onRetry={() => window.location.reload()}>
+            {/* Error Messages */}
+            {fileErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="space-y-1">
+                    {fileErrors.map((error, index) => (
+                      <div key={index}>{error}</div>
+                    ))}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* VIN Solutions Import Notice */}
+            <Alert>
+              <FileText className="h-4 w-4" />
               <AlertDescription>
-                <div className="space-y-1">
-                  {fileErrors.map((error, index) => (
-                    <div key={index}>{error}</div>
-                  ))}
-                </div>
+                <strong>Looking to import VIN Solutions message logs?</strong> Use the dedicated Message Import feature 
+                in the sidebar navigation or visit the Message Export page for proper VIN Solutions file processing.
               </AlertDescription>
             </Alert>
-          )}
 
-          {/* VIN Solutions Import Notice */}
-          <Alert>
-            <FileText className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Looking to import VIN Solutions message logs?</strong> Use the dedicated Message Import feature 
-              in the sidebar navigation or visit the Message Export page for proper VIN Solutions file processing.
-            </AlertDescription>
-          </Alert>
-
-          {/* Update Existing Leads Option */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                id="updateExistingLeads"
-                checked={updateExistingLeads}
-                onChange={(e) => setUpdateExistingLeads(e.target.checked)}
-                disabled={processing}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="updateExistingLeads" className="text-sm font-medium text-blue-900">
-                Update existing leads with new information
-              </label>
+            {/* Update Existing Leads Option */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="updateExistingLeads"
+                  checked={updateExistingLeads}
+                  onChange={(e) => setUpdateExistingLeads(e.target.checked)}
+                  disabled={processing}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="updateExistingLeads" className="text-sm font-medium text-blue-900">
+                  Update existing leads with new information
+                </label>
+              </div>
+              <p className="text-xs text-blue-700 mt-2 ml-7">
+                When enabled, leads that match existing records (by phone, email, or name) will be updated with any missing information from the upload, rather than being skipped as duplicates.
+              </p>
             </div>
-            <p className="text-xs text-blue-700 mt-2 ml-7">
-              When enabled, leads that match existing records (by phone, email, or name) will be updated with any missing information from the upload, rather than being skipped as duplicates.
-            </p>
-          </div>
 
-          {/* File Drop Zone */}
-          <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors"
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-          >
-            <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Drop lead files here or click to browse
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Supports CSV and Excel files (.csv, .xlsx, .xls) for lead data only
-            </p>
-            <input
-              type="file"
-              multiple
-              accept=".csv,.xlsx,.xls"
-              onChange={handleFileSelect}
-              className="hidden"
-              id="lead-file-input"
-              disabled={processing}
+            {/* File Drop Zone */}
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors"
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+            >
+              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Drop lead files here or click to browse
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Supports CSV and Excel files (.csv, .xlsx, .xls) for lead data only
+              </p>
+              <input
+                type="file"
+                multiple
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="lead-file-input"
+                disabled={processing}
+              />
+              <Button asChild disabled={processing}>
+                <label htmlFor="lead-file-input" className="cursor-pointer">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Select Lead Files
+                </label>
+              </Button>
+            </div>
+
+            {/* File Queue */}
+            <LeadFileQueue
+              files={queuedFiles}
+              onRemoveFile={removeFile}
+              processing={processing}
             />
-            <Button asChild disabled={processing}>
-              <label htmlFor="lead-file-input" className="cursor-pointer">
-                <Plus className="h-4 w-4 mr-2" />
-                Select Lead Files
-              </label>
-            </Button>
-          </div>
 
-          {/* File Queue */}
-          <LeadFileQueue
-            files={queuedFiles}
-            onRemoveFile={removeFile}
-            processing={processing}
-          />
-
-          {/* Info Section */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-2">Lead Upload Information</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Each file will be processed independently as lead data</li>
-              <li>• Duplicate leads will be automatically detected and {updateExistingLeads ? 'updated with new information' : 'skipped'}</li>
-              <li>• Phone numbers will be prioritized: Cell → Day → Evening</li>
-              <li>• Multi-sheet Excel files require individual processing</li>
-              <li>• For VIN Solutions message imports, use the Message Import feature</li>
-            </ul>
-          </div>
+            {/* Info Section */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-2">Lead Upload Information</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Each file will be processed independently as lead data</li>
+                <li>• Duplicate leads will be automatically detected and {updateExistingLeads ? 'updated with new information' : 'skipped'}</li>
+                <li>• Phone numbers will be prioritized: Cell → Day → Evening</li>
+                <li>• Multi-sheet Excel files require individual processing</li>
+                <li>• For VIN Solutions message imports, use the Message Import feature</li>
+                <li>• Manager or admin permissions are required for uploads</li>
+              </ul>
+            </div>
+          </EnhancedCSVUploadGuard>
         </div>
 
         {/* Actions */}
