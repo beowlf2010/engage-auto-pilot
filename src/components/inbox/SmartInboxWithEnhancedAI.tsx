@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useInboxFilters, InboxFilters } from '@/hooks/useInboxFilters';
@@ -49,16 +50,13 @@ const SmartInboxWithEnhancedAI = () => {
 
   // Fix the handleFiltersChange function to properly merge all filter properties
   const handleFiltersChange = useCallback((newFilters: Partial<InboxFilters>) => {
-    // Instead of overwriting, merge the new filters with existing ones
-    const mergedFilters = { ...filters, ...newFilters };
-    
     // Update each individual filter to maintain proper state
     Object.entries(newFilters).forEach(([key, value]) => {
       updateFilter(key as keyof InboxFilters, value);
     });
     
     console.log('🔧 [SMART INBOX] Filters updated:', newFilters);
-  }, [filters, updateFilter]);
+  }, [updateFilter]);
 
   const handleUnreadBadgeClick = useCallback(() => {
     if (filters.unreadOnly) {
@@ -163,11 +161,11 @@ const SmartInboxWithEnhancedAI = () => {
             ) : (
               <ul className="space-y-4">
                 {filteredConversations.map(conv => (
-                  <li key={conv.id} className="bg-white p-4 rounded shadow">
+                  <li key={conv.leadId} className="bg-white p-4 rounded shadow">
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="font-semibold text-slate-800">{conv.customerName || 'Unknown Customer'}</p>
-                        <p className="text-sm text-slate-600">{conv.lastMessagePreview || 'No messages yet'}</p>
+                        <p className="font-semibold text-slate-800">{conv.leadName || 'Unknown Customer'}</p>
+                        <p className="text-sm text-slate-600">{conv.lastMessage || 'No messages yet'}</p>
                       </div>
                       {conv.unreadCount > 0 && (
                         <Badge variant="destructive" className="text-xs">
