@@ -5,6 +5,7 @@ export interface PhoneNumber {
   priority: number;
   status: 'active' | 'failed' | 'opted_out' | 'needs_review';
   isPrimary: boolean;
+  lastAttempt?: string; // Add optional lastAttempt property
 }
 
 export interface Lead {
