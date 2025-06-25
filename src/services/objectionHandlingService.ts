@@ -1,6 +1,6 @@
 
 export interface ObjectionSignal {
-  type: 'price' | 'timing' | 'features' | 'trust' | 'decision' | 'life_circumstances' | 'general';
+  type: 'price' | 'timing' | 'features' | 'trust' | 'decision' | 'life_circumstances' | 'competitor_purchase' | 'general';
   confidence: number;
   keywords: string[];
   suggestedResponse: string;
@@ -9,6 +9,19 @@ export interface ObjectionSignal {
 export const detectObjectionSignals = (message: string): ObjectionSignal[] => {
   const text = message.toLowerCase();
   const signals: ObjectionSignal[] = [];
+
+  // Competitor purchase detection - NEW category (highest priority)
+  if (text.includes('purchased') || text.includes('bought') || text.includes('we got') ||
+      text.includes('picked up') || text.includes('already have') || text.includes('we have a') ||
+      text.includes('just bought') || text.includes('we bought') || text.includes('purchased a') ||
+      text.includes('got a') || text.includes('picked up a') || text.includes('we purchased')) {
+    signals.push({
+      type: 'competitor_purchase',
+      confidence: 0.95,
+      keywords: ['purchased', 'bought', 'we got', 'picked up'],
+      suggestedResponse: 'congratulate_competitor_purchase'
+    });
+  }
 
   // Decision/not ready objections
   if (text.includes('decided not to') || text.includes('not purchasing') || 
@@ -38,7 +51,7 @@ export const detectObjectionSignals = (message: string): ObjectionSignal[] => {
     });
   }
 
-  // Life circumstances objections - NEW category
+  // Life circumstances objections
   if (text.includes('house ready') || text.includes('getting my house') ||
       text.includes('working on my house') || text.includes('house situation') ||
       text.includes('personal situation') || text.includes('family situation') ||
@@ -71,6 +84,9 @@ export const generateObjectionResponse = (signals: ObjectionSignal[], customerNa
   const primarySignal = signals[0];
   
   switch (primarySignal.type) {
+    case 'competitor_purchase':
+      return `Congratulations on your new vehicle, ${customerName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
+    
     case 'decision':
       return `Thanks for letting me know, ${customerName}! I completely understand. I'll keep your info and reach out in a few months to see if anything changes. Best of luck with everything!`;
     
