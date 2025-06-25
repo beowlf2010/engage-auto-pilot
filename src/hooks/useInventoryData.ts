@@ -2,21 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getDataCompletenessScore } from "@/services/inventory/vehicleFormattingService";
-
-interface InventoryFilters {
-  make?: string;
-  model?: string;
-  inventoryType?: 'new' | 'used' | 'all';
-  sourceReport?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
-  rpoCode?: string;
-  yearMin?: number;
-  yearMax?: number;
-  priceMin?: number;
-  priceMax?: number;
-  sortBy?: 'age' | 'price' | 'year' | 'make' | 'model' | 'completeness';
-  sortOrder?: 'asc' | 'desc';
-  dataQuality?: 'all' | 'complete' | 'incomplete';
-}
+import { InventoryFilters, InventoryItem } from "@/services/inventory/types";
 
 export const useInventoryData = (filters: InventoryFilters, searchTerm: string) => {
   return useQuery({
@@ -91,15 +77,21 @@ export const useInventoryData = (filters: InventoryFilters, searchTerm: string) 
         }
 
         // Process the data to include deal information and data quality with error handling
-        let processedData = inventoryData?.map(vehicle => {
+        let processedData: InventoryItem[] = inventoryData?.map(vehicle => {
           try {
             // Find related deals for this vehicle
             const vehicleDeals = dealsData.filter(deal => 
               deal.stock_number === vehicle.stock_number
             );
 
+            // Ensure condition is properly typed
+            const typedCondition = (['new', 'used', 'certified'].includes(vehicle.condition)) 
+              ? vehicle.condition as 'new' | 'used' | 'certified'
+              : 'used' as const;
+
             return {
               ...vehicle,
+              condition: typedCondition,
               deals: vehicleDeals,
               deal_count: vehicleDeals.length,
               latest_deal: vehicleDeals.length > 0 
@@ -111,6 +103,7 @@ export const useInventoryData = (filters: InventoryFilters, searchTerm: string) 
             console.error('Error processing vehicle data:', error, vehicle);
             return {
               ...vehicle,
+              condition: 'used' as const,
               deals: [],
               deal_count: 0,
               latest_deal: null,
@@ -121,9 +114,9 @@ export const useInventoryData = (filters: InventoryFilters, searchTerm: string) 
 
         // Apply data quality filter
         if (filters.dataQuality === 'complete') {
-          processedData = processedData.filter(v => v.data_completeness >= 80);
+          processedData = processedData.filter(v => (v.data_completeness || 0) >= 80);
         } else if (filters.dataQuality === 'incomplete') {
-          processedData = processedData.filter(v => v.data_completeness < 80);
+          processedData = processedData.filter(v => (v.data_completeness || 0) < 80);
         }
 
         // Apply sorting
@@ -152,8 +145,8 @@ export const useInventoryData = (filters: InventoryFilters, searchTerm: string) 
               bVal = b.model || '';
               break;
             case 'completeness':
-              aVal = a.data_completeness;
-              bVal = b.data_completeness;
+              aVal = a.data_completeness || 0;
+              bVal = b.data_completeness || 0;
               break;
             default:
               return 0;

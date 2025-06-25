@@ -5,7 +5,7 @@ import InventoryFilters from './InventoryFilters';
 import InventoryTable from './InventoryTable';
 import InventoryCleanupButton from './InventoryCleanupButton';
 import UsedInventoryDiagnostics from './UsedInventoryDiagnostics';
-import { InventoryItem, InventoryFilters as IInventoryFilters } from '@/services/inventoryService';
+import { InventoryItem, InventoryFilters as IInventoryFilters } from '@/services/inventory/types';
 
 interface InventoryDashboardContentProps {
   inventory: InventoryItem[];
@@ -53,7 +53,7 @@ const InventoryDashboardContent = ({
         
         <InventoryTable
           inventory={inventory}
-          loading={isLoading}
+          isLoading={isLoading}
           onSort={toggleSort}
         />
       </div>

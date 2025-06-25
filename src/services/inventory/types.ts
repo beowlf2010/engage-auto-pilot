@@ -40,16 +40,26 @@ export interface InventoryItem {
   upload_history_id?: string;
   created_at: string;
   updated_at: string;
+  
+  // Extended properties for dashboard
+  deals?: any[];
+  deal_count?: number;
+  latest_deal?: any;
+  data_completeness?: number;
 }
 
 export interface InventoryFilters {
   make?: string;
   model?: string;
   status?: string;
+  inventoryType?: 'new' | 'used' | 'all';
   sourceReport?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'website_scrape';
   rpoCode?: string;
   priceMin?: number;
   priceMax?: number;
   yearMin?: number;
   yearMax?: number;
+  sortBy?: 'age' | 'price' | 'year' | 'make' | 'model' | 'completeness';
+  sortOrder?: 'asc' | 'desc';
+  dataQuality?: 'all' | 'complete' | 'incomplete';
 }

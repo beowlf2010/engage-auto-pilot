@@ -1,20 +1,6 @@
 
 import { useState } from 'react';
-
-interface InventoryFilters {
-  make?: string;
-  model?: string;
-  inventoryType?: 'new' | 'used' | 'all';
-  sourceReport?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
-  rpoCode?: string;
-  yearMin?: number;
-  yearMax?: number;
-  priceMin?: number;
-  priceMax?: number;
-  sortBy?: 'age' | 'price' | 'year' | 'make' | 'model' | 'completeness';
-  sortOrder?: 'asc' | 'desc';
-  dataQuality?: 'all' | 'complete' | 'incomplete';
-}
+import { InventoryFilters } from '@/services/inventory/types';
 
 export const useInventoryFilters = () => {
   const [filters, setFilters] = useState<InventoryFilters>({
