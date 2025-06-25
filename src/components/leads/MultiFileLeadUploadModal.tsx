@@ -1,12 +1,16 @@
+
 import React, { useCallback, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from "@/components/ui/button";
-import { Upload, Plus, Trash2, AlertCircle, FileText } from 'lucide-react';
+import { Upload, Trash2 } from 'lucide-react';
 import { useMultiFileLeadUpload } from '@/hooks/useMultiFileLeadUpload';
 import LeadFileQueue from './LeadFileQueue';
 import LeadBatchUploadResult from './LeadBatchUploadResult';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import EnhancedCSVUploadGuard from '@/components/upload-leads/EnhancedCSVUploadGuard';
+import FileUploadArea from './upload/FileUploadArea';
+import FileValidation, { validateFiles } from './upload/FileValidation';
+import UploadSettings from './upload/UploadSettings';
+import UploadInfoPanel from './upload/UploadInfoPanel';
 
 interface MultiFileLeadUploadModalProps {
   isOpen: boolean;
@@ -28,98 +32,39 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
     processBatch
   } = useMultiFileLeadUpload();
 
-  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      setFileErrors([]);
-      
-      // Check for VIN Solutions files or unsupported formats
-      const errors: string[] = [];
-      const validFiles: File[] = [];
-      
-      Array.from(files).forEach(file => {
-        const fileName = file.name.toLowerCase();
-        
-        // Check if it looks like a VIN Solutions export
-        if (fileName.includes('vinsolutions') || fileName.includes('vin_solutions') || 
-            fileName.includes('message') && (fileName.includes('export') || fileName.includes('log'))) {
-          errors.push(`"${file.name}" appears to be a VIN Solutions message export. Please use the Message Import feature instead.`);
-          return;
-        }
-        
-        // Check file extension
-        const validExtensions = ['.csv', '.xlsx', '.xls'];
-        const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
-        
-        if (!validExtensions.includes(fileExtension)) {
-          errors.push(`"${file.name}" has an unsupported format. Please use CSV or Excel files.`);
-          return;
-        }
-        
-        validFiles.push(file);
-      });
-      
-      if (errors.length > 0) {
-        setFileErrors(errors);
-      }
-      
-      if (validFiles.length > 0) {
-        const fileList = new DataTransfer();
-        validFiles.forEach(file => fileList.items.add(file));
-        addFiles(fileList.files);
-      }
-    }
-    // Reset the input so the same files can be selected again if needed
-    event.target.value = '';
-  }, [addFiles]);
-
-  const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const handleFilesSelected = useCallback((files: FileList) => {
+    setFileErrors([]);
     
-    const files = event.dataTransfer.files;
-    if (files && files.length > 0) {
-      setFileErrors([]);
+    // Validate files
+    const errors = validateFiles(Array.from(files));
+    
+    if (errors.length > 0) {
+      setFileErrors(errors);
+    }
+    
+    // Filter out invalid files
+    const validFiles = Array.from(files).filter(file => {
+      const fileName = file.name.toLowerCase();
       
-      const errors: string[] = [];
-      const validFiles: File[] = [];
-      
-      Array.from(files).forEach(file => {
-        const fileName = file.name.toLowerCase();
-        
-        if (fileName.includes('vinsolutions') || fileName.includes('vin_solutions') || 
-            fileName.includes('message') && (fileName.includes('export') || fileName.includes('log'))) {
-          errors.push(`"${file.name}" appears to be a VIN Solutions message export. Please use the Message Import feature instead.`);
-          return;
-        }
-        
-        const validExtensions = ['.csv', '.xlsx', '.xls'];
-        const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
-        
-        if (!validExtensions.includes(fileExtension)) {
-          errors.push(`"${file.name}" has an unsupported format. Please use CSV or Excel files.`);
-          return;
-        }
-        
-        validFiles.push(file);
-      });
-      
-      if (errors.length > 0) {
-        setFileErrors(errors);
+      // Check for VIN Solutions files
+      if (fileName.includes('vinsolutions') || fileName.includes('vin_solutions') || 
+          fileName.includes('message') && (fileName.includes('export') || fileName.includes('log'))) {
+        return false;
       }
       
-      if (validFiles.length > 0) {
-        const fileList = new DataTransfer();
-        validFiles.forEach(file => fileList.items.add(file));
-        addFiles(fileList.files);
-      }
+      // Check file extension
+      const validExtensions = ['.csv', '.xlsx', '.xls'];
+      const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
+      
+      return validExtensions.includes(fileExtension);
+    });
+    
+    if (validFiles.length > 0) {
+      const fileList = new DataTransfer();
+      validFiles.forEach(file => fileList.items.add(file));
+      addFiles(fileList.files);
     }
   }, [addFiles]);
-
-  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-  }, []);
 
   const handleProcessAll = async () => {
     const result = await processBatch();
@@ -174,77 +119,23 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
           {/* Enhanced Upload Guard */}
           <EnhancedCSVUploadGuard onRetry={() => window.location.reload()}>
             {/* Error Messages */}
-            {fileErrors.length > 0 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <div className="space-y-1">
-                    {fileErrors.map((error, index) => (
-                      <div key={index}>{error}</div>
-                    ))}
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
+            <FileValidation errors={fileErrors} />
 
-            {/* VIN Solutions Import Notice */}
-            <Alert>
-              <FileText className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Looking to import VIN Solutions message logs?</strong> Use the dedicated Message Import feature 
-                in the sidebar navigation or visit the Message Export page for proper VIN Solutions file processing.
-              </AlertDescription>
-            </Alert>
+            {/* Info Panel */}
+            <UploadInfoPanel updateExistingLeads={updateExistingLeads} />
 
             {/* Update Existing Leads Option */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  id="updateExistingLeads"
-                  checked={updateExistingLeads}
-                  onChange={(e) => setUpdateExistingLeads(e.target.checked)}
-                  disabled={processing}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="updateExistingLeads" className="text-sm font-medium text-blue-900">
-                  Update existing leads with new information
-                </label>
-              </div>
-              <p className="text-xs text-blue-700 mt-2 ml-7">
-                When enabled, leads that match existing records (by phone, email, or name) will be updated with any missing information from the upload, rather than being skipped as duplicates.
-              </p>
-            </div>
+            <UploadSettings
+              updateExistingLeads={updateExistingLeads}
+              onUpdateExistingLeadsChange={setUpdateExistingLeads}
+              disabled={processing}
+            />
 
-            {/* File Drop Zone */}
-            <div
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors"
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-            >
-              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Drop lead files here or click to browse
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Supports CSV and Excel files (.csv, .xlsx, .xls) for lead data only
-              </p>
-              <input
-                type="file"
-                multiple
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="lead-file-input"
-                disabled={processing}
-              />
-              <Button asChild disabled={processing}>
-                <label htmlFor="lead-file-input" className="cursor-pointer">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Select Lead Files
-                </label>
-              </Button>
-            </div>
+            {/* File Upload Area */}
+            <FileUploadArea
+              onFilesSelected={handleFilesSelected}
+              processing={processing}
+            />
 
             {/* File Queue */}
             <LeadFileQueue
@@ -252,19 +143,6 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
               onRemoveFile={removeFile}
               processing={processing}
             />
-
-            {/* Info Section */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-medium text-blue-900 mb-2">Lead Upload Information</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Each file will be processed independently as lead data</li>
-                <li>• Duplicate leads will be automatically detected and {updateExistingLeads ? 'updated with new information' : 'skipped'}</li>
-                <li>• Phone numbers will be prioritized: Cell → Day → Evening</li>
-                <li>• Multi-sheet Excel files require individual processing</li>
-                <li>• For VIN Solutions message imports, use the Message Import feature</li>
-                <li>• Manager or admin permissions are required for uploads</li>
-              </ul>
-            </div>
           </EnhancedCSVUploadGuard>
         </div>
 
