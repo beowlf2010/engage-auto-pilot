@@ -9,6 +9,10 @@ import { Eye, MessageCircle, Phone, Mail, Clock, Star } from "lucide-react";
 import { Lead } from "@/types/lead";
 import { formatDistanceToNow } from "date-fns";
 import HideLeadButton from './HideLeadButton';
+import LeadAgeDisplay from './LeadAgeDisplay';
+import SourceStrategyDisplay from './SourceStrategyDisplay';
+import AISequenceStatus from './AISequenceStatus';
+import DataQualityIndicator from './DataQualityIndicator';
 
 interface LeadsTableRowProps {
   lead: Lead;
@@ -21,6 +25,7 @@ interface LeadsTableRowProps {
   getEngagementScore: (lead: Lead) => number;
   isFresh: boolean;
   onToggleHidden?: (leadId: string, hidden: boolean) => void;
+  onEditData?: (leadId: string) => void;
 }
 
 const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
@@ -33,7 +38,8 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
   onQuickView,
   getEngagementScore,
   isFresh,
-  onToggleHidden
+  onToggleHidden,
+  onEditData
 }) => {
   const engagementScore = getEngagementScore(lead);
   const isSelected = selectedLeads.includes(lead.id.toString());
@@ -134,6 +140,33 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
       </TableCell>
 
       <TableCell>
+        <LeadAgeDisplay 
+          createdAt={lead.createdAt}
+          messageCount={lead.incomingCount + lead.outgoingCount}
+        />
+      </TableCell>
+
+      <TableCell>
+        <SourceStrategyDisplay
+          source={lead.source}
+          leadTypeName={lead.leadTypeName}
+          leadSourceName={lead.leadSourceName}
+          messageIntensity={lead.messageIntensity}
+        />
+      </TableCell>
+
+      <TableCell>
+        <AISequenceStatus
+          aiOptIn={lead.aiOptIn}
+          aiStage={lead.aiStage}
+          nextAiSendAt={lead.nextAiSendAt}
+          aiSequencePaused={lead.aiSequencePaused}
+          aiPauseReason={lead.aiPauseReason}
+          aiMessagesSent={lead.aiMessagesSent}
+        />
+      </TableCell>
+
+      <TableCell>
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-1">
             <MessageCircle className="h-4 w-4 text-blue-500" />
@@ -187,6 +220,16 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
             className="data-[state=checked]:bg-green-600"
           />
         )}
+      </TableCell>
+
+      <TableCell>
+        <DataQualityIndicator
+          leadId={lead.id}
+          firstName={lead.firstName}
+          lastName={lead.lastName}
+          vehicleInterest={lead.vehicleInterest}
+          onEditClick={onEditData}
+        />
       </TableCell>
 
       <TableCell>

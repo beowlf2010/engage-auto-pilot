@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
 import { useLeadFilters } from '@/hooks/useLeadFilters';
 import { Lead } from '@/types/lead';
+import { toast } from '@/hooks/use-toast';
 import LeadsPageHeader from './leads/LeadsPageHeader';
 import ProcessManagementPanel from './leads/ProcessManagementPanel';
 import MultiFileLeadUploadModal from './leads/MultiFileLeadUploadModal';
@@ -84,6 +85,18 @@ const LeadsList = () => {
     await refetch();
   };
 
+  const handleEditData = (leadId: string) => {
+    // For now, just show a toast. This could open a modal or navigate to an edit page
+    toast({
+      title: "Edit Lead Data",
+      description: "Lead data editing functionality will be implemented here.",
+      variant: "default"
+    });
+    
+    // Navigate to the lead detail page where editing can be done
+    navigate(`/leads/${leadId}`);
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -148,6 +161,7 @@ const LeadsList = () => {
           onLeadClick={handleLeadClick}
           onAiOptInChange={updateAiOptIn}
           onDoNotContactChange={updateDoNotContact}
+          onEditData={handleEditData}
         />
       )}
 

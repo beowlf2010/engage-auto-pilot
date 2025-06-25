@@ -19,6 +19,7 @@ interface LeadsTableWithSelectionProps {
   onLeadClick?: (lead: Lead) => void;
   onAiOptInChange?: (leadId: string, value: boolean) => void;
   onDoNotContactChange?: (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => void;
+  onEditData?: (leadId: string) => void;
 }
 
 const LeadsTableWithSelection = ({
@@ -30,7 +31,8 @@ const LeadsTableWithSelection = ({
   onToggleHidden,
   onLeadClick,
   onAiOptInChange,
-  onDoNotContactChange
+  onDoNotContactChange,
+  onEditData
 }: LeadsTableWithSelectionProps) => {
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -89,6 +91,7 @@ const LeadsTableWithSelection = ({
                 getEngagementScore={getEngagementScore}
                 isFresh={isFresh}
                 onToggleHidden={onToggleHidden}
+                onEditData={onEditData}
               />
             );
           })}

@@ -24,13 +24,19 @@ const LeadsTableHeader = ({ leads, selectedLeads, onSelectAll }: LeadsTableHeade
           />
         </TableHead>
         <TableHead>Lead</TableHead>
-        <TableHead>Source</TableHead>
-        <TableHead>Status</TableHead>
-        <TableHead>Vehicle Interest</TableHead>
-        <TableHead>AI Process</TableHead>
         <TableHead>Contact Info</TableHead>
-        <TableHead>Engagement</TableHead>
+        <TableHead>Vehicle Interest</TableHead>
+        <TableHead>Source</TableHead>
+        <TableHead>Lead Age</TableHead>
+        <TableHead>Source Strategy</TableHead>
+        <TableHead>AI Sequence</TableHead>
         <TableHead>Messages</TableHead>
+        <TableHead>Last Activity</TableHead>
+        <TableHead>Engagement</TableHead>
+        <TableHead>Status</TableHead>
+        <TableHead>AI Enabled</TableHead>
+        <TableHead>Data Quality</TableHead>
+        <TableHead>Do Not Contact</TableHead>
         <TableHead>Actions</TableHead>
       </TableRow>
     </TableHeader>
