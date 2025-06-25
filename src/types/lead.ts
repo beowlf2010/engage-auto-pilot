@@ -1,12 +1,10 @@
-
 export interface PhoneNumber {
   id: string;
   number: string;
   type: 'cell' | 'day' | 'eve';
   priority: number;
-  status: 'active' | 'failed' | 'opted_out';
+  status: 'active' | 'failed' | 'opted_out' | 'needs_review';
   isPrimary: boolean;
-  lastAttempt?: string;
 }
 
 export interface Lead {

@@ -71,13 +71,14 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
       // Data is already cleaned by the unified CSV parser
       // No need for additional quote removal since cleanFieldValue handles it
       
-      // Create phone numbers with priority
-      const phoneNumbers = createPhoneNumbers(
+      // Create phone numbers with priority - handle new return format
+      const phoneResult = createPhoneNumbers(
         row[mapping.cellphone] || '',
         row[mapping.dayphone] || '',
         row[mapping.evephone] || ''
       );
 
+      const phoneNumbers = phoneResult.phones;
       const primaryPhone = getPrimaryPhone(phoneNumbers);
       
       // Skip leads without valid phone numbers
