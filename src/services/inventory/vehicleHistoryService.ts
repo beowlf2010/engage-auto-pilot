@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import type { InventoryItem } from '@/utils/inventoryMapper';
+import type { InventoryItem } from './types';
 
 export interface VehicleHistoryEntry {
   id?: string;

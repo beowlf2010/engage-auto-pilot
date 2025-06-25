@@ -41,6 +41,13 @@ export interface InventoryItem {
   created_at: string;
   updated_at: string;
   
+  // GM Global and delivery-related properties
+  gm_order_number?: string;
+  customer_name?: string;
+  actual_delivery_date?: string;
+  estimated_delivery_date?: string;
+  delivery_variance_days?: number;
+  
   // Extended properties for dashboard
   deals?: any[];
   deal_count?: number;
