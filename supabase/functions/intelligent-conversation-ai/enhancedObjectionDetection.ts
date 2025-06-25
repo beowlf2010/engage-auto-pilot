@@ -1,13 +1,14 @@
+
 // Enhanced Objection Detection with Pricing Discrepancy Support
 // Identifies customer pricing concerns, vehicle nicknames, and improved objection handling
 
 import { getFirstName } from './nameFormatter.ts';
 
 export interface EnhancedObjectionSignal {
-  type: 'competitor_purchase' | 'pricing_discrepancy' | 'pricing_shock' | 'online_vs_call_price' | 'upgrade_costs' | 'hesitation' | 'price_concern' | 'timing_delay' | 'feature_concern' | 'competitor_mention' | 'vague_response';
+  type: 'competitor_purchase' | 'pricing_discrepancy' | 'pricing_shock' | 'online_vs_call_price' | 'upgrade_costs' | 'hesitation' | 'price_concern' | 'timing_delay' | 'market_readiness' | 'feature_concern' | 'competitor_mention' | 'vague_response';
   confidence: number;
   indicators: string[];
-  suggestedResponse: 'congratulate_competitor_purchase' | 'address_pricing_discrepancy' | 'explain_pricing_breakdown' | 'empathetic_pricing_response' | 'probe_deeper' | 'address_price' | 'create_urgency' | 'feature_benefits' | 'competitor_comparison' | 'assumptive_close';
+  suggestedResponse: 'congratulate_competitor_purchase' | 'address_pricing_discrepancy' | 'explain_pricing_breakdown' | 'empathetic_pricing_response' | 'probe_deeper' | 'address_price' | 'create_urgency' | 'feature_benefits' | 'competitor_comparison' | 'assumptive_close' | 'acknowledge_timing';
   vehicleNickname?: string;
   priceContext?: {
     mentionedOnlinePrice?: boolean;
@@ -100,6 +101,51 @@ export const detectEnhancedObjectionSignals = (customerMessage: string, conversa
 
   // If competitor purchase is detected, return early (highest priority)
   if (signals.length > 0 && signals[0].type === 'competitor_purchase') {
+    return signals;
+  }
+
+  // MARKET READINESS / TIMING OBJECTION PATTERNS (High Priority - NEW)
+  const marketReadinessPatterns = [
+    { 
+      pattern: /\b(not in the market|not in market|not looking|not ready|not interested right now|not shopping)\b/, 
+      confidence: 0.95,
+      type: 'market_readiness' as const,
+      response: 'acknowledge_timing' as const
+    },
+    { 
+      pattern: /\b(right now|at this time|currently|for now|at the moment)\b.*\b(not|don't|can't)\b/, 
+      confidence: 0.85,
+      type: 'market_readiness' as const,
+      response: 'acknowledge_timing' as const
+    },
+    { 
+      pattern: /\b(maybe later|in the future|down the road|someday|eventually)\b/, 
+      confidence: 0.8,
+      type: 'timing_delay' as const,
+      response: 'acknowledge_timing' as const
+    },
+    { 
+      pattern: /\b(just browsing|just looking|just checking|window shopping)\b/, 
+      confidence: 0.75,
+      type: 'market_readiness' as const,
+      response: 'acknowledge_timing' as const
+    }
+  ];
+
+  // Check for market readiness patterns (high priority after competitor purchase)
+  marketReadinessPatterns.forEach(({ pattern, confidence, type, response }) => {
+    if (pattern.test(message)) {
+      signals.push({
+        type,
+        confidence,
+        indicators: [message],
+        suggestedResponse: response
+      });
+    }
+  });
+
+  // If timing objections are detected, prioritize them
+  if (signals.length > 0) {
     return signals;
   }
 
@@ -219,8 +265,9 @@ export const generateEnhancedObjectionResponse = (
     current.confidence > prev.confidence ? current : prev
   );
 
-  const cleanVehicle = vehicleInterest.replace(/"/g, '').trim();
-  const vehicleToUse = primarySignal.vehicleNickname || cleanVehicle || 'the vehicle you\'re interested in';
+  // Safely handle vehicle interest
+  const cleanVehicle = vehicleInterest ? vehicleInterest.replace(/"/g, '').trim() : 'a vehicle';
+  const vehicleToUse = primarySignal.vehicleNickname || cleanVehicle || 'a vehicle';
   
   // Use only the first name for responses
   const firstName = getFirstName(leadName) || 'there';
@@ -228,6 +275,12 @@ export const generateEnhancedObjectionResponse = (
   switch (primarySignal.suggestedResponse) {
     case 'congratulate_competitor_purchase':
       return `Congratulations on your new vehicle, ${firstName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
+
+    case 'acknowledge_timing':
+      if (primarySignal.type === 'market_readiness') {
+        return `I completely understand, ${firstName}! No pressure at all. I know timing is everything when it comes to vehicle decisions. Would it be helpful if I just shared some quick info about current incentives or kept you updated on any special offers? That way, when you are ready, you'll have all the details.`;
+      }
+      return `I totally get that, ${firstName}. The timing has to be right for a decision like this. Would you mind if I just stayed in touch occasionally? That way, when the time feels right for you, I'll be here to help make the process as smooth as possible.`;
 
     case 'address_pricing_discrepancy':
       return `I completely understand your confusion about the pricing, ${firstName}. Online prices typically show the base MSRP and don't include additional packages, options, or dealer fees that might apply to ${vehicleToUse}. Let me clarify exactly what's included in that price difference so there are no surprises. What specific features or packages were mentioned when you called?`;

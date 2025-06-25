@@ -1,10 +1,11 @@
+
 // Enhanced intent analysis with better context awareness and customer message understanding
 
 import { detectEnhancedObjectionSignals, EnhancedObjectionSignal } from './enhancedObjectionDetection.ts';
 import { formatProperName, getFirstName } from './nameFormatter.ts';
 
 export interface EnhancedIntentAnalysis {
-  primaryIntent: 'competitor_purchase' | 'vehicle_inquiry' | 'expressing_interest' | 'asking_question' | 'providing_info' | 'objection' | 'ready_to_buy' | 'general';
+  primaryIntent: 'competitor_purchase' | 'market_readiness' | 'timing_delay' | 'vehicle_inquiry' | 'expressing_interest' | 'asking_question' | 'providing_info' | 'objection' | 'ready_to_buy' | 'general';
   confidence: number;
   customerContext: {
     mentionedVehicle: string | null;
@@ -12,7 +13,7 @@ export interface EnhancedIntentAnalysis {
     emotionalTone: 'positive' | 'neutral' | 'negative' | 'excited';
     urgencyLevel: 'low' | 'medium' | 'high';
   };
-  responseStrategy: 'congratulate_competitor_purchase' | 'acknowledge_and_engage' | 'provide_info' | 'ask_discovery' | 'address_concern' | 'move_to_action';
+  responseStrategy: 'congratulate_competitor_purchase' | 'acknowledge_timing' | 'acknowledge_and_engage' | 'provide_info' | 'ask_discovery' | 'address_concern' | 'move_to_action';
   suggestedResponse: string | null;
   objectionSignals?: EnhancedObjectionSignal[];
 }
@@ -29,22 +30,43 @@ export const analyzeEnhancedCustomerIntent = (
   // Use only the first name for responses
   const firstName = getFirstName(leadName) || 'there';
   
-  // First, check for objection signals (including competitor purchases)
+  // First, check for objection signals (including competitor purchases and timing objections)
   const objectionSignals = detectEnhancedObjectionSignals(customerMessage, conversationHistory);
   
-  // If competitor purchase is detected, this takes highest priority
+  // PRIORITY 1: If competitor purchase is detected, this takes highest priority
   if (objectionSignals.length > 0 && objectionSignals[0].type === 'competitor_purchase') {
     return {
       primaryIntent: 'competitor_purchase',
       confidence: objectionSignals[0].confidence,
       customerContext: {
-        mentionedVehicle: vehicleInterest,
+        mentionedVehicle: vehicleInterest || null,
         isFollowUp: history.includes('finn') || history.includes('jason pilger'),
         emotionalTone: 'neutral',
         urgencyLevel: 'low'
       },
       responseStrategy: 'congratulate_competitor_purchase',
       suggestedResponse: `Congratulations on your new vehicle, ${firstName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`,
+      objectionSignals
+    };
+  }
+  
+  // PRIORITY 2: If market readiness or timing objections are detected
+  if (objectionSignals.length > 0 && (objectionSignals[0].type === 'market_readiness' || objectionSignals[0].type === 'timing_delay')) {
+    const cleanVehicle = vehicleInterest ? vehicleInterest.replace(/"/g, '').trim() : 'a vehicle';
+    
+    return {
+      primaryIntent: objectionSignals[0].type,
+      confidence: objectionSignals[0].confidence,
+      customerContext: {
+        mentionedVehicle: cleanVehicle,
+        isFollowUp: history.includes('finn') || history.includes('jason pilger'),
+        emotionalTone: 'neutral',
+        urgencyLevel: 'low'
+      },
+      responseStrategy: 'acknowledge_timing',
+      suggestedResponse: objectionSignals[0].type === 'market_readiness' 
+        ? `I completely understand, ${firstName}! No pressure at all. I know timing is everything when it comes to vehicle decisions. Would it be helpful if I just shared some quick info about current incentives or kept you updated on any special offers? That way, when you are ready, you'll have all the details.`
+        : `I totally get that, ${firstName}. The timing has to be right for a decision like this. Would you mind if I just stayed in touch occasionally? That way, when the time feels right for you, I'll be here to help make the process as smooth as possible.`,
       objectionSignals
     };
   }
@@ -110,9 +132,9 @@ export const analyzeEnhancedCustomerIntent = (
   // Determine urgency level
   let urgencyLevel: 'low' | 'medium' | 'high' = 'medium';
   if (primaryIntent === 'ready_to_buy' || message.includes('today') || message.includes('asap')) urgencyLevel = 'high';
-  if (primaryIntent === 'objection' || emotionalTone === 'negative') urgencyLevel = 'low';
+  if (primaryIntent === 'objection' || emotionalTone === 'negative' || primaryIntent === 'market_readiness' || primaryIntent === 'timing_delay') urgencyLevel = 'low';
 
-  // Generate contextual suggested response with first name only
+  // Generate contextual suggested response with proper vehicle handling
   const suggestedResponse = generateContextualResponse(
     primaryIntent,
     mentionedVehicle,
@@ -147,7 +169,8 @@ const generateContextualResponse = (
   strategy: EnhancedIntentAnalysis['responseStrategy'],
   objectionSignals?: EnhancedObjectionSignal[]
 ): string => {
-  const vehicle = mentionedVehicle || vehicleInterest || 'the vehicle you\'re interested in';
+  // Safely handle vehicle interest - provide fallback for empty/undefined values
+  const vehicle = mentionedVehicle || (vehicleInterest && vehicleInterest.trim() !== '' ? vehicleInterest : 'your next vehicle');
   const cleanVehicle = vehicle.replace(/"/g, '').trim();
 
   // Handle objections with specific responses
@@ -157,6 +180,8 @@ const generateContextualResponse = (
     switch (primarySignal.suggestedResponse) {
       case 'congratulate_competitor_purchase':
         return `Congratulations on your new vehicle, ${firstName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
+      case 'acknowledge_timing':
+        return `I completely understand, ${firstName}! No pressure at all. I know timing is everything when it comes to vehicle decisions. Would it be helpful if I just shared some quick info about current incentives or kept you updated on any special offers? That way, when you are ready, you'll have all the details.`;
       case 'address_pricing_discrepancy':
         return `I completely understand your confusion about the pricing, ${firstName}. Online prices typically show the base MSRP and don't include additional packages, options, or dealer fees that might apply to ${cleanVehicle}. Let me clarify exactly what's included in that price difference so there are no surprises. What specific features or packages were mentioned when you called?`;
       case 'empathetic_pricing_response':
@@ -168,29 +193,29 @@ const generateContextualResponse = (
     }
   }
 
-  // Handle other intents with first name only
+  // Handle other intents with first name only and better vehicle handling
   switch (strategy) {
     case 'acknowledge_and_engage':
       if (intent === 'vehicle_inquiry') {
-        return `Hi ${firstName}! I see you're interested in the ${cleanVehicle}. That's a fantastic choice! What aspects are most important to you - performance, features, or pricing?`;
+        return `Hi ${firstName}! I see you're interested in ${cleanVehicle}. That's a fantastic choice! What aspects are most important to you - performance, features, or pricing?`;
       }
       if (intent === 'expressing_interest') {
-        return `That's great to hear, ${firstName}! The ${cleanVehicle} is really popular right now. What drew you to this particular model?`;
+        return `That's great to hear, ${firstName}! ${cleanVehicle} is really popular right now. What drew you to this particular model?`;
       }
       break;
 
     case 'provide_info':
-      return `Great question about the ${cleanVehicle}, ${firstName}! I'd be happy to provide those details. Are you most interested in specs, pricing, or availability?`;
+      return `Great question about ${cleanVehicle}, ${firstName}! I'd be happy to provide those details. Are you most interested in specs, pricing, or availability?`;
 
     case 'move_to_action':
-      return `Perfect timing, ${firstName}! I can definitely help you move forward with the ${cleanVehicle}. When would be a good time for you to take a look in person?`;
+      return `Perfect timing, ${firstName}! I can definitely help you move forward with ${cleanVehicle}. When would be a good time for you to take a look in person?`;
 
     case 'address_concern':
-      return `I understand your concerns about the ${cleanVehicle}, ${firstName}. What's your main hesitation? I'm here to help address any questions you might have.`;
+      return `I understand your concerns about ${cleanVehicle}, ${firstName}. What's your main hesitation? I'm here to help address any questions you might have.`;
 
     default:
-      return `Hi ${firstName}! Thanks for reaching out about the ${cleanVehicle}. I'm here to help make your car shopping experience as smooth as possible. What would be most helpful for you to know?`;
+      return `Hi ${firstName}! Thanks for reaching out about ${cleanVehicle}. I'm here to help make your car shopping experience as smooth as possible. What would be most helpful for you to know?`;
   }
 
-  return `Hi ${firstName}! I'm here to help with the ${cleanVehicle}. What would be most helpful for you to know?`;
+  return `Hi ${firstName}! I'm here to help with ${cleanVehicle}. What would be most helpful for you to know?`;
 };
