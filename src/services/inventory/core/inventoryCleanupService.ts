@@ -1,7 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { uploadSessionService } from "../uploadSessionService";
+import { shouldSkipCleanup } from "../uploadValidationService";
 
 export const getTodayAndYesterdayUploads = async () => {
   try {
@@ -45,7 +45,7 @@ export const getTodayAndYesterdayUploads = async () => {
 
 export const restoreRecentUsedInventory = async () => {
   try {
-    console.log('Restoring recently uploaded used inventory to available status...');
+    console.log('🔧 Restoring recently uploaded used inventory to available status...');
     
     // Find vehicles from recent "Tommy Merch-Inv View" uploads that were incorrectly marked as sold
     const { data: recentUploads, error: uploadsError } = await supabase
@@ -82,7 +82,7 @@ export const restoreRecentUsedInventory = async () => {
     if (restoreError) throw restoreError;
 
     const restoredCount = restoredVehicles?.length || 0;
-    console.log(`Successfully restored ${restoredCount} used vehicles to available status`);
+    console.log(`✅ Successfully restored ${restoredCount} used vehicles to available status`);
     
     return { restored: restoredCount, vehicles: restoredVehicles };
   } catch (error) {
@@ -93,50 +93,22 @@ export const restoreRecentUsedInventory = async () => {
 
 export const validateUploadBeforeCleanup = async (uploadIds: string[]) => {
   try {
-    console.log('🔍 Validating uploads before cleanup...');
+    console.log('🔍 Enhanced validation before cleanup...');
     
     if (!uploadIds || uploadIds.length === 0) {
       console.warn('⚠️ No upload IDs provided for validation');
       return { isValid: false, reason: 'No upload IDs provided' };
     }
 
-    // Check each upload to ensure it actually processed vehicles
-    for (const uploadId of uploadIds) {
-      const { data: uploadRecord, error: uploadError } = await supabase
-        .from('upload_history')
-        .select('successful_imports, total_rows, original_filename')
-        .eq('id', uploadId)
-        .single();
-
-      if (uploadError) {
-        console.error(`Error checking upload ${uploadId}:`, uploadError);
-        continue;
-      }
-
-      // Check that vehicles were actually inserted
-      const { data: vehicleCount, error: countError } = await supabase
-        .from('inventory')
-        .select('id', { count: 'exact' })
-        .eq('upload_history_id', uploadId);
-
-      if (countError) {
-        console.error(`Error counting vehicles for upload ${uploadId}:`, countError);
-        continue;
-      }
-
-      const actualVehicleCount = vehicleCount?.length || 0;
-      const reportedImports = uploadRecord?.successful_imports || 0;
-
-      console.log(`Upload ${uploadRecord?.original_filename}: reported ${reportedImports}, actual ${actualVehicleCount}`);
-
-      // If there's a significant mismatch, don't proceed with cleanup
-      if (reportedImports > 0 && actualVehicleCount === 0) {
-        console.warn(`⚠️ Upload ${uploadId} reported ${reportedImports} imports but no vehicles found in inventory`);
-        return { 
-          isValid: false, 
-          reason: `Upload processing failed - reported ${reportedImports} imports but no vehicles found`
-        };
-      }
+    // Use the new enhanced validation service
+    const validationResult = await shouldSkipCleanup(uploadIds);
+    
+    if (validationResult.skip) {
+      console.error('🚨 Cleanup blocked:', validationResult.reason);
+      return { 
+        isValid: false, 
+        reason: validationResult.reason || 'Upload validation failed'
+      };
     }
 
     return { isValid: true, reason: 'All uploads validated successfully' };
@@ -148,7 +120,7 @@ export const validateUploadBeforeCleanup = async (uploadIds: string[]) => {
 
 export const cleanupInventoryData = async () => {
   try {
-    console.log('Starting "today vs yesterday" inventory cleanup logic...');
+    console.log('🧹 Starting enhanced "today vs yesterday" inventory cleanup logic...');
     
     // Check if cleanup should be skipped due to active upload session
     if (uploadSessionService.shouldSkipAutoCleanup()) {
@@ -164,18 +136,19 @@ export const cleanupInventoryData = async () => {
       return { success: true, message: 'No uploads from today found' };
     }
 
-    // CRITICAL: Validate uploads before proceeding with cleanup
+    // CRITICAL: Enhanced validation before proceeding with cleanup
     const validation = await validateUploadBeforeCleanup(todayUploadIds);
     if (!validation.isValid) {
-      console.error('🚨 Upload validation failed:', validation.reason);
+      console.error('🚨 Enhanced validation failed:', validation.reason);
       toast({
         title: "Cleanup Blocked",
-        description: `Cleanup prevented due to upload issues: ${validation.reason}`,
+        description: `Cleanup prevented due to upload validation failure: ${validation.reason}`,
         variant: "destructive"
       });
       return { success: false, message: `Cleanup blocked: ${validation.reason}` };
     }
 
+    console.log('✅ Enhanced validation passed - proceeding with cleanup');
     console.log('Today upload IDs:', todayUploadIds);
     console.log('Yesterday upload IDs:', yesterdayUploadIds);
 
@@ -204,11 +177,10 @@ export const cleanupInventoryData = async () => {
 
       console.log(`Found ${yesterdayVehicles.length} available vehicles from yesterday`);
 
-      // Create sets for efficient comparison - explicitly type the arrays as strings
+      // Create sets for efficient comparison
       const todayVINs = new Set<string>();
       const todayStockNumbers = new Set<string>();
 
-      // Populate the sets with proper type checking
       todayVehicles.forEach(vehicle => {
         if (vehicle.vin && typeof vehicle.vin === 'string') {
           todayVINs.add(vehicle.vin);
@@ -219,15 +191,15 @@ export const cleanupInventoryData = async () => {
       });
 
       // Find vehicles from yesterday that are not in today's upload
-      // IMPORTANT: Only mark vehicles as sold if they are NOT used inventory from recent uploads
+      // IMPORTANT: Enhanced protection for used inventory
       vehiclesToMarkSold = yesterdayVehicles.filter(vehicle => {
         const hasVIN = vehicle.vin && todayVINs.has(vehicle.vin);
         const hasStock = vehicle.stock_number && todayStockNumbers.has(vehicle.stock_number);
         const notFound = !hasVIN && !hasStock;
         
-        // Additional safety: Don't mark used vehicles as sold if they're from recent uploads
+        // Enhanced safety: Don't mark used vehicles as sold if they're from recent uploads
         if (notFound && vehicle.condition === 'used') {
-          console.log(`⚠️ Skipping used vehicle ${vehicle.make} ${vehicle.model} (${vehicle.stock_number}) - preventing used inventory cleanup`);
+          console.log(`⚠️ Enhanced protection: Skipping used vehicle ${vehicle.make} ${vehicle.model} (${vehicle.stock_number}) - preventing incorrect used inventory cleanup`);
           return false;
         }
         
@@ -240,7 +212,7 @@ export const cleanupInventoryData = async () => {
     }
 
     if (vehiclesToMarkSold.length === 0) {
-      console.log('No vehicles need to be marked as sold - inventory is current');
+      console.log('✅ No vehicles need to be marked as sold - inventory is current');
       return { success: true, message: 'Inventory is already current - no vehicles to mark as sold' };
     }
 
@@ -271,31 +243,33 @@ export const cleanupInventoryData = async () => {
       }
 
       totalUpdated += updated?.length || 0;
-      console.log(`Updated batch ${Math.floor(i/batchSize) + 1}, ${updated?.length} vehicles marked as sold`);
+      console.log(`✅ Updated batch ${Math.floor(i/batchSize) + 1}, ${updated?.length} vehicles marked as sold`);
     }
 
-    console.log(`"Today vs Yesterday" cleanup completed. ${totalUpdated} vehicles marked as sold`);
+    console.log(`🎉 Enhanced "Today vs Yesterday" cleanup completed. ${totalUpdated} vehicles marked as sold`);
     
     return {
       success: true,
-      message: `Inventory updated: ${totalUpdated} vehicles from yesterday marked as sold (not in today's upload)`,
+      message: `Enhanced inventory update: ${totalUpdated} vehicles from yesterday marked as sold (validated upload success)`,
       totalProcessed: totalUpdated,
       todayUploads: todayUploadIds.length,
-      yesterdayUploads: yesterdayUploadIds.length
+      yesterdayUploadIds: yesterdayUploadIds.length
     };
 
   } catch (error) {
-    console.error('"Today vs Yesterday" cleanup error:', error);
+    console.error('Enhanced "Today vs Yesterday" cleanup error:', error);
     throw error;
   }
 };
 
 export const performInventoryCleanup = async () => {
   try {
+    console.log('🚀 Starting enhanced inventory cleanup with validation...');
+    
     // First, restore any recently uploaded used inventory that was incorrectly marked as sold
     const restoreResult = await restoreRecentUsedInventory();
     
-    // Then run the new "today vs yesterday" cleanup logic with validation
+    // Then run the enhanced "today vs yesterday" cleanup logic with validation
     const cleanupResult = await cleanupInventoryData();
     
     if (restoreResult.restored > 0) {
@@ -317,11 +291,11 @@ export const performInventoryCleanup = async () => {
     
     return { ...cleanupResult, restored: restoreResult.restored };
   } catch (error) {
-    console.error('Cleanup failed:', error);
+    console.error('Enhanced cleanup failed:', error);
     
     toast({
       title: "Cleanup Failed", 
-      description: "There was an error during cleanup. Check console for details.",
+      description: "There was an error during enhanced cleanup. Check console for details.",
       variant: "destructive"
     });
     

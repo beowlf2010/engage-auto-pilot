@@ -3,22 +3,40 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { updateInventoryLeadsCount } from './leadInteractionService';
 import { performInventoryCleanup } from './core/inventoryCleanupService';
+import { validateUploadSuccess } from './uploadValidationService';
 import { uploadSessionService } from './uploadSessionService';
 
 export const markMissingVehiclesSold = async (uploadId: string) => {
-  // This function is deprecated - we now use "today vs yesterday" comparison logic
-  console.log('Skipping legacy sold marking - using new "today vs yesterday" logic');
+  // This function is deprecated - we now use enhanced "today vs yesterday" comparison logic
+  console.log('Skipping legacy sold marking - using enhanced "today vs yesterday" logic with validation');
   return;
 };
 
 export const syncInventoryData = async (uploadId: string) => {
   try {
-    console.log('Starting enhanced inventory data sync with "today vs yesterday" logic for upload:', uploadId);
+    console.log('🚀 Starting enhanced inventory data sync with validation for upload:', uploadId);
     
     // Update session activity
     uploadSessionService.updateSessionActivity(uploadId);
     
-    // Check if this is a GM Global upload (should not trigger cleanup)
+    // Enhanced validation: Check if upload actually succeeded before proceeding
+    const uploadValidation = await validateUploadSuccess(uploadId);
+    console.log('📋 Upload validation result:', uploadValidation);
+    
+    if (!uploadValidation.isValid) {
+      console.warn('⚠️ Upload validation failed - will not trigger cleanup');
+      toast({
+        title: "Upload Validation Warning",
+        description: uploadValidation.reason || "Upload may not have inserted all vehicles correctly",
+        variant: "destructive"
+      });
+      
+      // Still update leads count but don't run cleanup
+      await updateInventoryLeadsCount();
+      return;
+    }
+    
+    // Check upload type to determine appropriate actions
     const { data: uploadInfo, error: uploadError } = await supabase
       .from('upload_history')
       .select('original_filename, upload_type')
@@ -52,13 +70,14 @@ export const syncInventoryData = async (uploadId: string) => {
     }
     
     // Only run cleanup for actual inventory uploads (not GM Global orders or preliminary data)
-    if (!isGMGlobalUpload && !isPreliminaryData) {
-      console.log('Running "today vs yesterday" inventory cleanup...');
+    // AND only if upload validation passed
+    if (!isGMGlobalUpload && !isPreliminaryData && uploadValidation.isValid) {
+      console.log('🧹 Running enhanced "today vs yesterday" inventory cleanup with validation...');
       try {
         await performInventoryCleanup();
-        console.log('"Today vs Yesterday" cleanup completed - vehicles from yesterday not in today marked as sold');
+        console.log('✅ Enhanced "Today vs Yesterday" cleanup completed - vehicles properly validated');
       } catch (cleanupError) {
-        console.error('"Today vs Yesterday" cleanup failed:', cleanupError);
+        console.error('Enhanced "Today vs Yesterday" cleanup failed:', cleanupError);
         toast({
           title: "Cleanup Warning",
           description: "Inventory uploaded successfully but cleanup had issues",
@@ -66,17 +85,29 @@ export const syncInventoryData = async (uploadId: string) => {
         });
       }
     } else {
-      console.log('Skipping cleanup for GM Global/preliminary data upload');
+      const skipReason = !uploadValidation.isValid ? 'upload validation failed' :
+                        isGMGlobalUpload ? 'GM Global/preliminary data upload' :
+                        'other conditions';
+      console.log(`Skipping cleanup: ${skipReason}`);
     }
     
-    console.log('Enhanced inventory data sync with "today vs yesterday" logic completed successfully');
+    console.log('🎉 Enhanced inventory data sync with validation completed successfully');
     
-    toast({
-      title: "Inventory synced",
-      description: isGMGlobalUpload ? "GM Global orders updated" : "Current inventory updated using today vs yesterday comparison",
-    });
+    // Provide appropriate success message based on validation results
+    if (uploadValidation.mismatch) {
+      toast({
+        title: "Upload completed with warnings",
+        description: `Uploaded but some data may not have been processed correctly. Check diagnostics.`,
+        variant: "default"
+      });
+    } else {
+      toast({
+        title: "Inventory synced successfully",
+        description: isGMGlobalUpload ? "GM Global orders updated and validated" : "Current inventory updated using enhanced validation",
+      });
+    }
   } catch (error) {
-    console.error('Error syncing inventory data:', error);
+    console.error('Error in enhanced inventory sync:', error);
     toast({
       title: "Sync Warning",
       description: "Inventory uploaded but some sync operations had issues. Check console for details.",
