@@ -1,3 +1,4 @@
+
 /**
  * Utility functions for formatting names consistently
  */
@@ -73,6 +74,13 @@ export const formatFullName = (firstName: string, lastName: string): string => {
   }
   
   return formattedFirst || formattedLast || '';
+};
+
+// Get first name only, properly formatted
+export const getFirstName = (fullName: string): string => {
+  if (!fullName) return '';
+  const formatted = formatProperName(fullName);
+  return formatted.split(' ')[0] || '';
 };
 
 // Enhanced validation helpers
