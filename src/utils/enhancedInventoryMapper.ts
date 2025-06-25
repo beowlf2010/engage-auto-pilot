@@ -4,7 +4,7 @@ import { extractVINField } from './field-extraction';
 import { extractOptionsFields } from './field-extraction';
 import { extractGMGlobalFields } from './field-extraction/gmGlobalEnhanced';
 import { extractVautoFields } from './field-extraction';
-import type { InventoryItem } from './inventoryMapper';
+import { InventoryItem } from '../services/inventory/types';
 import type { ReportDetection } from './reportDetection';
 
 export interface EnhancedMappingResult {
@@ -25,6 +25,7 @@ export const mapRowToInventoryItemEnhanced = (
   const warnings: string[] = [];
   let dataQualityScore = 100;
   let mappedData: any;
+  const currentTimestamp = new Date().toISOString();
 
   try {
     console.log('Enhanced mapping with detection:', { 
@@ -108,14 +109,21 @@ export const mapRowToInventoryItemEnhanced = (
       dataQualityScore -= 30;
     }
 
+    // Generate a temporary ID for the database to use
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Final data preparation
     const inventoryItem: InventoryItem = {
+      id: tempId, // Temporary ID, database will assign real UUID
       make: mappedData.make || 'Unknown',
       model: mappedData.model || 'Unknown',
+      vin: mappedData.vin || '',
       condition: mappedData.condition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
       source_report: mappedData.source_report,
+      created_at: currentTimestamp,
+      updated_at: currentTimestamp,
       ...mappedData
     };
 
@@ -153,15 +161,22 @@ export const mapRowToInventoryItemEnhanced = (
     console.error('Critical error in enhanced mapping:', error);
     warnings.push(`Mapping error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
+    // Generate a temporary ID for the fallback item
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     // Return minimal valid inventory item
     return {
       item: {
+        id: tempId,
         make: row.make || row.Make || 'Unknown',
         model: row.model || row.Model || 'Unknown',
+        vin: row.vin || row.VIN || '',
         condition: condition === 'gm_global' ? 'new' : (condition === 'new' ? 'new' : 'used'),
         status: condition === 'gm_global' ? 'available' : 'available',
         upload_history_id: uploadId,
-        source_report: condition === 'gm_global' ? 'orders_all' : (condition === 'new' ? 'new_car_main_view' : 'merch_inv_view')
+        source_report: condition === 'gm_global' ? 'orders_all' : (condition === 'new' ? 'new_car_main_view' : 'merch_inv_view'),
+        created_at: currentTimestamp,
+        updated_at: currentTimestamp
       },
       warnings,
       dataQualityScore: 20

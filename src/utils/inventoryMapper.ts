@@ -4,75 +4,7 @@ import { extractVINField } from './field-extraction';
 import { extractOptionsFields } from './field-extraction';
 import { extractGMGlobalFields } from './field-extraction/gmGlobalEnhanced';
 import { extractVautoFields } from './field-extraction';
-
-export interface InventoryItem {
-  id?: string;
-  vin?: string;
-  stock_number?: string;
-  year?: number;
-  make: string;
-  model: string;
-  trim?: string;
-  body_style?: string;
-  color_exterior?: string;
-  color_interior?: string;
-  engine?: string;
-  transmission?: string;
-  drivetrain?: string;
-  fuel_type?: string;
-  mileage?: number;
-  price?: number;
-  msrp?: number;
-  invoice?: number;
-  rebates?: number;
-  pack?: number;
-  condition: 'new' | 'used' | 'certified';
-  status: 'available' | 'sold' | 'pending' | 'service' | 'wholesale';
-  source_report?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all';
-  rpo_codes?: string[];
-  rpo_descriptions?: string[];
-  full_option_blob?: any;
-  
-  // GM Global specific fields
-  estimated_delivery_date?: string;
-  actual_delivery_date?: string;
-  order_date?: string;
-  gm_order_number?: string;
-  customer_name?: string;
-  dealer_order_code?: string;
-  build_week?: string;
-  production_sequence?: string;
-  gm_status_description?: string;
-  delivery_method?: string;
-  priority_code?: string;
-  order_type?: string;
-  plant_code?: string;
-  ship_to_dealer_code?: string;
-  selling_dealer_code?: string;
-  order_priority?: string;
-  special_equipment?: string;
-  customer_order_number?: string;
-  trade_hold_status?: string;
-  allocation_code?: string;
-  gm_model_code?: string;
-  order_source?: string;
-  original_order_date?: string;
-  revised_delivery_date?: string;
-  delivery_variance_days?: number;
-  
-  // Other fields
-  features?: string[];
-  description?: string;
-  dealer_notes?: string;
-  images?: string[];
-  carfax_url?: string;
-  location?: string;
-  upload_history_id?: string;
-  
-  // Required timestamp fields
-  created_at: string;
-  updated_at: string;
-}
+import { InventoryItem } from '../services/inventory/types';
 
 // Define the upload condition type
 export type UploadCondition = 'new' | 'used' | 'gm_global';
@@ -186,10 +118,15 @@ export const mapRowToInventoryItem = (
       finalCondition = condition;
     }
 
+    // Generate a temporary ID for the database to use
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Ensure required fields have valid values including timestamps
     const inventoryItem: InventoryItem = {
+      id: tempId, // Temporary ID, database will assign real UUID
       make: cleanedMake!,
       model: cleanedModel!,
+      vin: mappedData.vin || '',
       condition: mappedData.condition || finalCondition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
