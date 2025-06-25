@@ -6,7 +6,7 @@ import { useMultiFileLeadUpload } from '@/hooks/useMultiFileLeadUpload';
 import LeadFileQueue from './LeadFileQueue';
 import LeadBatchUploadResult from './LeadBatchUploadResult';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import EnhancedCSVUploadGuard from '@/components/ui/enhanced-csv-upload-guard';
+import EnhancedCSVUploadGuard from '@/components/upload-leads/EnhancedCSVUploadGuard';
 
 interface MultiFileLeadUploadModalProps {
   isOpen: boolean;
