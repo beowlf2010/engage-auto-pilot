@@ -116,3 +116,8 @@ export function getLeadSourceData(source: string): LeadSourceData {
     expectedResponseTime: 6
   };
 }
+
+// Export a service object that matches what centralizedAIService expects
+export const leadSourceStrategy = {
+  getLeadSourceData
+};
