@@ -28,7 +28,7 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
   
   // Enhanced processing options
   const [updateExistingLeads, setUpdateExistingLeads] = useState(false);
-  const [allowPartialData, setAllowPartialData] = useState(true); // Default to flexible mode
+  const [allowPartialData, setAllowPartialData] = useState(true);
   const [strictPhoneValidation, setStrictPhoneValidation] = useState(false);
 
   const handleFileUpload = async (files: FileList) => {
@@ -37,16 +37,20 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
 
     try {
       setUploading(true);
+      console.log(`📁 [FILE UPLOAD] Processing file: ${file.name} (${file.size} bytes)`);
+      
       const parsed = await parseCSVFile(file);
       setCsvData(parsed);
       setCurrentStep('map');
+      
+      console.log(`✅ [FILE UPLOAD] File parsed successfully: ${parsed.rows.length} rows, ${parsed.headers.length} columns`);
       
       toast({
         title: "File uploaded successfully",
         description: `Found ${parsed.rows.length} rows with ${parsed.headers.length} columns`,
       });
     } catch (error) {
-      console.error('CSV parsing error:', error);
+      console.error('❌ [FILE UPLOAD] CSV parsing error:', error);
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Failed to parse CSV file",
@@ -58,15 +62,21 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
   };
 
   const handleMappingComplete = (fieldMapping: FieldMapping) => {
+    console.log('🗺️ [FIELD MAPPING] Field mapping completed:', fieldMapping);
     setMapping(fieldMapping);
     setCurrentStep('process');
   };
 
   const handleProcessLeads = async () => {
-    if (!csvData || !mapping) return;
+    if (!csvData || !mapping) {
+      console.error('❌ [PROCESS LEADS] Missing required data');
+      return;
+    }
 
     try {
       setUploading(true);
+      
+      console.log('🚀 [PROCESS LEADS] Starting lead processing with enhanced validation');
       
       // Enhanced processing options
       const processingOptions: EnhancedProcessingOptions = {
@@ -74,6 +84,8 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
         allowPartialData,
         strictPhoneValidation
       };
+
+      console.log('🚀 [PROCESS LEADS] Processing options:', processingOptions);
 
       // Process leads with enhanced validation
       const processResult = await processLeadsEnhanced(
@@ -85,16 +97,32 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
         processingOptions
       );
 
-      // Insert leads to database
+      console.log('📊 [PROCESS LEADS] Processing completed:', {
+        validLeads: processResult.validLeads.length,
+        duplicates: processResult.duplicates.length,
+        errors: processResult.errors.length,
+        warnings: processResult.warnings.length
+      });
+
+      // Insert leads to database with enhanced error handling
       const bulkOptions: BulkInsertOptions = {
-        updateExistingLeads
+        updateExistingLeads,
+        allowPartialData
       };
 
+      console.log('💾 [PROCESS LEADS] Starting database insertion');
+      
       const insertResult = await insertLeadsToDatabase(
         processResult.validLeads,
         processResult.uploadHistoryId,
         bulkOptions
       );
+
+      console.log('✅ [PROCESS LEADS] Database insertion completed:', {
+        successfulInserts: insertResult.successfulInserts,
+        errors: insertResult.errors.length,
+        duplicates: insertResult.duplicates.length
+      });
 
       setUploadResult({
         processResult,
@@ -103,19 +131,29 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
         successfulImports: insertResult.successfulInserts,
         failedImports: insertResult.errors.length,
         duplicateImports: insertResult.duplicates.length,
-        warnings: processResult.warnings
+        warnings: processResult.warnings,
+        processingErrors: processResult.errors
       });
 
       setCurrentStep('complete');
       
-      toast({
-        title: "Import completed",
-        description: `Successfully imported ${insertResult.successfulInserts} leads`,
-      });
+      // Show appropriate toast based on results
+      if (insertResult.successfulInserts > 0) {
+        toast({
+          title: "Import completed",
+          description: `Successfully imported ${insertResult.successfulInserts} leads`,
+        });
+      } else {
+        toast({
+          title: "Import failed",
+          description: `No leads were imported. Please check the data and try again.`,
+          variant: "destructive",
+        });
+      }
 
       onUploadComplete?.();
     } catch (error) {
-      console.error('Lead processing error:', error);
+      console.error('💥 [PROCESS LEADS] Critical error during lead processing:', error);
       toast({
         title: "Processing failed",
         description: error instanceof Error ? error.message : "Failed to process leads",
@@ -127,6 +165,7 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
   };
 
   const resetUpload = () => {
+    console.log('🔄 [RESET] Resetting upload process');
     setCsvData(null);
     setMapping(null);
     setUploadResult(null);
@@ -139,7 +178,7 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Upload Leads</h2>
           <p className="text-slate-600 mt-1">
-            Import leads from CSV files with enhanced validation and duplicate detection
+            Import leads from CSV files with enhanced validation and comprehensive error reporting
           </p>
         </div>
         {currentStep !== 'upload' && (
@@ -230,7 +269,7 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
               </div>
               
               <Button onClick={handleProcessLeads} disabled={uploading} className="w-full">
-                {uploading ? 'Processing...' : 'Process and Import Leads'}
+                {uploading ? 'Processing and Inserting...' : 'Process and Import Leads'}
               </Button>
             </div>
           </CardContent>
@@ -252,34 +291,55 @@ const UploadLeads = ({ onUploadComplete }: UploadLeadsProps) => {
                   <div className="text-2xl font-bold text-green-600">
                     {uploadResult.successfulImports}
                   </div>
-                  <div className="text-sm text-slate-600">Imported</div>
+                  <div className="text-sm text-slate-600">Successfully Imported</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-red-600">
                     {uploadResult.failedImports}
                   </div>
-                  <div className="text-sm text-slate-600">Failed</div>
+                  <div className="text-sm text-slate-600">Failed to Import</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-yellow-600">
                     {uploadResult.duplicateImports}
                   </div>
-                  <div className="text-sm text-slate-600">Duplicates</div>
+                  <div className="text-sm text-slate-600">Duplicates Skipped</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
                     {uploadResult.warnings?.length || 0}
                   </div>
-                  <div className="text-sm text-slate-600">Warnings</div>
+                  <div className="text-sm text-slate-600">Data Quality Warnings</div>
                 </div>
               </div>
 
+              {/* Show detailed results */}
               {uploadResult.warnings && uploadResult.warnings.length > 0 && (
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
                     {uploadResult.warnings.length} leads imported with data quality warnings. 
                     Review these leads for potential phone number or data issues.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {uploadResult.processingErrors && uploadResult.processingErrors.length > 0 && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {uploadResult.processingErrors.length} leads failed during processing. 
+                    Check the data format and required fields.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {uploadResult.successfulImports === 0 && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    No leads were successfully imported. Please check your data format, 
+                    ensure required fields are mapped correctly, and verify phone number formats.
                   </AlertDescription>
                 </Alert>
               )}

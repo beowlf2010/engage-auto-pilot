@@ -32,8 +32,8 @@ export interface EnhancedProcessingResult {
 
 export interface EnhancedProcessingOptions {
   updateExistingLeads?: boolean;
-  allowPartialData?: boolean; // New option for flexible imports
-  strictPhoneValidation?: boolean; // Option to control phone validation strictness
+  allowPartialData?: boolean;
+  strictPhoneValidation?: boolean;
 }
 
 // Enhanced status mapping with complete audit trail
@@ -142,7 +142,7 @@ export const processLeadsEnhanced = async (
     rowIndex: number;
   }> = [];
 
-  console.log('🔄 [ENHANCED PROCESSING] Starting enhanced lead processing with flexible validation');
+  console.log('🔄 [ENHANCED PROCESSING] Starting enhanced lead processing with comprehensive validation');
   console.log('🔄 [ENHANCED PROCESSING] Options:', { updateExistingLeads, allowPartialData, strictPhoneValidation });
   console.log('🔄 [ENHANCED PROCESSING] Sample row:', csvData.sample);
 
@@ -152,6 +152,15 @@ export const processLeadsEnhanced = async (
     try {
       // Preserve all raw upload data
       const rawUploadData: Record<string, any> = { ...row };
+      
+      console.log(`🔍 [ROW ${index + 1}] Processing row data:`, {
+        cellphone: row[mapping.cellphone],
+        dayphone: row[mapping.dayphone],
+        evephone: row[mapping.evephone],
+        firstName: row[mapping.firstName],
+        lastName: row[mapping.lastName],
+        email: row[mapping.email]
+      });
       
       // Create phone numbers with enhanced parsing and flexible validation
       const phoneResult = createPhoneNumbers(
@@ -164,6 +173,12 @@ export const processLeadsEnhanced = async (
       const phoneNumbers = phoneResult.phones;
       const phoneWarnings = phoneResult.warnings;
       const primaryPhone = getPrimaryPhone(phoneNumbers);
+      
+      console.log(`📞 [ROW ${index + 1}] Phone processing result:`, {
+        phoneCount: phoneNumbers.length,
+        primaryPhone,
+        warnings: phoneWarnings.length
+      });
       
       // Add phone warnings to the warnings array
       phoneWarnings.forEach(warning => {
@@ -300,6 +315,7 @@ export const processLeadsEnhanced = async (
       }
 
     } catch (error) {
+      console.error(`💥 [ROW ${index + 1}] Processing error:`, error);
       errors.push({
         rowIndex: index + 1,
         error: `Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -308,14 +324,11 @@ export const processLeadsEnhanced = async (
     }
   }
 
-  // Update upload history with processing results
+  // Update upload history with processing results (not final results yet)
   await updateUploadHistory(uploadHistoryId, {
     total_rows: csvData.rows.length,
-    successful_imports: validLeads.length,
-    failed_imports: errors.length,
-    duplicate_imports: duplicates.length,
     processing_errors: errors,
-    upload_status: validLeads.length === 0 ? 'failed' : 'completed'
+    upload_status: validLeads.length === 0 ? 'failed' : 'processing'
   });
 
   console.log('🎉 [ENHANCED PROCESSING] Processing complete:', {
