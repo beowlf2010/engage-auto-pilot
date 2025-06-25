@@ -2,6 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Target, TrendingUp } from 'lucide-react';
+import { getLeadSourceData } from '@/services/leadSourceStrategy';
 
 interface SourceStrategyDisplayProps {
   source: string;
@@ -16,24 +17,30 @@ const SourceStrategyDisplay: React.FC<SourceStrategyDisplayProps> = ({
   leadSourceName,
   messageIntensity = 'gentle'
 }) => {
-  const getSourceCategory = (source: string) => {
-    const lowerSource = source.toLowerCase();
-    if (lowerSource.includes('autotrader') || lowerSource.includes('cars.com')) {
-      return { category: 'High Intent', urgency: 'High', conversionProb: 85 };
+  const sourceData = getLeadSourceData(source);
+  
+  const getCategoryDisplay = (category: string) => {
+    switch (category) {
+      case 'high_intent_digital': return 'High Intent';
+      case 'value_focused': return 'Value Focused';
+      case 'credit_ready': return 'Credit Ready';
+      case 'direct_inquiry': return 'Direct Inquiry';
+      case 'social_discovery': return 'Social Media';
+      case 'referral_based': return 'Trusted Source';
+      case 'service_related': return 'Service';
+      default: return 'Other';
     }
-    if (lowerSource.includes('referral') || lowerSource.includes('repeat')) {
-      return { category: 'Trusted Source', urgency: 'Medium', conversionProb: 70 };
-    }
-    if (lowerSource.includes('facebook') || lowerSource.includes('social')) {
-      return { category: 'Social Media', urgency: 'Low', conversionProb: 45 };
-    }
-    if (lowerSource.includes('website') || lowerSource.includes('organic')) {
-      return { category: 'Organic', urgency: 'Medium', conversionProb: 60 };
-    }
-    return { category: 'Other', urgency: 'Low', conversionProb: 40 };
   };
 
-  const strategyInfo = getSourceCategory(source);
+  const getUrgencyDisplay = (urgency: string) => {
+    switch (urgency) {
+      case 'immediate': return 'Immediate';
+      case 'high': return 'High';
+      case 'medium': return 'Medium';
+      case 'low': return 'Low';
+      default: return 'Low';
+    }
+  };
   
   const getIntensityColor = (intensity: string) => {
     switch (intensity) {
@@ -46,21 +53,26 @@ const SourceStrategyDisplay: React.FC<SourceStrategyDisplayProps> = ({
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
-      case 'High': return 'bg-red-100 text-red-700';
-      case 'Medium': return 'bg-yellow-100 text-yellow-700';
-      case 'Low': return 'bg-green-100 text-green-700';
+      case 'immediate':
+      case 'high': return 'bg-red-100 text-red-700';
+      case 'medium': return 'bg-yellow-100 text-yellow-700';
+      case 'low': return 'bg-green-100 text-green-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
 
+  const categoryDisplay = getCategoryDisplay(sourceData.sourceCategory);
+  const urgencyDisplay = getUrgencyDisplay(sourceData.urgencyLevel);
+  const conversionProb = Math.round(sourceData.conversionProbability * 100);
+
   return (
     <div className="flex flex-col gap-1">
       <Badge variant="outline" className="text-xs">
-        {strategyInfo.category}
+        {categoryDisplay}
       </Badge>
       <div className="flex items-center gap-1">
-        <Badge className={`text-xs ${getUrgencyColor(strategyInfo.urgency)} border-0`}>
-          {strategyInfo.urgency}
+        <Badge className={`text-xs ${getUrgencyColor(urgencyDisplay)} border-0`}>
+          {urgencyDisplay}
         </Badge>
       </div>
       <div className="flex items-center gap-1">
@@ -70,7 +82,7 @@ const SourceStrategyDisplay: React.FC<SourceStrategyDisplayProps> = ({
       </div>
       <div className="flex items-center gap-1 text-xs text-gray-500">
         <TrendingUp className="h-3 w-3" />
-        <span>{strategyInfo.conversionProb}%</span>
+        <span>{conversionProb}%</span>
       </div>
     </div>
   );
