@@ -10,33 +10,30 @@ export interface DetailedLeadInsertResult extends LeadInsertResult {
 }
 
 export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHistoryId?: string): Promise<DetailedLeadInsertResult> => {
-  console.log(`🔍 [LEAD INSERT] Starting insertion for: ${leadData.firstName} ${leadData.lastName}`);
+  console.log(`🔍 [LEAD INSERT] Starting insertion for: ${leadData.firstName || 'Unknown'} ${leadData.lastName || 'Lead'}`);
   
   try {
-    // Validate required fields before insertion
+    // Validate required fields before insertion - more flexible approach
     const validationErrors: string[] = [];
     
+    // Allow leads with missing names now that schema supports NULL
     if (!leadData.firstName && !leadData.lastName) {
-      validationErrors.push('Missing both first and last name');
+      validationErrors.push('Lead has no name information - will be imported for manual review');
     }
     
-    if (!leadData.primaryPhone) {
-      validationErrors.push('Missing primary phone number');
-    }
-    
-    if (leadData.phoneNumbers.length === 0) {
-      validationErrors.push('No phone numbers provided');
+    if (!leadData.primaryPhone && (!leadData.phoneNumbers || leadData.phoneNumbers.length === 0)) {
+      validationErrors.push('No phone numbers provided - lead may need manual contact information');
     }
 
-    // If we have validation errors but flexible mode is enabled, proceed with warnings
+    // Log validation warnings but don't fail insertion
     if (validationErrors.length > 0) {
-      console.log(`⚠️ [LEAD INSERT] Validation warnings for ${leadData.firstName} ${leadData.lastName}:`, validationErrors);
+      console.log(`⚠️ [LEAD INSERT] Validation warnings for ${leadData.firstName || 'Unknown'} ${leadData.lastName || 'Lead'}:`, validationErrors);
     }
 
-    // Prepare lead data for insertion
+    // Prepare lead data for insertion - handle NULL names properly
     const leadInsert = {
-      first_name: leadData.firstName || '',
-      last_name: leadData.lastName || '',
+      first_name: leadData.firstName || null,
+      last_name: leadData.lastName || null,
       middle_name: leadData.middleName || null,
       email: leadData.email || null,
       email_alt: leadData.emailAlt || null,
@@ -65,7 +62,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       firstName: leadInsert.first_name, 
       lastName: leadInsert.last_name,
       email: leadInsert.email,
-      phoneCount: leadData.phoneNumbers.length,
+      phoneCount: leadData.phoneNumbers?.length || 0,
       aiFields: {
         leadStatusTypeName: leadInsert.lead_status_type_name,
         leadTypeName: leadInsert.lead_type_name,
@@ -87,7 +84,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       });
       return { 
         success: false, 
-        error: leadError.message,
+        error: `Database insertion failed: ${leadError.message}`,
         validationErrors,
         rawError: leadError
       };
@@ -116,13 +113,9 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
 
       if (phoneError) {
         console.error(`⚠️ [PHONE INSERT] Phone number insertion failed:`, phoneError);
-        // Don't fail the whole operation for phone errors in flexible mode
-        return { 
-          success: true, 
-          leadId: lead.id,
-          validationErrors: [...validationErrors, `Phone insertion failed: ${phoneError.message}`],
-          phoneNumbersInserted: 0
-        };
+        // Don't fail the whole operation for phone errors
+        validationErrors.push(`Phone insertion failed: ${phoneError.message}`);
+        phoneNumbersInserted = 0;
       } else {
         phoneNumbersInserted = phoneData?.length || 0;
         console.log(`✅ [PHONE INSERT] Successfully inserted ${phoneNumbersInserted} phone numbers`);
@@ -140,9 +133,9 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
     console.error(`💥 [LEAD INSERT] Unexpected error:`, error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Unknown database error',
       rawError: error,
-      validationErrors: ['Unexpected insertion error']
+      validationErrors: ['Critical insertion error - please check data format']
     };
   }
 };

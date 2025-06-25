@@ -19,7 +19,7 @@ export interface EnhancedProcessingResult {
   warnings: Array<{
     rowIndex: number;
     warning: string;
-    warningType: 'phone_validation' | 'data_quality' | 'formatting';
+    warningType: 'phone_validation' | 'data_quality' | 'formatting' | 'missing_names';
     rawData?: Record<string, any>;
   }>;
   uploadHistoryId: string;
@@ -122,7 +122,7 @@ export const processLeadsEnhanced = async (
   fileType: string,
   options: EnhancedProcessingOptions = {}
 ): Promise<EnhancedProcessingResult> => {
-  // Default options - flexible by default for better import success rates
+  // Default options - very flexible to handle real-world data
   const {
     updateExistingLeads = false,
     allowPartialData = true,
@@ -142,7 +142,7 @@ export const processLeadsEnhanced = async (
     rowIndex: number;
   }> = [];
 
-  console.log('🔄 [ENHANCED PROCESSING] Starting enhanced lead processing with comprehensive validation');
+  console.log('🔄 [ENHANCED PROCESSING] Starting enhanced lead processing with flexible validation');
   console.log('🔄 [ENHANCED PROCESSING] Options:', { updateExistingLeads, allowPartialData, strictPhoneValidation });
   console.log('🔄 [ENHANCED PROCESSING] Sample row:', csvData.sample);
 
@@ -190,7 +190,7 @@ export const processLeadsEnhanced = async (
         });
       });
       
-      // Enhanced lead validation logic
+      // Enhanced lead validation logic - much more flexible
       const hasUsablePhone = hasUsablePhoneNumber(phoneNumbers);
       
       if (!hasUsablePhone && !allowPartialData) {
@@ -209,26 +209,17 @@ export const processLeadsEnhanced = async (
         });
       }
 
-      // Check for required fields (more flexible)
-      const firstName = row[mapping.firstName] || '';
-      const lastName = row[mapping.lastName] || '';
+      // Handle names more flexibly - now that schema allows NULL
+      const firstName = row[mapping.firstName] ? String(row[mapping.firstName]).trim() : null;
+      const lastName = row[mapping.lastName] ? String(row[mapping.lastName]).trim() : null;
       
       if (!firstName && !lastName) {
-        if (allowPartialData) {
-          warnings.push({
-            rowIndex: index + 1,
-            warning: 'Lead missing both first and last name - manual review required',
-            warningType: 'data_quality',
-            rawData: rawUploadData
-          });
-        } else {
-          errors.push({
-            rowIndex: index + 1,
-            error: 'Lead must have at least first name or last name',
-            rawData: rawUploadData
-          });
-          continue;
-        }
+        warnings.push({
+          rowIndex: index + 1,
+          warning: 'Lead has no name information - imported for manual review',
+          warningType: 'missing_names',
+          rawData: rawUploadData
+        });
       }
 
       // Combine vehicle information
@@ -296,7 +287,7 @@ export const processLeadsEnhanced = async (
         dataQualityScore: calculateDataQualityScore(phoneNumbers, firstName, lastName, row[mapping.email])
       };
 
-      console.log(`🔍 [ROW ${index + 1}] Processed lead: ${newLead.firstName} ${newLead.lastName} (Quality: ${newLead.dataQualityScore})`);
+      console.log(`🔍 [ROW ${index + 1}] Processed lead: ${newLead.firstName || 'Unknown'} ${newLead.lastName || 'Lead'} (Quality: ${newLead.dataQualityScore})`);
 
       // Check for duplicates against already processed leads
       const duplicateCheck = checkForDuplicate(newLead, validLeads);
@@ -350,7 +341,7 @@ export const processLeadsEnhanced = async (
 };
 
 // Helper function to calculate data quality score
-function calculateDataQualityScore(phoneNumbers: any[], firstName: string, lastName: string, email: string): number {
+function calculateDataQualityScore(phoneNumbers: any[], firstName: string | null, lastName: string | null, email: string): number {
   let score = 0;
   
   // Phone number quality (40% of score)
@@ -358,9 +349,10 @@ function calculateDataQualityScore(phoneNumbers: any[], firstName: string, lastN
   if (activePhones.length > 0) score += 40;
   else if (phoneNumbers.length > 0) score += 20; // Has phones but needs review
   
-  // Name quality (30% of score)
+  // Name quality (30% of score) - now handles NULL names
   if (firstName && lastName) score += 30;
   else if (firstName || lastName) score += 15;
+  // No penalty for missing names since they're now allowed
   
   // Email quality (20% of score)
   if (email && email.includes('@')) score += 20;
@@ -368,7 +360,8 @@ function calculateDataQualityScore(phoneNumbers: any[], firstName: string, lastN
   // Multiple contact methods bonus (10% of score)
   const contactMethods = [
     phoneNumbers.length > 0,
-    email && email.includes('@')
+    email && email.includes('@'),
+    firstName || lastName // At least some name info
   ].filter(Boolean).length;
   
   if (contactMethods >= 2) score += 10;
