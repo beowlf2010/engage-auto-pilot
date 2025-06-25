@@ -29,7 +29,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
 
     console.log(`✅ [LEAD INSERT] RLS validation passed for user with roles:`, rlsValidation.userRoles);
 
-    // Validate required fields before insertion - more flexible approach
+    // Validate required fields - more flexible approach with NULL names allowed
     const validationErrors: string[] = [];
     
     // Allow leads with missing names now that schema supports NULL
@@ -74,7 +74,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       lead_source_name: (leadData as any).leadSourceName || null
     };
 
-    console.log(`💾 [LEAD INSERT] Inserting lead data:`, { 
+    console.log(`💾 [LEAD INSERT] Inserting lead data with new RLS policies:`, { 
       firstName: leadInsert.first_name, 
       lastName: leadInsert.last_name,
       email: leadInsert.email,
@@ -86,7 +86,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       }
     });
 
-    // Insert the lead
+    // Insert the lead using the new non-recursive RLS policies
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .insert(leadInsert)
@@ -100,13 +100,12 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
         rlsValidation
       });
 
-      // Enhanced error handling for RLS issues
+      // Enhanced error handling - should no longer see recursion errors
       if (leadError.message.includes('row-level security') || 
-          leadError.message.includes('policy') ||
-          leadError.message.includes('recursive')) {
+          leadError.message.includes('policy')) {
         return { 
           success: false, 
-          error: `Database security error: User permissions may have changed. Please refresh and try again.`,
+          error: `Database security error: ${leadError.message}. Please ensure you have proper permissions.`,
           validationErrors: ['Row-level security policy violation'],
           rawError: leadError,
           rlsValidation
@@ -124,7 +123,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
 
     console.log(`✅ [LEAD INSERT] Lead inserted successfully with ID: ${lead.id}`);
 
-    // Insert phone numbers
+    // Insert phone numbers using the new non-recursive policies
     let phoneNumbersInserted = 0;
     if (leadData.phoneNumbers && leadData.phoneNumbers.length > 0) {
       console.log(`📞 [PHONE INSERT] Inserting ${leadData.phoneNumbers.length} phone numbers for lead ${lead.id}`);

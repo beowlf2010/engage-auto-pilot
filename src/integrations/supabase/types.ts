@@ -4860,6 +4860,10 @@ export type Database = {
         Args: { p_vin: string; p_stock_number: string }
         Returns: number
       }
+      can_manage_leads: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       classify_deal_by_stock: {
         Args: { stock_number: string }
         Returns: string

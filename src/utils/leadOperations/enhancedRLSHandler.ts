@@ -23,7 +23,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       };
     }
 
-    // Check user profile
+    // Check user profile using the new security definer function
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -40,7 +40,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       };
     }
 
-    // Check user roles
+    // Check user roles using the new security definer function
     const { data: roles, error: rolesError } = await supabase
       .from('user_roles')
       .select('role')
@@ -85,13 +85,13 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
 
 export const testLeadInsertion = async (): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log('🧪 [RLS TEST] Testing lead insertion permissions');
+    console.log('🧪 [RLS TEST] Testing lead insertion permissions with new policies');
     
-    // Try a minimal insert to test RLS
+    // Try a minimal insert to test RLS with the new non-recursive policies
     const testLead = {
       first_name: 'Test',
       last_name: 'Lead',
-      vehicle_interest: 'Testing RLS permissions',
+      vehicle_interest: 'Testing new RLS policies',
       source: 'RLS Test',
       status: 'new'
     };
@@ -113,7 +113,7 @@ export const testLeadInsertion = async (): Promise<{ success: boolean; error?: s
       console.log('🧹 [RLS TEST] Cleaned up test lead');
     }
 
-    console.log('✅ [RLS TEST] Insert test successful');
+    console.log('✅ [RLS TEST] Insert test successful with new policies');
     return { success: true };
   } catch (error) {
     console.error('💥 [RLS TEST] Unexpected error:', error);

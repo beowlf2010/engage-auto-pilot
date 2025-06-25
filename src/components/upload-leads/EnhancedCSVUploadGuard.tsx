@@ -27,13 +27,13 @@ const EnhancedCSVUploadGuard = ({ children, onRetry }: EnhancedCSVUploadGuardPro
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 animate-pulse" />
-            Setting up user permissions...
+            Verifying upload permissions...
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm text-gray-600">Configuring upload permissions...</span>
+            <span className="text-sm text-gray-600">Checking RLS policies and user permissions...</span>
           </div>
         </CardContent>
       </Card>
@@ -116,7 +116,7 @@ const EnhancedCSVUploadGuard = ({ children, onRetry }: EnhancedCSVUploadGuardPro
       <Alert>
         <CheckCircle className="h-4 w-4 text-green-600" />
         <AlertDescription className="text-green-700">
-          Upload permissions verified. You can proceed with CSV uploads.
+          Upload permissions verified with new RLS policies. You can proceed with CSV uploads.
         </AlertDescription>
       </Alert>
       {children}
