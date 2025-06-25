@@ -75,6 +75,7 @@ export const restoreRecentUsedInventory = async () => {
       })
       .in('upload_history_id', uploadIds)
       .eq('status', 'sold')
+      .eq('condition', 'used') // Only restore used vehicles
       .neq('source_report', 'orders_all') // Don't touch GM Global orders
       .select('id, stock_number, make, model, year');
 
@@ -87,6 +88,61 @@ export const restoreRecentUsedInventory = async () => {
   } catch (error) {
     console.error('Error restoring recent used inventory:', error);
     throw error;
+  }
+};
+
+export const validateUploadBeforeCleanup = async (uploadIds: string[]) => {
+  try {
+    console.log('🔍 Validating uploads before cleanup...');
+    
+    if (!uploadIds || uploadIds.length === 0) {
+      console.warn('⚠️ No upload IDs provided for validation');
+      return { isValid: false, reason: 'No upload IDs provided' };
+    }
+
+    // Check each upload to ensure it actually processed vehicles
+    for (const uploadId of uploadIds) {
+      const { data: uploadRecord, error: uploadError } = await supabase
+        .from('upload_history')
+        .select('successful_imports, total_rows, original_filename')
+        .eq('id', uploadId)
+        .single();
+
+      if (uploadError) {
+        console.error(`Error checking upload ${uploadId}:`, uploadError);
+        continue;
+      }
+
+      // Check that vehicles were actually inserted
+      const { data: vehicleCount, error: countError } = await supabase
+        .from('inventory')
+        .select('id', { count: 'exact' })
+        .eq('upload_history_id', uploadId);
+
+      if (countError) {
+        console.error(`Error counting vehicles for upload ${uploadId}:`, countError);
+        continue;
+      }
+
+      const actualVehicleCount = vehicleCount?.length || 0;
+      const reportedImports = uploadRecord?.successful_imports || 0;
+
+      console.log(`Upload ${uploadRecord?.original_filename}: reported ${reportedImports}, actual ${actualVehicleCount}`);
+
+      // If there's a significant mismatch, don't proceed with cleanup
+      if (reportedImports > 0 && actualVehicleCount === 0) {
+        console.warn(`⚠️ Upload ${uploadId} reported ${reportedImports} imports but no vehicles found in inventory`);
+        return { 
+          isValid: false, 
+          reason: `Upload processing failed - reported ${reportedImports} imports but no vehicles found`
+        };
+      }
+    }
+
+    return { isValid: true, reason: 'All uploads validated successfully' };
+  } catch (error) {
+    console.error('Error validating uploads:', error);
+    return { isValid: false, reason: 'Error during validation' };
   }
 };
 
@@ -108,6 +164,18 @@ export const cleanupInventoryData = async () => {
       return { success: true, message: 'No uploads from today found' };
     }
 
+    // CRITICAL: Validate uploads before proceeding with cleanup
+    const validation = await validateUploadBeforeCleanup(todayUploadIds);
+    if (!validation.isValid) {
+      console.error('🚨 Upload validation failed:', validation.reason);
+      toast({
+        title: "Cleanup Blocked",
+        description: `Cleanup prevented due to upload issues: ${validation.reason}`,
+        variant: "destructive"
+      });
+      return { success: false, message: `Cleanup blocked: ${validation.reason}` };
+    }
+
     console.log('Today upload IDs:', todayUploadIds);
     console.log('Yesterday upload IDs:', yesterdayUploadIds);
 
@@ -127,7 +195,7 @@ export const cleanupInventoryData = async () => {
     if (yesterdayUploadIds.length > 0) {
       const { data: yesterdayVehicles, error: yesterdayError } = await supabase
         .from('inventory')
-        .select('id, vin, stock_number, make, model, year, source_report')
+        .select('id, vin, stock_number, make, model, year, source_report, condition')
         .in('upload_history_id', yesterdayUploadIds as string[])
         .eq('status', 'available')
         .neq('source_report', 'orders_all'); // Don't mark GM Global orders as sold
@@ -151,10 +219,19 @@ export const cleanupInventoryData = async () => {
       });
 
       // Find vehicles from yesterday that are not in today's upload
+      // IMPORTANT: Only mark vehicles as sold if they are NOT used inventory from recent uploads
       vehiclesToMarkSold = yesterdayVehicles.filter(vehicle => {
         const hasVIN = vehicle.vin && todayVINs.has(vehicle.vin);
         const hasStock = vehicle.stock_number && todayStockNumbers.has(vehicle.stock_number);
-        return !hasVIN && !hasStock; // Not found in today's upload
+        const notFound = !hasVIN && !hasStock;
+        
+        // Additional safety: Don't mark used vehicles as sold if they're from recent uploads
+        if (notFound && vehicle.condition === 'used') {
+          console.log(`⚠️ Skipping used vehicle ${vehicle.make} ${vehicle.model} (${vehicle.stock_number}) - preventing used inventory cleanup`);
+          return false;
+        }
+        
+        return notFound;
       });
 
       console.log(`Found ${vehiclesToMarkSold.length} vehicles from yesterday that are missing from today's upload`);
@@ -218,7 +295,7 @@ export const performInventoryCleanup = async () => {
     // First, restore any recently uploaded used inventory that was incorrectly marked as sold
     const restoreResult = await restoreRecentUsedInventory();
     
-    // Then run the new "today vs yesterday" cleanup logic
+    // Then run the new "today vs yesterday" cleanup logic with validation
     const cleanupResult = await cleanupInventoryData();
     
     if (restoreResult.restored > 0) {
