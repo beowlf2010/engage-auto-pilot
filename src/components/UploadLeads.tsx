@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import CSVFieldMapper from "./CSVFieldMapper";
@@ -11,9 +12,14 @@ import { processLeadsEnhanced } from "./upload-leads/enhancedProcessLeads";
 import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
 import { 
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 interface UploadLeadsProps {
   user: {
@@ -28,6 +34,9 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
   const [showMapper, setShowMapper] = useState(false);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [updateExistingLeads, setUpdateExistingLeads] = useState(false);
+  const [allowPartialData, setAllowPartialData] = useState(true); // Default to flexible mode
+  const [strictPhoneValidation, setStrictPhoneValidation] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const { toast } = useToast();
 
   // Check permissions
@@ -88,22 +97,27 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
     
     try {
       console.log('Starting enhanced lead processing with mapping:', mapping);
-      console.log('Update mode:', updateExistingLeads ? 'enabled' : 'disabled');
+      console.log('Import options:', { updateExistingLeads, allowPartialData, strictPhoneValidation });
       
-      // Process the data with enhanced data preservation and update option
+      // Process the data with enhanced data preservation and flexible validation
       const processingResult = await processLeadsEnhanced(
         csvData, 
         mapping,
         currentFile.name,
         currentFile.size,
         currentFile.type,
-        { updateExistingLeads }
+        { 
+          updateExistingLeads,
+          allowPartialData,
+          strictPhoneValidation
+        }
       );
       
       console.log('Enhanced processing complete:', {
         validLeads: processingResult.validLeads.length,
         duplicates: processingResult.duplicates.length,
         errors: processingResult.errors.length,
+        warnings: processingResult.warnings.length,
         uploadHistoryId: processingResult.uploadHistoryId
       });
 
@@ -138,20 +152,25 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
         successfulUpdates: insertResult.successfulUpdates,
         errors: processingResult.errors.length + insertResult.errors.length,
         duplicates: allDuplicates.length,
+        warnings: processingResult.warnings.length,
         fileName: currentFile.name,
         uploadHistoryId: processingResult.uploadHistoryId,
         phoneNumberStats: {
           cellOnly: processingResult.validLeads.filter(l => l.phoneNumbers.length === 1 && l.phoneNumbers[0].type === 'cell').length,
           multipleNumbers: processingResult.validLeads.filter(l => l.phoneNumbers.length > 1).length,
-          dayPrimary: processingResult.validLeads.filter(l => l.phoneNumbers.length > 0 && l.phoneNumbers[0].type === 'day').length
+          dayPrimary: processingResult.validLeads.filter(l => l.phoneNumbers.length > 0 && l.phoneNumbers[0].type === 'day').length,
+          needsReview: processingResult.validLeads.filter(l => l.phoneNumbers.some(p => p.status === 'needs_review')).length
         },
         duplicateDetails: allDuplicates,
         dataQualityMetrics: {
           averageQualityScore: processingResult.validLeads.length > 0 
-            ? processingResult.validLeads.reduce((sum, lead) => sum + ((lead as any).dataSourceQualityScore || 0), 0) / processingResult.validLeads.length 
+            ? processingResult.validLeads.reduce((sum, lead) => sum + ((lead as any).dataQualityScore || 0), 0) / processingResult.validLeads.length 
             : 0,
-          statusMappingCount: processingResult.validLeads.filter(lead => (lead as any).originalStatus && (lead as any).originalStatus !== lead.status).length
-        }
+          statusMappingCount: processingResult.validLeads.filter(lead => (lead as any).originalStatus && (lead as any).originalStatus !== lead.status).length,
+          leadsWithValidPhones: processingResult.validLeads.filter(lead => (lead as any).hasValidPhone).length,
+          leadsNeedingPhoneReview: processingResult.validLeads.filter(lead => !(lead as any).hasValidPhone).length
+        },
+        warningDetails: processingResult.warnings
       };
       
       setUploadResult(result);
@@ -160,23 +179,28 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
       
       console.log('Enhanced upload process complete:', result);
       
+      // Enhanced success messaging
+      let successMessage = '';
       if (updateExistingLeads && insertResult.successfulUpdates > 0) {
-        toast({
-          title: "Upload and update completed!",
-          description: `${insertResult.successfulInserts} leads imported, ${insertResult.successfulUpdates} leads updated`,
-        });
-      } else if (allDuplicates.length > 0) {
-        toast({
-          title: "Upload completed with duplicates detected",
-          description: `${insertResult.successfulInserts} leads imported, ${allDuplicates.length} duplicates skipped`,
-          variant: "default"
-        });
+        successMessage = `${insertResult.successfulInserts} leads imported, ${insertResult.successfulUpdates} leads updated`;
+        if (processingResult.warnings.length > 0) {
+          successMessage += `, ${processingResult.warnings.length} warnings`;
+        }
+      } else if (allDuplicates.length > 0 || processingResult.warnings.length > 0) {
+        successMessage = `${insertResult.successfulInserts} leads imported`;
+        const issues = [];
+        if (allDuplicates.length > 0) issues.push(`${allDuplicates.length} duplicates skipped`);
+        if (processingResult.warnings.length > 0) issues.push(`${processingResult.warnings.length} warnings`);
+        if (issues.length > 0) successMessage += ` with ${issues.join(', ')}`;
       } else {
-        toast({
-          title: "Upload successful!",
-          description: `${insertResult.successfulInserts} leads imported with enhanced data preservation`,
-        });
+        successMessage = `${insertResult.successfulInserts} leads imported successfully`;
       }
+      
+      toast({
+        title: processingResult.warnings.length > 0 ? "Upload completed with warnings" : "Upload successful!",
+        description: successMessage,
+        variant: processingResult.warnings.length > 0 ? "default" : "default"
+      });
 
       if (insertResult.errors.length > 0) {
         console.error('Database operation errors:', insertResult.errors);
@@ -218,30 +242,74 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
           </div>
         </div>
 
-        {/* Update Existing Leads Option */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              id="updateExistingLeadsMapper"
-              checked={updateExistingLeads}
-              onChange={(e) => setUpdateExistingLeads(e.target.checked)}
-              disabled={uploading}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="updateExistingLeadsMapper" className="text-sm font-medium text-blue-900">
-              Update existing leads with new information
-            </label>
-          </div>
-          <p className="text-xs text-blue-700 mt-2 ml-7">
-            When enabled, leads that match existing records will be updated with any missing information from the upload.
-          </p>
-        </div>
-        
-        <CSVFieldMapper 
-          csvHeaders={csvData.headers}
+        {/* Import Options Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Settings className="w-5 h-5" />
+              <span>Import Options</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="allowPartialData" 
+                checked={allowPartialData}
+                onCheckedChange={setAllowPartialData}
+              />
+              <Label htmlFor="allowPartialData" className="text-sm">
+                Allow flexible imports (recommended) - Import leads even with incomplete phone numbers for manual review
+              </Label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="updateExistingLeads" 
+                checked={updateExistingLeads}
+                onCheckedChange={setUpdateExistingLeads}
+              />
+              <Label htmlFor="updateExistingLeads" className="text-sm">
+                Update existing leads if duplicates are found
+              </Label>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              className="text-xs"
+            >
+              {showAdvancedOptions ? 'Hide' : 'Show'} Advanced Options
+            </Button>
+
+            {showAdvancedOptions && (
+              <>
+                <Separator />
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="strictPhoneValidation" 
+                    checked={strictPhoneValidation}
+                    onCheckedChange={setStrictPhoneValidation}
+                  />
+                  <Label htmlFor="strictPhoneValidation" className="text-sm">
+                    Strict phone validation (only US 10/11 digit numbers)
+                  </Label>
+                </div>
+              </>
+            )}
+
+            <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+              <strong>Recommendation:</strong> Keep "Allow flexible imports" enabled to maximize import success. 
+              Leads with data quality issues will be flagged for manual review rather than rejected.
+            </div>
+          </CardContent>
+        </Card>
+
+        <CSVFieldMapper
+          headers={csvData.headers}
           sampleData={csvData.sample}
           onMappingComplete={handleMappingComplete}
+          uploading={uploading}
         />
       </div>
     );
@@ -249,32 +317,28 @@ const UploadLeads = ({ user }: UploadLeadsProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-slate-800">Upload Leads</h1>
         <p className="text-slate-600 mt-1">
-          Import leads from CSV or Excel files with enhanced data preservation and comprehensive tracking
+          Import leads from CSV, Excel, or text files with enhanced validation and flexible processing
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upload Area */}
-        <div>
-          <UploadArea onFilesSelected={handleFiles} uploading={uploading} />
-          
-          {/* Upload Result */}
-          {uploadResult && (
-            <UploadResult result={uploadResult} />
-          )}
+        <div className="space-y-6">
+          <UploadArea onFilesSelected={handleFiles} />
+          <ImportFeaturesCard />
         </div>
-
-        {/* Instructions & Template */}
+        
         <div className="space-y-6">
           <CSVTemplateCard />
           <PhonePriorityCard />
-          <ImportFeaturesCard />
         </div>
       </div>
+
+      {uploadResult && (
+        <UploadResult result={uploadResult} />
+      )}
     </div>
   );
 };

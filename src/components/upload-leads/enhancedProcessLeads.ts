@@ -1,5 +1,5 @@
 
-import { createPhoneNumbers, getPrimaryPhone } from "@/utils/phoneUtils";
+import { createPhoneNumbers, getPrimaryPhone, hasUsablePhoneNumber } from "@/utils/phoneUtils";
 import { checkForDuplicate, ProcessedLead } from "./duplicateDetection";
 import { createUploadHistory, updateUploadHistory } from "@/utils/leadOperations/uploadHistoryService";
 
@@ -16,6 +16,12 @@ export interface EnhancedProcessingResult {
     error: string;
     rawData?: Record<string, any>;
   }>;
+  warnings: Array<{
+    rowIndex: number;
+    warning: string;
+    warningType: 'phone_validation' | 'data_quality' | 'formatting';
+    rawData?: Record<string, any>;
+  }>;
   uploadHistoryId: string;
   updates: Array<{
     leadId: string;
@@ -26,6 +32,8 @@ export interface EnhancedProcessingResult {
 
 export interface EnhancedProcessingOptions {
   updateExistingLeads?: boolean;
+  allowPartialData?: boolean; // New option for flexible imports
+  strictPhoneValidation?: boolean; // Option to control phone validation strictness
 }
 
 // Enhanced status mapping with complete audit trail
@@ -90,12 +98,6 @@ const mapStatusToSystemStatus = (inputStatus: string, rowIndex: number): {
 // Function to safely extract AI strategy fields from CSV row with improved mapping
 const extractAIStrategyFields = (row: Record<string, any>, mapping: any) => {
   console.log('🧠 [AI STRATEGY] Extracting AI strategy fields from row');
-  console.log('🧠 [AI STRATEGY] Available CSV columns:', Object.keys(row));
-  console.log('🧠 [AI STRATEGY] Field mapping:', {
-    leadStatusTypeName: mapping.leadStatusTypeName,
-    leadTypeName: mapping.leadTypeName,
-    leadSourceName: mapping.leadSourceName
-  });
   
   // Extract values using the mapping configuration
   const leadStatusTypeName = mapping.leadStatusTypeName && row[mapping.leadStatusTypeName] ? 
@@ -104,12 +106,6 @@ const extractAIStrategyFields = (row: Record<string, any>, mapping: any) => {
     String(row[mapping.leadTypeName]).trim() : null;
   const leadSourceName = mapping.leadSourceName && row[mapping.leadSourceName] ? 
     String(row[mapping.leadSourceName]).trim() : null;
-  
-  console.log('🧠 [AI STRATEGY] Extracted values:', {
-    leadStatusTypeName,
-    leadTypeName,
-    leadSourceName
-  });
   
   return {
     leadStatusTypeName: leadStatusTypeName || null,
@@ -126,22 +122,29 @@ export const processLeadsEnhanced = async (
   fileType: string,
   options: EnhancedProcessingOptions = {}
 ): Promise<EnhancedProcessingResult> => {
+  // Default options - flexible by default for better import success rates
+  const {
+    updateExistingLeads = false,
+    allowPartialData = true,
+    strictPhoneValidation = false
+  } = options;
+
   // Create upload history record
   const uploadHistoryId = await createUploadHistory(fileName, fileSize, fileType, mapping);
   
   const validLeads: ProcessedLead[] = [];
   const duplicates: EnhancedProcessingResult['duplicates'] = [];
   const errors: EnhancedProcessingResult['errors'] = [];
+  const warnings: EnhancedProcessingResult['warnings'] = [];
   const updates: Array<{
     leadId: string;
     updatedFields: string[];
     rowIndex: number;
   }> = [];
 
-  console.log('🔄 [ENHANCED PROCESSING] Starting enhanced lead processing with AI strategy field mapping');
-  console.log('🔄 [ENHANCED PROCESSING] Field mapping configuration:', mapping);
+  console.log('🔄 [ENHANCED PROCESSING] Starting enhanced lead processing with flexible validation');
+  console.log('🔄 [ENHANCED PROCESSING] Options:', { updateExistingLeads, allowPartialData, strictPhoneValidation });
   console.log('🔄 [ENHANCED PROCESSING] Sample row:', csvData.sample);
-  console.log('🔄 [ENHANCED PROCESSING] Update mode:', options.updateExistingLeads ? 'enabled' : 'disabled');
 
   for (let index = 0; index < csvData.rows.length; index++) {
     const row = csvData.rows[index];
@@ -150,23 +153,67 @@ export const processLeadsEnhanced = async (
       // Preserve all raw upload data
       const rawUploadData: Record<string, any> = { ...row };
       
-      // Create phone numbers with priority
-      const phoneNumbers = createPhoneNumbers(
+      // Create phone numbers with enhanced parsing and flexible validation
+      const phoneResult = createPhoneNumbers(
         row[mapping.cellphone] || '',
         row[mapping.dayphone] || '',
-        row[mapping.evephone] || ''
+        row[mapping.evephone] || '',
+        allowPartialData
       );
 
+      const phoneNumbers = phoneResult.phones;
+      const phoneWarnings = phoneResult.warnings;
       const primaryPhone = getPrimaryPhone(phoneNumbers);
       
-      // Skip leads without valid phone numbers but preserve error details
-      if (!primaryPhone) {
+      // Add phone warnings to the warnings array
+      phoneWarnings.forEach(warning => {
+        warnings.push({
+          rowIndex: index + 1,
+          warning,
+          warningType: 'phone_validation',
+          rawData: rawUploadData
+        });
+      });
+      
+      // Enhanced lead validation logic
+      const hasUsablePhone = hasUsablePhoneNumber(phoneNumbers);
+      
+      if (!hasUsablePhone && !allowPartialData) {
         errors.push({
           rowIndex: index + 1,
           error: 'No valid phone number found',
           rawData: rawUploadData
         });
         continue;
+      } else if (!hasUsablePhone && allowPartialData) {
+        warnings.push({
+          rowIndex: index + 1,
+          warning: 'Lead imported without valid phone number - manual review required',
+          warningType: 'phone_validation',
+          rawData: rawUploadData
+        });
+      }
+
+      // Check for required fields (more flexible)
+      const firstName = row[mapping.firstName] || '';
+      const lastName = row[mapping.lastName] || '';
+      
+      if (!firstName && !lastName) {
+        if (allowPartialData) {
+          warnings.push({
+            rowIndex: index + 1,
+            warning: 'Lead missing both first and last name - manual review required',
+            warningType: 'data_quality',
+            rawData: rawUploadData
+          });
+        } else {
+          errors.push({
+            rowIndex: index + 1,
+            error: 'Lead must have at least first name or last name',
+            rawData: rawUploadData
+          });
+          continue;
+        }
       }
 
       // Combine vehicle information
@@ -197,9 +244,11 @@ export const processLeadsEnhanced = async (
         leadStatusTypeName?: string;
         leadTypeName?: string;
         leadSourceName?: string;
+        hasValidPhone: boolean;
+        dataQualityScore: number;
       } = {
-        firstName: row[mapping.firstName] || '',
-        lastName: row[mapping.lastName] || '',
+        firstName,
+        lastName,
         middleName: row[mapping.middleName] || '',
         phoneNumbers,
         primaryPhone,
@@ -223,44 +272,31 @@ export const processLeadsEnhanced = async (
         rawUploadData,
         originalStatus: row[mapping.status] || '',
         statusMappingLog: statusMapping.mappingLog,
-        // AI strategy fields - properly extracted using mapping
+        // AI strategy fields
         leadStatusTypeName: aiStrategyFields.leadStatusTypeName,
         leadTypeName: aiStrategyFields.leadTypeName,
-        leadSourceName: aiStrategyFields.leadSourceName
+        leadSourceName: aiStrategyFields.leadSourceName,
+        // Data quality metrics
+        hasValidPhone: hasUsablePhone,
+        dataQualityScore: calculateDataQualityScore(phoneNumbers, firstName, lastName, row[mapping.email])
       };
 
-      console.log(`🔍 [ROW ${index + 1}] Processed lead: ${newLead.firstName} ${newLead.lastName}`);
-      console.log(`🧠 [ROW ${index + 1}] AI Strategy Fields:`, {
-        leadStatusTypeName: newLead.leadStatusTypeName,
-        leadTypeName: newLead.leadTypeName,
-        leadSourceName: newLead.leadSourceName
-      });
+      console.log(`🔍 [ROW ${index + 1}] Processed lead: ${newLead.firstName} ${newLead.lastName} (Quality: ${newLead.dataQualityScore})`);
 
       // Check for duplicates against already processed leads
       const duplicateCheck = checkForDuplicate(newLead, validLeads);
       
       if (duplicateCheck.isDuplicate && duplicateCheck.conflictingLead) {
-        if (options.updateExistingLeads) {
-          // In update mode, we still track within-file duplicates but don't update them
-          duplicates.push({
-            lead: newLead,
-            duplicateType: duplicateCheck.duplicateType!,
-            conflictingLead: duplicateCheck.conflictingLead,
-            rowIndex: index + 1
-          });
-          console.log(`⚠️ [ROW ${index + 1}] Within-file duplicate found: ${duplicateCheck.duplicateType} conflict`);
-        } else {
-          duplicates.push({
-            lead: newLead,
-            duplicateType: duplicateCheck.duplicateType!,
-            conflictingLead: duplicateCheck.conflictingLead,
-            rowIndex: index + 1
-          });
-          console.log(`⚠️ [ROW ${index + 1}] Duplicate found: ${duplicateCheck.duplicateType} conflict`);
-        }
+        duplicates.push({
+          lead: newLead,
+          duplicateType: duplicateCheck.duplicateType!,
+          conflictingLead: duplicateCheck.conflictingLead,
+          rowIndex: index + 1
+        });
+        console.log(`⚠️ [ROW ${index + 1}] Duplicate found: ${duplicateCheck.duplicateType} conflict`);
       } else {
         validLeads.push(newLead);
-        console.log(`✅ [ROW ${index + 1}] Valid lead processed with AI fields`);
+        console.log(`✅ [ROW ${index + 1}] Valid lead processed`);
       }
 
     } catch (error) {
@@ -279,21 +315,50 @@ export const processLeadsEnhanced = async (
     failed_imports: errors.length,
     duplicate_imports: duplicates.length,
     processing_errors: errors,
-    upload_status: errors.length === csvData.rows.length ? 'failed' : 'completed'
+    upload_status: validLeads.length === 0 ? 'failed' : 'completed'
   });
 
   console.log('🎉 [ENHANCED PROCESSING] Processing complete:', {
     validLeads: validLeads.length,
     duplicates: duplicates.length,
     errors: errors.length,
-    aiFieldsExtracted: validLeads.filter(l => (l as any).leadTypeName || (l as any).leadStatusTypeName || (l as any).leadSourceName).length
+    warnings: warnings.length,
+    averageQualityScore: validLeads.length > 0 ? validLeads.reduce((sum, l) => sum + (l as any).dataQualityScore, 0) / validLeads.length : 0
   });
 
   return {
     validLeads,
     duplicates,
     errors,
+    warnings,
     uploadHistoryId,
     updates
   };
 };
+
+// Helper function to calculate data quality score
+function calculateDataQualityScore(phoneNumbers: any[], firstName: string, lastName: string, email: string): number {
+  let score = 0;
+  
+  // Phone number quality (40% of score)
+  const activePhones = phoneNumbers.filter(p => p.status === 'active');
+  if (activePhones.length > 0) score += 40;
+  else if (phoneNumbers.length > 0) score += 20; // Has phones but needs review
+  
+  // Name quality (30% of score)
+  if (firstName && lastName) score += 30;
+  else if (firstName || lastName) score += 15;
+  
+  // Email quality (20% of score)
+  if (email && email.includes('@')) score += 20;
+  
+  // Multiple contact methods bonus (10% of score)
+  const contactMethods = [
+    phoneNumbers.length > 0,
+    email && email.includes('@')
+  ].filter(Boolean).length;
+  
+  if (contactMethods >= 2) score += 10;
+  
+  return Math.min(100, score);
+}
