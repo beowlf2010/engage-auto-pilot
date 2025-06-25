@@ -1,12 +1,6 @@
 
 // Lead source strategy service for categorizing and analyzing lead sources
-export interface LeadSourceData {
-  sourceCategory: string;
-  urgencyLevel: string;
-  conversionProbability: number;
-  messageIntensity: string;
-  expectedResponseTime: number;
-}
+import { LeadSourceData, LeadSourceCategory } from '@/types/leadSource';
 
 export function getLeadSourceData(source: string): LeadSourceData {
   const lowerSource = source.toLowerCase().trim();
@@ -17,11 +11,13 @@ export function getLeadSourceData(source: string): LeadSourceData {
       lowerSource.includes('carmax') ||
       lowerSource.includes('truecar')) {
     return {
+      source,
       sourceCategory: 'high_intent_digital',
       urgencyLevel: 'high',
-      conversionProbability: 0.85,
-      messageIntensity: 'standard',
-      expectedResponseTime: 2
+      pricingTier: 'premium',
+      communicationStyle: 'professional',
+      expectedResponseTime: 2,
+      conversionProbability: 0.85
     };
   }
   
@@ -30,11 +26,13 @@ export function getLeadSourceData(source: string): LeadSourceData {
       lowerSource.includes('pre-qualified') ||
       lowerSource.includes('prequalified')) {
     return {
+      source,
       sourceCategory: 'value_focused',
       urgencyLevel: 'medium',
-      conversionProbability: 0.75,
-      messageIntensity: 'gentle',
-      expectedResponseTime: 4
+      pricingTier: 'value',
+      communicationStyle: 'friendly',
+      expectedResponseTime: 4,
+      conversionProbability: 0.75
     };
   }
   
@@ -44,11 +42,13 @@ export function getLeadSourceData(source: string): LeadSourceData {
       lowerSource.includes('financing') ||
       lowerSource.includes('loan')) {
     return {
+      source,
       sourceCategory: 'credit_ready',
       urgencyLevel: 'immediate',
-      conversionProbability: 0.90,
-      messageIntensity: 'aggressive',
-      expectedResponseTime: 1
+      pricingTier: 'premium',
+      communicationStyle: 'professional',
+      expectedResponseTime: 1,
+      conversionProbability: 0.90
     };
   }
   
@@ -58,11 +58,13 @@ export function getLeadSourceData(source: string): LeadSourceData {
       lowerSource.includes('direct') ||
       lowerSource.includes('organic')) {
     return {
+      source,
       sourceCategory: 'direct_inquiry',
       urgencyLevel: 'medium',
-      conversionProbability: 0.60,
-      messageIntensity: 'standard',
-      expectedResponseTime: 3
+      pricingTier: 'value',
+      communicationStyle: 'professional',
+      expectedResponseTime: 3,
+      conversionProbability: 0.60
     };
   }
   
@@ -72,11 +74,13 @@ export function getLeadSourceData(source: string): LeadSourceData {
       lowerSource.includes('social') ||
       lowerSource.includes('meta')) {
     return {
+      source,
       sourceCategory: 'social_discovery',
       urgencyLevel: 'low',
-      conversionProbability: 0.45,
-      messageIntensity: 'gentle',
-      expectedResponseTime: 6
+      pricingTier: 'budget',
+      communicationStyle: 'casual',
+      expectedResponseTime: 6,
+      conversionProbability: 0.45
     };
   }
   
@@ -86,11 +90,13 @@ export function getLeadSourceData(source: string): LeadSourceData {
       lowerSource.includes('previous customer') ||
       lowerSource.includes('word of mouth')) {
     return {
+      source,
       sourceCategory: 'referral_based',
       urgencyLevel: 'medium',
-      conversionProbability: 0.70,
-      messageIntensity: 'gentle',
-      expectedResponseTime: 4
+      pricingTier: 'value',
+      communicationStyle: 'friendly',
+      expectedResponseTime: 4,
+      conversionProbability: 0.70
     };
   }
   
@@ -99,21 +105,25 @@ export function getLeadSourceData(source: string): LeadSourceData {
       lowerSource.includes('parts') ||
       lowerSource.includes('maintenance')) {
     return {
+      source,
       sourceCategory: 'service_related',
       urgencyLevel: 'low',
-      conversionProbability: 0.55,
-      messageIntensity: 'gentle',
-      expectedResponseTime: 8
+      pricingTier: 'budget',
+      communicationStyle: 'professional',
+      expectedResponseTime: 8,
+      conversionProbability: 0.55
     };
   }
   
   // Default fallback for unknown sources
   return {
-    sourceCategory: 'other',
+    source,
+    sourceCategory: 'unknown',
     urgencyLevel: 'low',
-    conversionProbability: 0.40,
-    messageIntensity: 'gentle',
-    expectedResponseTime: 6
+    pricingTier: 'budget',
+    communicationStyle: 'casual',
+    expectedResponseTime: 6,
+    conversionProbability: 0.40
   };
 }
 
