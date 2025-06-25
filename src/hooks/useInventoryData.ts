@@ -89,9 +89,15 @@ export const useInventoryData = (filters: InventoryFilters, searchTerm: string) 
               ? vehicle.condition as 'new' | 'used' | 'certified'
               : 'used' as const;
 
+            // Ensure status is properly typed
+            const typedStatus = (['available', 'sold', 'pending', 'service', 'wholesale'].includes(vehicle.status)) 
+              ? vehicle.status as 'available' | 'sold' | 'pending' | 'service' | 'wholesale'
+              : 'available' as const;
+
             return {
               ...vehicle,
               condition: typedCondition,
+              status: typedStatus,
               deals: vehicleDeals,
               deal_count: vehicleDeals.length,
               latest_deal: vehicleDeals.length > 0 
@@ -104,6 +110,7 @@ export const useInventoryData = (filters: InventoryFilters, searchTerm: string) 
             return {
               ...vehicle,
               condition: 'used' as const,
+              status: 'available' as const,
               deals: [],
               deal_count: 0,
               latest_deal: null,
