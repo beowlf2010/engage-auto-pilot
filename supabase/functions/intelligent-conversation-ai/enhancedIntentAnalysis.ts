@@ -26,8 +26,8 @@ export const analyzeEnhancedCustomerIntent = (
   const message = customerMessage.toLowerCase().trim();
   const history = conversationHistory.toLowerCase();
   
-  // Format the lead name properly at the start
-  const formattedLeadName = formatProperName(leadName);
+  // Use only the first name for responses
+  const firstName = getFirstName(leadName) || 'there';
   
   // First, check for objection signals (including competitor purchases)
   const objectionSignals = detectEnhancedObjectionSignals(customerMessage, conversationHistory);
@@ -44,7 +44,7 @@ export const analyzeEnhancedCustomerIntent = (
         urgencyLevel: 'low'
       },
       responseStrategy: 'congratulate_competitor_purchase',
-      suggestedResponse: `Congratulations on your new vehicle, ${formattedLeadName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`,
+      suggestedResponse: `Congratulations on your new vehicle, ${firstName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`,
       objectionSignals
     };
   }
@@ -112,11 +112,11 @@ export const analyzeEnhancedCustomerIntent = (
   if (primaryIntent === 'ready_to_buy' || message.includes('today') || message.includes('asap')) urgencyLevel = 'high';
   if (primaryIntent === 'objection' || emotionalTone === 'negative') urgencyLevel = 'low';
 
-  // Generate contextual suggested response with formatted name
+  // Generate contextual suggested response with first name only
   const suggestedResponse = generateContextualResponse(
     primaryIntent,
     mentionedVehicle,
-    formattedLeadName,
+    firstName,
     vehicleInterest,
     emotionalTone,
     responseStrategy,
@@ -141,7 +141,7 @@ export const analyzeEnhancedCustomerIntent = (
 const generateContextualResponse = (
   intent: EnhancedIntentAnalysis['primaryIntent'],
   mentionedVehicle: string | null,
-  leadName: string,
+  firstName: string,
   vehicleInterest: string,
   tone: 'positive' | 'neutral' | 'negative' | 'excited',
   strategy: EnhancedIntentAnalysis['responseStrategy'],
@@ -149,9 +149,6 @@ const generateContextualResponse = (
 ): string => {
   const vehicle = mentionedVehicle || vehicleInterest || 'the vehicle you\'re interested in';
   const cleanVehicle = vehicle.replace(/"/g, '').trim();
-  
-  // Format the lead name properly for use in responses
-  const formattedName = formatProperName(leadName);
 
   // Handle objections with specific responses
   if (objectionSignals && objectionSignals.length > 0) {
@@ -159,41 +156,41 @@ const generateContextualResponse = (
     
     switch (primarySignal.suggestedResponse) {
       case 'congratulate_competitor_purchase':
-        return `Congratulations on your new vehicle, ${formattedName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
+        return `Congratulations on your new vehicle, ${firstName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
       case 'address_pricing_discrepancy':
-        return `I completely understand your confusion about the pricing, ${formattedName}. Online prices typically show the base MSRP and don't include additional packages, options, or dealer fees that might apply to ${cleanVehicle}. Let me clarify exactly what's included in that price difference so there are no surprises. What specific features or packages were mentioned when you called?`;
+        return `I completely understand your confusion about the pricing, ${firstName}. Online prices typically show the base MSRP and don't include additional packages, options, or dealer fees that might apply to ${cleanVehicle}. Let me clarify exactly what's included in that price difference so there are no surprises. What specific features or packages were mentioned when you called?`;
       case 'empathetic_pricing_response':
-        return `I totally understand that pricing surprise, ${formattedName} - nobody likes unexpected costs when they're excited about ${cleanVehicle}. Let's work together to find the right solution within your budget. What monthly payment would feel comfortable for you, and are there specific features that are must-haves versus nice-to-haves?`;
+        return `I totally understand that pricing surprise, ${firstName} - nobody likes unexpected costs when they're excited about ${cleanVehicle}. Let's work together to find the right solution within your budget. What monthly payment would feel comfortable for you, and are there specific features that are must-haves versus nice-to-haves?`;
       case 'address_price':
-        return `I understand budget is a major consideration, ${formattedName}. Let's find a way to make ${cleanVehicle} work for you. What monthly payment range feels comfortable? We have financing options and sometimes incentives that can help bring the cost down.`;
+        return `I understand budget is a major consideration, ${firstName}. Let's find a way to make ${cleanVehicle} work for you. What monthly payment range feels comfortable? We have financing options and sometimes incentives that can help bring the cost down.`;
       case 'probe_deeper':
-        return `I want to make sure I address your main concern about ${cleanVehicle}, ${formattedName}. Is it the pricing, timing, or specific features that are holding you back?`;
+        return `I want to make sure I address your main concern about ${cleanVehicle}, ${firstName}. Is it the pricing, timing, or specific features that are holding you back?`;
     }
   }
 
-  // Handle other intents with formatted names
+  // Handle other intents with first name only
   switch (strategy) {
     case 'acknowledge_and_engage':
       if (intent === 'vehicle_inquiry') {
-        return `Hi ${formattedName}! I see you're interested in the ${cleanVehicle}. That's a fantastic choice! What aspects are most important to you - performance, features, or pricing?`;
+        return `Hi ${firstName}! I see you're interested in the ${cleanVehicle}. That's a fantastic choice! What aspects are most important to you - performance, features, or pricing?`;
       }
       if (intent === 'expressing_interest') {
-        return `That's great to hear, ${formattedName}! The ${cleanVehicle} is really popular right now. What drew you to this particular model?`;
+        return `That's great to hear, ${firstName}! The ${cleanVehicle} is really popular right now. What drew you to this particular model?`;
       }
       break;
 
     case 'provide_info':
-      return `Great question about the ${cleanVehicle}, ${formattedName}! I'd be happy to provide those details. Are you most interested in specs, pricing, or availability?`;
+      return `Great question about the ${cleanVehicle}, ${firstName}! I'd be happy to provide those details. Are you most interested in specs, pricing, or availability?`;
 
     case 'move_to_action':
-      return `Perfect timing, ${formattedName}! I can definitely help you move forward with the ${cleanVehicle}. When would be a good time for you to take a look in person?`;
+      return `Perfect timing, ${firstName}! I can definitely help you move forward with the ${cleanVehicle}. When would be a good time for you to take a look in person?`;
 
     case 'address_concern':
-      return `I understand your concerns about the ${cleanVehicle}, ${formattedName}. What's your main hesitation? I'm here to help address any questions you might have.`;
+      return `I understand your concerns about the ${cleanVehicle}, ${firstName}. What's your main hesitation? I'm here to help address any questions you might have.`;
 
     default:
-      return `Hi ${formattedName}! Thanks for reaching out about the ${cleanVehicle}. I'm here to help make your car shopping experience as smooth as possible. What would be most helpful for you to know?`;
+      return `Hi ${firstName}! Thanks for reaching out about the ${cleanVehicle}. I'm here to help make your car shopping experience as smooth as possible. What would be most helpful for you to know?`;
   }
 
-  return `Hi ${formattedName}! I'm here to help with the ${cleanVehicle}. What would be most helpful for you to know?`;
+  return `Hi ${firstName}! I'm here to help with the ${cleanVehicle}. What would be most helpful for you to know?`;
 };
