@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useInboxFilters, InboxFilters } from '@/hooks/useInboxFilters';
 import SmartFilters from './SmartFilters';
@@ -8,6 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConversationListItem } from '@/types/conversation';
 
+/**
+ * Smart Inbox component with enhanced AI capabilities and filter management
+ */
 const SmartInboxWithEnhancedAI = () => {
   const { profile, loading: authLoading } = useAuth();
 
@@ -26,11 +29,9 @@ const SmartInboxWithEnhancedAI = () => {
   const [filteredConversations, setFilteredConversations] = useState<ConversationListItem[]>([]);
   const [stats, setStats] = useState({ total: 0, unread: 0 });
 
-  // Fetch conversations (mocked here, replace with real data fetching)
+  // Fetch conversations - TODO: Replace with actual data fetching logic
   useEffect(() => {
-    // TODO: Replace with actual data fetching logic
     const fetchConversations = async () => {
-      // Mock data
       const data: ConversationListItem[] = [];
       setConversations(data);
     };
@@ -48,22 +49,14 @@ const SmartInboxWithEnhancedAI = () => {
     });
   }, [conversations, applyFilters]);
 
-  // Fix the handleFiltersChange function to properly merge all filter properties
   const handleFiltersChange = useCallback((newFilters: Partial<InboxFilters>) => {
-    // Update each individual filter to maintain proper state
     Object.entries(newFilters).forEach(([key, value]) => {
       updateFilter(key as keyof InboxFilters, value);
     });
-    
-    console.log('🔧 [SMART INBOX] Filters updated:', newFilters);
   }, [updateFilter]);
 
   const handleUnreadBadgeClick = useCallback(() => {
-    if (filters.unreadOnly) {
-      updateFilter('unreadOnly', false);
-    } else {
-      updateFilter('unreadOnly', true);
-    }
+    updateFilter('unreadOnly', !filters.unreadOnly);
   }, [filters.unreadOnly, updateFilter]);
 
   const handleClearRestoredFilters = useCallback(() => {
@@ -71,9 +64,7 @@ const SmartInboxWithEnhancedAI = () => {
   }, [clearFilters]);
 
   const handleDismissRestorationBanner = useCallback(() => {
-    // Just hide the banner by marking as not restored
-    // This could be managed by a local state or context if needed
-    // For now, do nothing as isRestored is managed by useInboxFilters
+    // Banner dismissal handled by useInboxFilters hook
   }, []);
 
   if (authLoading) {
@@ -153,25 +144,45 @@ const SmartInboxWithEnhancedAI = () => {
             />
           </div>
 
-          {/* Conversations list and other components would go here */}
+          {/* Conversations list */}
           <div className="flex-1 overflow-auto p-6">
-            {/* Placeholder for conversation list */}
             {filteredConversations.length === 0 ? (
-              <p className="text-center text-gray-500">No conversations match the current filters.</p>
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg">No conversations match the current filters.</p>
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    onClick={clearFilters}
+                    className="mt-4"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
             ) : (
               <ul className="space-y-4">
                 {filteredConversations.map(conv => (
-                  <li key={conv.leadId} className="bg-white p-4 rounded shadow">
+                  <li key={conv.leadId} className="bg-white p-4 rounded-lg shadow-sm border hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-semibold text-slate-800">{conv.leadName || 'Unknown Customer'}</p>
-                        <p className="text-sm text-slate-600">{conv.lastMessage || 'No messages yet'}</p>
+                        <p className="text-sm text-slate-600 mt-1">{conv.lastMessage || 'No messages yet'}</p>
+                        {conv.vehicleInterest && (
+                          <p className="text-xs text-blue-600 mt-1">Interest: {conv.vehicleInterest}</p>
+                        )}
                       </div>
-                      {conv.unreadCount > 0 && (
-                        <Badge variant="destructive" className="text-xs">
-                          {conv.unreadCount} unread
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {conv.unreadCount > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {conv.unreadCount} unread
+                          </Badge>
+                        )}
+                        {conv.status && (
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {conv.status}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </li>
                 ))}
