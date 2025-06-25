@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Brain, RefreshCw, Send, Lightbulb, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { generateEnhancedIntelligentResponse, ConversationContext } from '@/services/intelligentConversationAI';
+import { formatProperName, formatFullName } from '@/utils/nameFormatter';
 
 interface AIResponseSuggestionPanelProps {
   selectedConversation: any;
@@ -28,12 +28,6 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [lastInboundMessageId, setLastInboundMessageId] = useState<string | null>(null);
 
-  // Helper function to extract first name only
-  const getFirstName = (fullName: string) => {
-    if (!fullName) return 'there';
-    return fullName.split(' ')[0];
-  };
-
   // Generate AI response when new inbound message arrives
   useEffect(() => {
     if (!selectedConversation || !messages.length) return;
@@ -51,6 +45,12 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
   const generateAIResponse = async () => {
     setIsGenerating(true);
     try {
+      // Format the lead name properly before creating context
+      const firstName = selectedConversation.first_name || '';
+      const lastName = selectedConversation.last_name || '';
+      const rawLeadName = selectedConversation.leadName || `${firstName} ${lastName}`.trim();
+      const formattedLeadName = formatProperName(rawLeadName) || 'there';
+
       // Format messages for the enhanced AI service
       const formattedMessages = messages.map(msg => ({
         id: msg.id,
@@ -63,7 +63,7 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
       // Create context for enhanced AI response
       const context: ConversationContext = {
         leadId: selectedConversation.id,
-        leadName: selectedConversation.leadName || `${selectedConversation.first_name || ''} ${selectedConversation.last_name || ''}`.trim() || 'Customer',
+        leadName: formattedLeadName,
         vehicleInterest: selectedConversation.vehicleInterest || selectedConversation.vehicle_interest || 'vehicle',
         leadSource: selectedConversation.source,
         messages: formattedMessages,
@@ -98,7 +98,10 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
       } else {
         // Fallback if enhanced AI fails
         console.log('⚠️ Enhanced AI failed, using fallback');
-        setAiSuggestion('I appreciate you reaching out! How can I help you today?');
+        const fallbackName = formatProperName(rawLeadName) || 'there';
+        const vehicleInterest = selectedConversation.vehicleInterest || selectedConversation.vehicle_interest || 'vehicle';
+        
+        setAiSuggestion(`Hi ${fallbackName}! Thanks for your message about the ${vehicleInterest}. I'm here to help with any questions you might have.`);
         setReasoning('Fallback response - enhanced AI unavailable');
         setConfidence(0.5);
         setSuggestionType('fallback');
@@ -106,11 +109,11 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
     } catch (error) {
       console.error('❌ Error generating enhanced AI response:', error);
       
-      // Fallback to basic response
-      const firstName = getFirstName(selectedConversation?.leadName || selectedConversation?.first_name || '');
+      // Fallback to basic response with proper name formatting
+      const fallbackName = formatProperName(selectedConversation?.leadName || selectedConversation?.first_name || '') || 'there';
       const vehicleInterest = selectedConversation?.vehicleInterest || selectedConversation?.vehicle_interest || 'vehicle';
       
-      setAiSuggestion(`Hi ${firstName}! Thanks for your message about the ${vehicleInterest}. I'm here to help with any questions you might have.`);
+      setAiSuggestion(`Hi ${fallbackName}! Thanks for your message about the ${vehicleInterest}. I'm here to help with any questions you might have.`);
       setReasoning('Fallback response due to AI service error');
       setConfidence(0.6);
       setSuggestionType('error_fallback');

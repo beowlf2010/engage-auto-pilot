@@ -1,6 +1,7 @@
-
 // Enhanced Objection Detection with Pricing Discrepancy Support
 // Identifies customer pricing concerns, vehicle nicknames, and improved objection handling
+
+import { formatProperName } from './nameFormatter.ts';
 
 export interface EnhancedObjectionSignal {
   type: 'competitor_purchase' | 'pricing_discrepancy' | 'pricing_shock' | 'online_vs_call_price' | 'upgrade_costs' | 'hesitation' | 'price_concern' | 'timing_delay' | 'feature_concern' | 'competitor_mention' | 'vague_response';
@@ -221,29 +222,32 @@ export const generateEnhancedObjectionResponse = (
   const cleanVehicle = vehicleInterest.replace(/"/g, '').trim();
   const vehicleToUse = primarySignal.vehicleNickname || cleanVehicle || 'the vehicle you\'re interested in';
   
+  // Format the lead name properly
+  const formattedName = formatProperName(leadName);
+  
   switch (primarySignal.suggestedResponse) {
     case 'congratulate_competitor_purchase':
-      return `Congratulations on your new vehicle, ${leadName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
+      return `Congratulations on your new vehicle, ${formattedName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
 
     case 'address_pricing_discrepancy':
-      return `I completely understand your confusion about the pricing, ${leadName}. Online prices typically show the base MSRP and don't include additional packages, options, or dealer fees that might apply to ${vehicleToUse}. Let me clarify exactly what's included in that price difference so there are no surprises. What specific features or packages were mentioned when you called?`;
+      return `I completely understand your confusion about the pricing, ${formattedName}. Online prices typically show the base MSRP and don't include additional packages, options, or dealer fees that might apply to ${vehicleToUse}. Let me clarify exactly what's included in that price difference so there are no surprises. What specific features or packages were mentioned when you called?`;
 
     case 'explain_pricing_breakdown':
       if (primarySignal.priceContext?.upgradesConcern) {
-        return `I hear your concern about the additional costs for upgrades on ${vehicleToUse}, ${leadName}. Those packages and options do add value, but I want to make sure you're getting exactly what you want within your budget. Would you like me to break down what's included in those upgrades and see if we have other trim levels that might work better?`;
+        return `I hear your concern about the additional costs for upgrades on ${vehicleToUse}, ${formattedName}. Those packages and options do add value, but I want to make sure you're getting exactly what you want within your budget. Would you like me to break down what's included in those upgrades and see if we have other trim levels that might work better?`;
       }
-      return `Let me explain the pricing breakdown for ${vehicleToUse}, ${leadName}. The difference you're seeing likely includes options, packages, or fees that weren't shown in the online price. I want to be completely transparent with you - what would be a comfortable monthly payment range for you?`;
+      return `Let me explain the pricing breakdown for ${vehicleToUse}, ${formattedName}. The difference you're seeing likely includes options, packages, or fees that weren't shown in the online price. I want to be completely transparent with you - what would be a comfortable monthly payment range for you?`;
 
     case 'empathetic_pricing_response':
-      return `I totally understand that pricing surprise, ${leadName} - nobody likes unexpected costs when they're excited about ${vehicleToUse}. Let's work together to find the right solution within your budget. What monthly payment would feel comfortable for you, and are there specific features that are must-haves versus nice-to-haves?`;
+      return `I totally understand that pricing surprise, ${formattedName} - nobody likes unexpected costs when they're excited about ${vehicleToUse}. Let's work together to find the right solution within your budget. What monthly payment would feel comfortable for you, and are there specific features that are must-haves versus nice-to-haves?`;
 
     case 'address_price':
-      return `I understand budget is a major consideration, ${leadName}. Let's find a way to make ${vehicleToUse} work for you. What monthly payment range feels comfortable? We have financing options and sometimes incentives that can help bring the cost down.`;
+      return `I understand budget is a major consideration, ${formattedName}. Let's find a way to make ${vehicleToUse} work for you. What monthly payment range feels comfortable? We have financing options and sometimes incentives that can help bring the cost down.`;
 
     case 'probe_deeper':
-      return `I want to make sure I address your main concern about ${vehicleToUse}, ${leadName}. Is it the pricing, timing, or specific features that are holding you back?`;
+      return `I want to make sure I address your main concern about ${vehicleToUse}, ${formattedName}. Is it the pricing, timing, or specific features that are holding you back?`;
 
     default:
-      return `Thanks for that feedback about ${vehicleToUse}, ${leadName}. I want to make sure I address your specific concerns - what's your main question right now?`;
+      return `Thanks for that feedback about ${vehicleToUse}, ${formattedName}. I want to make sure I address your specific concerns - what's your main question right now?`;
   }
 };

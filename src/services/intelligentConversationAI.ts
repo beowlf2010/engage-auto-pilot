@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { LeadSourceData } from '@/types/leadSource';
 import { UnknownMessageContext } from '@/services/unknownMessageLearning';
+import { formatProperName, formatFullName } from '@/utils/nameFormatter';
 
 export interface ConversationContext {
   leadId: string;
@@ -79,23 +80,27 @@ export const generateEnhancedIntelligentResponse = async (
   try {
     console.log('🤖 [ENHANCED AI] Generating contextually aware response for lead:', context.leadId);
 
+    // Format the lead name properly before sending to edge function
+    const formattedLeadName = formatProperName(context.leadName) || 'there';
+
     // Format conversation history for AI analysis
     const conversationHistory = context.messages
       .map(msg => `${msg.direction === 'in' ? 'Customer' : 'Sales'}: ${msg.body}`)
       .join('\n');
 
     console.log('📝 [ENHANCED AI] Conversation context:', {
-      leadName: context.leadName,
+      leadId: context.leadId,
+      leadName: formattedLeadName,
       vehicleInterest: context.vehicleInterest,
       messageCount: context.messages.length,
       lastMessageDirection: context.messages[context.messages.length - 1]?.direction
     });
 
-    // Call the enhanced edge function
+    // Call the enhanced edge function with formatted name
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: context.leadId,
-        leadName: context.leadName,
+        leadName: formattedLeadName,
         vehicleInterest: context.vehicleInterest,
         conversationHistory,
         leadInfo: context.leadInfo,
