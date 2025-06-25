@@ -13,7 +13,7 @@ export const validateAndProcessInventoryRows = async (
   rows: any[],
   condition: 'new' | 'used' | 'gm_global',
   uploadHistoryId: string,
-  mapRowToInventoryItem: (row: any, condition: string, uploadHistoryId: string) => InventoryItem
+  mapRowToInventoryItem: (row: any, condition: 'new' | 'used' | 'gm_global', uploadHistoryId: string) => InventoryItem
 ): Promise<ValidationResult> => {
   const errors: string[] = [];
   const insertedVehicleIds: string[] = [];
@@ -47,8 +47,8 @@ export const validateAndProcessInventoryRows = async (
             ...vehicle,
             status: vehicle.status || 'available',
             condition: vehicle.condition || (condition === 'gm_global' ? 'new' : condition),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            created_at: vehicle.created_at || new Date().toISOString(),
+            updated_at: vehicle.updated_at || new Date().toISOString()
           };
 
           vehiclesToInsert.push(processedVehicle);

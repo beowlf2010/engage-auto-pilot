@@ -68,6 +68,10 @@ export interface InventoryItem {
   carfax_url?: string;
   location?: string;
   upload_history_id?: string;
+  
+  // Required timestamp fields
+  created_at: string;
+  updated_at: string;
 }
 
 // Define the upload condition type
@@ -112,6 +116,7 @@ export const mapRowToInventoryItem = (
   console.log('Mapping row to inventory item:', { condition, keys: Object.keys(row) });
 
   let mappedData: any;
+  const currentTimestamp = new Date().toISOString();
 
   try {
     // Determine file type and use appropriate extraction
@@ -170,7 +175,6 @@ export const mapRowToInventoryItem = (
         cleanedModel
       });
       
-      // Return null or throw error to indicate this vehicle should be skipped
       throw new Error(`Invalid vehicle data: make="${mappedData.make}", model="${mappedData.model}"`);
     }
 
@@ -182,13 +186,15 @@ export const mapRowToInventoryItem = (
       finalCondition = condition;
     }
 
-    // Ensure required fields have valid values
+    // Ensure required fields have valid values including timestamps
     const inventoryItem: InventoryItem = {
       make: cleanedMake!,
       model: cleanedModel!,
       condition: mappedData.condition || finalCondition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
+      created_at: currentTimestamp,
+      updated_at: currentTimestamp,
       ...mappedData
     };
 
@@ -222,7 +228,9 @@ export const mapRowToInventoryItem = (
       gm_order_number: inventoryItem.gm_order_number,
       customer_name: inventoryItem.customer_name,
       estimated_delivery_date: inventoryItem.estimated_delivery_date,
-      hasGMData: !!(inventoryItem.gm_order_number || inventoryItem.customer_name)
+      hasGMData: !!(inventoryItem.gm_order_number || inventoryItem.customer_name),
+      created_at: inventoryItem.created_at,
+      updated_at: inventoryItem.updated_at
     });
 
     return inventoryItem;
