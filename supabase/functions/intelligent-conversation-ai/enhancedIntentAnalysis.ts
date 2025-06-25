@@ -1,8 +1,10 @@
 
 // Enhanced intent analysis with better context awareness and customer message understanding
 
+import { detectEnhancedObjectionSignals, EnhancedObjectionSignal } from './enhancedObjectionDetection.ts';
+
 export interface EnhancedIntentAnalysis {
-  primaryIntent: 'vehicle_inquiry' | 'expressing_interest' | 'asking_question' | 'providing_info' | 'objection' | 'ready_to_buy' | 'general';
+  primaryIntent: 'competitor_purchase' | 'vehicle_inquiry' | 'expressing_interest' | 'asking_question' | 'providing_info' | 'objection' | 'ready_to_buy' | 'general';
   confidence: number;
   customerContext: {
     mentionedVehicle: string | null;
@@ -10,8 +12,9 @@ export interface EnhancedIntentAnalysis {
     emotionalTone: 'positive' | 'neutral' | 'negative' | 'excited';
     urgencyLevel: 'low' | 'medium' | 'high';
   };
-  responseStrategy: 'acknowledge_and_engage' | 'provide_info' | 'ask_discovery' | 'address_concern' | 'move_to_action';
+  responseStrategy: 'congratulate_competitor_purchase' | 'acknowledge_and_engage' | 'provide_info' | 'ask_discovery' | 'address_concern' | 'move_to_action';
   suggestedResponse: string | null;
+  objectionSignals?: EnhancedObjectionSignal[];
 }
 
 export const analyzeEnhancedCustomerIntent = (
@@ -22,6 +25,26 @@ export const analyzeEnhancedCustomerIntent = (
 ): EnhancedIntentAnalysis => {
   const message = customerMessage.toLowerCase().trim();
   const history = conversationHistory.toLowerCase();
+  
+  // First, check for objection signals (including competitor purchases)
+  const objectionSignals = detectEnhancedObjectionSignals(customerMessage, conversationHistory);
+  
+  // If competitor purchase is detected, this takes highest priority
+  if (objectionSignals.length > 0 && objectionSignals[0].type === 'competitor_purchase') {
+    return {
+      primaryIntent: 'competitor_purchase',
+      confidence: objectionSignals[0].confidence,
+      customerContext: {
+        mentionedVehicle: vehicleInterest,
+        isFollowUp: history.includes('finn') || history.includes('jason pilger'),
+        emotionalTone: 'neutral',
+        urgencyLevel: 'low'
+      },
+      responseStrategy: 'congratulate_competitor_purchase',
+      suggestedResponse: `Congratulations on your new vehicle, ${leadName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`,
+      objectionSignals
+    };
+  }
   
   // Extract mentioned vehicles from the message
   const vehicleKeywords = ['silverado', 'tahoe', 'suburban', 'blazer', 'equinox', 'traverse', 'camaro', 'corvette', 'malibu'];
@@ -47,43 +70,38 @@ export const analyzeEnhancedCustomerIntent = (
   let confidence = 0.5;
   let responseStrategy: EnhancedIntentAnalysis['responseStrategy'] = 'acknowledge_and_engage';
 
+  // Check for other objections first
+  if (objectionSignals.length > 0) {
+    primaryIntent = 'objection';
+    confidence = objectionSignals[0].confidence;
+    responseStrategy = 'address_concern';
+  }
   // Vehicle inquiry detection
-  if (mentionedVehicle || message.includes('truck') || message.includes('car') || message.includes('suv')) {
+  else if (mentionedVehicle || message.includes('truck') || message.includes('car') || message.includes('suv')) {
     primaryIntent = 'vehicle_inquiry';
     confidence = 0.8;
     responseStrategy = 'acknowledge_and_engage';
   }
-
   // Interest expression detection
-  if (message.includes('interested') || message.includes('looking for') || message.includes('want') || 
+  else if (message.includes('interested') || message.includes('looking for') || message.includes('want') || 
       message.includes('need') || emotionalTone === 'positive') {
     primaryIntent = 'expressing_interest';
     confidence = 0.85;
     responseStrategy = 'acknowledge_and_engage';
   }
-
   // Question detection
-  if (message.includes('?') || message.startsWith('what') || message.startsWith('how') || 
+  else if (message.includes('?') || message.startsWith('what') || message.startsWith('how') || 
       message.startsWith('when') || message.startsWith('where') || message.includes('tell me')) {
     primaryIntent = 'asking_question';
     confidence = 0.9;
     responseStrategy = 'provide_info';
   }
-
   // Ready to buy signals
-  if (message.includes('buy') || message.includes('purchase') || message.includes('financing') || 
+  else if (message.includes('buy') || message.includes('purchase') || message.includes('financing') || 
       message.includes('payment') || message.includes('schedule') || message.includes('appointment')) {
     primaryIntent = 'ready_to_buy';
     confidence = 0.9;
     responseStrategy = 'move_to_action';
-  }
-
-  // Objection detection
-  if (message.includes('expensive') || message.includes('think about') || message.includes('not sure') ||
-      emotionalTone === 'negative') {
-    primaryIntent = 'objection';
-    confidence = 0.8;
-    responseStrategy = 'address_concern';
   }
 
   // Determine urgency level
@@ -98,7 +116,8 @@ export const analyzeEnhancedCustomerIntent = (
     leadName,
     vehicleInterest,
     emotionalTone,
-    responseStrategy
+    responseStrategy,
+    objectionSignals
   );
 
   return {
@@ -111,7 +130,8 @@ export const analyzeEnhancedCustomerIntent = (
       urgencyLevel
     },
     responseStrategy,
-    suggestedResponse
+    suggestedResponse,
+    objectionSignals
   };
 };
 
@@ -121,11 +141,31 @@ const generateContextualResponse = (
   leadName: string,
   vehicleInterest: string,
   tone: 'positive' | 'neutral' | 'negative' | 'excited',
-  strategy: EnhancedIntentAnalysis['responseStrategy']
+  strategy: EnhancedIntentAnalysis['responseStrategy'],
+  objectionSignals?: EnhancedObjectionSignal[]
 ): string => {
   const vehicle = mentionedVehicle || vehicleInterest || 'the vehicle you\'re interested in';
   const cleanVehicle = vehicle.replace(/"/g, '').trim();
 
+  // Handle objections with specific responses
+  if (objectionSignals && objectionSignals.length > 0) {
+    const primarySignal = objectionSignals[0];
+    
+    switch (primarySignal.suggestedResponse) {
+      case 'congratulate_competitor_purchase':
+        return `Congratulations on your new vehicle, ${leadName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
+      case 'address_pricing_discrepancy':
+        return `I completely understand your confusion about the pricing, ${leadName}. Online prices typically show the base MSRP and don't include additional packages, options, or dealer fees that might apply to ${cleanVehicle}. Let me clarify exactly what's included in that price difference so there are no surprises. What specific features or packages were mentioned when you called?`;
+      case 'empathetic_pricing_response':
+        return `I totally understand that pricing surprise, ${leadName} - nobody likes unexpected costs when they're excited about ${cleanVehicle}. Let's work together to find the right solution within your budget. What monthly payment would feel comfortable for you, and are there specific features that are must-haves versus nice-to-haves?`;
+      case 'address_price':
+        return `I understand budget is a major consideration, ${leadName}. Let's find a way to make ${cleanVehicle} work for you. What monthly payment range feels comfortable? We have financing options and sometimes incentives that can help bring the cost down.`;
+      case 'probe_deeper':
+        return `I want to make sure I address your main concern about ${cleanVehicle}, ${leadName}. Is it the pricing, timing, or specific features that are holding you back?`;
+    }
+  }
+
+  // Handle other intents
   switch (strategy) {
     case 'acknowledge_and_engage':
       if (intent === 'vehicle_inquiry') {

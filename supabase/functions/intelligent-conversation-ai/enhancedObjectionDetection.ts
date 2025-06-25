@@ -1,11 +1,12 @@
+
 // Enhanced Objection Detection with Pricing Discrepancy Support
 // Identifies customer pricing concerns, vehicle nicknames, and improved objection handling
 
 export interface EnhancedObjectionSignal {
-  type: 'pricing_discrepancy' | 'pricing_shock' | 'online_vs_call_price' | 'upgrade_costs' | 'hesitation' | 'price_concern' | 'timing_delay' | 'feature_concern' | 'competitor_mention' | 'vague_response';
+  type: 'competitor_purchase' | 'pricing_discrepancy' | 'pricing_shock' | 'online_vs_call_price' | 'upgrade_costs' | 'hesitation' | 'price_concern' | 'timing_delay' | 'feature_concern' | 'competitor_mention' | 'vague_response';
   confidence: number;
   indicators: string[];
-  suggestedResponse: 'address_pricing_discrepancy' | 'explain_pricing_breakdown' | 'empathetic_pricing_response' | 'probe_deeper' | 'address_price' | 'create_urgency' | 'feature_benefits' | 'competitor_comparison' | 'assumptive_close';
+  suggestedResponse: 'congratulate_competitor_purchase' | 'address_pricing_discrepancy' | 'explain_pricing_breakdown' | 'empathetic_pricing_response' | 'probe_deeper' | 'address_price' | 'create_urgency' | 'feature_benefits' | 'competitor_comparison' | 'assumptive_close';
   vehicleNickname?: string;
   priceContext?: {
     mentionedOnlinePrice?: boolean;
@@ -68,7 +69,40 @@ export const detectEnhancedObjectionSignals = (customerMessage: string, conversa
   const message = customerMessage.toLowerCase().trim();
   const signals: EnhancedObjectionSignal[] = [];
 
-  // PRICING DISCREPANCY PATTERNS (New - High Priority)
+  // COMPETITOR PURCHASE DETECTION (NEW - Highest Priority)
+  const competitorPurchasePatterns = [
+    { 
+      pattern: /\b(purchased|bought|we got|picked up|already have|we have a|just bought|we bought|purchased a|got a|picked up a|we purchased)\b.*\b(equinox|silverado|tahoe|suburban|blazer|traverse|camaro|corvette|malibu|truck|car|suv|vehicle)\b/, 
+      confidence: 0.95,
+      type: 'competitor_purchase' as const,
+      response: 'congratulate_competitor_purchase' as const
+    },
+    { 
+      pattern: /\b(purchased|bought|we got|picked up|already have|we have a|just bought|we bought|purchased a|got a|picked up a|we purchased)\b/, 
+      confidence: 0.9,
+      type: 'competitor_purchase' as const,
+      response: 'congratulate_competitor_purchase' as const
+    }
+  ];
+
+  // Check for competitor purchase patterns first (highest priority)
+  competitorPurchasePatterns.forEach(({ pattern, confidence, type, response }) => {
+    if (pattern.test(message)) {
+      signals.push({
+        type,
+        confidence,
+        indicators: [message],
+        suggestedResponse: response
+      });
+    }
+  });
+
+  // If competitor purchase is detected, return early (highest priority)
+  if (signals.length > 0 && signals[0].type === 'competitor_purchase') {
+    return signals;
+  }
+
+  // PRICING DISCREPANCY PATTERNS (High Priority)
   const pricingDiscrepancyPatterns = [
     { 
       pattern: /\b(different price|price was different|price changed|not the same price)\b.*\b(online|website|called|phone)\b/, 
@@ -188,6 +222,9 @@ export const generateEnhancedObjectionResponse = (
   const vehicleToUse = primarySignal.vehicleNickname || cleanVehicle || 'the vehicle you\'re interested in';
   
   switch (primarySignal.suggestedResponse) {
+    case 'congratulate_competitor_purchase':
+      return `Congratulations on your new vehicle, ${leadName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
+
     case 'address_pricing_discrepancy':
       return `I completely understand your confusion about the pricing, ${leadName}. Online prices typically show the base MSRP and don't include additional packages, options, or dealer fees that might apply to ${vehicleToUse}. Let me clarify exactly what's included in that price difference so there are no surprises. What specific features or packages were mentioned when you called?`;
 
