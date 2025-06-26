@@ -29,51 +29,150 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper function to fetch user profile
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
+      
+      // If no profile exists, create one with default manager role
+      if (!profileData) {
+        console.log('No profile found, creating default profile with manager role');
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: user?.email || '',
+            first_name: user?.user_metadata?.first_name || 'User',
+            last_name: user?.user_metadata?.last_name || 'Name',
+            role: 'manager' // Default to manager for CSV upload capabilities
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating profile:', createError);
+          return null;
+        }
+        
+        return newProfile;
+      }
+      
+      return profileData;
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
+    }
+  };
+
+  // Helper function to ensure user has manager role
+  const ensureManagerRole = async (userId: string) => {
+    try {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', userId);
+
+      const hasManagerOrAdmin = roles?.some(r => ['manager', 'admin'].includes(r.role));
+      
+      if (!hasManagerOrAdmin) {
+        console.log('Adding manager role for CSV upload capabilities');
+        await supabase
+          .from('user_roles')
+          .insert({
+            user_id: userId,
+            role: 'manager'
+          });
+      }
+    } catch (error) {
+      console.error('Error ensuring manager role:', error);
+    }
+  };
+
   useEffect(() => {
-    // Set up auth state listener
+    let mounted = true;
+    
+    // Set up auth state listener - NEVER use async functions directly here
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        if (!mounted) return;
+        
+        console.log('Auth state changed:', event, session?.user?.id);
+        
+        // Only synchronous updates here to avoid deadlocks
         setSession(session);
         setUser(session?.user ?? null);
         
+        // Defer any Supabase calls using setTimeout to avoid deadlocks
         if (session?.user) {
-          // Fetch user profile
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          setProfile(profileData);
+          setTimeout(() => {
+            if (!mounted) return;
+            
+            Promise.all([
+              fetchUserProfile(session.user.id),
+              ensureManagerRole(session.user.id)
+            ]).then(([profileData]) => {
+              if (!mounted) return;
+              setProfile(profileData);
+              setLoading(false);
+            }).catch((error) => {
+              console.error('Error in deferred auth setup:', error);
+              if (!mounted) return;
+              setLoading(false);
+            });
+          }, 0);
         } else {
           setProfile(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            setProfile(data);
-            setLoading(false);
-          });
+        Promise.all([
+          fetchUserProfile(session.user.id),
+          ensureManagerRole(session.user.id)
+        ]).then(([profileData]) => {
+          if (!mounted) return;
+          setProfile(profileData);
+          setLoading(false);
+        }).catch((error) => {
+          console.error('Error in initial auth setup:', error);
+          if (!mounted) return;
+          setLoading(false);
+        });
       } else {
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Fallback timeout to prevent infinite loading
+    const fallbackTimeout = setTimeout(() => {
+      if (!mounted) return;
+      console.warn('Auth loading timeout - setting loading to false');
+      setLoading(false);
+    }, 10000); // 10 second timeout
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      clearTimeout(fallbackTimeout);
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
