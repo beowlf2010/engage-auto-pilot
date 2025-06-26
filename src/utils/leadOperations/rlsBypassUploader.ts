@@ -44,7 +44,7 @@ export const uploadLeadsWithRLSBypass = async (
         type: phone.type,
         priority: phone.priority,
         status: phone.status || 'active',
-        isPrimary: phone.is_primary || false
+        isPrimary: phone.isPrimary || false
       }))
     }));
 
@@ -61,12 +61,15 @@ export const uploadLeadsWithRLSBypass = async (
 
     console.log('✅ [BYPASS UPLOADER] Upload completed:', data);
 
+    // Type assertion for the response data
+    const result = data as any;
+
     return {
-      success: data.success,
-      totalProcessed: data.totalProcessed,
-      successfulInserts: data.successfulInserts,
-      errors: data.errors || [],
-      message: data.message
+      success: result.success,
+      totalProcessed: result.totalProcessed,
+      successfulInserts: result.successfulInserts,
+      errors: result.errors || [],
+      message: result.message
     };
 
   } catch (error) {
@@ -93,7 +96,13 @@ export const promoteToAdmin = async (): Promise<{ success: boolean; message: str
     }
     
     console.log('✅ [ADMIN PROMOTION] Success:', data);
-    return data;
+    
+    // Type assertion for the response data
+    const result = data as any;
+    return {
+      success: result.success,
+      message: result.message
+    };
   } catch (error) {
     console.error('💥 [ADMIN PROMOTION] Error:', error);
     return {
