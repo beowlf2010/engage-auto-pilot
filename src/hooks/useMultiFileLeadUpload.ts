@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from '@/hooks/use-toast';
@@ -16,19 +17,22 @@ interface QueuedFile {
 
 interface BatchUploadResult {
   totalFiles: number;
-  successfulFiles: number;
-  failedFiles: number;
   totalLeads: number;
   successfulLeads: number;
   failedLeads: number;
   duplicateLeads: number;
-  updatedLeads: number;
   results: Array<{
     fileName: string;
     status: 'success' | 'error';
-    records?: number;
-    updates?: number;
-    error?: string;
+    totalRows: number;
+    successfulImports: number;
+    errors: number;
+    duplicates: number;
+    errorDetails?: Array<{
+      rowIndex: number;
+      error: string;
+      leadName?: string;
+    }>;
   }>;
 }
 
@@ -89,7 +93,18 @@ export const useMultiFileLeadUpload = () => {
     setBatchResult(null);
   }, []);
 
-  const processFile = async (queuedFile: QueuedFile): Promise<{ success: boolean; records?: number; updates?: number; error?: string }> => {
+  const processFile = async (queuedFile: QueuedFile): Promise<{
+    success: boolean;
+    totalRows: number;
+    successfulImports: number;
+    errors: number;
+    duplicates: number;
+    errorDetails?: Array<{
+      rowIndex: number;
+      error: string;
+      leadName?: string;
+    }>;
+  }> => {
     try {
       console.log(`📤 [MULTI UPLOAD] Processing file: ${queuedFile.file.name}`);
       console.log(`📤 [MULTI UPLOAD] File details:`, {
@@ -168,6 +183,13 @@ export const useMultiFileLeadUpload = () => {
         duplicates: insertResult.duplicates.length
       });
 
+      // Convert insertion errors to the expected format
+      const errorDetails = insertResult.errors.map(error => ({
+        rowIndex: error.rowIndex,
+        error: error.error,
+        leadName: `${error.leadData.firstName || 'Unknown'} ${error.leadData.lastName || 'Lead'}`
+      }));
+
       // Update file status to completed
       setQueuedFiles(prev => prev.map(f => 
         f.id === queuedFile.id ? { 
@@ -176,17 +198,20 @@ export const useMultiFileLeadUpload = () => {
           result: {
             totalRows: parsedData.rows.length,
             successfulImports: insertResult.successfulInserts,
-            successfulUpdates: insertResult.successfulUpdates,
             errors: insertResult.errors.length,
-            duplicates: insertResult.duplicates.length + processingResult.duplicates.length
+            duplicates: insertResult.duplicates.length + processingResult.duplicates.length,
+            errorDetails
           }
         } : f
       ));
 
       return { 
-        success: true, 
-        records: insertResult.successfulInserts,
-        updates: insertResult.successfulUpdates
+        success: true,
+        totalRows: parsedData.rows.length,
+        successfulImports: insertResult.successfulInserts,
+        errors: insertResult.errors.length,
+        duplicates: insertResult.duplicates.length + processingResult.duplicates.length,
+        errorDetails
       };
 
     } catch (error) {
@@ -199,7 +224,18 @@ export const useMultiFileLeadUpload = () => {
         f.id === queuedFile.id ? { ...f, status: 'error', error: errorMessage } : f
       ));
 
-      return { success: false, error: errorMessage };
+      return { 
+        success: false,
+        totalRows: 0,
+        successfulImports: 0,
+        errors: 1,
+        duplicates: 0,
+        errorDetails: [{
+          rowIndex: 1,
+          error: errorMessage,
+          leadName: 'File Processing Error'
+        }]
+      };
     }
   };
 
@@ -216,13 +252,10 @@ export const useMultiFileLeadUpload = () => {
     
     const result: BatchUploadResult = {
       totalFiles: queuedFiles.length,
-      successfulFiles: 0,
-      failedFiles: 0,
       totalLeads: 0,
       successfulLeads: 0,
       failedLeads: 0,
       duplicateLeads: 0,
-      updatedLeads: 0,
       results: []
     };
 
@@ -233,30 +266,24 @@ export const useMultiFileLeadUpload = () => {
       for (const queuedFile of queuedFiles) {
         const fileResult = await processFile(queuedFile);
         
-        if (fileResult.success) {
-          result.successfulFiles++;
-          result.successfulLeads += fileResult.records || 0;
-          result.updatedLeads += fileResult.updates || 0;
-          result.results.push({
-            fileName: queuedFile.file.name,
-            status: 'success',
-            records: fileResult.records,
-            updates: fileResult.updates
-          });
-        } else {
-          result.failedFiles++;
-          result.results.push({
-            fileName: queuedFile.file.name,
-            status: 'error',
-            error: fileResult.error
-          });
-        }
+        result.totalLeads += fileResult.totalRows;
+        result.successfulLeads += fileResult.successfulImports;
+        result.failedLeads += fileResult.errors;
+        result.duplicateLeads += fileResult.duplicates;
+        
+        result.results.push({
+          fileName: queuedFile.file.name,
+          status: fileResult.success ? 'success' : 'error',
+          totalRows: fileResult.totalRows,
+          successfulImports: fileResult.successfulImports,
+          errors: fileResult.errors,
+          duplicates: fileResult.duplicates,
+          errorDetails: fileResult.errorDetails
+        });
 
         // Add a small delay between files to prevent overwhelming the system
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-
-      result.totalLeads = result.successfulLeads + result.failedLeads;
 
       console.log(`🎉 [MULTI UPLOAD] Batch processing completed:`, result);
 
