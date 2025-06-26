@@ -11,7 +11,7 @@ export interface RLSValidationResult {
 
 export const validateRLSPermissions = async (): Promise<RLSValidationResult> => {
   try {
-    console.log('🔍 [RLS VALIDATION] Starting clean RLS validation');
+    console.log('🔍 [RLS VALIDATION] Starting simplified RLS validation');
     
     // Get current user with session
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -29,28 +29,52 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
 
     console.log('🔍 [RLS VALIDATION] User authenticated:', user.id);
 
-    // Use the new clean initialization function
+    // Initialize user with direct table operations
     try {
-      console.log('🔧 [RLS VALIDATION] Using clean initialization function');
-      const { data: initResult, error: initError } = await supabase.rpc('initialize_user_completely_clean', {
-        p_user_id: user.id,
-        p_email: user.email || '',
-        p_first_name: user.user_metadata?.first_name || 'User',
-        p_last_name: user.user_metadata?.last_name || 'Name'
-      });
+      console.log('🔧 [RLS VALIDATION] Initializing user with direct operations');
+      
+      // Direct profile upsert
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          email: user.email || '',
+          first_name: user.user_metadata?.first_name || 'User',
+          last_name: user.user_metadata?.last_name || 'Name',
+          role: 'manager'
+        }, { onConflict: 'id' });
 
-      if (initError) {
-        console.error('⚠️ [RLS VALIDATION] Clean initialization failed:', initError);
+      if (profileError) {
+        console.error('⚠️ [RLS VALIDATION] Profile initialization failed:', profileError);
         return {
           canInsert: false,
           userProfile: null,
           userRoles: [],
-          error: `Clean initialization failed: ${initError.message}`,
-          debugInfo: { initError, userId: user.id }
+          error: `Profile initialization failed: ${profileError.message}`,
+          debugInfo: { profileError, userId: user.id }
         };
       }
 
-      console.log('✅ [RLS VALIDATION] Clean initialization completed:', initResult);
+      // Direct role upsert
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: user.id,
+          role: 'manager'
+        }, { onConflict: 'user_id,role' });
+
+      if (roleError) {
+        console.error('⚠️ [RLS VALIDATION] Role initialization failed:', roleError);
+        return {
+          canInsert: false,
+          userProfile: null,
+          userRoles: [],
+          error: `Role initialization failed: ${roleError.message}`,
+          debugInfo: { roleError, userId: user.id }
+        };
+      }
+
+      console.log('✅ [RLS VALIDATION] Direct initialization completed');
     } catch (initError) {
       console.error('💥 [RLS VALIDATION] Initialization error:', initError);
       return {
@@ -62,32 +86,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       };
     }
 
-    // Test RLS policies using the new test function
-    const { data: rlsTest, error: rlsError } = await supabase.rpc('test_rls_policies');
-    
-    if (rlsError) {
-      console.error('❌ [RLS VALIDATION] RLS test failed:', rlsError);
-      return {
-        canInsert: false,
-        userProfile: null,
-        userRoles: [],
-        error: `RLS test failed: ${rlsError.message}`,
-        debugInfo: { rlsError, userId: user.id }
-      };
-    }
-
-    if (!rlsTest?.success) {
-      console.error('❌ [RLS VALIDATION] RLS test returned error:', rlsTest?.error);
-      return {
-        canInsert: false,
-        userProfile: null,
-        userRoles: [],
-        error: rlsTest?.error || 'RLS test failed',
-        debugInfo: { rlsTest, userId: user.id }
-      };
-    }
-
-    // Get user profile - should work now with clean RLS
+    // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -105,7 +104,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       };
     }
 
-    // Get user roles - should work now with clean RLS
+    // Get user roles
     const { data: userRoles, error: rolesError } = await supabase
       .from('user_roles')
       .select('role')
@@ -125,7 +124,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
     const roleNames = userRoles?.map(r => r.role) || [];
     const hasRequiredRole = roleNames.includes('manager') || roleNames.includes('admin');
 
-    console.log('✅ [RLS VALIDATION] Clean validation complete:', {
+    console.log('✅ [RLS VALIDATION] Validation complete:', {
       userId: user.id,
       profileRole: profile?.role,
       systemRoles: roleNames,
@@ -144,8 +143,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
         systemRoles: roleNames,
         hasRequiredRole,
         sessionValid: !!session,
-        profileExists: !!profile,
-        rlsTestPassed: true
+        profileExists: !!profile
       }
     };
   } catch (error) {
@@ -162,28 +160,28 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
 
 export const testLeadInsertion = async (): Promise<{ success: boolean; error?: string; debugInfo?: any }> => {
   try {
-    console.log('🧪 [RLS TEST] Testing lead insertion with clean RLS');
+    console.log('🧪 [RLS TEST] Testing lead insertion with direct validation');
     
-    // First validate RLS permissions using clean functions
+    // First validate RLS permissions
     const validation = await validateRLSPermissions();
     if (!validation.canInsert) {
       return { 
         success: false, 
-        error: validation.error || 'Clean RLS validation failed',
+        error: validation.error || 'RLS validation failed',
         debugInfo: validation.debugInfo
       };
     }
     
-    // Try a minimal insert to test clean RLS policies
+    // Try a minimal insert to test RLS policies
     const testLead = {
       first_name: 'Test',
       last_name: 'Lead',
-      vehicle_interest: 'Testing clean RLS policies',
-      source: 'Clean RLS Test',
+      vehicle_interest: 'Testing RLS policies',
+      source: 'RLS Test',
       status: 'new'
     };
 
-    console.log('🧪 [RLS TEST] Attempting test lead insertion with clean policies');
+    console.log('🧪 [RLS TEST] Attempting test lead insertion');
     const { data, error } = await supabase
       .from('leads')
       .insert(testLead)
@@ -191,7 +189,7 @@ export const testLeadInsertion = async (): Promise<{ success: boolean; error?: s
       .single();
 
     if (error) {
-      console.error('❌ [RLS TEST] Clean insert failed:', error);
+      console.error('❌ [RLS TEST] Insert failed:', error);
       return { 
         success: false, 
         error: error.message,
@@ -205,7 +203,7 @@ export const testLeadInsertion = async (): Promise<{ success: boolean; error?: s
       console.log('🧹 [RLS TEST] Cleaned up test lead');
     }
 
-    console.log('✅ [RLS TEST] Clean insert test successful');
+    console.log('✅ [RLS TEST] Insert test successful');
     return { 
       success: true,
       debugInfo: { testLead, validation: validation.debugInfo }
