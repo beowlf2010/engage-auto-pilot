@@ -46,13 +46,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // If no profile exists, create one with default manager role
       if (!profileData) {
         console.log('No profile found, creating default profile with manager role');
+        const userEmail = user?.email || '';
+        const firstName = user?.user_metadata?.first_name || 'User';
+        const lastName = user?.user_metadata?.last_name || 'Name';
+        
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({
             id: userId,
-            email: user?.email || '',
-            first_name: user?.user_metadata?.first_name || 'User',
-            last_name: user?.user_metadata?.last_name || 'Name',
+            email: userEmail,
+            first_name: firstName,
+            last_name: lastName,
             role: 'manager' // Default to manager for CSV upload capabilities
           })
           .select()
@@ -100,7 +104,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let mounted = true;
     
-    // Set up auth state listener - NEVER use async functions directly here
+    // Set up auth state listener - FIXED: Never use async functions directly here
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
@@ -111,7 +115,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer any Supabase calls using setTimeout to avoid deadlocks
+        // FIXED: Defer any Supabase calls using setTimeout to avoid deadlocks
         if (session?.user) {
           setTimeout(() => {
             if (!mounted) return;

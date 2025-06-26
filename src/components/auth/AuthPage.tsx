@@ -34,6 +34,7 @@ const AuthPage = () => {
       } else if (isLogin) {
         // Navigation will be handled automatically by the routing logic in App.tsx
         // The user will be redirected to /leads via the Navigate component
+        console.log('Sign in successful, navigation will be handled by routing');
       } else {
         setError('Please check your email for a confirmation link before signing in.');
       }
