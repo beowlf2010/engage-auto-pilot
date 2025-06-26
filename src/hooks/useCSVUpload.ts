@@ -25,13 +25,12 @@ export const useCSVUpload = () => {
   const [processedData, setProcessedData] = useState<ParsedCSVData | null>(null);
 
   const handleFileUpload = async (file: File, updateExisting: boolean = false) => {
+    console.log('🔄 [CSV UPLOAD] Starting CSV PARSING ONLY for:', file.name);
     setUploading(true);
     setProcessedData(null);
     setUploadResult(null);
 
     try {
-      console.log('🔄 [CSV UPLOAD] Starting file processing:', file.name);
-      
       // Parse CSV file
       const text = await file.text();
       const parsedCSV = parseCSVText(text);
@@ -43,10 +42,10 @@ export const useCSVUpload = () => {
       const fieldMapping = performAutoDetection(parsedCSV.headers);
       console.log('🔍 [CSV UPLOAD] Auto-detected field mapping:', fieldMapping);
       
-      // Process leads using the standard processor
+      // Process leads using the standard processor (LOCAL PROCESSING ONLY)
       const processResult = processLeads(parsedCSV, fieldMapping);
       
-      console.log('✅ [CSV UPLOAD] Processing complete:', {
+      console.log('✅ [CSV UPLOAD] LOCAL Processing complete (NO DATABASE):', {
         processedCount: processResult.validLeads.length,
         duplicatesCount: processResult.duplicates.length,
         errorsCount: processResult.errors.length
@@ -60,6 +59,7 @@ export const useCSVUpload = () => {
       };
       
       setProcessedData(processedData);
+      console.log('🎯 [CSV UPLOAD] processedData set, bypass button should appear');
       
     } catch (error) {
       console.error('💥 [CSV UPLOAD] File processing error:', error);
@@ -72,6 +72,7 @@ export const useCSVUpload = () => {
       });
     } finally {
       setUploading(false);
+      console.log('🔄 [CSV UPLOAD] Upload state set to false');
     }
   };
 

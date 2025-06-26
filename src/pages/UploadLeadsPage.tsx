@@ -27,10 +27,19 @@ const UploadLeadsPage = () => {
   const { userProfile, loading: profileLoading } = useEnhancedUserProfile();
 
   const handleFilesSelected = (files: FileList) => {
+    console.log('🔥 [UPLOAD PAGE] handleFilesSelected called with files:', files.length);
     if (files.length > 0) {
+      console.log('🔥 [UPLOAD PAGE] Calling handleFileUpload for:', files[0].name);
       handleFileUpload(files[0], updateExistingLeads);
     }
   };
+
+  console.log('🔍 [UPLOAD PAGE] Current state:', {
+    uploading,
+    hasUploadResult: !!uploadResult,
+    hasProcessedData: !!processedData,
+    processedLeadsCount: processedData?.processedLeads?.length || 0
+  });
 
   if (profileLoading) {
     return (
@@ -105,12 +114,25 @@ const UploadLeadsPage = () => {
                 </div>
                 
                 {processedData && processedData.processedLeads.length > 0 && (
-                  <div className="pt-4 border-t">
+                  <div className="pt-4 border-t bg-green-50 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-slate-600">
-                          {processedData.processedLeads.length} leads ready for upload
+                        <p className="text-sm font-medium text-green-800">
+                          ✅ CSV Processed Successfully!
                         </p>
+                        <p className="text-sm text-green-600">
+                          {processedData.processedLeads.length} leads ready for bypass upload
+                        </p>
+                        {processedData.duplicates.length > 0 && (
+                          <p className="text-xs text-orange-600">
+                            {processedData.duplicates.length} potential duplicates detected
+                          </p>
+                        )}
+                        {processedData.errors.length > 0 && (
+                          <p className="text-xs text-red-600">
+                            {processedData.errors.length} rows had errors
+                          </p>
+                        )}
                       </div>
                       <BypassUploadButton 
                         leads={processedData.processedLeads}

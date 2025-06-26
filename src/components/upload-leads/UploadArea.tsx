@@ -3,7 +3,6 @@ import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, Database, FileSpreadsheet, CheckCircle, AlertCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface UploadAreaProps {
   onFilesSelected: (files: FileList) => void;
@@ -33,6 +32,7 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       setLastUploadedFile(file.name);
+      console.log('📁 [UPLOAD AREA] File dropped, calling onFilesSelected:', file.name);
       onFilesSelected(e.dataTransfer.files);
     }
   };
@@ -40,6 +40,7 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
   const handleFileSelect = (files: FileList) => {
     if (files && files[0]) {
       setLastUploadedFile(files[0].name);
+      console.log('📁 [UPLOAD AREA] File selected, calling onFilesSelected:', files[0].name);
       onFilesSelected(files);
     }
   };
@@ -75,10 +76,10 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
             <div className="space-y-4">
               <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
               <div className="space-y-2">
-                <p className="text-slate-600 font-medium">Processing and saving leads...</p>
+                <p className="text-slate-600 font-medium">Processing CSV file...</p>
                 <div className="flex items-center justify-center space-x-2 text-sm text-slate-500">
-                  <Database className="w-4 h-4" />
-                  <span>Validating duplicates and inserting to database</span>
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Parsing data and preparing for bypass upload</span>
                 </div>
                 {lastUploadedFile && (
                   <div className="flex items-center justify-center space-x-2 text-xs text-slate-400">
@@ -118,7 +119,7 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
 
               {lastUploadedFile && (
                 <div className="flex items-center justify-center space-x-2 text-sm text-green-600 bg-green-50 rounded-lg p-2">
-                  <CheckCircle className="w-4 h-4" />
+                  <CheckCircle className="w-4 w-4" />
                   <span>Last uploaded: {lastUploadedFile}</span>
                 </div>
               )}
@@ -145,8 +146,8 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
                 <div className="flex items-start space-x-2 text-xs text-amber-600 bg-amber-50 rounded p-2 mt-3">
                   <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="font-medium">File Requirements:</div>
-                    <div>Max size: 10MB • Headers in first row • UTF-8 encoding recommended</div>
+                    <div className="font-medium">Processing Note:</div>
+                    <div>File will be parsed locally - use Bypass Upload button to save to database</div>
                   </div>
                 </div>
               </div>
