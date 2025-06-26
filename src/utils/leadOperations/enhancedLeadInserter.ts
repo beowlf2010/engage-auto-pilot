@@ -13,13 +13,6 @@ export interface DetailedLeadInsertResult extends LeadInsertResult {
 
 export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHistoryId?: string): Promise<DetailedLeadInsertResult> => {
   console.log(`🔍 [LEAD INSERT] Starting insertion for: ${leadData.firstName || 'Unknown'} ${leadData.lastName || 'Lead'}`);
-  console.log(`🔍 [LEAD INSERT] Lead data:`, {
-    firstName: leadData.firstName,
-    lastName: leadData.lastName,
-    email: leadData.email,
-    phoneNumbers: leadData.phoneNumbers?.length || 0,
-    primaryPhone: leadData.primaryPhone
-  });
   
   try {
     // Validate RLS permissions before attempting insertion
@@ -52,11 +45,6 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       validationErrors.push('No phone numbers provided - lead may need manual contact information');
     }
 
-    // Log validation warnings but don't fail insertion
-    if (validationErrors.length > 0) {
-      console.log(`⚠️ [LEAD INSERT] Validation warnings for ${leadData.firstName || 'Unknown'} ${leadData.lastName || 'Lead'}:`, validationErrors);
-    }
-
     // Prepare lead data for insertion - handle NULL names properly
     const leadInsert = {
       first_name: leadData.firstName || null,
@@ -87,7 +75,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
 
     console.log(`💾 [LEAD INSERT] Inserting lead data:`, leadInsert);
 
-    // Insert the lead using the new non-recursive RLS policies
+    // Insert the lead using the clean RLS policies
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .insert(leadInsert)
@@ -95,24 +83,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       .single();
 
     if (leadError) {
-      console.error(`❌ [LEAD INSERT] Lead insertion failed:`, {
-        error: leadError,
-        leadData: leadInsert,
-        rlsValidation
-      });
-
-      // Enhanced error handling - should no longer see recursion errors
-      if (leadError.message.includes('row-level security') || 
-          leadError.message.includes('policy')) {
-        return { 
-          success: false, 
-          error: `Database security error: ${leadError.message}. Please ensure you have proper permissions.`,
-          validationErrors: ['Row-level security policy violation'],
-          rawError: leadError,
-          rlsValidation
-        };
-      }
-
+      console.error(`❌ [LEAD INSERT] Lead insertion failed:`, leadError);
       return { 
         success: false, 
         error: `Database insertion failed: ${leadError.message}`,
@@ -124,7 +95,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
 
     console.log(`✅ [LEAD INSERT] Lead inserted successfully with ID: ${lead.id}`);
 
-    // Insert phone numbers using the new non-recursive policies
+    // Insert phone numbers using the clean RLS policies
     let phoneNumbersInserted = 0;
     if (leadData.phoneNumbers && leadData.phoneNumbers.length > 0) {
       console.log(`📞 [PHONE INSERT] Inserting ${leadData.phoneNumbers.length} phone numbers for lead ${lead.id}`);
@@ -138,8 +109,6 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
         is_primary: phone.isPrimary
       }));
 
-      console.log(`📞 [PHONE INSERT] Phone inserts:`, phoneInserts);
-
       const { data: phoneData, error: phoneError } = await supabase
         .from('phone_numbers')
         .insert(phoneInserts)
@@ -147,7 +116,6 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
 
       if (phoneError) {
         console.error(`⚠️ [PHONE INSERT] Phone number insertion failed:`, phoneError);
-        // Don't fail the whole operation for phone errors
         validationErrors.push(`Phone insertion failed: ${phoneError.message}`);
         phoneNumbersInserted = 0;
       } else {
