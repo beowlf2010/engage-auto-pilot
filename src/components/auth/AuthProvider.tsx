@@ -29,16 +29,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize user for CSV operations using the clean function
+  // Initialize user for CSV operations using the completely clean function
   const initializeUserForCSV = async (): Promise<{ success: boolean; error?: string }> => {
     if (!user || !session) {
       return { success: false, error: 'User not authenticated' };
     }
 
     try {
-      console.log('🔧 [AUTH] Initializing user for CSV operations:', user.id);
+      console.log('🔧 [AUTH] Initializing user with completely clean function:', user.id);
       
-      const { data, error } = await supabase.rpc('initialize_user_for_csv_clean', {
+      const { data, error } = await supabase.rpc('initialize_user_completely_clean', {
         p_user_id: user.id,
         p_email: user.email || '',
         p_first_name: user.user_metadata?.first_name || 'User',
@@ -46,23 +46,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (error) {
-        console.error('❌ [AUTH] Failed to initialize user for CSV:', error);
+        console.error('❌ [AUTH] Failed to initialize user with clean function:', error);
         return { success: false, error: error.message };
       }
 
-      console.log('✅ [AUTH] User initialized for CSV operations:', data);
+      console.log('✅ [AUTH] User initialized with clean function:', data);
       
       // Refresh profile data
       await fetchUserProfile(user.id);
       
       return { success: true };
     } catch (error) {
-      console.error('💥 [AUTH] Unexpected error during CSV initialization:', error);
+      console.error('💥 [AUTH] Unexpected error during clean initialization:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
-  // Helper function to fetch user profile
+  // Helper function to fetch user profile with clean RLS
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data: profileData, error } = await supabase
@@ -72,13 +72,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
       
       if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', error);
+        console.error('Error fetching profile with clean RLS:', error);
         return null;
       }
       
-      // If no profile exists, initialize the user
+      // If no profile exists, initialize the user with clean function
       if (!profileData) {
-        console.log('No profile found, initializing user');
+        console.log('No profile found, initializing user with clean function');
         const initResult = await initializeUserForCSV();
         
         if (initResult.success) {
@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       return profileData;
     } catch (error) {
-      console.error('Error in fetchUserProfile:', error);
+      console.error('Error in fetchUserProfile with clean RLS:', error);
       return null;
     }
   };
