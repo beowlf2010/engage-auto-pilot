@@ -6,6 +6,21 @@ import AuthPage from './components/auth/AuthPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
 import LeadsList from './components/LeadsList';
+import DashboardPage from './pages/DashboardPage';
+import SmartInboxPage from './pages/SmartInboxPage';
+import InventoryDashboardPage from './pages/InventoryDashboardPage';
+import InventoryUploadPage from './pages/InventoryUploadPage';
+import RPOInsightsPage from './pages/RPOInsightsPage';
+import FinancialDashboardPage from './pages/FinancialDashboardPage';
+import AIMonitorPage from './pages/AIMonitorPage';
+import SalesDashboardPage from './pages/SalesDashboardPage';
+import AdvancedAnalyticsPage from './pages/AdvancedAnalyticsPage';
+import PredictiveAnalyticsPage from './pages/PredictiveAnalyticsPage';
+import MessageExportPage from './pages/MessageExportPage';
+import PersonalizationPage from './pages/PersonalizationPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import ManagerDashboardPage from './pages/ManagerDashboardPage';
+import SettingsPage from './pages/SettingsPage';
 import { Toaster } from '@/components/ui/toaster';
 
 const queryClient = new QueryClient();
@@ -24,7 +39,18 @@ const AppContent = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/auth" element={user ? <Navigate to="/leads" replace /> : <AuthPage />} />
+        <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+        
+        {/* Dashboard */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <DashboardPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Leads */}
         <Route path="/leads" element={
           <ProtectedRoute>
             <AppLayout>
@@ -32,7 +58,127 @@ const AppContent = () => {
             </AppLayout>
           </ProtectedRoute>
         } />
-        <Route path="/" element={<Navigate to={user ? "/leads" : "/auth"} replace />} />
+        
+        {/* Smart Inbox */}
+        <Route path="/smart-inbox" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <SmartInboxPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Inventory */}
+        <Route path="/inventory-dashboard" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <InventoryDashboardPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/upload-inventory" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <InventoryUploadPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/rpo-insights" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <RPOInsightsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Analytics */}
+        <Route path="/financial-dashboard" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <FinancialDashboardPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/ai-monitor" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AIMonitorPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/sales-dashboard" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <SalesDashboardPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/analytics" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AdvancedAnalyticsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Tools */}
+        <Route path="/predictive-analytics" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PredictiveAnalyticsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/message-export" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <MessageExportPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/personalization" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PersonalizationPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Admin */}
+        <Route path="/admin-dashboard" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AdminDashboardPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/manager-dashboard" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ManagerDashboardPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Settings */}
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <SettingsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Default redirect to dashboard */}
+        <Route path="/" element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} />
       </Routes>
     </Router>
   );
