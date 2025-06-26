@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +29,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize user for CSV operations
+  // Initialize user for CSV operations using simplified function
   const initializeUserForCSV = async (): Promise<{ success: boolean; error?: string }> => {
     if (!user || !session) {
       return { success: false, error: 'User not authenticated' };
@@ -39,11 +38,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('🔧 [AUTH] Initializing user for CSV operations:', user.id);
       
-      const { data, error } = await supabase.rpc('initialize_user_for_csv', {
+      const { data, error } = await supabase.rpc('initialize_user_for_csv_simple', {
         p_user_id: user.id,
-        p_email: user.email || '',
-        p_first_name: user.user_metadata?.first_name || 'User',
-        p_last_name: user.user_metadata?.last_name || 'Name'
+        p_email: user.email || ''
       });
 
       if (error) {

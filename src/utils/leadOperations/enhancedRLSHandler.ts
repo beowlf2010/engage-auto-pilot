@@ -29,22 +29,34 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
 
     console.log('🔍 [RLS VALIDATION] User authenticated:', user.id);
 
-    // Initialize user for CSV if needed
+    // Initialize user using simplified function to avoid recursion
     try {
-      const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv', {
+      const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv_simple', {
         p_user_id: user.id,
-        p_email: user.email || '',
-        p_first_name: user.user_metadata?.first_name || 'User',
-        p_last_name: user.user_metadata?.last_name || 'Name'
+        p_email: user.email || ''
       });
 
       if (initError) {
         console.error('⚠️ [RLS VALIDATION] Failed to initialize user:', initError);
+        return {
+          canInsert: false,
+          userProfile: null,
+          userRoles: [],
+          error: `User initialization failed: ${initError.message}`,
+          debugInfo: { initError, userId: user.id }
+        };
       } else {
         console.log('✅ [RLS VALIDATION] User initialized:', initResult);
       }
     } catch (initError) {
-      console.warn('⚠️ [RLS VALIDATION] User initialization warning:', initError);
+      console.error('💥 [RLS VALIDATION] User initialization error:', initError);
+      return {
+        canInsert: false,
+        userProfile: null,
+        userRoles: [],
+        error: `User initialization error: ${initError instanceof Error ? initError.message : 'Unknown error'}`,
+        debugInfo: { initError, userId: user.id }
+      };
     }
 
     // Check user profile
