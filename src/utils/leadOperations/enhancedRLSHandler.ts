@@ -13,8 +13,10 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
     console.log('🔍 [RLS VALIDATION] Checking user permissions for lead insertion');
     
     // Get current user with session
-    const { data: { user, session }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user || !session) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (userError || !user || sessionError || !session) {
       return {
         canInsert: false,
         userProfile: null,
