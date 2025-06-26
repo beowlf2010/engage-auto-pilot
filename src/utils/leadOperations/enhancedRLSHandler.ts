@@ -29,58 +29,41 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
 
     console.log('🔍 [RLS VALIDATION] User authenticated:', user.id);
 
-    // Direct user setup using upsert operations
+    // Use the SECURITY DEFINER function to initialize user safely (bypasses RLS)
     try {
-      console.log('🔧 [RLS VALIDATION] Setting up user profile and role');
+      console.log('🔧 [RLS VALIDATION] Initializing user via database function');
       
-      // Profile upsert
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          email: user.email || '',
-          first_name: user.user_metadata?.first_name || 'User',
-          last_name: user.user_metadata?.last_name || 'Name',
-          role: 'manager'
-        }, { onConflict: 'id' });
+      const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv_clean', {
+        p_user_id: user.id,
+        p_email: user.email || '',
+        p_first_name: user.user_metadata?.first_name || 'User',
+        p_last_name: user.user_metadata?.last_name || 'Name'
+      });
 
-      if (profileError && !profileError.message.includes('duplicate key')) {
-        console.error('⚠️ [RLS VALIDATION] Profile upsert failed:', profileError);
+      if (initError) {
+        console.error('⚠️ [RLS VALIDATION] User initialization failed:', initError);
         return {
           canInsert: false,
           userProfile: null,
           userRoles: [],
-          error: `Profile setup failed: ${profileError.message}`,
-          debugInfo: { profileError, userId: user.id }
+          error: `User initialization failed: ${initError.message}`,
+          debugInfo: { initError, userId: user.id }
         };
       }
 
-      // Role upsert
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: user.id,
-          role: 'manager'
-        }, { onConflict: 'user_id,role' });
-
-      if (roleError && !roleError.message.includes('duplicate key')) {
-        console.error('⚠️ [RLS VALIDATION] Role upsert failed:', roleError);
-        return {
-          canInsert: false,
-          userProfile: null,
-          userRoles: [],
-          error: `Role setup failed: ${roleError.message}`,
-          debugInfo: { roleError, userId: user.id }
-        };
-      }
-
-      console.log('✅ [RLS VALIDATION] User setup completed');
+      console.log('✅ [RLS VALIDATION] User initialization successful:', initResult);
     } catch (setupError) {
       console.error('💥 [RLS VALIDATION] Setup error:', setupError);
-      // Continue with mock data since setup might fail due to existing records
+      return {
+        canInsert: false,
+        userProfile: null,
+        userRoles: [],
+        error: `Setup failed: ${setupError instanceof Error ? setupError.message : 'Unknown error'}`,
+        debugInfo: { setupError, userId: user.id }
+      };
     }
 
-    // Create consistent profile data
+    // Create consistent profile data (we know user is properly initialized now)
     const userProfile = {
       id: user.id,
       email: user.email,
