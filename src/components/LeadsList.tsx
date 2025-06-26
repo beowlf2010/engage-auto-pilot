@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -55,6 +54,15 @@ const LeadsList = () => {
 
     initUser();
   }, [profile, initializeUserForCSV]);
+
+  // Debug logging to help identify the issue
+  console.log('LeadsList Debug:', {
+    loading,
+    error,
+    leadsCount: leads?.length || 0,
+    profile: !!profile,
+    profileRole: profile?.role
+  });
 
   // Filtering logic, event handlers, etc.
   const filteredLeads = useMemo(() => {
@@ -128,6 +136,7 @@ const LeadsList = () => {
     });
   }, [leads, searchFilters, showHidden]);
 
+  // Handler functions
   const handleLeadSelect = (leadId: string) => {
     setSelectedLeads(prev => 
       prev.includes(leadId) 
@@ -186,6 +195,7 @@ const LeadsList = () => {
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
 
+  // Show loading state with better UI
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
@@ -197,7 +207,9 @@ const LeadsList = () => {
     );
   }
 
+  // Show error state with better handling
   if (error) {
+    console.error('LeadsList Error:', error);
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -205,9 +217,28 @@ const LeadsList = () => {
             <CardTitle className="text-red-600">Error Loading Leads</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600 mb-4">{error.message}</p>
+            <p className="text-gray-600 mb-4">{error.message || 'An unexpected error occurred'}</p>
             <Button onClick={() => refetch()} className="w-full">
               Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show a fallback if leads is null/undefined but no error
+  if (!leads) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-yellow-600">No Data Available</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 mb-4">Unable to load leads data. Please try refreshing the page.</p>
+            <Button onClick={() => window.location.reload()} className="w-full">
+              Refresh Page
             </Button>
           </CardContent>
         </Card>
@@ -293,4 +324,3 @@ const LeadsList = () => {
 };
 
 export default LeadsList;
-
