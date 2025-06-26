@@ -6,6 +6,8 @@ import { useLeads } from '@/hooks/useLeads';
 import { useLeadFilters } from '@/hooks/useLeadFilters';
 import { Lead } from '@/types/lead';
 import { toast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { LogOut } from 'lucide-react';
 import LeadsPageHeader from './leads/LeadsPageHeader';
 import ProcessManagementPanel from './leads/ProcessManagementPanel';
 import MultiFileLeadUploadModal from './leads/MultiFileLeadUploadModal';
@@ -16,7 +18,7 @@ import LeadsLoadingState from './leads/LeadsLoadingState';
 import ShowHiddenLeadsToggle from './leads/ShowHiddenLeadsToggle';
 
 const LeadsList = () => {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [isVINImportModalOpen, setIsVINImportModalOpen] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -97,6 +99,11 @@ const LeadsList = () => {
     navigate(`/leads/${leadId}`);
   };
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -115,6 +122,20 @@ const LeadsList = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header with logout button */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Leads Management</h1>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-gray-600">
+            Welcome, {profile?.first_name || 'User'}
+          </span>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
+      </div>
+
       <LeadsPageHeader 
         canImport={canImport}
         onVINImportClick={() => setIsVINImportModalOpen(true)}

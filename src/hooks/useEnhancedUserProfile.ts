@@ -22,7 +22,7 @@ interface UserRole {
 }
 
 export const useEnhancedUserProfile = () => {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile: authProfile, loading: authLoading } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,40 +38,45 @@ export const useEnhancedUserProfile = () => {
     try {
       console.log('🔍 [USER PROFILE] Checking user profile for:', user.id);
       
-      // Check if profile exists
-      const { data: existingProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError && profileError.code !== 'PGRST116') {
-        throw profileError;
-      }
-
-      let currentProfile = existingProfile;
-
-      // Create profile if it doesn't exist
-      if (!existingProfile) {
-        console.log('📝 [USER PROFILE] Creating new profile for user');
-        const { data: newProfile, error: createError } = await supabase
+      // Use the profile from auth context if available
+      if (authProfile) {
+        setUserProfile(authProfile);
+      } else {
+        // Fallback to direct query
+        const { data: existingProfile, error: profileError } = await supabase
           .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email || '',
-            first_name: user.user_metadata?.first_name || 'User',
-            last_name: user.user_metadata?.last_name || 'Name',
-            role: 'manager' // Default to manager for CSV upload capabilities
-          })
-          .select()
+          .select('*')
+          .eq('id', user.id)
           .single();
 
-        if (createError) throw createError;
-        currentProfile = newProfile;
-        console.log('✅ [USER PROFILE] Created new profile with manager role');
-      }
+        if (profileError && profileError.code !== 'PGRST116') {
+          throw profileError;
+        }
 
-      setUserProfile(currentProfile);
+        let currentProfile = existingProfile;
+
+        // Create profile if it doesn't exist
+        if (!existingProfile) {
+          console.log('📝 [USER PROFILE] Creating new profile for user');
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email || '',
+              first_name: user.user_metadata?.first_name || 'User',
+              last_name: user.user_metadata?.last_name || 'Name',
+              role: 'manager' // Default to manager for CSV upload capabilities
+            })
+            .select()
+            .single();
+
+          if (createError) throw createError;
+          currentProfile = newProfile;
+          console.log('✅ [USER PROFILE] Created new profile with manager role');
+        }
+
+        setUserProfile(currentProfile);
+      }
 
       // Check user roles
       const { data: roles, error: rolesError } = await supabase
@@ -142,10 +147,10 @@ export const useEnhancedUserProfile = () => {
       setLoading(false);
       setError('User not authenticated');
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, authProfile]);
 
   return {
-    userProfile,
+    userProfile: userProfile || authProfile,
     userRoles,
     loading,
     error,
