@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { parseCSVText } from '@/utils/csvParser';
 import { performAutoDetection } from '@/components/csv-mapper/fieldMappingUtils';
-import { processLeadsEnhanced } from '@/components/upload-leads/processLeads';
+import { processLeads } from '@/components/upload-leads/processLeads';
 
 export interface CSVUploadResult {
   success: boolean;
@@ -43,23 +43,18 @@ export const useCSVUpload = () => {
       const fieldMapping = performAutoDetection(parsedCSV.headers);
       console.log('🔍 [CSV UPLOAD] Auto-detected field mapping:', fieldMapping);
       
-      // Process leads using the enhanced processor (without database validation)
-      const processResult = await processLeadsEnhanced(
-        parsedCSV.rows,
-        fieldMapping,
-        [], // No existing leads for duplicate checking since we're bypassing
-        updateExisting
-      );
+      // Process leads using the standard processor
+      const processResult = processLeads(parsedCSV, fieldMapping);
       
       console.log('✅ [CSV UPLOAD] Processing complete:', {
-        processedCount: processResult.processedLeads.length,
+        processedCount: processResult.validLeads.length,
         duplicatesCount: processResult.duplicates.length,
         errorsCount: processResult.errors.length
       });
       
       // Set processed data - this will enable the bypass upload button
       const processedData: ParsedCSVData = {
-        processedLeads: processResult.processedLeads,
+        processedLeads: processResult.validLeads,
         duplicates: processResult.duplicates,
         errors: processResult.errors
       };
