@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -11,6 +12,7 @@ import EnhancedLeadSearch from './leads/EnhancedLeadSearch';
 import MultiFileLeadUploadModal from './leads/MultiFileLeadUploadModal';
 import { Lead } from '@/types/lead';
 import { useToast } from '@/hooks/use-toast';
+import { SearchFilters, SavedPreset } from '@/hooks/useAdvancedLeads';
 
 const LeadsList = () => {
   const { profile, initializeUserForCSV } = useAuth();
@@ -19,6 +21,10 @@ const LeadsList = () => {
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+    searchTerm: '',
+    dateFilter: 'all'
+  });
 
   const {
     leads,
@@ -55,6 +61,7 @@ const LeadsList = () => {
     if (!leads) return [];
     
     return leads.filter(lead => {
+      const searchTerm = searchFilters.searchTerm || '';
       const matchesSearch = !searchTerm || 
         lead.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         lead.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -63,9 +70,63 @@ const LeadsList = () => {
       
       const matchesHiddenFilter = showHidden || !lead.is_hidden;
       
-      return matchesSearch && matchesHiddenFilter;
+      // Apply other filters
+      let matchesFilters = true;
+      
+      if (searchFilters.status) {
+        matchesFilters = matchesFilters && lead.status === searchFilters.status;
+      }
+      
+      if (searchFilters.contactStatus) {
+        matchesFilters = matchesFilters && lead.contactStatus === searchFilters.contactStatus;
+      }
+      
+      if (searchFilters.aiOptIn !== undefined) {
+        matchesFilters = matchesFilters && lead.aiOptIn === searchFilters.aiOptIn;
+      }
+      
+      if (searchFilters.vehicleInterest) {
+        matchesFilters = matchesFilters && lead.vehicleInterest?.toLowerCase().includes(searchFilters.vehicleInterest.toLowerCase());
+      }
+      
+      if (searchFilters.source) {
+        matchesFilters = matchesFilters && lead.source === searchFilters.source;
+      }
+      
+      // Date filtering
+      if (searchFilters.dateFilter && searchFilters.dateFilter !== 'all') {
+        const leadDate = new Date(lead.createdAt);
+        const today = new Date();
+        
+        switch (searchFilters.dateFilter) {
+          case 'today':
+            const todayStart = new Date(today);
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date(today);
+            todayEnd.setHours(23, 59, 59, 999);
+            matchesFilters = matchesFilters && leadDate >= todayStart && leadDate <= todayEnd;
+            break;
+          case 'yesterday':
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStart = new Date(yesterday);
+            yesterdayStart.setHours(0, 0, 0, 0);
+            const yesterdayEnd = new Date(yesterday);
+            yesterdayEnd.setHours(23, 59, 59, 999);
+            matchesFilters = matchesFilters && leadDate >= yesterdayStart && leadDate <= yesterdayEnd;
+            break;
+          case 'this_week':
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            weekStart.setHours(0, 0, 0, 0);
+            matchesFilters = matchesFilters && leadDate >= weekStart;
+            break;
+        }
+      }
+      
+      return matchesSearch && matchesHiddenFilter && matchesFilters;
     });
-  }, [leads, searchTerm, showHidden]);
+  }, [leads, searchFilters, showHidden]);
 
   const handleLeadSelect = (leadId: string) => {
     setSelectedLeads(prev => 
@@ -106,6 +167,22 @@ const LeadsList = () => {
       }).length,
     };
   }, [filteredLeads]);
+
+  const handleFiltersChange = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+  };
+
+  const handleSavePreset = (name: string, filters: SearchFilters) => {
+    // For now, just show a toast - you can implement actual saving later
+    toast({
+      title: "Preset Saved",
+      description: `Filter preset "${name}" has been saved.`,
+    });
+  };
+
+  const handleLoadPreset = (preset: SavedPreset) => {
+    setSearchFilters(preset.filters);
+  };
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
 
@@ -176,9 +253,12 @@ const LeadsList = () => {
 
         {/* Search */}
         <EnhancedLeadSearch
-          value={searchTerm}
-          onChange={setSearchTerm}
-          totalLeads={filteredLeads.length}
+          onFiltersChange={handleFiltersChange}
+          savedPresets={[]} // Empty for now, implement actual presets later
+          onSavePreset={handleSavePreset}
+          onLoadPreset={handleLoadPreset}
+          totalResults={filteredLeads.length}
+          isLoading={loading}
         />
 
         {/* Leads Table */}
@@ -188,7 +268,7 @@ const LeadsList = () => {
           onDoNotContactChange={updateDoNotContact}
           canEdit={canEdit}
           loading={loading}
-          searchTerm={searchTerm}
+          searchTerm={searchFilters.searchTerm || ''}
           selectedLeads={selectedLeads}
           onLeadSelect={handleLeadSelect}
           onQuickView={handleQuickView}
@@ -213,3 +293,4 @@ const LeadsList = () => {
 };
 
 export default LeadsList;
+
