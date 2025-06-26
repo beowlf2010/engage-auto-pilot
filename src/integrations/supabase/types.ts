@@ -4973,6 +4973,10 @@ export type Database = {
         }
         Returns: Json
       }
+      make_current_user_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       mark_missing_vehicles_sold: {
         Args: { p_upload_id: string }
         Returns: undefined
@@ -5008,6 +5012,10 @@ export type Database = {
       update_inventory_velocity_tracking: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      upload_csv_leads_bypass_rls: {
+        Args: { p_leads: Json; p_upload_history_id?: string }
+        Returns: Json
       }
       upsert_expanded_profit_snapshot: {
         Args: {
