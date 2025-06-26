@@ -12,25 +12,45 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
   try {
     console.log('🔍 [RLS VALIDATION] Checking user permissions for lead insertion');
     
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    // Get current user with session
+    const { data: { user, session }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user || !session) {
       return {
         canInsert: false,
         userProfile: null,
         userRoles: [],
-        error: 'User not authenticated'
+        error: 'User not authenticated or session invalid'
       };
     }
 
-    // Check user profile using the new security definer function
+    console.log('🔍 [RLS VALIDATION] User authenticated:', user.id);
+
+    // Initialize user for CSV if needed
+    try {
+      const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv', {
+        p_user_id: user.id,
+        p_email: user.email || '',
+        p_first_name: user.user_metadata?.first_name || 'User',
+        p_last_name: user.user_metadata?.last_name || 'Name'
+      });
+
+      if (initError) {
+        console.error('⚠️ [RLS VALIDATION] Failed to initialize user:', initError);
+      } else {
+        console.log('✅ [RLS VALIDATION] User initialized:', initResult);
+      }
+    } catch (initError) {
+      console.warn('⚠️ [RLS VALIDATION] User initialization warning:', initError);
+    }
+
+    // Check user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
 
-    if (profileError) {
+    if (profileError && profileError.code !== 'PGRST116') {
       console.error('❌ [RLS VALIDATION] Profile error:', profileError);
       return {
         canInsert: false,
@@ -40,7 +60,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       };
     }
 
-    // Check user roles using the new security definer function
+    // Check user roles
     const { data: roles, error: rolesError } = await supabase
       .from('user_roles')
       .select('role')
@@ -63,7 +83,8 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       userId: user.id,
       profileRole: profile?.role,
       systemRoles: roleNames,
-      hasRequiredRole
+      hasRequiredRole,
+      sessionValid: !!session
     });
 
     return {
@@ -85,13 +106,19 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
 
 export const testLeadInsertion = async (): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log('🧪 [RLS TEST] Testing lead insertion permissions with new policies');
+    console.log('🧪 [RLS TEST] Testing lead insertion permissions');
     
-    // Try a minimal insert to test RLS with the new non-recursive policies
+    // First validate RLS permissions
+    const validation = await validateRLSPermissions();
+    if (!validation.canInsert) {
+      return { success: false, error: validation.error || 'RLS validation failed' };
+    }
+    
+    // Try a minimal insert to test RLS
     const testLead = {
       first_name: 'Test',
       last_name: 'Lead',
-      vehicle_interest: 'Testing new RLS policies',
+      vehicle_interest: 'Testing RLS permissions',
       source: 'RLS Test',
       status: 'new'
     };
@@ -113,7 +140,7 @@ export const testLeadInsertion = async (): Promise<{ success: boolean; error?: s
       console.log('🧹 [RLS TEST] Cleaned up test lead');
     }
 
-    console.log('✅ [RLS TEST] Insert test successful with new policies');
+    console.log('✅ [RLS TEST] Insert test successful');
     return { success: true };
   } catch (error) {
     console.error('💥 [RLS TEST] Unexpected error:', error);

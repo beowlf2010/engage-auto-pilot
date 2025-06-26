@@ -11,6 +11,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  initializeUserForCSV: () => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +30,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Initialize user for CSV operations
+  const initializeUserForCSV = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!user || !session) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    try {
+      console.log('🔧 [AUTH] Initializing user for CSV operations:', user.id);
+      
+      const { data, error } = await supabase.rpc('initialize_user_for_csv', {
+        p_user_id: user.id,
+        p_email: user.email || '',
+        p_first_name: user.user_metadata?.first_name || 'User',
+        p_last_name: user.user_metadata?.last_name || 'Name'
+      });
+
+      if (error) {
+        console.error('❌ [AUTH] Failed to initialize user for CSV:', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log('✅ [AUTH] User initialized for CSV operations:', data);
+      
+      // Refresh profile data
+      await fetchUserProfile(user.id);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('💥 [AUTH] Unexpected error during CSV initialization:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  };
+
   // Helper function to fetch user profile
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -43,31 +77,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return null;
       }
       
-      // If no profile exists, create one with default manager role
+      // If no profile exists, initialize the user
       if (!profileData) {
-        console.log('No profile found, creating default profile with manager role');
-        const userEmail = user?.email || '';
-        const firstName = user?.user_metadata?.first_name || 'User';
-        const lastName = user?.user_metadata?.last_name || 'Name';
+        console.log('No profile found, initializing user');
+        const initResult = await initializeUserForCSV();
         
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            email: userEmail,
-            first_name: firstName,
-            last_name: lastName,
-            role: 'manager' // Default to manager for CSV upload capabilities
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating profile:', createError);
-          return null;
+        if (initResult.success) {
+          // Try fetching profile again
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          return newProfile;
         }
         
-        return newProfile;
+        return null;
       }
       
       return profileData;
@@ -77,61 +102,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Helper function to ensure user has manager role
-  const ensureManagerRole = async (userId: string) => {
-    try {
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', userId);
-
-      const hasManagerOrAdmin = roles?.some(r => ['manager', 'admin'].includes(r.role));
-      
-      if (!hasManagerOrAdmin) {
-        console.log('Adding manager role for CSV upload capabilities');
-        await supabase
-          .from('user_roles')
-          .insert({
-            user_id: userId,
-            role: 'manager'
-          });
-      }
-    } catch (error) {
-      console.error('Error ensuring manager role:', error);
-    }
-  };
-
   useEffect(() => {
     let mounted = true;
     
-    // Set up auth state listener - FIXED: Never use async functions directly here
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
         
-        console.log('Auth state changed:', event, session?.user?.id);
+        console.log('🔄 [AUTH] Auth state changed:', event, session?.user?.id);
         
-        // Only synchronous updates here to avoid deadlocks
+        // Update session and user state
         setSession(session);
         setUser(session?.user ?? null);
         
-        // FIXED: Defer any Supabase calls using setTimeout to avoid deadlocks
+        // Handle profile fetching after state update
         if (session?.user) {
-          setTimeout(() => {
+          setTimeout(async () => {
             if (!mounted) return;
             
-            Promise.all([
-              fetchUserProfile(session.user.id),
-              ensureManagerRole(session.user.id)
-            ]).then(([profileData]) => {
+            try {
+              const profileData = await fetchUserProfile(session.user.id);
               if (!mounted) return;
+              
               setProfile(profileData);
               setLoading(false);
-            }).catch((error) => {
+            } catch (error) {
               console.error('Error in deferred auth setup:', error);
               if (!mounted) return;
               setLoading(false);
-            });
+            }
           }, 0);
         } else {
           setProfile(null);
@@ -148,10 +148,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        Promise.all([
-          fetchUserProfile(session.user.id),
-          ensureManagerRole(session.user.id)
-        ]).then(([profileData]) => {
+        fetchUserProfile(session.user.id).then((profileData) => {
           if (!mounted) return;
           setProfile(profileData);
           setLoading(false);
@@ -170,7 +167,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!mounted) return;
       console.warn('Auth loading timeout - setting loading to false');
       setLoading(false);
-    }, 10000); // 10 second timeout
+    }, 10000);
 
     return () => {
       mounted = false;
@@ -213,6 +210,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         signIn,
         signUp,
         signOut,
+        initializeUserForCSV,
       }}
     >
       {children}

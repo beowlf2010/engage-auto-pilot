@@ -4876,6 +4876,19 @@ export type Database = {
         Args: { p_upload_history_id: string }
         Returns: number
       }
+      ensure_manager_role: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      ensure_user_profile: {
+        Args: {
+          p_user_id: string
+          p_email: string
+          p_first_name?: string
+          p_last_name?: string
+        }
+        Returns: string
+      }
       find_matching_inventory: {
         Args: { p_lead_id: string }
         Returns: {
@@ -4949,6 +4962,15 @@ export type Database = {
       increment_template_usage: {
         Args: { template_id: string }
         Returns: undefined
+      }
+      initialize_user_for_csv: {
+        Args: {
+          p_user_id: string
+          p_email: string
+          p_first_name?: string
+          p_last_name?: string
+        }
+        Returns: Json
       }
       mark_missing_vehicles_sold: {
         Args: { p_upload_id: string }
