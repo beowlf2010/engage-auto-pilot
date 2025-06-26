@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -80,12 +81,31 @@ const LeadsList = () => {
 
   const getEngagementScore = (lead: Lead) => {
     let score = 0;
-    if (lead.lastReplyAt) score += 30;
+    if (lead.lastMessageTime) score += 30;
     if (lead.phoneNumbers && lead.phoneNumbers.length > 0) score += 20;
     if (lead.email) score += 15;
     if (lead.vehicleInterest && lead.vehicleInterest !== 'finding the right vehicle for your needs') score += 25;
     return Math.min(score, 100);
   };
+
+  // Calculate stats for LeadsStatsCards
+  const stats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return {
+      total: filteredLeads.length,
+      noContact: filteredLeads.filter(lead => lead.contactStatus === 'no_contact').length,
+      contacted: filteredLeads.filter(lead => lead.contactStatus === 'contact_attempted').length,
+      responded: filteredLeads.filter(lead => lead.contactStatus === 'response_received').length,
+      aiEnabled: filteredLeads.filter(lead => lead.aiOptIn).length,
+      fresh: filteredLeads.filter(lead => {
+        const leadDate = new Date(lead.createdAt);
+        leadDate.setHours(0, 0, 0, 0);
+        return leadDate.getTime() === today.getTime();
+      }).length,
+    };
+  }, [filteredLeads]);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
 
@@ -152,12 +172,12 @@ const LeadsList = () => {
         </div>
 
         {/* Stats Cards */}
-        <LeadsStatsCards leads={filteredLeads} />
+        <LeadsStatsCards stats={stats} />
 
         {/* Search */}
         <EnhancedLeadSearch
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+          value={searchTerm}
+          onChange={setSearchTerm}
           totalLeads={filteredLeads.length}
         />
 
