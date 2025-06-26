@@ -29,37 +29,49 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
 
     console.log('🔍 [RLS VALIDATION] User authenticated:', user.id);
 
-    // Initialize user using simplified function to avoid recursion
-    try {
-      const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv_simple', {
-        p_user_id: user.id,
-        p_email: user.email || ''
-      });
+    // Check if user profile exists first
+    const { data: existingProfile, error: profileCheckError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
-      if (initError) {
-        console.error('⚠️ [RLS VALIDATION] Failed to initialize user:', initError);
+    // Only initialize user if profile doesn't exist
+    if (!existingProfile && profileCheckError?.code === 'PGRST116') {
+      try {
+        console.log('🔧 [RLS VALIDATION] Initializing user profile and role');
+        const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv', {
+          p_user_id: user.id,
+          p_email: user.email || '',
+          p_first_name: user.user_metadata?.first_name || 'User',
+          p_last_name: user.user_metadata?.last_name || 'Name'
+        });
+
+        if (initError) {
+          console.error('⚠️ [RLS VALIDATION] Failed to initialize user:', initError);
+          return {
+            canInsert: false,
+            userProfile: null,
+            userRoles: [],
+            error: `User initialization failed: ${initError.message}`,
+            debugInfo: { initError, userId: user.id }
+          };
+        } else {
+          console.log('✅ [RLS VALIDATION] User initialized:', initResult);
+        }
+      } catch (initError) {
+        console.error('💥 [RLS VALIDATION] User initialization error:', initError);
         return {
           canInsert: false,
           userProfile: null,
           userRoles: [],
-          error: `User initialization failed: ${initError.message}`,
+          error: `User initialization error: ${initError instanceof Error ? initError.message : 'Unknown error'}`,
           debugInfo: { initError, userId: user.id }
         };
-      } else {
-        console.log('✅ [RLS VALIDATION] User initialized:', initResult);
       }
-    } catch (initError) {
-      console.error('💥 [RLS VALIDATION] User initialization error:', initError);
-      return {
-        canInsert: false,
-        userProfile: null,
-        userRoles: [],
-        error: `User initialization error: ${initError instanceof Error ? initError.message : 'Unknown error'}`,
-        debugInfo: { initError, userId: user.id }
-      };
     }
 
-    // Check user profile
+    // Get user profile (should exist now)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -77,25 +89,33 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       };
     }
 
-    // Check user roles
-    const { data: roles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
+    // Check user roles using the new security definer function
+    const { data: hasManagerRole, error: roleCheckError } = await supabase.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'manager'
+    });
 
-    if (rolesError) {
-      console.error('❌ [RLS VALIDATION] Roles error:', rolesError);
+    if (roleCheckError) {
+      console.error('❌ [RLS VALIDATION] Role check error:', roleCheckError);
       return {
         canInsert: false,
         userProfile: profile,
         userRoles: [],
-        error: `Roles error: ${rolesError.message}`,
-        debugInfo: { rolesError, profile, userId: user.id }
+        error: `Role check error: ${roleCheckError.message}`,
+        debugInfo: { roleCheckError, profile, userId: user.id }
       };
     }
 
-    const roleNames = roles?.map(r => r.role) || [];
-    const hasRequiredRole = roleNames.some(role => ['admin', 'manager'].includes(role));
+    // Also check admin role
+    const { data: hasAdminRole, error: adminRoleCheckError } = await supabase.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'admin'
+    });
+
+    const hasRequiredRole = hasManagerRole || hasAdminRole;
+    const roleNames = [];
+    if (hasManagerRole) roleNames.push('manager');
+    if (hasAdminRole) roleNames.push('admin');
 
     console.log('✅ [RLS VALIDATION] Validation complete:', {
       userId: user.id,
