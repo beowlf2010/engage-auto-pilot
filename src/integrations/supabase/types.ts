@@ -4972,6 +4972,15 @@ export type Database = {
         }
         Returns: Json
       }
+      initialize_user_for_csv_clean: {
+        Args: {
+          p_user_id: string
+          p_email: string
+          p_first_name?: string
+          p_last_name?: string
+        }
+        Returns: Json
+      }
       mark_missing_vehicles_sold: {
         Args: { p_upload_id: string }
         Returns: undefined
@@ -5073,6 +5082,14 @@ export type Database = {
           p_data: Json
         }
         Returns: string
+      }
+      user_has_manager_access: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      user_is_authenticated_simple: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
     }
     Enums: {

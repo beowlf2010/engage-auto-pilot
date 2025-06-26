@@ -40,7 +40,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
     if (!existingProfile && profileCheckError?.code === 'PGRST116') {
       try {
         console.log('🔧 [RLS VALIDATION] Initializing user profile and role');
-        const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv', {
+        const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv_clean', {
           p_user_id: user.id,
           p_email: user.email || '',
           p_first_name: user.user_metadata?.first_name || 'User',
@@ -89,33 +89,25 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       };
     }
 
-    // Check user roles using the new security definer function
-    const { data: hasManagerRole, error: roleCheckError } = await supabase.rpc('has_role', {
-      _user_id: user.id,
-      _role: 'manager'
-    });
+    // Check user roles directly from the user_roles table
+    const { data: userRoles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
 
-    if (roleCheckError) {
-      console.error('❌ [RLS VALIDATION] Role check error:', roleCheckError);
+    if (rolesError) {
+      console.error('❌ [RLS VALIDATION] Role check error:', rolesError);
       return {
         canInsert: false,
         userProfile: profile,
         userRoles: [],
-        error: `Role check error: ${roleCheckError.message}`,
-        debugInfo: { roleCheckError, profile, userId: user.id }
+        error: `Role check error: ${rolesError.message}`,
+        debugInfo: { rolesError, profile, userId: user.id }
       };
     }
 
-    // Also check admin role
-    const { data: hasAdminRole, error: adminRoleCheckError } = await supabase.rpc('has_role', {
-      _user_id: user.id,
-      _role: 'admin'
-    });
-
-    const hasRequiredRole = hasManagerRole || hasAdminRole;
-    const roleNames = [];
-    if (hasManagerRole) roleNames.push('manager');
-    if (hasAdminRole) roleNames.push('admin');
+    const roleNames = userRoles?.map(r => r.role) || [];
+    const hasRequiredRole = roleNames.includes('manager') || roleNames.includes('admin');
 
     console.log('✅ [RLS VALIDATION] Validation complete:', {
       userId: user.id,
