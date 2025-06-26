@@ -3,6 +3,7 @@ import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { BulkInsertResult } from './types';
 import { insertLeadWithValidation, DetailedLeadInsertResult } from './enhancedLeadInserter';
 import { updateUploadHistory } from './uploadHistoryService';
+import { testLeadInsertion } from './enhancedRLSHandler';
 
 export interface EnhancedBulkInsertOptions {
   updateExistingLeads?: boolean;
@@ -18,6 +19,25 @@ export const insertLeadsBulkEnhanced = async (
   
   console.log(`🚀 [BULK INSERT] Starting enhanced bulk insertion for ${leads.length} leads`);
   console.log(`🚀 [BULK INSERT] Options:`, { allowPartialData, uploadHistoryId });
+  
+  // Run initial RLS test
+  const rlsTest = await testLeadInsertion();
+  if (!rlsTest.success) {
+    console.error(`❌ [BULK INSERT] RLS test failed before processing:`, rlsTest.error);
+    return {
+      totalProcessed: leads.length,
+      successfulInserts: 0,
+      successfulUpdates: 0,
+      errors: leads.map((lead, index) => ({
+        leadData: lead,
+        error: `Pre-flight check failed: ${rlsTest.error}`,
+        rowIndex: index + 1
+      })),
+      duplicates: []
+    };
+  }
+
+  console.log(`✅ [BULK INSERT] RLS test passed, proceeding with insertion`);
   console.log(`🚀 [BULK INSERT] Sample leads:`, leads.slice(0, 3).map(lead => ({
     firstName: lead.firstName,
     lastName: lead.lastName,
@@ -59,10 +79,14 @@ export const insertLeadsBulkEnhanced = async (
         });
         
         console.error(`❌ [BULK INSERT] Lead ${rowIndex} insertion failed:`, result.error);
-        console.error(`❌ [BULK INSERT] Raw error:`, result.rawError);
-        
+        if (result.debugInfo) {
+          console.error(`❌ [BULK INSERT] Debug info for row ${rowIndex}:`, result.debugInfo);
+        }
+        if (result.rawError) {
+          console.error(`❌ [BULK INSERT] Raw error for row ${rowIndex}:`, result.rawError);
+        }
         if (result.validationErrors) {
-          console.error(`❌ [BULK INSERT] Validation errors:`, result.validationErrors);
+          console.error(`❌ [BULK INSERT] Validation errors for row ${rowIndex}:`, result.validationErrors);
         }
       }
     } catch (error) {
@@ -113,7 +137,8 @@ export const insertLeadsBulkEnhanced = async (
     successfulInserts: result.successfulInserts,
     errors: result.errors.length,
     validationWarnings: totalValidationErrors,
-    phoneNumbersInserted: totalPhoneNumbersInserted
+    phoneNumbersInserted: totalPhoneNumbersInserted,
+    successRate: `${((successfulInserts / leads.length) * 100).toFixed(1)}%`
   });
 
   if (warnings.length > 0) {
@@ -121,7 +146,17 @@ export const insertLeadsBulkEnhanced = async (
   }
 
   if (errors.length > 0) {
-    console.log(`❌ [BULK INSERT] All errors:`, errors);
+    console.log(`❌ [BULK INSERT] Failed insertions summary:`, {
+      totalFailed: errors.length,
+      errorTypes: errors.reduce((acc, error) => {
+        const errorType = error.error.includes('Permission denied') ? 'Permission' :
+                          error.error.includes('Database connection') ? 'Connection' :
+                          error.error.includes('Database insertion') ? 'Insertion' :
+                          'Other';
+        acc[errorType] = (acc[errorType] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
+    });
   }
 
   return result;

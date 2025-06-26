@@ -6,6 +6,7 @@ export interface RLSValidationResult {
   userProfile: any;
   userRoles: string[];
   error?: string;
+  debugInfo?: any;
 }
 
 export const validateRLSPermissions = async (): Promise<RLSValidationResult> => {
@@ -21,7 +22,8 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
         canInsert: false,
         userProfile: null,
         userRoles: [],
-        error: 'User not authenticated or session invalid'
+        error: 'User not authenticated or session invalid',
+        debugInfo: { userError, sessionError, hasUser: !!user, hasSession: !!session }
       };
     }
 
@@ -58,7 +60,8 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
         canInsert: false,
         userProfile: null,
         userRoles: [],
-        error: `Profile error: ${profileError.message}`
+        error: `Profile error: ${profileError.message}`,
+        debugInfo: { profileError, userId: user.id }
       };
     }
 
@@ -74,7 +77,8 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
         canInsert: false,
         userProfile: profile,
         userRoles: [],
-        error: `Roles error: ${rolesError.message}`
+        error: `Roles error: ${rolesError.message}`,
+        debugInfo: { rolesError, profile, userId: user.id }
       };
     }
 
@@ -93,7 +97,15 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       canInsert: hasRequiredRole,
       userProfile: profile,
       userRoles: roleNames,
-      error: hasRequiredRole ? undefined : 'User lacks required manager or admin role'
+      error: hasRequiredRole ? undefined : 'User lacks required manager or admin role',
+      debugInfo: {
+        userId: user.id,
+        profileRole: profile?.role,
+        systemRoles: roleNames,
+        hasRequiredRole,
+        sessionValid: !!session,
+        profileExists: !!profile
+      }
     };
   } catch (error) {
     console.error('💥 [RLS VALIDATION] Unexpected error:', error);
@@ -101,19 +113,24 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       canInsert: false,
       userProfile: null,
       userRoles: [],
-      error: error instanceof Error ? error.message : 'Unknown validation error'
+      error: error instanceof Error ? error.message : 'Unknown validation error',
+      debugInfo: { unexpectedError: error }
     };
   }
 };
 
-export const testLeadInsertion = async (): Promise<{ success: boolean; error?: string }> => {
+export const testLeadInsertion = async (): Promise<{ success: boolean; error?: string; debugInfo?: any }> => {
   try {
     console.log('🧪 [RLS TEST] Testing lead insertion permissions');
     
     // First validate RLS permissions
     const validation = await validateRLSPermissions();
     if (!validation.canInsert) {
-      return { success: false, error: validation.error || 'RLS validation failed' };
+      return { 
+        success: false, 
+        error: validation.error || 'RLS validation failed',
+        debugInfo: validation.debugInfo
+      };
     }
     
     // Try a minimal insert to test RLS
@@ -133,7 +150,11 @@ export const testLeadInsertion = async (): Promise<{ success: boolean; error?: s
 
     if (error) {
       console.error('❌ [RLS TEST] Insert failed:', error);
-      return { success: false, error: error.message };
+      return { 
+        success: false, 
+        error: error.message,
+        debugInfo: { testLead, insertError: error, validation: validation.debugInfo }
+      };
     }
 
     // Clean up test lead
@@ -143,12 +164,16 @@ export const testLeadInsertion = async (): Promise<{ success: boolean; error?: s
     }
 
     console.log('✅ [RLS TEST] Insert test successful');
-    return { success: true };
+    return { 
+      success: true,
+      debugInfo: { testLead, validation: validation.debugInfo }
+    };
   } catch (error) {
     console.error('💥 [RLS TEST] Unexpected error:', error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Unknown test error' 
+      error: error instanceof Error ? error.message : 'Unknown test error',
+      debugInfo: { unexpectedError: error }
     };
   }
 };

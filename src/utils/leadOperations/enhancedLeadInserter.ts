@@ -9,6 +9,7 @@ export interface DetailedLeadInsertResult extends LeadInsertResult {
   phoneNumbersInserted?: number;
   rawError?: any;
   rlsValidation?: any;
+  debugInfo?: any;
 }
 
 export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHistoryId?: string): Promise<DetailedLeadInsertResult> => {
@@ -75,6 +76,26 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
 
     console.log(`💾 [LEAD INSERT] Inserting lead data:`, leadInsert);
 
+    // Test database connection first
+    const { data: testData, error: testError } = await supabase
+      .from('leads')
+      .select('id')
+      .limit(1);
+
+    if (testError) {
+      console.error(`❌ [LEAD INSERT] Database connection test failed:`, testError);
+      return { 
+        success: false, 
+        error: `Database connection failed: ${testError.message}`,
+        validationErrors,
+        rawError: testError,
+        rlsValidation,
+        debugInfo: { connectionTest: 'failed', testError }
+      };
+    }
+
+    console.log(`✅ [LEAD INSERT] Database connection test passed`);
+
     // Insert the lead using the clean RLS policies
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -84,12 +105,31 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
 
     if (leadError) {
       console.error(`❌ [LEAD INSERT] Lead insertion failed:`, leadError);
+      
+      // Enhanced error analysis
+      let errorAnalysis = 'Unknown insertion error';
+      if (leadError.code === 'PGRST301') {
+        errorAnalysis = 'Row Level Security policy violation - user may not have permission to insert leads';
+      } else if (leadError.code === '23505') {
+        errorAnalysis = 'Duplicate key violation - lead may already exist';
+      } else if (leadError.code === '23502') {
+        errorAnalysis = 'Missing required field - check database schema requirements';
+      } else if (leadError.code === '42601') {
+        errorAnalysis = 'SQL syntax error in insertion query';
+      }
+
       return { 
         success: false, 
-        error: `Database insertion failed: ${leadError.message}`,
+        error: `Database insertion failed: ${leadError.message} (${errorAnalysis})`,
         validationErrors,
         rawError: leadError,
-        rlsValidation
+        rlsValidation,
+        debugInfo: { 
+          leadInsert, 
+          errorCode: leadError.code,
+          errorAnalysis,
+          connectionTest: 'passed'
+        }
       };
     }
 
@@ -129,7 +169,12 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       leadId: lead.id,
       validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
       phoneNumbersInserted,
-      rlsValidation
+      rlsValidation,
+      debugInfo: { 
+        leadInsert, 
+        connectionTest: 'passed',
+        phoneNumbersInserted
+      }
     };
 
   } catch (error) {
@@ -138,7 +183,11 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown database error',
       rawError: error,
-      validationErrors: ['Critical insertion error - please check data format and user permissions']
+      validationErrors: ['Critical insertion error - please check data format and user permissions'],
+      debugInfo: { 
+        errorType: 'unexpected',
+        connectionTest: 'unknown'
+      }
     };
   }
 };
