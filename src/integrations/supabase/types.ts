@@ -4860,10 +4860,6 @@ export type Database = {
         Args: { p_vin: string; p_stock_number: string }
         Returns: number
       }
-      can_manage_leads: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       classify_deal_by_stock: {
         Args: { stock_number: string }
         Returns: string
@@ -4912,10 +4908,6 @@ export type Database = {
           slot_time: string
           available_spots: number
         }[]
-      }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       get_gm_global_status_summary: {
         Args: Record<PropertyKey, never>
