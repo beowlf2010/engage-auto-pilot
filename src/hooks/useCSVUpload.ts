@@ -1,6 +1,9 @@
 
 import { useState } from 'react';
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
+import { parseCSVText } from '@/utils/csvParser';
+import { performAutoDetection } from '@/components/csv-mapper/fieldMappingUtils';
+import { processLeadsEnhanced } from '@/components/upload-leads/processLeads';
 
 export interface CSVUploadResult {
   success: boolean;
@@ -27,24 +30,44 @@ export const useCSVUpload = () => {
     setUploadResult(null);
 
     try {
-      // This is a placeholder - in a real implementation, you would parse the CSV file
-      // and process the leads here. For now, just simulate the structure.
-      console.log('Processing file:', file.name);
+      console.log('🔄 [CSV UPLOAD] Starting file processing:', file.name);
       
-      // Simulate processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Parse CSV file
+      const text = await file.text();
+      const parsedCSV = parseCSVText(text);
       
-      // Placeholder processed data
-      const mockProcessedData: ParsedCSVData = {
-        processedLeads: [],
-        duplicates: [],
-        errors: []
+      console.log('📊 [CSV UPLOAD] Parsed CSV headers:', parsedCSV.headers);
+      console.log('📊 [CSV UPLOAD] Total rows:', parsedCSV.rows.length);
+      
+      // Auto-detect field mapping
+      const fieldMapping = performAutoDetection(parsedCSV.headers);
+      console.log('🔍 [CSV UPLOAD] Auto-detected field mapping:', fieldMapping);
+      
+      // Process leads using the enhanced processor (without database validation)
+      const processResult = await processLeadsEnhanced(
+        parsedCSV.rows,
+        fieldMapping,
+        [], // No existing leads for duplicate checking since we're bypassing
+        updateExisting
+      );
+      
+      console.log('✅ [CSV UPLOAD] Processing complete:', {
+        processedCount: processResult.processedLeads.length,
+        duplicatesCount: processResult.duplicates.length,
+        errorsCount: processResult.errors.length
+      });
+      
+      // Set processed data - this will enable the bypass upload button
+      const processedData: ParsedCSVData = {
+        processedLeads: processResult.processedLeads,
+        duplicates: processResult.duplicates,
+        errors: processResult.errors
       };
       
-      setProcessedData(mockProcessedData);
+      setProcessedData(processedData);
       
     } catch (error) {
-      console.error('File processing error:', error);
+      console.error('💥 [CSV UPLOAD] File processing error:', error);
       setUploadResult({
         success: false,
         totalProcessed: 0,
