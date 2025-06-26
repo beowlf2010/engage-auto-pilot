@@ -13,10 +13,19 @@ export interface DetailedLeadInsertResult extends LeadInsertResult {
 
 export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHistoryId?: string): Promise<DetailedLeadInsertResult> => {
   console.log(`🔍 [LEAD INSERT] Starting insertion for: ${leadData.firstName || 'Unknown'} ${leadData.lastName || 'Lead'}`);
+  console.log(`🔍 [LEAD INSERT] Lead data:`, {
+    firstName: leadData.firstName,
+    lastName: leadData.lastName,
+    email: leadData.email,
+    phoneNumbers: leadData.phoneNumbers?.length || 0,
+    primaryPhone: leadData.primaryPhone
+  });
   
   try {
     // Validate RLS permissions before attempting insertion
     const rlsValidation = await validateRLSPermissions();
+    console.log(`🔍 [LEAD INSERT] RLS validation result:`, rlsValidation);
+    
     if (!rlsValidation.canInsert) {
       console.error(`❌ [LEAD INSERT] RLS validation failed:`, rlsValidation.error);
       return { 
@@ -34,10 +43,12 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
     
     // Allow leads with missing names now that schema supports NULL
     if (!leadData.firstName && !leadData.lastName) {
+      console.warn(`⚠️ [LEAD INSERT] Lead has no name information`);
       validationErrors.push('Lead has no name information - will be imported for manual review');
     }
     
     if (!leadData.primaryPhone && (!leadData.phoneNumbers || leadData.phoneNumbers.length === 0)) {
+      console.warn(`⚠️ [LEAD INSERT] No phone numbers provided`);
       validationErrors.push('No phone numbers provided - lead may need manual contact information');
     }
 
@@ -74,17 +85,7 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
       lead_source_name: (leadData as any).leadSourceName || null
     };
 
-    console.log(`💾 [LEAD INSERT] Inserting lead data with new RLS policies:`, { 
-      firstName: leadInsert.first_name, 
-      lastName: leadInsert.last_name,
-      email: leadInsert.email,
-      phoneCount: leadData.phoneNumbers?.length || 0,
-      aiFields: {
-        leadStatusTypeName: leadInsert.lead_status_type_name,
-        leadTypeName: leadInsert.lead_type_name,
-        leadSourceName: leadInsert.lead_source_name
-      }
-    });
+    console.log(`💾 [LEAD INSERT] Inserting lead data:`, leadInsert);
 
     // Insert the lead using the new non-recursive RLS policies
     const { data: lead, error: leadError } = await supabase
@@ -136,6 +137,8 @@ export const insertLeadWithValidation = async (leadData: ProcessedLead, uploadHi
         status: phone.status,
         is_primary: phone.isPrimary
       }));
+
+      console.log(`📞 [PHONE INSERT] Phone inserts:`, phoneInserts);
 
       const { data: phoneData, error: phoneError } = await supabase
         .from('phone_numbers')

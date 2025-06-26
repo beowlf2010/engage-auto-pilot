@@ -18,6 +18,12 @@ export const insertLeadsBulkEnhanced = async (
   
   console.log(`🚀 [BULK INSERT] Starting enhanced bulk insertion for ${leads.length} leads`);
   console.log(`🚀 [BULK INSERT] Options:`, { allowPartialData, uploadHistoryId });
+  console.log(`🚀 [BULK INSERT] Sample leads:`, leads.slice(0, 3).map(lead => ({
+    firstName: lead.firstName,
+    lastName: lead.lastName,
+    email: lead.email,
+    phoneCount: lead.phoneNumbers?.length || 0
+  })));
   
   const errors: BulkInsertResult['errors'] = [];
   const warnings: string[] = [];
@@ -30,7 +36,7 @@ export const insertLeadsBulkEnhanced = async (
     const lead = leads[i];
     const rowIndex = i + 1;
     
-    console.log(`📋 [BULK INSERT] Processing lead ${rowIndex}/${leads.length}: ${lead.firstName} ${lead.lastName}`);
+    console.log(`📋 [BULK INSERT] Processing lead ${rowIndex}/${leads.length}: ${lead.firstName || 'Unknown'} ${lead.lastName || 'Lead'}`);
     
     try {
       const result: DetailedLeadInsertResult = await insertLeadWithValidation(lead, uploadHistoryId);
@@ -53,6 +59,7 @@ export const insertLeadsBulkEnhanced = async (
         });
         
         console.error(`❌ [BULK INSERT] Lead ${rowIndex} insertion failed:`, result.error);
+        console.error(`❌ [BULK INSERT] Raw error:`, result.rawError);
         
         if (result.validationErrors) {
           console.error(`❌ [BULK INSERT] Validation errors:`, result.validationErrors);
@@ -82,7 +89,7 @@ export const insertLeadsBulkEnhanced = async (
         processing_errors: errors.map(e => ({
           rowIndex: e.rowIndex,
           error: e.error,
-          leadName: `${e.leadData.firstName} ${e.leadData.lastName}`
+          leadName: `${e.leadData.firstName || 'Unknown'} ${e.leadData.lastName || 'Lead'}`
         })),
         upload_status: successfulInserts > 0 ? 'completed' : 'failed'
       });
@@ -111,6 +118,10 @@ export const insertLeadsBulkEnhanced = async (
 
   if (warnings.length > 0) {
     console.log(`⚠️ [BULK INSERT] Validation warnings:`, warnings);
+  }
+
+  if (errors.length > 0) {
+    console.log(`❌ [BULK INSERT] All errors:`, errors);
   }
 
   return result;

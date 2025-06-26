@@ -92,6 +92,11 @@ export const useMultiFileLeadUpload = () => {
   const processFile = async (queuedFile: QueuedFile): Promise<{ success: boolean; records?: number; updates?: number; error?: string }> => {
     try {
       console.log(`📤 [MULTI UPLOAD] Processing file: ${queuedFile.file.name}`);
+      console.log(`📤 [MULTI UPLOAD] File details:`, {
+        name: queuedFile.file.name,
+        size: queuedFile.file.size,
+        type: queuedFile.file.type
+      });
       
       // Update file status to processing
       setQueuedFiles(prev => prev.map(f => 
@@ -102,17 +107,21 @@ export const useMultiFileLeadUpload = () => {
       let parsedData;
       try {
         if (queuedFile.file.name.toLowerCase().endsWith('.csv')) {
+          console.log(`📄 [MULTI UPLOAD] Parsing CSV file: ${queuedFile.file.name}`);
           const text = await queuedFile.file.text();
           parsedData = parseCSV(text);
         } else {
+          console.log(`📊 [MULTI UPLOAD] Parsing Excel file: ${queuedFile.file.name}`);
           // For Excel files, use the enhanced parser
           parsedData = await parseEnhancedInventoryFile(queuedFile.file);
         }
       } catch (parseError) {
+        console.error(`❌ [MULTI UPLOAD] File parsing failed:`, parseError);
         throw new Error(`File parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`);
       }
 
       if (!parsedData || !parsedData.rows || parsedData.rows.length === 0) {
+        console.error(`❌ [MULTI UPLOAD] No data found in file`);
         throw new Error('No data found in file or file is empty');
       }
 
@@ -121,6 +130,7 @@ export const useMultiFileLeadUpload = () => {
       console.log(`🔍 [MULTI UPLOAD] Sample row data:`, parsedData.sample);
 
       // Process leads using enhanced processing with upload history and update option
+      console.log(`⚙️ [MULTI UPLOAD] Processing leads with enhanced processing...`);
       const processingResult = await processLeadsEnhanced(
         parsedData,
         DEFAULT_LEAD_MAPPING,
@@ -130,20 +140,33 @@ export const useMultiFileLeadUpload = () => {
         { updateExistingLeads }
       );
 
-      console.log(`⚙️ [MULTI UPLOAD] Processed ${processingResult.validLeads.length} valid leads, ${processingResult.duplicates.length} duplicates, ${processingResult.errors.length} errors`);
+      console.log(`⚙️ [MULTI UPLOAD] Processing result:`, {
+        validLeads: processingResult.validLeads.length,
+        duplicates: processingResult.duplicates.length,
+        errors: processingResult.errors.length,
+        warnings: processingResult.warnings.length
+      });
 
       if (processingResult.validLeads.length === 0) {
-        throw new Error(`No valid leads found. ${processingResult.errors.length} processing errors, ${processingResult.duplicates.length} duplicates detected.`);
+        const errorMsg = `No valid leads found. ${processingResult.errors.length} processing errors, ${processingResult.duplicates.length} duplicates detected.`;
+        console.error(`❌ [MULTI UPLOAD] ${errorMsg}`);
+        throw new Error(errorMsg);
       }
 
       // Insert leads to database using existing enhanced insertion with update support
+      console.log(`💾 [MULTI UPLOAD] Inserting ${processingResult.validLeads.length} leads to database...`);
       const insertResult = await insertLeadsToDatabase(
         processingResult.validLeads,
         processingResult.uploadHistoryId,
         { updateExistingLeads }
       );
 
-      console.log(`💾 [MULTI UPLOAD] Database operation: ${insertResult.successfulInserts} inserted, ${insertResult.successfulUpdates} updated, ${insertResult.errors.length} errors`);
+      console.log(`💾 [MULTI UPLOAD] Database operation result:`, {
+        successfulInserts: insertResult.successfulInserts,
+        successfulUpdates: insertResult.successfulUpdates,
+        errors: insertResult.errors.length,
+        duplicates: insertResult.duplicates.length
+      });
 
       // Update file status to completed
       setQueuedFiles(prev => prev.map(f => 
