@@ -69,6 +69,12 @@ export const uploadLeadsWithRLSBypass = async (
     if (error) {
       console.error('❌ [SUPABASE BYPASS] Function call failed:', error);
       
+      // Check if this is still the old session_replication_role error
+      if (error.message?.includes('session_replication_role')) {
+        console.error('🔄 [SUPABASE BYPASS] Still getting session_replication_role error - function may not be updated');
+        throw new Error('Database function needs to be refreshed. Please try again in a moment.');
+      }
+      
       // Enhanced error handling for common Supabase issues
       let errorMessage = error.message || 'Unknown database error';
       if (error.code === '42501') {
