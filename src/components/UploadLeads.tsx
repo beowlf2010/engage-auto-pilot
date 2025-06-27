@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -171,8 +172,6 @@ const UploadLeads = () => {
     setProcessingMessage('');
   };
 
-  const [updateExistingLeads, setUpdateExistingLeads] = useState(false);
-
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -228,8 +227,18 @@ const UploadLeads = () => {
 
           {processingStage === 'results' && uploadResult && (
             <UploadResult
-              result={uploadResult}
-              onStartOver={clearResults}
+              result={{
+                totalRows: uploadResult.totalProcessed,
+                successfulImports: uploadResult.successfulInserts,
+                errors: uploadResult.errors.length,
+                duplicates: uploadResult.duplicates.length,
+                duplicateDetails: uploadResult.duplicates.map((dup: any, index: number) => ({
+                  rowIndex: index + 1,
+                  duplicateType: 'email',
+                  leadName: dup.firstName + ' ' + dup.lastName,
+                  conflictingName: 'Existing Lead'
+                }))
+              }}
             />
           )}
 
