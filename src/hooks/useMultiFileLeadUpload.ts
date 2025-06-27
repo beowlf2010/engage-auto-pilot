@@ -80,7 +80,7 @@ export const useMultiFileLeadUpload = () => {
     }>;
   }> => {
     try {
-      console.log(`📤 [MULTI UPLOAD] Processing file: ${queuedFile.file.name}`);
+      console.log(`📤 [SUPABASE MULTI UPLOAD] Processing file: ${queuedFile.file.name}`);
       
       // Update file status to processing
       setQueuedFiles(prev => prev.map(f => 
@@ -91,33 +91,33 @@ export const useMultiFileLeadUpload = () => {
       let parsedData;
       try {
         if (queuedFile.file.name.toLowerCase().endsWith('.csv')) {
-          console.log(`📄 [MULTI UPLOAD] Parsing CSV file: ${queuedFile.file.name}`);
+          console.log(`📄 [SUPABASE MULTI UPLOAD] Parsing CSV file: ${queuedFile.file.name}`);
           const text = await queuedFile.file.text();
           parsedData = parseCSV(text);
         } else {
-          console.log(`📊 [MULTI UPLOAD] Parsing Excel file: ${queuedFile.file.name}`);
+          console.log(`📊 [SUPABASE MULTI UPLOAD] Parsing Excel file: ${queuedFile.file.name}`);
           parsedData = await parseEnhancedInventoryFile(queuedFile.file);
         }
       } catch (parseError) {
-        console.error(`❌ [MULTI UPLOAD] File parsing failed:`, parseError);
+        console.error(`❌ [SUPABASE MULTI UPLOAD] File parsing failed:`, parseError);
         throw new Error(`File parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`);
       }
 
       if (!parsedData || !parsedData.rows || parsedData.rows.length === 0) {
-        console.error(`❌ [MULTI UPLOAD] No data found in file`);
+        console.error(`❌ [SUPABASE MULTI UPLOAD] No data found in file`);
         throw new Error('No data found in file or file is empty');
       }
 
-      console.log(`📊 [MULTI UPLOAD] Parsed ${parsedData.rows.length} rows from ${queuedFile.file.name}`);
+      console.log(`📊 [SUPABASE MULTI UPLOAD] Parsed ${parsedData.rows.length} rows from ${queuedFile.file.name}`);
 
       // Auto-detect field mapping
       const fieldMapping = performAutoDetection(parsedData.headers);
-      console.log('🔍 [MULTI UPLOAD] Auto-detected field mapping:', fieldMapping);
+      console.log('🔍 [SUPABASE MULTI UPLOAD] Auto-detected field mapping:', fieldMapping);
 
       // Process leads using the standard processor
       const processingResult = processLeads(parsedData, fieldMapping);
       
-      console.log(`⚙️ [MULTI UPLOAD] Processing result:`, {
+      console.log(`⚙️ [SUPABASE MULTI UPLOAD] Processing result:`, {
         validLeads: processingResult.validLeads.length,
         duplicates: processingResult.duplicates.length,
         errors: processingResult.errors.length
@@ -125,15 +125,15 @@ export const useMultiFileLeadUpload = () => {
 
       if (processingResult.validLeads.length === 0) {
         const errorMsg = `No valid leads found. ${processingResult.errors.length} processing errors, ${processingResult.duplicates.length} duplicates detected.`;
-        console.error(`❌ [MULTI UPLOAD] ${errorMsg}`);
+        console.error(`❌ [SUPABASE MULTI UPLOAD] ${errorMsg}`);
         throw new Error(errorMsg);
       }
 
-      // Use ultimate bypass upload
-      console.log(`💾 [MULTI UPLOAD] Using ultimate bypass upload for ${processingResult.validLeads.length} leads...`);
+      // Use Supabase-compatible bypass upload
+      console.log(`💾 [SUPABASE MULTI UPLOAD] Using Supabase-compatible bypass upload for ${processingResult.validLeads.length} leads...`);
       const uploadResult = await uploadLeadsWithRLSBypass(processingResult.validLeads);
 
-      console.log(`💾 [MULTI UPLOAD] Ultimate bypass upload result:`, uploadResult);
+      console.log(`💾 [SUPABASE MULTI UPLOAD] Supabase-compatible bypass upload result:`, uploadResult);
 
       // Enhanced error details processing
       const errorDetails = (uploadResult.errors || []).map((error: any, index: number) => ({
@@ -171,7 +171,7 @@ export const useMultiFileLeadUpload = () => {
       };
 
     } catch (error) {
-      console.error(`❌ [MULTI UPLOAD] Error processing ${queuedFile.file.name}:`, error);
+      console.error(`❌ [SUPABASE MULTI UPLOAD] Error processing ${queuedFile.file.name}:`, error);
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
@@ -217,7 +217,7 @@ export const useMultiFileLeadUpload = () => {
     };
 
     try {
-      console.log(`🚀 [MULTI UPLOAD] Starting ultimate bypass batch processing of ${queuedFiles.length} files`);
+      console.log(`🚀 [SUPABASE MULTI UPLOAD] Starting Supabase-compatible batch processing of ${queuedFiles.length} files`);
 
       // Process files sequentially to avoid overwhelming the system
       for (const queuedFile of queuedFiles) {
@@ -242,15 +242,15 @@ export const useMultiFileLeadUpload = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      console.log(`🎉 [MULTI UPLOAD] Ultimate bypass batch processing completed:`, result);
+      console.log(`🎉 [SUPABASE MULTI UPLOAD] Supabase-compatible batch processing completed:`, result);
 
       setBatchResult(result);
       return result;
 
     } catch (error) {
-      console.error('❌ [MULTI UPLOAD] Ultimate bypass batch processing failed:', error);
+      console.error('❌ [SUPABASE MULTI UPLOAD] Supabase-compatible batch processing failed:', error);
       toast({
-        title: "Ultimate Bypass Upload Failed",
+        title: "Supabase Upload Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });
