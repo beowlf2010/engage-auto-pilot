@@ -33,6 +33,8 @@ interface BatchUploadResult {
       rowIndex: number;
       error: string;
       leadName?: string;
+      sqlstate?: string;
+      timestamp?: string;
     }>;
   }>;
 }
@@ -73,6 +75,8 @@ export const useMultiFileLeadUpload = () => {
       rowIndex: number;
       error: string;
       leadName?: string;
+      sqlstate?: string;
+      timestamp?: string;
     }>;
   }> => {
     try {
@@ -125,17 +129,21 @@ export const useMultiFileLeadUpload = () => {
         throw new Error(errorMsg);
       }
 
-      // Use bypass upload instead of RLS-validated insertion
-      console.log(`💾 [MULTI UPLOAD] Using bypass upload for ${processingResult.validLeads.length} leads...`);
+      // Use ultimate bypass upload
+      console.log(`💾 [MULTI UPLOAD] Using ultimate bypass upload for ${processingResult.validLeads.length} leads...`);
       const uploadResult = await uploadLeadsWithRLSBypass(processingResult.validLeads);
 
-      console.log(`💾 [MULTI UPLOAD] Bypass upload result:`, uploadResult);
+      console.log(`💾 [MULTI UPLOAD] Ultimate bypass upload result:`, uploadResult);
 
-      // Convert bypass result to expected format
-      const errorDetails = uploadResult.errors.map((error: any, index: number) => ({
+      // Enhanced error details processing
+      const errorDetails = (uploadResult.errors || []).map((error: any, index: number) => ({
         rowIndex: error.rowIndex || index + 1,
         error: error.error || 'Unknown error',
-        leadName: `Lead ${index + 1}`
+        leadName: error.leadData ? 
+          `${error.leadData.firstName || 'Unknown'} ${error.leadData.lastName || 'Lead'}` : 
+          `Lead ${index + 1}`,
+        sqlstate: error.sqlstate,
+        timestamp: error.timestamp
       }));
 
       // Update file status to completed
@@ -146,7 +154,7 @@ export const useMultiFileLeadUpload = () => {
           result: {
             totalRows: parsedData.rows.length,
             successfulImports: uploadResult.successfulInserts,
-            errors: uploadResult.errors.length,
+            errors: uploadResult.errors?.length || 0,
             duplicates: processingResult.duplicates.length,
             errorDetails
           }
@@ -157,7 +165,7 @@ export const useMultiFileLeadUpload = () => {
         success: uploadResult.success && uploadResult.successfulInserts > 0,
         totalRows: parsedData.rows.length,
         successfulImports: uploadResult.successfulInserts,
-        errors: uploadResult.errors.length,
+        errors: uploadResult.errors?.length || 0,
         duplicates: processingResult.duplicates.length,
         errorDetails
       };
@@ -181,7 +189,8 @@ export const useMultiFileLeadUpload = () => {
         errorDetails: [{
           rowIndex: 1,
           error: errorMessage,
-          leadName: 'File Processing Error'
+          leadName: 'File Processing Error',
+          timestamp: new Date().toISOString()
         }]
       };
     }
@@ -208,7 +217,7 @@ export const useMultiFileLeadUpload = () => {
     };
 
     try {
-      console.log(`🚀 [MULTI UPLOAD] Starting batch processing of ${queuedFiles.length} files`);
+      console.log(`🚀 [MULTI UPLOAD] Starting ultimate bypass batch processing of ${queuedFiles.length} files`);
 
       // Process files sequentially to avoid overwhelming the system
       for (const queuedFile of queuedFiles) {
@@ -233,15 +242,15 @@ export const useMultiFileLeadUpload = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      console.log(`🎉 [MULTI UPLOAD] Batch processing completed:`, result);
+      console.log(`🎉 [MULTI UPLOAD] Ultimate bypass batch processing completed:`, result);
 
       setBatchResult(result);
       return result;
 
     } catch (error) {
-      console.error('❌ [MULTI UPLOAD] Batch processing failed:', error);
+      console.error('❌ [MULTI UPLOAD] Ultimate bypass batch processing failed:', error);
       toast({
-        title: "Batch Upload Failed",
+        title: "Ultimate Bypass Upload Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });

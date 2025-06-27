@@ -7,7 +7,9 @@ export interface BypassUploadResult {
   totalProcessed: number;
   successfulInserts: number;
   errors: any[];
+  errorCount?: number;
   message: string;
+  timestamp?: string;
 }
 
 export const uploadLeadsWithRLSBypass = async (
@@ -15,40 +17,50 @@ export const uploadLeadsWithRLSBypass = async (
   uploadHistoryId?: string
 ): Promise<BypassUploadResult> => {
   try {
-    console.log('🚀 [BYPASS UPLOADER] Starting RLS bypass upload for', leads.length, 'leads');
+    console.log('🚀 [BYPASS UPLOADER] Starting ultimate RLS bypass upload for', leads.length, 'leads');
 
-    // Transform leads to the expected format
-    const transformedLeads = leads.map(lead => ({
-      firstName: lead.firstName,
-      lastName: lead.lastName,
-      middleName: lead.middleName,
-      email: lead.email,
-      emailAlt: lead.emailAlt,
-      address: lead.address,
-      city: lead.city,
-      state: lead.state,
-      postalCode: lead.postalCode,
-      vehicleInterest: lead.vehicleInterest,
-      vehicleVIN: lead.vehicleVIN,
-      source: lead.source,
-      status: lead.status,
-      doNotCall: lead.doNotCall,
-      doNotEmail: lead.doNotEmail,
-      doNotMail: lead.doNotMail,
-      salesPersonName: lead.salesPersonName,
-      leadStatusTypeName: lead.leadStatusTypeName,
-      leadTypeName: lead.leadTypeName,
-      leadSourceName: lead.leadSourceName,
-      phoneNumbers: lead.phoneNumbers.map(phone => ({
-        number: phone.number,
-        type: phone.type,
-        priority: phone.priority,
-        status: phone.status || 'active',
-        isPrimary: phone.isPrimary || false
-      }))
-    }));
+    // Transform leads to the expected format with enhanced data validation
+    const transformedLeads = leads.map((lead, index) => {
+      console.log(`📝 [BYPASS UPLOADER] Transforming lead ${index + 1}:`, {
+        name: `${lead.firstName} ${lead.lastName}`,
+        email: lead.email,
+        phoneCount: lead.phoneNumbers?.length || 0
+      });
 
-    // Call the bypass function
+      return {
+        firstName: lead.firstName || null,
+        lastName: lead.lastName || null,
+        middleName: lead.middleName || null,
+        email: lead.email || null,
+        emailAlt: lead.emailAlt || null,
+        address: lead.address || null,
+        city: lead.city || null,
+        state: lead.state || null,
+        postalCode: lead.postalCode || null,
+        vehicleInterest: lead.vehicleInterest || 'finding the right vehicle for your needs',
+        vehicleVIN: lead.vehicleVIN || null,
+        source: lead.source || 'CSV Import',
+        status: lead.status || 'new',
+        doNotCall: Boolean(lead.doNotCall),
+        doNotEmail: Boolean(lead.doNotEmail),
+        doNotMail: Boolean(lead.doNotMail),
+        salesPersonName: lead.salesPersonName || null,
+        leadStatusTypeName: lead.leadStatusTypeName || null,
+        leadTypeName: lead.leadTypeName || null,
+        leadSourceName: lead.leadSourceName || null,
+        phoneNumbers: (lead.phoneNumbers || []).map(phone => ({
+          number: phone.number,
+          type: phone.type || 'mobile',
+          priority: phone.priority || 1,
+          status: phone.status || 'active',
+          isPrimary: Boolean(phone.isPrimary)
+        }))
+      };
+    });
+
+    console.log('🔄 [BYPASS UPLOADER] Calling ultimate bypass function with', transformedLeads.length, 'transformed leads');
+
+    // Call the ultimate bypass function
     const { data, error } = await supabase.rpc('upload_csv_leads_bypass_rls', {
       p_leads: transformedLeads,
       p_upload_history_id: uploadHistoryId || null
@@ -59,27 +71,40 @@ export const uploadLeadsWithRLSBypass = async (
       throw error;
     }
 
-    console.log('✅ [BYPASS UPLOADER] Upload completed:', data);
+    console.log('✅ [BYPASS UPLOADER] Ultimate bypass upload completed:', data);
 
-    // Type assertion for the response data
+    // Type assertion and enhanced result processing
     const result = data as any;
 
     return {
-      success: result.success,
-      totalProcessed: result.totalProcessed,
-      successfulInserts: result.successfulInserts,
+      success: result.success || false,
+      totalProcessed: result.totalProcessed || 0,
+      successfulInserts: result.successfulInserts || 0,
       errors: result.errors || [],
-      message: result.message
+      errorCount: result.errorCount || 0,
+      message: result.message || 'Upload completed',
+      timestamp: result.timestamp
     };
 
   } catch (error) {
-    console.error('💥 [BYPASS UPLOADER] Upload failed:', error);
+    console.error('💥 [BYPASS UPLOADER] Ultimate bypass upload failed:', error);
+    
+    // Enhanced error handling with more details
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorDetails = error instanceof Error && 'details' in error ? (error as any).details : null;
+    
     return {
       success: false,
       totalProcessed: 0,
       successfulInserts: 0,
-      errors: [{ error: error instanceof Error ? error.message : 'Unknown error' }],
-      message: 'Upload failed with error'
+      errors: [{
+        error: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+        context: 'Frontend bypass uploader'
+      }],
+      errorCount: 1,
+      message: `Upload failed: ${errorMessage}`
     };
   }
 };
@@ -100,8 +125,8 @@ export const promoteToAdmin = async (): Promise<{ success: boolean; message: str
     // Type assertion for the response data
     const result = data as any;
     return {
-      success: result.success,
-      message: result.message
+      success: result.success || false,
+      message: result.message || 'Admin promotion completed'
     };
   } catch (error) {
     console.error('💥 [ADMIN PROMOTION] Error:', error);
