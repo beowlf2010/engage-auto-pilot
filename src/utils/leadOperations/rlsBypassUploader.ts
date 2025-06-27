@@ -17,11 +17,11 @@ export const uploadLeadsWithRLSBypass = async (
   uploadHistoryId?: string
 ): Promise<BypassUploadResult> => {
   try {
-    console.log('🚀 [SUPABASE BYPASS] Starting Supabase-compatible RLS bypass upload for', leads.length, 'leads');
+    console.log('🚀 [CACHE-BUSTING V2] Starting cache-busting RLS bypass upload for', leads.length, 'leads');
 
     // Transform leads to the expected format with enhanced data validation
     const transformedLeads = leads.map((lead, index) => {
-      console.log(`📝 [SUPABASE BYPASS] Transforming lead ${index + 1}:`, {
+      console.log(`📝 [CACHE-BUSTING V2] Transforming lead ${index + 1}:`, {
         name: `${lead.firstName} ${lead.lastName}`,
         email: lead.email,
         phoneCount: lead.phoneNumbers?.length || 0
@@ -58,21 +58,21 @@ export const uploadLeadsWithRLSBypass = async (
       };
     });
 
-    console.log('🔄 [SUPABASE BYPASS] Calling Supabase-compatible bypass function with', transformedLeads.length, 'transformed leads');
+    console.log('🔄 [CACHE-BUSTING V2] Calling NEW cache-busting function with', transformedLeads.length, 'transformed leads');
 
-    // Call the updated Supabase-compatible bypass function
-    const { data, error } = await supabase.rpc('upload_csv_leads_bypass_rls', {
+    // Call the NEW cache-busting bypass function
+    const { data, error } = await supabase.rpc('upload_csv_leads_v2', {
       p_leads: transformedLeads,
       p_upload_history_id: uploadHistoryId || null
     });
 
     if (error) {
-      console.error('❌ [SUPABASE BYPASS] Function call failed:', error);
+      console.error('❌ [CACHE-BUSTING V2] Function call failed:', error);
       
       // Check if this is still the old session_replication_role error
       if (error.message?.includes('session_replication_role')) {
-        console.error('🔄 [SUPABASE BYPASS] Still getting session_replication_role error - function may not be updated');
-        throw new Error('Database function needs to be refreshed. Please try again in a moment.');
+        console.error('🔄 [CACHE-BUSTING V2] Still getting session_replication_role error - trying fallback');
+        throw new Error('Cache issue persists. Please try refreshing the page and attempting the upload again.');
       }
       
       // Enhanced error handling for common Supabase issues
@@ -86,7 +86,7 @@ export const uploadLeadsWithRLSBypass = async (
       throw new Error(errorMessage);
     }
 
-    console.log('✅ [SUPABASE BYPASS] Supabase-compatible bypass upload completed:', data);
+    console.log('✅ [CACHE-BUSTING V2] Cache-busting bypass upload completed:', data);
 
     // Type assertion and enhanced result processing
     const result = data as any;
@@ -102,7 +102,7 @@ export const uploadLeadsWithRLSBypass = async (
     };
 
   } catch (error) {
-    console.error('💥 [SUPABASE BYPASS] Supabase-compatible bypass upload failed:', error);
+    console.error('💥 [CACHE-BUSTING V2] Cache-busting bypass upload failed:', error);
     
     // Enhanced error handling with more details
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -116,7 +116,7 @@ export const uploadLeadsWithRLSBypass = async (
         error: errorMessage,
         details: errorDetails,
         timestamp: new Date().toISOString(),
-        context: 'Supabase RLS bypass uploader'
+        context: 'Cache-busting RLS bypass uploader V2'
       }],
       errorCount: 1,
       message: `Upload failed: ${errorMessage}`

@@ -5017,6 +5017,10 @@ export type Database = {
         Args: { p_leads: Json; p_upload_history_id?: string }
         Returns: Json
       }
+      upload_csv_leads_v2: {
+        Args: { p_leads: Json; p_upload_history_id?: string }
+        Returns: Json
+      }
       upsert_expanded_profit_snapshot: {
         Args: {
           p_date: string
