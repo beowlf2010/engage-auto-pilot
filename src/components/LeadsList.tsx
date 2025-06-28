@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -92,24 +93,48 @@ const LeadsList = () => {
     }
   };
 
-  // Calculate stats for LeadsStatsCards
+  // Calculate stats for LeadsStatsCards - structure it properly for the component
   const statsData = useMemo(() => {
-    const totalLeads = allLeads.length;
-    const newLeads = allLeads.filter(lead => lead.status === 'new').length;
-    const engagedLeads = allLeads.filter(lead => lead.status === 'engaged').length;
+    const today = new Date();
+    const todayString = today.toDateString();
+    
+    const totalLeads = allLeads.filter(lead => 
+      lead.status !== 'lost' && 
+      !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
+    ).length;
+    
+    const noContactLeads = allLeads.filter(lead => 
+      lead.contactStatus === 'no_contact' && 
+      lead.status !== 'lost' &&
+      !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
+    ).length;
+    
+    const contactedLeads = allLeads.filter(lead => 
+      lead.contactStatus === 'contact_attempted' && 
+      lead.status !== 'lost'
+    ).length;
+    
+    const respondedLeads = allLeads.filter(lead => 
+      (lead.contactStatus === 'response_received' || lead.status === 'engaged') && 
+      lead.status !== 'lost'
+    ).length;
+    
     const aiEnabledLeads = allLeads.filter(lead => lead.aiOptIn).length;
-    const lostLeads = allLeads.filter(lead => lead.status === 'lost').length;
-    const pausedLeads = allLeads.filter(lead => lead.status === 'paused').length;
-    const closedLeads = allLeads.filter(lead => lead.status === 'closed').length;
+    
+    const freshLeads = allLeads.filter(lead => {
+      const leadDate = new Date(lead.createdAt);
+      return leadDate.toDateString() === todayString;
+    }).length;
 
     return {
-      totalLeads,
-      newLeads,
-      engagedLeads,
-      aiEnabledLeads,
-      lostLeads,
-      pausedLeads,
-      closedLeads
+      stats: {
+        total: totalLeads,
+        noContact: noContactLeads,
+        contacted: contactedLeads,
+        responded: respondedLeads,
+        aiEnabled: aiEnabledLeads,
+        fresh: freshLeads
+      }
     };
   }, [allLeads]);
 
@@ -138,6 +163,24 @@ const LeadsList = () => {
   };
 
   const tabCounts = getTabCounts();
+
+  // Handler functions for LeadQuickView
+  const handleMessage = (lead: any) => {
+    // Navigate to lead detail or open messaging interface
+    console.log('Message lead:', lead.id);
+  };
+
+  const handleCall = (phoneNumber: string) => {
+    // Initiate call or copy phone number
+    if (phoneNumber) {
+      window.open(`tel:${phoneNumber}`);
+    }
+  };
+
+  const handleSchedule = (lead: any) => {
+    // Open scheduling interface
+    console.log('Schedule with lead:', lead.id);
+  };
 
   return (
     <div className="space-y-6">
@@ -231,6 +274,9 @@ const LeadsList = () => {
         <LeadQuickView
           lead={quickViewLead}
           onClose={hideQuickView}
+          onMessage={handleMessage}
+          onCall={handleCall}
+          onSchedule={handleSchedule}
         />
       )}
     </div>
