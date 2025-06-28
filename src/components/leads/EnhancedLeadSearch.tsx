@@ -12,7 +12,8 @@ import {
   Save, 
   Loader2,
   Bot,
-  BotOff
+  BotOff,
+  Users
 } from 'lucide-react';
 import { SearchFilters, SavedPreset } from '@/hooks/useAdvancedLeads';
 
@@ -105,6 +106,17 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
 
         {/* Quick AI Filters */}
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant={filters.activeNotOptedIn ? "default" : "outline"}
+            size="sm"
+            onClick={() => updateFilter('activeNotOptedIn', filters.activeNotOptedIn ? undefined : true)}
+            className="flex items-center gap-1"
+          >
+            <Users className="w-3 h-3" />
+            Active Not Opted In
+            {filters.activeNotOptedIn && <X className="w-3 h-3 ml-1" />}
+          </Button>
+          
           <Button
             variant={filters.aiOptIn === false ? "default" : "outline"}
             size="sm"

@@ -8,6 +8,7 @@ export interface SearchFilters {
   status?: string;
   source?: string;
   aiOptIn?: boolean;
+  activeNotOptedIn?: boolean; // New filter for active leads not opted into AI
   contactStatus?: string;
   dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
   vehicleInterest?: string;
@@ -82,6 +83,20 @@ export const useAdvancedLeads = () => {
       );
     }
 
+    // Apply Active Not Opted In filter
+    if (searchFilters.activeNotOptedIn) {
+      filtered = filtered.filter(lead => 
+        // Must be active status (not lost, paused, or closed)
+        (lead.status === 'new' || lead.status === 'engaged') &&
+        // Must not be opted into AI
+        !lead.aiOptIn &&
+        // Must not have do-not-contact restrictions
+        !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail &&
+        // Must not be hidden
+        !lead.is_hidden
+      );
+    }
+
     // Enhanced status-based filtering with special handling for lost leads and do not contact
     if (statusFilter !== 'all') {
       switch (statusFilter) {
@@ -122,7 +137,7 @@ export const useAdvancedLeads = () => {
       }
     } else {
       // For "All" tab: exclude lost leads and do-not-contact leads unless searching by name/phone
-      if (!isSearchingByNameOrPhone) {
+      if (!isSearchingByNameOrPhone && !searchFilters.activeNotOptedIn) {
         filtered = filtered.filter(lead => 
           lead.status !== 'lost' && 
           !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
