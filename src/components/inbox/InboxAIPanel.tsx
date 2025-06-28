@@ -11,7 +11,7 @@ import {
   TrendingUp, 
   MessageSquare,
   ChevronDown,
-  ChevranUp
+  ChevronUp
 } from 'lucide-react';
 import IntelligentAIPanel from './IntelligentAIPanel';
 import AIInsightsPanel from '../ai/AIInsightsPanel';

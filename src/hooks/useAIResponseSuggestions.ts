@@ -59,7 +59,7 @@ export const useAIResponseSuggestions = ({ leadId, messages }: UseAIResponseSugg
           message: data.message,
           confidence: data.confidence || 0.8,
           reasoning: data.reasoning || 'AI-generated response based on conversation context',
-          responseType: 'general_response',
+          responseType: 'follow_up', // Use a valid responseType
           priority: 'medium',
           suggestedActions: []
         };
