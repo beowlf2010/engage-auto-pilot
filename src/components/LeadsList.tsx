@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -12,6 +11,7 @@ import MultiFileLeadUploadModal from './leads/MultiFileLeadUploadModal';
 import { Lead } from '@/types/lead';
 import { useToast } from '@/hooks/use-toast';
 import { SearchFilters, SavedPreset } from '@/hooks/useAdvancedLeads';
+import DuplicateCleanupButton from './leads/DuplicateCleanupButton';
 
 const LeadsList = () => {
   const { profile, initializeUserForCSV } = useAuth();
@@ -259,6 +259,7 @@ const LeadsList = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <DuplicateCleanupButton onCleanupComplete={refetch} />
             {hiddenCount > 0 && (
               <Button
                 variant="outline"
