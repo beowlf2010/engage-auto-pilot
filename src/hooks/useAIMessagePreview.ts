@@ -12,14 +12,14 @@ export interface AIMessagePreviewState {
   isSending: boolean;
   originalDataQuality: any;
   leadData: any;
-  nameDecision: 'use_original' | 'use_suggested' | null;
-  vehicleDecision: 'use_original' | 'use_suggested' | null;
+  nameDecision: 'approved' | 'denied' | null;
+  vehicleDecision: 'approved' | 'denied' | null;
   error: string | null;
 }
 
 interface UseAIMessagePreviewProps {
   leadId: string;
-  onMessageSent: () => void;
+  onMessageSent?: () => void;
 }
 
 export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePreviewProps) => {
@@ -68,12 +68,16 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         nameValidation: {
           quality: 'good',
           confidence: 0.9,
-          suggestedName: lead.first_name || 'Customer'
+          suggestedName: lead.first_name || 'Customer',
+          isValidPersonalName: true,
+          detectedType: 'personal_name'
         },
         vehicleValidation: {
           quality: lead.vehicle_interest ? 'good' : 'poor',
           confidence: lead.vehicle_interest ? 0.8 : 0.3,
-          suggestedVehicle: lead.vehicle_interest || 'the right vehicle'
+          suggestedVehicle: lead.vehicle_interest || 'the right vehicle',
+          isValidVehicleInterest: !!lead.vehicle_interest,
+          detectedIssue: lead.vehicle_interest ? 'None' : 'Missing vehicle interest'
         }
       };
 
@@ -95,12 +99,12 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     }
   }, [leadId]);
 
-  const handleNameDecision = useCallback((decision: 'use_original' | 'use_suggested') => {
+  const handleNameDecision = useCallback((decision: 'approved' | 'denied') => {
     console.log('👤 [AI PREVIEW] Name decision:', decision);
     setState(prev => ({ ...prev, nameDecision: decision }));
   }, []);
 
-  const handleVehicleDecision = useCallback((decision: 'use_original' | 'use_suggested') => {
+  const handleVehicleDecision = useCallback((decision: 'approved' | 'denied') => {
     console.log('🚗 [AI PREVIEW] Vehicle decision:', decision);
     setState(prev => ({ ...prev, vehicleDecision: decision }));
   }, []);
@@ -112,13 +116,13 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
 
     try {
       // Use decisions or fallback to original data
-      const finalName = state.nameDecision === 'use_suggested' 
+      const finalName = state.nameDecision === 'approved' 
         ? state.originalDataQuality?.nameValidation?.suggestedName 
-        : state.leadData?.first_name || 'Customer';
+        : 'Customer';
       
-      const finalVehicle = state.vehicleDecision === 'use_suggested'
+      const finalVehicle = state.vehicleDecision === 'approved'
         ? state.originalDataQuality?.vehicleValidation?.suggestedVehicle
-        : state.leadData?.vehicle_interest || 'the right vehicle';
+        : 'the right vehicle';
 
       console.log('📝 [AI PREVIEW] Using name:', finalName, 'vehicle:', finalVehicle);
 
@@ -152,6 +156,11 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
       }));
     }
   }, [leadId, state.nameDecision, state.vehicleDecision, state.originalDataQuality, state.leadData]);
+
+  const generatePreview = useCallback(() => {
+    // Start the analysis process for preview generation
+    startAnalysis();
+  }, [startAnalysis]);
 
   const sendNow = useCallback(async () => {
     if (!state.generatedMessage) return;
@@ -197,12 +206,15 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
         description: "The lead has been opted into AI messaging and the initial message has been sent.",
       });
 
-      // Wait a moment to ensure database changes are committed
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setState(prev => ({ ...prev, isSending: false }));
 
-      // Now trigger the callback to update the UI
-      console.log('🔄 [AI PREVIEW] Triggering onMessageSent callback');
-      onMessageSent();
+      // Wait for database changes to propagate before calling onMessageSent
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      if (onMessageSent) {
+        console.log('🔄 [AI PREVIEW] Triggering onMessageSent callback');
+        onMessageSent();
+      }
 
     } catch (error) {
       console.error('❌ [AI PREVIEW] Send failed:', error);
@@ -219,6 +231,23 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
       });
     }
   }, [leadId, state.generatedMessage, onMessageSent]);
+
+  const cancel = useCallback(() => {
+    console.log('🔄 [AI PREVIEW] Canceling and resetting state');
+    setState({
+      isAnalyzing: false,
+      isGenerating: false,
+      generatedMessage: null,
+      showDecisionStep: false,
+      showPreview: false,
+      isSending: false,
+      originalDataQuality: null,
+      leadData: null,
+      nameDecision: null,
+      vehicleDecision: null,
+      error: null
+    });
+  }, []);
 
   const reset = useCallback(() => {
     console.log('🔄 [AI PREVIEW] Resetting state');
@@ -243,7 +272,9 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     handleNameDecision,
     handleVehicleDecision,
     generateWithDecisions,
+    generatePreview,
     sendNow,
+    cancel,
     reset
   };
 };
