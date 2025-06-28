@@ -160,10 +160,35 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: { leadId?: string
       // Use the working fixed message service
       await fixedSendMessage(useLeadId, messageToSend.trim(), profile, true);
       
-      toast({
-        title: "Message Sent",
-        description: "AI message sent successfully",
-      });
+      // IMPORTANT: Update the lead's AI opt-in status after successful message send
+      console.log(`🔄 [AI PREVIEW] Updating AI opt-in status for lead: ${useLeadId}`);
+      const { error: updateError } = await supabase
+        .from('leads')
+        .update({
+          ai_opt_in: true,
+          ai_stage: 'active',
+          next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Next day
+          ai_sequence_paused: false,
+          ai_pause_reason: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', useLeadId);
+
+      if (updateError) {
+        console.error('❌ [AI PREVIEW] Error updating AI opt-in status:', updateError);
+        // Don't throw error here since message was sent successfully
+        toast({
+          title: "Message Sent",
+          description: "AI message sent successfully, but there was an issue updating AI status. Please refresh the page.",
+          variant: "default"
+        });
+      } else {
+        console.log(`✅ [AI PREVIEW] AI opt-in status updated successfully for lead: ${useLeadId}`);
+        toast({
+          title: "AI Messaging Enabled",
+          description: "Message sent successfully and AI messaging has been enabled for this lead.",
+        });
+      }
       
       // Clear the preview after sending
       reset();
