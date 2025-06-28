@@ -125,13 +125,17 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
       <TableCell>
         <div className="flex items-center space-x-2">
           <AISequenceStatus 
-            lead={lead}
-            showQuickActions={true}
+            aiOptIn={lead.aiOptIn || false}
+            aiStage={lead.ai_stage}
+            nextAiSendAt={lead.next_ai_send_at}
+            aiSequencePaused={lead.ai_sequence_paused}
+            aiPauseReason={lead.ai_pause_reason}
+            aiMessagesSent={lead.ai_messages_sent}
           />
           <QuickAIActions
             leadId={lead.id}
             leadName={`${lead.firstName} ${lead.lastName}`}
-            aiOptIn={lead.aiOptIn}
+            aiOptIn={lead.aiOptIn || false}
             onUpdate={handleRefresh}
           />
         </div>
