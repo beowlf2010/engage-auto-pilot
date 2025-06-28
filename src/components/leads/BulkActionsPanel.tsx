@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import BulkEmailAction from "./BulkEmailAction";
+import BulkAIOptInAction from "./BulkAIOptInAction";
 import MarkLostConfirmDialog from "./MarkLostConfirmDialog";
 import { markMultipleLeadsAsLost } from "@/services/leadStatusService";
 
@@ -23,6 +24,7 @@ interface Lead {
   email?: string;
   status: string;
   vehicle_interest?: string;
+  ai_opt_in?: boolean;
 }
 
 interface BulkActionsPanelProps {
@@ -82,6 +84,13 @@ const BulkActionsPanel = ({
     }
   };
 
+  const handleAIActionComplete = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
+    onClearSelection();
+  };
+
   return (
     <>
       <div className="bg-white border rounded-lg p-4 shadow-sm">
@@ -104,6 +113,11 @@ const BulkActionsPanel = ({
             <Separator orientation="vertical" className="h-6" />
             
             <div className="flex items-center space-x-2">
+              <BulkAIOptInAction
+                selectedLeads={selectedLeads}
+                onComplete={handleAIActionComplete}
+              />
+              
               <Button variant="outline" size="sm" onClick={onBulkMessage}>
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Send SMS
