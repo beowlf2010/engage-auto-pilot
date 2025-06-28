@@ -1,85 +1,86 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Bot, BotOff } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { Lead } from '@/types/lead';
+import AIPreviewPopout from './AIPreviewPopout';
 
 interface QuickAIActionsProps {
   leadId: string;
   leadName: string;
   aiOptIn: boolean;
   onUpdate: () => void;
+  lead?: Lead; // Optional lead object for full preview
 }
 
 const QuickAIActions: React.FC<QuickAIActionsProps> = ({
   leadId,
   leadName,
   aiOptIn,
-  onUpdate
+  onUpdate,
+  lead
 }) => {
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  const handleToggleAI = async () => {
-    setIsUpdating(true);
-    try {
-      const newOptIn = !aiOptIn;
-      
-      const updateData = newOptIn ? {
-        ai_opt_in: true,
-        ai_stage: 'ready_for_contact',
-        next_ai_send_at: new Date().toISOString(),
-        ai_sequence_paused: false,
-        ai_pause_reason: null
-      } : {
-        ai_opt_in: false,
-        ai_sequence_paused: true,
-        ai_pause_reason: 'manually_disabled'
-      };
-
-      const { error } = await supabase
-        .from('leads')
-        .update(updateData)
-        .eq('id', leadId);
-
-      if (error) throw error;
-
-      toast({
-        title: newOptIn ? "AI messaging enabled" : "AI messaging disabled",
-        description: `${leadName} will ${newOptIn ? 'now receive' : 'no longer receive'} AI-generated messages.`,
-      });
-
-      onUpdate();
-    } catch (error) {
-      console.error('Error updating AI opt-in:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update AI messaging settings",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={handleToggleAI}
-      disabled={isUpdating}
-      className={`h-6 px-2 ${aiOptIn 
-        ? 'text-green-600 hover:text-green-700 hover:bg-green-50' 
-        : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
-      }`}
-      title={aiOptIn ? 'Disable AI messaging' : 'Enable AI messaging'}
-    >
-      {aiOptIn ? (
+  // For leads that already have AI enabled, show simple indicator
+  if (aiOptIn) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+        title="AI messaging enabled"
+        disabled
+      >
         <Bot className="h-3 w-3" />
-      ) : (
+      </Button>
+    );
+  }
+
+  // For leads without AI, show the preview popout button
+  return (
+    <AIPreviewPopout
+      lead={lead || {
+        id: leadId,
+        firstName: leadName.split(' ')[0] || '',
+        lastName: leadName.split(' ').slice(1).join(' ') || '',
+        vehicleInterest: '',
+        // Add other required Lead properties with defaults
+        primaryPhone: '',
+        email: '',
+        source: '',
+        status: 'new',
+        salesperson: '',
+        salespersonId: '',
+        aiOptIn: false,
+        createdAt: '',
+        unreadCount: 0,
+        doNotCall: false,
+        doNotEmail: false,
+        doNotMail: false,
+        contactStatus: 'no_contact',
+        incomingCount: 0,
+        outgoingCount: 0,
+        unrepliedCount: 0,
+        phoneNumbers: [],
+        first_name: leadName.split(' ')[0] || '',
+        last_name: leadName.split(' ').slice(1).join(' ') || '',
+        created_at: '',
+        is_hidden: false
+      } as Lead}
+      onAIOptInChange={(leadId, enabled) => {
+        if (enabled) {
+          onUpdate();
+        }
+      }}
+    >
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+        title="Enable AI messaging"
+      >
         <BotOff className="h-3 w-3" />
-      )}
-    </Button>
+      </Button>
+    </AIPreviewPopout>
   );
 };
 

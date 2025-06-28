@@ -137,6 +137,7 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
             leadName={`${lead.firstName} ${lead.lastName}`}
             aiOptIn={lead.aiOptIn || false}
             onUpdate={handleRefresh}
+            lead={lead}
           />
         </div>
       </TableCell>
