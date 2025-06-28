@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { Lead } from '@/types/lead';
 import { fetchLeadsData, fetchConversationsData } from './leads/useLeadsDataFetcher';
@@ -34,11 +33,17 @@ export const useLeads = () => {
   }, [showHidden]);
 
   const toggleLeadHidden = (leadId: string, hidden: boolean) => {
-    setLeads(prevLeads => 
-      prevLeads.map(lead => 
-        lead.id === leadId ? { ...lead, is_hidden: hidden } : lead
-      )
-    );
+    setLeads(prevLeads => {
+      if (hidden && !showHidden) {
+        // If hiding a lead and we're not showing hidden leads, remove it from the list
+        return prevLeads.filter(lead => lead.id !== leadId);
+      } else {
+        // Otherwise, just update the is_hidden property
+        return prevLeads.map(lead => 
+          lead.id === leadId ? { ...lead, is_hidden: hidden } : lead
+        );
+      }
+    });
   };
 
   const updateAiOptIn = async (leadId: string, aiOptIn: boolean) => {
