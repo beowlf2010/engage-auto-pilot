@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Lead } from '@/types/lead';
 import { useLeads } from '@/hooks/useLeads';
+import { useFilterPersistence } from '@/hooks/useFilterPersistence';
 
 export interface SearchFilters {
   searchTerm: string;
@@ -26,16 +27,37 @@ export interface SavedPreset {
   createdAt: string;
 }
 
+// Combined persistent filter state
+interface PersistentFilterState {
+  searchFilters: SearchFilters;
+  statusFilter: string;
+}
+
+const DEFAULT_FILTERS: PersistentFilterState = {
+  searchFilters: { 
+    searchTerm: '',
+    dateFilter: 'all'
+  },
+  statusFilter: 'all'
+};
+
 export const useAdvancedLeads = () => {
   const { leads, loading, error, refetch } = useLeads();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>([]);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({ 
-    searchTerm: '',
-    dateFilter: 'all'
-  });
+  
+  // Use persistent filters
+  const {
+    state: persistentFilters,
+    saveState: savePersistentFilters,
+    clearState: clearPersistentFilters,
+    isLoaded: filtersLoaded
+  } = useFilterPersistence<PersistentFilterState>(DEFAULT_FILTERS, 'leads-filters-v1');
+
+  // Extract individual states for compatibility
+  const searchFilters = persistentFilters.searchFilters;
+  const statusFilter = persistentFilters.statusFilter;
 
   // Load saved presets from localStorage
   useEffect(() => {
@@ -63,6 +85,8 @@ export const useAdvancedLeads = () => {
 
   // Filter leads based on current filters and status
   const filteredLeads = useMemo(() => {
+    if (!filtersLoaded) return []; // Don't filter until filters are loaded
+    
     let filtered = [...leads];
     
     // Check if user is searching by name or phone number
@@ -230,7 +254,7 @@ export const useAdvancedLeads = () => {
     }
 
     return filtered;
-  }, [leads, statusFilter, searchFilters]);
+  }, [leads, statusFilter, searchFilters, filtersLoaded]);
 
   const savePreset = (name: string, filters: SearchFilters) => {
     const newPreset: SavedPreset = {
@@ -245,14 +269,32 @@ export const useAdvancedLeads = () => {
   };
 
   const loadPreset = (preset: SavedPreset) => {
-    setSearchFilters(preset.filters);
-    setStatusFilter('all'); // Reset status filter when loading preset
+    const newState = {
+      searchFilters: preset.filters,
+      statusFilter: 'all' // Reset status filter when loading preset
+    };
+    savePersistentFilters(newState);
   };
 
   const clearFilters = () => {
-    setSearchFilters({ searchTerm: '', dateFilter: 'all' });
-    setStatusFilter('all');
+    clearPersistentFilters();
     setSelectedLeads([]);
+  };
+
+  const setStatusFilter = (status: string) => {
+    const newState = {
+      ...persistentFilters,
+      statusFilter: status
+    };
+    savePersistentFilters(newState);
+  };
+
+  const setSearchFilters = (filters: SearchFilters) => {
+    const newState = {
+      ...persistentFilters,
+      searchFilters: filters
+    };
+    savePersistentFilters(newState);
   };
 
   const selectAllFiltered = () => {
@@ -290,6 +332,7 @@ export const useAdvancedLeads = () => {
     savedPresets,
     statusFilter,
     searchFilters,
+    filtersLoaded, // Expose filter loading state
     
     // Actions
     setStatusFilter,
