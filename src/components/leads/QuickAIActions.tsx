@@ -10,8 +10,8 @@ interface QuickAIActionsProps {
   leadName: string;
   aiOptIn: boolean;
   onUpdate: () => void;
-  lead?: Lead; // Optional lead object for full preview
-  onAiOptInChange?: (leadId: string, enabled: boolean) => void; // Add callback for AI opt-in changes
+  lead?: Lead;
+  onAiOptInChange?: (leadId: string, enabled: boolean) => void;
 }
 
 const QuickAIActions: React.FC<QuickAIActionsProps> = ({
@@ -37,6 +37,23 @@ const QuickAIActions: React.FC<QuickAIActionsProps> = ({
     );
   }
 
+  // Enhanced callback that ensures proper state updates
+  const handleAIOptInSuccess = async () => {
+    console.log('🎉 [QUICK AI] AI opt-in successful for lead:', leadId);
+    
+    // First call the specific AI opt-in callback if available
+    if (onAiOptInChange) {
+      console.log('🔄 [QUICK AI] Calling onAiOptInChange callback');
+      onAiOptInChange(leadId, true);
+    }
+    
+    // Then trigger the general update with a small delay to ensure database consistency
+    setTimeout(() => {
+      console.log('🔄 [QUICK AI] Calling general onUpdate callback');
+      onUpdate();
+    }, 750);
+  };
+
   // For leads without AI, show the preview popout button
   return (
     <AIPreviewPopout
@@ -45,7 +62,6 @@ const QuickAIActions: React.FC<QuickAIActionsProps> = ({
         firstName: leadName.split(' ')[0] || '',
         lastName: leadName.split(' ').slice(1).join(' ') || '',
         vehicleInterest: '',
-        // Add other required Lead properties with defaults
         primaryPhone: '',
         email: '',
         source: '',
@@ -68,16 +84,7 @@ const QuickAIActions: React.FC<QuickAIActionsProps> = ({
         created_at: '',
         is_hidden: false
       } as Lead}
-      onAIOptInChange={(leadId, enabled) => {
-        if (enabled) {
-          // Call the AI opt-in callback first if available
-          if (onAiOptInChange) {
-            onAiOptInChange(leadId, true);
-          }
-          // Then trigger the general update
-          onUpdate();
-        }
-      }}
+      onAIOptInChange={handleAIOptInSuccess}
     >
       <Button
         variant="ghost"

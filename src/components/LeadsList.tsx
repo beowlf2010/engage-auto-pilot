@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -74,17 +73,24 @@ const LeadsList = () => {
     statusFilter !== 'all'
   ].filter(Boolean).length;
 
-  // Enhanced AI opt-in handler that triggers proper refresh
+  // Enhanced AI opt-in handler with improved state management
   const handleAiOptInChange = async (leadId: string, aiOptIn: boolean) => {
+    console.log('🤖 [LEADS LIST] AI opt-in change requested:', { leadId, aiOptIn });
+    
     try {
+      // First update the local state optimistically
       await updateAiOptIn(leadId, aiOptIn);
-      // The updateAiOptIn function should already handle the state update
-      // But we can add a small delay to ensure the database is updated
-      setTimeout(() => {
-        refetch();
-      }, 500);
+      console.log('✅ [LEADS LIST] Local state updated');
+      
+      // Add a longer delay to ensure database consistency before refetch
+      setTimeout(async () => {
+        console.log('🔄 [LEADS LIST] Refetching leads data');
+        await refetch();
+        console.log('✅ [LEADS LIST] Leads data refreshed');
+      }, 1000);
+      
     } catch (error) {
-      console.error('Error updating AI opt-in:', error);
+      console.error('❌ [LEADS LIST] Error updating AI opt-in:', error);
       toast({
         title: "Error",
         description: "Failed to update AI settings. Please try again.",
