@@ -185,18 +185,98 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
 
       console.log('✅ [AI PREVIEW] AI opt-in enabled successfully');
 
-      // Then send the message
-      const { error: sendError } = await supabase.functions.invoke('send-ai-message', {
+      // Get the lead's phone number
+      console.log('📱 [AI PREVIEW] Getting phone number for lead:', leadId);
+      
+      const { data: phoneData, error: phoneError } = await supabase
+        .from('phone_numbers')
+        .select('number')
+        .eq('lead_id', leadId)
+        .eq('is_primary', true)
+        .maybeSingle();
+
+      if (phoneError) {
+        console.error('❌ [AI PREVIEW] Failed to get phone number:', phoneError);
+        throw new Error('Failed to get phone number for lead');
+      }
+
+      if (!phoneData) {
+        console.error('❌ [AI PREVIEW] No phone number found for lead:', leadId);
+        throw new Error('No phone number found for this lead');
+      }
+
+      console.log('✅ [AI PREVIEW] Found phone number:', phoneData.number);
+
+      // Create conversation record first
+      const { data: conversationData, error: conversationError } = await supabase
+        .from('conversations')
+        .insert({
+          lead_id: leadId,
+          body: state.generatedMessage,
+          direction: 'out',
+          ai_generated: true,
+          sms_status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (conversationError) {
+        console.error('❌ [AI PREVIEW] Failed to create conversation record:', conversationError);
+        throw new Error('Failed to save message record');
+      }
+
+      console.log('✅ [AI PREVIEW] Created conversation record:', conversationData.id);
+
+      // Send SMS using the existing send-sms function
+      const { data: smsResult, error: sendError } = await supabase.functions.invoke('send-sms', {
         body: {
-          leadId,
-          message: state.generatedMessage,
-          messageType: 'initial_contact'
+          to: phoneData.number,
+          body: state.generatedMessage,
+          conversationId: conversationData.id
         }
       });
 
       if (sendError) {
-        console.error('❌ [AI PREVIEW] Failed to send message:', sendError);
-        throw sendError;
+        console.error('❌ [AI PREVIEW] Failed to send SMS:', sendError);
+        
+        // Update conversation record with error
+        await supabase
+          .from('conversations')
+          .update({
+            sms_status: 'failed',
+            sms_error: sendError.message
+          })
+          .eq('id', conversationData.id);
+        
+        throw new Error(sendError.message || 'Failed to send message');
+      }
+
+      if (!smsResult?.success) {
+        console.error('❌ [AI PREVIEW] SMS sending failed:', smsResult);
+        
+        // Update conversation record with error
+        await supabase
+          .from('conversations')
+          .update({
+            sms_status: 'failed',
+            sms_error: smsResult?.error || 'SMS sending failed'
+          })
+          .eq('id', conversationData.id);
+        
+        throw new Error(smsResult?.error || 'Failed to send message');
+      }
+
+      console.log('✅ [AI PREVIEW] SMS sent successfully:', smsResult);
+
+      // Update conversation record with success
+      if (smsResult.messageSid) {
+        await supabase
+          .from('conversations')
+          .update({
+            sms_status: 'sent',
+            twilio_message_id: smsResult.messageSid
+          })
+          .eq('id', conversationData.id);
       }
 
       console.log('✅ [AI PREVIEW] Message sent successfully');
@@ -221,12 +301,12 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
       setState(prev => ({
         ...prev,
         isSending: false,
-        error: 'Failed to send message. Please try again.'
+        error: error instanceof Error ? error.message : 'Failed to send message. Please try again.'
       }));
       
       toast({
         title: "Error",
-        description: "Failed to enable AI messaging. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to enable AI messaging. Please try again.",
         variant: "destructive"
       });
     }
