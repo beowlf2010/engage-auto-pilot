@@ -10,6 +10,7 @@ import { MessageSquare, AlertCircle, Inbox } from "lucide-react";
 import ConversationsList from './ConversationsList';
 import { ConversationListSkeleton } from '@/components/ui/skeletons/ConversationSkeleton';
 import EnhancedChatView from './EnhancedChatView';
+import LeadContextPanel from './LeadContextPanel';
 
 interface ConsolidatedSmartInboxProps {
   onLeadsRefresh: () => void;
@@ -151,7 +152,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
         </Tabs>
       </div>
 
-      {/* Main content area */}
+      {/* Main content area with 3-column layout */}
       <div className="h-[calc(100vh-8rem)] flex space-x-4">
         {/* Conversations sidebar */}
         <div className="w-80 flex-shrink-0">
@@ -199,7 +200,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
           </div>
         </div>
 
-        {/* Chat area */}
+        {/* Chat area - Main conversation view */}
         <div className="flex-1 min-w-0">
           <EnhancedChatView
             selectedConversation={selectedConversation}
@@ -212,6 +213,19 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
               id: profile.id
             }}
             isLoading={sendingMessage}
+          />
+        </div>
+
+        {/* Lead Context Panel - AI and Actions */}
+        <div className="w-80 flex-shrink-0">
+          <LeadContextPanel
+            conversation={selectedConversation}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            onScheduleAppointment={() => {
+              // Handle appointment scheduling
+              console.log('Schedule appointment for', selectedConversation?.leadName);
+            }}
           />
         </div>
       </div>
