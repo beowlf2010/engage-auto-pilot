@@ -20,6 +20,7 @@ interface LeadsTableProps {
   onLeadSelect: (leadId: string) => void;
   onQuickView: (lead: Lead) => void;
   getEngagementScore: (lead: Lead) => number;
+  onToggleHidden?: (leadId: string, hidden: boolean) => void;
 }
 
 const LeadsTable = ({
@@ -32,7 +33,8 @@ const LeadsTable = ({
   selectedLeads,
   onLeadSelect,
   onQuickView,
-  getEngagementScore
+  getEngagementScore,
+  onToggleHidden
 }: LeadsTableProps) => {
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -77,6 +79,7 @@ const LeadsTable = ({
                 onQuickView={onQuickView}
                 getEngagementScore={getEngagementScore}
                 isFresh={isFresh}
+                onToggleHidden={onToggleHidden}
               />
             );
           })}

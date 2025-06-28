@@ -42,7 +42,7 @@ const DEFAULT_FILTERS: PersistentFilterState = {
 };
 
 export const useAdvancedLeads = () => {
-  const { leads, loading, error, refetch } = useLeads();
+  const { leads, loading, error, refetch, showHidden } = useLeads();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>([]);
@@ -88,6 +88,11 @@ export const useAdvancedLeads = () => {
     if (!filtersLoaded) return []; // Don't filter until filters are loaded
     
     let filtered = [...leads];
+    
+    // Apply hidden lead filtering based on showHidden state
+    if (!showHidden) {
+      filtered = filtered.filter(lead => !lead.is_hidden);
+    }
     
     // Check if user is searching by name or phone number
     const isSearchingByNameOrPhone = searchFilters.searchTerm && (
@@ -254,7 +259,7 @@ export const useAdvancedLeads = () => {
     }
 
     return filtered;
-  }, [leads, statusFilter, searchFilters, filtersLoaded]);
+  }, [leads, statusFilter, searchFilters, filtersLoaded, showHidden]);
 
   const savePreset = (name: string, filters: SearchFilters) => {
     const newPreset: SavedPreset = {

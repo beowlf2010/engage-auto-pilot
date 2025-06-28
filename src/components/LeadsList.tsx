@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -13,10 +14,21 @@ import EnhancedLeadSearch from './leads/EnhancedLeadSearch';
 import LeadsStatsCards from './leads/LeadsStatsCards';
 import LeadQuickView from './leads/LeadQuickView';
 import FilterRestorationBanner from './leads/FilterRestorationBanner';
+import ShowHiddenLeadsToggle from './leads/ShowHiddenLeadsToggle';
 
 const LeadsList = () => {
   const { user } = useAuth();
-  const { leads: allLeads, updateAiOptIn, updateDoNotContact, refetch } = useLeads();
+  const { 
+    leads: allLeads, 
+    updateAiOptIn, 
+    updateDoNotContact, 
+    refetch,
+    showHidden,
+    setShowHidden,
+    hiddenCount,
+    toggleLeadHidden
+  } = useLeads();
+  
   const {
     leads: filteredLeads,
     loading,
@@ -104,30 +116,33 @@ const LeadsList = () => {
     const today = new Date();
     const todayString = today.toDateString();
     
-    const totalLeads = allLeads.filter(lead => 
+    // Filter out hidden leads unless specifically showing them
+    const visibleLeads = showHidden ? allLeads : allLeads.filter(lead => !lead.is_hidden);
+    
+    const totalLeads = visibleLeads.filter(lead => 
       lead.status !== 'lost' && 
       !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
     ).length;
     
-    const noContactLeads = allLeads.filter(lead => 
+    const noContactLeads = visibleLeads.filter(lead => 
       lead.contactStatus === 'no_contact' && 
       lead.status !== 'lost' &&
       !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
     ).length;
     
-    const contactedLeads = allLeads.filter(lead => 
+    const contactedLeads = visibleLeads.filter(lead => 
       lead.contactStatus === 'contact_attempted' && 
       lead.status !== 'lost'
     ).length;
     
-    const respondedLeads = allLeads.filter(lead => 
+    const respondedLeads = visibleLeads.filter(lead => 
       (lead.contactStatus === 'response_received' || lead.status === 'engaged') && 
       lead.status !== 'lost'
     ).length;
     
-    const aiEnabledLeads = allLeads.filter(lead => lead.aiOptIn).length;
+    const aiEnabledLeads = visibleLeads.filter(lead => lead.aiOptIn).length;
     
-    const freshLeads = allLeads.filter(lead => {
+    const freshLeads = visibleLeads.filter(lead => {
       const leadDate = new Date(lead.createdAt);
       return leadDate.toDateString() === todayString;
     }).length;
@@ -142,27 +157,30 @@ const LeadsList = () => {
         fresh: freshLeads
       }
     };
-  }, [allLeads]);
+  }, [allLeads, showHidden]);
 
   const getTabCounts = () => {
+    // Filter out hidden leads unless specifically showing them
+    const visibleLeads = showHidden ? allLeads : allLeads.filter(lead => !lead.is_hidden);
+    
     return {
-      all: allLeads.filter(lead => 
+      all: visibleLeads.filter(lead => 
         lead.status !== 'lost' && 
         !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
       ).length,
-      new: allLeads.filter(lead => 
+      new: visibleLeads.filter(lead => 
         lead.contactStatus === 'no_contact' && 
         lead.status !== 'lost' &&
         !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
       ).length,
-      engaged: allLeads.filter(lead => 
+      engaged: visibleLeads.filter(lead => 
         (lead.contactStatus === 'response_received' || lead.status === 'engaged') && 
         lead.status !== 'lost'
       ).length,
-      paused: allLeads.filter(lead => lead.status === 'paused').length,
-      closed: allLeads.filter(lead => lead.status === 'closed').length,
-      lost: allLeads.filter(lead => lead.status === 'lost').length,
-      do_not_contact: allLeads.filter(lead => 
+      paused: visibleLeads.filter(lead => lead.status === 'paused').length,
+      closed: visibleLeads.filter(lead => lead.status === 'closed').length,
+      lost: visibleLeads.filter(lead => lead.status === 'lost').length,
+      do_not_contact: visibleLeads.filter(lead => 
         lead.doNotCall || lead.doNotEmail || lead.doNotMail
       ).length
     };
@@ -197,6 +215,13 @@ const LeadsList = () => {
           filtersCount={restoredFiltersCount}
         />
       )}
+
+      {/* Hidden Leads Toggle */}
+      <ShowHiddenLeadsToggle
+        showHidden={showHidden}
+        onToggle={setShowHidden}
+        hiddenCount={hiddenCount}
+      />
 
       {/* Stats Cards */}
       <LeadsStatsCards {...statsData} />
@@ -268,6 +293,7 @@ const LeadsList = () => {
                   onLeadSelect={() => {}} // Implement if needed
                   onQuickView={showQuickView}
                   getEngagementScore={getEngagementScore}
+                  onToggleHidden={toggleLeadHidden}
                 />
               </CardContent>
             </Card>
