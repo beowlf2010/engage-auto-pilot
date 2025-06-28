@@ -11,6 +11,7 @@ interface QuickAIActionsProps {
   aiOptIn: boolean;
   onUpdate: () => void;
   lead?: Lead; // Optional lead object for full preview
+  onAiOptInChange?: (leadId: string, enabled: boolean) => void; // Add callback for AI opt-in changes
 }
 
 const QuickAIActions: React.FC<QuickAIActionsProps> = ({
@@ -18,7 +19,8 @@ const QuickAIActions: React.FC<QuickAIActionsProps> = ({
   leadName,
   aiOptIn,
   onUpdate,
-  lead
+  lead,
+  onAiOptInChange
 }) => {
   // For leads that already have AI enabled, show simple indicator
   if (aiOptIn) {
@@ -68,6 +70,11 @@ const QuickAIActions: React.FC<QuickAIActionsProps> = ({
       } as Lead}
       onAIOptInChange={(leadId, enabled) => {
         if (enabled) {
+          // Call the AI opt-in callback first if available
+          if (onAiOptInChange) {
+            onAiOptInChange(leadId, true);
+          }
+          // Then trigger the general update
           onUpdate();
         }
       }}

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -93,6 +94,19 @@ const LeadsList = () => {
         matchesFilters = matchesFilters && lead.aiOptIn === searchFilters.aiOptIn;
       }
       
+      // Apply Active Not Opted In filter
+      if (searchFilters.activeNotOptedIn) {
+        matchesFilters = matchesFilters && 
+          // Must be active status (not lost, paused, or closed)
+          (lead.status === 'new' || lead.status === 'engaged') &&
+          // Must not be opted into AI
+          !lead.aiOptIn &&
+          // Must not have do-not-contact restrictions
+          !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail &&
+          // Must not be hidden
+          !lead.is_hidden;
+      }
+      
       if (searchFilters.vehicleInterest) {
         matchesFilters = matchesFilters && lead.vehicleInterest?.toLowerCase().includes(searchFilters.vehicleInterest.toLowerCase());
       }
@@ -156,6 +170,25 @@ const LeadsList = () => {
     if (lead.email) score += 15;
     if (lead.vehicleInterest && lead.vehicleInterest !== 'finding the right vehicle for your needs') score += 25;
     return Math.min(score, 100);
+  };
+
+  // Enhanced AI opt-in handler that triggers proper refresh
+  const handleAiOptInChange = async (leadId: string, aiOptIn: boolean) => {
+    try {
+      await updateAiOptIn(leadId, aiOptIn);
+      // The updateAiOptIn function should already handle the state update
+      // But we can add a small delay to ensure the database is updated
+      setTimeout(() => {
+        refetch();
+      }, 500);
+    } catch (error) {
+      console.error('Error updating AI opt-in:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update AI settings. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Calculate stats for LeadsStatsCards
@@ -296,7 +329,7 @@ const LeadsList = () => {
         {/* Leads Table */}
         <LeadsTable
           leads={filteredLeads}
-          onAiOptInChange={updateAiOptIn}
+          onAiOptInChange={handleAiOptInChange}
           onDoNotContactChange={updateDoNotContact}
           canEdit={canEdit}
           loading={loading}

@@ -64,8 +64,9 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
   };
 
   const handleRefresh = () => {
-    // Trigger a refresh of the leads data
-    window.location.reload();
+    // This will be called when AI opt-in is successful
+    // The parent component should handle the actual refresh
+    console.log('AI opt-in successful for lead:', lead.id);
   };
 
   return (
@@ -138,6 +139,7 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
             aiOptIn={lead.aiOptIn || false}
             onUpdate={handleRefresh}
             lead={lead}
+            onAiOptInChange={onAiOptInChange}
           />
         </div>
       </TableCell>
