@@ -66,6 +66,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           onSendMessage={onSendMessage}
           onToggleTemplates={onToggleTemplates}
           user={user}
+          isLoading={sendingMessage}
         />
       </div>
 
