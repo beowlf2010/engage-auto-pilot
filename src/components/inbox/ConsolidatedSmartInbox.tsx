@@ -114,9 +114,9 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full">
       {/* Full-width tabs across the top */}
-      <div className="mb-4">
+      <div className="mb-4 flex-shrink-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-gray-100 h-12">
             <TabsTrigger value="unread" className="flex items-center gap-2 text-base">
@@ -152,36 +152,38 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
         </Tabs>
       </div>
 
-      {/* Main content area with 3-column layout */}
-      <div className="h-[calc(100vh-8rem)] flex space-x-4">
-        {/* Conversations sidebar */}
+      {/* Main content area with 3-column layout - Flexible height */}
+      <div className="flex-1 flex gap-4 min-h-0" style={{ height: 'calc(100vh - 12rem)' }}>
+        {/* Conversations sidebar - Fixed width */}
         <div className="w-80 flex-shrink-0">
-          <div className="h-full bg-white rounded-lg border shadow-sm">
+          <div className="h-full bg-white rounded-lg border shadow-sm flex flex-col">
             {/* Tab descriptions */}
-            {activeTab === "unread" && !conversationsLoading && (
-              <div className="flex items-center justify-between px-4 py-3 bg-red-50 border-b border-red-200">
-                <span className="text-sm font-medium text-red-800">
-                  🚨 Priority: All Unread Messages
-                </span>
-                <span className="text-xs text-red-600">
-                  {unreadConversations.length} leads need attention
-                </span>
-              </div>
-            )}
-            
-            {activeTab === "incoming" && !conversationsLoading && (
-              <div className="flex items-center justify-between px-4 py-3 bg-blue-50 border-b border-blue-200">
-                <span className="text-sm font-medium text-blue-800">
-                  📥 All Customer Messages
-                </span>
-                <span className="text-xs text-blue-600">
-                  Last customer message shown first
-                </span>
-              </div>
-            )}
+            <div className="flex-shrink-0">
+              {activeTab === "unread" && !conversationsLoading && (
+                <div className="flex items-center justify-between px-4 py-3 bg-red-50 border-b border-red-200">
+                  <span className="text-sm font-medium text-red-800">
+                    🚨 Priority: All Unread Messages
+                  </span>
+                  <span className="text-xs text-red-600">
+                    {unreadConversations.length} leads need attention
+                  </span>
+                </div>
+              )}
+              
+              {activeTab === "incoming" && !conversationsLoading && (
+                <div className="flex items-center justify-between px-4 py-3 bg-blue-50 border-b border-blue-200">
+                  <span className="text-sm font-medium text-blue-800">
+                    📥 All Customer Messages
+                  </span>
+                  <span className="text-xs text-blue-600">
+                    Last customer message shown first
+                  </span>
+                </div>
+              )}
+            </div>
 
-            {/* Conversations list */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Conversations list - Flexible height */}
+            <div className="flex-1 overflow-y-auto min-h-0">
               {conversationsLoading ? (
                 <ConversationListSkeleton />
               ) : (
@@ -200,7 +202,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
           </div>
         </div>
 
-        {/* Chat area - Main conversation view */}
+        {/* Chat area - Main conversation view - Flexible width */}
         <div className="flex-1 min-w-0">
           <EnhancedChatView
             selectedConversation={selectedConversation}
@@ -216,7 +218,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
           />
         </div>
 
-        {/* Lead Context Panel - AI and Actions */}
+        {/* Lead Context Panel - AI and Actions - Fixed width */}
         <div className="w-80 flex-shrink-0">
           <LeadContextPanel
             conversation={selectedConversation}

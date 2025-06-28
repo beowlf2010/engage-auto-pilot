@@ -1,107 +1,82 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useContextualAI } from '@/hooks/useContextualAI';
+import React, { useState, useRef, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { 
   Send, 
-  Smile, 
-  Paperclip, 
-  MoreVertical, 
-  MessageSquare,
-  Phone,
-  User,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Search,
-  Filter,
-  Bookmark,
-  Brain,
-  ChevronRight,
-  ChevronLeft
+  MessageSquare, 
+  Phone, 
+  CheckCheck, 
+  ArrowDown,
+  Clock
 } from 'lucide-react';
-import MessageTemplates from './MessageTemplates';
-import AIInsightsPanel from '../ai/AIInsightsPanel';
-import ContextualAssistancePanel from '../ai/ContextualAssistancePanel';
-import type { ConversationListItem, MessageData } from '@/types/conversation';
+import { formatDistanceToNow } from 'date-fns';
 
 interface EnhancedChatViewProps {
-  selectedConversation: ConversationListItem | undefined;
-  messages: MessageData[];
-  onSendMessage: (message: string, isTemplate?: boolean) => Promise<void>;
+  selectedConversation: any;
+  messages: any[];
+  onSendMessage: (message: string) => Promise<void>;
   showTemplates: boolean;
   onToggleTemplates: () => void;
   user: {
     role: string;
     id: string;
   };
-  isLoading?: boolean;
-  onThreadView?: () => void;
+  isLoading: boolean;
 }
 
 const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
   selectedConversation,
   messages,
   onSendMessage,
-  showTemplates,
-  onToggleTemplates,
-  user,
-  isLoading = false,
-  onThreadView
+  isLoading,
+  user
 }) => {
-  const [messageInput, setMessageInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [showAIPanel, setShowAIPanel] = useState(true);
-  const [aiPanelWidth, setAIPanelWidth] = useState(320);
+  const [messageText, setMessageText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { analyzeConversation } = useContextualAI(selectedConversation?.leadId || null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ 
+      behavior: smooth ? 'smooth' : 'instant' 
+    });
+  };
 
-  // Auto-analyze conversation when messages change
-  useEffect(() => {
-    if (selectedConversation && messages.length > 0) {
-      const conversationHistory = messages
-        .map(m => `${m.direction === 'in' ? 'Customer' : 'Agent'}: ${m.body}`)
-        .join('\n');
-      
-      const latestMessage = messages[messages.length - 1];
-      if (latestMessage?.direction === 'in') {
-        analyzeConversation(conversationHistory, latestMessage.body);
-      }
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollToBottom(!isNearBottom && messages.length > 5);
     }
-  }, [messages, selectedConversation, analyzeConversation]);
+  };
+
+  useEffect(() => {
+    // Always scroll to bottom when new messages arrive
+    scrollToBottom(false);
+  }, [messages.length]);
+
+  useEffect(() => {
+    // Scroll to bottom when conversation changes
+    if (selectedConversation) {
+      scrollToBottom(false);
+    }
+  }, [selectedConversation?.leadId]);
 
   const handleSendMessage = async () => {
-    if (!messageInput.trim() || isLoading) return;
-
-    const message = messageInput.trim();
-    setMessageInput('');
-    setIsTyping(false);
-
+    if (!messageText.trim() || sending || isLoading) return;
+    
+    setSending(true);
     try {
-      await onSendMessage(message);
-      
-      // Re-analyze after sending a message
-      if (selectedConversation && messages.length > 0) {
-        const conversationHistory = [...messages, { direction: 'out', body: message }]
-          .map(m => `${m.direction === 'in' ? 'Customer' : 'Agent'}: ${m.body}`)
-          .join('\n');
-        
-        setTimeout(() => {
-          analyzeConversation(conversationHistory, message);
-        }, 1000);
-      }
+      await onSendMessage(messageText.trim());
+      setMessageText('');
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Restore message input on error
-      setMessageInput(message);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -112,360 +87,165 @@ const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
     }
   };
 
-  const formatMessageTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const findLatestInboundMessage = () => {
+    const inboundMessages = messages.filter(msg => msg.direction === 'in');
+    return inboundMessages[inboundMessages.length - 1];
   };
 
-  const formatMessageDate = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString();
+  const scrollToLatestInbound = () => {
+    const latestInbound = findLatestInboundMessage();
+    if (latestInbound) {
+      const messageElement = document.getElementById(`message-${latestInbound.id}`);
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   };
 
-  // Group messages by date
-  const groupedMessages = useMemo(() => {
-    const groups: { [key: string]: MessageData[] } = {};
-    
-    messages.forEach(message => {
-      const dateKey = new Date(message.sentAt).toDateString();
-      if (!groups[dateKey]) {
-        groups[dateKey] = [];
-      }
-      groups[dateKey].push(message);
-    });
-
-    return Object.entries(groups).sort(([a], [b]) => 
-      new Date(a).getTime() - new Date(b).getTime()
-    );
-  }, [messages]);
-
   if (!selectedConversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50 text-gray-400" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">AI-Enhanced Smart Inbox</h3>
-          <p className="text-gray-500">Select a conversation to view AI insights and assistance</p>
-        </div>
-      </div>
+      <Card className="h-full flex items-center justify-center">
+        <CardContent className="text-center">
+          <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Select a conversation
+          </h3>
+          <p className="text-gray-500">
+            Choose a conversation from the list to start messaging
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
-  const canReply = user.role === "manager" || user.role === "admin" || 
-    !selectedConversation.salespersonId || selectedConversation.salespersonId === user.id;
+  const latestInbound = findLatestInboundMessage();
+  const canReply = selectedConversation.lastMessageDirection === 'in' || selectedConversation.unreadCount > 0;
 
   return (
-    <div className="flex-1 flex relative">
-      {/* Main Chat Content */}
-      <div className={`flex-1 flex flex-col bg-white transition-all duration-300 ${showAIPanel ? 'mr-2' : ''}`}>
-        {/* Enhanced header */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <User className="h-5 w-5 text-white" />
-                </div>
-                
-                <div>
-                  <h2 className="font-semibold text-lg">
-                    {selectedConversation.leadName || 'Unknown Lead'}
-                  </h2>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Phone className="h-3 w-3" />
-                    {selectedConversation.primaryPhone}
-                    
-                    {selectedConversation.vehicleInterest && (
-                      <>
-                        <span>•</span>
-                        <span>🚗 {selectedConversation.vehicleInterest}</span>
-                      </>
+    <Card className="h-full flex flex-col">
+      {/* Header */}
+      <CardHeader className="flex-shrink-0 border-b bg-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center space-x-2">
+              <span>{selectedConversation.leadName}</span>
+              {selectedConversation.unreadCount > 0 && (
+                <Badge variant="destructive">{selectedConversation.unreadCount} unread</Badge>
+              )}
+            </CardTitle>
+            <div className="flex items-center space-x-4 text-sm text-gray-600 mt-2">
+              <div className="flex items-center space-x-1">
+                <Phone className="h-4 w-4" />
+                <span>{selectedConversation.leadPhone}</span>
+              </div>
+              <span>•</span>
+              <span>{selectedConversation.vehicleInterest}</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {latestInbound && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={scrollToLatestInbound}
+                className="flex items-center space-x-2"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>Latest Message</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+
+      {/* Messages Container - Flexible height */}
+      <div className="flex-1 relative min-h-0">
+        <div 
+          ref={messagesContainerRef}
+          className="absolute inset-0 overflow-y-auto p-4 space-y-4"
+          onScroll={handleScroll}
+        >
+          {messages.length === 0 ? (
+            <div className="text-center py-8">
+              <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No messages yet</p>
+            </div>
+          ) : (
+            messages.map((message, index) => (
+              <div
+                key={message.id || index}
+                id={`message-${message.id}`}
+                className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                    message.direction === 'out'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-900 border-l-4 border-blue-500'
+                  }`}
+                >
+                  <p className="text-sm">{message.body}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className={`text-xs ${
+                      message.direction === 'out' ? 'text-blue-100' : 'text-gray-500'
+                    }`}>
+                      {formatDistanceToNow(new Date(message.sentAt), { addSuffix: true })}
+                    </span>
+                    {message.direction === 'out' && message.aiGenerated && (
+                      <Badge variant="secondary" className="text-xs ml-2">AI</Badge>
                     )}
                   </div>
                 </div>
               </div>
-
-              {/* Status badges */}
-              <div className="flex items-center gap-2">
-                {selectedConversation.unreadCount > 0 && (
-                  <Badge variant="secondary">
-                    {selectedConversation.unreadCount} unread
-                  </Badge>
-                )}
-                
-                {selectedConversation.aiOptIn && (
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700">
-                    AI Enabled
-                  </Badge>
-                )}
-                
-                {selectedConversation.aiStage && (
-                  <Badge variant="outline">
-                    AI: {selectedConversation.aiStage}
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {/* Header actions */}
-            <div className="flex items-center gap-2">
-              {onThreadView && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onThreadView}
-                  title="View as threads"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                </Button>
-              )}
-              
-              <Button variant="outline" size="sm">
-                <Search className="h-4 w-4" />
-              </Button>
-              
-              <Button variant="outline" size="sm">
-                <Bookmark className="h-4 w-4" />
-              </Button>
-              
-              <Button variant="ghost" size="sm">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {groupedMessages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              <div className="text-center">
-                <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No messages yet</p>
-                <p className="text-sm">Start the conversation!</p>
-              </div>
-            </div>
-          ) : (
-            groupedMessages.map(([dateKey, dateMessages]) => (
-              <div key={dateKey}>
-                {/* Date separator */}
-                <div className="flex items-center justify-center my-6">
-                  <div className="bg-gray-100 px-3 py-1 rounded-full text-xs text-gray-600">
-                    {formatMessageDate(dateKey)}
-                  </div>
-                </div>
-
-                {/* Messages for this date */}
-                <div className="space-y-3">
-                  {dateMessages.map((message, index) => {
-                    const isIncoming = message.direction === 'in';
-                    const showTime = index === 0 || 
-                      new Date(message.sentAt).getTime() - new Date(dateMessages[index - 1].sentAt).getTime() > 300000; // 5 minutes
-
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex ${isIncoming ? 'justify-start' : 'justify-end'} animate-fade-in`}
-                      >
-                        <div className={`max-w-xs lg:max-w-md ${isIncoming ? 'order-2' : 'order-1'}`}>
-                          <div
-                            className={`
-                              px-4 py-3 rounded-lg shadow-sm
-                              ${isIncoming 
-                                ? 'bg-gray-100 text-gray-900' 
-                                : 'bg-blue-600 text-white'
-                              }
-                              ${message.aiGenerated ? 'border-l-4 border-purple-400' : ''}
-                            `}
-                          >
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                              {message.body}
-                            </p>
-                            
-                            {message.aiGenerated && (
-                              <div className="mt-2 pt-2 border-t border-purple-200">
-                                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
-                                  AI Generated
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-
-                          {showTime && (
-                            <div className={`flex items-center gap-2 mt-1 text-xs text-gray-500 ${
-                              isIncoming ? 'justify-start' : 'justify-end'
-                            }`}>
-                              <span>{formatMessageTime(message.sentAt)}</span>
-                              {!isIncoming && message.smsStatus && (
-                                <span className="flex items-center gap-1">
-                                  {message.smsStatus === 'sent' ? (
-                                    <CheckCircle className="h-3 w-3 text-green-500" />
-                                  ) : message.smsStatus === 'failed' ? (
-                                    <AlertCircle className="h-3 w-3 text-red-500" />
-                                  ) : (
-                                    <Clock className="h-3 w-3" />
-                                  )}
-                                  {message.smsStatus}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
             ))
           )}
-          
-          {/* Typing indicator */}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-gray-100 px-4 py-3 rounded-lg">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </div>
-            </div>
-          )}
-          
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Message templates */}
-        {showTemplates && (
-          <div className="border-t border-gray-200 p-4 bg-gray-50">
-            <MessageTemplates
-              onSelectTemplate={(template) => onSendMessage(template, true)}
-              onClose={onToggleTemplates}
-            />
-          </div>
-        )}
-
-        {/* Input area */}
-        {canReply ? (
-          <div className="p-4 border-t border-gray-200 bg-white">
-            <div className="flex items-end gap-3">
-              <div className="flex-1 relative">
-                <Input
-                  ref={inputRef}
-                  value={messageInput}
-                  onChange={(e) => {
-                    setMessageInput(e.target.value);
-                    setIsTyping(e.target.value.length > 0);
-                  }}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  disabled={isLoading}
-                  className="pr-20 resize-none"
-                  maxLength={1000}
-                />
-                
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    title="Add emoji"
-                  >
-                    <Smile className="h-4 w-4" />
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    title="Attach file"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onToggleTemplates}
-                className={showTemplates ? 'bg-blue-50' : ''}
-              >
-                Templates
-              </Button>
-
-              <Button
-                onClick={handleSendMessage}
-                disabled={!messageInput.trim() || isLoading}
-                className="shrink-0"
-              >
-                {isLoading ? (
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-              <span>{messageInput.length}/1000 characters</span>
-              <span>Press Enter to send, Shift+Enter for new line</span>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4 border-t border-gray-200 bg-gray-50 text-center text-gray-600">
-            <p>You don't have permission to reply to this conversation.</p>
-            <p className="text-sm">Contact your manager or the assigned salesperson.</p>
-          </div>
+        {/* Scroll to bottom button */}
+        {showScrollToBottom && (
+          <Button
+            className="absolute bottom-4 right-4 rounded-full h-10 w-10 p-0 shadow-lg"
+            onClick={() => scrollToBottom()}
+            size="sm"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
         )}
       </div>
 
-      {/* AI Panel Toggle Button */}
-      <div className="absolute top-4 right-2 z-10">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowAIPanel(!showAIPanel)}
-          className="bg-white shadow-md"
-        >
-          <Brain className="h-4 w-4 mr-1" />
-          AI
-          {showAIPanel ? <ChevronRight className="h-4 w-4 ml-1" /> : <ChevronLeft className="h-4 w-4 ml-1" />}
-        </Button>
-      </div>
-
-      {/* AI Insights Panel */}
-      {showAIPanel && (
-        <div 
-          className="flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto"
-          style={{ width: aiPanelWidth }}
-        >
-          <div className="p-4 space-y-4">
-            <AIInsightsPanel
-              leadId={selectedConversation.leadId}
-              conversation={selectedConversation}
-              messages={messages}
+      {/* Message Input - Fixed at bottom */}
+      {canReply && (
+        <div className="flex-shrink-0 border-t bg-white p-4">
+          <div className="flex space-x-2">
+            <Textarea
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message..."
+              className="flex-1 min-h-[44px] max-h-32 resize-none"
+              disabled={sending || isLoading}
             />
-            
-            <ContextualAssistancePanel
-              leadId={selectedConversation.leadId}
-              conversation={selectedConversation}
-              onSendMessage={onSendMessage}
-            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!messageText.trim() || sending || isLoading}
+              size="sm"
+              className="self-end px-4 h-[44px]"
+            >
+              {sending || isLoading ? (
+                <Clock className="h-4 w-4 animate-pulse" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Press Enter to send, Shift+Enter for new line
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 
