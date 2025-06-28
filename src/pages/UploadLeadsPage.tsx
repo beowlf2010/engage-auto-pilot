@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,7 @@ import ImportFeaturesCard from "@/components/upload-leads/ImportFeaturesCard";
 import PhonePriorityCard from "@/components/upload-leads/PhonePriorityCard";
 import CSVTemplateCard from "@/components/upload-leads/CSVTemplateCard";
 import UploadInfoPanel from "@/components/leads/upload/UploadInfoPanel";
-import BypassUploadButton from "@/components/upload-leads/BypassUploadButton";
+import EnhancedBypassUploadButton from "@/components/upload-leads/EnhancedBypassUploadButton";
 import { useCSVUpload } from "@/hooks/useCSVUpload";
 import { useEnhancedUserProfile } from "@/hooks/useEnhancedUserProfile";
 
@@ -121,11 +120,11 @@ const UploadLeadsPage = () => {
                           ✅ CSV Processed Successfully!
                         </p>
                         <p className="text-sm text-green-600">
-                          {processedData.processedLeads.length} leads ready for bypass upload
+                          {processedData.processedLeads.length} leads ready for enhanced bypass upload
                         </p>
                         {processedData.duplicates.length > 0 && (
                           <p className="text-xs text-orange-600">
-                            {processedData.duplicates.length} potential duplicates detected
+                            {processedData.duplicates.length} potential duplicates detected in CSV
                           </p>
                         )}
                         {processedData.errors.length > 0 && (
@@ -133,8 +132,11 @@ const UploadLeadsPage = () => {
                             {processedData.errors.length} rows had errors
                           </p>
                         )}
+                        <p className="text-xs text-blue-600 mt-1">
+                          ℹ️ Database duplicate check will be performed before upload
+                        </p>
                       </div>
-                      <BypassUploadButton 
+                      <EnhancedBypassUploadButton 
                         leads={processedData.processedLeads}
                         disabled={uploading}
                       />
