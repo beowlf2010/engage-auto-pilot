@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { 
   UserCheck,
   UserX,
@@ -10,11 +11,13 @@ import {
   Calendar,
   Phone,
   Mail,
-  MessageSquare
+  MessageSquare,
+  Bot
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { markLeadAsLost } from '@/services/leadStatusService';
 import { supabase } from '@/integrations/supabase/client';
+import { useLeadsOperations } from '@/hooks/leads/useLeadsOperations';
 import MarkLostConfirmDialog from '../leads/MarkLostConfirmDialog';
 
 interface InboxLeadActionsProps {
@@ -30,6 +33,35 @@ const InboxLeadActions: React.FC<InboxLeadActionsProps> = ({
   const [isMarkingLost, setIsMarkingLost] = useState(false);
   const [isMarkingSold, setIsMarkingSold] = useState(false);
   const [isSettingSlowerFollowup, setIsSettingSlowerFollowup] = useState(false);
+  const [isUpdatingAI, setIsUpdatingAI] = useState(false);
+
+  const { updateAiOptIn } = useLeadsOperations();
+
+  const handleAiOptInToggle = async (enabled: boolean) => {
+    if (!conversation?.leadId) return;
+    
+    setIsUpdatingAI(true);
+    try {
+      const success = await updateAiOptIn(conversation.leadId, enabled);
+      if (success) {
+        toast({
+          title: enabled ? "AI messaging enabled" : "AI messaging disabled",
+          description: `${conversation.leadName} will ${enabled ? 'now receive' : 'no longer receive'} AI-generated messages.`,
+        });
+        
+        if (onActionComplete) onActionComplete();
+      }
+    } catch (error) {
+      console.error('Error updating AI opt-in:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update AI messaging settings",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingAI(false);
+    }
+  };
 
   const handleMarkAsLost = async () => {
     if (!conversation?.leadId) return;
@@ -163,6 +195,27 @@ const InboxLeadActions: React.FC<InboxLeadActionsProps> = ({
         </CardHeader>
         
         <CardContent className="space-y-3">
+          {/* AI Automation Section */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-medium text-gray-600 uppercase tracking-wide">AI Automation</h4>
+            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center space-x-2">
+                <Bot className="h-4 w-4 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">AI Messaging</p>
+                  <p className="text-xs text-blue-700">
+                    {conversation.aiOptIn ? 'Enabled' : 'Disabled'}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={conversation.aiOptIn || false}
+                onCheckedChange={handleAiOptInToggle}
+                disabled={isUpdatingAI || conversation.status === 'lost' || conversation.status === 'closed'}
+              />
+            </div>
+          </div>
+
           {/* Contact Actions */}
           <div className="space-y-2">
             <h4 className="text-xs font-medium text-gray-600 uppercase tracking-wide">Quick Contact</h4>
