@@ -16,22 +16,29 @@ import EnhancedChatView from "@/components/inbox/EnhancedChatView";
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState("unread");
+  const [selectedLead, setSelectedLead] = useState<string | null>(null);
 
   // Use existing conversation hooks
   const { 
     conversations, 
-    loading: conversationsLoading, 
-    selectedLead, 
-    setSelectedLead 
+    conversationsLoading
   } = useConversationsList();
 
   const { 
     messages, 
     sendMessage, 
+    loadMessages,
     sendingMessage 
-  } = useMessagesOperations(selectedLead);
+  } = useMessagesOperations();
 
   const { markAsRead, isMarkingAsRead } = useMarkAsRead();
+
+  // Load messages when a lead is selected
+  useEffect(() => {
+    if (selectedLead) {
+      loadMessages(selectedLead);
+    }
+  }, [selectedLead, loadMessages]);
 
   // Request notification permission when the page loads
   useEffect(() => {
@@ -80,7 +87,7 @@ const SmartInboxPage = () => {
 
   const handleSendMessage = async (message: string, isTemplate?: boolean) => {
     if (selectedLead) {
-      await sendMessage(message, isTemplate);
+      await sendMessage(selectedLead, message);
     }
   };
 

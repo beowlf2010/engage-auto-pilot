@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationsList } from '@/hooks/conversation/useConversationsList';
 import { useMessagesOperations } from '@/hooks/conversation/useMessagesOperations';
@@ -20,21 +20,28 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
 }) => {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState("unread");
+  const [selectedLead, setSelectedLead] = useState<string | null>(null);
   
   const { 
     conversations, 
-    loading: conversationsLoading, 
-    selectedLead, 
-    setSelectedLead 
+    conversationsLoading
   } = useConversationsList();
 
   const { 
     messages, 
     sendMessage, 
+    loadMessages,
     sendingMessage 
-  } = useMessagesOperations(selectedLead);
+  } = useMessagesOperations();
 
   const { markAsRead, isMarkingAsRead } = useMarkAsRead();
+
+  // Load messages when a lead is selected
+  useEffect(() => {
+    if (selectedLead) {
+      loadMessages(selectedLead);
+    }
+  }, [selectedLead, loadMessages]);
 
   const handleSelectConversation = async (leadId: string) => {
     setSelectedLead(leadId);
@@ -42,7 +49,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
 
   const handleSendMessage = async (message: string, isTemplate?: boolean) => {
     if (selectedLead) {
-      await sendMessage(message, isTemplate);
+      await sendMessage(selectedLead, message);
     }
   };
 

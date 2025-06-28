@@ -4,6 +4,7 @@ export interface ConversationListItem {
   leadName: string;
   primaryPhone: string;
   leadPhone: string;
+  leadEmail: string; // Added missing property
   lastMessage: string;
   lastMessageTime: string;
   lastMessageDirection: 'in' | 'out' | null;
@@ -11,11 +12,12 @@ export interface ConversationListItem {
   messageCount: number;
   salespersonId: string | null;
   vehicleInterest: string;
+  leadSource: string; // Added missing property
+  leadType: string; // Added missing property
   status: string;
   lastMessageDate: Date;
   salespersonName?: string;
   aiOptIn?: boolean;
-  leadSource?: string;
   aiStage?: string;
   aiMessagesSent?: number;
   aiSequencePaused?: boolean;

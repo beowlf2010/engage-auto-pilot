@@ -28,10 +28,13 @@ export const useConversationsList = () => {
               id,
               first_name,
               last_name,
+              email,
               vehicle_interest,
               salesperson_id,
               status,
               ai_opt_in,
+              source,
+              lead_type,
               phone_numbers!inner(
                 number,
                 is_primary
@@ -62,6 +65,7 @@ export const useConversationsList = () => {
               leadName: `${lead.first_name} ${lead.last_name}`,
               primaryPhone,
               leadPhone: primaryPhone,
+              leadEmail: lead.email || '',
               lastMessage: conv.body,
               lastMessageTime: new Date(conv.sent_at).toLocaleString(),
               lastMessageDirection: conv.direction as 'in' | 'out',
@@ -70,6 +74,8 @@ export const useConversationsList = () => {
               messageCount: 0,
               salespersonId: lead.salesperson_id,
               vehicleInterest: lead.vehicle_interest || '',
+              leadSource: lead.source || '',
+              leadType: lead.lead_type || 'unknown',
               status: lead.status || 'new',
               salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : undefined,
               aiOptIn: lead.ai_opt_in || false
