@@ -5,12 +5,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Eye, Edit2, EyeOff, Phone, AlertCircle, Sparkles } from "lucide-react";
+import { Eye, Edit2, Phone, AlertCircle, Sparkles } from "lucide-react";
 import { Lead } from "@/types/lead";
 import { formatDistanceToNow } from "date-fns";
 import ContactPreferenceToggles from "./ContactPreferenceToggles";
 import AISequenceStatus from "./AISequenceStatus";
 import QuickAIActions from "./QuickAIActions";
+import HideLeadButton from "./HideLeadButton";
 
 interface LeadsTableRowProps {
   lead: Lead;
@@ -196,19 +197,11 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
           )}
           
           {onToggleHidden && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onToggleHidden(lead.id, !lead.is_hidden)}
-              className="h-6 w-6 p-0"
-              title={lead.is_hidden ? "Show lead" : "Hide lead"}
-            >
-              {lead.is_hidden ? (
-                <Eye className="h-3 w-3" />
-              ) : (
-                <EyeOff className="h-3 w-3" />
-              )}
-            </Button>
+            <HideLeadButton
+              leadId={lead.id}
+              isHidden={lead.is_hidden || false}
+              onToggleHidden={onToggleHidden}
+            />
           )}
         </div>
       </TableCell>
