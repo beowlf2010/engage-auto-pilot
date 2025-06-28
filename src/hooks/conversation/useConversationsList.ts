@@ -34,7 +34,7 @@ export const useConversationsList = () => {
               status,
               ai_opt_in,
               source,
-              lead_type,
+              lead_type_name,
               phone_numbers!inner(
                 number,
                 is_primary
@@ -75,7 +75,7 @@ export const useConversationsList = () => {
               salespersonId: lead.salesperson_id,
               vehicleInterest: lead.vehicle_interest || '',
               leadSource: lead.source || '',
-              leadType: lead.lead_type || 'unknown',
+              leadType: lead.lead_type_name || 'unknown',
               status: lead.status || 'new',
               salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : undefined,
               aiOptIn: lead.ai_opt_in || false
