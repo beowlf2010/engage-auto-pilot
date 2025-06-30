@@ -204,13 +204,22 @@ export class VehiclePersonalizationService {
   // Track successful vehicle conversations for learning
   async trackVehicleEngagement(leadId: string, vehicleContext: VehicleRecognitionResult, responseReceived: boolean) {
     try {
+      // Convert VehicleRecognitionResult to a plain object for JSON compatibility
+      const vehicleContextForDb = {
+        confidence: vehicleContext.confidence,
+        extractedVehicle: vehicleContext.extractedVehicle,
+        enhancedDescription: vehicleContext.enhancedDescription,
+        recognizedTerms: vehicleContext.recognizedTerms,
+        suggestions: vehicleContext.suggestions
+      };
+
       await supabase
         .from('ai_learning_outcomes')
         .insert({
           lead_id: leadId,
           outcome_type: responseReceived ? 'vehicle_engagement_success' : 'vehicle_engagement_attempt',
           lead_characteristics: {
-            vehicle_recognition: vehicleContext,
+            vehicle_recognition: vehicleContextForDb,
             vehicle_confidence: vehicleContext.confidence,
             vehicle_strategy: responseReceived ? 'successful' : 'attempted'
           },

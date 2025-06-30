@@ -1,344 +1,366 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Expanded vehicle database with better coverage
-const VEHICLE_DATABASE = {
-  chevrolet: {
-    aliases: ['chevy', 'chevrolet'],
-    models: {
-      'silverado': ['1500', '2500hd', '3500hd', 'rst', 'zr2', 'trail boss', 'high country'],
-      'equinox': ['ls', 'lt', 'premier', 'rs'],
-      'tahoe': ['ls', 'lt', 'z71', 'premier', 'high country'],
-      'suburban': ['ls', 'lt', 'z71', 'premier', 'high country'],
-      'traverse': ['ls', 'lt', 'rs', 'premier'],
-      'malibu': ['ls', 'lt', 'rs', 'premier'],
-      'camaro': ['ls', 'lt', 'ss', 'zl1', '1ls', '2ls', '3lt'],
-      'corvette': ['stingray', 'z06', 'zr1'],
-      'blazer': ['l', 'lt', 'rs', 'premier'],
-      'trailblazer': ['ls', 'lt', 'activ', 'rs'],
-      'colorado': ['work truck', 'lt', 'z71', 'zr2'],
-      'express': ['2500', '3500', 'cargo', 'passenger'],
-      'impala': ['ls', 'lt', 'premier'],
-      'cruze': ['l', 'ls', 'lt', 'premier'],
-      'sonic': ['ls', 'lt', 'premier'],
-      'spark': ['ls', 'lt'],
-      'bolt': ['ev', 'euv'],
-      'trax': ['ls', 'lt', 'premier']
-    },
-    categories: {
-      'truck': ['silverado', 'colorado'],
-      'suv': ['tahoe', 'suburban', 'traverse', 'equinox', 'blazer', 'trailblazer'],
-      'sedan': ['malibu', 'impala', 'cruze'],
-      'sports': ['camaro', 'corvette'],
-      'compact': ['sonic', 'spark', 'trax', 'bolt'],
-      'van': ['express']
-    }
-  },
-  gmc: {
-    aliases: ['gmc'],
-    models: {
-      'sierra': ['1500', '2500hd', '3500hd', 'at4', 'denali', 'elevation'],
-      'yukon': ['sle', 'slt', 'at4', 'denali'],
-      'acadia': ['sle', 'slt', 'at4', 'denali'],
-      'terrain': ['sle', 'slt', 'at4', 'denali'],
-      'canyon': ['elevation', 'sle', 'slt', 'at4'],
-      'savana': ['2500', '3500', 'cargo', 'passenger']
-    },
-    categories: {
-      'truck': ['sierra', 'canyon'],
-      'suv': ['yukon', 'acadia', 'terrain'],
-      'van': ['savana']
-    }
-  },
-  ford: {
-    aliases: ['ford'],
-    models: {
-      'f150': ['regular cab', 'supercab', 'supercrew', 'lightning', 'raptor'],
-      'f250': ['regular cab', 'supercab', 'crew cab'],
-      'f350': ['regular cab', 'supercab', 'crew cab'],
-      'explorer': ['base', 'xlt', 'limited', 'platinum', 'st'],
-      'escape': ['s', 'se', 'sel', 'titanium'],
-      'edge': ['se', 'sel', 'titanium', 'st'],
-      'expedition': ['xlt', 'limited', 'king ranch', 'platinum'],
-      'mustang': ['ecoboost', 'gt', 'mach 1', 'shelby'],
-      'fusion': ['s', 'se', 'sel', 'titanium'],
-      'focus': ['s', 'se', 'sel', 'st', 'rs'],
-      'ranger': ['regular cab', 'supercab', 'supercrew']
-    },
-    categories: {
-      'truck': ['f150', 'f250', 'f350', 'ranger'],
-      'suv': ['explorer', 'escape', 'edge', 'expedition'],
-      'sports': ['mustang'],
-      'sedan': ['fusion', 'focus']
-    }
-  }
-};
-
 export interface VehicleRecognitionResult {
-  isValid: boolean;
   confidence: number;
   extractedVehicle: {
     make?: string;
     model?: string;
     year?: number;
-    trim?: string;
     category?: string;
+    trim?: string;
+    bodyStyle?: string;
   };
-  suggestions: string[];
-  useGeneric: boolean;
   enhancedDescription: string;
+  recognizedTerms: string[];
+  suggestions: string[];
 }
 
+export interface InventoryValidationResult {
+  hasInventoryMatch: boolean;
+  exactMatches: any[];
+  similarVehicles: any[];
+  suggestedAlternatives: string[];
+  inventoryCount: number;
+}
+
+// Expanded vehicle database
+const VEHICLE_DATABASE = {
+  chevrolet: {
+    models: ['equinox', 'tahoe', 'suburban', 'silverado', 'malibu', 'cruze', 'impala', 'camaro', 'corvette', 'traverse', 'trax', 'spark', 'sonic', 'bolt'],
+    categories: {
+      'suv': ['equinox', 'tahoe', 'suburban', 'traverse', 'trax'],
+      'truck': ['silverado'],
+      'sedan': ['malibu', 'cruze', 'impala'],
+      'sports': ['camaro', 'corvette'],
+      'compact': ['spark', 'sonic', 'trax'],
+      'electric': ['bolt']
+    }
+  },
+  ford: {
+    models: ['f150', 'escape', 'explorer', 'edge', 'fusion', 'focus', 'mustang', 'expedition', 'ranger', 'bronco'],
+    categories: {
+      'truck': ['f150', 'ranger'],
+      'suv': ['escape', 'explorer', 'edge', 'expedition', 'bronco'],
+      'sedan': ['fusion', 'focus'],
+      'sports': ['mustang']
+    }
+  },
+  toyota: {
+    models: ['camry', 'corolla', 'rav4', 'highlander', 'sienna', 'prius', 'tacoma', 'tundra', '4runner'],
+    categories: {
+      'sedan': ['camry', 'corolla'],
+      'suv': ['rav4', 'highlander', '4runner'],
+      'truck': ['tacoma', 'tundra'],
+      'hybrid': ['prius']
+    }
+  },
+  honda: {
+    models: ['accord', 'civic', 'crv', 'pilot', 'odyssey', 'ridgeline', 'passport'],
+    categories: {
+      'sedan': ['accord', 'civic'],
+      'suv': ['crv', 'pilot', 'passport'],
+      'truck': ['ridgeline']
+    }
+  }
+};
+
+const VEHICLE_CATEGORIES = [
+  'suv', 'truck', 'sedan', 'hatchback', 'coupe', 'convertible', 'wagon',
+  'pickup', 'crossover', 'minivan', 'sports car', 'luxury', 'compact',
+  'mid-size', 'full-size', 'electric', 'hybrid'
+];
+
 export class VehicleRecognitionService {
-  // Enhanced vehicle interest recognition with fuzzy matching
   recognizeVehicleInterest(vehicleInterest: string): VehicleRecognitionResult {
-    console.log(`🔍 [VEHICLE RECOGNITION] Analyzing: "${vehicleInterest}"`);
+    if (!vehicleInterest || vehicleInterest.length < 3) {
+      return this.createFallbackResult(vehicleInterest);
+    }
+
+    const normalized = vehicleInterest.toLowerCase().trim();
+    const words = normalized.split(/\s+/);
     
-    const cleaned = vehicleInterest.toLowerCase().trim();
+    const result: VehicleRecognitionResult = {
+      confidence: 0,
+      extractedVehicle: {},
+      enhancedDescription: vehicleInterest,
+      recognizedTerms: [],
+      suggestions: []
+    };
+
+    // Try to extract make, model, year, etc.
+    this.extractMake(normalized, words, result);
+    this.extractModel(normalized, words, result);
+    this.extractYear(normalized, words, result);
+    this.extractCategory(normalized, words, result);
+    this.extractTrimAndBodyStyle(normalized, words, result);
     
-    // Check for corruption patterns first
-    if (this.isCorruptedData(cleaned)) {
-      return this.createGenericResult('Corrupted data detected');
-    }
-
-    // Extract year if present
-    const yearMatch = cleaned.match(/\b(19|20)\d{2}\b/);
-    const year = yearMatch ? parseInt(yearMatch[0]) : undefined;
-
-    // Try to identify make and model
-    const vehicleInfo = this.extractMakeModel(cleaned);
+    // Calculate confidence based on what we found
+    result.confidence = this.calculateConfidence(result);
     
-    if (vehicleInfo.make && vehicleInfo.model) {
-      const category = this.getVehicleCategory(vehicleInfo.make, vehicleInfo.model);
-      const trim = this.extractTrim(cleaned, vehicleInfo.make, vehicleInfo.model);
-      
-      return {
-        isValid: true,
-        confidence: 0.9,
-        extractedVehicle: {
-          make: vehicleInfo.make,
-          model: vehicleInfo.model,
-          year,
-          trim,
-          category
-        },
-        suggestions: this.generateSuggestions(vehicleInfo.make, vehicleInfo.model),
-        useGeneric: false,
-        enhancedDescription: this.createEnhancedDescription(vehicleInfo.make, vehicleInfo.model, year, trim, category)
-      };
-    }
+    // Generate enhanced description
+    result.enhancedDescription = this.generateEnhancedDescription(result, vehicleInterest);
+    
+    // Generate suggestions for better matching
+    result.suggestions = this.generateSuggestions(result, normalized);
 
-    // Try partial matches
-    const partialMatch = this.findPartialMatches(cleaned);
-    if (partialMatch.confidence > 0.4) {
-      return partialMatch;
-    }
-
-    // Check for vehicle categories
-    const categoryMatch = this.findCategoryMatch(cleaned);
-    if (categoryMatch.confidence > 0.3) {
-      return categoryMatch;
-    }
-
-    return this.createGenericResult('No specific vehicle recognized');
+    return result;
   }
 
-  private isCorruptedData(text: string): boolean {
-    const corruptionPatterns = [
-      'unknown', 'not specified', 'n/a', 'null', 'undefined', 'test', 'sample', 'demo',
-      'make unknown', 'model unknown', 'year unknown'
-    ];
-    
-    return corruptionPatterns.some(pattern => text.includes(pattern)) || 
-           text.length < 2 || 
-           text.length > 200;
-  }
-
-  private extractMakeModel(text: string): { make?: string; model?: string } {
+  private extractMake(normalized: string, words: string[], result: VehicleRecognitionResult) {
     for (const [make, data] of Object.entries(VEHICLE_DATABASE)) {
-      // Check make aliases
-      const makeFound = data.aliases.some(alias => text.includes(alias));
+      if (normalized.includes(make) || words.includes(make)) {
+        result.extractedVehicle.make = make;
+        result.recognizedTerms.push(make);
+        return;
+      }
       
-      if (makeFound) {
-        // Look for model
-        for (const model of Object.keys(data.models)) {
-          if (text.includes(model)) {
-            return { make, model };
+      // Check for common abbreviations
+      const abbreviations: { [key: string]: string } = {
+        'chevy': 'chevrolet',
+        'ford': 'ford',
+        'toyota': 'toyota',
+        'honda': 'honda'
+      };
+      
+      for (const [abbrev, fullMake] of Object.entries(abbreviations)) {
+        if (normalized.includes(abbrev) && fullMake === make) {
+          result.extractedVehicle.make = make;
+          result.recognizedTerms.push(abbrev);
+          return;
+        }
+      }
+    }
+  }
+
+  private extractModel(normalized: string, words: string[], result: VehicleRecognitionResult) {
+    const make = result.extractedVehicle.make;
+    if (make && VEHICLE_DATABASE[make as keyof typeof VEHICLE_DATABASE]) {
+      const makeData = VEHICLE_DATABASE[make as keyof typeof VEHICLE_DATABASE];
+      const models = makeData.models || [];
+      
+      for (const model of models) {
+        if (normalized.includes(model) || words.includes(model)) {
+          result.extractedVehicle.model = model;
+          result.recognizedTerms.push(model);
+          return;
+        }
+      }
+    }
+    
+    // Also check across all makes if no make was found
+    if (!make) {
+      for (const [makeName, data] of Object.entries(VEHICLE_DATABASE)) {
+        const models = data.models || [];
+        for (const model of models) {
+          if (normalized.includes(model) || words.includes(model)) {
+            result.extractedVehicle.make = makeName;
+            result.extractedVehicle.model = model;
+            result.recognizedTerms.push(model);
+            return;
           }
         }
-        return { make };
+      }
+    }
+  }
+
+  private extractYear(normalized: string, words: string[], result: VehicleRecognitionResult) {
+    const currentYear = new Date().getFullYear();
+    const yearPattern = /\b(19|20)\d{2}\b/g;
+    const matches = normalized.match(yearPattern);
+    
+    if (matches && matches.length > 0) {
+      const years = matches.map(y => parseInt(y)).filter(y => y >= 1990 && y <= currentYear + 2);
+      if (years.length > 0) {
+        result.extractedVehicle.year = years[0];
+        result.recognizedTerms.push(years[0].toString());
+      }
+    }
+  }
+
+  private extractCategory(normalized: string, words: string[], result: VehicleRecognitionResult) {
+    for (const category of VEHICLE_CATEGORIES) {
+      if (normalized.includes(category) || words.includes(category)) {
+        result.extractedVehicle.category = category;
+        result.recognizedTerms.push(category);
+        return;
       }
     }
     
-    return {};
+    // Try to infer category from make/model if found
+    const make = result.extractedVehicle.make;
+    const model = result.extractedVehicle.model;
+    
+    if (make && model && VEHICLE_DATABASE[make as keyof typeof VEHICLE_DATABASE]) {
+      const makeData = VEHICLE_DATABASE[make as keyof typeof VEHICLE_DATABASE];
+      if (makeData.categories) {
+        for (const [cat, models] of Object.entries(makeData.categories)) {
+          if (models.includes(model)) {
+            result.extractedVehicle.category = cat;
+            result.recognizedTerms.push(`${cat} (inferred)`);
+            return;
+          }
+        }
+      }
+    }
   }
 
-  private extractTrim(text: string, make: string, model: string): string | undefined {
-    const makeData = VEHICLE_DATABASE[make as keyof typeof VEHICLE_DATABASE];
-    if (!makeData) return undefined;
+  private extractTrimAndBodyStyle(normalized: string, words: string[], result: VehicleRecognitionResult) {
+    const trimLevels = ['base', 'ltz', 'lt', 'ls', 'premier', 'high country', 'work truck', 'custom'];
+    const bodyStyles = ['crew cab', 'extended cab', 'regular cab', '2 door', '4 door', 'coupe', 'sedan', 'hatchback'];
     
-    const trims = makeData.models[model as keyof typeof makeData.models];
-    if (!trims) return undefined;
-    
-    return trims.find(trim => text.includes(trim.toLowerCase()));
-  }
-
-  private getVehicleCategory(make: string, model: string): string | undefined {
-    const makeData = VEHICLE_DATABASE[make as keyof typeof VEHICLE_DATABASE];
-    if (!makeData) return undefined;
-    
-    for (const [category, models] of Object.entries(makeData.categories)) {
-      if (models.includes(model)) {
-        return category;
+    for (const trim of trimLevels) {
+      if (normalized.includes(trim)) {
+        result.extractedVehicle.trim = trim;
+        result.recognizedTerms.push(trim);
+        break;
       }
     }
     
-    return undefined;
-  }
-
-  private findPartialMatches(text: string): VehicleRecognitionResult {
-    // Look for just make mentions
-    for (const [make, data] of Object.entries(VEHICLE_DATABASE)) {
-      if (data.aliases.some(alias => text.includes(alias))) {
-        return {
-          isValid: true,
-          confidence: 0.6,
-          extractedVehicle: { make },
-          suggestions: Object.keys(data.models).slice(0, 3),
-          useGeneric: false,
-          enhancedDescription: `${make.charAt(0).toUpperCase() + make.slice(1)} vehicle`
-        };
+    for (const style of bodyStyles) {
+      if (normalized.includes(style)) {
+        result.extractedVehicle.bodyStyle = style;
+        result.recognizedTerms.push(style);
+        break;
       }
     }
-
-    return this.createGenericResult('No partial matches');
   }
 
-  private findCategoryMatch(text: string): VehicleRecognitionResult {
-    const categoryKeywords = {
-      truck: ['truck', 'pickup', 'hauling', 'towing'],
-      suv: ['suv', 'crossover', 'family vehicle', 'utility'],
-      sedan: ['sedan', 'car', 'four door'],
-      sports: ['sports car', 'performance', 'fast'],
-      compact: ['compact', 'small', 'economy', 'gas saver']
-    };
-
-    for (const [category, keywords] of Object.entries(categoryKeywords)) {
-      if (keywords.some(keyword => text.includes(keyword))) {
-        return {
-          isValid: true,
-          confidence: 0.4,
-          extractedVehicle: { category },
-          suggestions: this.getSuggestionsByCategory(category),
-          useGeneric: false,
-          enhancedDescription: `${category} vehicle`
-        };
-      }
+  private calculateConfidence(result: VehicleRecognitionResult): number {
+    let confidence = 0;
+    
+    if (result.extractedVehicle.make) confidence += 0.3;
+    if (result.extractedVehicle.model) confidence += 0.4;
+    if (result.extractedVehicle.year) confidence += 0.15;
+    if (result.extractedVehicle.category) confidence += 0.1;
+    if (result.extractedVehicle.trim) confidence += 0.05;
+    
+    // Boost confidence for complete make+model combinations
+    if (result.extractedVehicle.make && result.extractedVehicle.model) {
+      confidence += 0.2;
     }
-
-    return this.createGenericResult('No category match');
+    
+    return Math.min(confidence, 1.0);
   }
 
-  private generateSuggestions(make: string, model: string): string[] {
-    const makeData = VEHICLE_DATABASE[make as keyof typeof VEHICLE_DATABASE];
-    if (!makeData) return [];
-
-    // Get similar models from same make
-    const allModels = Object.keys(makeData.models);
-    return allModels.filter(m => m !== model).slice(0, 3);
+  private generateEnhancedDescription(result: VehicleRecognitionResult, original: string): string {
+    const vehicle = result.extractedVehicle;
+    
+    if (vehicle.year && vehicle.make && vehicle.model) {
+      return `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ''}`;
+    } else if (vehicle.make && vehicle.model) {
+      return `${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ''}`;
+    } else if (vehicle.category && vehicle.make) {
+      return `${vehicle.make} ${vehicle.category}`;
+    } else if (vehicle.category) {
+      return vehicle.category;
+    }
+    
+    return original;
   }
 
-  private getSuggestionsByCategory(category: string): string[] {
+  private generateSuggestions(result: VehicleRecognitionResult, normalized: string): string[] {
     const suggestions: string[] = [];
+    const vehicle = result.extractedVehicle;
     
-    for (const [make, data] of Object.entries(VEHICLE_DATABASE)) {
-      const categoryModels = data.categories[category as keyof typeof data.categories];
-      if (categoryModels) {
-        suggestions.push(...categoryModels.slice(0, 2).map(model => `${make} ${model}`));
+    if (vehicle.make && !vehicle.model) {
+      const makeData = VEHICLE_DATABASE[vehicle.make as keyof typeof VEHICLE_DATABASE];
+      if (makeData && makeData.models) {
+        suggestions.push(...makeData.models.slice(0, 3).map(model => `${vehicle.make} ${model}`));
       }
     }
     
-    return suggestions.slice(0, 4);
+    if (vehicle.category && !vehicle.make) {
+      suggestions.push(`Chevrolet ${vehicle.category}`, `Ford ${vehicle.category}`, `Toyota ${vehicle.category}`);
+    }
+    
+    return suggestions;
   }
 
-  private createEnhancedDescription(make?: string, model?: string, year?: number, trim?: string, category?: string): string {
-    const parts = [];
-    if (year) parts.push(year.toString());
-    if (make) parts.push(make.charAt(0).toUpperCase() + make.slice(1));
-    if (model) parts.push(model.charAt(0).toUpperCase() + model.slice(1));
-    if (trim) parts.push(trim.toUpperCase());
-    
-    return parts.join(' ') || (category ? `${category} vehicle` : 'vehicle');
-  }
-
-  private createGenericResult(reason: string): VehicleRecognitionResult {
-    console.log(`⚠️ [VEHICLE RECOGNITION] Using generic result: ${reason}`);
-    
+  private createFallbackResult(vehicleInterest: string): VehicleRecognitionResult {
     return {
-      isValid: false,
-      confidence: 0.2,
-      extractedVehicle: {},
-      suggestions: ['finding the right vehicle', 'exploring your options', 'looking at available inventory'],
-      useGeneric: true,
-      enhancedDescription: 'finding the perfect vehicle for your needs'
+      confidence: 0.1,
+      extractedVehicle: {
+        category: 'vehicle'
+      },
+      enhancedDescription: vehicleInterest || 'finding the right vehicle',
+      recognizedTerms: [],
+      suggestions: ['Chevrolet Equinox', 'Ford Escape', 'Toyota RAV4']
     };
   }
 
-  // Get contextual validation based on dealership inventory
-  async getContextualValidation(vehicleInterest: string, leadId?: string): Promise<{
-    hasInventoryMatch: boolean;
-    similarVehicles: any[];
-    inventoryHint: string;
-  }> {
+  async getContextualValidation(vehicleInterest: string, leadId: string): Promise<InventoryValidationResult> {
     try {
       const recognition = this.recognizeVehicleInterest(vehicleInterest);
+      const vehicle = recognition.extractedVehicle;
       
-      if (!recognition.isValid || !recognition.extractedVehicle.make) {
-        return {
-          hasInventoryMatch: false,
-          similarVehicles: [],
-          inventoryHint: ''
-        };
-      }
-
-      // Check inventory for matches
-      const { data: inventory } = await supabase
+      // Build inventory query based on recognized vehicle details
+      let query = supabase
         .from('inventory')
         .select('*')
-        .eq('status', 'available')
-        .ilike('make', `%${recognition.extractedVehicle.make}%`)
-        .limit(5);
-
-      const exactMatches = inventory?.filter(item => 
-        recognition.extractedVehicle.model && 
-        item.model?.toLowerCase().includes(recognition.extractedVehicle.model.toLowerCase())
-      ) || [];
-
-      const similarVehicles = inventory?.filter(item => 
-        !exactMatches.find(exact => exact.id === item.id)
-      ).slice(0, 3) || [];
-
-      let inventoryHint = '';
-      if (exactMatches.length > 0) {
-        inventoryHint = `We have ${exactMatches.length} ${recognition.enhancedDescription}${exactMatches.length > 1 ? 's' : ''} available`;
-      } else if (similarVehicles.length > 0) {
-        inventoryHint = `We have similar ${recognition.extractedVehicle.make} vehicles available`;
+        .eq('status', 'available');
+      
+      if (vehicle.make) {
+        query = query.ilike('make', `%${vehicle.make}%`);
       }
-
+      
+      const { data: exactMatches } = await query.limit(5);
+      
+      // Get similar vehicles if no exact matches
+      let similarQuery = supabase
+        .from('inventory')
+        .select('*')
+        .eq('status', 'available');
+        
+      if (vehicle.category) {
+        // This is a simple approach - in reality you'd want more sophisticated category matching
+        similarQuery = similarQuery.or(`body_style.ilike.%${vehicle.category}%`);
+      }
+      
+      const { data: similarVehicles } = await similarQuery.limit(10);
+      
       return {
-        hasInventoryMatch: exactMatches.length > 0,
-        similarVehicles: [...exactMatches, ...similarVehicles],
-        inventoryHint
+        hasInventoryMatch: (exactMatches?.length || 0) > 0,
+        exactMatches: exactMatches || [],
+        similarVehicles: similarVehicles || [],
+        suggestedAlternatives: this.generateAlternatives(vehicle),
+        inventoryCount: (exactMatches?.length || 0) + (similarVehicles?.length || 0)
       };
-
+      
     } catch (error) {
-      console.error('❌ [VEHICLE RECOGNITION] Error in contextual validation:', error);
+      console.error('❌ [VEHICLE RECOGNITION] Error validating inventory:', error);
       return {
         hasInventoryMatch: false,
+        exactMatches: [],
         similarVehicles: [],
-        inventoryHint: ''
+        suggestedAlternatives: [],
+        inventoryCount: 0
       };
     }
+  }
+
+  private generateAlternatives(vehicle: any): string[] {
+    const alternatives: string[] = [];
+    
+    if (vehicle.make === 'chevrolet') {
+      alternatives.push('Chevrolet Equinox', 'Chevrolet Traverse', 'Chevrolet Silverado');
+    } else if (vehicle.category) {
+      switch (vehicle.category) {
+        case 'suv':
+          alternatives.push('Chevrolet Equinox', 'Chevrolet Traverse');
+          break;
+        case 'truck':
+          alternatives.push('Chevrolet Silverado');
+          break;
+        case 'sedan':
+          alternatives.push('Chevrolet Malibu');
+          break;
+        default:
+          alternatives.push('Chevrolet Equinox');
+      }
+    }
+    
+    return alternatives;
   }
 }
 
