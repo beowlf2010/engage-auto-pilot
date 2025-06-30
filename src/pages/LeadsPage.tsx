@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import LeadsList from '@/components/LeadsList';
 import MultiFileLeadUploadModal from '@/components/leads/MultiFileLeadUploadModal';
+import PostSaleFollowUpPanel from '@/components/leads/PostSaleFollowUpPanel';
 
 const LeadsPage = () => {
   const { user } = useAuth();
@@ -36,6 +36,16 @@ const LeadsPage = () => {
           </Button>
         )}
       </div>
+
+      {/* Post-Sale Follow-Up Panel */}
+      {canUpload && (
+        <div className="mb-6">
+          <PostSaleFollowUpPanel
+            selectedLeadIds={[]} // Can be enhanced to work with selected leads
+            onProcessAssigned={handleUploadSuccess}
+          />
+        </div>
+      )}
 
       <LeadsList />
 

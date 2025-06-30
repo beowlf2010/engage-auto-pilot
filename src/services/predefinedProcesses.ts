@@ -1,5 +1,5 @@
-
 import { leadProcessService } from './leadProcessService';
+import { initializePostSaleProcesses } from './postSaleProcesses';
 import { LeadProcess } from '@/types/leadProcess';
 
 export const initializePredefinedProcesses = async (): Promise<void> => {
@@ -147,4 +147,7 @@ export const initializePredefinedProcesses = async (): Promise<void> => {
       console.error(`Error creating process ${process.name}:`, error);
     }
   }
+
+  // Initialize post-sale processes as well
+  await initializePostSaleProcesses();
 };
