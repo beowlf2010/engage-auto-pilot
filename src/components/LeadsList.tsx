@@ -135,6 +135,24 @@ const LeadsList = () => {
     vehicle_interest: lead.vehicleInterest
   }));
 
+  // Bulk action handlers
+  const handleBulkStatusUpdate = async (status: string) => {
+    // This will be implemented by the BulkActionsPanel
+    setRefreshKey(prev => prev + 1);
+    await refetch();
+  };
+
+  const handleBulkDelete = async () => {
+    // This will be implemented by the BulkActionsPanel
+    setRefreshKey(prev => prev + 1);
+    await refetch();
+  };
+
+  const handleBulkMessage = async () => {
+    // This will be implemented by the BulkActionsPanel
+    console.log('Bulk message action triggered');
+  };
+
   return (
     <div className="space-y-6" key={refreshKey}>
       {/* Filter Restoration Banner */}
@@ -148,7 +166,6 @@ const LeadsList = () => {
       {/* Stats Cards */}
       <LeadsStatsCards 
         stats={calculateStats()}
-        loading={loading}
       />
 
       {/* Filters Bar */}
@@ -162,6 +179,9 @@ const LeadsList = () => {
         <BulkActionsPanel
           selectedLeads={selectedLeadObjects}
           onClearSelection={clearSelection}
+          onBulkStatusUpdate={handleBulkStatusUpdate}
+          onBulkDelete={handleBulkDelete}
+          onBulkMessage={handleBulkMessage}
           onRefresh={() => {
             setRefreshKey(prev => prev + 1);
             refetch();
