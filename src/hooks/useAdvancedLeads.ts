@@ -179,10 +179,14 @@ export const useAdvancedLeads = () => {
           filtered = filtered.filter(lead => lead.status === statusFilter);
       }
     } else if (statusFilter === 'all') {
-      // For "All" tab: exclude lost leads and do-not-contact leads unless searching by name/phone
+      // For "All" tab: include new, engaged, active, paused, closed - exclude only lost leads and do-not-contact leads unless searching by name/phone
       if (!isSearchingByNameOrPhone && !searchFilters.activeNotOptedIn) {
         filtered = filtered.filter(lead => 
+          // Include all active statuses
+          (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active' || lead.status === 'paused' || lead.status === 'closed') &&
+          // Exclude lost leads
           lead.status !== 'lost' && 
+          // Exclude do-not-contact leads
           !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
         );
       }
