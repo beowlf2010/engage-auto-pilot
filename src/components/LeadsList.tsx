@@ -97,6 +97,21 @@ const LeadsList = () => {
     searchFilters.doNotContact !== undefined ? 1 : 0
   ].reduce((sum, count) => sum + count, 0);
 
+  // Calculate stats for LeadsStatsCards
+  const calculateStats = () => {
+    const today = new Date();
+    const todayString = today.toDateString();
+    
+    return {
+      total: finalFilteredLeads.length,
+      noContact: finalFilteredLeads.filter(lead => lead.contactStatus === 'no_contact').length,
+      contacted: finalFilteredLeads.filter(lead => lead.contactStatus === 'contact_attempted').length,
+      responded: finalFilteredLeads.filter(lead => lead.contactStatus === 'response_received').length,
+      aiEnabled: finalFilteredLeads.filter(lead => lead.aiOptIn).length,
+      fresh: finalFilteredLeads.filter(lead => new Date(lead.createdAt).toDateString() === todayString).length
+    };
+  };
+
   if (!filtersLoaded) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -107,6 +122,18 @@ const LeadsList = () => {
       </div>
     );
   }
+
+  // Transform selected leads for BulkActionsPanel
+  const selectedLeadObjects = finalFilteredLeads.filter(lead => 
+    selectedLeads.includes(lead.id.toString())
+  ).map(lead => ({
+    id: lead.id.toString(),
+    first_name: lead.firstName,
+    last_name: lead.lastName,
+    email: lead.email,
+    status: lead.status,
+    vehicle_interest: lead.vehicleInterest
+  }));
 
   return (
     <div className="space-y-6" key={refreshKey}>
@@ -120,21 +147,20 @@ const LeadsList = () => {
 
       {/* Stats Cards */}
       <LeadsStatsCards 
-        leads={finalFilteredLeads}
+        stats={calculateStats()}
         loading={loading}
       />
 
       {/* Filters Bar */}
       <LeadsFiltersBar
-        searchFilters={searchFilters}
-        onFiltersChange={setSearchFilters}
-        totalResults={finalFilteredLeads.length}
+        filter={searchFilters.searchTerm}
+        setFilter={(term) => setSearchFilters({ ...searchFilters, searchTerm: term })}
       />
 
       {/* Bulk Actions Panel */}
       {selectedLeads.length > 0 && (
         <BulkActionsPanel
-          selectedLeadIds={selectedLeads}
+          selectedLeads={selectedLeadObjects}
           onClearSelection={clearSelection}
           onRefresh={() => {
             setRefreshKey(prev => prev + 1);
@@ -165,8 +191,10 @@ const LeadsList = () => {
       {quickViewLead && (
         <LeadQuickView
           lead={quickViewLead}
-          isOpen={!!quickViewLead}
           onClose={hideQuickView}
+          onMessage={() => {}}
+          onCall={() => {}}
+          onSchedule={() => {}}
         />
       )}
     </div>
