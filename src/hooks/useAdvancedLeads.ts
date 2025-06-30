@@ -1,372 +1,404 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Lead } from '@/types/lead';
-import { useLeads } from '@/hooks/useLeads';
-import { useFilterPersistence } from '@/hooks/useFilterPersistence';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useToast } from '@/hooks/use-toast';
 
 export interface SearchFilters {
   searchTerm: string;
-  status?: string;
+  dateFilter: 'all' | 'today' | 'yesterday' | 'this_week';
   source?: string;
   aiOptIn?: boolean;
-  activeNotOptedIn?: boolean;
-  dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
   vehicleInterest?: string;
   city?: string;
   state?: string;
   engagementScoreMin?: number;
   engagementScoreMax?: number;
   doNotContact?: boolean;
+  status?: string;
+  activeNotOptedIn?: boolean;
 }
 
 export interface SavedPreset {
   id: string;
   name: string;
   filters: SearchFilters;
-  createdAt: string;
+  created_at: string;
 }
 
-// Combined persistent filter state
-interface PersistentFilterState {
-  searchFilters: SearchFilters;
-  statusFilter: string;
-}
-
-const DEFAULT_FILTERS: PersistentFilterState = {
-  searchFilters: { 
-    searchTerm: '',
-    dateFilter: 'all'
-  },
-  statusFilter: 'all'
-};
+const ITEMS_PER_PAGE = 20;
 
 export const useAdvancedLeads = () => {
-  const { leads, loading, error, refetch, showHidden } = useLeads();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
+  const [finalFilteredLeads, setFinalFilteredLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+    searchTerm: '',
+    dateFilter: 'all'
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>([]);
-  
-  // Use persistent filters
-  const {
-    state: persistentFilters,
-    saveState: savePersistentFilters,
-    clearState: clearPersistentFilters,
-    isLoaded: filtersLoaded
-  } = useFilterPersistence<PersistentFilterState>(DEFAULT_FILTERS, 'leads-filters-v1');
+  const { profile } = useAuth();
+  const { toast } = useToast();
 
-  // Extract individual states for compatibility
-  const searchFilters = persistentFilters.searchFilters;
-  const statusFilter = persistentFilters.statusFilter;
-
-  // Load saved presets from localStorage
+  // Load saved presets on mount
   useEffect(() => {
-    const saved = localStorage.getItem('lead-filter-presets');
-    if (saved) {
+    const loadPresets = async () => {
+      if (!profile) return;
       try {
-        const parsed = JSON.parse(saved);
-        setSavedPresets(parsed);
-      } catch (error) {
-        console.error('Error loading saved presets:', error);
-      }
-    }
-  }, []);
+        const { data, error } = await supabase
+          .from('lead_search_presets')
+          .select('*')
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false });
 
-  // Calculate engagement score for a lead
-  const getEngagementScore = (lead: Lead) => {
-    let score = 0;
-    if (lead.incomingCount > 0) score += 40;
-    if (lead.outgoingCount > 0) score += 20;
-    if (lead.lastMessageTime) score += 20;
-    if (lead.aiOptIn) score += 10;
-    if (lead.status === 'engaged') score += 10;
-    return Math.min(score, 100);
+        if (error) {
+          console.error('Error loading saved presets:', error);
+        } else {
+          setSavedPresets(data || []);
+        }
+      } catch (err) {
+        console.error('Error loading saved presets:', err);
+      }
+    };
+
+    loadPresets();
+  }, [profile]);
+
+  // Save a search preset
+  const saveSearchPreset = async (name: string, filters: SearchFilters) => {
+    if (!profile) return;
+    try {
+      const { data, error } = await supabase
+        .from('lead_search_presets')
+        .insert([{
+          user_id: profile.id,
+          name: name,
+          filters: filters
+        }])
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error saving search preset:', error);
+        toast({
+          title: "Error saving preset",
+          description: "Failed to save the search preset. Please try again.",
+          variant: "destructive"
+        });
+      } else {
+        setSavedPresets(prev => [data, ...prev]);
+        toast({
+          title: "Preset saved",
+          description: "Your search preset has been saved successfully.",
+        });
+      }
+    } catch (err) {
+      console.error('Error saving search preset:', err);
+      toast({
+        title: "Error saving preset",
+        description: "Failed to save the search preset. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  // Filter leads based on current filters and status
-  const filteredLeads = useMemo(() => {
-    if (!filtersLoaded) return [];
-    
-    let filtered = [...leads];
-    
-    // Check if user is searching by name or phone number
-    const isSearchingByNameOrPhone = searchFilters.searchTerm && (
-      /^[\d\s\-\(\)\+]+$/.test(searchFilters.searchTerm) || // Phone number pattern
-      /^[a-zA-Z\s]+$/.test(searchFilters.searchTerm) // Name pattern
+  // Load a search preset
+  const loadSearchPreset = (preset: SavedPreset) => {
+    setSearchFilters(preset.filters);
+  };
+
+  // Fetch leads from Supabase
+  const fetchLeads = useCallback(async () => {
+    if (!profile) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      let query = supabase
+        .from('leads')
+        .select('*', { count: 'exact' })
+        .eq('salesperson_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      if (searchFilters.activeNotOptedIn) {
+        // Filter for active leads not opted into AI
+        query = query.not('ai_opt_in', 'is', true);
+      }
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error('Error fetching leads:', error);
+        setError('Failed to fetch leads');
+      } else {
+        setLeads(data || []);
+        setTotalLeads(count || 0);
+      }
+    } catch (err) {
+      console.error('Error fetching leads:', err);
+      setError('Failed to fetch leads');
+    } finally {
+      setLoading(false);
+      setFiltersLoaded(true);
+    }
+  }, [profile, searchFilters.activeNotOptedIn]);
+
+  // Fetch leads only once on component mount
+  useEffect(() => {
+    fetchLeads();
+  }, [fetchLeads]);
+
+  // Apply local filtering
+  useEffect(() => {
+    let filtered: Lead[] = [...leads];
+
+    const isSearchingByNameOrPhone = searchFilters.searchTerm !== '' && (
+      searchFilters.searchTerm.length >= 3 && !isNaN(Number(searchFilters.searchTerm))
     );
 
-    // Apply search term filter first
-    if (searchFilters.searchTerm) {
-      const searchTerm = searchFilters.searchTerm.toLowerCase();
-      filtered = filtered.filter(lead => 
-        lead.firstName.toLowerCase().includes(searchTerm) ||
-        lead.lastName.toLowerCase().includes(searchTerm) ||
-        lead.email?.toLowerCase().includes(searchTerm) ||
-        lead.primaryPhone?.includes(searchTerm) ||
-        lead.vehicleInterest.toLowerCase().includes(searchTerm)
-      );
+    // Apply AI Opt-In filter
+    if (searchFilters.aiOptIn !== undefined) {
+      filtered = filtered.filter(lead => lead.aiOptIn === searchFilters.aiOptIn);
     }
 
-    // Handle hidden tab specifically
-    if (statusFilter === 'hidden') {
-      // Show only hidden leads
-      filtered = filtered.filter(lead => lead.is_hidden);
-    } else {
-      // For all other tabs, exclude hidden leads unless searching by name/phone
-      if (!isSearchingByNameOrPhone) {
-        filtered = filtered.filter(lead => !lead.is_hidden);
-      }
+    // Apply Do Not Contact filter
+    if (searchFilters.doNotContact !== undefined) {
+      filtered = filtered.filter(lead => {
+        const doNotContact = lead.doNotCall || lead.doNotEmail || lead.doNotMail;
+        return doNotContact === searchFilters.doNotContact;
+      });
     }
 
-    // Apply Active Not Opted In filter
-    if (searchFilters.activeNotOptedIn) {
+    // Apply engagement score filter
+    if (searchFilters.engagementScoreMin !== undefined) {
+      filtered = filtered.filter(lead => getEngagementScore(lead) >= searchFilters.engagementScoreMin!);
+    }
+
+    if (searchFilters.engagementScoreMax !== undefined) {
+      filtered = filtered.filter(lead => getEngagementScore(lead) <= searchFilters.engagementScoreMax!);
+    }
+
+    // Apply status filter
+    if (statusFilter === 'needs_ai') {
+      // Show leads that are active but not opted into AI
       filtered = filtered.filter(lead => 
-        // Must be active status (not lost, paused, or closed) - including 'active' status
-        (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active') &&
-        // Must not be opted into AI
+        (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active') && 
         !lead.aiOptIn &&
-        // Must not have do-not-contact restrictions
-        !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail &&
-        // Must not be hidden
-        !lead.is_hidden
+        !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
       );
-    }
-
-    // Enhanced status-based filtering with new tab support
-    if (statusFilter !== 'all' && statusFilter !== 'hidden') {
-      switch (statusFilter) {
-        case 'new':
-          // Show leads with 'new' status, excluding lost leads and do-not-contact
-          filtered = filtered.filter(lead => 
-            lead.status === 'new' &&
-            !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
-          );
-          break;
-        case 'needs_ai':
-          // Leads that are active but not opted into AI
-          filtered = filtered.filter(lead => 
-            (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active') &&
-            !lead.aiOptIn &&
-            !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
-          );
-          break;
-        case 'engaged':
-          // Show leads with 'engaged' status, excluding lost leads
-          filtered = filtered.filter(lead => 
-            lead.status === 'engaged'
-          );
-          break;
-        case 'sold_customers':
-          // Filter for sold customers
-          filtered = filtered.filter(lead => 
-            lead.source?.toLowerCase().includes('sold') || 
-            (lead.status === 'closed' && lead.aiPauseReason === 'marked_sold')
-          );
-          break;
-        case 'paused':
-          filtered = filtered.filter(lead => lead.status === 'paused');
-          break;
-        case 'closed':
-          filtered = filtered.filter(lead => lead.status === 'closed');
-          break;
-        case 'lost':
-          filtered = filtered.filter(lead => lead.status === 'lost');
-          break;
-        case 'do_not_contact':
-          filtered = filtered.filter(lead => 
-            lead.doNotCall || lead.doNotEmail || lead.doNotMail
-          );
-          break;
-        default:
-          filtered = filtered.filter(lead => lead.status === statusFilter);
+    } else if (statusFilter === 'do_not_contact') {
+      // Show leads with any do not contact restrictions
+      filtered = filtered.filter(lead => 
+        lead.doNotCall || lead.doNotEmail || lead.doNotMail
+      );
+    } else if (statusFilter === 'hidden') {
+      // Show hidden leads
+      filtered = filtered.filter(lead => lead.is_hidden === true);
+    } else if (statusFilter === 'sold_customers') {
+      // Show sold customers - this would need to be implemented based on your business logic
+      // For now, filtering by a hypothetical 'sold' status or similar
+      filtered = filtered.filter(lead => lead.status === 'closed');
+    } else if (statusFilter !== 'all') {
+      // For specific status filters
+      if (statusFilter === 'active') {
+        // If there's an 'active' filter, show only active leads
+        filtered = filtered.filter(lead => lead.status === 'active');
+      } else {
+        // For other specific statuses (new, engaged, paused, closed, lost)
+        filtered = filtered.filter(lead => lead.status === statusFilter);
       }
     } else if (statusFilter === 'all') {
       // For "All" tab: include new, engaged, active, paused, closed - exclude only lost leads and do-not-contact leads unless searching by name/phone
       if (!isSearchingByNameOrPhone && !searchFilters.activeNotOptedIn) {
         filtered = filtered.filter(lead => 
-          // Include all active statuses
-          (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active' || lead.status === 'paused' || lead.status === 'closed') &&
-          // Exclude lost leads
+          // Include all active statuses, exclude lost and do-not-contact
           lead.status !== 'lost' && 
-          // Exclude do-not-contact leads
           !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
         );
       }
     }
 
-    // Apply other search filters only if tab status is 'all' or 'hidden' (to avoid conflicts)
-    if ((statusFilter === 'all' || statusFilter === 'hidden') && searchFilters.status && !isSearchingByNameOrPhone) {
-      filtered = filtered.filter(lead => lead.status === searchFilters.status);
+    // Apply search term filter
+    if (searchFilters.searchTerm) {
+      const searchTermLower = searchFilters.searchTerm.toLowerCase();
+      filtered = filtered.filter(lead =>
+        lead.firstName.toLowerCase().includes(searchTermLower) ||
+        lead.lastName.toLowerCase().includes(searchTermLower) ||
+        lead.email.toLowerCase().includes(searchTermLower) ||
+        lead.primaryPhone.includes(searchFilters.searchTerm) ||
+        lead.vehicleInterest.toLowerCase().includes(searchTermLower)
+      );
     }
 
-    // Do not contact filter
-    if (searchFilters.doNotContact !== undefined) {
-      if (searchFilters.doNotContact) {
-        filtered = filtered.filter(lead => lead.doNotCall || lead.doNotEmail || lead.doNotMail);
-      } else {
-        filtered = filtered.filter(lead => !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail);
-      }
-    }
-
-    // Source filter
-    if (searchFilters.source) {
-      filtered = filtered.filter(lead => lead.source === searchFilters.source);
-    }
-
-    // AI opt-in filter
-    if (searchFilters.aiOptIn !== undefined) {
-      filtered = filtered.filter(lead => lead.aiOptIn === searchFilters.aiOptIn);
-    }
-
-    // Date filter
-    if (searchFilters.dateFilter && searchFilters.dateFilter !== 'all') {
+    // Apply date filter
+    if (searchFilters.dateFilter !== 'all') {
       const today = new Date();
       const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const weekAgo = new Date(today);
-      weekAgo.setDate(weekAgo.getDate() - 7);
+      yesterday.setDate(today.getDate() - 1);
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay()); // Start of the week (Sunday)
 
       filtered = filtered.filter(lead => {
         const leadDate = new Date(lead.createdAt);
-        
-        switch (searchFilters.dateFilter) {
-          case 'today':
-            return today.toDateString() === leadDate.toDateString();
-          case 'yesterday':
-            return yesterday.toDateString() === leadDate.toDateString();
-          case 'this_week':
-            return leadDate >= weekAgo;
-          default:
-            return true;
+        if (searchFilters.dateFilter === 'today') {
+          return leadDate.toDateString() === today.toDateString();
+        } else if (searchFilters.dateFilter === 'yesterday') {
+          return leadDate.toDateString() === yesterday.toDateString();
+        } else if (searchFilters.dateFilter === 'this_week') {
+          return leadDate >= startOfWeek && leadDate <= today;
         }
+        return true;
       });
     }
 
-    // Vehicle interest filter
+    // Apply source filter
+    if (searchFilters.source) {
+      const sourceLower = searchFilters.source.toLowerCase();
+      filtered = filtered.filter(lead =>
+        lead.source.toLowerCase().includes(sourceLower)
+      );
+    }
+
+    // Apply vehicle interest filter
     if (searchFilters.vehicleInterest) {
-      filtered = filtered.filter(lead => 
-        lead.vehicleInterest?.toLowerCase().includes(searchFilters.vehicleInterest!.toLowerCase())
+      const vehicleInterestLower = searchFilters.vehicleInterest.toLowerCase();
+      filtered = filtered.filter(lead =>
+        lead.vehicleInterest.toLowerCase().includes(vehicleInterestLower)
       );
     }
 
-    // City filter
+    // Apply city filter
     if (searchFilters.city) {
-      filtered = filtered.filter(lead => 
-        lead.city?.toLowerCase().includes(searchFilters.city!.toLowerCase())
+      const cityLower = searchFilters.city.toLowerCase();
+      filtered = filtered.filter(lead =>
+        lead.city?.toLowerCase().includes(cityLower)
       );
     }
 
-    // State filter
-    if (searchFilters.state) {
-      filtered = filtered.filter(lead => 
-        lead.state?.toLowerCase().includes(searchFilters.state!.toLowerCase())
+     // Apply state filter
+     if (searchFilters.state) {
+      const stateLower = searchFilters.state.toLowerCase();
+      filtered = filtered.filter(lead =>
+        lead.state?.toLowerCase().includes(stateLower)
       );
     }
 
-    // Engagement score filter
-    if (searchFilters.engagementScoreMin !== undefined || searchFilters.engagementScoreMax !== undefined) {
-      filtered = filtered.filter(lead => {
-        const score = getEngagementScore(lead);
-        const min = searchFilters.engagementScoreMin ?? 0;
-        const max = searchFilters.engagementScoreMax ?? 100;
-        return score >= min && score <= max;
-      });
-    }
+    setFilteredLeads(filtered);
+  }, [leads, statusFilter, searchFilters]);
 
-    return filtered;
-  }, [leads, statusFilter, searchFilters, filtersLoaded, showHidden]);
+  // Apply pagination
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    setFinalFilteredLeads(filteredLeads.slice(startIndex, endIndex));
+  }, [filteredLeads, currentPage]);
 
-  const savePreset = (name: string, filters: SearchFilters) => {
-    const newPreset: SavedPreset = {
-      id: Date.now().toString(),
-      name,
-      filters,
-      createdAt: new Date().toISOString()
-    };
-    const newPresets = [...savedPresets, newPreset];
-    setSavedPresets(newPresets);
-    localStorage.setItem('lead-filter-presets', JSON.stringify(newPresets));
-  };
-
-  const loadPreset = (preset: SavedPreset) => {
-    const newState = {
-      searchFilters: preset.filters,
-      statusFilter: 'all'
-    };
-    savePersistentFilters(newState);
-  };
-
+  // Clear all filters
   const clearFilters = () => {
-    clearPersistentFilters();
-    setSelectedLeads([]);
+    setStatusFilter('all');
+    setSearchFilters({ searchTerm: '', dateFilter: 'all' });
   };
 
-  const setStatusFilter = (status: string) => {
-    const newState = {
-      ...persistentFilters,
-      statusFilter: status
-    };
-    savePersistentFilters(newState);
-  };
-
-  const setSearchFilters = (filters: SearchFilters) => {
-    const newState = {
-      ...persistentFilters,
-      searchFilters: filters
-    };
-    savePersistentFilters(newState);
-  };
-
+  // Select all filtered leads
   const selectAllFiltered = () => {
-    setSelectedLeads(filteredLeads.map(lead => lead.id.toString()));
+    const allIds = finalFilteredLeads.map(lead => lead.id.toString());
+    setSelectedLeads(allIds);
   };
 
+  // Clear selection
   const clearSelection = () => {
     setSelectedLeads([]);
   };
 
+  // Toggle lead selection
   const toggleLeadSelection = (leadId: string) => {
-    setSelectedLeads(prev => 
-      prev.includes(leadId) 
-        ? prev.filter(id => id !== leadId)
-        : [...prev, leadId]
-    );
+    if (selectedLeads.includes(leadId)) {
+      setSelectedLeads(selectedLeads.filter(id => id !== leadId));
+    } else {
+      setSelectedLeads([...selectedLeads, leadId]);
+    }
   };
 
+  // Show quick view
   const showQuickView = (lead: Lead) => {
     setQuickViewLead(lead);
   };
 
+  // Hide quick view
   const hideQuickView = () => {
     setQuickViewLead(null);
   };
 
+   // Function to calculate engagement score
+   const getEngagementScore = (lead: Lead): number => {
+    let score = 0;
+
+    // Award points based on communication activity
+    score += lead.incomingCount * 5;  // Incoming messages are valuable
+    score += lead.outgoingCount * 2;  // Outgoing messages also count
+
+    // Deduct points for DNC status
+    if (lead.doNotCall || lead.doNotEmail || lead.doNotMail) {
+        score -= 10; // Substantial penalty for DNC
+    }
+
+    // Add points if AI is enabled
+    if (lead.aiOptIn) {
+        score += 5;
+    }
+
+    // Adjustments based on lead status
+    if (lead.status === 'new') {
+        score -= 2; // Slightly lower score for new leads
+    } else if (lead.status === 'engaged') {
+        score += 8; // Higher score for engaged leads
+    } else if (lead.status === 'closed') {
+        score += 10; // Highest score for closed leads
+    }
+
+    // Ensure score is non-negative
+    return Math.max(0, score);
+  };
+
+  const refetch = async () => {
+    await fetchLeads();
+  };
+
   return {
-    // Data
-    leads: filteredLeads,
+    leads,
+    filteredLeads,
+    finalFilteredLeads,
     loading,
     error,
-    loadingProgress: 0,
     selectedLeads,
     quickViewLead,
-    savedPresets,
     statusFilter,
     searchFilters,
+    currentPage,
+    totalLeads,
     filtersLoaded,
-    
-    // Actions
+    savedPresets,
     setStatusFilter,
     setSearchFilters,
-    savePreset,
-    loadPreset,
+    setCurrentPage,
     clearFilters,
     selectAllFiltered,
     clearSelection,
     toggleLeadSelection,
     showQuickView,
     hideQuickView,
-    refetch,
-    retry: refetch,
-    
-    // Utilities
-    getEngagementScore
+    saveSearchPreset,
+    loadSearchPreset,
+    getEngagementScore,
+    refetch
   };
 };
