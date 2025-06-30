@@ -5,7 +5,8 @@ import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import AuthPage from './components/auth/AuthPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
-import LeadsList from './components/LeadsList';
+import LeadsPage from './pages/LeadsPage';
+import UploadLeadsPage from './pages/UploadLeadsPage';
 import DashboardPage from './pages/DashboardPage';
 import SmartInboxPage from './pages/SmartInboxPage';
 import InventoryDashboardPage from './pages/InventoryDashboardPage';
@@ -54,7 +55,15 @@ const AppContent = () => {
         <Route path="/leads" element={
           <ProtectedRoute>
             <AppLayout>
-              <LeadsList />
+              <LeadsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/upload-leads" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <UploadLeadsPage />
             </AppLayout>
           </ProtectedRoute>
         } />

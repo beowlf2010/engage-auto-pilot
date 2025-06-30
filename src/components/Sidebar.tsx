@@ -23,7 +23,8 @@ import {
   Shield,
   MessageSquare,
   Palette,
-  LogOut
+  LogOut,
+  FileSpreadsheet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +72,14 @@ const Sidebar = ({ user, activeView, onViewChange, unreadCount }: SidebarProps) 
       icon: Users,
       href: "/leads",
       badge: null
+    },
+    {
+      id: "upload-leads",
+      label: "Upload Leads",
+      icon: FileSpreadsheet,
+      href: "/upload-leads",
+      badge: null,
+      managerOnly: true
     },
     {
       id: "inbox",
