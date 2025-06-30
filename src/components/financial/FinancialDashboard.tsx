@@ -1,77 +1,83 @@
 
-import FinancialUpload from "./FinancialUpload";
-import DealManagement from "./DealManagement";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, Upload, Settings, Database } from "lucide-react";
+import FlexibleFinancialUpload from "./FlexibleFinancialUpload";
+import DealManagement from "./DealManagement";
 
 interface FinancialDashboardProps {
   user: {
     id: string;
     email: string;
     role: string;
-    firstName: string;
-    lastName: string;
+    firstName?: string;
+    lastName?: string;
     phone?: string;
   };
 }
 
 const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
-  // Load pack adjustment from localStorage with default of 1500
-  const [packAdjustment, setPackAdjustment] = useState(() => {
-    const saved = localStorage.getItem('packAdjustment');
-    return saved ? Number(saved) : 1500;
-  });
-  
-  const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(() => {
-    const saved = localStorage.getItem('packAdjustmentEnabled');
-    return saved === 'true';
-  });
-
-  // Save pack adjustment to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('packAdjustment', packAdjustment.toString());
-  }, [packAdjustment]);
-
-  useEffect(() => {
-    localStorage.setItem('packAdjustmentEnabled', packAdjustmentEnabled.toString());
-  }, [packAdjustmentEnabled]);
-
-  const effectivePackAdjustment = packAdjustmentEnabled ? packAdjustment : 0;
+  const [activeTab, setActiveTab] = useState("upload");
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800">Financial Dashboard</h1>
-          <p className="text-slate-600 mt-1">
-            Track daily sales performance and profit metrics
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Financial Dashboard</h1>
+          <p className="text-slate-600">
+            Upload and manage your financial data with flexible column mapping
           </p>
         </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="upload" className="flex items-center space-x-2">
+              <Upload className="w-4 h-4" />
+              <span>Upload Data</span>
+            </TabsTrigger>
+            <TabsTrigger value="manage" className="flex items-center space-x-2">
+              <Database className="w-4 h-4" />
+              <span>Manage Deals</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center space-x-2">
+              <TrendingUp className="w-4 h-4" />
+              <span>Analytics</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="upload" className="space-y-6">
+            <FlexibleFinancialUpload user={user} />
+          </TabsContent>
+
+          <TabsContent value="manage" className="space-y-6">
+            <DealManagement user={user} />
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <TrendingUp className="w-5 h-5" />
+                  <span>Financial Analytics</span>
+                </CardTitle>
+                <CardDescription>
+                  Comprehensive financial reporting and insights
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Settings className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-700 mb-2">Analytics Coming Soon</h3>
+                  <p className="text-slate-600">
+                    Advanced financial analytics and reporting features will be available here.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="deals" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="deals">Deal Management</TabsTrigger>
-          <TabsTrigger value="upload">Upload Data</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="deals" className="space-y-6">
-          <DealManagement 
-            user={{ id: user.id, role: user.role }} 
-            packAdjustment={effectivePackAdjustment}
-            packAdjustmentEnabled={packAdjustmentEnabled}
-            setPackAdjustmentEnabled={setPackAdjustmentEnabled}
-            localPackAdjustment={packAdjustment}
-            setLocalPackAdjustment={setPackAdjustment}
-          />
-        </TabsContent>
-
-        <TabsContent value="upload" className="space-y-6">
-          <FinancialUpload user={{ id: user.id, role: user.role }} />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 };
