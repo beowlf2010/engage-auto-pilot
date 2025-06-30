@@ -19,6 +19,8 @@ interface FinancialDashboardProps {
 
 const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
   const [activeTab, setActiveTab] = useState("upload");
+  const [packAdjustmentEnabled, setPackAdjustmentEnabled] = useState(false);
+  const [localPackAdjustment, setLocalPackAdjustment] = useState(0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -51,7 +53,14 @@ const FinancialDashboard = ({ user }: FinancialDashboardProps) => {
           </TabsContent>
 
           <TabsContent value="manage" className="space-y-6">
-            <DealManagement user={user} />
+            <DealManagement 
+              user={user}
+              packAdjustment={localPackAdjustment}
+              packAdjustmentEnabled={packAdjustmentEnabled}
+              setPackAdjustmentEnabled={setPackAdjustmentEnabled}
+              localPackAdjustment={localPackAdjustment}
+              setLocalPackAdjustment={setLocalPackAdjustment}
+            />
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">

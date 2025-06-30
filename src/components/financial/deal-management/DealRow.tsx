@@ -6,6 +6,7 @@ import DealTypeCell from "./DealTypeCell";
 import ProfitCell from "./ProfitCell";
 import PackAdjustmentCell from "./PackAdjustmentCell";
 import ActionsCell from "./ActionsCell";
+import CustomerNameLink from "./CustomerNameLink";
 import { getAdjustedTotalProfit } from "./DealManagementUtils";
 
 interface Deal {
@@ -87,9 +88,7 @@ const DealRow = ({
       </TableCell>
       
       <TableCell>
-        <div className="font-medium">
-          {deal.buyer_name || 'Unknown'}
-        </div>
+        <CustomerNameLink customerName={deal.buyer_name || 'Unknown'} />
       </TableCell>
       
       <TableCell>
