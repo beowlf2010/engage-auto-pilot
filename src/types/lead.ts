@@ -1,3 +1,4 @@
+
 export interface PhoneNumber {
   id: string;
   number: string;
@@ -23,7 +24,7 @@ export interface Lead {
   postalCode?: string;
   vehicleInterest: string;
   source: string;
-  status: 'new' | 'engaged' | 'paused' | 'closed' | 'lost';
+  status: 'new' | 'engaged' | 'active' | 'paused' | 'closed' | 'lost';
   salesperson: string;
   salespersonId: string;
   aiOptIn: boolean;
