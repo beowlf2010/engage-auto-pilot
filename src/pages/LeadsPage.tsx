@@ -27,16 +27,17 @@ const LeadsPage = () => {
 
   // Listen for sold customers view event
   useEffect(() => {
-    const handleViewSoldCustomers = () => {
+    const handleNavigateToSoldCustomers = () => {
       // Trigger navigation to sold customers tab
-      // This could be implemented by passing a state to LeadsList
-      // or by using a context/state management solution
-      console.log('Navigate to sold customers view');
+      const event = new CustomEvent('setStatusFilter', { 
+        detail: { statusFilter: 'sold_customers' } 
+      });
+      window.dispatchEvent(event);
     };
 
-    window.addEventListener('viewSoldCustomers', handleViewSoldCustomers);
+    window.addEventListener('navigateToSoldCustomers', handleNavigateToSoldCustomers);
     return () => {
-      window.removeEventListener('viewSoldCustomers', handleViewSoldCustomers);
+      window.removeEventListener('navigateToSoldCustomers', handleNavigateToSoldCustomers);
     };
   }, []);
 

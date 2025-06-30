@@ -3,6 +3,7 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EyeOff } from "lucide-react";
 import LeadsTable from "../LeadsTable";
 import { Lead } from "@/types/lead";
 
@@ -20,6 +21,7 @@ interface LeadsStatusTabsProps {
   searchTerm: string;
   onQuickView: (lead: Lead) => void;
   getEngagementScore: (lead: Lead) => number;
+  onToggleHidden?: (leadId: string, hidden: boolean) => void;
 }
 
 const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
@@ -36,16 +38,21 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
   searchTerm,
   onQuickView,
   getEngagementScore,
+  onToggleHidden,
 }) => {
   // Helper function to get tab description
   const getTabDescription = (tabValue: string) => {
     switch (tabValue) {
       case 'all':
-        return 'All active leads (excludes lost)';
+        return 'All active leads (excludes lost and hidden)';
       case 'new':
         return 'No contact attempted yet';
+      case 'needs_ai':
+        return 'Active leads not opted into AI';
       case 'engaged':
         return 'Actively communicating';
+      case 'sold_customers':
+        return 'Sold customers';
       case 'paused':
         return 'Temporarily paused';
       case 'closed':
@@ -54,6 +61,8 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
         return 'Marked as lost';
       case 'do_not_contact':
         return 'Leads with contact restrictions';
+      case 'hidden':
+        return 'Hidden leads';
       default:
         return '';
     }
@@ -61,15 +70,21 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
 
   return (
     <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
-      <TabsList className="grid w-full grid-cols-7">
+      <TabsList className="grid w-full grid-cols-10">
         <TabsTrigger value="all" title={getTabDescription('all')}>
           All
         </TabsTrigger>
         <TabsTrigger value="new" title={getTabDescription('new')}>
           New
         </TabsTrigger>
+        <TabsTrigger value="needs_ai" title={getTabDescription('needs_ai')}>
+          Needs AI
+        </TabsTrigger>
         <TabsTrigger value="engaged" title={getTabDescription('engaged')}>
           Engaged
+        </TabsTrigger>
+        <TabsTrigger value="sold_customers" title={getTabDescription('sold_customers')}>
+          Sold
         </TabsTrigger>
         <TabsTrigger value="paused" title={getTabDescription('paused')}>
           Paused
@@ -82,6 +97,10 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
         </TabsTrigger>
         <TabsTrigger value="do_not_contact" title={getTabDescription('do_not_contact')}>
           DNC
+        </TabsTrigger>
+        <TabsTrigger value="hidden" title={getTabDescription('hidden')} className="flex items-center gap-1">
+          <EyeOff className="w-3 h-3" />
+          Hidden
         </TabsTrigger>
       </TabsList>
 
@@ -119,6 +138,7 @@ const LeadsStatusTabs: React.FC<LeadsStatusTabsProps> = ({
           onLeadSelect={toggleLeadSelection}
           onQuickView={onQuickView}
           getEngagementScore={getEngagementScore}
+          onToggleHidden={onToggleHidden}
         />
       </TabsContent>
     </Tabs>

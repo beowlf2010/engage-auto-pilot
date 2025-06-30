@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -94,9 +93,8 @@ const PostSaleFollowUpPanel: React.FC<PostSaleFollowUpPanelProps> = ({
   };
 
   const handleViewSoldCustomers = () => {
-    // This will set the "Sold" tab filter
-    // The parent component should handle this navigation
-    const event = new CustomEvent('viewSoldCustomers');
+    // Navigate to the sold customers tab
+    const event = new CustomEvent('navigateToSoldCustomers');
     window.dispatchEvent(event);
   };
 

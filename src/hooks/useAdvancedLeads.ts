@@ -88,11 +88,6 @@ export const useAdvancedLeads = () => {
     
     let filtered = [...leads];
     
-    // Apply hidden lead filtering based on showHidden state
-    if (!showHidden) {
-      filtered = filtered.filter(lead => !lead.is_hidden);
-    }
-    
     // Check if user is searching by name or phone number
     const isSearchingByNameOrPhone = searchFilters.searchTerm && (
       /^[\d\s\-\(\)\+]+$/.test(searchFilters.searchTerm) || // Phone number pattern
@@ -111,6 +106,17 @@ export const useAdvancedLeads = () => {
       );
     }
 
+    // Handle hidden tab specifically
+    if (statusFilter === 'hidden') {
+      // Show only hidden leads
+      filtered = filtered.filter(lead => lead.is_hidden);
+    } else {
+      // For all other tabs, exclude hidden leads unless searching by name/phone
+      if (!isSearchingByNameOrPhone) {
+        filtered = filtered.filter(lead => !lead.is_hidden);
+      }
+    }
+
     // Apply Active Not Opted In filter
     if (searchFilters.activeNotOptedIn) {
       filtered = filtered.filter(lead => 
@@ -126,7 +132,7 @@ export const useAdvancedLeads = () => {
     }
 
     // Enhanced status-based filtering with new tab support
-    if (statusFilter !== 'all') {
+    if (statusFilter !== 'all' && statusFilter !== 'hidden') {
       switch (statusFilter) {
         case 'new':
           filtered = filtered.filter(lead => 
@@ -140,8 +146,7 @@ export const useAdvancedLeads = () => {
           filtered = filtered.filter(lead => 
             (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active') &&
             !lead.aiOptIn &&
-            !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail &&
-            !lead.is_hidden
+            !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
           );
           break;
         case 'engaged':
@@ -174,7 +179,7 @@ export const useAdvancedLeads = () => {
         default:
           filtered = filtered.filter(lead => lead.status === statusFilter);
       }
-    } else {
+    } else if (statusFilter === 'all') {
       // For "All" tab: exclude lost leads and do-not-contact leads unless searching by name/phone
       if (!isSearchingByNameOrPhone && !searchFilters.activeNotOptedIn) {
         filtered = filtered.filter(lead => 
@@ -184,13 +189,13 @@ export const useAdvancedLeads = () => {
       }
     }
 
-    // Apply other search filters only if tab status is 'all' (to avoid conflicts)
-    if (statusFilter === 'all' && searchFilters.status && !isSearchingByNameOrPhone) {
+    // Apply other search filters only if tab status is 'all' or 'hidden' (to avoid conflicts)
+    if ((statusFilter === 'all' || statusFilter === 'hidden') && searchFilters.status && !isSearchingByNameOrPhone) {
       filtered = filtered.filter(lead => lead.status === searchFilters.status);
     }
 
     // Contact status filter (only apply if not conflicting with tab-based filtering)
-    if (searchFilters.contactStatus && statusFilter === 'all') {
+    if (searchFilters.contactStatus && (statusFilter === 'all' || statusFilter === 'hidden')) {
       filtered = filtered.filter(lead => lead.contactStatus === searchFilters.contactStatus);
     }
 

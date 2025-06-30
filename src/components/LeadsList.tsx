@@ -1,343 +1,172 @@
 
-import React, { useState, useMemo } from 'react';
-import { useAuth } from './auth/AuthProvider';
-import { useLeads } from '@/hooks/useLeads';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, UserCheck, UserX, Clock, CheckCircle, XCircle, AlertTriangle, Heart, Bot } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import LeadsTable from './LeadsTable';
-import EnhancedLeadSearch from './leads/EnhancedLeadSearch';
-import LeadsStatsCards from './leads/LeadsStatsCards';
-import LeadQuickView from './leads/LeadQuickView';
-import FilterRestorationBanner from './leads/FilterRestorationBanner';
-import ShowHiddenLeadsToggle from './leads/ShowHiddenLeadsToggle';
+import { useLeadsOperations } from '@/hooks/leads/useLeadsOperations';
+import LeadsStatsCards from '@/components/leads/LeadsStatsCards';
+import LeadsFiltersBar from '@/components/leads/LeadsFiltersBar';
+import LeadsStatusTabs from '@/components/leads/LeadsStatusTabs';
+import LeadQuickView from '@/components/leads/LeadQuickView';
+import BulkActionsPanel from '@/components/leads/BulkActionsPanel';
+import FilterRestorationBanner from '@/components/leads/FilterRestorationBanner';
+import { Lead } from '@/types/lead';
 
 const LeadsList = () => {
   const { user } = useAuth();
-  const { 
-    leads: allLeads, 
-    updateAiOptIn, 
-    updateDoNotContact, 
-    refetch,
-    showHidden,
-    setShowHidden,
-    hiddenCount,
-    toggleLeadHidden
-  } = useLeads();
+  const { updateAiOptIn, updateDoNotContact } = useLeadsOperations();
   
   const {
-    leads: filteredLeads,
+    leads: finalFilteredLeads,
     loading,
-    statusFilter,
-    setStatusFilter,
-    searchFilters,
-    setSearchFilters,
     selectedLeads,
     quickViewLead,
-    savedPresets,
-    savePreset,
-    loadPreset,
+    statusFilter,
+    searchFilters,
+    filtersLoaded,
+    setStatusFilter,
+    setSearchFilters,
     clearFilters,
+    selectAllFiltered,
+    clearSelection,
+    toggleLeadSelection,
     showQuickView,
     hideQuickView,
     getEngagementScore,
-    filtersLoaded
+    refetch
   } = useAdvancedLeads();
+
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const canEdit = user?.role === 'admin' || user?.role === 'manager';
 
-  // Check if filters were restored from persistence
-  const hasRestoredFilters = filtersLoaded && (
-    searchFilters.searchTerm ||
-    searchFilters.status ||
+  // Enhanced AI opt-in handler with immediate UI update
+  const handleAiOptInChange = async (leadId: string, value: boolean) => {
+    console.log('🔄 [LEADS LIST] Handling AI opt-in change:', { leadId, value });
+    
+    const success = await updateAiOptIn(leadId, value);
+    
+    if (success) {
+      console.log('✅ [LEADS LIST] AI opt-in updated successfully, triggering refresh');
+      // Force a refresh to update the filtered leads
+      setRefreshKey(prev => prev + 1);
+      await refetch();
+    }
+  };
+
+  const handleDoNotContactChange = async (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => {
+    const success = await updateDoNotContact(leadId, field, value);
+    if (success) {
+      setRefreshKey(prev => prev + 1);
+      await refetch();
+    }
+  };
+
+  const handleToggleHidden = async (leadId: string, hidden: boolean) => {
+    // This will be handled by the HideLeadButton component
+    // and the leads will be automatically filtered by the hook
+    setRefreshKey(prev => prev + 1);
+    await refetch();
+  };
+
+  // Check if we have active filters
+  const hasActiveFilters = statusFilter !== 'all' || 
+    searchFilters.searchTerm !== '' ||
+    searchFilters.dateFilter !== 'all' ||
     searchFilters.source ||
     searchFilters.aiOptIn !== undefined ||
-    searchFilters.activeNotOptedIn ||
     searchFilters.contactStatus ||
-    searchFilters.dateFilter !== 'all' ||
     searchFilters.vehicleInterest ||
     searchFilters.city ||
     searchFilters.state ||
     searchFilters.engagementScoreMin !== undefined ||
     searchFilters.engagementScoreMax !== undefined ||
-    searchFilters.doNotContact !== undefined ||
-    statusFilter !== 'all'
-  );
+    searchFilters.doNotContact !== undefined;
 
-  const restoredFiltersCount = [
-    searchFilters.searchTerm,
-    searchFilters.status,
-    searchFilters.source,
-    searchFilters.aiOptIn !== undefined,
-    searchFilters.activeNotOptedIn,
-    searchFilters.contactStatus,
-    searchFilters.dateFilter !== 'all',
-    searchFilters.vehicleInterest,
-    searchFilters.city,
-    searchFilters.state,
-    searchFilters.engagementScoreMin !== undefined,
-    searchFilters.engagementScoreMax !== undefined,
-    searchFilters.doNotContact !== undefined,
-    statusFilter !== 'all'
-  ].filter(Boolean).length;
+  const filtersCount = [
+    statusFilter !== 'all' ? 1 : 0,
+    searchFilters.searchTerm ? 1 : 0,
+    searchFilters.dateFilter !== 'all' ? 1 : 0,
+    searchFilters.source ? 1 : 0,
+    searchFilters.aiOptIn !== undefined ? 1 : 0,
+    searchFilters.contactStatus ? 1 : 0,
+    searchFilters.vehicleInterest ? 1 : 0,
+    searchFilters.city ? 1 : 0,
+    searchFilters.state ? 1 : 0,
+    searchFilters.engagementScoreMin !== undefined ? 1 : 0,
+    searchFilters.engagementScoreMax !== undefined ? 1 : 0,
+    searchFilters.doNotContact !== undefined ? 1 : 0
+  ].reduce((sum, count) => sum + count, 0);
 
-  // Enhanced AI opt-in handler with proper refresh
-  const handleAiOptInChange = async (leadId: string, aiOptIn: boolean) => {
-    console.log('🤖 [LEADS LIST] AI opt-in change requested:', { leadId, aiOptIn });
-    
-    try {
-      // Call the updateAiOptIn function which includes optimistic updates
-      const success = await updateAiOptIn(leadId, aiOptIn);
-      
-      if (!success) {
-        throw new Error('Failed to update AI settings in database');
-      }
-      
-      console.log('✅ [LEADS LIST] AI opt-in updated successfully');
-      
-      // Show success message
-      toast({
-        title: aiOptIn ? "AI Messaging Enabled" : "AI Messaging Disabled",
-        description: aiOptIn 
-          ? "The lead has been opted into AI messaging successfully."
-          : "AI messaging has been turned off for this lead.",
-      });
-      
-      // Force a complete refresh to ensure UI is updated
-      console.log('🔄 [LEADS LIST] Refreshing data after AI opt-in change');
-      await refetch();
-      
-      return true;
-      
-    } catch (error) {
-      console.error('❌ [LEADS LIST] Error updating AI opt-in:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update AI settings. Please try again.",
-        variant: "destructive"
-      });
-      return false;
-    }
-  };
-
-  // Calculate stats for LeadsStatsCards
-  const statsData = useMemo(() => {
-    const today = new Date();
-    const todayString = today.toDateString();
-    
-    // Filter out hidden leads unless specifically showing them
-    const visibleLeads = showHidden ? allLeads : allLeads.filter(lead => !lead.is_hidden);
-    
-    const totalLeads = visibleLeads.filter(lead => 
-      lead.status !== 'lost' && 
-      !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
-    ).length;
-    
-    const noContactLeads = visibleLeads.filter(lead => 
-      lead.contactStatus === 'no_contact' && 
-      lead.status !== 'lost' &&
-      !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
-    ).length;
-    
-    const contactedLeads = visibleLeads.filter(lead => 
-      lead.contactStatus === 'contact_attempted' && 
-      lead.status !== 'lost'
-    ).length;
-    
-    const respondedLeads = visibleLeads.filter(lead => 
-      (lead.contactStatus === 'response_received' || lead.status === 'engaged') && 
-      lead.status !== 'lost'
-    ).length;
-    
-    const aiEnabledLeads = visibleLeads.filter(lead => lead.aiOptIn).length;
-    
-    const freshLeads = visibleLeads.filter(lead => {
-      const leadDate = new Date(lead.createdAt);
-      return leadDate.toDateString() === todayString;
-    }).length;
-
-    return {
-      stats: {
-        total: totalLeads,
-        noContact: noContactLeads,
-        contacted: contactedLeads,
-        responded: respondedLeads,
-        aiEnabled: aiEnabledLeads,
-        fresh: freshLeads
-      }
-    };
-  }, [allLeads, showHidden]);
-
-  const getTabCounts = () => {
-    // Filter out hidden leads unless specifically showing them
-    const visibleLeads = showHidden ? allLeads : allLeads.filter(lead => !lead.is_hidden);
-    
-    return {
-      all: visibleLeads.filter(lead => 
-        lead.status !== 'lost' && 
-        !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
-      ).length,
-      new: visibleLeads.filter(lead => 
-        lead.contactStatus === 'no_contact' && 
-        lead.status !== 'lost' &&
-        !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
-      ).length,
-      engaged: visibleLeads.filter(lead => 
-        (lead.contactStatus === 'response_received' || lead.status === 'engaged') && 
-        lead.status !== 'lost'
-      ).length,
-      paused: visibleLeads.filter(lead => lead.status === 'paused').length,
-      closed: visibleLeads.filter(lead => lead.status === 'closed').length,
-      lost: visibleLeads.filter(lead => lead.status === 'lost').length,
-      do_not_contact: visibleLeads.filter(lead => 
-        lead.doNotCall || lead.doNotEmail || lead.doNotMail
-      ).length,
-      sold_customers: visibleLeads.filter(lead => 
-        lead.source?.toLowerCase().includes('sold') || 
-        (lead.status === 'closed' && lead.aiPauseReason === 'marked_sold')
-      ).length,
-      needs_ai: visibleLeads.filter(lead => 
-        (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active') &&
-        !lead.aiOptIn &&
-        !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail &&
-        !lead.is_hidden
-      ).length
-    };
-  };
-
-  const tabCounts = getTabCounts();
-
-  // Handler functions for LeadQuickView
-  const handleMessage = (lead: any) => {
-    console.log('Message lead:', lead.id);
-  };
-
-  const handleCall = (phoneNumber: string) => {
-    if (phoneNumber) {
-      window.open(`tel:${phoneNumber}`);
-    }
-  };
-
-  const handleSchedule = (lead: any) => {
-    console.log('Schedule with lead:', lead.id);
-  };
+  if (!filtersLoaded) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading filters...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" key={refreshKey}>
       {/* Filter Restoration Banner */}
-      {hasRestoredFilters && (
+      {hasActiveFilters && (
         <FilterRestorationBanner
           onClearFilters={clearFilters}
-          filtersCount={restoredFiltersCount}
+          filtersCount={filtersCount}
         />
       )}
 
-      {/* Hidden Leads Toggle */}
-      <ShowHiddenLeadsToggle
-        showHidden={showHidden}
-        onToggle={setShowHidden}
-        hiddenCount={hiddenCount}
-      />
-
       {/* Stats Cards */}
-      <LeadsStatsCards {...statsData} />
-
-      {/* Search & Filters */}
-      <EnhancedLeadSearch
-        onFiltersChange={setSearchFilters}
-        savedPresets={savedPresets}
-        onSavePreset={savePreset}
-        onLoadPreset={loadPreset}
-        totalResults={filteredLeads.length}
-        isLoading={loading}
+      <LeadsStatsCards 
+        leads={finalFilteredLeads}
+        loading={loading}
       />
 
-      {/* Enhanced Status Tabs with Sold Customers and Needs AI */}
-      <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
-        <TabsList className="grid w-full grid-cols-9">
-          <TabsTrigger value="all" className="flex items-center space-x-1">
-            <Users className="w-4 h-4" />
-            <span>All</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.all}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="new" className="flex items-center space-x-1">
-            <UserCheck className="w-4 h-4" />
-            <span>New</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.new}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="needs_ai" className="flex items-center space-x-1">
-            <Bot className="w-4 h-4" />
-            <span>Needs AI</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.needs_ai}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="engaged" className="flex items-center space-x-1">
-            <CheckCircle className="w-4 h-4" />
-            <span>Engaged</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.engaged}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="sold_customers" className="flex items-center space-x-1">
-            <Heart className="w-4 h-4" />
-            <span>Sold</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.sold_customers}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="paused" className="flex items-center space-x-1">
-            <Clock className="w-4 h-4" />
-            <span>Paused</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.paused}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="closed" className="flex items-center space-x-1">
-            <CheckCircle className="w-4 h-4" />
-            <span>Closed</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.closed}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="lost" className="flex items-center space-x-1">
-            <XCircle className="w-4 h-4" />
-            <span>Lost</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.lost}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="do_not_contact" className="flex items-center space-x-1">
-            <AlertTriangle className="w-4 h-4" />
-            <span>DNC</span>
-            <Badge variant="secondary" className="ml-1">{tabCounts.do_not_contact}</Badge>
-          </TabsTrigger>
-        </TabsList>
+      {/* Filters Bar */}
+      <LeadsFiltersBar
+        searchFilters={searchFilters}
+        onFiltersChange={setSearchFilters}
+        totalResults={finalFilteredLeads.length}
+      />
 
-        {/* Tab Content - All tabs show the same table with different filters */}
-        {['all', 'new', 'needs_ai', 'engaged', 'sold_customers', 'paused', 'closed', 'lost', 'do_not_contact'].map(tab => (
-          <TabsContent key={tab} value={tab}>
-            <Card>
-              <CardContent className="p-0">
-                <LeadsTable
-                  leads={filteredLeads}
-                  onAiOptInChange={handleAiOptInChange}
-                  onDoNotContactChange={updateDoNotContact}
-                  canEdit={canEdit}
-                  loading={loading}
-                  searchTerm={searchFilters.searchTerm}
-                  selectedLeads={selectedLeads}
-                  onLeadSelect={() => {}} // Implement if needed
-                  onQuickView={showQuickView}
-                  getEngagementScore={getEngagementScore}
-                  onToggleHidden={toggleLeadHidden}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ))}
-      </Tabs>
+      {/* Bulk Actions Panel */}
+      {selectedLeads.length > 0 && (
+        <BulkActionsPanel
+          selectedLeadIds={selectedLeads}
+          onClearSelection={clearSelection}
+          onRefresh={() => {
+            setRefreshKey(prev => prev + 1);
+            refetch();
+          }}
+        />
+      )}
+
+      {/* Status Tabs with Leads Table */}
+      <LeadsStatusTabs
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        finalFilteredLeads={finalFilteredLeads}
+        loading={loading}
+        selectedLeads={selectedLeads}
+        selectAllFiltered={selectAllFiltered}
+        toggleLeadSelection={toggleLeadSelection}
+        handleAiOptInChange={handleAiOptInChange}
+        handleDoNotContactChange={handleDoNotContactChange}
+        canEdit={canEdit}
+        searchTerm={searchFilters.searchTerm}
+        onQuickView={showQuickView}
+        getEngagementScore={getEngagementScore}
+        onToggleHidden={handleToggleHidden}
+      />
 
       {/* Quick View Modal */}
       {quickViewLead && (
         <LeadQuickView
           lead={quickViewLead}
+          isOpen={!!quickViewLead}
           onClose={hideQuickView}
-          onMessage={handleMessage}
-          onCall={handleCall}
-          onSchedule={handleSchedule}
         />
       )}
     </div>
