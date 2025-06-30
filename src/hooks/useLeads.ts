@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { Lead } from '@/types/lead';
 import { fetchLeadsData, fetchConversationsData } from './leads/useLeadsDataFetcher';
@@ -47,14 +48,30 @@ export const useLeads = () => {
   };
 
   const updateAiOptIn = async (leadId: string, aiOptIn: boolean) => {
+    console.log('🔄 [USE LEADS] Updating AI opt-in:', { leadId, aiOptIn });
+    
+    // Optimistically update the UI immediately
+    setLeads(prevLeads => 
+      prevLeads.map(lead => 
+        lead.id === leadId ? { ...lead, aiOptIn } : lead
+      )
+    );
+
     const success = await updateAiOptInOperation(leadId, aiOptIn);
-    if (success) {
+    
+    if (!success) {
+      console.error('❌ [USE LEADS] Failed to update AI opt-in, reverting optimistic update');
+      // Revert optimistic update on failure
       setLeads(prevLeads => 
         prevLeads.map(lead => 
-          lead.id === leadId ? { ...lead, aiOptIn } : lead
+          lead.id === leadId ? { ...lead, aiOptIn: !aiOptIn } : lead
         )
       );
+      return false;
     }
+    
+    console.log('✅ [USE LEADS] AI opt-in updated successfully');
+    return true;
   };
 
   const updateDoNotContact = async (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => {

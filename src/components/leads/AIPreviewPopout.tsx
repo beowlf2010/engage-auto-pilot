@@ -1,12 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { DialogTrigger } from '@/components/ui/dialog';
+import React, { useState } from 'react';
 import { Lead } from '@/types/lead';
 import EnhancedAIPreview from './EnhancedAIPreview';
 
 interface AIPreviewPopoutProps {
   lead: Lead;
-  onAIOptInChange: (leadId: string, value: boolean) => void;
+  onAIOptInChange: () => void;
   children: React.ReactNode;
 }
 
@@ -18,12 +17,19 @@ const AIPreviewPopout: React.FC<AIPreviewPopoutProps> = ({
   const [isOpen, setIsOpen] = useState(false);
 
   const handleAIEnabled = () => {
-    onAIOptInChange(lead.id, true);
+    console.log('🎯 [AI PREVIEW POPOUT] AI enabled for lead:', lead.id);
+    setIsOpen(false); // Close the modal first
+    onAIOptInChange(); // Then trigger the callback
+  };
+
+  const handleOpenModal = () => {
+    console.log('📝 [AI PREVIEW POPOUT] Opening AI preview for lead:', lead.id);
+    setIsOpen(true);
   };
 
   return (
     <>
-      <div onClick={() => setIsOpen(true)}>
+      <div onClick={handleOpenModal} className="cursor-pointer">
         {children}
       </div>
       

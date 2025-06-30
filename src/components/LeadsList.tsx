@@ -85,21 +85,29 @@ const LeadsList = () => {
     statusFilter !== 'all'
   ].filter(Boolean).length;
 
-  // Enhanced AI opt-in handler with improved state management
+  // Enhanced AI opt-in handler with improved error handling and user feedback
   const handleAiOptInChange = async (leadId: string, aiOptIn: boolean) => {
     console.log('🤖 [LEADS LIST] AI opt-in change requested:', { leadId, aiOptIn });
     
     try {
-      // First update the local state optimistically
-      await updateAiOptIn(leadId, aiOptIn);
-      console.log('✅ [LEADS LIST] Local state updated');
+      // Call the updateAiOptIn function which now includes optimistic updates
+      const success = await updateAiOptIn(leadId, aiOptIn);
       
-      // Add a longer delay to ensure database consistency before refetch
-      setTimeout(async () => {
-        console.log('🔄 [LEADS LIST] Refetching leads data');
-        await refetch();
-        console.log('✅ [LEADS LIST] Leads data refreshed');
-      }, 1000);
+      if (!success) {
+        throw new Error('Failed to update AI settings in database');
+      }
+      
+      console.log('✅ [LEADS LIST] AI opt-in updated successfully');
+      
+      // Show success message
+      toast({
+        title: aiOptIn ? "AI Messaging Enabled" : "AI Messaging Disabled",
+        description: aiOptIn 
+          ? "The lead has been opted into AI messaging successfully."
+          : "AI messaging has been turned off for this lead.",
+      });
+      
+      return true;
       
     } catch (error) {
       console.error('❌ [LEADS LIST] Error updating AI opt-in:', error);
@@ -108,6 +116,7 @@ const LeadsList = () => {
         description: "Failed to update AI settings. Please try again.",
         variant: "destructive"
       });
+      return false;
     }
   };
 

@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Bot, BotOff } from 'lucide-react';
+import { Bot, BotOff, Loader2 } from 'lucide-react';
 import { Lead } from '@/types/lead';
 import AIPreviewPopout from './AIPreviewPopout';
 
@@ -22,6 +22,8 @@ const QuickAIActions: React.FC<QuickAIActionsProps> = ({
   lead,
   onAiOptInChange
 }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
   // For leads that already have AI enabled, show simple indicator
   if (aiOptIn) {
     return (
@@ -37,22 +39,48 @@ const QuickAIActions: React.FC<QuickAIActionsProps> = ({
     );
   }
 
-  // Enhanced callback that ensures proper state updates
+  // Enhanced callback with proper state management
   const handleAIOptInSuccess = async () => {
     console.log('🎉 [QUICK AI] AI opt-in successful for lead:', leadId);
+    setIsProcessing(true);
     
-    // First call the specific AI opt-in callback if available
-    if (onAiOptInChange) {
-      console.log('🔄 [QUICK AI] Calling onAiOptInChange callback');
-      onAiOptInChange(leadId, true);
-    }
-    
-    // Then trigger the general update with a small delay to ensure database consistency
-    setTimeout(() => {
+    try {
+      // First call the specific AI opt-in callback if available
+      if (onAiOptInChange) {
+        console.log('🔄 [QUICK AI] Calling onAiOptInChange callback');
+        const success = await onAiOptInChange(leadId, true);
+        
+        if (success === false) {
+          console.error('❌ [QUICK AI] onAiOptInChange callback failed');
+          return;
+        }
+      }
+      
+      // Then trigger the general update callback
       console.log('🔄 [QUICK AI] Calling general onUpdate callback');
       onUpdate();
-    }, 750);
+      
+    } catch (error) {
+      console.error('❌ [QUICK AI] Error in AI opt-in success handler:', error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
+
+  // Show processing state
+  if (isProcessing) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-blue-600"
+        disabled
+        title="Processing AI enablement..."
+      >
+        <Loader2 className="h-3 w-3 animate-spin" />
+      </Button>
+    );
+  }
 
   // For leads without AI, show the preview popout button
   return (
