@@ -115,8 +115,8 @@ export const useAdvancedLeads = () => {
     // Apply Active Not Opted In filter
     if (searchFilters.activeNotOptedIn) {
       filtered = filtered.filter(lead => 
-        // Must be active status (not lost, paused, or closed)
-        (lead.status === 'new' || lead.status === 'engaged') &&
+        // Must be active status (not lost, paused, or closed) - including 'active' status
+        (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active') &&
         // Must not be opted into AI
         !lead.aiOptIn &&
         // Must not have do-not-contact restrictions
