@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Heart, Users, MessageCircle, TrendingUp } from 'lucide-react';
+import { Heart, Users, MessageCircle, TrendingUp, Eye } from 'lucide-react';
 import { soldCustomerService } from '@/services/soldCustomerService';
 import { initializePostSaleProcesses } from '@/services/postSaleProcesses';
 import { toast } from '@/hooks/use-toast';
@@ -19,6 +19,21 @@ const PostSaleFollowUpPanel: React.FC<PostSaleFollowUpPanelProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [autoAssigning, setAutoAssigning] = useState(false);
+  const [soldCustomersCount, setSoldCustomersCount] = useState(0);
+
+  // Load sold customers count on component mount
+  useEffect(() => {
+    const loadSoldCustomersCount = async () => {
+      try {
+        const soldLeads = await soldCustomerService.getSoldCustomerLeads();
+        setSoldCustomersCount(soldLeads.length);
+      } catch (error) {
+        console.error('Error loading sold customers count:', error);
+      }
+    };
+
+    loadSoldCustomersCount();
+  }, []);
 
   const handleInitializePostSaleProcess = async () => {
     setLoading(true);
@@ -55,6 +70,10 @@ const PostSaleFollowUpPanel: React.FC<PostSaleFollowUpPanelProps> = ({
           console.warn('Some assignments had errors:', result.errors);
         }
         
+        // Refresh the sold customers count
+        const soldLeads = await soldCustomerService.getSoldCustomerLeads();
+        setSoldCustomersCount(soldLeads.length);
+        
         onProcessAssigned?.();
       } else {
         toast({
@@ -74,12 +93,24 @@ const PostSaleFollowUpPanel: React.FC<PostSaleFollowUpPanelProps> = ({
     }
   };
 
+  const handleViewSoldCustomers = () => {
+    // This will set the "Sold" tab filter
+    // The parent component should handle this navigation
+    const event = new CustomEvent('viewSoldCustomers');
+    window.dispatchEvent(event);
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Heart className="h-5 w-5 text-green-600" />
           Post-Sale Customer Follow-Up
+          {soldCustomersCount > 0 && (
+            <Badge variant="secondary" className="bg-green-100 text-green-700">
+              {soldCustomersCount} sold customers found
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -118,23 +149,36 @@ const PostSaleFollowUpPanel: React.FC<PostSaleFollowUpPanelProps> = ({
         </div>
 
         <div className="flex flex-col gap-3">
-          <Button 
-            onClick={handleInitializePostSaleProcess}
-            disabled={loading}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-          >
-            <TrendingUp className="h-4 w-4" />
-            {loading ? 'Initializing...' : 'Initialize Post-Sale Process'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleInitializePostSaleProcess}
+              disabled={loading}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+            >
+              <TrendingUp className="h-4 w-4" />
+              {loading ? 'Initializing...' : 'Initialize Post-Sale Process'}
+            </Button>
+
+            {soldCustomersCount > 0 && (
+              <Button 
+                onClick={handleViewSoldCustomers}
+                variant="outline"
+                className="flex items-center gap-2 border-green-200 text-green-700 hover:bg-green-50"
+              >
+                <Eye className="h-4 w-4" />
+                View Sold Customers ({soldCustomersCount})
+              </Button>
+            )}
+          </div>
 
           <Button 
             onClick={handleAutoAssignSoldCustomers}
-            disabled={autoAssigning}
+            disabled={autoAssigning || soldCustomersCount === 0}
             variant="outline"
             className="flex items-center gap-2 border-green-200 text-green-700 hover:bg-green-50"
           >
             <Users className="h-4 w-4" />
-            {autoAssigning ? 'Auto-Assigning...' : 'Auto-Assign Sold Customers'}
+            {autoAssigning ? 'Auto-Assigning...' : `Auto-Assign Sold Customers (${soldCustomersCount})`}
           </Button>
         </div>
 

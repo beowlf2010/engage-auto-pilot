@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -6,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, UserCheck, UserX, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Users, UserCheck, UserX, Clock, CheckCircle, XCircle, AlertTriangle, Heart, Bot } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import LeadsTable from './LeadsTable';
 import EnhancedLeadSearch from './leads/EnhancedLeadSearch';
@@ -84,7 +85,7 @@ const LeadsList = () => {
     statusFilter !== 'all'
   ].filter(Boolean).length;
 
-  // Enhanced AI opt-in handler with automatic refresh
+  // Enhanced AI opt-in handler with proper refresh
   const handleAiOptInChange = async (leadId: string, aiOptIn: boolean) => {
     console.log('🤖 [LEADS LIST] AI opt-in change requested:', { leadId, aiOptIn });
     
@@ -106,7 +107,7 @@ const LeadsList = () => {
           : "AI messaging has been turned off for this lead.",
       });
       
-      // Refresh data to ensure accurate state and potentially filter out opted-in leads
+      // Force a complete refresh to ensure UI is updated
       console.log('🔄 [LEADS LIST] Refreshing data after AI opt-in change');
       await refetch();
       
@@ -123,7 +124,7 @@ const LeadsList = () => {
     }
   };
 
-  // Calculate stats for LeadsStatsCards - structure it properly for the component
+  // Calculate stats for LeadsStatsCards
   const statsData = useMemo(() => {
     const today = new Date();
     const todayString = today.toDateString();
@@ -194,6 +195,16 @@ const LeadsList = () => {
       lost: visibleLeads.filter(lead => lead.status === 'lost').length,
       do_not_contact: visibleLeads.filter(lead => 
         lead.doNotCall || lead.doNotEmail || lead.doNotMail
+      ).length,
+      sold_customers: visibleLeads.filter(lead => 
+        lead.source?.toLowerCase().includes('sold') || 
+        (lead.status === 'closed' && lead.aiPauseReason === 'marked_sold')
+      ).length,
+      needs_ai: visibleLeads.filter(lead => 
+        (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active') &&
+        !lead.aiOptIn &&
+        !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail &&
+        !lead.is_hidden
       ).length
     };
   };
@@ -202,19 +213,16 @@ const LeadsList = () => {
 
   // Handler functions for LeadQuickView
   const handleMessage = (lead: any) => {
-    // Navigate to lead detail or open messaging interface
     console.log('Message lead:', lead.id);
   };
 
   const handleCall = (phoneNumber: string) => {
-    // Initiate call or copy phone number
     if (phoneNumber) {
       window.open(`tel:${phoneNumber}`);
     }
   };
 
   const handleSchedule = (lead: any) => {
-    // Open scheduling interface
     console.log('Schedule with lead:', lead.id);
   };
 
@@ -248,9 +256,9 @@ const LeadsList = () => {
         isLoading={loading}
       />
 
-      {/* Status Tabs */}
+      {/* Enhanced Status Tabs with Sold Customers and Needs AI */}
       <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="all" className="flex items-center space-x-1">
             <Users className="w-4 h-4" />
             <span>All</span>
@@ -261,10 +269,20 @@ const LeadsList = () => {
             <span>New</span>
             <Badge variant="secondary" className="ml-1">{tabCounts.new}</Badge>
           </TabsTrigger>
+          <TabsTrigger value="needs_ai" className="flex items-center space-x-1">
+            <Bot className="w-4 h-4" />
+            <span>Needs AI</span>
+            <Badge variant="secondary" className="ml-1">{tabCounts.needs_ai}</Badge>
+          </TabsTrigger>
           <TabsTrigger value="engaged" className="flex items-center space-x-1">
             <CheckCircle className="w-4 h-4" />
             <span>Engaged</span>
             <Badge variant="secondary" className="ml-1">{tabCounts.engaged}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="sold_customers" className="flex items-center space-x-1">
+            <Heart className="w-4 h-4" />
+            <span>Sold</span>
+            <Badge variant="secondary" className="ml-1">{tabCounts.sold_customers}</Badge>
           </TabsTrigger>
           <TabsTrigger value="paused" className="flex items-center space-x-1">
             <Clock className="w-4 h-4" />
@@ -289,11 +307,10 @@ const LeadsList = () => {
         </TabsList>
 
         {/* Tab Content - All tabs show the same table with different filters */}
-        {['all', 'new', 'engaged', 'paused', 'closed', 'lost', 'do_not_contact'].map(tab => (
+        {['all', 'new', 'needs_ai', 'engaged', 'sold_customers', 'paused', 'closed', 'lost', 'do_not_contact'].map(tab => (
           <TabsContent key={tab} value={tab}>
             <Card>
               <CardContent className="p-0">
-                {/* Leads Table */}
                 <LeadsTable
                   leads={filteredLeads}
                   onAiOptInChange={handleAiOptInChange}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { Lead } from '@/types/lead';
 import { useLeads } from '@/hooks/useLeads';
@@ -9,7 +8,7 @@ export interface SearchFilters {
   status?: string;
   source?: string;
   aiOptIn?: boolean;
-  activeNotOptedIn?: boolean; // New filter for active leads not opted into AI
+  activeNotOptedIn?: boolean;
   contactStatus?: string;
   dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
   vehicleInterest?: string;
@@ -85,7 +84,7 @@ export const useAdvancedLeads = () => {
 
   // Filter leads based on current filters and status
   const filteredLeads = useMemo(() => {
-    if (!filtersLoaded) return []; // Don't filter until filters are loaded
+    if (!filtersLoaded) return [];
     
     let filtered = [...leads];
     
@@ -126,22 +125,36 @@ export const useAdvancedLeads = () => {
       );
     }
 
-    // Enhanced status-based filtering with special handling for lost leads and do not contact
+    // Enhanced status-based filtering with new tab support
     if (statusFilter !== 'all') {
       switch (statusFilter) {
         case 'new':
-          // Only show leads with no contact attempted and not lost or do-not-contact
           filtered = filtered.filter(lead => 
             lead.contactStatus === 'no_contact' && 
             lead.status !== 'lost' &&
             !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
           );
           break;
+        case 'needs_ai':
+          // Leads that are active but not opted into AI
+          filtered = filtered.filter(lead => 
+            (lead.status === 'new' || lead.status === 'engaged' || lead.status === 'active') &&
+            !lead.aiOptIn &&
+            !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail &&
+            !lead.is_hidden
+          );
+          break;
         case 'engaged':
-          // Show leads that have received responses or are marked as engaged
           filtered = filtered.filter(lead => 
             (lead.contactStatus === 'response_received' || lead.status === 'engaged') && 
             lead.status !== 'lost'
+          );
+          break;
+        case 'sold_customers':
+          // Filter for sold customers
+          filtered = filtered.filter(lead => 
+            lead.source?.toLowerCase().includes('sold') || 
+            (lead.status === 'closed' && lead.aiPauseReason === 'marked_sold')
           );
           break;
         case 'paused':
@@ -151,17 +164,14 @@ export const useAdvancedLeads = () => {
           filtered = filtered.filter(lead => lead.status === 'closed');
           break;
         case 'lost':
-          // Only show lost leads in the Lost tab
           filtered = filtered.filter(lead => lead.status === 'lost');
           break;
         case 'do_not_contact':
-          // Show leads with any do-not-contact restrictions
           filtered = filtered.filter(lead => 
             lead.doNotCall || lead.doNotEmail || lead.doNotMail
           );
           break;
         default:
-          // For any other status filter
           filtered = filtered.filter(lead => lead.status === statusFilter);
       }
     } else {
@@ -276,7 +286,7 @@ export const useAdvancedLeads = () => {
   const loadPreset = (preset: SavedPreset) => {
     const newState = {
       searchFilters: preset.filters,
-      statusFilter: 'all' // Reset status filter when loading preset
+      statusFilter: 'all'
     };
     savePersistentFilters(newState);
   };
@@ -331,13 +341,13 @@ export const useAdvancedLeads = () => {
     leads: filteredLeads,
     loading,
     error,
-    loadingProgress: 0, // Add default value for compatibility
+    loadingProgress: 0,
     selectedLeads,
     quickViewLead,
     savedPresets,
     statusFilter,
     searchFilters,
-    filtersLoaded, // Expose filter loading state
+    filtersLoaded,
     
     // Actions
     setStatusFilter,
@@ -351,7 +361,7 @@ export const useAdvancedLeads = () => {
     showQuickView,
     hideQuickView,
     refetch,
-    retry: refetch, // Map refetch to retry for compatibility
+    retry: refetch,
     
     // Utilities
     getEngagementScore

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -9,14 +10,35 @@ import PostSaleFollowUpPanel from '@/components/leads/PostSaleFollowUpPanel';
 const LeadsPage = () => {
   const { user } = useAuth();
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const canUpload = user?.role === 'admin' || user?.role === 'manager';
 
   const handleUploadSuccess = () => {
     setShowUploadModal(false);
-    // Force a page refresh to show new leads
-    window.location.reload();
+    // Trigger a refresh of the leads list
+    setRefreshTrigger(prev => prev + 1);
   };
+
+  const handleProcessAssigned = () => {
+    // Trigger a refresh of the leads list
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  // Listen for sold customers view event
+  useEffect(() => {
+    const handleViewSoldCustomers = () => {
+      // Trigger navigation to sold customers tab
+      // This could be implemented by passing a state to LeadsList
+      // or by using a context/state management solution
+      console.log('Navigate to sold customers view');
+    };
+
+    window.addEventListener('viewSoldCustomers', handleViewSoldCustomers);
+    return () => {
+      window.removeEventListener('viewSoldCustomers', handleViewSoldCustomers);
+    };
+  }, []);
 
   return (
     <div className="container mx-auto py-6">
@@ -41,13 +63,13 @@ const LeadsPage = () => {
       {canUpload && (
         <div className="mb-6">
           <PostSaleFollowUpPanel
-            selectedLeadIds={[]} // Can be enhanced to work with selected leads
-            onProcessAssigned={handleUploadSuccess}
+            selectedLeadIds={[]}
+            onProcessAssigned={handleProcessAssigned}
           />
         </div>
       )}
 
-      <LeadsList />
+      <LeadsList key={refreshTrigger} />
 
       {/* Upload Modal */}
       <MultiFileLeadUploadModal

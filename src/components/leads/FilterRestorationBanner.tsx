@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, X } from 'lucide-react';
 
 interface FilterRestorationBannerProps {
   onClearFilters: () => void;
@@ -14,23 +14,27 @@ const FilterRestorationBanner: React.FC<FilterRestorationBannerProps> = ({
   filtersCount
 }) => {
   return (
-    <Alert className="mb-4 bg-blue-50 border-blue-200">
-      <RotateCcw className="h-4 w-4 text-blue-600" />
-      <AlertDescription className="flex items-center justify-between">
-        <span className="text-blue-800">
-          Restored {filtersCount} saved filter{filtersCount !== 1 ? 's' : ''} from your last session
+    <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
+      <div className="flex items-center space-x-2">
+        <AlertCircle className="h-4 w-4 text-blue-600" />
+        <span className="text-sm text-blue-800">
+          Restored previous search filters
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClearFilters}
-          className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-        >
-          <X className="h-3 w-3 mr-1" />
-          Clear All
-        </Button>
-      </AlertDescription>
-    </Alert>
+        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+          {filtersCount} active
+        </Badge>
+      </div>
+      
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onClearFilters}
+        className="border-blue-300 text-blue-700 hover:bg-blue-100"
+      >
+        <X className="h-4 w-4 mr-1" />
+        Clear All Filters
+      </Button>
+    </div>
   );
 };
 
