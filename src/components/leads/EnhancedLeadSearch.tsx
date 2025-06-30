@@ -15,13 +15,13 @@ import {
   BotOff,
   Users
 } from 'lucide-react';
-import { SearchFilters, SavedPreset } from '@/hooks/useAdvancedLeads';
+import { SearchFilters } from '@/hooks/useAdvancedLeads';
 
 interface EnhancedLeadSearchProps {
   onFiltersChange: (filters: SearchFilters) => void;
-  savedPresets: SavedPreset[];
+  savedPresets: any[];
   onSavePreset: (name: string, filters: SearchFilters) => void;
-  onLoadPreset: (preset: SavedPreset) => void;
+  onLoadPreset: (preset: any) => void;
   totalResults: number;
   isLoading: boolean;
 }

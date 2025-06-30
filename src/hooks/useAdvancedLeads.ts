@@ -1,10 +1,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useLeadsDataProcessor } from './leads/useLeadsDataProcessor';
+import { processLeadData } from './leads/useLeadsDataProcessor';
 import { Lead } from '@/types/lead';
 
-// Remove the SavedPreset interface since the table doesn't exist
 export interface SearchFilters {
   searchTerm: string;
   dateFilter: string;
@@ -33,26 +32,6 @@ export const useAdvancedLeads = () => {
     dateFilter: 'all'
   });
 
-  // Remove preset functionality since the table doesn't exist
-  const [savedPresets] = useState<any[]>([]);
-
-  const { processLeadsData } = useLeadsDataProcessor();
-
-  // Remove preset loading functions since table doesn't exist
-  const loadSavedPresets = useCallback(async () => {
-    // Removed preset loading since lead_search_presets table doesn't exist
-  }, []);
-
-  const savePreset = useCallback(async (name: string, filters: SearchFilters) => {
-    // Removed preset saving since lead_search_presets table doesn't exist
-    console.log('Preset saving not implemented - table does not exist');
-  }, []);
-
-  const loadPreset = useCallback((preset: any) => {
-    // Removed preset loading since functionality doesn't exist
-    console.log('Preset loading not implemented');
-  }, []);
-
   const fetchLeads = useCallback(async () => {
     try {
       setLoading(true);
@@ -78,7 +57,7 @@ export const useAdvancedLeads = () => {
       }
 
       if (leadsData) {
-        const processedLeads = processLeadsData(leadsData);
+        const processedLeads = processLeadData(leadsData, []);
         setLeads(processedLeads);
       }
     } catch (error) {
@@ -86,7 +65,7 @@ export const useAdvancedLeads = () => {
     } finally {
       setLoading(false);
     }
-  }, [processLeadsData]);
+  }, []);
 
   const refetch = useCallback(() => {
     return fetchLeads();
@@ -302,7 +281,7 @@ export const useAdvancedLeads = () => {
     quickViewLead,
     statusFilter,
     searchFilters,
-    savedPresets,
+    savedPresets: [], // Empty array since we removed preset functionality
     filtersLoaded,
     setStatusFilter,
     setSearchFilters,
@@ -312,8 +291,8 @@ export const useAdvancedLeads = () => {
     toggleLeadSelection,
     showQuickView,
     hideQuickView,
-    savePreset,
-    loadPreset,
+    savePreset: () => {}, // No-op function
+    loadPreset: () => {}, // No-op function
     getEngagementScore,
     refetch
   };
