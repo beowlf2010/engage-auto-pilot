@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { LeadSourceData } from '@/types/leadSource';
 import { UnknownMessageContext } from '@/services/unknownMessageLearning';
@@ -81,7 +82,7 @@ export const generateEnhancedIntelligentResponse = async (
   try {
     console.log('🤖 [ENHANCED AI] Generating contextually aware response for lead:', context.leadId);
 
-    // NEW: Try vehicle-intelligent response first
+    // Try vehicle-intelligent response first (this will NOT cause infinite loop now)
     const vehicleResponse = await generateVehicleIntelligentResponse({
       leadId: context.leadId,
       leadName: context.leadName,
@@ -145,7 +146,7 @@ export const generateEnhancedIntelligentResponse = async (
 
     if (error) {
       console.error('❌ [ENHANCED AI] Edge function error:', error);
-      return null;
+      return generateSimpleFallback(formattedLeadName);
     }
 
     if (data?.message) {
@@ -164,12 +165,24 @@ export const generateEnhancedIntelligentResponse = async (
     }
 
     console.log('⚠️ [ENHANCED AI] No message generated from enhanced AI');
-    return null;
+    return generateSimpleFallback(formattedLeadName);
 
   } catch (error) {
     console.error('❌ [ENHANCED AI] Service error:', error);
-    return null;
+    return generateSimpleFallback(formatProperName(context.leadName) || 'there');
   }
+};
+
+// Simple fallback that doesn't cause infinite loops
+const generateSimpleFallback = (leadName: string): IntelligentAIResponse => {
+  const greeting = leadName && leadName !== 'there' ? `Hi ${leadName}! ` : 'Hello! ';
+  
+  return {
+    message: `${greeting}Thanks for reaching out. I'm Finn with Jason Pilger Chevrolet and I'm here to help you find the perfect vehicle for your needs. What can I assist you with today?`,
+    confidence: 0.6,
+    reasoning: 'Simple fallback response to prevent infinite loops',
+    sourceStrategy: 'fallback'
+  };
 };
 
 export const shouldGenerateResponse = (context: ConversationContext): boolean => {
@@ -186,7 +199,6 @@ export const shouldGenerateResponse = (context: ConversationContext): boolean =>
 
   if (messagesAfterCustomer.length > 0) return false;
 
-  // CHANGED: Always attempt to respond to ANY inbound customer message
-  // This removes the previous restrictive logic that only responded to questions
+  // Always attempt to respond to ANY inbound customer message
   return true;
 };

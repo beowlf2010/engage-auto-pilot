@@ -75,8 +75,8 @@ export const generateVehicleIntelligentResponse = async (
       }
     }
     
-    // Fallback to standard AI response
-    return await generateStandardAIResponse(context);
+    // Direct fallback without circular dependency
+    return await generateDirectFallbackResponse(context);
     
   } catch (error) {
     console.error('❌ [ENHANCED CONVERSATION AI] Error:', error);
@@ -87,6 +87,17 @@ export const generateVehicleIntelligentResponse = async (
 const analyzeVehicleConversation = async (message: string, context: EnhancedConversationContext) => {
   const messageLower = message.toLowerCase();
   
+  // Check for vehicle interest corrections first
+  const vehicleCorrections = [
+    "i don't need", "don't need", "i'm not looking for", "not looking for",
+    "i don't want", "don't want", "not interested in", "i'm not interested",
+    "that's not what", "not what i", "wrong vehicle", "incorrect"
+  ];
+  
+  const isVehicleCorrection = vehicleCorrections.some(pattern => 
+    messageLower.includes(pattern)
+  );
+  
   // Vehicle-specific conversation patterns
   const vehicleQuestions = [
     'what do you have', 'what models', 'what vehicles', 'do you have',
@@ -96,7 +107,7 @@ const analyzeVehicleConversation = async (message: string, context: EnhancedConv
   
   const needsVehicleResponse = vehicleQuestions.some(pattern => 
     messageLower.includes(pattern)
-  );
+  ) || isVehicleCorrection;
   
   // Detect specific vehicle mentions
   const vehicleRecognition = await import('./vehicleRecognitionService').then(
@@ -106,8 +117,9 @@ const analyzeVehicleConversation = async (message: string, context: EnhancedConv
   return {
     needsVehicleResponse,
     vehicleRecognition,
-    intent: determineVehicleIntent(messageLower),
-    urgency: determineUrgency(messageLower)
+    intent: isVehicleCorrection ? 'vehicle_correction' : determineVehicleIntent(messageLower),
+    urgency: determineUrgency(messageLower),
+    isVehicleCorrection
   };
 };
 
@@ -118,15 +130,29 @@ const generateVehicleContextualResponse = async (
   const formattedName = formatProperName(context.leadName);
   const greeting = formattedName ? `${formattedName}, ` : '';
   
+  let message = '';
+  let inventoryMentioned: string[] = [];
+  
+  // Handle vehicle interest corrections
+  if (analysis.isVehicleCorrection) {
+    message = `${greeting}I apologize for the confusion! It sounds like there may have been a mix-up with your vehicle interest. What type of vehicle are you actually looking for? I'd love to help you find exactly what you need.`;
+    
+    return {
+      message,
+      confidence: 0.9,
+      reasoning: 'Vehicle interest correction response',
+      vehicleContext: analysis.vehicleRecognition,
+      followUpScheduled: false,
+      inventoryMentioned
+    };
+  }
+  
   // Check inventory based on their request
   const { data: inventory } = await supabase
     .from('inventory')
     .select('*')
     .eq('status', 'available')
     .limit(3);
-  
-  let message = '';
-  let inventoryMentioned: string[] = [];
   
   if (analysis.intent === 'inventory_inquiry' && inventory && inventory.length > 0) {
     const vehicle = inventory[0];
@@ -152,31 +178,16 @@ const generateVehicleContextualResponse = async (
   };
 };
 
-const generateStandardAIResponse = async (
+const generateDirectFallbackResponse = async (
   context: EnhancedConversationContext
 ): Promise<EnhancedAIResponse> => {
-  // Call the existing intelligent conversation AI
-  const { generateEnhancedIntelligentResponse } = await import('../intelligentConversationAI');
-  
-  const response = await generateEnhancedIntelligentResponse(context);
-  
-  if (response) {
-    return {
-      message: response.message,
-      confidence: response.confidence,
-      reasoning: response.reasoning,
-      followUpScheduled: false
-    };
-  }
-  
-  // Final fallback
   const formattedName = formatProperName(context.leadName);
   const greeting = formattedName ? `${formattedName}, ` : '';
   
   return {
     message: `${greeting}thanks for reaching out! I'm here to help you with any questions about our vehicles or to assist you in finding the perfect match for your needs. What can I help you with today?`,
     confidence: 0.6,
-    reasoning: 'Standard fallback response',
+    reasoning: 'Direct fallback response without circular dependency',
     followUpScheduled: false
   };
 };
