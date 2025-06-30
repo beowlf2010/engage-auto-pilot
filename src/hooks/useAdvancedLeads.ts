@@ -9,7 +9,6 @@ export interface SearchFilters {
   source?: string;
   aiOptIn?: boolean;
   activeNotOptedIn?: boolean;
-  contactStatus?: string;
   dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
   vehicleInterest?: string;
   city?: string;
@@ -135,9 +134,9 @@ export const useAdvancedLeads = () => {
     if (statusFilter !== 'all' && statusFilter !== 'hidden') {
       switch (statusFilter) {
         case 'new':
+          // Show leads with 'new' status, excluding lost leads and do-not-contact
           filtered = filtered.filter(lead => 
-            lead.contactStatus === 'no_contact' && 
-            lead.status !== 'lost' &&
+            lead.status === 'new' &&
             !lead.doNotCall && !lead.doNotEmail && !lead.doNotMail
           );
           break;
@@ -150,9 +149,9 @@ export const useAdvancedLeads = () => {
           );
           break;
         case 'engaged':
+          // Show leads with 'engaged' status, excluding lost leads
           filtered = filtered.filter(lead => 
-            (lead.contactStatus === 'response_received' || lead.status === 'engaged') && 
-            lead.status !== 'lost'
+            lead.status === 'engaged'
           );
           break;
         case 'sold_customers':
@@ -192,11 +191,6 @@ export const useAdvancedLeads = () => {
     // Apply other search filters only if tab status is 'all' or 'hidden' (to avoid conflicts)
     if ((statusFilter === 'all' || statusFilter === 'hidden') && searchFilters.status && !isSearchingByNameOrPhone) {
       filtered = filtered.filter(lead => lead.status === searchFilters.status);
-    }
-
-    // Contact status filter (only apply if not conflicting with tab-based filtering)
-    if (searchFilters.contactStatus && (statusFilter === 'all' || statusFilter === 'hidden')) {
-      filtered = filtered.filter(lead => lead.contactStatus === searchFilters.contactStatus);
     }
 
     // Do not contact filter

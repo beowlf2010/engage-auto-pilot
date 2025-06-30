@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
@@ -74,7 +73,6 @@ const LeadsList = () => {
     searchFilters.dateFilter !== 'all' ||
     searchFilters.source ||
     searchFilters.aiOptIn !== undefined ||
-    searchFilters.contactStatus ||
     searchFilters.vehicleInterest ||
     searchFilters.city ||
     searchFilters.state ||
@@ -88,7 +86,6 @@ const LeadsList = () => {
     searchFilters.dateFilter !== 'all' ? 1 : 0,
     searchFilters.source ? 1 : 0,
     searchFilters.aiOptIn !== undefined ? 1 : 0,
-    searchFilters.contactStatus ? 1 : 0,
     searchFilters.vehicleInterest ? 1 : 0,
     searchFilters.city ? 1 : 0,
     searchFilters.state ? 1 : 0,
@@ -104,9 +101,9 @@ const LeadsList = () => {
     
     return {
       total: finalFilteredLeads.length,
-      noContact: finalFilteredLeads.filter(lead => lead.contactStatus === 'no_contact').length,
-      contacted: finalFilteredLeads.filter(lead => lead.contactStatus === 'contact_attempted').length,
-      responded: finalFilteredLeads.filter(lead => lead.contactStatus === 'response_received').length,
+      noContact: finalFilteredLeads.filter(lead => lead.status === 'new').length,
+      contacted: finalFilteredLeads.filter(lead => lead.outgoingCount > 0).length,
+      responded: finalFilteredLeads.filter(lead => lead.incomingCount > 0).length,
       aiEnabled: finalFilteredLeads.filter(lead => lead.aiOptIn).length,
       fresh: finalFilteredLeads.filter(lead => new Date(lead.createdAt).toDateString() === todayString).length
     };
