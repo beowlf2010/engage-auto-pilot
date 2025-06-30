@@ -1,5 +1,6 @@
 
 import { parseCSVFile, parseExcelFile } from './dms/fileReaders';
+import { extractDealDate } from './dms/dateParser';
 import { FinancialFieldMapping } from '@/components/financial/FinancialCSVFieldMapper';
 import { DealRecord, FinancialSummary } from './dms/types';
 
@@ -96,6 +97,13 @@ export const parseFinancialFileWithMapping = async (
         continue;
       }
       
+      // Parse the date using the existing date parser
+      const parsedDate = extractDealDate(dateStr);
+      if (!parsedDate) {
+        console.warn(`Skipping deal with unparseable date: "${dateStr}"`);
+        continue; // Skip deals with invalid dates
+      }
+      
       // Parse numeric values
       const parseNumeric = (value: string): number => {
         const cleaned = value.replace(/[$,\s]/g, '').replace(/[()]/g, '-');
@@ -110,7 +118,7 @@ export const parseFinancialFileWithMapping = async (
       };
       
       const deal: DealRecord = {
-        saleDate: dateStr,
+        saleDate: parsedDate, // Use the parsed date instead of raw string
         age: parseAge(getValue('age') || '0'),
         stockNumber,
         vin: getValue('vin6') || '',
