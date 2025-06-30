@@ -115,22 +115,21 @@ export const useAIMessagePreview = ({ leadId, onMessageSent }: UseAIMessagePrevi
     setState(prev => ({ ...prev, isGenerating: true, error: null }));
 
     try {
-      // Use decisions or fallback to original data
-      const finalName = state.nameDecision === 'approved' 
-        ? state.originalDataQuality?.nameValidation?.suggestedName 
-        : 'Customer';
-      
-      const finalVehicle = state.vehicleDecision === 'approved'
-        ? state.originalDataQuality?.vehicleValidation?.suggestedVehicle
-        : 'the right vehicle';
+      console.log('📝 [AI PREVIEW] Sending decisions to edge function:', {
+        nameDecision: state.nameDecision,
+        vehicleDecision: state.vehicleDecision,
+        leadName: state.leadData?.first_name,
+        vehicleInterest: state.leadData?.vehicle_interest
+      });
 
-      console.log('📝 [AI PREVIEW] Using name:', finalName, 'vehicle:', finalVehicle);
-
+      // Send the raw decisions and data to the edge function
       const { data, error } = await supabase.functions.invoke('generate-ai-message', {
         body: {
           leadId,
-          leadName: finalName,
-          vehicleInterest: finalVehicle,
+          leadData: state.leadData,
+          nameDecision: state.nameDecision,
+          vehicleDecision: state.vehicleDecision,
+          originalDataQuality: state.originalDataQuality,
           messageType: 'initial_contact'
         }
       });
