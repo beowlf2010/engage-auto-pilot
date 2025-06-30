@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAuth } from './auth/AuthProvider';
 import { useLeads } from '@/hooks/useLeads';
@@ -85,12 +84,12 @@ const LeadsList = () => {
     statusFilter !== 'all'
   ].filter(Boolean).length;
 
-  // Enhanced AI opt-in handler with improved error handling and user feedback
+  // Enhanced AI opt-in handler with automatic refresh
   const handleAiOptInChange = async (leadId: string, aiOptIn: boolean) => {
     console.log('🤖 [LEADS LIST] AI opt-in change requested:', { leadId, aiOptIn });
     
     try {
-      // Call the updateAiOptIn function which now includes optimistic updates
+      // Call the updateAiOptIn function which includes optimistic updates
       const success = await updateAiOptIn(leadId, aiOptIn);
       
       if (!success) {
@@ -106,6 +105,10 @@ const LeadsList = () => {
           ? "The lead has been opted into AI messaging successfully."
           : "AI messaging has been turned off for this lead.",
       });
+      
+      // Refresh data to ensure accurate state and potentially filter out opted-in leads
+      console.log('🔄 [LEADS LIST] Refreshing data after AI opt-in change');
+      await refetch();
       
       return true;
       

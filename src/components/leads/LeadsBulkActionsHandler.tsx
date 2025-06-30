@@ -32,7 +32,7 @@ const LeadsBulkActionsHandler = ({
         description: `Updated ${selectedLeads.length} leads to ${status} status`,
       });
 
-      refetch();
+      await refetch();
       clearSelection();
     } catch (error) {
       console.error('Error updating leads:', error);
@@ -66,7 +66,7 @@ const LeadsBulkActionsHandler = ({
         description: `Deleted ${selectedLeads.length} leads`,
       });
 
-      refetch();
+      await refetch();
       clearSelection();
     } catch (error) {
       console.error('Error deleting leads:', error);
@@ -76,6 +76,13 @@ const LeadsBulkActionsHandler = ({
         variant: "destructive",
       });
     }
+  };
+
+  // Enhanced onComplete callback that triggers refetch
+  const handleBulkActionComplete = async () => {
+    console.log('🔄 [BULK ACTIONS] Refreshing data after bulk action');
+    await refetch();
+    clearSelection();
   };
 
   // Transform selected leads for BulkActionsPanel
@@ -101,7 +108,7 @@ const LeadsBulkActionsHandler = ({
       onBulkStatusUpdate={handleBulkStatusUpdate}
       onBulkDelete={handleBulkDelete}
       onBulkMessage={handleBulkMessage}
-      onRefresh={refetch}
+      onRefresh={handleBulkActionComplete}
     />
   );
 };

@@ -48,7 +48,10 @@ const BulkAIOptInAction: React.FC<BulkAIOptInActionProps> = ({
         description: `Successfully enabled AI messaging for ${selectedLeads.length} leads.`,
       });
 
+      // Trigger data refresh by calling onComplete
+      console.log('🔄 [BULK AI OPT-IN] Triggering data refresh after bulk opt-in');
       onComplete();
+      
     } catch (error) {
       console.error('Error enabling AI opt-in:', error);
       toast({
