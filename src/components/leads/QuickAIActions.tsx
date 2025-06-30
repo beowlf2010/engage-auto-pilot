@@ -11,7 +11,7 @@ interface QuickAIActionsProps {
   aiOptIn: boolean;
   onUpdate: () => void;
   lead?: Lead;
-  onAiOptInChange?: (leadId: string, enabled: boolean) => void;
+  onAiOptInChange?: (leadId: string, enabled: boolean) => Promise<boolean> | boolean | void;
 }
 
 const QuickAIActions: React.FC<QuickAIActionsProps> = ({
@@ -48,9 +48,10 @@ const QuickAIActions: React.FC<QuickAIActionsProps> = ({
       // First call the specific AI opt-in callback if available
       if (onAiOptInChange) {
         console.log('🔄 [QUICK AI] Calling onAiOptInChange callback');
-        const success = await onAiOptInChange(leadId, true);
+        const result = await onAiOptInChange(leadId, true);
         
-        if (success === false) {
+        // Only check for explicit false return (success can be true, undefined, or void)
+        if (result === false) {
           console.error('❌ [QUICK AI] onAiOptInChange callback failed');
           return;
         }
