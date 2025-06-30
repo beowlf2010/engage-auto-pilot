@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { LeadSourceData } from '@/types/leadSource';
 import { UnknownMessageContext } from '@/services/unknownMessageLearning';
 import { formatProperName, formatFullName } from '@/utils/nameFormatter';
+import { generateVehicleIntelligentResponse } from './vehicleIntelligence/enhancedConversationAI';
 
 export interface ConversationContext {
   leadId: string;
@@ -80,6 +81,28 @@ export const generateEnhancedIntelligentResponse = async (
   try {
     console.log('🤖 [ENHANCED AI] Generating contextually aware response for lead:', context.leadId);
 
+    // NEW: Try vehicle-intelligent response first
+    const vehicleResponse = await generateVehicleIntelligentResponse({
+      leadId: context.leadId,
+      leadName: context.leadName,
+      vehicleInterest: context.vehicleInterest,
+      messages: context.messages,
+      leadInfo: context.leadInfo,
+      leadSource: context.leadSource
+    });
+
+    if (vehicleResponse && vehicleResponse.confidence > 0.7) {
+      console.log(`✅ [ENHANCED AI] Using vehicle-intelligent response with ${vehicleResponse.confidence} confidence`);
+      return {
+        message: vehicleResponse.message,
+        confidence: vehicleResponse.confidence,
+        reasoning: vehicleResponse.reasoning,
+        sourceStrategy: 'vehicle_intelligent',
+        customerIntent: vehicleResponse.vehicleContext,
+        answerGuidance: vehicleResponse.inventoryMentioned
+      };
+    }
+
     // Format the lead name properly before sending to edge function
     const formattedLeadName = formatProperName(context.leadName) || 'there';
 
@@ -114,6 +137,7 @@ export const generateEnhancedIntelligentResponse = async (
         dealershipName: 'Jason Pilger Chevrolet',
         context: {
           enhancedMode: true,
+          vehicleIntelligent: true,
           timestamp: new Date().toISOString()
         }
       }

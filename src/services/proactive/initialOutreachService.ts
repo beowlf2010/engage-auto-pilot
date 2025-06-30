@@ -1,7 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { formatProperName } from '@/utils/nameFormatter';
 import { assessLeadDataQuality } from '../unifiedDataQualityService';
+import { vehiclePersonalizationService, PersonalizationContext } from '../vehicleIntelligence/vehiclePersonalizationService';
 
 export interface InitialOutreachRequest {
   leadId: string;
@@ -23,20 +23,39 @@ export const generateInitialOutreachMessage = async (
   request: InitialOutreachRequest
 ): Promise<InitialOutreachResponse | null> => {
   try {
-    console.log(`🚀 [INITIAL OUTREACH] Generating message for ${request.firstName}`);
+    console.log(`🚀 [INITIAL OUTREACH] Generating vehicle-intelligent message for ${request.firstName}`);
 
     const salespersonName = request.salespersonName || 'Finn';
     const dealershipName = request.dealershipName || 'Jason Pilger Chevrolet';
     const formattedName = formatProperName(request.firstName);
     const vehicleInterest = request.vehicleInterest || 'finding the right vehicle';
 
-    // Assess data quality for this lead
+    // NEW: Use vehicle personalization service for initial outreach
+    const personalizationContext: PersonalizationContext = {
+      leadId: request.leadId,
+      leadName: formattedName,
+      originalVehicleInterest: vehicleInterest,
+      salespersonName,
+    };
+
+    const personalizedMessage = await vehiclePersonalizationService.generatePersonalizedMessage(personalizationContext);
+
+    if (personalizedMessage.confidence > 0.7) {
+      console.log(`✅ [INITIAL OUTREACH] Using vehicle-personalized message with ${personalizedMessage.confidence} confidence`);
+      return {
+        message: personalizedMessage.message,
+        strategy: personalizedMessage.strategy,
+        confidence: personalizedMessage.confidence
+      };
+    }
+
+    // Fallback to data quality assessment for edge function approach
     const dataQuality = await assessLeadDataQuality(request.firstName, vehicleInterest);
     
     console.log(`🔍 [INITIAL OUTREACH] Data quality score: ${dataQuality.overallQualityScore}`);
     console.log(`📋 [INITIAL OUTREACH] Strategy: ${dataQuality.messageStrategy}`);
 
-    // Use the edge function for initial outreach generation
+    // Use the edge function for initial outreach generation with vehicle context
     const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
       body: {
         leadId: request.leadId,
@@ -59,6 +78,7 @@ export const generateInitialOutreachMessage = async (
         dataQuality,
         context: {
           initialOutreach: true,
+          vehicleIntelligent: true,
           usePersonalGreeting: dataQuality.recommendations.usePersonalGreeting,
           useSpecificVehicle: dataQuality.recommendations.useSpecificVehicle
         }
