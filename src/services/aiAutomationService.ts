@@ -3,11 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const enableAIForLead = async (leadId: string): Promise<boolean> => {
   try {
-    console.log(`🤖 [AI AUTOMATION] Enabling super aggressive AI for lead: ${leadId}`);
+    console.log(`🤖 [AI AUTOMATION] Enabling enhanced AI for lead: ${leadId}`);
     
-    // Calculate next AI send time - super aggressive (2-4 hours from now)
+    // Calculate next AI send time - enhanced aggressive timing (1-3 hours from now)
     const nextSendTime = new Date();
-    const hoursToAdd = 2 + Math.random() * 2; // 2-4 hours
+    const hoursToAdd = 1 + Math.random() * 2; // 1-3 hours for immediate engagement
     nextSendTime.setTime(nextSendTime.getTime() + (hoursToAdd * 60 * 60 * 1000));
     
     console.log(`📅 [AI AUTOMATION] Next message scheduled for: ${nextSendTime.toLocaleString()}`);
@@ -18,7 +18,7 @@ export const enableAIForLead = async (leadId: string): Promise<boolean> => {
         ai_opt_in: true,
         ai_sequence_paused: false,
         ai_pause_reason: null,
-        message_intensity: 'super_aggressive',
+        message_intensity: 'aggressive', // Default to aggressive for new AI leads
         ai_stage: 'initial',
         next_ai_send_at: nextSendTime.toISOString(),
         ai_messages_sent: 0,
@@ -31,7 +31,7 @@ export const enableAIForLead = async (leadId: string): Promise<boolean> => {
       return false;
     }
 
-    console.log('✅ [AI AUTOMATION] Super aggressive AI enabled successfully');
+    console.log('✅ [AI AUTOMATION] Enhanced AI enabled successfully');
     return true;
   } catch (error) {
     console.error('❌ [AI AUTOMATION] Exception enabling AI:', error);
@@ -167,9 +167,9 @@ export const scheduleNextAIMessage = async (leadId: string, currentStage?: strin
 
 export const getAIAutomationStatus = async () => {
   try {
-    console.log('📊 [AI AUTOMATION] Getting automation status');
+    console.log('📊 [AI AUTOMATION] Getting enhanced automation status');
     
-    // Get counts of pending messages
+    // Get counts of pending messages with better categorization
     const { count: pendingMessages } = await supabase
       .from('leads')
       .select('*', { count: 'exact', head: true })
@@ -193,76 +193,132 @@ export const getAIAutomationStatus = async () => {
       .select('*', { count: 'exact', head: true })
       .eq('ai_opt_in', true);
 
+    // Get queue health data
+    const { data: queueHealth } = await supabase
+      .from('ai_queue_health')
+      .select('*')
+      .order('check_time', { ascending: false })
+      .limit(1)
+      .single();
+
+    // Get recent automation performance
+    const { data: recentRuns } = await supabase
+      .from('ai_automation_runs')
+      .select('*')
+      .order('started_at', { ascending: false })
+      .limit(5);
+
+    const avgSuccessRate = recentRuns && recentRuns.length > 0 
+      ? recentRuns.reduce((sum, run) => 
+          sum + (run.successful_sends / Math.max(run.processed_leads, 1)), 0
+        ) / recentRuns.length * 100
+      : 0;
+
     return {
       pendingMessages: pendingMessages || 0,
       messagesSentToday: messagesSentToday || 0,
-      totalAILeads: totalAILeads || 0
+      totalAILeads: totalAILeads || 0,
+      queueHealthScore: queueHealth?.queue_health_score || 100,
+      avgSuccessRate: Math.round(avgSuccessRate),
+      systemStatus: (pendingMessages || 0) < 20 ? 'healthy' : 'backlogged',
+      lastProcessingTime: recentRuns?.[0]?.started_at,
+      enhanced: true // Flag indicating this is the enhanced system
     };
   } catch (error) {
     console.error('❌ [AI AUTOMATION] Error getting status:', error);
     return {
       pendingMessages: 0,
       messagesSentToday: 0,
-      totalAILeads: 0
+      totalAILeads: 0,
+      queueHealthScore: 0,
+      avgSuccessRate: 0,
+      systemStatus: 'error'
     };
   }
 };
 
 export const triggerAIAutomation = async () => {
   try {
-    console.log('🚀 [AI AUTOMATION] Triggering unified automation');
+    console.log('🚀 [AI AUTOMATION] Triggering enhanced automation');
     
-    // Get leads that need AI messages
-    const { data: dueLeads } = await supabase
-      .from('leads')
-      .select('id, first_name, last_name, ai_stage, ai_messages_sent')
-      .eq('ai_opt_in', true)
-      .eq('ai_sequence_paused', false)
-      .not('next_ai_send_at', 'is', null)
-      .lte('next_ai_send_at', new Date().toISOString())
-      .limit(50);
-
-    if (!dueLeads || dueLeads.length === 0) {
-      console.log('📭 [AI AUTOMATION] No leads due for messaging');
-      return {
-        processed: 0,
-        successful: 0,
-        failed: 0
-      };
-    }
-
-    let successful = 0;
-    let failed = 0;
-
-    for (const lead of dueLeads) {
-      try {
-        // Here you would typically call an AI message generation service
-        // For now, we'll just schedule the next message
-        const success = await scheduleNextAIMessage(lead.id, lead.ai_stage);
-        if (success) {
-          successful++;
-        } else {
-          failed++;
-        }
-      } catch (error) {
-        console.error(`❌ [AI AUTOMATION] Error processing lead ${lead.id}:`, error);
-        failed++;
+    const { data, error } = await supabase.functions.invoke('ai-automation', {
+      body: {
+        automated: false,
+        source: 'manual_trigger',
+        priority: 'high',
+        enhanced: true
       }
+    });
+
+    if (error) {
+      throw error;
     }
 
-    console.log(`✅ [AI AUTOMATION] Processed ${dueLeads.length} leads: ${successful} successful, ${failed} failed`);
+    console.log(`✅ [AI AUTOMATION] Enhanced automation completed successfully`);
     
     return {
-      processed: dueLeads.length,
-      successful,
-      failed
+      processed: data.processed || 0,
+      successful: data.successful || 0,
+      failed: data.failed || 0,
+      queueSize: data.queueSize || 0,
+      processingTime: data.processingTime || 0,
+      enhanced: true
     };
   } catch (error) {
     console.error('❌ [AI AUTOMATION] Error triggering automation:', error);
     return {
       processed: 0,
       successful: 0,
-      failed: 0
+      failed: 0,
+      error: error.message
+    };
+  }
+};
+
+// New function to get detailed queue analysis
+export const getQueueAnalysis = async () => {
+  try {
+    const { data } = await supabase
+      .from('leads')
+      .select(`
+        id, first_name, last_name, vehicle_interest, message_intensity,
+        ai_messages_sent, next_ai_send_at, created_at, ai_stage
+      `)
+      .eq('ai_opt_in', true)
+      .eq('ai_sequence_paused', false)
+      .not('next_ai_send_at', 'is', null)
+      .order('next_ai_send_at', { ascending: true });
+
+    const now = new Date();
+    const analysis = {
+      total: data?.length || 0,
+      overdue: data?.filter(lead => new Date(lead.next_ai_send_at) < now).length || 0,
+      upcoming: data?.filter(lead => new Date(lead.next_ai_send_at) >= now).length || 0,
+      byIntensity: {
+        aggressive: data?.filter(lead => lead.message_intensity === 'aggressive').length || 0,
+        gentle: data?.filter(lead => lead.message_intensity === 'gentle').length || 0,
+        super_aggressive: data?.filter(lead => lead.message_intensity === 'super_aggressive').length || 0
+      },
+      avgOverdueHours: 0
+    };
+
+    if (analysis.overdue > 0) {
+      const overdueLeads = data?.filter(lead => new Date(lead.next_ai_send_at) < now) || [];
+      const totalOverdueMs = overdueLeads.reduce((sum, lead) => 
+        sum + (now.getTime() - new Date(lead.next_ai_send_at).getTime()), 0
+      );
+      analysis.avgOverdueHours = Math.round(totalOverdueMs / (1000 * 60 * 60) / analysis.overdue);
+    }
+
+    return analysis;
+  } catch (error) {
+    console.error('Error getting queue analysis:', error);
+    return {
+      total: 0,
+      overdue: 0,
+      upcoming: 0,
+      byIntensity: { aggressive: 0, gentle: 0, super_aggressive: 0 },
+      avgOverdueHours: 0
     };
   }
 };

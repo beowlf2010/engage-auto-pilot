@@ -1,720 +1,429 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-// Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-interface Lead {
-  id: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  vehicle_interest: string;
-  ai_opt_in: boolean;
-  ai_sequence_paused: boolean;
-  ai_stage: string;
-  ai_messages_sent: number;
-  next_ai_send_at: string;
-  message_intensity: string;
-  created_at: string;
-  ai_enabled_at: string;
+interface ProcessingResult {
+  processed: number
+  successful: number
+  failed: number
+  errors: string[]
+  queueSize: number
+  processingTime: number
 }
 
-// Name formatting utilities
-const formatProperName = (name: string): string => {
-  if (!name || typeof name !== 'string') return '';
-  
-  const trimmed = name.trim();
-  if (!trimmed) return '';
-  
-  return trimmed
-    .split(' ')
-    .map(part => formatNamePart(part))
-    .join(' ');
-};
+interface AIAutomationSettings {
+  daily_message_limit_per_lead: number
+  business_hours_start: number
+  business_hours_end: number
+  automation_enabled: boolean
+  max_concurrent_sends: number
+  batch_size: number
+}
 
-const formatNamePart = (part: string): string => {
-  if (!part) return '';
-  
-  const lower = part.toLowerCase();
-  
-  if (lower.includes('-')) {
-    return lower
-      .split('-')
-      .map(segment => capitalizeSegment(segment))
-      .join('-');
-  }
-  
-  if (lower.includes("'")) {
-    return lower
-      .split("'")
-      .map((segment, index) => {
-        if (index === 0) return capitalizeSegment(segment);
-        return capitalizeSegment(segment);
-      })
-      .join("'");
-  }
-  
-  if (lower.startsWith('mc') && lower.length > 2) {
-    return 'Mc' + capitalizeSegment(lower.slice(2));
-  }
-  
-  if (lower.startsWith('mac') && lower.length > 3) {
-    return 'Mac' + capitalizeSegment(lower.slice(3));
-  }
-  
-  return capitalizeSegment(lower);
-};
-
-const capitalizeSegment = (segment: string): string => {
-  if (!segment) return '';
-  return segment.charAt(0).toUpperCase() + segment.slice(1);
-};
-
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
+
+  const startTime = Date.now()
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   try {
-    console.log('🤖 [AI-AUTOMATION] Starting unified AI automation process...');
-    
-    const { automated = false, source = 'manual' } = await req.json().catch(() => ({ automated: false, source: 'manual' }));
-    
-    // Create automation run record
-    const { data: runRecord, error: runError } = await supabase
-      .from('ai_automation_runs')
-      .insert({
-        source,
-        status: 'running'
-      })
-      .select()
-      .single();
+    console.log('🚀 [AI-AUTOMATION] Enhanced automation started')
 
-    if (runError) {
-      console.error('❌ [AI-AUTOMATION] Error creating run record:', runError);
+    // Get automation settings with improved defaults
+    const { data: settings } = await supabase
+      .from('ai_automation_settings')
+      .select('setting_key, setting_value')
+
+    const settingsMap: Partial<AIAutomationSettings> = {}
+    settings?.forEach(setting => {
+      settingsMap[setting.setting_key as keyof AIAutomationSettings] = 
+        typeof setting.setting_value === 'string' 
+          ? JSON.parse(setting.setting_value) 
+          : setting.setting_value
+    })
+
+    // Enhanced default settings for better performance
+    const config: AIAutomationSettings = {
+      daily_message_limit_per_lead: settingsMap.daily_message_limit_per_lead || 8, // Increased from 5
+      business_hours_start: settingsMap.business_hours_start || 8,
+      business_hours_end: settingsMap.business_hours_end || 20,
+      automation_enabled: settingsMap.automation_enabled !== false,
+      max_concurrent_sends: settingsMap.max_concurrent_sends || 10, // New setting
+      batch_size: settingsMap.batch_size || 100 // Increased from 50
     }
 
-    const runId = runRecord?.id;
-
-    // Check if automation is globally enabled
-    const { data: automationSetting } = await supabase
-      .from('ai_automation_settings')
-      .select('setting_value')
-      .eq('setting_key', 'automation_enabled')
-      .single();
-
-    if (automationSetting?.setting_value === false) {
-      console.log('⏸️ [AI-AUTOMATION] Automation is disabled globally');
-      
-      if (runId) {
-        await supabase
-          .from('ai_automation_runs')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            processed_leads: 0,
-            successful_sends: 0,
-            failed_sends: 0
-          })
-          .eq('id', runId);
-      }
-
+    if (!config.automation_enabled) {
+      console.log('⏸️ [AI-AUTOMATION] Automation is disabled')
       return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'Automation is disabled',
-        processed: 0
+        message: 'AI automation is disabled',
+        processed: 0,
+        successful: 0,
+        failed: 0 
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
-    
-    // Get current timestamp for due message checking
-    const now = new Date().toISOString();
-    console.log(`⏰ [AI-AUTOMATION] Current time: ${now}`);
 
-    // 1. Auto-pause sequences when leads reply (last 5 minutes)
-    await pauseSequencesForRepliedLeads();
+    // Clean up bad vehicle data first
+    console.log('🧹 [AI-AUTOMATION] Cleaning up bad vehicle data...')
+    const { count: cleanedCount } = await supabase
+      .from('leads')
+      .update({ 
+        vehicle_interest: 'finding the right vehicle for your needs',
+        updated_at: new Date().toISOString()
+      })
+      .or('vehicle_interest.ilike.%Unknown%,vehicle_interest.is.null,vehicle_interest.eq.')
+      .eq('ai_opt_in', true)
 
-    // 2. Set new uncontacted leads to super aggressive mode for first day
-    await setNewLeadsToSuperAggressive();
+    if (cleanedCount && cleanedCount > 0) {
+      console.log(`✅ [AI-AUTOMATION] Cleaned ${cleanedCount} leads with bad vehicle data`)
+    }
 
-    // 3. Check daily message limits
-    const { data: dailyLimitSetting } = await supabase
-      .from('ai_automation_settings')
-      .select('setting_value')
-      .eq('setting_key', 'daily_message_limit_per_lead')
-      .single();
-
-    const dailyLimit = parseInt(dailyLimitSetting?.setting_value || '5');
-
-    // 4. Get leads that are due for AI messages OR new leads needing first contact
+    // Get leads with intelligent prioritization
     const { data: dueLeads, error: leadsError } = await supabase
       .from('leads')
       .select(`
-        id,
-        first_name,
-        last_name,
-        phone,
-        vehicle_interest,
-        ai_opt_in,
-        ai_sequence_paused,
-        ai_stage,
-        ai_messages_sent,
-        next_ai_send_at,
-        message_intensity,
-        created_at,
-        ai_enabled_at
+        id, first_name, last_name, vehicle_interest, message_intensity,
+        ai_messages_sent, ai_stage, next_ai_send_at, created_at,
+        phone_numbers!inner(number, is_primary)
       `)
       .eq('ai_opt_in', true)
       .eq('ai_sequence_paused', false)
-      .or(`next_ai_send_at.lt.${now},and(ai_messages_sent.is.null,next_ai_send_at.is.null),and(ai_messages_sent.eq.0,next_ai_send_at.is.null)`)
-      .limit(30);
+      .not('next_ai_send_at', 'is', null)
+      .lte('next_ai_send_at', new Date().toISOString())
+      .not('vehicle_interest', 'ilike', '%Unknown%')
+      .not('vehicle_interest', 'is', null)
+      .neq('vehicle_interest', '')
+      .order('next_ai_send_at', { ascending: true }) // Oldest overdue first
+      .order('created_at', { ascending: false }) // Then newest leads
+      .limit(config.batch_size)
 
     if (leadsError) {
-      console.error('❌ [AI-AUTOMATION] Error fetching leads:', leadsError);
-      throw leadsError;
+      throw new Error(`Failed to fetch leads: ${leadsError.message}`)
     }
-
-    console.log(`📋 [AI-AUTOMATION] Found ${dueLeads?.length || 0} leads for processing`);
 
     if (!dueLeads || dueLeads.length === 0) {
-      if (runId) {
-        await supabase
-          .from('ai_automation_runs')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            processed_leads: 0,
-            successful_sends: 0,
-            failed_sends: 0
-          })
-          .eq('id', runId);
-      }
-
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'No leads due for AI messages at this time',
-        processed: 0
+      console.log('📭 [AI-AUTOMATION] No leads due for messaging')
+      return new Response(JSON.stringify({
+        message: 'No leads due for messaging',
+        processed: 0,
+        successful: 0,
+        failed: 0,
+        queueSize: 0,
+        processingTime: Date.now() - startTime
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    const results = [];
-    let successfulSends = 0;
-    let failedSends = 0;
+    console.log(`📬 [AI-AUTOMATION] Processing ${dueLeads.length} leads due for messaging`)
 
-    // 5. Process each lead
-    for (const lead of dueLeads) {
-      try {
-        // Check daily message limit for this lead
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+    // Check daily message limits for each lead
+    const today = new Date().toISOString().split('T')[0]
+    const { data: todayMessages } = await supabase
+      .from('conversations')
+      .select('lead_id')
+      .eq('ai_generated', true)
+      .gte('sent_at', `${today}T00:00:00.000Z`)
+      .lte('sent_at', `${today}T23:59:59.999Z`)
+
+    const dailyMessageCounts = todayMessages?.reduce((acc, msg) => {
+      acc[msg.lead_id] = (acc[msg.lead_id] || 0) + 1
+      return acc
+    }, {} as Record<string, number>) || {}
+
+    // Process leads with parallel batching for better performance
+    const results: ProcessingResult = {
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      errors: [],
+      queueSize: dueLeads.length,
+      processingTime: 0
+    }
+
+    // Process in smaller parallel batches to avoid overwhelming the system
+    const batchSize = Math.min(config.max_concurrent_sends, 5)
+    for (let i = 0; i < dueLeads.length; i += batchSize) {
+      const batch = dueLeads.slice(i, i + batchSize)
+      
+      const batchPromises = batch.map(async (lead) => {
+        return processLeadMessage(lead, supabase, config, dailyMessageCounts)
+      })
+
+      const batchResults = await Promise.allSettled(batchPromises)
+      
+      batchResults.forEach((result, index) => {
+        results.processed++
         
-        const { count: todayMessageCount } = await supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .eq('lead_id', lead.id)
-          .eq('direction', 'out')
-          .eq('ai_generated', true)
-          .gte('sent_at', today.toISOString());
-
-        if ((todayMessageCount || 0) >= dailyLimit) {
-          console.log(`⏭️ [AI-AUTOMATION] Skipping lead ${lead.id} - daily limit reached (${todayMessageCount}/${dailyLimit})`);
-          results.push({ leadId: lead.id, success: false, error: 'Daily limit reached' });
-          continue;
-        }
-
-        // Format lead name properly
-        const formattedFirstName = formatProperName(lead.first_name);
-        const formattedLastName = formatProperName(lead.last_name);
-        
-        const intensity = lead.message_intensity || 'gentle';
-        const messagesSent = lead.ai_messages_sent || 0;
-        
-        console.log(`👤 [AI-AUTOMATION] Processing lead: ${formattedFirstName} ${formattedLastName} (${lead.vehicle_interest}) - Intensity: ${intensity} - Messages: ${messagesSent}`);
-        
-        // Skip if no phone number
-        if (!lead.phone) {
-          console.warn(`⚠️ [AI-AUTOMATION] Skipping lead ${lead.id} - no phone number`);
-          
-          // Try to get phone from phone_numbers table
-          const { data: phoneData } = await supabase
-            .from('phone_numbers')
-            .select('number')
-            .eq('lead_id', lead.id)
-            .eq('is_primary', true)
-            .maybeSingle();
-
-          if (phoneData) {
-            // Update the lead with the phone number
-            await supabase
-              .from('leads')
-              .update({ phone: phoneData.number })
-              .eq('id', lead.id);
-            
-            lead.phone = phoneData.number;
-            console.log(`📱 [AI-AUTOMATION] Updated phone for lead ${lead.id}: ${phoneData.number}`);
-          } else {
-            results.push({ leadId: lead.id, success: false, error: 'No phone number found' });
-            failedSends++;
-            continue;
-          }
-        }
-
-        // Skip leads with unknown vehicle interest
-        if (!lead.vehicle_interest || 
-            lead.vehicle_interest.toLowerCase().includes('unknown') ||
-            lead.vehicle_interest.trim() === '') {
-          console.warn(`⚠️ [AI-AUTOMATION] Skipping lead with unknown vehicle interest: ${formattedFirstName}`);
-          results.push({ leadId: lead.id, success: false, error: 'Unknown vehicle interest' });
-          failedSends++;
-          continue;
-        }
-
-        // 6. Generate AI message based on intensity and first-day logic
-        const message = await generateAIMessage(lead);
-        if (!message) {
-          console.warn(`⚠️ [AI-AUTOMATION] No message generated for lead ${lead.id}`);
-          results.push({ leadId: lead.id, success: false, error: 'Failed to generate message' });
-          failedSends++;
-          continue;
-        }
-
-        // Additional validation to ensure no "Unknown" vehicles in message
-        if (message.includes('Unknown') || message.toLowerCase().includes('unknown')) {
-          console.warn(`⚠️ [AI-AUTOMATION] Skipping message with unknown vehicle for ${formattedFirstName}`);
-          results.push({ leadId: lead.id, success: false, error: 'Message contains unknown vehicle' });
-          failedSends++;
-          continue;
-        }
-
-        console.log(`📤 [AI-AUTOMATION] Sending ${intensity} message to ${formattedFirstName}: "${message}"`);
-
-        // 7. Send the message via SMS
-        const messageResult = await sendSMSMessage(lead.phone, message, lead.id);
-        
-        if (messageResult.success) {
-          // 8. Update lead's AI tracking
-          await updateLeadAfterMessage(lead);
-
-          console.log(`✅ [AI-AUTOMATION] Successfully processed lead ${lead.id}`);
-          results.push({ leadId: lead.id, success: true, message });
-          successfulSends++;
+        if (result.status === 'fulfilled' && result.value) {
+          results.successful++
+          console.log(`✅ [AI-AUTOMATION] Successfully processed lead ${batch[index].id}`)
         } else {
-          console.error(`❌ [AI-AUTOMATION] Failed to send message to lead ${lead.id}:`, messageResult.error);
-          results.push({ leadId: lead.id, success: false, error: messageResult.error });
-          failedSends++;
+          results.failed++
+          const error = result.status === 'rejected' ? result.reason.message : 'Unknown error'
+          results.errors.push(`Lead ${batch[index].id}: ${error}`)
+          console.error(`❌ [AI-AUTOMATION] Failed to process lead ${batch[index].id}: ${error}`)
         }
+      })
 
-        // Add delay between messages to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-      } catch (error) {
-        console.error(`❌ [AI-AUTOMATION] Error processing lead ${lead.id}:`, error);
-        results.push({ leadId: lead.id, success: false, error: error.message });
-        failedSends++;
+      // Small delay between batches to avoid rate limiting
+      if (i + batchSize < dueLeads.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
 
-    console.log(`🎯 [AI-AUTOMATION] Completed processing. Success: ${successfulSends}/${results.length}`);
+    results.processingTime = Date.now() - startTime
 
-    // Update run record
-    if (runId) {
-      await supabase
-        .from('ai_automation_runs')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          processed_leads: results.length,
-          successful_sends: successfulSends,
-          failed_sends: failedSends
-        })
-        .eq('id', runId);
-    }
+    // Log automation run
+    await supabase
+      .from('ai_automation_runs')
+      .insert({
+        source: 'enhanced_cron',
+        processed_leads: results.processed,
+        successful_sends: results.successful,
+        failed_sends: results.failed,
+        error_details: results.errors.length > 0 ? { errors: results.errors } : null,
+        status: results.failed === 0 ? 'completed' : 'completed_with_errors',
+        completed_at: new Date().toISOString()
+      })
+
+    console.log(`🎯 [AI-AUTOMATION] Enhanced processing complete: ${results.successful}/${results.processed} successful in ${results.processingTime}ms`)
 
     return new Response(JSON.stringify({
-      success: true,
-      processed: results.length,
-      successful: successfulSends,
-      failed: failedSends,
-      results: results
+      message: `Enhanced AI automation completed: ${results.successful}/${results.processed} successful`,
+      ...results
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
 
   } catch (error) {
-    console.error('❌ [AI-AUTOMATION] Critical error:', error);
+    console.error('❌ [AI-AUTOMATION] Critical error:', error)
+    
+    // Log failed run
+    await supabase
+      .from('ai_automation_runs')
+      .insert({
+        source: 'enhanced_cron',
+        processed_leads: 0,
+        successful_sends: 0,
+        failed_sends: 0,
+        error_details: { error: error.message },
+        status: 'failed',
+        completed_at: new Date().toISOString()
+      })
+
     return new Response(JSON.stringify({
-      success: false,
-      error: error.message
+      error: 'AI automation failed',
+      message: error.message,
+      processed: 0,
+      successful: 0,
+      failed: 0
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
-});
+})
 
-// Auto-pause AI sequences when leads reply
-async function pauseSequencesForRepliedLeads() {
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+async function processLeadMessage(
+  lead: any, 
+  supabase: any, 
+  config: AIAutomationSettings,
+  dailyMessageCounts: Record<string, number>
+): Promise<boolean> {
+  const messagesSentToday = dailyMessageCounts[lead.id] || 0
   
-  const { data: recentReplies } = await supabase
-    .from('conversations')
-    .select('lead_id, sent_at')
-    .eq('direction', 'in')
-    .gte('sent_at', fiveMinutesAgo)
-    .order('sent_at', { ascending: false });
+  if (messagesSentToday >= config.daily_message_limit_per_lead) {
+    console.log(`⏭️ [AI-AUTOMATION] Skipping lead ${lead.id} - daily limit reached (${messagesSentToday}/${config.daily_message_limit_per_lead})`)
+    return false
+  }
 
-  if (recentReplies && recentReplies.length > 0) {
-    const leadIds = [...new Set(recentReplies.map(r => r.lead_id))];
+  const primaryPhone = lead.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+                     lead.phone_numbers?.[0]?.number
+
+  if (!primaryPhone) {
+    console.warn(`⚠️ [AI-AUTOMATION] Skipping lead ${lead.id} - no phone number`)
+    return false
+  }
+
+  console.log(`👤 [AI-AUTOMATION] Processing lead: ${lead.first_name} ${lead.last_name} (${lead.vehicle_interest}) - Intensity: ${lead.message_intensity} - Messages: ${lead.ai_messages_sent || 0}`)
+
+  // Generate AI message with enhanced prompting
+  const messageStage = determineMessageStage(lead.ai_messages_sent || 0, lead.message_intensity)
+  const aiMessage = await generateEnhancedAIMessage(lead, messageStage, supabase)
+
+  if (!aiMessage) {
+    throw new Error('Failed to generate AI message')
+  }
+
+  // Send the message
+  const success = await sendMessage(lead, aiMessage, primaryPhone, supabase)
+  
+  if (success) {
+    // Update lead with next send time using improved scheduling
+    await updateLeadSchedule(lead, config, supabase)
+  }
+
+  return success
+}
+
+function determineMessageStage(messagesSent: number, intensity: string): string {
+  if (messagesSent === 0) return 'initial_contact'
+  
+  switch (intensity) {
+    case 'super_aggressive':
+    case 'aggressive':
+      if (messagesSent < 3) return 'aggressive_follow_up'
+      if (messagesSent < 6) return 'value_proposition'
+      return 'aggressive_maintenance'
     
-    await supabase
-      .from('leads')
-      .update({
-        ai_sequence_paused: true,
-        ai_pause_reason: 'Customer replied - human review needed',
-        next_ai_send_at: null
-      })
-      .in('id', leadIds)
-      .eq('ai_opt_in', true)
-      .eq('ai_sequence_paused', false);
-
-    console.log(`⏸️ [AI-AUTOMATION] Auto-paused ${leadIds.length} sequences due to replies`);
+    case 'gentle':
+    default:
+      if (messagesSent < 2) return 'gentle_introduction'
+      if (messagesSent < 4) return 'gentle_follow_up'
+      return 'gentle_maintenance'
   }
 }
 
-// Set new uncontacted leads to super aggressive mode for first day
-async function setNewLeadsToSuperAggressive() {
-  const now = new Date();
-  const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-  
-  // Set leads that were just enabled for AI to super aggressive
-  await supabase
-    .from('leads')
-    .update({ message_intensity: 'super_aggressive' })
-    .eq('ai_opt_in', true)
-    .eq('ai_sequence_paused', false)
-    .or('ai_messages_sent.is.null,ai_messages_sent.eq.0')
-    .gte('ai_enabled_at', thirtyMinutesAgo);
-
-  console.log(`🔥 [AI-AUTOMATION] Set recently enabled leads to super aggressive mode`);
-}
-
-// Generate AI message for a lead based on intensity and first-day logic
-async function generateAIMessage(lead: Lead): Promise<string | null> {
+async function generateEnhancedAIMessage(lead: any, stage: string, supabase: any): Promise<string | null> {
   try {
-    const messagesSent = lead.ai_messages_sent || 0;
-    const isSuperAggressive = lead.message_intensity === 'super_aggressive';
-    const isAggressive = lead.message_intensity === 'aggressive';
-    
-    let message: string;
-    
-    if (isSuperAggressive) {
-      message = generateSuperAggressiveMessage(lead, messagesSent);
-    } else if (isAggressive) {
-      message = generateAggressiveMessage(lead, messagesSent);
-    } else {
-      message = generateGentleMessage(lead, messagesSent);
-    }
-
-    // If OpenAI is available and message is substantial, enhance it
-    if (openAIApiKey && message.length > 50 && messagesSent > 0) {
-      try {
-        const enhancedMessage = await enhanceMessageWithAI(message, lead);
-        return enhancedMessage || message;
-      } catch (aiError) {
-        console.warn('AI enhancement failed, using template:', aiError);
-        return message;
-      }
-    }
-
-    return message;
-  } catch (error) {
-    console.error('Error generating AI message:', error);
-    return null;
-  }
-}
-
-// Generate super aggressive messages for first-day contact (3 messages in first day)
-function generateSuperAggressiveMessage(lead: Lead, messagesSent: number): string {
-  const vehicleInterest = lead.vehicle_interest || 'a vehicle';
-  const firstName = formatProperName(lead.first_name) || 'there';
-  
-  const firstDayTemplates = [
-    // Message 1 (immediate, within 30 minutes)
-    `Hi ${firstName}! I'm Finn with Jason Pilger Chevrolet. I see you're interested in ${vehicleInterest} - I've got some exciting options to show you! When would be a good time to chat?`,
-    
-    // Message 2 (2-3 hours later)
-    `${firstName}, just wanted to follow up on the ${vehicleInterest}. We actually have a few that just came in that I think you'd love. Are you available for a quick call to go over the details?`,
-    
-    // Message 3 (4-6 hours after message 2)
-    `Hi ${firstName}! Don't want you to miss out on the perfect ${vehicleInterest}. These are moving fast today. Can we set up a time to take a look? Even a quick 15-minute visit could save you thousands!`
-  ];
-  
-  // Cycle through first day templates, then fall back to regular aggressive
-  const templateIndex = messagesSent < firstDayTemplates.length ? messagesSent : (messagesSent % 3);
-  return firstDayTemplates[templateIndex] || generateAggressiveMessage(lead, messagesSent);
-}
-
-// Generate aggressive messages for uncontacted leads
-function generateAggressiveMessage(lead: Lead, messagesSent: number): string {
-  const vehicleInterest = lead.vehicle_interest || 'a vehicle';
-  const firstName = formatProperName(lead.first_name) || 'there';
-  
-  const templates = [
-    `Hi ${firstName}! I see you're interested in ${vehicleInterest}. We have some great options available right now. When can you come take a look?`,
-    `${firstName}, that ${vehicleInterest} won't last long! We've had several people ask about it today. Want to secure it with a quick visit?`,
-    `Hey ${firstName}! Great news - we have special financing available on ${vehicleInterest} this week. Interested in learning more?`,
-    `${firstName}, this might be your final opportunity on the ${vehicleInterest}. Don't miss out! Available for a quick call today?`,
-    `Hi ${firstName}! Last chance - the ${vehicleInterest} you inquired about is being considered by another customer. Still interested?`
-  ];
-  
-  const templateIndex = messagesSent % templates.length;
-  return templates[templateIndex];
-}
-
-// Generate gentle messages for engaged leads
-function generateGentleMessage(lead: Lead, messagesSent: number): string {
-  const vehicleInterest = lead.vehicle_interest || 'a vehicle';
-  const firstName = formatProperName(lead.first_name) || 'there';
-  
-  const templates = [
-    `Hi ${firstName}, hope you're doing well! Still thinking about ${vehicleInterest}? Happy to answer any questions.`,
-    `${firstName}, just wanted to follow up on ${vehicleInterest}. Any questions I can help with?`,
-    `Hi ${firstName}, hope you found what you were looking for! If you're still interested in ${vehicleInterest}, we're here to help.`
-  ];
-  
-  const templateIndex = messagesSent % templates.length;
-  return templates[templateIndex];
-}
-
-// Enhance message with OpenAI
-async function enhanceMessageWithAI(baseMessage: string, lead: Lead): Promise<string | null> {
-  try {
-    if (!openAIApiKey) return null;
-
-    const formattedFirstName = formatProperName(lead.first_name);
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are Finn, a friendly AI assistant for Jason Pilger Chevrolet. Enhance the following message to be more personalized and engaging while keeping it professional and conversational. The message should be warm, helpful, and focused on the customer's vehicle interest. Keep it under 160 characters for SMS. Do not change the core message intent.`
-          },
-          {
-            role: 'user',
-            content: `Enhance this message for ${formattedFirstName} who is interested in ${lead.vehicle_interest}:\n\n${baseMessage}`
-          }
-        ],
-        max_tokens: 100,
-        temperature: 0.7
-      }),
-    });
-
-    if (!response.ok) {
-      console.warn('OpenAI API request failed:', response.status);
-      return null;
-    }
-
-    const data = await response.json();
-    return data.choices[0]?.message?.content?.trim() || null;
-  } catch (error) {
-    console.error('Error enhancing message with AI:', error);
-    return null;
-  }
-}
-
-// Send SMS message
-async function sendSMSMessage(phone: string, message: string, leadId: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    console.log(`📱 [AI-AUTOMATION] Sending SMS to ${phone}: "${message}"`);
-
-    // Create conversation record
-    const { data: conversation, error: conversationError } = await supabase
-      .from('conversations')
-      .insert({
-        lead_id: leadId,
-        body: message,
-        direction: 'out',
-        sent_at: new Date().toISOString(),
-        ai_generated: true,
-        sms_status: 'pending'
-      })
-      .select()
-      .single();
-
-    if (conversationError) {
-      throw new Error(`Failed to create conversation: ${conversationError.message}`);
-    }
-
-    // Send SMS via send-sms function
-    const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
+    const { data, error } = await supabase.functions.invoke('generate-ai-message', {
       body: {
-        to: phone,
-        body: message,
-        conversationId: conversation.id
+        leadId: lead.id,
+        leadName: `${lead.first_name} ${lead.last_name}`,
+        vehicleInterest: lead.vehicle_interest,
+        stage,
+        intensity: lead.message_intensity || 'gentle',
+        messagesSent: lead.ai_messages_sent || 0,
+        enhanced: true // Flag for better message generation
       }
-    });
-
-    if (smsError || !smsResult?.success) {
-      // Update conversation with error
-      await supabase
-        .from('conversations')
-        .update({ 
-          sms_status: 'failed',
-          sms_error: smsResult?.error || smsError?.message || 'SMS sending failed'
-        })
-        .eq('id', conversation.id);
-      
-      throw new Error(smsResult?.error || smsError?.message || 'SMS sending failed');
-    }
-
-    // Update conversation with success
-    await supabase
-      .from('conversations')
-      .update({
-        sms_status: 'sent',
-        twilio_message_id: smsResult.telnyxMessageId || smsResult.messageSid
-      })
-      .eq('id', conversation.id);
-
-    console.log(`✅ [AI-AUTOMATION] SMS sent successfully to ${phone}`);
-    return { success: true };
-
-  } catch (error) {
-    console.error(`❌ [AI-AUTOMATION] SMS sending failed:`, error);
-    return { success: false, error: error.message };
-  }
-}
-
-// Update lead after sending message with super aggressive timing
-async function updateLeadAfterMessage(lead: Lead): Promise<void> {
-  try {
-    const messagesSent = (lead.ai_messages_sent || 0) + 1;
-    const isSuperAggressive = lead.message_intensity === 'super_aggressive';
-    const isAggressive = lead.message_intensity === 'aggressive';
-    
-    // Calculate next send time based on intensity and first-day logic
-    const nextSendAt = calculateNextSendTime(isSuperAggressive, isAggressive, messagesSent);
-    const nextStage = getNextAIStage(lead.ai_stage, messagesSent, isSuperAggressive || isAggressive);
-
-    // Switch from super aggressive to regular aggressive after 3 messages
-    let newIntensity = lead.message_intensity;
-    if (isSuperAggressive && messagesSent >= 3) {
-      newIntensity = 'aggressive';
-      console.log(`🔄 [AI-AUTOMATION] Switching lead ${lead.id} from super_aggressive to aggressive after 3 messages`);
-    }
-
-    const { error } = await supabase
-      .from('leads')
-      .update({
-        ai_messages_sent: messagesSent,
-        next_ai_send_at: nextSendAt,
-        ai_stage: nextStage,
-        ai_last_message_stage: lead.ai_stage,
-        message_intensity: newIntensity
-      })
-      .eq('id', lead.id);
+    })
 
     if (error) {
-      console.error(`Error updating lead ${lead.id} after message:`, error);
-    } else {
-      console.log(`✅ Updated lead ${lead.id}: messages=${messagesSent}, next_send=${nextSendAt}, stage=${nextStage}, intensity=${newIntensity}`);
+      console.error('❌ [AI-AUTOMATION] AI message generation error:', error)
+      return null
     }
+
+    return data?.message || null
+  } catch (error) {
+    console.error('❌ [AI-AUTOMATION] Exception in AI message generation:', error)
+    return null
+  }
+}
+
+async function sendMessage(lead: any, message: string, phoneNumber: string, supabase: any): Promise<boolean> {
+  try {
+    // Create conversation record first
+    const { data: conversationData, error: conversationError } = await supabase
+      .from('conversations')
+      .insert({
+        lead_id: lead.id,
+        body: message,
+        direction: 'out',
+        ai_generated: true,
+        sent_at: new Date().toISOString()
+      })
+      .select('id')
+      .single()
+
+    if (conversationError) {
+      throw new Error(`Failed to create conversation: ${conversationError.message}`)
+    }
+
+    console.log(`📤 [AI-AUTOMATION] Sending ${lead.message_intensity || 'gentle'} message to ${lead.first_name}: "${message}"`)
+    console.log(`📱 [AI-AUTOMATION] Sending SMS to ${phoneNumber}: "${message}"`)
+
+    // Send SMS via edge function
+    const { data: smsData, error: smsError } = await supabase.functions.invoke('send-sms', {
+      body: {
+        to: phoneNumber,
+        body: message,
+        conversationId: conversationData.id
+      }
+    })
+
+    if (smsError) {
+      throw new Error(`SMS sending failed: ${smsError.message}`)
+    }
+
+    console.log(`✅ [AI-AUTOMATION] SMS sent successfully to ${phoneNumber}`)
+    return true
 
   } catch (error) {
-    console.error(`Error in updateLeadAfterMessage for lead ${lead.id}:`, error);
+    console.error(`❌ [AI-AUTOMATION] Error sending message:`, error)
+    return false
   }
 }
 
-// Calculate next send time with super aggressive first-day timing
-function calculateNextSendTime(isSuperAggressive: boolean, isAggressive: boolean, messagesSent: number): string {
-  const now = new Date();
+async function updateLeadSchedule(lead: any, config: AIAutomationSettings, supabase: any): Promise<void> {
+  const messagesSent = (lead.ai_messages_sent || 0) + 1
+  const intensity = lead.message_intensity || 'gentle'
   
-  // Central Time business hours (8 AM - 8 PM for super aggressive, 8 AM - 7 PM for others)
-  const centralOffset = 6; // UTC-6 for Central Standard Time
-  const businessStart = 8; // 8 AM Central
-  const businessEnd = isSuperAggressive ? 20 : 19; // 8 PM for super aggressive, 7 PM for others
-  
-  let hoursToAdd: number;
-  
-  if (isSuperAggressive && messagesSent <= 3) {
-    // Super aggressive first-day timing
-    if (messagesSent === 1) {
-      hoursToAdd = 2 + Math.random() * 1; // 2-3 hours after first message
-    } else if (messagesSent === 2) {
-      hoursToAdd = 4 + Math.random() * 2; // 4-6 hours after second message
-    } else {
-      hoursToAdd = 24 + Math.random() * 24; // Switch to regular timing after 3 messages
-    }
-  } else if (isAggressive) {
-    // Regular aggressive: 2-4 hours between messages
-    hoursToAdd = 2 + Math.random() * 2;
-  } else {
-    // Gentle: 24-48 hours between messages
-    hoursToAdd = 24 + Math.random() * 24;
-  }
-  
-  const nextSendAt = new Date(now.getTime() + (hoursToAdd * 60 * 60 * 1000));
-  
-  // For super aggressive first-day messages, be more flexible with business hours
-  if (isSuperAggressive && messagesSent <= 3) {
-    const centralHour = (nextSendAt.getUTCHours() - centralOffset + 24) % 24;
-    
-    // Only pause overnight (8 PM - 8 AM)
-    if (centralHour >= businessEnd || centralHour < businessStart) {
-      // If it's after 8 PM, schedule for 8 AM next day
-      // If it's before 8 AM, schedule for 8 AM same day
-      if (centralHour >= businessEnd) {
-        nextSendAt.setDate(nextSendAt.getDate() + 1);
+  // Calculate next send time with improved logic
+  let hoursToAdd = 24 // Default gentle interval
+
+  switch (intensity) {
+    case 'super_aggressive':
+      if (messagesSent < 3) {
+        hoursToAdd = 2 + Math.random() * 2 // 2-4 hours for first few
+      } else if (messagesSent < 6) {
+        hoursToAdd = 4 + Math.random() * 4 // 4-8 hours
+      } else {
+        hoursToAdd = 12 + Math.random() * 12 // 12-24 hours
       }
-      nextSendAt.setUTCHours((businessStart + centralOffset) % 24, 0, 0, 0);
-    }
-  } else {
-    // Apply regular business hours for non-super-aggressive messages
-    const centralHour = (nextSendAt.getUTCHours() - centralOffset + 24) % 24;
+      break
     
-    if (centralHour < businessStart) {
-      nextSendAt.setUTCHours((businessStart + centralOffset) % 24, 0, 0, 0);
-    } else if (centralHour >= businessEnd) {
-      nextSendAt.setDate(nextSendAt.getDate() + 1);
-      nextSendAt.setUTCHours((businessStart + centralOffset) % 24, 0, 0, 0);
-    }
+    case 'aggressive':
+      if (messagesSent < 3) {
+        hoursToAdd = 4 + Math.random() * 4 // 4-8 hours
+      } else {
+        hoursToAdd = 8 + Math.random() * 8 // 8-16 hours
+      }
+      break
+    
+    case 'gentle':
+    default:
+      if (messagesSent < 2) {
+        hoursToAdd = 24 + Math.random() * 12 // 24-36 hours
+      } else {
+        hoursToAdd = 48 + Math.random() * 24 // 2-3 days
+      }
+      break
   }
-  
-  return nextSendAt.toISOString();
-}
 
-// Determine next AI stage based on current stage, message count, and intensity
-function getNextAIStage(currentStage: string, messageCount: number, isSuperAggressive: boolean): string {
-  if (isSuperAggressive) {
-    if (messageCount <= 2) return 'super_aggressive_initial';
-    if (messageCount <= 5) return 'super_aggressive_urgency';
-    if (messageCount <= 8) return 'super_aggressive_deals';
-    return 'super_aggressive_final';
+  const nextSendTime = new Date(Date.now() + (hoursToAdd * 60 * 60 * 1000))
+  
+  // Ensure message is sent during business hours
+  const hour = nextSendTime.getHours()
+  if (hour < config.business_hours_start) {
+    nextSendTime.setHours(config.business_hours_start, 0, 0, 0)
+  } else if (hour >= config.business_hours_end) {
+    nextSendTime.setDate(nextSendTime.getDate() + 1)
+    nextSendTime.setHours(config.business_hours_start, 0, 0, 0)
+  }
+
+  const stage = determineMessageStage(messagesSent, intensity)
+
+  const { error: updateError } = await supabase
+    .from('leads')
+    .update({
+      ai_messages_sent: messagesSent,
+      next_ai_send_at: nextSendTime.toISOString(),
+      ai_stage: stage,
+      message_intensity: intensity,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', lead.id)
+
+  if (updateError) {
+    console.error(`❌ [AI-AUTOMATION] Failed to update lead ${lead.id}:`, updateError)
   } else {
-    if (messageCount <= 2) return 'gentle_follow_up';
-    if (messageCount <= 4) return 'gentle_nurture';
-    return 'gentle_maintenance';
+    console.log(`✅ Updated lead ${lead.id}: messages=${messagesSent}, next_send=${nextSendTime.toISOString()}, stage=${stage}, intensity=${intensity}`)
   }
 }
