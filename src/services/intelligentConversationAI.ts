@@ -1,9 +1,9 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { LeadSourceData } from '@/types/leadSource';
 import { UnknownMessageContext } from '@/services/unknownMessageLearning';
 import { formatProperName, formatFullName } from '@/utils/nameFormatter';
 import { generateVehicleIntelligentResponse } from './vehicleIntelligence/enhancedConversationAI';
+import { responseVariationService } from './responseVariationService';
 
 export interface ConversationContext {
   leadId: string;
@@ -82,7 +82,31 @@ export const generateEnhancedIntelligentResponse = async (
   try {
     console.log('🤖 [ENHANCED AI] Generating contextually aware response for lead:', context.leadId);
 
-    // Try vehicle-intelligent response first (this will NOT cause infinite loop now)
+    // Try response variation service first for maximum diversity
+    try {
+      const response = responseVariationService.generateContextualResponse({
+        leadId: context.leadId,
+        leadName: context.leadName,
+        vehicleInterest: context.vehicleInterest,
+        timeOfDay: getTimeOfDay(),
+        conversationStage: context.messages.length <= 2 ? 'initial' : 'follow_up'
+      });
+      
+      if (response && response.length > 20) {
+        console.log(`✅ [ENHANCED AI] Using response variation service with high diversity`);
+        return {
+          message: response,
+          confidence: 0.9,
+          reasoning: 'Response variation service - maximum diversity',
+          sourceStrategy: 'response_variation',
+          customerIntent: { type: 'general', confidence: 0.8 }
+        };
+      }
+    } catch (error) {
+      console.log('Response variation service not available, continuing with other methods');
+    }
+
+    // Try vehicle-intelligent response (this will NOT cause infinite loop now)
     const vehicleResponse = await generateVehicleIntelligentResponse({
       leadId: context.leadId,
       leadName: context.leadName,
@@ -139,6 +163,7 @@ export const generateEnhancedIntelligentResponse = async (
         context: {
           enhancedMode: true,
           vehicleIntelligent: true,
+          diverseResponses: true,
           timestamp: new Date().toISOString()
         }
       }
@@ -146,7 +171,7 @@ export const generateEnhancedIntelligentResponse = async (
 
     if (error) {
       console.error('❌ [ENHANCED AI] Edge function error:', error);
-      return generateSimpleFallback(formattedLeadName);
+      return generateEnhancedFallback(formattedLeadName, context.vehicleInterest);
     }
 
     if (data?.message) {
@@ -165,12 +190,75 @@ export const generateEnhancedIntelligentResponse = async (
     }
 
     console.log('⚠️ [ENHANCED AI] No message generated from enhanced AI');
-    return generateSimpleFallback(formattedLeadName);
+    return generateEnhancedFallback(formattedLeadName, context.vehicleInterest);
 
   } catch (error) {
     console.error('❌ [ENHANCED AI] Service error:', error);
-    return generateSimpleFallback(formatProperName(context.leadName) || 'there');
+    return generateEnhancedFallback(formatProperName(context.leadName) || 'there', context.vehicleInterest);
   }
+};
+
+// Enhanced fallback with much more variety - prevents repetitive messages
+const generateEnhancedFallback = (leadName: string, vehicleInterest?: string): IntelligentAIResponse => {
+  // Try response variation service for fallback
+  try {
+    const response = responseVariationService.generateDiverseFallback(leadName, vehicleInterest);
+    if (response && response.length > 20) {
+      return {
+        message: response,
+        confidence: 0.7,
+        reasoning: 'Response variation service fallback - high diversity',
+        sourceStrategy: 'diverse_fallback'
+      };
+    }
+  } catch (error) {
+    console.log('Using traditional fallback approach');
+  }
+
+  // Enhanced fallback templates with personality variations
+  const fallbackTemplates = {
+    with_vehicle: [
+      `Hi ${leadName}! I'm here to help with ${vehicleInterest}. What questions do you have?`,
+      `Hello ${leadName}! Ready to discuss ${vehicleInterest} - what interests you most?`,
+      `Hey ${leadName}! Let's talk about ${vehicleInterest}. What would you like to know?`,
+      `Hi ${leadName}! I have great info about ${vehicleInterest}. What can I share with you?`,
+      `Hello ${leadName}! Excited to help with ${vehicleInterest}. What's on your mind?`,
+      `Hi ${leadName}! ${vehicleInterest} is a great choice. What features matter most to you?`,
+      `Hey ${leadName}! I'd love to tell you about ${vehicleInterest}. What should we cover first?`
+    ],
+    generic: [
+      `Hi ${leadName}! I'm Finn with Jason Pilger Chevrolet. How can I help you today?`,
+      `Hello ${leadName}! Ready to help you find exactly what you're looking for. What's on your mind?`,
+      `Hey ${leadName}! What can I do for you today?`,
+      `Hi ${leadName}! I'm here to make your car shopping easy. What questions do you have?`,
+      `Hello ${leadName}! Let's find you the perfect vehicle. What are you thinking?`,
+      `Hi ${leadName}! Excited to help you out today. What can I assist with?`,
+      `Hey ${leadName}! What brings you our way today?`,
+      `Hello ${leadName}! I'm here to help make this process smooth for you. What do you need?`
+    ]
+  };
+
+  // Select template set based on whether we have vehicle interest
+  const templates = vehicleInterest && vehicleInterest !== 'finding the right vehicle' 
+    ? fallbackTemplates.with_vehicle 
+    : fallbackTemplates.generic;
+  
+  // Randomly select from templates
+  const selectedTemplate = templates[Math.floor(Math.random() * templates.length)];
+  
+  return {
+    message: selectedTemplate,
+    confidence: 0.6,
+    reasoning: 'Enhanced diverse fallback to prevent repetitive messages',
+    sourceStrategy: 'enhanced_fallback'
+  };
+};
+
+const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
 };
 
 // Simple fallback that doesn't cause infinite loops
