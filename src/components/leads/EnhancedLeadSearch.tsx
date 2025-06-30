@@ -160,16 +160,15 @@ const EnhancedLeadSearch: React.FC<EnhancedLeadSearchProps> = ({
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Contact Status</label>
-              <Select value={filters.contactStatus || ''} onValueChange={(value) => updateFilter('contactStatus', value || undefined)}>
+              <label className="text-sm font-medium mb-2 block">Do Not Contact</label>
+              <Select value={filters.doNotContact?.toString() || ''} onValueChange={(value) => updateFilter('doNotContact', value === '' ? undefined : value === 'true')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Any contact status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Any contact status</SelectItem>
-                  <SelectItem value="no_contact">No Contact</SelectItem>
-                  <SelectItem value="contact_attempted">Contact Attempted</SelectItem>
-                  <SelectItem value="response_received">Response Received</SelectItem>
+                  <SelectItem value="false">Can Contact</SelectItem>
+                  <SelectItem value="true">Do Not Contact</SelectItem>
                 </SelectContent>
               </Select>
             </div>

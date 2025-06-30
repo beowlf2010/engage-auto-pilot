@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useAdvancedLeads } from '@/hooks/useAdvancedLeads';
@@ -165,11 +166,11 @@ const LeadsList = () => {
         stats={calculateStats()}
       />
 
-      {/* Filters Bar */}
-      <LeadsFiltersBar
+      {/* Filters Bar - Remove this component since we have proper tabs now */}
+      {/* <LeadsFiltersBar
         filter={searchFilters.searchTerm}
         setFilter={(term) => setSearchFilters({ ...searchFilters, searchTerm: term })}
-      />
+      /> */}
 
       {/* Bulk Actions Panel */}
       {selectedLeads.length > 0 && (
