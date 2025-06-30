@@ -103,18 +103,24 @@ export const parseFinancialFileWithMapping = async (
         return isNaN(num) ? 0 : num;
       };
       
+      // Parse age as number
+      const parseAge = (value: string): number => {
+        const num = parseInt(value) || 0;
+        return num;
+      };
+      
       const deal: DealRecord = {
-        date: dateStr,
-        age: getValue('age') || '0',
+        saleDate: dateStr,
+        age: parseAge(getValue('age') || '0'),
         stockNumber,
-        vin6: getValue('vin6') || '',
+        vin: getValue('vin6') || '',
         vehicle,
-        trade: parseNumeric(getValue('trade') || '0'),
-        slp: parseNumeric(getValue('salePrice') || '0'),
-        customer,
-        gross: parseNumeric(getValue('grossProfit') || '0'),
-        fi: parseNumeric(getValue('financeProfit') || '0'),
-        total: parseNumeric(getValue('totalProfit') || '0')
+        tradeValue: parseNumeric(getValue('trade') || '0'),
+        saleAmount: parseNumeric(getValue('salePrice') || '0'),
+        buyerName: customer,
+        grossProfit: parseNumeric(getValue('grossProfit') || '0'),
+        fiProfit: parseNumeric(getValue('financeProfit') || '0'),
+        totalProfit: parseNumeric(getValue('totalProfit') || '0')
       };
       
       deals.push(deal);
@@ -126,15 +132,23 @@ export const parseFinancialFileWithMapping = async (
       throw new Error('No valid deals found. Please check that your file contains transaction data in the mapped columns.');
     }
     
-    // Calculate summary
+    // Calculate summary using correct property names
     const summary: FinancialSummary = {
-      totalDeals: deals.length,
-      totalGross: deals.reduce((sum, deal) => sum + deal.gross, 0),
-      totalFI: deals.reduce((sum, deal) => sum + deal.fi, 0),
-      totalProfit: deals.reduce((sum, deal) => sum + deal.total, 0),
-      avgGross: deals.length > 0 ? deals.reduce((sum, deal) => sum + deal.gross, 0) / deals.length : 0,
-      avgFI: deals.length > 0 ? deals.reduce((sum, deal) => sum + deal.fi, 0) / deals.length : 0,
-      avgTotal: deals.length > 0 ? deals.reduce((sum, deal) => sum + deal.total, 0) / deals.length : 0
+      totalUnits: deals.length,
+      totalSales: deals.reduce((sum, deal) => sum + (deal.saleAmount || 0), 0),
+      totalGross: deals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
+      totalFiProfit: deals.reduce((sum, deal) => sum + (deal.fiProfit || 0), 0),
+      totalProfit: deals.reduce((sum, deal) => sum + (deal.totalProfit || 0), 0),
+      newUnits: 0, // Will be calculated based on deal classification
+      newGross: 0,
+      usedUnits: deals.length, // Assuming all are used for now
+      usedGross: deals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
+      retailUnits: deals.length, // Assuming all are retail for now
+      retailGross: deals.reduce((sum, deal) => sum + (deal.grossProfit || 0), 0),
+      dealerTradeUnits: 0,
+      dealerTradeGross: 0,
+      wholesaleUnits: 0,
+      wholesaleGross: 0
     };
     
     console.log('Summary:', summary);
