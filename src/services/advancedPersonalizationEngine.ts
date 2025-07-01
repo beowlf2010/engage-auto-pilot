@@ -1,14 +1,16 @@
-
 interface PersonalizationProfile {
   leadId: string;
-  communicationStyle: 'formal' | 'casual' | 'direct' | 'friendly';
-  responseTimePreference: 'immediate' | 'business_hours' | 'flexible';
-  interestLevel: 'high' | 'medium' | 'low';
-  priceConsciousness: 'budget' | 'value' | 'premium' | 'unknown';
-  decisionSpeed: 'quick' | 'thoughtful' | 'analytical';
+  communicationStyle: 'formal' | 'casual' | 'professional';
   preferredTopics: string[];
-  avoidanceTopics: string[];
+  responsePatterns: string[];
+  engagementLevel: number;
   lastUpdated: Date;
+}
+
+interface PersonalizationContext {
+  customerMessage: string;
+  conversationHistory: string[];
+  vehicleInterest: string;
 }
 
 interface PersonalizedResponse {
@@ -23,40 +25,46 @@ class AdvancedPersonalizationEngine {
   async generatePersonalizedResponse(
     leadId: string,
     baseMessage: string,
-    context: {
-      customerMessage: string;
-      conversationHistory: string[];
-      vehicleInterest: string;
-    }
+    context: PersonalizationContext
   ): Promise<PersonalizedResponse> {
-    console.log('👤 [PERSONALIZATION] Generating personalized response...');
+    console.log('🎭 [PERSONALIZATION] Generating personalized response...');
 
     try {
       // Get or create personalization profile
-      let profile = await this.getPersonalizationProfile(leadId);
-      
+      let profile = this.profiles.get(leadId);
       if (!profile) {
         profile = await this.createPersonalizationProfile(leadId, context);
-      } else {
-        profile = await this.updatePersonalizationProfile(leadId, context);
+        this.profiles.set(leadId, profile);
       }
 
-      // Apply personalization to base message
-      const personalizedMessage = this.applyPersonalization(baseMessage, profile, context);
-      
-      // Calculate confidence based on profile completeness
-      const confidence = this.calculatePersonalizationConfidence(profile);
-      
-      const result: PersonalizedResponse = {
+      // Apply personalization transformations
+      let personalizedMessage = baseMessage;
+      const factors: string[] = [];
+
+      // Apply communication style
+      personalizedMessage = this.applyCommunicationStyle(personalizedMessage, profile.communicationStyle);
+      factors.push(`communication_style_${profile.communicationStyle}`);
+
+      // Apply topic preferences
+      personalizedMessage = this.applyTopicPreferences(personalizedMessage, profile.preferredTopics, context.vehicleInterest);
+      factors.push('topic_preferences');
+
+      // Apply engagement level adjustments
+      personalizedMessage = this.applyEngagementLevel(personalizedMessage, profile.engagementLevel);
+      factors.push(`engagement_level_${profile.engagementLevel}`);
+
+      const confidence = this.calculatePersonalizationConfidence(profile, context);
+
+      console.log(`✅ [PERSONALIZATION] Applied ${factors.length} personalization factors`);
+
+      return {
         message: personalizedMessage,
         confidence,
-        personalizationFactors: this.getAppliedFactors(profile)
+        personalizationFactors: factors
       };
 
-      console.log(`✅ [PERSONALIZATION] Applied ${result.personalizationFactors.length} factors with ${Math.round(confidence * 100)}% confidence`);
-      return result;
     } catch (error) {
-      console.error('❌ [PERSONALIZATION] Personalization failed:', error);
+      console.error('❌ [PERSONALIZATION] Error generating personalized response:', error);
       return {
         message: baseMessage,
         confidence: 0.5,
@@ -65,243 +73,206 @@ class AdvancedPersonalizationEngine {
     }
   }
 
-  private async getPersonalizationProfile(leadId: string): Promise<PersonalizationProfile | null> {
-    return this.profiles.get(leadId) || null;
-  }
-
   private async createPersonalizationProfile(
     leadId: string,
-    context: any
+    context: PersonalizationContext
   ): Promise<PersonalizationProfile> {
-    console.log('📊 [PERSONALIZATION] Creating new profile for lead:', leadId);
+    // Analyze communication style from conversation history
+    const communicationStyle = this.analyzeCommunicationStyle(context.conversationHistory);
+    
+    // Extract preferred topics
+    const preferredTopics = this.extractPreferredTopics(context);
+    
+    // Analyze response patterns
+    const responsePatterns = this.analyzeResponsePatterns(context.conversationHistory);
+    
+    // Calculate engagement level
+    const engagementLevel = this.calculateEngagementLevel(context.conversationHistory);
 
-    const profile: PersonalizationProfile = {
+    return {
       leadId,
-      communicationStyle: this.detectCommunicationStyle(context.customerMessage),
-      responseTimePreference: 'business_hours',
-      interestLevel: this.detectInterestLevel(context.conversationHistory),
-      priceConsciousness: this.detectPriceConsciousness(context.customerMessage, context.conversationHistory),
-      decisionSpeed: this.detectDecisionSpeed(context.conversationHistory),
-      preferredTopics: this.extractPreferredTopics(context),
-      avoidanceTopics: [],
+      communicationStyle,
+      preferredTopics,
+      responsePatterns,
+      engagementLevel,
       lastUpdated: new Date()
     };
-
-    this.profiles.set(leadId, profile);
-    return profile;
   }
 
-  private async updatePersonalizationProfile(
-    leadId: string,
-    context: any
-  ): Promise<PersonalizationProfile> {
-    const profile = this.profiles.get(leadId)!;
-    
-    // Update based on new interactions
-    profile.communicationStyle = this.detectCommunicationStyle(context.customerMessage);
-    profile.interestLevel = this.detectInterestLevel(context.conversationHistory);
-    profile.lastUpdated = new Date();
-
-    this.profiles.set(leadId, profile);
-    return profile;
+  updatePersonalizationProfile(leadId: string, updates: any): void {
+    const profile = this.profiles.get(leadId);
+    if (profile) {
+      // Update profile based on feedback
+      if (updates.responseReceived) {
+        profile.engagementLevel = Math.min(10, profile.engagementLevel + 1);
+      }
+      
+      if (updates.satisfactionLevel) {
+        profile.engagementLevel = Math.max(1, Math.min(10, updates.satisfactionLevel * 2));
+      }
+      
+      profile.lastUpdated = new Date();
+      this.profiles.set(leadId, profile);
+    }
   }
 
-  private detectCommunicationStyle(message: string): PersonalizationProfile['communicationStyle'] {
-    const lowerMessage = message.toLowerCase();
+  private analyzeCommunicationStyle(conversationHistory: string[]): 'formal' | 'casual' | 'professional' {
+    const messages = conversationHistory.join(' ').toLowerCase();
     
-    if (lowerMessage.includes('please') || lowerMessage.includes('thank you') || lowerMessage.includes('sir') || lowerMessage.includes('ma\'am')) {
+    const formalIndicators = ['please', 'thank you', 'appreciate', 'regarding', 'sincerely'];
+    const casualIndicators = ['hey', 'thanks', 'cool', 'awesome', 'yeah'];
+    const professionalIndicators = ['information', 'details', 'specifications', 'requirements'];
+    
+    const formalScore = formalIndicators.reduce((score, word) => 
+      score + (messages.split(word).length - 1), 0);
+    const casualScore = casualIndicators.reduce((score, word) => 
+      score + (messages.split(word).length - 1), 0);
+    const professionalScore = professionalIndicators.reduce((score, word) => 
+      score + (messages.split(word).length - 1), 0);
+    
+    if (formalScore > casualScore && formalScore > professionalScore) {
       return 'formal';
-    } else if (lowerMessage.includes('hey') || lowerMessage.includes('awesome') || lowerMessage.includes('cool') || lowerMessage.includes('!')) {
+    } else if (casualScore > professionalScore) {
       return 'casual';
-    } else if (lowerMessage.length < 10 && !lowerMessage.includes('?')) {
-      return 'direct';
     } else {
-      return 'friendly';
+      return 'professional';
     }
   }
 
-  private detectInterestLevel(conversationHistory: string[]): PersonalizationProfile['interestLevel'] {
-    const messageCount = conversationHistory.length;
-    const hasQuestions = conversationHistory.some(msg => msg.includes('?'));
-    const hasSpecificInquiries = conversationHistory.some(msg => 
-      msg.toLowerCase().includes('price') || 
-      msg.toLowerCase().includes('available') || 
-      msg.toLowerCase().includes('schedule')
-    );
-
-    if (hasSpecificInquiries && messageCount > 3) {
-      return 'high';
-    } else if (hasQuestions || messageCount > 1) {
-      return 'medium';
-    } else {
-      return 'low';
-    }
-  }
-
-  private detectPriceConsciousness(message: string, conversationHistory: string[]): PersonalizationProfile['priceConsciousness'] {
-    const allMessages = [message, ...conversationHistory].join(' ').toLowerCase();
-    
-    if (allMessages.includes('cheap') || allMessages.includes('budget') || allMessages.includes('affordable')) {
-      return 'budget';
-    } else if (allMessages.includes('luxury') || allMessages.includes('premium') || allMessages.includes('high-end')) {
-      return 'premium';
-    } else if (allMessages.includes('value') || allMessages.includes('deal') || allMessages.includes('price')) {
-      return 'value';
-    } else {
-      return 'unknown';
-    }
-  }
-
-  private detectDecisionSpeed(conversationHistory: string[]): PersonalizationProfile['decisionSpeed'] {
-    if (conversationHistory.length < 2) {
-      return 'quick';
-    } else if (conversationHistory.length > 5) {
-      return 'analytical';
-    } else {
-      return 'thoughtful';
-    }
-  }
-
-  private extractPreferredTopics(context: any): string[] {
+  private extractPreferredTopics(context: PersonalizationContext): string[] {
     const topics: string[] = [];
-    const allText = [context.customerMessage, context.vehicleInterest].join(' ').toLowerCase();
+    const combinedText = (context.conversationHistory.join(' ') + ' ' + context.vehicleInterest).toLowerCase();
     
-    if (allText.includes('fuel') || allText.includes('mpg') || allText.includes('gas')) {
-      topics.push('fuel_efficiency');
-    }
-    if (allText.includes('safety') || allText.includes('airbag') || allText.includes('rating')) {
-      topics.push('safety_features');
-    }
-    if (allText.includes('tech') || allText.includes('screen') || allText.includes('bluetooth')) {
-      topics.push('technology');
-    }
-    if (allText.includes('warranty') || allText.includes('service') || allText.includes('maintenance')) {
-      topics.push('service_warranty');
-    }
+    const topicKeywords = {
+      'safety': ['safety', 'airbag', 'crash', 'secure'],
+      'performance': ['performance', 'power', 'speed', 'engine'],
+      'fuel_economy': ['fuel', 'mpg', 'economy', 'gas'],
+      'technology': ['technology', 'tech', 'bluetooth', 'navigation'],
+      'comfort': ['comfort', 'seat', 'interior', 'luxury'],
+      'price': ['price', 'cost', 'budget', 'affordable'],
+      'reliability': ['reliable', 'dependable', 'warranty', 'maintenance']
+    };
+    
+    Object.entries(topicKeywords).forEach(([topic, keywords]) => {
+      if (keywords.some(keyword => combinedText.includes(keyword))) {
+        topics.push(topic);
+      }
+    });
     
     return topics;
   }
 
-  private applyPersonalization(
-    baseMessage: string,
-    profile: PersonalizationProfile,
-    context: any
-  ): string {
-    let personalizedMessage = baseMessage;
-
-    // Apply communication style
-    personalizedMessage = this.applyCommunicationStyle(personalizedMessage, profile.communicationStyle);
+  private analyzeResponsePatterns(conversationHistory: string[]): string[] {
+    const patterns: string[] = [];
     
-    // Apply interest level adjustments
-    personalizedMessage = this.applyInterestLevelPersonalization(personalizedMessage, profile.interestLevel);
+    if (conversationHistory.length > 0) {
+      const avgLength = conversationHistory.reduce((sum, msg) => sum + msg.length, 0) / conversationHistory.length;
+      
+      if (avgLength > 100) {
+        patterns.push('detailed_responses');
+      } else if (avgLength < 30) {
+        patterns.push('brief_responses');
+      } else {
+        patterns.push('moderate_responses');
+      }
+      
+      const questionResponses = conversationHistory.filter(msg => msg.includes('?'));
+      if (questionResponses.length > conversationHistory.length * 0.3) {
+        patterns.push('question_heavy');
+      }
+    }
     
-    // Apply price consciousness
-    personalizedMessage = this.applyPricePersonalization(personalizedMessage, profile.priceConsciousness);
-    
-    // Apply decision speed adjustments
-    personalizedMessage = this.applyDecisionSpeedPersonalization(personalizedMessage, profile.decisionSpeed);
-
-    return personalizedMessage;
+    return patterns;
   }
 
-  private applyCommunicationStyle(message: string, style: PersonalizationProfile['communicationStyle']): string {
+  private calculateEngagementLevel(conversationHistory: string[]): number {
+    let engagementScore = 5; // Start at neutral
+    
+    // More messages = higher engagement
+    engagementScore += Math.min(3, conversationHistory.length * 0.5);
+    
+    // Questions indicate engagement
+    const questions = conversationHistory.filter(msg => msg.includes('?')).length;
+    engagementScore += Math.min(2, questions);
+    
+    // Enthusiasm indicators
+    const enthusiasm = conversationHistory.join(' ').toLowerCase();
+    if (enthusiasm.includes('excited') || enthusiasm.includes('interested') || enthusiasm.includes('love')) {
+      engagementScore += 2;
+    }
+    
+    return Math.max(1, Math.min(10, Math.round(engagementScore)));
+  }
+
+  private applyCommunicationStyle(message: string, style: 'formal' | 'casual' | 'professional'): string {
     switch (style) {
       case 'formal':
-        return message.replace(/Hi|Hey/g, 'Hello').replace(/!+/g, '.') + ' Please let me know if you have any questions.';
+        return message
+          .replace(/Hi /g, 'Good day ')
+          .replace(/Thanks/g, 'Thank you')
+          .replace(/I'd/g, 'I would')
+          .replace(/Let's/g, 'Let us');
+      
       case 'casual':
-        return message.replace(/Hello/g, 'Hey') + ' Let me know what you think!';
-      case 'direct':
-        return message.split('.')[0] + '. Interested?';
-      case 'friendly':
-      default:
-        return message + ' I\'m here to help with any questions you might have!';
-    }
-  }
-
-  private applyInterestLevelPersonalization(message: string, interestLevel: PersonalizationProfile['interestLevel']): string {
-    switch (interestLevel) {
-      case 'high':
-        return message + ' I can prioritize this for you and get back with details today.';
-      case 'medium':
-        return message + ' Take your time to consider, and feel free to ask any questions.';
-      case 'low':
-      default:
-        return message + ' No pressure - just wanted to share this option with you.';
-    }
-  }
-
-  private applyPricePersonalization(message: string, priceConsciousness: PersonalizationProfile['priceConsciousness']): string {
-    switch (priceConsciousness) {
-      case 'budget':
-        return message + ' I can also discuss financing options that work within your budget.';
-      case 'premium':
-        return message + ' This model includes premium features that enhance the ownership experience.';
-      case 'value':
-        return message + ' This represents excellent value with its combination of features and reliability.';
-      case 'unknown':
+        return message
+          .replace(/Good day/g, 'Hey')
+          .replace(/I would/g, 'I\'d')
+          .replace(/Thank you/g, 'Thanks');
+      
+      case 'professional':
+        return message
+          .replace(/Hi /g, 'Hello ')
+          .replace(/Thanks/g, 'Thank you');
+      
       default:
         return message;
     }
   }
 
-  private applyDecisionSpeedPersonalization(message: string, decisionSpeed: PersonalizationProfile['decisionSpeed']): string {
-    switch (decisionSpeed) {
-      case 'quick':
-        return message + ' If you\'d like to move forward, I can expedite the process for you.';
-      case 'analytical':
-        return message + ' I can provide detailed specifications and comparisons to help with your analysis.';
-      case 'thoughtful':
-      default:
-        return message + ' Take your time to think it over, and I\'ll follow up in a few days.';
+  private applyTopicPreferences(message: string, preferredTopics: string[], vehicleInterest: string): string {
+    if (preferredTopics.includes('safety') && !message.toLowerCase().includes('safety')) {
+      message += ' Safety is always a top priority with our vehicles.';
     }
+    
+    if (preferredTopics.includes('fuel_economy') && !message.toLowerCase().includes('fuel')) {
+      message += ' Our fuel-efficient options can help you save at the pump.';
+    }
+    
+    if (preferredTopics.includes('technology') && !message.toLowerCase().includes('tech')) {
+      message += ' You\'ll love the latest technology features available.';
+    }
+    
+    return message;
   }
 
-  private calculatePersonalizationConfidence(profile: PersonalizationProfile): number {
+  private applyEngagementLevel(message: string, engagementLevel: number): string {
+    if (engagementLevel >= 8) {
+      // High engagement - add enthusiasm
+      return message + ' I\'m excited to help you find the perfect match!';
+    } else if (engagementLevel <= 3) {
+      // Low engagement - keep it simple
+      return message.replace(/!/g, '.').replace(/\s+Let me.*/g, '');
+    }
+    
+    return message;
+  }
+
+  private calculatePersonalizationConfidence(
+    profile: PersonalizationProfile,
+    context: PersonalizationContext
+  ): number {
     let confidence = 0.5; // Base confidence
     
-    // Increase confidence based on profile completeness
-    if (profile.preferredTopics.length > 0) confidence += 0.1;
-    if (profile.priceConsciousness !== 'unknown') confidence += 0.1;
-    if (profile.communicationStyle !== 'friendly') confidence += 0.1; // Not default
+    // More conversation history = higher confidence
+    confidence += Math.min(0.3, context.conversationHistory.length * 0.05);
     
-    // Increase confidence based on profile age (more interactions = higher confidence)
-    const profileAge = Date.now() - profile.lastUpdated.getTime();
-    if (profileAge > 24 * 60 * 60 * 1000) confidence += 0.2; // 24+ hours old
+    // More preferred topics = higher confidence
+    confidence += Math.min(0.2, profile.preferredTopics.length * 0.05);
     
-    return Math.min(confidence, 1.0);
-  }
-
-  private getAppliedFactors(profile: PersonalizationProfile): string[] {
-    return [
-      `communication_${profile.communicationStyle}`,
-      `interest_${profile.interestLevel}`,
-      `price_${profile.priceConsciousness}`,
-      `decision_${profile.decisionSpeed}`,
-      ...profile.preferredTopics.map(topic => `topic_${topic}`)
-    ];
-  }
-
-  async updatePersonalizationProfile(
-    leadId: string,
-    feedback: {
-      responseReceived: boolean;
-      satisfactionLevel?: number;
-    }
-  ): Promise<void> {
-    const profile = this.profiles.get(leadId);
-    if (!profile) return;
-
-    // Adjust profile based on feedback
-    if (feedback.responseReceived) {
-      // Positive feedback - reinforce current style
-      console.log(`✅ [PERSONALIZATION] Positive feedback for lead ${leadId}`);
-    } else {
-      // No response - might need to adjust approach
-      console.log(`⚠️ [PERSONALIZATION] No response from lead ${leadId}, may adjust approach`);
-    }
-
-    profile.lastUpdated = new Date();
-    this.profiles.set(leadId, profile);
+    // Higher engagement = higher confidence
+    confidence += profile.engagementLevel * 0.03;
+    
+    return Math.min(1.0, confidence);
   }
 }
 

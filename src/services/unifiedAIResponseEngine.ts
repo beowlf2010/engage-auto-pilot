@@ -7,6 +7,18 @@ export interface MessageContext {
   vehicleInterest: string;
 }
 
+export interface UnifiedAIResponse {
+  message: string;
+  confidence: number;
+  responseType: 'greeting' | 'question_response' | 'follow_up' | 'vehicle_inquiry' | 'general';
+  intent: {
+    primary: string;
+    secondary?: string;
+  };
+  responseStrategy: string;
+  reasoning: string[];
+}
+
 interface BaseResponse {
   message: string;
   confidence: number;
@@ -14,26 +26,63 @@ interface BaseResponse {
 }
 
 class UnifiedAIResponseEngine {
-  generateResponse(context: MessageContext): BaseResponse {
-    console.log('🎤 [UNIFIED-AI] Generating base AI response...');
+  generateResponse(context: MessageContext): UnifiedAIResponse {
+    console.log('🎤 [UNIFIED-AI] Generating unified AI response...');
 
     try {
       // Analyze message intent
       const intent = this.analyzeMessageIntent(context.latestMessage);
       
       // Generate appropriate response
-      const response = this.generateBaseResponse(context, intent);
+      const baseResponse = this.generateBaseResponse(context, intent);
       
-      console.log(`✅ [UNIFIED-AI] Generated ${response.responseType} response with ${Math.round(response.confidence * 100)}% confidence`);
-      return response;
+      // Create unified response with all required properties
+      const unifiedResponse: UnifiedAIResponse = {
+        message: baseResponse.message,
+        confidence: baseResponse.confidence,
+        responseType: baseResponse.responseType,
+        intent: {
+          primary: intent,
+          secondary: this.detectSecondaryIntent(context.latestMessage)
+        },
+        responseStrategy: this.determineResponseStrategy(intent, context),
+        reasoning: this.generateReasoningSteps(intent, context)
+      };
+      
+      console.log(`✅ [UNIFIED-AI] Generated ${unifiedResponse.responseType} response with ${Math.round(unifiedResponse.confidence * 100)}% confidence`);
+      return unifiedResponse;
     } catch (error) {
-      console.error('❌ [UNIFIED-AI] Base response generation failed:', error);
+      console.error('❌ [UNIFIED-AI] Unified response generation failed:', error);
       return {
         message: `Hi ${context.leadName}! Thanks for your message. I'm here to help with any questions about vehicles.`,
         confidence: 0.5,
-        responseType: 'general'
+        responseType: 'general',
+        intent: { primary: 'general_inquiry' },
+        responseStrategy: 'fallback',
+        reasoning: ['Fallback response due to processing error']
       };
     }
+  }
+
+  validateResponseQuality(message: string): { isValid: boolean; issues: string[] } {
+    const issues: string[] = [];
+    
+    if (!message || message.trim().length === 0) {
+      issues.push('Message is empty');
+    }
+    
+    if (message.length < 10) {
+      issues.push('Message is too short');
+    }
+    
+    if (message.length > 500) {
+      issues.push('Message is too long');
+    }
+    
+    return {
+      isValid: issues.length === 0,
+      issues
+    };
   }
 
   private analyzeMessageIntent(message: string): string {
@@ -52,6 +101,49 @@ class UnifiedAIResponseEngine {
     } else {
       return 'general_inquiry';
     }
+  }
+
+  private detectSecondaryIntent(message: string): string | undefined {
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('trade') || lowerMessage.includes('exchange')) {
+      return 'trade_inquiry';
+    } else if (lowerMessage.includes('finance') || lowerMessage.includes('loan')) {
+      return 'financing_inquiry';
+    }
+    
+    return undefined;
+  }
+
+  private determineResponseStrategy(intent: string, context: MessageContext): string {
+    switch (intent) {
+      case 'price_inquiry':
+        return 'value_focused';
+      case 'availability_inquiry':
+        return 'urgency_focused';
+      case 'appointment_request':
+        return 'scheduling_focused';
+      case 'greeting':
+        return 'relationship_building';
+      default:
+        return 'consultative';
+    }
+  }
+
+  private generateReasoningSteps(intent: string, context: MessageContext): string[] {
+    const steps = [
+      `Detected intent: ${intent}`,
+      `Lead has vehicle interest: ${context.vehicleInterest}`,
+      `Conversation history length: ${context.conversationHistory.length} messages`
+    ];
+    
+    if (context.conversationHistory.length > 5) {
+      steps.push('Established conversation - using personalized approach');
+    } else {
+      steps.push('New conversation - using introduction approach');
+    }
+    
+    return steps;
   }
 
   private generateBaseResponse(context: MessageContext, intent: string): BaseResponse {

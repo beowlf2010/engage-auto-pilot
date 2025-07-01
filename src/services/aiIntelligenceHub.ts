@@ -187,8 +187,8 @@ class AIIntelligenceHub {
     try {
       console.log('📊 [AI-HUB] Processing intelligence feedback for:', leadId);
 
-      // Update personalization profile
-      await advancedPersonalizationEngine.updatePersonalizationProfile(leadId, {
+      // Update personalization profile using public method
+      advancedPersonalizationEngine.updatePersonalizationProfile(leadId, {
         responseReceived: feedback.response_received,
         satisfactionLevel: feedback.user_satisfaction
       });
