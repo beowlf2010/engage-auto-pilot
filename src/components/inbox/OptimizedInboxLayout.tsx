@@ -48,6 +48,11 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
     onSelectConversation(conversation.leadId);
   };
 
+  // Create canReply function from boolean prop
+  const canReplyFunction = (conversation: ConversationListItem) => {
+    return canReply;
+  };
+
   return (
     <div className="flex h-full">
       {/* Conversations List */}
@@ -58,7 +63,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           onSelectConversation={handleConversationSelect}
           markAsRead={markAsRead}
           markingAsRead={markingAsRead}
-          canReply={canReply}
+          canReply={canReplyFunction}
         />
       </div>
 
