@@ -1,10 +1,50 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { generateEnhancedIntelligentResponse } from '../intelligentConversationAI';
 import { generateInitialOutreachMessage } from './initialOutreachService';
 import { formatProperName } from '@/utils/nameFormatter';
 import { assessLeadDataQuality } from '../unifiedDataQualityService';
 import { responseVariationService } from '../responseVariationService';
+
+// Vehicle Interest Validation
+const INVALID_PATTERNS = [
+  /^not specified$/i,
+  /^unknown$/i,
+  /^n\/a$/i,
+  /^na$/i,
+  /^null$/i,
+  /^undefined$/i,
+  /^none$/i,
+  /^test$/i,
+  /^sample$/i,
+  /^demo$/i,
+  /^vehicle$/i,
+  /^car$/i,
+  /^auto$/i,
+  /^automobile$/i,
+  /^\s*-+\s*$/,
+  /^\s*\.+\s*$/,
+];
+
+const FALLBACK_MESSAGE = "I see you're still exploring options—happy to help you find the right fit!";
+
+const validateVehicleInterest = (vehicleInterest: string | null | undefined) => {
+  if (!vehicleInterest || typeof vehicleInterest !== 'string') {
+    return { isValid: false, message: FALLBACK_MESSAGE };
+  }
+
+  const trimmed = vehicleInterest.trim();
+  if (trimmed.length === 0) {
+    return { isValid: false, message: FALLBACK_MESSAGE };
+  }
+
+  for (const pattern of INVALID_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return { isValid: false, message: FALLBACK_MESSAGE };
+    }
+  }
+
+  return { isValid: true, message: trimmed };
+};
 
 // Generate warm, introductory initial outreach messages using UNIFIED AI with enhanced variety
 export const generateWarmInitialMessage = async (
@@ -14,6 +54,13 @@ export const generateWarmInitialMessage = async (
 ): Promise<string | null> => {
   try {
     console.log(`🤖 [WARM INTRO] Starting diverse message generation for ${lead.first_name}`);
+
+    // Validate vehicle interest early
+    const vehicleValidation = validateVehicleInterest(lead.vehicle_interest);
+    console.log(`🔍 [WARM INTRO] Vehicle validation:`, {
+      isValid: vehicleValidation.isValid,
+      originalValue: lead.vehicle_interest
+    });
 
     // Check if this lead has any existing conversations
     const { data: existingMessages } = await supabase
@@ -34,7 +81,7 @@ export const generateWarmInitialMessage = async (
         const response = responseVariationService.generateContextualResponse({
           leadId: lead.id,
           leadName: formattedName,
-          vehicleInterest: lead.vehicle_interest,
+          vehicleInterest: vehicleValidation.isValid ? vehicleValidation.message : null,
           timeOfDay: getTimeOfDay(),
           conversationStage: 'initial'
         });
@@ -54,7 +101,7 @@ export const generateWarmInitialMessage = async (
         leadId: lead.id,
         firstName: lead.first_name,
         lastName: lead.last_name,
-        vehicleInterest: lead.vehicle_interest,
+        vehicleInterest: vehicleValidation.isValid ? vehicleValidation.message : null,
         salespersonName: profile?.first_name || 'Finn',
         dealershipName: 'Jason Pilger Chevrolet'
       });
@@ -101,16 +148,16 @@ export const generateWarmInitialMessage = async (
 
     // Enhanced fallback with variety
     console.log(`⚠️ [WARM INTRO] Using enhanced diverse fallback`);
-    return generateEnhancedFallback(lead, profile);
+    return generateEnhancedFallback(lead, profile, vehicleValidation);
 
   } catch (error) {
     console.error('❌ [WARM INTRO] Error:', error);
-    return generateEnhancedFallback(lead, profile);
+    return generateEnhancedFallback(lead, profile, validateVehicleInterest(lead.vehicle_interest));
   }
 };
 
 // Enhanced fallback with multiple variations
-const generateEnhancedFallback = (lead: any, profile?: any): string => {
+const generateEnhancedFallback = (lead: any, profile?: any, vehicleValidation?: any): string => {
   const salespersonName = profile?.first_name || 'Finn';
   const formattedName = formatProperName(lead.first_name);
   
@@ -118,7 +165,7 @@ const generateEnhancedFallback = (lead: any, profile?: any): string => {
   try {
     const response = responseVariationService.generateDiverseFallback(
       formattedName || 'there', 
-      lead.vehicle_interest
+      vehicleValidation?.isValid ? vehicleValidation.message : null
     );
     
     if (response && response.length > 20) {
@@ -128,32 +175,17 @@ const generateEnhancedFallback = (lead: any, profile?: any): string => {
     console.log('Response variation service not available for fallback');
   }
   
-  // Enhanced fallback templates with much more variety
-  const fallbackTemplates = [
-    // Professional variations
-    `Hello {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. I'm here to help you find the perfect vehicle for your needs. What type of vehicle are you looking for?`,
-    `Hi {name}! This is ${salespersonName} from Jason Pilger Chevrolet. I'd love to assist you in finding exactly what you need. What brings you our way today?`,
-    `Good day {name}! I'm ${salespersonName} with Jason Pilger Chevrolet, ready to help make your car shopping experience great. What can I do for you?`,
-    
-    // Casual variations
-    `Hey {name}! ${salespersonName} here from Jason Pilger Chevrolet. What can I help you with today?`,
-    `Hi there {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. Ready to help you find your perfect ride!`,
-    `Hello {name}! ${salespersonName} from Jason Pilger Chevrolet here. What's on your mind for your next vehicle?`,
-    
-    // Enthusiastic variations
-    `Hi {name}! I'm ${salespersonName} with Jason Pilger Chevrolet and I'm excited to help you find an amazing vehicle! What are you looking for?`,
-    `Hello {name}! ${salespersonName} here from Jason Pilger Chevrolet. I love helping people find their dream cars - what's yours going to be?`,
-    `Hey {name}! This is ${salespersonName} with Jason Pilger Chevrolet. Let's find you something fantastic! What interests you?`,
-    
-    // Question-focused variations
-    `Hi {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. What questions can I answer for you today?`,
-    `Hello {name}! ${salespersonName} from Jason Pilger Chevrolet here. What would be most helpful for me to share with you?`,
-    `Hey {name}! This is ${salespersonName} with Jason Pilger Chevrolet. What information can I provide to help you out?`,
-    
-    // Service-focused variations
-    `Hello {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. I'm here to make your car shopping as easy as possible. How can I help?`,
-    `Hi {name}! ${salespersonName} from Jason Pilger Chevrolet, ready to provide you with excellent service. What do you need to know?`,
-    `Good to connect {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. Let me know how I can assist you today.`
+  // Enhanced fallback templates with vehicle interest validation
+  const fallbackTemplates = vehicleValidation?.isValid ? [
+    // Valid vehicle interest templates
+    `Hello {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. I see you're interested in ${vehicleValidation.message}. How can I help you find the perfect fit?`,
+    `Hi {name}! This is ${salespersonName} from Jason Pilger Chevrolet. I'd love to assist you with ${vehicleValidation.message}. What questions can I answer?`,
+    `Good day {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. Regarding ${vehicleValidation.message}, what would be most helpful to know?`
+  ] : [
+    // Fallback message templates
+    `Hello {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. ${FALLBACK_MESSAGE} What can I do for you?`,
+    `Hi {name}! This is ${salespersonName} from Jason Pilger Chevrolet. ${FALLBACK_MESSAGE} Any questions I can answer?`,
+    `Good day {name}! I'm ${salespersonName} with Jason Pilger Chevrolet. ${FALLBACK_MESSAGE} How can I assist you today?`
   ];
 
   // Use personal name if it looks legitimate, otherwise use generic greeting

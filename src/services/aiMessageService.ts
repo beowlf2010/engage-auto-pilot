@@ -32,8 +32,60 @@ const AI_MESSAGE_TEMPLATES: AIMessageTemplate[] = [
   }
 ];
 
+// Vehicle Interest Validation - inline implementation
+const INVALID_PATTERNS = [
+  /^not specified$/i,
+  /^unknown$/i,
+  /^n\/a$/i,
+  /^na$/i,
+  /^null$/i,
+  /^undefined$/i,
+  /^none$/i,
+  /^test$/i,
+  /^sample$/i,
+  /^demo$/i,
+  /^vehicle$/i,
+  /^car$/i,
+  /^auto$/i,
+  /^automobile$/i,
+  /^\s*-+\s*$/,
+  /^\s*\.+\s*$/,
+];
+
+const validateVehicleInterest = (vehicleInterest: string | null | undefined) => {
+  if (!vehicleInterest || typeof vehicleInterest !== 'string') {
+    return { isValid: false, message: "I see you're still exploring options—happy to help you find the right fit!" };
+  }
+
+  const trimmed = vehicleInterest.trim();
+  if (trimmed.length === 0) {
+    return { isValid: false, message: "I see you're still exploring options—happy to help you find the right fit!" };
+  }
+
+  for (const pattern of INVALID_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return { isValid: false, message: "I see you're still exploring options—happy to help you find the right fit!" };
+    }
+  }
+
+  return { isValid: true, message: trimmed };
+};
+
 const generateInventoryMessage = async (leadId: string, vehicleInterest: string) => {
   try {
+    // Validate vehicle interest first
+    const validation = validateVehicleInterest(vehicleInterest);
+    
+    if (!validation.isValid) {
+      console.log(`🔍 [AI MESSAGE] Using fallback for invalid vehicle interest: ${vehicleInterest}`);
+      return {
+        inventoryMessage: validation.message,
+        availabilityMessage: "What specific features are you looking for?",
+        pricingMessage: "",
+        context: { isInventoryRelated: false, usesFallback: true }
+      };
+    }
+
     const matchingInventory = await findMatchingInventory(leadId);
     
     // Filter out any vehicles with unknown make/model
@@ -91,10 +143,10 @@ const generateInventoryMessage = async (leadId: string, vehicleInterest: string)
   } catch (error) {
     console.error('Error generating inventory message:', error);
     return {
-      inventoryMessage: "We have several vehicles that might interest you.",
+      inventoryMessage: "I see you're still exploring options—happy to help you find the right fit!",
       availabilityMessage: "Let me know what you're looking for!",
       pricingMessage: "",
-      context: { isInventoryRelated: false }
+      context: { isInventoryRelated: false, usesFallback: true }
     };
   }
 };
@@ -133,14 +185,17 @@ export const generateAIMessage = async (leadId: string): Promise<string | null> 
       .map(m => m.content)
       .join('. ');
 
-    // Generate inventory-specific content with unknown filtering
+    // Generate inventory-specific content with vehicle interest validation
     const inventoryData = await generateInventoryMessage(leadId, lead.vehicle_interest);
 
-    // Replace template variables
+    // Replace template variables with validation
+    const vehicleValidation = validateVehicleInterest(lead.vehicle_interest);
+    const vehicleText = vehicleValidation.isValid ? vehicleValidation.message : vehicleValidation.message;
+
     let message = template.template
       .replace(/{firstName}/g, lead.first_name)
       .replace(/{lastName}/g, lead.last_name)
-      .replace(/{vehicleInterest}/g, lead.vehicle_interest)
+      .replace(/{vehicleInterest}/g, vehicleText)
       .replace(/{inventoryMessage}/g, inventoryData.inventoryMessage)
       .replace(/{availabilityMessage}/g, inventoryData.availabilityMessage)
       .replace(/{pricingMessage}/g, inventoryData.pricingMessage)

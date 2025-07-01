@@ -1,191 +1,101 @@
 
 /**
  * Vehicle Interest Validation Service
- * Detects corrupted or suspicious vehicle interest data
+ * Handles validation and sanitization of vehicle interest data
  */
 
-// Known corruption patterns in vehicle interest data
-const CORRUPTION_PATTERNS = [
-  'make unknown',
-  'unknown m',
-  'model unknown',
-  'year unknown',
-  'unknown make',
-  'unknown model',
-  'unknown year',
-  'not specified',
-  'n/a',
-  'na',
-  'null',
-  'undefined',
-  'none',
-  'test',
-  'sample',
-  'demo'
+// Invalid patterns that should trigger fallback message
+const INVALID_PATTERNS = [
+  // Null/empty checks handled separately
+  /^not specified$/i,
+  /^unknown$/i,
+  /^n\/a$/i,
+  /^na$/i,
+  /^null$/i,
+  /^undefined$/i,
+  /^none$/i,
+  /^test$/i,
+  /^sample$/i,
+  /^demo$/i,
+  /^vehicle$/i,
+  /^car$/i,
+  /^auto$/i,
+  /^automobile$/i,
+  /^\s*-+\s*$/,  // Just dashes
+  /^\s*\.+\s*$/,  // Just periods
 ];
 
-// Generic vehicle terms that indicate poor data quality
-const GENERIC_VEHICLE_TERMS = [
-  'vehicle',
-  'car',
-  'auto',
-  'automobile',
-  'truck',
-  'suv',
-  'sedan',
-  'coupe',
-  'hatchback'
-];
+// The fallback message to use when vehicle interest is invalid
+const FALLBACK_MESSAGE = "I see you're still exploring options—happy to help you find the right fit!";
 
-// Pattern to detect incomplete year/make/model combinations
-const INCOMPLETE_PATTERN = /^\d{4}\s+(make|model|unknown|year)/i;
-
-export interface VehicleInterestValidationResult {
-  isValidVehicleInterest: boolean;
-  confidence: number;
-  detectedIssue: 'corruption' | 'generic' | 'incomplete' | 'quoted_data' | 'valid';
-  suggestions: {
-    useGenericVehicleMessage: boolean;
-    fallbackMessage?: string;
-  };
+export interface VehicleInterestValidation {
+  isValid: boolean;
+  sanitizedMessage: string;
+  originalValue: string;
+  reason?: string;
 }
 
-export const validateVehicleInterest = (vehicleInterest: string): VehicleInterestValidationResult => {
+/**
+ * Validates vehicle interest and returns appropriate message
+ */
+export const validateVehicleInterest = (vehicleInterest: string | null | undefined): VehicleInterestValidation => {
+  const originalValue = vehicleInterest || '';
+  
+  // Check for null, undefined, or empty
   if (!vehicleInterest || typeof vehicleInterest !== 'string') {
     return {
-      isValidVehicleInterest: false,
-      confidence: 0,
-      detectedIssue: 'corruption',
-      suggestions: {
-        useGenericVehicleMessage: true,
-        fallbackMessage: 'finding the right vehicle'
-      }
+      isValid: false,
+      sanitizedMessage: FALLBACK_MESSAGE,
+      originalValue,
+      reason: 'Null or undefined value'
     };
   }
 
-  // Clean the interest by removing quotes and normalizing
-  const cleanInterest = vehicleInterest
-    .replace(/"/g, '') // Remove all quotes
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim()
-    .toLowerCase();
-  
-  // Check if the original had excessive quotes (indicates data quality issue)
-  const hasExcessiveQuotes = (vehicleInterest.match(/"/g) || []).length > 2;
-  
-  // Check for known corruption patterns
-  const hasCorruption = CORRUPTION_PATTERNS.some(pattern => 
-    cleanInterest.includes(pattern)
-  );
-  
-  if (hasCorruption) {
+  // Check for empty or whitespace-only strings
+  const trimmed = vehicleInterest.trim();
+  if (trimmed.length === 0) {
     return {
-      isValidVehicleInterest: false,
-      confidence: 0.1,
-      detectedIssue: 'corruption',
-      suggestions: {
-        useGenericVehicleMessage: true,
-        fallbackMessage: 'finding the perfect vehicle for your needs'
-      }
+      isValid: false,
+      sanitizedMessage: FALLBACK_MESSAGE,
+      originalValue,
+      reason: 'Empty or whitespace-only string'
     };
   }
 
-  // Check for incomplete patterns like "2025 Make Unknown"
-  if (INCOMPLETE_PATTERN.test(cleanInterest)) {
-    return {
-      isValidVehicleInterest: false,
-      confidence: 0.2,
-      detectedIssue: 'incomplete',
-      suggestions: {
-        useGenericVehicleMessage: true,
-        fallbackMessage: 'finding a great vehicle'
-      }
-    };
-  }
-
-  // Handle quoted data issue - lower confidence but still usable
-  if (hasExcessiveQuotes) {
-    return {
-      isValidVehicleInterest: true,
-      confidence: 0.7, // Lower confidence due to data quality issues
-      detectedIssue: 'quoted_data',
-      suggestions: {
-        useGenericVehicleMessage: false,
-        fallbackMessage: 'exploring your vehicle options'
-      }
-    };
-  }
-
-  // Check if it's just generic vehicle terms
-  const isOnlyGeneric = GENERIC_VEHICLE_TERMS.some(term => 
-    cleanInterest === term || cleanInterest === `${term}s`
-  );
-  
-  if (isOnlyGeneric) {
-    return {
-      isValidVehicleInterest: false,
-      confidence: 0.4,
-      detectedIssue: 'generic',
-      suggestions: {
-        useGenericVehicleMessage: true,
-        fallbackMessage: 'finding the right vehicle'
-      }
-    };
-  }
-
-  // If it contains specific make/model information, it's likely valid
-  const hasSpecificInfo = /\b(chevrolet|chevy|ford|toyota|honda|nissan|bmw|mercedes|audi|silverado|camaro|equinox|traverse|tahoe|suburban|malibu|cruze|sonic|spark|bolt|corvette|colorado|express|impala|trailblazer|blazer|acadia|terrain|yukon|sierra|canyon|tundra|camry|corolla|prius|rav4|highlander|4runner|tacoma|sienna)\b/i.test(cleanInterest);
-  
-  if (hasSpecificInfo) {
-    return {
-      isValidVehicleInterest: true,
-      confidence: 0.9,
-      detectedIssue: 'valid',
-      suggestions: {
-        useGenericVehicleMessage: false
-      }
-    };
-  }
-
-  // Check length and structure for reasonable vehicle descriptions
-  if (cleanInterest.length > 50 || cleanInterest.split(' ').length > 8) {
-    return {
-      isValidVehicleInterest: false,
-      confidence: 0.3,
-      detectedIssue: 'corruption',
-      suggestions: {
-        useGenericVehicleMessage: true,
-        fallbackMessage: 'finding the perfect vehicle'
-      }
-    };
-  }
-
-  // Default to valid but low confidence for unknown patterns
-  return {
-    isValidVehicleInterest: true,
-    confidence: 0.6,
-    detectedIssue: 'valid',
-    suggestions: {
-      useGenericVehicleMessage: false
+  // Check against invalid patterns
+  for (const pattern of INVALID_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return {
+        isValid: false,
+        sanitizedMessage: FALLBACK_MESSAGE,
+        originalValue,
+        reason: `Matched invalid pattern: ${pattern.source}`
+      };
     }
+  }
+
+  // If we get here, the vehicle interest appears valid
+  return {
+    isValid: true,
+    sanitizedMessage: `your interest in ${trimmed}`,
+    originalValue,
+    reason: 'Valid vehicle interest'
   };
 };
 
-export const shouldUseGenericVehicleMessage = (vehicleInterest: string): boolean => {
+/**
+ * Get a contextual message fragment for vehicle interest
+ * Returns either the valid vehicle interest or the fallback message
+ */
+export const getVehicleInterestMessage = (vehicleInterest: string | null | undefined): string => {
   const validation = validateVehicleInterest(vehicleInterest);
-  return validation.suggestions.useGenericVehicleMessage || validation.confidence < 0.5;
+  return validation.sanitizedMessage;
 };
 
-export const getCleanVehicleInterest = (vehicleInterest: string): string => {
+/**
+ * Check if vehicle interest should use fallback
+ */
+export const shouldUseFallback = (vehicleInterest: string | null | undefined): boolean => {
   const validation = validateVehicleInterest(vehicleInterest);
-  
-  if (validation.suggestions.useGenericVehicleMessage) {
-    return validation.suggestions.fallbackMessage || 'finding the right vehicle';
-  }
-  
-  // Clean and return the vehicle interest
-  return vehicleInterest
-    .replace(/"/g, '') // Remove all quotes
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim();
+  return !validation.isValid;
 };
