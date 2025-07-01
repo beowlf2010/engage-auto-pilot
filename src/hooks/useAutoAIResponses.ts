@@ -1,7 +1,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { generateEnhancedIntelligentResponse, shouldGenerateResponse } from '@/services/intelligentConversationAI';
+import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 import { toast } from '@/hooks/use-toast';
 
 interface UseAutoAIResponsesProps {
@@ -14,6 +14,18 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
   const processedMessages = useRef(new Set<string>());
   const isProcessing = useRef(false);
   const channelRef = useRef<any>(null);
+
+  const shouldGenerateResponse = (context: any): boolean => {
+    const lastCustomerMessage = context.messages.filter((msg: any) => msg.direction === 'in').slice(-1)[0];
+    if (!lastCustomerMessage) return false;
+    
+    const responseAfter = context.messages.find((msg: any) => 
+      msg.direction === 'out' && 
+      new Date(msg.sentAt) > new Date(lastCustomerMessage.sentAt)
+    );
+    
+    return !responseAfter;
+  };
 
   const processIncomingMessage = useCallback(async (messageId: string, leadId: string) => {
     if (processedMessages.current.has(messageId) || isProcessing.current) {
@@ -79,7 +91,15 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
       console.log('🤖 [AUTO AI] Generating AI response preview for:', leadId);
 
       // Generate AI response PREVIEW (don't send)
-      const aiResponse = await generateEnhancedIntelligentResponse(context);
+      const messageContext: MessageContext = {
+        leadId,
+        leadName: context.leadName,
+        latestMessage: conversations.filter(msg => msg.direction === 'in').slice(-1)[0]?.body || '',
+        conversationHistory: conversations.map(msg => msg.body),
+        vehicleInterest: context.vehicleInterest
+      };
+
+      const aiResponse = unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (!aiResponse?.message) {
         console.log('🤖 [AUTO AI] No AI response generated for:', leadId);

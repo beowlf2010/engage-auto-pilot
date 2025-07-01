@@ -1,280 +1,163 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Brain, RefreshCw, Send, Lightbulb, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Send, RefreshCw } from 'lucide-react';
+import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 import { toast } from '@/hooks/use-toast';
-import { generateEnhancedIntelligentResponse, ConversationContext } from '@/services/intelligentConversationAI';
-import { formatProperName, getFirstName } from '@/utils/nameFormatter';
 
 interface AIResponseSuggestionPanelProps {
-  selectedConversation: any;
+  conversation: any;
   messages: any[];
   onSendMessage: (message: string) => Promise<void>;
-  canReply: boolean;
+  className?: string;
 }
 
 const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
-  selectedConversation,
+  conversation,
   messages,
   onSendMessage,
-  canReply
+  className = ''
 }) => {
-  const [aiSuggestion, setAiSuggestion] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [confidence, setConfidence] = useState(0);
-  const [reasoning, setReasoning] = useState('');
-  const [suggestionType, setSuggestionType] = useState('');
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [lastInboundMessageId, setLastInboundMessageId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastGenerated, setLastGenerated] = useState<string>('');
 
-  // Generate AI response when new inbound message arrives
-  useEffect(() => {
-    if (!selectedConversation || !messages.length) return;
+  const generateSuggestions = async () => {
+    if (!conversation || !messages.length) return;
 
-    const lastMessage = messages[messages.length - 1];
-    const isInbound = lastMessage?.direction === 'in';
-    
-    // Only generate for new inbound messages
-    if (isInbound && lastMessage.id !== lastInboundMessageId) {
-      setLastInboundMessageId(lastMessage.id);
-      generateAIResponse();
-    }
-  }, [messages, selectedConversation, lastInboundMessageId]);
-
-  const generateAIResponse = async () => {
-    setIsGenerating(true);
+    setIsLoading(true);
     try {
-      // Get the raw lead name and extract only the first name
-      const firstName = selectedConversation.first_name || '';
-      const lastName = selectedConversation.last_name || '';
-      const rawLeadName = selectedConversation.leadName || `${firstName} ${lastName}`.trim();
-      
-      // Extract and format only the first name
-      const firstNameOnly = getFirstName(rawLeadName) || formatProperName(firstName) || 'there';
+      const lastCustomerMessage = messages
+        .filter(msg => msg.direction === 'in')
+        .slice(-1)[0];
 
-      // Format messages for the enhanced AI service
-      const formattedMessages = messages.map(msg => ({
-        id: msg.id,
-        body: msg.body || '',
-        direction: msg.direction as 'in' | 'out',
-        sentAt: msg.sent_at || msg.sentAt || new Date().toISOString(),
-        aiGenerated: msg.ai_generated || false
-      }));
+      if (!lastCustomerMessage) {
+        setIsLoading(false);
+        return;
+      }
 
-      // Create context for enhanced AI response - using only first name
-      const context: ConversationContext = {
-        leadId: selectedConversation.id,
-        leadName: firstNameOnly,
-        vehicleInterest: selectedConversation.vehicleInterest || selectedConversation.vehicle_interest || 'vehicle',
-        leadSource: selectedConversation.source,
-        messages: formattedMessages,
-        leadInfo: {
-          phone: selectedConversation.phone || '',
-          status: selectedConversation.status || 'active',
-          lastReplyAt: messages[messages.length - 1]?.sent_at
-        }
+      const messageContext: MessageContext = {
+        leadId: conversation.leadId,
+        leadName: conversation.leadName || 'there',
+        latestMessage: lastCustomerMessage.body,
+        conversationHistory: messages.map(m => m.body),
+        vehicleInterest: conversation.vehicleInterest || ''
       };
 
-      console.log('🤖 Generating enhanced AI response for context:', {
-        leadId: context.leadId,
-        leadName: context.leadName,
-        vehicleInterest: context.vehicleInterest,
-        messageCount: context.messages.length
-      });
-
-      // Use the enhanced AI service
-      const aiResponse = await generateEnhancedIntelligentResponse(context);
-
-      if (aiResponse?.message) {
-        setAiSuggestion(aiResponse.message);
-        setReasoning(aiResponse.reasoning || 'Enhanced AI response generated');
-        setConfidence(aiResponse.confidence || 0.8);
-        setSuggestionType(aiResponse.sourceStrategy || 'enhanced');
-        
-        console.log('✅ Enhanced AI response generated:', {
-          confidence: aiResponse.confidence,
-          strategy: aiResponse.sourceStrategy,
-          messageLength: aiResponse.message.length
-        });
-      } else {
-        // Fallback if enhanced AI fails - use only first name
-        console.log('⚠️ Enhanced AI failed, using fallback');
-        const fallbackFirstName = getFirstName(rawLeadName) || formatProperName(firstName) || 'there';
-        const vehicleInterest = selectedConversation.vehicleInterest || selectedConversation.vehicle_interest || 'vehicle';
-        
-        setAiSuggestion(`Hi ${fallbackFirstName}! Thanks for your message about the ${vehicleInterest}. I'm here to help with any questions you might have.`);
-        setReasoning('Fallback response - enhanced AI unavailable');
-        setConfidence(0.5);
-        setSuggestionType('fallback');
+      // Generate multiple response variations
+      const suggestions: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const response = unifiedAIResponseEngine.generateResponse(messageContext);
+        if (response?.message && !suggestions.includes(response.message)) {
+          suggestions.push(response.message);
+        }
       }
+
+      setSuggestions(suggestions);
+      setLastGenerated(Date.now().toString());
     } catch (error) {
-      console.error('❌ Error generating enhanced AI response:', error);
-      
-      // Fallback to basic response with proper first name formatting
-      const firstName = selectedConversation?.first_name || '';
-      const rawLeadName = selectedConversation?.leadName || firstName;
-      const fallbackFirstName = getFirstName(rawLeadName) || formatProperName(firstName) || 'there';
-      const vehicleInterest = selectedConversation?.vehicleInterest || selectedConversation?.vehicle_interest || 'vehicle';
-      
-      setAiSuggestion(`Hi ${fallbackFirstName}! Thanks for your message about the ${vehicleInterest}. I'm here to help with any questions you might have.`);
-      setReasoning('Fallback response due to AI service error');
-      setConfidence(0.6);
-      setSuggestionType('error_fallback');
+      console.error('Error generating AI suggestions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate AI suggestions",
+        variant: "destructive"
+      });
     } finally {
-      setIsGenerating(false);
+      setIsLoading(false);
     }
   };
 
-  const handleSendSuggestion = async () => {
-    if (!canReply || !aiSuggestion || aiSuggestion.includes('Unable to generate')) return;
-    
+  const handleSendSuggestion = async (suggestion: string) => {
     try {
-      await onSendMessage(aiSuggestion);
+      await onSendMessage(suggestion);
       toast({
-        title: "AI Response Sent",
-        description: "Finn's suggested response has been sent successfully",
+        title: "Message Sent",
+        description: "AI suggestion sent successfully",
       });
-      
-      // Clear the suggestion after sending
-      setAiSuggestion('');
-      setReasoning('');
-      setConfidence(0);
-      setSuggestionType('');
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to send AI suggestion",
+        description: "Failed to send message",
         variant: "destructive"
       });
     }
   };
 
-  const getConfidenceColor = (conf: number) => {
-    if (conf >= 0.9) return 'text-green-700 bg-green-100';
-    if (conf >= 0.8) return 'text-green-600 bg-green-50';
-    if (conf >= 0.6) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'congratulate_competitor_purchase': return '🎉';
-      case 'acknowledge_and_engage': return '👋';
-      case 'provide_info': return '📋';
-      case 'move_to_action': return '🎯';
-      case 'address_concern': return '🛡️';
-      case 'enhanced': return '🧠';
-      case 'fallback': return '💬';
-      case 'error_fallback': return '⚠️';
-      default: return '💬';
+  useEffect(() => {
+    if (conversation && messages.length > 0) {
+      generateSuggestions();
     }
-  };
+  }, [conversation?.leadId, messages.length]);
 
-  if (!canReply) return null;
+  if (!conversation) {
+    return (
+      <Card className={className}>
+        <CardContent className="p-6 text-center">
+          <p className="text-gray-500">Select a conversation to see AI suggestions</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="shadow-sm border-blue-200 bg-gradient-to-r from-blue-50 to-purple-50">
+    <Card className={className}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Brain className="h-4 w-4 text-blue-600" />
-            <Sparkles className="h-3 w-3 text-yellow-500" />
-            Finn's AI Response
-            {confidence > 0 && (
-              <Badge className={`text-xs ${getConfidenceColor(confidence)}`}>
-                {Math.round(confidence * 100)}% confident
-              </Badge>
-            )}
-            {suggestionType && (
-              <span className="text-sm">{getTypeIcon(suggestionType)}</span>
-            )}
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-purple-600" />
+            AI Suggestions
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={generateAIResponse}
-              disabled={isGenerating}
-              title="Regenerate suggestion"
-            >
-              <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={generateSuggestions}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3 w-3" />
+            )}
+          </Button>
         </div>
       </CardHeader>
+      
+      <CardContent className="space-y-3">
+        {isLoading && suggestions.length === 0 && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+            <span className="ml-2 text-sm text-gray-600">Generating suggestions...</span>
+          </div>
+        )}
 
-      {isExpanded && (
-        <CardContent className="pt-0">
-          {isGenerating ? (
-            <div className="flex items-center justify-center py-4">
-              <div className="text-center">
-                <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mx-auto mb-2" />
-                <span className="text-sm text-gray-600">Finn is analyzing the conversation...</span>
-                <p className="text-xs text-gray-400 mt-1">Using enhanced AI detection</p>
+        {suggestions.length > 0 && (
+          <div className="space-y-2">
+            {suggestions.map((suggestion, index) => (
+              <div key={index} className="border rounded-lg p-3 bg-gray-50">
+                <p className="text-sm text-gray-700 mb-2">{suggestion}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleSendSuggestion(suggestion)}
+                  className="ml-auto"
+                >
+                  <Send className="h-3 w-3 mr-1" />
+                  Use This
+                </Button>
               </div>
-            </div>
-          ) : aiSuggestion ? (
-            <div className="space-y-3">
-              <div className="bg-white border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-2 mb-3">
-                  <Lightbulb className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <span className="text-xs font-medium text-blue-800 block mb-1">
-                      Finn's Enhanced Response:
-                    </span>
-                    <p className="text-sm text-gray-800 leading-relaxed mb-3">
-                      {aiSuggestion}
-                    </p>
-                    
-                    <div className="text-xs text-gray-600 mb-3 p-2 bg-gray-50 rounded border">
-                      <strong>AI Reasoning:</strong> {reasoning}
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={handleSendSuggestion}
-                        disabled={!canReply || aiSuggestion.includes('Unable to generate')}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700"
-                      >
-                        <Send className="h-3 w-3 mr-1" />
-                        Send This Response
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={generateAIResponse}
-                        disabled={isGenerating}
-                        title="Generate new suggestion"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <Brain className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-              <p className="text-sm text-gray-500 mb-3">
-                Finn will suggest responses for inbound messages
-              </p>
-              <p className="text-xs text-gray-400">
-                Enhanced AI suggestions with objection detection
-              </p>
-            </div>
-          )}
-        </CardContent>
-      )}
+            ))}
+          </div>
+        )}
+
+        {!isLoading && suggestions.length === 0 && (
+          <div className="text-center py-6">
+            <p className="text-sm text-gray-500">No suggestions available</p>
+            <p className="text-xs text-gray-400 mt-1">Try refreshing or check if there are recent customer messages</p>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 };

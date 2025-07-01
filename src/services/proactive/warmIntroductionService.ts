@@ -1,5 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { generateEnhancedIntelligentResponse } from '../intelligentConversationAI';
+import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 import { generateInitialOutreachMessage } from './initialOutreachService';
 import { formatProperName } from '@/utils/nameFormatter';
 import { assessLeadDataQuality } from '../unifiedDataQualityService';
@@ -111,33 +112,23 @@ export const generateWarmInitialMessage = async (
         return outreachResponse.message;
       }
     } else {
-      // Use conversation AI for follow-up messages
-      console.log(`🔄 [WARM INTRO] Using enhanced conversation AI for follow-up`);
+      // Use unified AI for follow-up messages
+      console.log(`🔄 [WARM INTRO] Using unified AI for follow-up`);
 
       const dataQuality = dataQualityOverride || await assessLeadDataQuality(lead.first_name, lead.vehicle_interest);
       
       if (dataQuality.overallQualityScore > 0.7) {
         const formattedName = formatProperName(lead.first_name);
         
-        const context = {
+        const messageContext: MessageContext = {
           leadId: lead.id,
           leadName: formattedName,
-          vehicleInterest: lead.vehicle_interest,
-          messages: existingMessages.map(msg => ({
-            id: msg.id,
-            body: msg.body,
-            direction: msg.direction as 'in' | 'out',
-            sentAt: msg.sent_at,
-            aiGenerated: false
-          })),
-          leadInfo: {
-            phone: '',
-            status: 'active',
-            lastReplyAt: existingMessages[0]?.sent_at || new Date().toISOString()
-          }
+          latestMessage: existingMessages[0]?.body || '',
+          conversationHistory: existingMessages.map(msg => msg.body),
+          vehicleInterest: lead.vehicle_interest || ''
         };
         
-        const aiResponse = await generateEnhancedIntelligentResponse(context);
+        const aiResponse = unifiedAIResponseEngine.generateResponse(messageContext);
         
         if (aiResponse?.message) {
           console.log(`✅ [WARM INTRO] Generated diverse follow-up message: ${aiResponse.message}`);

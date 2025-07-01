@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Brain, Loader2, Send, Sparkles, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
-import { generateEnhancedIntelligentResponse, shouldGenerateResponse, type ConversationContext } from '@/services/intelligentConversationAI';
+import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 import { toast } from '@/hooks/use-toast';
 
 interface IntelligentAIPanelProps {
@@ -30,19 +30,18 @@ const IntelligentAIPanel = ({
 
   if (!conversation || !canReply) return null;
 
-  const context: ConversationContext = {
-    leadId: conversation.leadId,
-    leadName: conversation.leadName,
-    vehicleInterest: conversation.vehicleInterest,
-    messages: messages,
-    leadInfo: {
-      phone: conversation.leadPhone,
-      status: conversation.status,
-      lastReplyAt: conversation.lastReplyAt
-    }
+  const shouldGenerate = () => {
+    const lastCustomerMessage = messages.filter(msg => msg.direction === 'in').slice(-1)[0];
+    if (!lastCustomerMessage) return false;
+    
+    const responseAfter = messages.find(msg => 
+      msg.direction === 'out' && 
+      new Date(msg.sent_at) > new Date(lastCustomerMessage.sent_at)
+    );
+    
+    return !responseAfter;
   };
 
-  const shouldGenerate = shouldGenerateResponse(context);
   const lastCustomerMessage = messages
     .filter(msg => msg.direction === 'in')
     .slice(-1)[0];
@@ -55,7 +54,16 @@ const IntelligentAIPanel = ({
     
     try {
       console.log('🤖 Generating QUESTION-FIRST intelligent AI response...');
-      const response = await generateEnhancedIntelligentResponse(context);
+      
+      const messageContext: MessageContext = {
+        leadId: conversation.leadId,
+        leadName: conversation.leadName || 'there',
+        latestMessage: lastCustomerMessage?.body || '',
+        conversationHistory: messages.map(m => m.body),
+        vehicleInterest: conversation.vehicleInterest || ''
+      };
+
+      const response = unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (response && response.message) {
         setLastAIResponse(response.message);
@@ -115,7 +123,7 @@ const IntelligentAIPanel = ({
             <div className="flex items-center gap-2">
               <Brain className="h-4 w-4 text-purple-600" />
               <span className="text-sm font-medium">Finn AI Assistant</span>
-              {shouldGenerate && (
+              {shouldGenerate() && (
                 <Badge variant="outline" className="bg-orange-100 text-orange-700 text-xs">
                   Ready to help
                 </Badge>
@@ -182,7 +190,7 @@ const IntelligentAIPanel = ({
         )}
 
         {/* Customer Question Display */}
-        {lastCustomerMessage && shouldGenerate && !error && (
+        {lastCustomerMessage && shouldGenerate() && !error && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <Sparkles className="h-4 w-4 text-blue-600 mt-0.5" />
@@ -213,44 +221,53 @@ const IntelligentAIPanel = ({
 
         {/* Action Buttons */}
         <div className="flex gap-2">
-          <Button
-            onClick={handleGenerateResponse}
-            disabled={isGenerating || (!shouldGenerate && !error)}
-            size="sm"
-            variant="outline"
-            className="flex-1"
-          >
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Brain className="h-4 w-4 mr-2" />
-            )}
-            {isGenerating ? 'Thinking...' : error ? 'Retry' : 'Generate Response'}
-          </Button>
-
-          {lastAIResponse && !error && (
+          {!lastAIResponse && !error && (
             <Button
-              onClick={handleSendAIResponse}
               size="sm"
-              className="bg-purple-600 hover:bg-purple-700"
+              onClick={handleGenerateResponse}
+              disabled={isGenerating || !shouldGenerate()}
+              className="flex-1"
             >
-              <Send className="h-4 w-4 mr-2" />
-              Send
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Brain className="h-3 w-3 mr-2" />
+                  Generate Response
+                </>
+              )}
             </Button>
+          )}
+
+          {lastAIResponse && (
+            <>
+              <Button
+                size="sm"
+                onClick={handleSendAIResponse}
+                className="flex-1"
+              >
+                <Send className="h-3 w-3 mr-2" />
+                Send Response
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLastAIResponse(null)}
+              >
+                Clear
+              </Button>
+            </>
           )}
         </div>
 
-        {/* Status Message */}
-        {!shouldGenerate && !lastAIResponse && !error && (
-          <p className="text-xs text-slate-500 text-center">
-            Finn is monitoring for questions to answer...
-          </p>
+        {!shouldGenerate() && !lastAIResponse && !error && (
+          <div className="text-center py-4">
+            <p className="text-sm text-gray-500">No customer message to respond to</p>
+          </div>
         )}
-
-        {/* Learning Note */}
-        <div className="text-xs text-purple-600 bg-purple-100 rounded p-2">
-          💡 Finn learns from every interaction to improve responses over time
-        </div>
       </CardContent>
     </Card>
   );
