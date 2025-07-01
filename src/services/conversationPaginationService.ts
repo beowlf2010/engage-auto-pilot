@@ -28,7 +28,7 @@ class ConversationPaginationService {
       
       const offset = (page - 1) * this.pageSize;
       
-      // Build query with pagination
+      // Build query with pagination - include created_at field
       let query = supabase
         .from('leads')
         .select(`
@@ -39,6 +39,7 @@ class ConversationPaginationService {
           status,
           salesperson_id,
           ai_opt_in,
+          created_at,
           phone_numbers!inner (
             number,
             is_primary
