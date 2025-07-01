@@ -51,7 +51,7 @@ const LeadDetailTabsSection: React.FC<LeadDetailTabsSectionProps> = ({
         <EnhancedMessageThread
           leadName={`${lead.firstName || ''} ${lead.lastName || ''}`.trim()}
           messages={messages}
-          loading={messagesLoading}
+          isLoading={messagesLoading}
           onSendMessage={onSendMessage}
         />
       </TabsContent>
