@@ -3,15 +3,18 @@ import { useState, useCallback, useEffect } from 'react';
 import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 import { toast } from '@/hooks/use-toast';
 
-// Simplified interfaces for compatibility
+// Updated interfaces to match component expectations
 interface ContextualInsights {
   leadTemperature: number;
   urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
   conversationStage: string;
   nextBestActions: AIRecommendation[];
+  riskFactors: string[];
+  opportunities: string[];
   followUpScheduling: {
     shouldSchedule: boolean;
     suggestedTime: string;
+    reason: string;
   };
 }
 
@@ -20,6 +23,8 @@ interface AIRecommendation {
   action: string;
   type: 'immediate' | 'scheduled';
   priority: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  reasoning: string;
   automatable: boolean;
 }
 
@@ -71,18 +76,23 @@ export const useContextualAI = (leadId: string | null) => {
         leadTemperature: 75,
         urgencyLevel: 'medium',
         conversationStage: 'consideration',
+        riskFactors: ['Customer may be price shopping', 'Long response delays'],
+        opportunities: ['Interested in specific vehicle type', 'Ready for test drive'],
         nextBestActions: [
           {
             id: 'ai_response',
             action: 'Generate AI response',
             type: 'immediate',
             priority: 'medium',
+            confidence: 0.8,
+            reasoning: 'Customer has asked a question that needs response',
             automatable: true
           }
         ],
         followUpScheduling: {
           shouldSchedule: false,
-          suggestedTime: ''
+          suggestedTime: '',
+          reason: 'No immediate follow-up needed'
         }
       };
 
