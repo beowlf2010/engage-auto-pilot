@@ -1,4 +1,3 @@
-
 export interface MessageContext {
   leadId: string;
   leadName: string;

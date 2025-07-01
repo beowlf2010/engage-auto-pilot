@@ -1,7 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { aiServiceGuard, AI_SERVICE_IDS } from './aiServiceGuard';
-import { unifiedAIResponseEngine, MessageContext } from './unifiedAIResponseEngine';
+import { unifiedAIResponseEngine, MessageContext, UnifiedAIResponse } from './unifiedAIResponseEngine';
 
 class UnifiedAIService {
   private processedMessages = new Set<string>();
@@ -106,7 +105,7 @@ class UnifiedAIService {
         vehicleInterest: lead.vehicle_interest
       };
 
-      const response = unifiedAIResponseEngine.generateResponse(messageContext);
+      const response: UnifiedAIResponse = unifiedAIResponseEngine.generateResponse(messageContext);
 
       if (response.message) {
         this.processedMessages.add(lastCustomerMessage.id);

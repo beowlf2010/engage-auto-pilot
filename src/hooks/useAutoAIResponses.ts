@@ -113,7 +113,7 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
         onResponsePreview(leadId, {
           message: aiResponse.message,
           confidence: aiResponse.confidence,
-          reasoning: aiResponse.reasoning,
+          reasoning: aiResponse.reasoning, // Now this property exists
           leadName: lead.first_name,
           context: context
         });
