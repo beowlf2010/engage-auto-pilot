@@ -49,7 +49,6 @@ const LeadDetailTabsSection: React.FC<LeadDetailTabsSectionProps> = ({
 
       <TabsContent value="messages" className="h-[calc(100%-3rem)] overflow-hidden">
         <EnhancedMessageThread
-          leadId={lead.id}
           leadName={`${lead.firstName || ''} ${lead.lastName || ''}`.trim()}
           messages={messages}
           loading={messagesLoading}

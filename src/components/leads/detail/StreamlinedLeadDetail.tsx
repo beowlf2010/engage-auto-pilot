@@ -64,6 +64,11 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
     console.log('✅ [LEAD DETAIL] Message sent successfully via fixed service');
   };
 
+  // Wrapper function to match the expected signature (message: string) => Promise<void>
+  const handleSendMessageWrapper = async (message: string): Promise<void> => {
+    await sendMessage(lead.id, message);
+  };
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || isSending) return;
     
@@ -155,7 +160,7 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
             leadName={`${lead.firstName} ${lead.lastName}`}
             messages={conversationMessages}
             vehicleInterest={lead.vehicleInterest}
-            onSendMessage={sendMessage}
+            onSendMessage={handleSendMessageWrapper}
           />
         </div>
         
