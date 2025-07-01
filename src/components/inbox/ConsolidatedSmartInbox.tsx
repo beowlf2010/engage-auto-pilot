@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationsList } from '@/hooks/conversation/useConversationsList';
 import { useMessagesOperations } from '@/hooks/conversation/useMessagesOperations';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, AlertCircle, Inbox } from "lucide-react";
@@ -11,6 +12,8 @@ import ConversationsList from './ConversationsList';
 import { ConversationListSkeleton } from '@/components/ui/skeletons/ConversationSkeleton';
 import EnhancedChatView from './EnhancedChatView';
 import LeadContextPanel from './LeadContextPanel';
+import MessageSyncDebugPanel from '@/components/debug/MessageSyncDebugPanel';
+import type { ConversationListItem } from '@/hooks/conversation/conversationTypes';
 
 interface ConsolidatedSmartInboxProps {
   onLeadsRefresh: () => void;
@@ -22,10 +25,12 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState("unread");
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
+  const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   
   const { 
     conversations, 
-    conversationsLoading
+    conversationsLoading,
+    refetchConversations
   } = useConversationsList();
 
   const { 
@@ -37,6 +42,25 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
 
   const { markAsRead, isMarkingAsRead } = useMarkAsRead();
 
+  // Real-time message synchronization
+  const handleMessageUpdate = useCallback((leadId: string) => {
+    console.log('📨 Real-time message update for lead:', leadId);
+    if (selectedLead === leadId) {
+      loadMessages(leadId);
+    }
+  }, [selectedLead, loadMessages]);
+
+  const handleConversationUpdate = useCallback(() => {
+    console.log('🔄 Real-time conversation update');
+    refetchConversations();
+    onLeadsRefresh();
+  }, [refetchConversations, onLeadsRefresh]);
+
+  const { reconnect } = useRealtimeMessages({
+    onMessageUpdate: handleMessageUpdate,
+    onConversationUpdate: handleConversationUpdate
+  });
+
   // Load messages when a lead is selected
   useEffect(() => {
     if (selectedLead) {
@@ -45,6 +69,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
   }, [selectedLead, loadMessages]);
 
   const handleSelectConversation = async (leadId: string) => {
+    console.log('🎯 Selecting conversation for lead:', leadId);
     setSelectedLead(leadId);
   };
 
@@ -54,7 +79,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
     }
   };
 
-  const canReply = (conversation: any) => {
+  const canReply = (conversation: ConversationListItem) => {
     return conversation.lastMessageDirection === 'in' || conversation.unreadCount > 0;
   };
 
@@ -73,7 +98,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
   const allIncoming = conversations.filter(conv => conv.lastMessageDirection === 'in');
 
   // Calculate urgency levels for unread messages
-  const getUrgencyLevel = (conv: any): 'high' | 'medium' | 'low' => {
+  const getUrgencyLevel = (conv: ConversationListItem): 'high' | 'medium' | 'low' => {
     const hoursSinceLastMessage = conv.lastMessageDate ? 
       (Date.now() - conv.lastMessageDate.getTime()) / (1000 * 60 * 60) : 0;
     
@@ -231,6 +256,13 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
           />
         </div>
       </div>
+
+      {/* Debug Panel */}
+      <MessageSyncDebugPanel
+        isOpen={debugPanelOpen}
+        onToggle={() => setDebugPanelOpen(!debugPanelOpen)}
+        selectedLeadId={selectedLead}
+      />
     </div>
   );
 };
