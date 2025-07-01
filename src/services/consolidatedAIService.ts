@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { aiServiceGuard, AI_SERVICE_IDS } from './aiServiceGuard';
 
@@ -110,14 +111,16 @@ class ConsolidatedAIService {
         .map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`)
         .join('\n');
 
-      console.log('📞 [CONSOLIDATED AI] Calling intelligent-conversation-ai edge function');
+      console.log('📞 [CONSOLIDATED AI] Calling intelligent-conversation-ai with direct message context');
+      console.log('📝 [CONSOLIDATED AI] Customer message:', lastCustomerMessage.body.substring(0, 100) + '...');
 
-      // Call the conversation-aware edge function
+      // Call the conversation-aware edge function with the actual customer message
       const { data: aiResponse, error: aiError } = await supabase.functions.invoke('intelligent-conversation-ai', {
         body: {
           leadId,
           leadName: `${lead.first_name} ${lead.last_name}`,
-          messageBody: lastCustomerMessage.body,
+          messageBody: lastCustomerMessage.body, // Pass the actual customer message
+          latestCustomerMessage: lastCustomerMessage.body, // Alternative parameter
           conversationHistory,
           hasConversationalSignals: false,
           leadSource: lead.source,
@@ -131,12 +134,13 @@ class ConsolidatedAIService {
         return null;
       }
 
-      if (aiResponse?.success && aiResponse?.response) {
+      if (aiResponse?.message) {
         // Mark this message as processed
         this.processedMessages.add(lastCustomerMessage.id);
-        console.log(`✅ [CONSOLIDATED AI] Generated conversation-aware response:`, aiResponse.response);
+        console.log(`✅ [CONSOLIDATED AI] Generated contextual response:`, aiResponse.message.substring(0, 100) + '...');
+        console.log(`🎯 [CONSOLIDATED AI] Response reasoning:`, aiResponse.reasoning);
         
-        return aiResponse.response;
+        return aiResponse.message;
       } else {
         console.log('❌ [CONSOLIDATED AI] No response generated from edge function');
         return null;

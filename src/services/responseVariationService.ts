@@ -14,74 +14,74 @@ export interface ResponseVariationConfig {
   timeOfDay: 'morning' | 'afternoon' | 'evening';
   conversationStage: 'initial' | 'follow_up' | 'warm_up' | 'closing';
   lastResponseType?: string;
+  customerMessage?: string; // NEW: Direct customer message for context
 }
 
 class ResponseVariationService {
   private usedResponses = new Map<string, Set<string>>();
   private responseMemory = new Map<string, string[]>();
 
-  // Diverse greeting variations
+  // More professional greeting variations
   private greetings = {
     casual: [
-      "Hey {name}!", "Hi there {name}!", "Hello {name}!", "Hi {name}!",
-      "What's up {name}?", "Good to hear from you {name}!", "Hope you're doing well {name}!"
+      "Hi {name}!", "Hello {name}!", "Hi there {name}!",
+      "Good to hear from you {name}!", "Thanks for reaching out {name}!"
     ],
     professional: [
       "Hello {name},", "Good morning {name},", "Good afternoon {name},", 
-      "Thank you for reaching out {name},", "I hope this message finds you well {name},",
+      "Thank you for contacting us {name},", "I hope this message finds you well {name},",
       "It's great to connect with you {name},"
     ],
     enthusiastic: [
-      "Hi {name}! 🚗", "Hey {name}! Excited to help!", "Hello {name}! Great to connect!",
-      "Hi there {name}! Ready to find your perfect ride?", "Hey {name}! Let's find your dream car!"
+      "Hi {name}! Great to connect!", "Hello {name}! Thanks for reaching out!",
+      "Hi there {name}! I'm here to help!", "Hello {name}! Ready to assist you!"
     ],
     warm: [
       "Hi {name}, hope you're having a great day!", "Hello {name}, thanks for getting in touch!",
-      "Hi {name}, I'm here and ready to help!", "Hello there {name}! Nice to meet you!"
+      "Hi {name}, I'm here and ready to help!", "Hello there {name}! Nice to connect!"
     ]
   };
 
-  // Vehicle reference variations
+  // More professional vehicle references
   private vehicleReferences = [
-    "I see you're interested in the {vehicle}",
-    "I noticed you're looking at the {vehicle}",
-    "The {vehicle} caught your eye",
-    "You're considering the {vehicle}",
-    "I have some great info about the {vehicle}",
-    "Let's talk about that {vehicle}",
-    "The {vehicle} is a fantastic choice",
-    "I'd love to help with the {vehicle}"
+    "I understand you're interested in the {vehicle}",
+    "I see you're considering the {vehicle}",
+    "Regarding the {vehicle} you inquired about",
+    "I'd be happy to help with information about the {vehicle}",
+    "Let me assist you with the {vehicle}",
+    "I can provide details about the {vehicle}",
+    "The {vehicle} is an excellent choice to consider"
   ];
 
-  // Call-to-action variations
+  // More professional call-to-action variations
   private callToActions = {
     question_based: [
       "What questions can I answer for you?",
-      "What would you like to know more about?",
-      "Is there anything specific you'd like to discuss?",
       "What information would be most helpful?",
-      "What can I help clarify for you?"
+      "How can I best assist you today?",
+      "What would you like to know more about?",
+      "Is there anything specific I can help clarify?"
     ],
     offer_based: [
-      "I'd love to share some details with you.",
+      "I'd be happy to provide more information.",
       "Let me know how I can help!",
-      "I'm here to make this process easy for you.",
-      "I can provide all the information you need.",
-      "I'm ready to help you every step of the way."
+      "I'm here to assist you with any questions.",
+      "I can provide all the details you need.",
+      "I'm ready to help you find the right solution."
     ],
     action_based: [
-      "Should we set up a time to chat?",
-      "Would you like to see some photos or details?",
-      "Ready to take the next step?",
-      "Want to schedule a test drive?",
-      "Shall we discuss your options?"
+      "Would you like to discuss your options?",
+      "Should we go over the details?",
+      "Would it be helpful to review the information together?",
+      "Shall we discuss what works best for you?",
+      "Would you like me to provide more specific information?"
     ],
     casual: [
-      "What's on your mind?",
-      "How can I help you out?",
-      "What do you want to know?",
-      "Let's figure this out together!",
-      "What are you thinking?"
+      "What can I help you with?",
+      "How can I assist you?",
+      "What would you like to know?",
+      "How can I be of help?",
+      "What information do you need?"
     ]
   };
 
@@ -140,24 +140,91 @@ class ResponseVariationService {
     return response;
   }
 
-  // Generate fallback responses with variety
-  generateDiverseFallback(leadName: string, vehicleInterest?: string): string {
+  // Enhanced response generation with customer message context
+  generateContextualResponse(config: ResponseVariationConfig): string {
+    const personality = this.selectPersonality(config);
+    
+    // Analyze customer message for context if provided
+    let responseContext = 'general';
+    if (config.customerMessage) {
+      const msgLower = config.customerMessage.toLowerCase();
+      if (msgLower.includes('price') || msgLower.includes('cost')) {
+        responseContext = 'pricing';
+      } else if (msgLower.includes('test drive') || msgLower.includes('appointment')) {
+        responseContext = 'scheduling';
+      } else if (msgLower.includes('available') || msgLower.includes('inventory')) {
+        responseContext = 'availability';
+      } else if (msgLower.includes('thank') || msgLower.includes('appreciate')) {
+        responseContext = 'appreciation';
+      }
+    }
+    
+    const greeting = this.selectRandomAvoid(
+      this.greetings[personality], 
+      this.responseMemory.get(config.leadId) || []
+    ).replace('{name}', config.leadName || 'there');
+    
+    // Context-aware response building
+    let contextualOpener = '';
+    if (responseContext === 'pricing' && config.customerMessage) {
+      contextualOpener = "I understand you're asking about pricing.";
+    } else if (responseContext === 'scheduling' && config.customerMessage) {
+      contextualOpener = "I'd be happy to help you schedule something.";
+    } else if (responseContext === 'availability' && config.customerMessage) {
+      contextualOpener = "Let me help you with availability information.";
+    } else if (responseContext === 'appreciation' && config.customerMessage) {
+      contextualOpener = "You're very welcome!";
+    }
+    
+    const vehicleRef = config.vehicleInterest && Math.random() < 0.6 ? 
+      this.selectRandomAvoid(this.vehicleReferences, this.responseMemory.get(config.leadId) || [])
+        .replace('{vehicle}', config.vehicleInterest) : '';
+    
+    const callToAction = this.selectCallToAction(personality, this.responseMemory.get(config.leadId) || []);
+    
+    // Construct message with natural flow
+    const parts = [greeting, contextualOpener, vehicleRef, callToAction].filter(Boolean);
+    const response = parts.join(' ').replace(/\s+/g, ' ').trim();
+    
+    // Remember this response
+    this.rememberResponse(config.leadId, response);
+    
+    return response;
+  }
+
+  // Enhanced fallback with more professional options
+  generateDiverseFallback(leadName: string, vehicleInterest?: string, customerMessage?: string): string {
     const fallbacks = [
-      `Hi ${leadName}! I'm Finn with Jason Pilger Chevrolet. How can I help you today?`,
-      `Hello ${leadName}! Thanks for reaching out. What can I assist you with?`,
-      `Hey ${leadName}! I'm here to help with any questions you might have.`,
-      `Hi there ${leadName}! What brings you our way today?`,
-      `Hello ${leadName}! Ready to help you find exactly what you're looking for.`,
-      `Hi ${leadName}! Let's make your car shopping experience great!`,
-      `Hey ${leadName}! What can I do for you today?`,
-      `Hello ${leadName}! I'm excited to help you out.`
+      `Hi ${leadName}! I'm Finn with Jason Pilger Chevrolet. How can I assist you today?`,
+      `Hello ${leadName}! Thank you for reaching out. What information can I provide?`,
+      `Hi there ${leadName}! I'm here to help with any questions you might have.`,
+      `Hello ${leadName}! What can I help you with regarding your automotive needs?`,
+      `Hi ${leadName}! I'm ready to assist you with finding the right vehicle.`,
+      `Hello ${leadName}! Let me know how I can help you today.`,
+      `Hi ${leadName}! What questions can I answer for you?`,
+      `Hello ${leadName}! I'm here to provide the information you need.`
     ];
+    
+    // Add context-aware fallbacks if customer message is provided
+    if (customerMessage) {
+      const msgLower = customerMessage.toLowerCase();
+      if (msgLower.includes('price') || msgLower.includes('cost')) {
+        fallbacks.unshift(
+          `Hi ${leadName}! I understand you're asking about pricing. I'd be happy to help with that information.`,
+          `Hello ${leadName}! Let me assist you with pricing details.`
+        );
+      } else if (msgLower.includes('available') || msgLower.includes('inventory')) {
+        fallbacks.unshift(
+          `Hi ${leadName}! I can help you with availability information.`,
+          `Hello ${leadName}! Let me check what we have available for you.`
+        );
+      }
+    }
     
     if (vehicleInterest) {
       fallbacks.push(
-        `Hi ${leadName}! I see you're interested in ${vehicleInterest}. Let's chat!`,
-        `Hello ${leadName}! The ${vehicleInterest} is a great choice. What would you like to know?`,
-        `Hey ${leadName}! Ready to talk about that ${vehicleInterest}?`
+        `Hi ${leadName}! I understand you're interested in ${vehicleInterest}. How can I help?`,
+        `Hello ${leadName}! I'd be happy to provide information about ${vehicleInterest}.`
       );
     }
     
@@ -165,16 +232,27 @@ class ResponseVariationService {
   }
 
   private selectPersonality(config: ResponseVariationConfig): 'casual' | 'professional' | 'enthusiastic' | 'warm' {
-    // Logic to select personality based on context
+    // More professional by default, especially for initial contacts
     if (config.conversationStage === 'initial') {
-      return Math.random() < 0.5 ? 'warm' : 'professional';
+      return Math.random() < 0.7 ? 'professional' : 'warm';
     }
     if (config.conversationStage === 'closing') {
-      return Math.random() < 0.6 ? 'enthusiastic' : 'professional';
+      return Math.random() < 0.6 ? 'professional' : 'warm';
+    }
+    
+    // Analyze customer message tone if available
+    if (config.customerMessage) {
+      const msgLower = config.customerMessage.toLowerCase();
+      if (msgLower.includes('thank') || msgLower.includes('appreciate')) {
+        return 'warm';
+      }
+      if (msgLower.length > 50 && !msgLower.includes('!')) {
+        return 'professional'; // Longer, more formal messages get professional responses
+      }
     }
     
     const personalities: ('casual' | 'professional' | 'enthusiastic' | 'warm')[] = 
-      ['casual', 'professional', 'enthusiastic', 'warm'];
+      ['professional', 'warm', 'professional', 'casual']; // Weighted toward professional
     return personalities[Math.floor(Math.random() * personalities.length)];
   }
 
@@ -226,14 +304,6 @@ class ResponseVariationService {
     if (hour < 12) return 'morning';
     if (hour < 17) return 'afternoon';
     return 'evening';
-  }
-
-  // Generate context-aware response
-  generateContextualResponse(config: ResponseVariationConfig): string {
-    const timeOfDay = this.getTimeOfDay();
-    const fullConfig = { ...config, timeOfDay };
-    
-    return this.generateVariedResponse(fullConfig);
   }
 
   // Reset memory for testing or cleanup

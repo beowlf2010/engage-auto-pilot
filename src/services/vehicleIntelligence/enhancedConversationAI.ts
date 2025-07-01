@@ -20,6 +20,7 @@ export interface EnhancedConversationContext {
     lastReplyAt?: string;
   };
   leadSource?: string;
+  latestCustomerMessage?: string; // NEW: Direct customer message
 }
 
 export interface EnhancedAIResponse {
@@ -39,6 +40,18 @@ export const generateVehicleIntelligentResponse = async (
     
     const formattedName = formatProperName(context.leadName);
     const isInitialContact = context.messages.length === 0;
+    
+    // Get the actual customer message - prioritize direct parameter
+    let customerMessage = context.latestCustomerMessage;
+    
+    if (!customerMessage && context.messages.length > 0) {
+      const lastCustomerMessage = context.messages
+        .filter(msg => msg.direction === 'in')
+        .slice(-1)[0];
+      customerMessage = lastCustomerMessage?.body;
+    }
+
+    console.log('📝 [ENHANCED CONVERSATION AI] Processing customer message:', customerMessage?.substring(0, 100) + '...');
     
     if (isInitialContact) {
       // Use vehicle personalization for initial contact
@@ -62,21 +75,16 @@ export const generateVehicleIntelligentResponse = async (
       };
     }
     
-    // For follow-up messages, analyze the conversation context
-    const lastCustomerMessage = context.messages
-      .filter(msg => msg.direction === 'in')
-      .slice(-1)[0];
-    
-    if (lastCustomerMessage) {
-      const conversationAnalysis = await analyzeVehicleConversation(lastCustomerMessage.body, context);
+    if (customerMessage) {
+      const conversationAnalysis = await analyzeVehicleConversation(customerMessage, context);
       
       if (conversationAnalysis.needsVehicleResponse) {
-        return await generateVehicleContextualResponse(context, conversationAnalysis);
+        return await generateVehicleContextualResponse(context, conversationAnalysis, customerMessage);
       }
     }
     
-    // Direct fallback without circular dependency
-    return await generateDirectFallbackResponse(context);
+    // Direct fallback with customer message context
+    return await generateDirectFallbackResponse(context, customerMessage);
     
   } catch (error) {
     console.error('❌ [ENHANCED CONVERSATION AI] Error:', error);
@@ -125,7 +133,8 @@ const analyzeVehicleConversation = async (message: string, context: EnhancedConv
 
 const generateVehicleContextualResponse = async (
   context: EnhancedConversationContext, 
-  analysis: any
+  analysis: any,
+  customerMessage: string
 ): Promise<EnhancedAIResponse> => {
   const formattedName = formatProperName(context.leadName);
   const greeting = formattedName ? `${formattedName}, ` : '';
@@ -140,7 +149,7 @@ const generateVehicleContextualResponse = async (
     return {
       message,
       confidence: 0.9,
-      reasoning: 'Vehicle interest correction response',
+      reasoning: `Vehicle interest correction response to: "${customerMessage.substring(0, 50)}..."`,
       vehicleContext: analysis.vehicleRecognition,
       followUpScheduled: false,
       inventoryMentioned
@@ -164,14 +173,14 @@ const generateVehicleContextualResponse = async (
   } else if (analysis.intent === 'features_inquiry') {
     message = `${greeting}absolutely! I can go over all the features and options. What aspects are most important to you - technology, safety features, performance, or comfort options?`;
   } else {
-    // General vehicle response
-    message = `${greeting}I'm here to help you find exactly what you're looking for! Let me know what specific information would be most helpful - availability, pricing, features, or anything else about our vehicles.`;
+    // General vehicle response that acknowledges their specific message
+    message = `${greeting}I understand you're asking about ${customerMessage.toLowerCase().includes('price') ? 'pricing' : customerMessage.toLowerCase().includes('available') ? 'availability' : 'that'}. I'm here to help you find exactly what you're looking for! Let me know what specific information would be most helpful.`;
   }
   
   return {
     message,
     confidence: 0.85,
-    reasoning: `Vehicle-contextual response for ${analysis.intent} intent`,
+    reasoning: `Vehicle-contextual response for ${analysis.intent} intent addressing: "${customerMessage.substring(0, 50)}..."`,
     vehicleContext: analysis.vehicleRecognition,
     followUpScheduled: analysis.urgency === 'high',
     inventoryMentioned
@@ -179,15 +188,31 @@ const generateVehicleContextualResponse = async (
 };
 
 const generateDirectFallbackResponse = async (
-  context: EnhancedConversationContext
+  context: EnhancedConversationContext,
+  customerMessage?: string
 ): Promise<EnhancedAIResponse> => {
   const formattedName = formatProperName(context.leadName);
   const greeting = formattedName ? `${formattedName}, ` : '';
   
+  let message = `${greeting}thanks for reaching out! I'm here to help you with any questions about our vehicles or to assist you in finding the perfect match for your needs.`;
+  
+  // Add context based on what they said if available
+  if (customerMessage) {
+    if (customerMessage.toLowerCase().includes('price') || customerMessage.toLowerCase().includes('cost')) {
+      message += ' I can definitely help you with pricing information.';
+    } else if (customerMessage.toLowerCase().includes('test drive') || customerMessage.toLowerCase().includes('appointment')) {
+      message += ' I can help you schedule a test drive or appointment.';
+    } else if (customerMessage.toLowerCase().includes('available') || customerMessage.toLowerCase().includes('inventory')) {
+      message += ' I can show you what we have available in our inventory.';
+    }
+  }
+  
+  message += ' What can I help you with today?';
+  
   return {
-    message: `${greeting}thanks for reaching out! I'm here to help you with any questions about our vehicles or to assist you in finding the perfect match for your needs. What can I help you with today?`,
-    confidence: 0.6,
-    reasoning: 'Direct fallback response without circular dependency',
+    message,
+    confidence: 0.7,
+    reasoning: `Direct contextual fallback ${customerMessage ? `addressing: "${customerMessage.substring(0, 50)}..."` : 'response'}`,
     followUpScheduled: false
   };
 };

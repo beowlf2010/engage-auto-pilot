@@ -27,33 +27,56 @@ serve(async (req) => {
       leadName,
       vehicleInterest,
       conversationHistory,
+      messageBody,  // NEW: Direct customer message
+      latestCustomerMessage,  // NEW: Alternative parameter name
       isInitialContact,
       salespersonName = 'Finn',
       dealershipName = 'Jason Pilger Chevrolet'
     } = await req.json();
 
     console.log('🤖 Enhanced AI processing for lead:', leadId, leadName);
+    
+    // Get the actual customer message - prioritize direct parameters over parsing
+    let customerMessage = messageBody || latestCustomerMessage;
+    
+    // If no direct message provided, try to extract from conversation history
+    if (!customerMessage && conversationHistory) {
+      console.log('📝 Extracting customer message from conversation history');
+      const messages = conversationHistory.split('\n').filter((line: string) => line.trim());
+      const lastCustomerLine = messages
+        .filter((line: string) => line.toLowerCase().includes('customer:'))
+        .pop();
+      
+      if (lastCustomerLine) {
+        customerMessage = lastCustomerLine.replace(/^customer:\s*/i, '').trim();
+      }
+    }
 
-    // Get the latest customer message from conversation history
-    const messages = conversationHistory.split('\n').filter((line: string) => line.trim());
-    const lastCustomerMessage = messages
-      .filter((line: string) => line.toLowerCase().includes('customer:'))
-      .pop()?.replace(/^customer:\s*/i, '') || '';
+    console.log('📝 Processing customer message:', customerMessage);
 
-    console.log('📝 Latest customer message:', lastCustomerMessage);
+    if (!customerMessage) {
+      console.log('⚠️ No customer message found to process');
+      return new Response(JSON.stringify({
+        error: 'No customer message provided for analysis'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Enhanced intent analysis with objection detection
+    // Enhanced intent analysis with the actual customer message
     const intentAnalysis = analyzeEnhancedCustomerIntent(
-      lastCustomerMessage,
-      conversationHistory,
-      vehicleInterest,
-      leadName
+      customerMessage,
+      conversationHistory || '',
+      vehicleInterest || '',
+      leadName || ''
     );
 
     console.log('🎯 Intent analysis result:', {
       primaryIntent: intentAnalysis.primaryIntent,
       confidence: intentAnalysis.confidence,
       strategy: intentAnalysis.responseStrategy,
+      customerMessage: customerMessage.substring(0, 100) + '...',
       hasObjections: intentAnalysis.objectionSignals?.length || 0
     });
 
@@ -62,7 +85,7 @@ serve(async (req) => {
       console.log('🏆 Competitor purchase detected - generating congratulatory response');
       
       const response = intentAnalysis.suggestedResponse || 
-        `Congratulations on your new vehicle, ${leadName}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
+        `Congratulations on your new vehicle, ${leadName || 'there'}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
 
       return new Response(JSON.stringify({
         message: response,
@@ -88,9 +111,9 @@ serve(async (req) => {
       
       const objectionResponse = generateEnhancedObjectionResponse(
         intentAnalysis.objectionSignals,
-        lastCustomerMessage,
-        vehicleInterest,
-        leadName
+        customerMessage,
+        vehicleInterest || '',
+        leadName || ''
       );
 
       if (objectionResponse) {
@@ -113,14 +136,14 @@ serve(async (req) => {
       }
     }
 
-    // Fall back to regular AI response generation if no specific objections detected
+    // Use enhanced contextual response if available
     if (intentAnalysis.suggestedResponse) {
       console.log('💡 Using enhanced contextual response');
       
       return new Response(JSON.stringify({
         message: intentAnalysis.suggestedResponse,
         confidence: intentAnalysis.confidence,
-        reasoning: `Enhanced contextual response for ${intentAnalysis.primaryIntent}`,
+        reasoning: `Enhanced contextual response for ${intentAnalysis.primaryIntent} based on: "${customerMessage.substring(0, 50)}..."`,
         intentAnalysis: {
           strategy: intentAnalysis.responseStrategy,
           primaryIntent: intentAnalysis.primaryIntent,
@@ -135,19 +158,29 @@ serve(async (req) => {
       });
     }
 
-    // Fallback to OpenAI if no enhanced response available
-    console.log('🤖 Falling back to OpenAI generation');
+    // Enhanced OpenAI fallback with better context
+    console.log('🤖 Using enhanced OpenAI generation with customer message context');
     
-    const prompt = `You are Finn, a helpful car salesperson at ${dealershipName}. 
-    
-Customer: ${leadName}
-Vehicle Interest: ${vehicleInterest}
-Latest Message: "${lastCustomerMessage}"
+    const prompt = `You are Finn, a professional and helpful automotive sales consultant at ${dealershipName}. 
 
-Conversation Context:
-${conversationHistory}
+Customer: ${leadName || 'Customer'}
+Vehicle Interest: ${vehicleInterest || 'Not specified'}
+Customer's Latest Message: "${customerMessage}"
 
-Generate a helpful, conversational response. Keep it natural and engaging. Focus on understanding their needs and building rapport.`;
+Context from conversation:
+${conversationHistory || 'This is the beginning of the conversation.'}
+
+IMPORTANT INSTRUCTIONS:
+- Respond directly to what the customer just said: "${customerMessage}"
+- Be professional, helpful, and build rapport
+- Don't be overly enthusiastic or pushy
+- Focus on understanding their needs and being genuinely helpful
+- If they ask about pricing, acknowledge that and offer to help with pricing information
+- If they want to schedule something, respond appropriately to their scheduling request
+- Match their communication style (formal vs. casual)
+- Don't assume they're excited or ready to buy unless they indicate that
+
+Generate a natural, conversational response that directly addresses their message.`;
 
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -158,7 +191,10 @@ Generate a helpful, conversational response. Keep it natural and engaging. Focus
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You are Finn, a friendly and knowledgeable car salesperson at Jason Pilger Chevrolet.' },
+          { 
+            role: 'system', 
+            content: 'You are Finn, a professional automotive sales consultant who focuses on building rapport and being genuinely helpful rather than pushy. Always respond directly to what the customer is saying.'
+          },
           { role: 'user', content: prompt }
         ],
         max_tokens: 200,
@@ -169,14 +205,20 @@ Generate a helpful, conversational response. Keep it natural and engaging. Focus
     const aiData = await openAIResponse.json();
     const aiMessage = aiData.choices?.[0]?.message?.content || 'I\'d be happy to help! What questions do you have?';
 
+    console.log('✅ Generated contextual OpenAI response:', aiMessage.substring(0, 100) + '...');
+
     return new Response(JSON.stringify({
       message: aiMessage,
-      confidence: 0.7,
-      reasoning: 'OpenAI fallback response',
+      confidence: 0.8,
+      reasoning: `Professional OpenAI response directly addressing: "${customerMessage.substring(0, 50)}..."`,
       intentAnalysis: {
         strategy: intentAnalysis.responseStrategy,
         primaryIntent: intentAnalysis.primaryIntent,
         urgencyLevel: intentAnalysis.customerContext.urgencyLevel
+      },
+      customerIntent: {
+        type: 'contextual_response',
+        confidence: 0.8
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
