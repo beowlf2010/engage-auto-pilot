@@ -1,222 +1,236 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useConversationOperations } from '@/hooks/useConversationOperations';
-import { useInboxOperations } from '@/hooks/inbox/useInboxOperations';
+import { useConversationsList } from '@/hooks/conversation/useConversationsList';
+import { useMessagesOperations } from '@/hooks/conversation/useMessagesOperations';
+import { useMarkAsRead } from '@/hooks/useMarkAsRead';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { MessageSquare, AlertCircle, Inbox } from "lucide-react";
 import ConversationsList from './ConversationsList';
+import { ConversationListSkeleton } from '@/components/ui/skeletons/ConversationSkeleton';
 import EnhancedChatView from './EnhancedChatView';
-import MessageDebugPanel from './MessageDebugPanel';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { RefreshCw, MessageSquare, AlertCircle } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { ConversationListItem } from '@/types/conversation';
+import LeadContextPanel from './LeadContextPanel';
 
 interface ConsolidatedSmartInboxProps {
-  onLeadsRefresh?: () => void;
+  onLeadsRefresh: () => void;
 }
 
-const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({ onLeadsRefresh }) => {
+const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
+  onLeadsRefresh
+}) => {
   const { profile } = useAuth();
-  const [selectedConversation, setSelectedConversation] = useState<any>(null);
-  const [showTemplates, setShowTemplates] = useState(false);
+  const [activeTab, setActiveTab] = useState("unread");
+  const [selectedLead, setSelectedLead] = useState<string | null>(null);
+  
+  const { 
+    conversations, 
+    conversationsLoading
+  } = useConversationsList();
 
-  const {
-    conversations,
-    messages,
-    selectedLeadId,
-    loading,
-    messagesLoading,
-    sendingMessage,
-    error,
-    totalConversations,
+  const { 
+    messages, 
+    sendMessage, 
     loadMessages,
-    sendMessage,
-    manualRefresh,
-    debugConversationState,
-    setError
-  } = useConversationOperations();
+    sendingMessage 
+  } = useMessagesOperations();
 
-  const {
-    canReply,
-    handleSelectConversation,
-    handleSendMessage
-  } = useInboxOperations({
-    user: profile ? { role: profile.role || 'user', id: profile.id } : { role: 'user', id: '' },
-    loadMessages,
-    sendMessage,
-    sendingMessage,
-    setError
-  });
+  const { markAsRead, isMarkingAsRead } = useMarkAsRead();
 
-  // Enhanced conversation selection with debug logging
-  const onSelectConversation = useCallback(async (conversation: ConversationListItem) => {
-    console.log('📱 [CONSOLIDATED INBOX] Selecting conversation:', {
-      leadId: conversation.leadId,
-      leadName: conversation.leadName,
-      unreadCount: conversation.unreadCount,
-      lastMessage: conversation.lastMessage?.substring(0, 50) + '...'
-    });
-
-    setSelectedConversation(conversation);
-    
-    try {
-      await handleSelectConversation(conversation.leadId);
-      console.log('✅ [CONSOLIDATED INBOX] Conversation selected successfully');
-    } catch (error) {
-      console.error('❌ [CONSOLIDATED INBOX] Error selecting conversation:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load conversation messages",
-        variant: "destructive"
-      });
-    }
-  }, [handleSelectConversation]);
-
-  // Enhanced message sending with debug logging
-  const onSendMessage = useCallback(async (message: string) => {
-    if (!selectedConversation) return;
-    
-    console.log('📤 [CONSOLIDATED INBOX] Sending message:', {
-      leadId: selectedConversation.leadId,
-      messageLength: message.length
-    });
-
-    try {
-      await handleSendMessage(
-        selectedConversation.leadId,
-        selectedConversation,
-        message
-      );
-      console.log('✅ [CONSOLIDATED INBOX] Message sent successfully');
-    } catch (error) {
-      console.error('❌ [CONSOLIDATED INBOX] Error sending message:', error);
-      toast({
-        title: "Error", 
-        description: error instanceof Error ? error.message : "Failed to send message",
-        variant: "destructive"
-      });
-    }
-  }, [selectedConversation, handleSendMessage]);
-
-  // Enhanced manual refresh with debug logging
-  const onManualRefresh = useCallback(() => {
-    console.log('🔄 [CONSOLIDATED INBOX] Manual refresh triggered');
-    manualRefresh();
-    debugConversationState();
-    
-    if (onLeadsRefresh) {
-      onLeadsRefresh();
-    }
-    
-    toast({
-      title: "Refreshed",
-      description: "Conversations and messages have been refreshed"
-    });
-  }, [manualRefresh, debugConversationState, onLeadsRefresh]);
-
-  // Log state changes for debugging
+  // Load messages when a lead is selected
   useEffect(() => {
-    console.log('📊 [CONSOLIDATED INBOX] State update:', {
-      conversationsCount: conversations.length,
-      messagesCount: messages.length,
-      selectedLeadId,
-      loading,
-      messagesLoading,
-      error
-    });
-  }, [conversations.length, messages.length, selectedLeadId, loading, messagesLoading, error]);
+    if (selectedLead) {
+      loadMessages(selectedLead);
+    }
+  }, [selectedLead, loadMessages]);
 
-  if (loading) {
+  const handleSelectConversation = async (leadId: string) => {
+    setSelectedLead(leadId);
+  };
+
+  const handleSendMessage = async (message: string, isTemplate?: boolean) => {
+    if (selectedLead) {
+      await sendMessage(selectedLead, message);
+    }
+  };
+
+  const canReply = (conversation: any) => {
+    return conversation.lastMessageDirection === 'in' || conversation.unreadCount > 0;
+  };
+
+  const selectedConversation = conversations.find(conv => conv.leadId === selectedLead);
+
+  if (!profile) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-lg font-medium text-gray-700">Loading conversations...</p>
-          <p className="text-sm text-gray-500">Setting up real-time updates</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg font-medium text-gray-700">Please log in to view your inbox.</p>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <Card className="p-6 text-center">
-        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Conversations</h3>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <Button onClick={onManualRefresh} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Retry
-        </Button>
-      </Card>
-    );
-  }
+  // Filter conversations based on active tab
+  const unreadConversations = conversations.filter(conv => conv.unreadCount > 0);
+  const allIncoming = conversations.filter(conv => conv.lastMessageDirection === 'in');
+
+  // Calculate urgency levels for unread messages
+  const getUrgencyLevel = (conv: any): 'high' | 'medium' | 'low' => {
+    const hoursSinceLastMessage = conv.lastMessageDate ? 
+      (Date.now() - conv.lastMessageDate.getTime()) / (1000 * 60 * 60) : 0;
+    
+    if (conv.unreadCount > 3 || hoursSinceLastMessage > 24) return 'high';
+    if (conv.unreadCount > 1 || hoursSinceLastMessage > 4) return 'medium';
+    return 'low';
+  };
+
+  // Sort unread by urgency and time
+  const sortedUnreadConversations = [...unreadConversations].sort((a, b) => {
+    const urgencyOrder = { high: 0, medium: 1, low: 2 };
+    const aUrgency = getUrgencyLevel(a);
+    const bUrgency = getUrgencyLevel(b);
+    
+    if (aUrgency !== bUrgency) {
+      return urgencyOrder[aUrgency] - urgencyOrder[bUrgency];
+    }
+    
+    // Same urgency, sort by time (newest first)
+    return (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0);
+  });
+
+  // Sort all incoming by most recent
+  const sortedAllIncoming = [...allIncoming].sort((a, b) => 
+    (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0)
+  );
+
+  const getTabConversations = () => {
+    switch (activeTab) {
+      case "unread":
+        return sortedUnreadConversations;
+      case "incoming":
+        return sortedAllIncoming;
+      case "all":
+      default:
+        return conversations;
+    }
+  };
 
   return (
-    <div className="h-full flex">
-      {/* Conversations List */}
-      <div className="w-80 border-r bg-white flex flex-col">
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Conversations</h2>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">{totalConversations}</Badge>
-              <Button 
-                onClick={onManualRefresh}
-                variant="ghost" 
-                size="sm"
-                className="p-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+    <div className="w-full h-full">
+      {/* Full-width tabs across the top */}
+      <div className="mb-4 flex-shrink-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100 h-12">
+            <TabsTrigger value="unread" className="flex items-center gap-2 text-base">
+              <AlertCircle className="w-4 h-4" />
+              <span>Unread</span>
+              {!conversationsLoading && unreadConversations.length > 0 && (
+                <Badge variant="destructive" className="text-xs">
+                  {unreadConversations.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            
+            <TabsTrigger value="incoming" className="flex items-center gap-2 text-base">
+              <MessageSquare className="w-4 h-4" />
+              <span>All Incoming</span>
+              {!conversationsLoading && (
+                <Badge variant="secondary" className="text-xs">
+                  {allIncoming.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            
+            <TabsTrigger value="all" className="flex items-center gap-2 text-base">
+              <Inbox className="w-4 h-4" />
+              <span>All Conversations</span>
+              {!conversationsLoading && (
+                <Badge variant="outline" className="text-xs">
+                  {conversations.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Main content area with 3-column layout - Flexible height */}
+      <div className="flex-1 flex gap-4 min-h-0" style={{ height: 'calc(100vh - 12rem)' }}>
+        {/* Conversations sidebar - Fixed width */}
+        <div className="w-80 flex-shrink-0">
+          <div className="h-full bg-white rounded-lg border shadow-sm flex flex-col">
+            {/* Tab descriptions */}
+            <div className="flex-shrink-0">
+              {activeTab === "unread" && !conversationsLoading && (
+                <div className="flex items-center justify-between px-4 py-3 bg-red-50 border-b border-red-200">
+                  <span className="text-sm font-medium text-red-800">
+                    🚨 Priority: All Unread Messages
+                  </span>
+                  <span className="text-xs text-red-600">
+                    {unreadConversations.length} leads need attention
+                  </span>
+                </div>
+              )}
+              
+              {activeTab === "incoming" && !conversationsLoading && (
+                <div className="flex items-center justify-between px-4 py-3 bg-blue-50 border-b border-blue-200">
+                  <span className="text-sm font-medium text-blue-800">
+                    📥 All Customer Messages
+                  </span>
+                  <span className="text-xs text-blue-600">
+                    Last customer message shown first
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Conversations list - Flexible height */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {conversationsLoading ? (
+                <ConversationListSkeleton />
+              ) : (
+                <ConversationsList
+                  conversations={getTabConversations()}
+                  selectedLead={selectedLead}
+                  onSelectConversation={handleSelectConversation}
+                  canReply={canReply}
+                  showUrgencyIndicator={activeTab === "unread"}
+                  showTimestamps={activeTab === "incoming"}
+                  markAsRead={markAsRead}
+                  markingAsRead={isMarkingAsRead ? selectedLead : null}
+                />
+              )}
             </div>
           </div>
-          
-          {/* Unread summary */}
-          {conversations.some(c => c.unreadCount > 0) && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-red-600" />
-                <span className="text-sm font-medium text-red-800">
-                  {conversations.reduce((sum, c) => sum + c.unreadCount, 0)} unread messages
-                </span>
-              </div>
-            </div>
-          )}
         </div>
-        
-        <div className="flex-1 overflow-auto">
-          <ConversationsList
-            conversations={conversations}
-            selectedConversationId={selectedConversation?.leadId || null}
-            onSelectConversation={onSelectConversation}
-            userRole={profile?.role || 'user'}
-            userId={profile?.id || ''}
+
+        {/* Chat area - Main conversation view - Flexible width */}
+        <div className="flex-1 min-w-0">
+          <EnhancedChatView
+            selectedConversation={selectedConversation}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            showTemplates={false}
+            onToggleTemplates={() => {}}
+            user={{
+              role: profile.role,
+              id: profile.id
+            }}
+            isLoading={sendingMessage}
+          />
+        </div>
+
+        {/* Lead Context Panel - AI and Actions - Fixed width */}
+        <div className="w-80 flex-shrink-0">
+          <LeadContextPanel
+            conversation={selectedConversation}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            onScheduleAppointment={() => {
+              // Handle appointment scheduling
+              console.log('Schedule appointment for', selectedConversation?.leadName);
+            }}
           />
         </div>
       </div>
-
-      {/* Chat View */}
-      <div className="flex-1 flex flex-col">
-        <EnhancedChatView
-          selectedConversation={selectedConversation}
-          messages={messages}
-          onSendMessage={onSendMessage}
-          showTemplates={showTemplates}
-          onToggleTemplates={() => setShowTemplates(!showTemplates)}
-          user={profile ? { role: profile.role || 'user', id: profile.id } : { role: 'user', id: '' }}
-          isLoading={messagesLoading || sendingMessage}
-        />
-      </div>
-
-      {/* Debug Panel */}
-      <MessageDebugPanel
-        selectedLeadId={selectedLeadId}
-        messages={messages}
-        conversations={conversations}
-        onRefresh={onManualRefresh}
-      />
     </div>
   );
 };

@@ -43,16 +43,6 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
   markAsRead,
   markingAsRead
 }) => {
-  // Create wrapper function to match expected signature
-  const handleConversationSelect = (conversation: ConversationListItem) => {
-    onSelectConversation(conversation.leadId);
-  };
-
-  // Create canReply function from boolean prop
-  const canReplyFunction = (conversation: ConversationListItem) => {
-    return canReply;
-  };
-
   return (
     <div className="flex h-full">
       {/* Conversations List */}
@@ -60,10 +50,10 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
         <ConversationsList
           conversations={conversations}
           selectedLead={selectedLead}
-          onSelectConversation={handleConversationSelect}
+          onSelectConversation={onSelectConversation}
           markAsRead={markAsRead}
           markingAsRead={markingAsRead}
-          canReply={canReplyFunction}
+          canReply={(conversation) => canReply}
         />
       </div>
 
