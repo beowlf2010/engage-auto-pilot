@@ -50,7 +50,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({ onLeads
   });
 
   // Enhanced conversation selection with debug logging
-  const onSelectConversation = useCallback(async (conversation: any) => {
+  const onSelectConversation = useCallback(async (conversation: ConversationListItem) => {
     console.log('📱 [CONSOLIDATED INBOX] Selecting conversation:', {
       leadId: conversation.leadId,
       leadName: conversation.leadName,

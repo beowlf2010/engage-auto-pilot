@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +62,11 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
     (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0)
   );
 
+  // Create wrapper function to match expected signature
+  const handleConversationSelect = (conversation: ConversationListItem) => {
+    onSelectConversation(conversation.leadId);
+  };
+
   return (
     <Tabs defaultValue="unread" className="w-full">
       <TabsList className="grid w-full grid-cols-3 bg-gray-100">
@@ -116,7 +120,7 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
             <ConversationsList
               conversations={sortedUnreadConversations}
               selectedLead={selectedLead}
-              onSelectConversation={onSelectConversation}
+              onSelectConversation={handleConversationSelect}
               canReply={canReply}
               showUrgencyIndicator={true}
               markAsRead={markAsRead}
@@ -145,7 +149,7 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
             <ConversationsList
               conversations={sortedAllIncoming}
               selectedLead={selectedLead}
-              onSelectConversation={onSelectConversation}
+              onSelectConversation={handleConversationSelect}
               canReply={canReply}
               showTimestamps={true}
               markAsRead={markAsRead}
@@ -162,7 +166,7 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
           <ConversationsList
             conversations={conversations}
             selectedLead={selectedLead}
-            onSelectConversation={onSelectConversation}
+            onSelectConversation={handleConversationSelect}
             canReply={canReply}
             markAsRead={markAsRead}
             markingAsRead={markingAsRead}
