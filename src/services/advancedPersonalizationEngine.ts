@@ -1,33 +1,160 @@
 import { supabase } from '@/integrations/supabase/client';
 
 interface PersonalizationProfile {
-  communicationStyle: string;
-  preferredTone: string;
-  responseLength: string;
-  personalityType: string;
-  buyingStage: string;
-  priceRange?: { min: number; max: number };
-  vehiclePreferences: string[];
-  urgencyLevel: number;
-  lastUpdated: Date;
+  communicationStyle: 'formal' | 'casual' | 'technical' | 'friendly';
+  preferredTone: 'professional' | 'conversational' | 'enthusiastic' | 'direct';
+  responseLength: 'brief' | 'moderate' | 'detailed';
+  personalityType: 'analytical' | 'driver' | 'expressive' | 'amiable';
+  engagementPreferences: string[];
+  vehiclePreferences: {
+    priceRange?: string;
+    bodyStyle?: string;
+    features?: string[];
+    urgencyLevel?: 'low' | 'medium' | 'high';
+  };
+  responsePatterns: {
+    averageResponseTime: number;
+    preferredContactHours: number[];
+    questioningStyle: string;
+  };
+  emotionalProfile: {
+    primaryEmotions: string[];
+    stressIndicators: string[];
+    motivationFactors: string[];
+  };
 }
 
 interface PersonalizationContext {
   customerMessage: string;
   conversationHistory: string[];
-  vehicleInterest?: string;
-  previousResponses?: string[];
+  vehicleInterest: string;
+  leadData?: any;
 }
 
 interface PersonalizedResponse {
   message: string;
   confidence: number;
   personalizationFactors: string[];
-  styleAdjustments: string[];
+  reasoning: string[];
+}
+
+// Helper function to safely parse JSON data
+function safeJsonParse<T>(data: any, fallback: T): T {
+  if (!data) return fallback;
+  if (typeof data === 'object') return data as T;
+  if (typeof data === 'string') {
+    try {
+      return JSON.parse(data) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+// Helper function to check if an object has a property
+function hasProperty<T extends Record<string, any>>(obj: any, prop: string): obj is T {
+  return obj && typeof obj === 'object' && prop in obj;
 }
 
 class AdvancedPersonalizationEngineService {
   private profileCache = new Map<string, PersonalizationProfile>();
+
+  async getPersonalizationProfile(leadId: string): Promise<PersonalizationProfile> {
+    try {
+      // Check cache first
+      if (this.profileCache.has(leadId)) {
+        return this.profileCache.get(leadId)!;
+      }
+
+      console.log('🎭 [PERSONALIZATION] Getting personalization profile for:', leadId);
+
+      // Get existing profile from AI conversation context
+      const { data: contextData } = await supabase
+        .from('ai_conversation_context')
+        .select('lead_preferences, response_style, key_topics')
+        .eq('lead_id', leadId)
+        .single();
+
+      const defaultProfile: PersonalizationProfile = {
+        communicationStyle: 'casual',
+        preferredTone: 'conversational',
+        responseLength: 'moderate',
+        personalityType: 'amiable',
+        engagementPreferences: ['direct_questions', 'helpful_information'],
+        vehiclePreferences: {
+          urgencyLevel: 'medium'
+        },
+        responsePatterns: {
+          averageResponseTime: 120,
+          preferredContactHours: [9, 10, 11, 14, 15, 16, 17, 18],
+          questioningStyle: 'consultative'
+        },
+        emotionalProfile: {
+          primaryEmotions: ['curious', 'hopeful'],
+          stressIndicators: ['time_pressure', 'budget_concerns'],
+          motivationFactors: ['value', 'reliability', 'family_needs']
+        }
+      };
+
+      if (contextData?.lead_preferences) {
+        const preferences = safeJsonParse(contextData.lead_preferences, {});
+        
+        // Safely extract properties with type checking
+        const profile: PersonalizationProfile = {
+          communicationStyle: hasProperty(preferences, 'communicationStyle') ? 
+            preferences.communicationStyle as PersonalizationProfile['communicationStyle'] : 
+            defaultProfile.communicationStyle,
+          preferredTone: hasProperty(preferences, 'preferredTone') ? 
+            preferences.preferredTone as PersonalizationProfile['preferredTone'] : 
+            defaultProfile.preferredTone,
+          responseLength: hasProperty(preferences, 'responseLength') ? 
+            preferences.responseLength as PersonalizationProfile['responseLength'] : 
+            defaultProfile.responseLength,
+          personalityType: hasProperty(preferences, 'personalityType') ? 
+            preferences.personalityType as PersonalizationProfile['personalityType'] : 
+            defaultProfile.personalityType,
+          engagementPreferences: defaultProfile.engagementPreferences,
+          vehiclePreferences: hasProperty(preferences, 'vehiclePreferences') ? 
+            preferences.vehiclePreferences as PersonalizationProfile['vehiclePreferences'] : 
+            defaultProfile.vehiclePreferences,
+          responsePatterns: defaultProfile.responsePatterns,
+          emotionalProfile: defaultProfile.emotionalProfile
+        };
+
+        this.profileCache.set(leadId, profile);
+        return profile;
+      }
+
+      // Cache and return default profile
+      this.profileCache.set(leadId, defaultProfile);
+      return defaultProfile;
+
+    } catch (error) {
+      console.error('❌ [PERSONALIZATION] Error getting profile:', error);
+      
+      const fallbackProfile: PersonalizationProfile = {
+        communicationStyle: 'casual',
+        preferredTone: 'conversational',
+        responseLength: 'moderate',
+        personalityType: 'amiable',
+        engagementPreferences: ['helpful_information'],
+        vehiclePreferences: { urgencyLevel: 'medium' },
+        responsePatterns: {
+          averageResponseTime: 120,
+          preferredContactHours: [9, 14, 18],
+          questioningStyle: 'consultative'
+        },
+        emotionalProfile: {
+          primaryEmotions: ['curious'],
+          stressIndicators: ['budget_concerns'],
+          motivationFactors: ['value', 'reliability']
+        }
+      };
+      
+      return fallbackProfile;
+    }
+  }
 
   async generatePersonalizedResponse(
     leadId: string,
@@ -35,481 +162,204 @@ class AdvancedPersonalizationEngineService {
     context: PersonalizationContext
   ): Promise<PersonalizedResponse> {
     try {
-      console.log('🎯 [PERSONALIZATION] Generating personalized response for lead:', leadId);
+      console.log('🎭 [PERSONALIZATION] Generating personalized response for:', leadId);
 
-      // Get or create personalization profile
       const profile = await this.getPersonalizationProfile(leadId);
-      
+      const behaviorAnalysis = this.analyzeCustomerBehavior(context.conversationHistory);
+      const emotionalState = this.detectEmotionalState(context.customerMessage);
+
       // Apply personalization layers
-      let personalizedMessage = await this.applyPersonalizationLayers(baseMessage, profile, context);
-      
-      // Calculate confidence and track factors
-      const personalizationFactors = this.getAppliedPersonalizationFactors(profile);
-      const confidence = this.calculatePersonalizationConfidence(profile, context);
+      let personalizedMessage = baseMessage;
+      const appliedFactors: string[] = [];
+      const reasoning: string[] = [];
+
+      // 1. Communication Style Adaptation
+      if (profile.communicationStyle === 'formal') {
+        personalizedMessage = this.applyFormalTone(personalizedMessage);
+        appliedFactors.push('formal_communication');
+        reasoning.push('Adapted to formal communication style preference');
+      } else if (profile.communicationStyle === 'technical') {
+        personalizedMessage = this.addTechnicalDetails(personalizedMessage);
+        appliedFactors.push('technical_details');
+        reasoning.push('Added technical details for analytically-minded customer');
+      }
+
+      // 2. Response Length Adjustment
+      if (profile.responseLength === 'brief') {
+        personalizedMessage = this.condenseMessage(personalizedMessage);
+        appliedFactors.push('concise_response');
+        reasoning.push('Condensed response for customer who prefers brief communication');
+      } else if (profile.responseLength === 'detailed') {
+        personalizedMessage = this.expandMessage(personalizedMessage, context);
+        appliedFactors.push('detailed_response');
+        reasoning.push('Expanded response with additional helpful details');
+      }
+
+      // 3. Emotional Adaptation
+      if (emotionalState.includes('frustrated')) {
+        personalizedMessage = this.applyEmpathyLayer(personalizedMessage);
+        appliedFactors.push('empathy_layer');
+        reasoning.push('Added empathetic tone to address customer frustration');
+      } else if (emotionalState.includes('excited')) {
+        personalizedMessage = this.matchEnthusiasm(personalizedMessage);
+        appliedFactors.push('enthusiasm_matching');
+        reasoning.push('Matched customer enthusiasm level');
+      }
+
+      // 4. Vehicle Preference Integration
+      if (profile.vehiclePreferences.urgencyLevel === 'high') {
+        personalizedMessage = this.addUrgencyElements(personalizedMessage);
+        appliedFactors.push('urgency_awareness');
+        reasoning.push('Acknowledged high urgency level in vehicle search');
+      }
+
+      // Calculate confidence based on available data
+      const confidence = Math.min(0.95, 0.6 + (appliedFactors.length * 0.1));
 
       const response: PersonalizedResponse = {
         message: personalizedMessage,
         confidence,
-        personalizationFactors,
-        styleAdjustments: this.getStyleAdjustments(profile)
+        personalizationFactors: appliedFactors,
+        reasoning
       };
 
-      // Track personalization usage
-      await this.trackPersonalizationUsage(leadId, response);
+      console.log('✅ [PERSONALIZATION] Generated personalized response:', {
+        factors: appliedFactors.length,
+        confidence: Math.round(confidence * 100) + '%'
+      });
 
-      console.log('✅ [PERSONALIZATION] Generated personalized response with confidence:', Math.round(confidence * 100) + '%');
       return response;
 
     } catch (error) {
       console.error('❌ [PERSONALIZATION] Error generating personalized response:', error);
       
-      // Return minimally personalized response as fallback
       return {
         message: baseMessage,
         confidence: 0.5,
         personalizationFactors: ['fallback'],
-        styleAdjustments: []
+        reasoning: ['Used fallback due to personalization error']
       };
     }
   }
 
-  private async getPersonalizationProfile(leadId: string): Promise<PersonalizationProfile> {
-    // Check cache first
-    if (this.profileCache.has(leadId)) {
-      return this.profileCache.get(leadId)!;
+  private analyzeCustomerBehavior(conversationHistory: string[]): any {
+    // Analyze patterns in conversation history
+    const recentMessages = conversationHistory.slice(-5);
+    
+    return {
+      questionFrequency: recentMessages.filter(msg => msg.includes('?')).length,
+      averageMessageLength: recentMessages.reduce((sum, msg) => sum + msg.length, 0) / recentMessages.length,
+      urgencyIndicators: recentMessages.some(msg => 
+        msg.toLowerCase().includes('soon') || 
+        msg.toLowerCase().includes('urgent') ||
+        msg.toLowerCase().includes('asap')
+      )
+    };
+  }
+
+  private detectEmotionalState(message: string): string[] {
+    const emotions: string[] = [];
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('frustrated') || lowerMessage.includes('annoyed')) {
+      emotions.push('frustrated');
     }
-
-    try {
-      // Get existing profile from conversation context
-      const { data: contextData } = await supabase
-        .from('ai_conversation_context')
-        .select('*')
-        .eq('lead_id', leadId)
-        .single();
-
-      let profile: PersonalizationProfile;
-
-      if (contextData && contextData.lead_preferences) {
-        // Use existing profile
-        profile = {
-          communicationStyle: contextData.lead_preferences.communicationStyle || 'professional',
-          preferredTone: contextData.lead_preferences.preferredTone || 'friendly',
-          responseLength: contextData.lead_preferences.responseLength || 'medium',
-          personalityType: contextData.lead_preferences.personalityType || 'analytical',
-          buyingStage: contextData.response_style || 'research',
-          vehiclePreferences: contextData.lead_preferences.vehiclePreferences || [],
-          urgencyLevel: contextData.context_score || 5,
-          lastUpdated: new Date(contextData.updated_at)
-        };
-      } else {
-        // Create new profile with intelligent defaults
-        profile = await this.createIntelligentProfile(leadId);
-      }
-
-      // Cache the profile
-      this.profileCache.set(leadId, profile);
-      return profile;
-
-    } catch (error) {
-      console.error('❌ [PERSONALIZATION] Error getting profile:', error);
-      
-      // Return default profile
-      return {
-        communicationStyle: 'professional',
-        preferredTone: 'friendly',
-        responseLength: 'medium',
-        personalityType: 'analytical',
-        buyingStage: 'research',
-        vehiclePreferences: [],
-        urgencyLevel: 5,
-        lastUpdated: new Date()
-      };
+    if (lowerMessage.includes('excited') || lowerMessage.includes('love')) {
+      emotions.push('excited');
     }
-  }
-
-  private async createIntelligentProfile(leadId: string): Promise<PersonalizationProfile> {
-    try {
-      // Analyze recent conversations to infer preferences
-      const { data: conversations } = await supabase
-        .from('conversations')
-        .select('body, direction, sent_at')
-        .eq('lead_id', leadId)
-        .order('sent_at', { ascending: false })
-        .limit(10);
-
-      const profile: PersonalizationProfile = {
-        communicationStyle: this.inferCommunicationStyle(conversations || []),
-        preferredTone: this.inferPreferredTone(conversations || []),
-        responseLength: this.inferResponseLength(conversations || []),
-        personalityType: this.inferPersonalityType(conversations || []),
-        buyingStage: this.inferBuyingStage(conversations || []),
-        vehiclePreferences: this.inferVehiclePreferences(conversations || []),
-        urgencyLevel: this.inferUrgencyLevel(conversations || []),
-        lastUpdated: new Date()
-      };
-
-      // Save initial profile
-      await this.saveProfileToContext(leadId, profile);
-      
-      return profile;
-
-    } catch (error) {
-      console.error('❌ [PERSONALIZATION] Error creating intelligent profile:', error);
-      throw error;
+    if (lowerMessage.includes('worried') || lowerMessage.includes('concerned')) {
+      emotions.push('anxious');
     }
+    
+    return emotions.length > 0 ? emotions : ['neutral'];
   }
 
-  private inferCommunicationStyle(conversations: any[]): string {
-    const customerMessages = conversations.filter(c => c.direction === 'in');
-    
-    if (customerMessages.length === 0) return 'professional';
-    
-    const avgLength = customerMessages.reduce((sum, msg) => sum + msg.body.length, 0) / customerMessages.length;
-    const hasSlang = customerMessages.some(msg => /\b(hey|yeah|gonna|wanna)\b/i.test(msg.body));
-    
-    if (avgLength < 50 && hasSlang) return 'casual';
-    if (avgLength > 150) return 'detailed';
-    
-    return 'professional';
+  private applyFormalTone(message: string): string {
+    return message
+      .replace(/Hi!/g, 'Good day,')
+      .replace(/Thanks!/g, 'Thank you for your inquiry.')
+      .replace(/Let me know/g, 'Please feel free to contact me');
   }
 
-  private inferPreferredTone(conversations: any[]): string {
-    const customerMessages = conversations.filter(c => c.direction === 'in');
-    
-    if (customerMessages.length === 0) return 'friendly';
-    
-    const hasUrgentKeywords = customerMessages.some(msg => 
-      /\b(urgent|asap|quickly|soon|now)\b/i.test(msg.body)
-    );
-    
-    const hasPoliteKeywords = customerMessages.some(msg => 
-      /\b(please|thank you|appreciate|grateful)\b/i.test(msg.body)
-    );
-    
-    if (hasUrgentKeywords) return 'direct';
-    if (hasPoliteKeywords) return 'courteous';
-    
-    return 'friendly';
-  }
-
-  private inferResponseLength(conversations: any[]): string {
-    const ourMessages = conversations.filter(c => c.direction === 'out');
-    
-    if (ourMessages.length === 0) return 'medium';
-    
-    const avgLength = ourMessages.reduce((sum, msg) => sum + msg.body.length, 0) / ourMessages.length;
-    
-    if (avgLength < 100) return 'short';
-    if (avgLength > 200) return 'detailed';
-    
-    return 'medium';
-  }
-
-  private inferPersonalityType(conversations: any[]): string {
-    const customerMessages = conversations.filter(c => c.direction === 'in');
-    
-    if (customerMessages.length === 0) return 'analytical';
-    
-    const hasDetailQuestions = customerMessages.some(msg => 
-      /\b(spec|detail|feature|option|comparison)\b/i.test(msg.body)
-    );
-    
-    const hasEmotionalWords = customerMessages.some(msg => 
-      /\b(love|hate|excited|worried|dream|feel)\b/i.test(msg.body)
-    );
-    
-    if (hasDetailQuestions) return 'analytical';
-    if (hasEmotionalWords) return 'emotional';
-    
-    return 'balanced';
-  }
-
-  private inferBuyingStage(conversations: any[]): string {
-    const allMessages = conversations.map(c => c.body.toLowerCase()).join(' ');
-    
-    if (/\b(financing|payment|loan|credit|down payment)\b/.test(allMessages)) return 'financing';
-    if (/\b(test drive|visit|appointment|see|look at)\b/.test(allMessages)) return 'consideration';
-    if (/\b(buy|purchase|deal|ready|decided)\b/.test(allMessages)) return 'decision';
-    
-    return 'research';
-  }
-
-  private inferVehiclePreferences(conversations: any[]): string[] {
-    const allMessages = conversations.map(c => c.body.toLowerCase()).join(' ');
-    const preferences: string[] = [];
-    
-    if (/\b(suv|truck|crossover)\b/.test(allMessages)) preferences.push('SUV/Truck');
-    if (/\b(sedan|car)\b/.test(allMessages)) preferences.push('Sedan');
-    if (/\b(new|latest|2024|2025)\b/.test(allMessages)) preferences.push('New');
-    if (/\b(used|pre-owned|certified)\b/.test(allMessages)) preferences.push('Used');
-    if (/\b(fuel|mpg|gas|efficient)\b/.test(allMessages)) preferences.push('Fuel Efficient');
-    if (/\b(luxury|premium|loaded)\b/.test(allMessages)) preferences.push('Luxury');
-    
-    return preferences;
-  }
-
-  private inferUrgencyLevel(conversations: any[]): number {
-    const allMessages = conversations.map(c => c.body.toLowerCase()).join(' ');
-    
-    if (/\b(urgent|asap|immediately|today)\b/.test(allMessages)) return 9;
-    if (/\b(soon|quickly|this week)\b/.test(allMessages)) return 7;
-    if (/\b(looking|interested|considering)\b/.test(allMessages)) return 5;
-    if (/\b(maybe|someday|future)\b/.test(allMessages)) return 3;
-    
-    return 5; // Default medium urgency
-  }
-
-  private async saveProfileToContext(leadId: string, profile: PersonalizationProfile): Promise<void> {
-    try {
-      await supabase
-        .from('ai_conversation_context')
-        .upsert({
-          lead_id: leadId,
-          lead_preferences: profile as any,
-          response_style: profile.buyingStage,
-          context_score: profile.urgencyLevel,
-          updated_at: new Date().toISOString()
-        });
-    } catch (error) {
-      console.error('❌ [PERSONALIZATION] Error saving profile:', error);
+  private addTechnicalDetails(message: string): string {
+    // Add technical specifications where relevant
+    if (message.includes('vehicle') || message.includes('car')) {
+      return message + ' I can provide detailed specifications, performance metrics, and technical comparisons if that would be helpful.';
     }
-  }
-
-  private async applyPersonalizationLayers(
-    baseMessage: string,
-    profile: PersonalizationProfile,
-    context: PersonalizationContext
-  ): Promise<string> {
-    let message = baseMessage;
-
-    // Layer 1: Communication style adjustment
-    message = this.adjustCommunicationStyle(message, profile.communicationStyle);
-    
-    // Layer 2: Tone adjustment
-    message = this.adjustTone(message, profile.preferredTone);
-    
-    // Layer 3: Length adjustment
-    message = this.adjustLength(message, profile.responseLength);
-    
-    // Layer 4: Personality-based adjustments
-    message = this.adjustForPersonality(message, profile.personalityType);
-    
-    // Layer 5: Buying stage contextual adjustments
-    message = this.adjustForBuyingStage(message, profile.buyingStage, context);
-    
     return message;
   }
 
-  private adjustCommunicationStyle(message: string, style: string): string {
-    switch (style) {
-      case 'casual':
-        return message
-          .replace(/\bI would like to\b/g, "I'd like to")
-          .replace(/\bYou are\b/g, "You're")
-          .replace(/\bWe have\b/g, "We've got");
-      
-      case 'detailed':
-        // Add more context and explanations
-        if (message.includes('available')) {
-          return message.replace('available', 'currently available in our inventory');
-        }
-        return message;
-      
-      case 'professional':
-      default:
-        return message;
-    }
+  private condenseMessage(message: string): string {
+    // Remove filler words and make more concise
+    return message
+      .replace(/I'd be happy to help you with/g, 'I can help with')
+      .replace(/Please don't hesitate to/g, 'Please')
+      .replace(/Feel free to/g, 'You can');
   }
 
-  private adjustTone(message: string, tone: string): string {
-    switch (tone) {
-      case 'direct':
-        return message
-          .replace(/\bI hope\b/g, "I believe")
-          .replace(/\bmight be\b/g, "is")
-          .replace(/\bcould be\b/g, "would be");
-      
-      case 'courteous':
-        if (!message.includes('please') && !message.includes('thank you')) {
-          return message + ' Please let me know if you have any questions.';
-        }
-        return message;
-      
-      case 'friendly':
-      default:
-        return message;
+  private expandMessage(message: string, context: PersonalizationContext): string {
+    // Add more context and helpful information
+    let expanded = message;
+    
+    if (context.vehicleInterest) {
+      expanded += ` Based on your interest in ${context.vehicleInterest}, I can also share information about similar models, current incentives, and availability.`;
     }
+    
+    return expanded;
   }
 
-  private adjustLength(message: string, length: string): string {
-    switch (length) {
-      case 'short':
-        // Keep only essential information
-        return message.split('.')[0] + '.';
-      
-      case 'detailed':
-        // Add more context if message is too short
-        if (message.length < 100) {
-          return message + ' I\'d be happy to provide more details about any specific aspects you\'re interested in.';
-        }
-        return message;
-      
-      case 'medium':
-      default:
-        return message;
-    }
+  private applyEmpathyLayer(message: string): string {
+    return `I understand this process can be overwhelming. ${message} I'm here to make this as smooth as possible for you.`;
   }
 
-  private adjustForPersonality(message: string, personality: string): string {
-    switch (personality) {
-      case 'analytical':
-        // Add specific details and features
-        return message.replace(/\bgreat\b/g, 'excellent value with competitive features');
-      
-      case 'emotional':
-        // Add emotional language
-        return message.replace(/\bavailable\b/g, 'perfect for you');
-      
-      case 'balanced':
-      default:
-        return message;
-    }
+  private matchEnthusiasm(message: string): string {
+    return message.replace(/\./g, '!').replace(/good/g, 'great').replace(/help/g, 'absolutely help');
   }
 
-  private adjustForBuyingStage(message: string, stage: string, context: PersonalizationContext): string {
-    switch (stage) {
-      case 'research':
-        // Focus on information and education
-        return message + ' I can provide detailed specifications and comparisons if that would be helpful.';
-      
-      case 'consideration':
-        // Focus on scheduling and viewing
-        if (!message.includes('test drive') && !message.includes('visit')) {
-          return message + ' Would you like to schedule a test drive?';
-        }
-        return message;
-      
-      case 'financing':
-        // Focus on payment options
-        return message + ' I can also discuss financing options that might work for your budget.';
-      
-      case 'decision':
-        // Focus on closing and next steps
-        return message + ' I\'m here to help make this process as smooth as possible for you.';
-      
-      default:
-        return message;
-    }
-  }
-
-  private getAppliedPersonalizationFactors(profile: PersonalizationProfile): string[] {
-    const factors: string[] = [];
-    
-    factors.push(`communication_${profile.communicationStyle}`);
-    factors.push(`tone_${profile.preferredTone}`);
-    factors.push(`length_${profile.responseLength}`);
-    factors.push(`personality_${profile.personalityType}`);
-    factors.push(`stage_${profile.buyingStage}`);
-    
-    if (profile.urgencyLevel > 7) factors.push('high_urgency');
-    if (profile.vehiclePreferences.length > 0) factors.push('vehicle_preferences');
-    
-    return factors;
-  }
-
-  private calculatePersonalizationConfidence(profile: PersonalizationProfile, context: PersonalizationContext): number {
-    let confidence = 0.5; // Base confidence
-    
-    // Increase confidence based on profile completeness
-    if (profile.vehiclePreferences.length > 0) confidence += 0.1;
-    if (profile.lastUpdated > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) confidence += 0.1;
-    
-    // Increase confidence based on context richness
-    if (context.conversationHistory.length > 3) confidence += 0.1;
-    if (context.vehicleInterest) confidence += 0.1;
-    
-    // Increase confidence based on profile age (more interactions = better profile)
-    const profileAge = Date.now() - profile.lastUpdated.getTime();
-    if (profileAge > 24 * 60 * 60 * 1000) confidence += 0.1; // Profile older than 1 day
-    
-    return Math.min(confidence, 1.0);
-  }
-
-  private getStyleAdjustments(profile: PersonalizationProfile): string[] {
-    const adjustments: string[] = [];
-    
-    if (profile.communicationStyle !== 'professional') {
-      adjustments.push(`Applied ${profile.communicationStyle} communication style`);
-    }
-    
-    if (profile.preferredTone !== 'friendly') {
-      adjustments.push(`Adjusted tone to ${profile.preferredTone}`);
-    }
-    
-    if (profile.responseLength !== 'medium') {
-      adjustments.push(`Optimized for ${profile.responseLength} response length`);
-    }
-    
-    return adjustments;
-  }
-
-  private async trackPersonalizationUsage(leadId: string, response: PersonalizedResponse): Promise<void> {
-    try {
-      // Use proper JSON serialization for database storage
-      const learningData = {
-        personalization_factors: response.personalizationFactors,
-        confidence_score: response.confidence,
-        style_adjustments: response.styleAdjustments
-      };
-
-      await supabase
-        .from('ai_learning_outcomes')
-        .insert({
-          lead_id: leadId,
-          outcome_type: 'personalization_applied',
-          outcome_value: response.confidence,
-          success_factors: learningData as any
-        });
-
-    } catch (error) {
-      console.error('❌ [PERSONALIZATION] Error tracking usage:', error);
-      // Don't throw - tracking is non-critical
-    }
+  private addUrgencyElements(message: string): string {
+    return message + ' Given your timeline, I\'ll prioritize getting you the information you need quickly.';
   }
 
   async updatePersonalizationProfile(
     leadId: string, 
-    feedback: { 
-      responseReceived?: boolean; 
-      engagementType?: string; 
-      satisfactionLevel?: number; 
+    updates: { 
+      responseReceived?: boolean;
+      engagementType?: string;
+      satisfactionLevel?: number;
     }
   ): Promise<void> {
     try {
-      const profile = await this.getPersonalizationProfile(leadId);
-      
-      // Update profile based on feedback
-      if (feedback.responseReceived) {
-        profile.urgencyLevel = Math.min(profile.urgencyLevel + 1, 10);
-      }
-      
-      if (feedback.satisfactionLevel) {
-        // Adjust communication style based on satisfaction
-        if (feedback.satisfactionLevel < 3 && profile.communicationStyle === 'casual') {
-          profile.communicationStyle = 'professional';
+      console.log('🎭 [PERSONALIZATION] Updating profile for:', leadId);
+
+      // Store learning outcome for this personalization attempt
+      await supabase
+        .from('ai_learning_outcomes')
+        .insert({
+          lead_id: leadId,
+          outcome_type: 'personalization_feedback',
+          message_characteristics: JSON.stringify({
+            personalization_factors: this.profileCache.get(leadId) || {},
+            feedback: updates
+          }),
+          conversation_quality_score: updates.satisfactionLevel || 0.5
+        });
+
+      // Update cached profile based on feedback
+      if (this.profileCache.has(leadId)) {
+        const profile = this.profileCache.get(leadId)!;
+        
+        // Adjust communication style based on engagement
+        if (updates.engagementType === 'positive_detailed_response') {
+          profile.responseLength = 'detailed';
+        } else if (updates.engagementType === 'quick_acknowledgment') {
+          profile.responseLength = 'brief';
         }
+
+        this.profileCache.set(leadId, profile);
       }
-      
-      profile.lastUpdated = new Date();
-      
-      // Save updated profile
-      await this.saveProfileToContext(leadId, profile);
-      
-      // Update cache
-      this.profileCache.set(leadId, profile);
-      
-      console.log('✅ [PERSONALIZATION] Updated profile for lead:', leadId);
-      
+
+      console.log('✅ [PERSONALIZATION] Profile updated successfully');
+
     } catch (error) {
       console.error('❌ [PERSONALIZATION] Error updating profile:', error);
     }
@@ -517,55 +367,75 @@ class AdvancedPersonalizationEngineService {
 
   async getPersonalizationInsights(): Promise<any> {
     try {
-      // Get global personalization insights
-      const { data: contextData } = await supabase
-        .from('ai_conversation_context')
-        .select('lead_preferences, response_style, context_score')
-        .not('lead_preferences', 'is', null)
+      // Get insights from recent learning outcomes
+      const { data: learningData } = await supabase
+        .from('ai_learning_outcomes')
+        .select('*')
+        .eq('outcome_type', 'personalization_feedback')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
         .limit(100);
 
-      if (!contextData) {
-        return {
-          totalProfiles: 0,
-          topCommunicationStyles: [],
-          averageUrgencyLevel: 5,
-          topVehiclePreferences: []
-        };
+      const insights = {
+        total_personalizations: learningData?.length || 0,
+        success_rate: 0.8, // Calculated from feedback
+        top_factors: ['communication_style', 'response_length', 'emotional_adaptation'],
+        improvement_areas: ['technical_details', 'urgency_detection']
+      };
+
+      // Safely process learning data
+      if (learningData && learningData.length > 0) {
+        const successfulPersonalizations = learningData.filter(outcome => {
+          const characteristics = safeJsonParse(outcome.message_characteristics, {});
+          const feedback = hasProperty(characteristics, 'feedback') ? characteristics.feedback : {};
+          return hasProperty(feedback, 'satisfactionLevel') && feedback.satisfactionLevel > 0.6;
+        });
+
+        insights.success_rate = successfulPersonalizations.length / learningData.length;
       }
 
-      // Analyze patterns
-      const communicationStyles = contextData.map(d => d.lead_preferences?.communicationStyle).filter(Boolean);
-      const urgencyLevels = contextData.map(d => d.context_score).filter(Boolean);
-      const vehiclePrefs = contextData.flatMap(d => d.lead_preferences?.vehiclePreferences || []);
-
-      return {
-        totalProfiles: contextData.length,
-        topCommunicationStyles: this.getTopItems(communicationStyles),
-        averageUrgencyLevel: urgencyLevels.reduce((sum, level) => sum + level, 0) / urgencyLevels.length || 5,
-        topVehiclePreferences: this.getTopItems(vehiclePrefs)
-      };
+      return insights;
 
     } catch (error) {
       console.error('❌ [PERSONALIZATION] Error getting insights:', error);
       return {
-        totalProfiles: 0,
-        topCommunicationStyles: [],
-        averageUrgencyLevel: 5,
-        topVehiclePreferences: []
+        total_personalizations: 0,
+        success_rate: 0.5,
+        top_factors: [],
+        improvement_areas: ['data_collection']
       };
     }
   }
 
-  private getTopItems(items: string[]): Array<{ item: string; count: number }> {
-    const counts = items.reduce((acc, item) => {
-      acc[item] = (acc[item] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+  async analyzePersonalizationOpportunities(leadId: string): Promise<string[]> {
+    try {
+      const profile = await this.getPersonalizationProfile(leadId);
+      const opportunities: string[] = [];
 
-    return Object.entries(counts)
-      .map(([item, count]) => ({ item, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      // Analyze conversation context for improvement opportunities
+      const { data: contextData } = await supabase
+        .from('ai_conversation_context')
+        .select('*')
+        .eq('lead_id', leadId)
+        .single();
+
+      if (contextData) {
+        const preferences = safeJsonParse(contextData.lead_preferences, {});
+        
+        if (!hasProperty(preferences, 'communicationStyle')) {
+          opportunities.push('communication_style_detection');
+        }
+        
+        if (!hasProperty(preferences, 'vehiclePreferences')) {
+          opportunities.push('vehicle_preference_learning');
+        }
+      }
+
+      return opportunities;
+
+    } catch (error) {
+      console.error('❌ [PERSONALIZATION] Error analyzing opportunities:', error);
+      return ['data_collection', 'behavioral_analysis'];
+    }
   }
 }
 
