@@ -8,11 +8,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enhanced Intent Recognition - inline implementation
+// Enhanced Intent Recognition - consistent with unified service
 const analyzeCustomerIntent = (message: string) => {
   const text = message.toLowerCase().trim();
   
-  // Financing patterns
+  // Financing patterns - consistent with unifiedAIResponseEngine
   const financingPatterns = [
     { pattern: /\b(down payment|downpayment|dp)\b/i, type: 'down_payment', confidence: 0.9 },
     { pattern: /\b(monthly payment|payments|monthly)\b/i, type: 'monthly_payment', confidence: 0.8 },
@@ -58,7 +58,7 @@ const analyzeCustomerIntent = (message: string) => {
   };
 };
 
-// Professional Response Templates
+// Professional Response Templates - consistent with unified service
 const getResponseTemplate = (intent: any, leadName: string, customerMessage: string) => {
   const templates = {
     financing_saving_up: `I completely understand, ${leadName} - saving up shows you're being smart about this decision. When you're ready, we'll have financing options that can help minimize your upfront costs. What timeline are you thinking?`,

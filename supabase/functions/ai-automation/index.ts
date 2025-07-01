@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -68,38 +69,38 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get automation settings
-    const { data: settings, error: settingsError } = await supabaseClient
-      .from('ai_automation_settings')
-      .select('setting_key, setting_value');
+    // Use default settings instead of accessing non-existent table
+    const batchSize = 50;
+    const maxConcurrentSends = 5;
+    const dailyMessageLimit = 8;
+    const autoUnpauseStaleLeads = true;
+    const stalePauseThresholdDays = 7;
 
-    if (settingsError) {
-      console.error('❌ [AI-AUTOMATION] Error fetching automation settings:', settingsError);
-      throw new Error('Failed to fetch automation settings');
-    }
+    console.log(`⚙️ [AI-AUTOMATION] Using default settings: batchSize=${batchSize}, maxConcurrentSends=${maxConcurrentSends}, dailyMessageLimit=${dailyMessageLimit}`);
 
-    const settingsMap = settings?.reduce((acc: Record<string, any>, setting: any) => {
-      acc[setting.setting_key] = setting.setting_value;
-      return acc;
-    }, {} as Record<string, any>) || {};
-
-    const batchSize = parseInt(settingsMap.batch_size) || 50;
-    const maxConcurrentSends = parseInt(settingsMap.max_concurrent_sends) || 5;
-    const dailyMessageLimit = parseInt(settingsMap.daily_message_limit_per_lead) || 8;
-    const autoUnpauseStaleLeads = settingsMap.auto_unpause_stale_leads === true;
-    const stalePauseThresholdDays = parseInt(settingsMap.stale_pause_threshold_days) || 7;
-
-    console.log(`⚙️ [AI-AUTOMATION] Settings: batchSize=${batchSize}, maxConcurrentSends=${maxConcurrentSends}, dailyMessageLimit=${dailyMessageLimit}`);
-
-    // Unpause stale leads if enabled
+    // Auto-unpause stale leads
     if (autoUnpauseStaleLeads) {
       console.log('▶️ [AI-AUTOMATION] Auto-unpausing stale leads');
-      const { data: unpausedCount, error: unpauseError } = await supabaseClient.rpc('auto_unpause_stale_leads' as any);
+      
+      // Manual unpause logic since we don't have the RPC function
+      const staleDate = new Date();
+      staleDate.setDate(staleDate.getDate() - stalePauseThresholdDays);
+
+      const { data: unpausedLeads, error: unpauseError } = await supabaseClient
+        .from('leads')
+        .update({
+          ai_sequence_paused: false,
+          ai_pause_reason: null,
+          next_ai_send_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() // 2 hours from now
+        })
+        .eq('ai_sequence_paused', true)
+        .lt('updated_at', staleDate.toISOString())
+        .select('id');
 
       if (unpauseError) {
         console.error('❌ [AI-AUTOMATION] Error unpausing stale leads:', unpauseError);
       } else {
-        console.log(`✅ [AI-AUTOMATION] Unpaused ${unpausedCount} stale leads`);
+        console.log(`✅ [AI-AUTOMATION] Unpaused ${unpausedLeads?.length || 0} stale leads`);
       }
     }
 
@@ -164,16 +165,15 @@ serve(async (req) => {
         // Generate message
         const gentleMessage = generateGentleMessage(lead.first_name, lead.vehicle_interest);
 
-        // Send message
+        // Send message using conversations table instead of messages
         const { data: messageData, error: messageError } = await supabaseClient
-          .from('messages')
+          .from('conversations')
           .insert({
             lead_id: lead.id,
             body: gentleMessage,
             direction: 'out',
             sent_at: new Date().toISOString(),
-            ai_generated: true,
-            created_by: 'ai_automation'
+            ai_generated: true
           })
           .select()
           .single();
@@ -218,13 +218,13 @@ serve(async (req) => {
       const executing: Promise<void>[] = [];
       for (const task of tasks) {
         if (executing.length >= maxConcurrent) {
-          await Promise.race(executing); // Wait for one to complete
+          await Promise.race(executing);
         }
         const p = task();
         executing.push(p);
-        p.finally(() => executing.splice(executing.indexOf(p), 1)); // Remove from executing when complete
+        p.finally(() => executing.splice(executing.indexOf(p), 1));
       }
-      await Promise.all(executing); // Wait for all to complete
+      await Promise.all(executing);
     };
 
     const leadTasks = leads.map(lead => async () => {
