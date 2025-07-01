@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { centralizedAI } from './centralizedAIService';
+import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 
 // Process incoming messages for AI analysis and potential response
 export const processIncomingMessage = async (
@@ -10,9 +9,6 @@ export const processIncomingMessage = async (
 ): Promise<void> => {
   try {
     console.log(`📥 Processing incoming message for lead ${leadId}: "${messageBody}"`);
-    
-    // Process vehicle mentions
-    await centralizedAI.processIncomingMessage(leadId, conversationId, messageBody);
     
     // Check if this message contains a question that needs answering
     const isQuestion = containsQuestion(messageBody);
@@ -24,17 +20,15 @@ export const processIncomingMessage = async (
       // Mark this as needing urgent attention
       await markQuestionForAttention(leadId, conversationId, messageBody, isInventoryQuestion);
       
-      // Check if AI should auto-respond
-      const shouldRespond = await centralizedAI.shouldGenerateResponse(leadId);
+      // Check if AI should auto-respond using unified system
+      const shouldRespond = await shouldGenerateResponse(leadId);
       if (shouldRespond) {
         console.log(`🤖 Auto-generating response for question: "${messageBody}"`);
         
-        // Generate and potentially send auto-response
-        const aiResponse = await centralizedAI.generateResponse(leadId);
+        // Generate and potentially send auto-response using unified AI
+        const aiResponse = await generateResponse(leadId);
         if (aiResponse) {
           console.log(`✅ AI generated response: "${aiResponse}"`);
-          // Note: In a real implementation, you might want to queue this for human review
-          // rather than auto-sending, depending on your business rules
         }
       }
     }
@@ -44,6 +38,73 @@ export const processIncomingMessage = async (
     
   } catch (error) {
     console.error('Error processing incoming message:', error);
+  }
+};
+
+const shouldGenerateResponse = async (leadId: string): Promise<boolean> => {
+  try {
+    const { data: messages } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('sent_at', { ascending: false })
+      .limit(5);
+
+    if (!messages || messages.length === 0) return false;
+
+    const lastCustomerMessage = messages.find(msg => msg.direction === 'in');
+    if (!lastCustomerMessage) return false;
+
+    const responseAfter = messages.find(msg => 
+      msg.direction === 'out' && 
+      new Date(msg.sent_at) > new Date(lastCustomerMessage.sent_at)
+    );
+
+    return !responseAfter;
+  } catch (error) {
+    console.error('Error checking if response needed:', error);
+    return false;
+  }
+};
+
+const generateResponse = async (leadId: string): Promise<string | null> => {
+  try {
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('first_name, last_name, vehicle_interest')
+      .eq('id', leadId)
+      .single();
+
+    if (!lead) return null;
+
+    const { data: conversations } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('sent_at', { ascending: true })
+      .limit(10);
+
+    if (!conversations || conversations.length === 0) return null;
+
+    const lastCustomerMessage = conversations
+      .filter(msg => msg.direction === 'in')
+      .slice(-1)[0];
+
+    if (!lastCustomerMessage) return null;
+
+    const messageContext: MessageContext = {
+      leadId,
+      leadName: `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'there',
+      latestMessage: lastCustomerMessage.body,
+      conversationHistory: conversations.map(c => c.body),
+      vehicleInterest: lead.vehicle_interest || ''
+    };
+
+    const response = unifiedAIResponseEngine.generateResponse(messageContext);
+    return response?.message || null;
+  } catch (error) {
+    console.error('Error generating response:', error);
+    return null;
   }
 };
 

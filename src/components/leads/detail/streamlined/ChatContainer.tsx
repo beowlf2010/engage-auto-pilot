@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import ChatMessages from "./ChatMessages";
 import MessageInput from "./MessageInput";
 import IntelligentAIPanel from "@/components/inbox/IntelligentAIPanel";
-import { centralizedAI } from "@/services/centralizedAIService";
+import { unifiedAIResponseEngine, MessageContext } from "@/services/unifiedAIResponseEngine";
 import { toast } from "@/hooks/use-toast";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
@@ -58,23 +58,33 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     try {
       console.log('🤖 Generating enhanced AI response for lead:', lead.id);
       
-      const shouldGenerate = await centralizedAI.shouldGenerateResponse(lead.id);
-      if (!shouldGenerate) {
+      const lastCustomerMessage = messages.filter(msg => msg.direction === 'in').slice(-1)[0];
+      
+      if (!lastCustomerMessage) {
         toast({
-          title: "No Response Needed",
-          description: "AI determined no response is needed at this time",
+          title: "No Customer Message",
+          description: "No recent customer message to respond to",
           variant: "default"
         });
         return;
       }
 
-      const aiMessage = await centralizedAI.generateResponse(lead.id);
-      if (aiMessage) {
-        setNewMessage(aiMessage);
+      const messageContext: MessageContext = {
+        leadId: lead.id,
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        latestMessage: lastCustomerMessage.body,
+        conversationHistory: messages.map(m => m.body),
+        vehicleInterest: lead.vehicleInterest || ''
+      };
+
+      const aiResponse = unifiedAIResponseEngine.generateResponse(messageContext);
+      
+      if (aiResponse?.message) {
+        setNewMessage(aiResponse.message);
         setShowAIPanel(false);
         toast({
           title: "AI Response Generated",
-          description: "Finn has generated a response. Review and send when ready.",
+          description: "AI has generated a response. Review and send when ready.",
         });
       } else {
         toast({

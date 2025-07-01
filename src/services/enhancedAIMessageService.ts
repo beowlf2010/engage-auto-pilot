@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { generateIntelligentAIMessage } from './intelligentAIMessageService';
+import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 
 export interface AIMessageSchedule {
   leadId: string;
@@ -12,15 +11,27 @@ export interface AIMessageSchedule {
 
 export const generateEnhancedAIMessage = async (leadId: string): Promise<string | null> => {
   try {
-    console.log('🤖 Generating enhanced AI message for lead:', leadId);
+    console.log('🤖 Generating enhanced AI message for lead using unified AI:', leadId);
     
-    // Use the existing intelligent AI message service
-    const message = await generateIntelligentAIMessage({
-      leadId,
-      stage: 'enhanced_follow_up'
-    });
+    // Get lead information
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('first_name, last_name, vehicle_interest')
+      .eq('id', leadId)
+      .single();
 
-    return message;
+    if (!lead) return null;
+
+    const messageContext: MessageContext = {
+      leadId,
+      leadName: `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'there',
+      latestMessage: '',
+      conversationHistory: [],
+      vehicleInterest: lead.vehicle_interest || ''
+    };
+
+    const response = unifiedAIResponseEngine.generateResponse(messageContext);
+    return response?.message || null;
   } catch (error) {
     console.error('Error generating enhanced AI message:', error);
     return null;
@@ -143,10 +154,7 @@ export const processQueuedMessages = async (): Promise<void> => {
     for (const lead of dueMessages) {
       try {
         // Generate AI message
-        const message = await generateIntelligentAIMessage({
-          leadId: lead.id,
-          stage: lead.ai_stage || 'follow_up'
-        });
+        const message = await generateEnhancedAIMessage(lead.id);
 
         if (message) {
           // Store message for manual approval in queue

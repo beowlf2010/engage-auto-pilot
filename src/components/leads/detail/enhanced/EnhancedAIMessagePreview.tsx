@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bot, Send, X, AlertTriangle, CheckCircle } from "lucide-react";
 import { getInventoryForAIMessaging } from "@/services/inventory/inventoryQueries";
-import { generateIntelligentAIMessage } from "@/services/intelligentAIMessageService";
+import { unifiedAIResponseEngine, MessageContext } from "@/services/unifiedAIResponseEngine";
 import { sendMessage } from "@/services/messagesService";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "@/hooks/use-toast";
@@ -49,20 +48,19 @@ const EnhancedAIMessagePreview: React.FC<EnhancedAIMessagePreviewProps> = ({
       setInventoryContext(validInventory);
       setInventoryValidated(true);
 
-      // Generate message with strict inventory context
-      const message = await generateIntelligentAIMessage({
+      // Generate message using unified AI
+      const messageContext: MessageContext = {
         leadId,
-        stage: 'follow_up',
-        context: {
-          availableInventory: validInventory,
-          inventoryCount: validInventory.length,
-          strictInventoryMode: true, // Flag for AI to be extra careful
-          vehicleInterest: vehicleInterest || ''
-        }
-      });
+        leadName,
+        latestMessage: '',
+        conversationHistory: [],
+        vehicleInterest: vehicleInterest || ''
+      };
 
-      if (message) {
-        setGeneratedMessage(message);
+      const response = unifiedAIResponseEngine.generateResponse(messageContext);
+      
+      if (response?.message) {
+        setGeneratedMessage(response.message);
       } else {
         throw new Error('Failed to generate message');
       }

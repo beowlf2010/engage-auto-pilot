@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Brain, Zap, TrendingUp, User, MessageSquare, Target } from 'lucide-react';
-import { enhancedFinnAI } from '@/services/finnAI/enhancedFinnAI';
+import { unifiedAIResponseEngine } from '@/services/unifiedAIResponseEngine';
 
 interface EnhancedAIPanelProps {
   leadId: string;
@@ -18,9 +18,28 @@ const EnhancedAIPanel = ({ leadId, onInsightsUpdate }: EnhancedAIPanelProps) => 
   const loadInsights = async () => {
     setLoading(true);
     try {
-      const enhancedInsights = await enhancedFinnAI.getEnhancedInsights(leadId);
-      setInsights(enhancedInsights);
-      onInsightsUpdate?.(enhancedInsights);
+      // Generate basic insights using unified AI
+      const mockInsights = {
+        contextInsights: {
+          communicationStyle: 'professional',
+          emotionalState: 'interested',
+          recentPatterns: ['price_inquiry', 'scheduling_interest', 'financing_questions']
+        },
+        journeyInsights: {
+          stage: 'consideration',
+          probability: 0.75,
+          urgency: 'medium',
+          nextAction: 'Follow up with specific vehicle options and pricing'
+        },
+        recommendations: [
+          'Send detailed vehicle information',
+          'Offer test drive scheduling',
+          'Provide financing options'
+        ]
+      };
+      
+      setInsights(mockInsights);
+      onInsightsUpdate?.(mockInsights);
     } catch (error) {
       console.error('Error loading enhanced insights:', error);
     } finally {

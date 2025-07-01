@@ -1,7 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { emailService } from './emailService';
-import { generateIntelligentAIMessage } from './intelligentAIMessageService';
+import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 
 export interface EmailSequenceStage {
   stage: string;
@@ -111,26 +110,18 @@ class FinnEmailService {
 
       if (!lead) return 'Following up on your inquiry';
 
-      const context = {
-        firstName: lead.first_name,
-        vehicleInterest: lead.vehicle_interest,
-        stage,
-        timeOfDay: new Date().getHours() < 12 ? 'morning' : 'afternoon'
+      // Use unified AI to generate contextual subject line
+      const messageContext: MessageContext = {
+        leadId,
+        leadName: lead.first_name || 'there',
+        latestMessage: `Generate email subject for ${stage}`,
+        conversationHistory: [],
+        vehicleInterest: lead.vehicle_interest || ''
       };
 
-      // Use AI to generate contextual subject line
-      const aiSubject = await generateIntelligentAIMessage({
-        leadId,
-        stage: 'email_subject',
-        context: {
-          ...context,
-          urgency_factor: 'medium',
-          inventory_mentioned: [],
-          behavioral_trigger: 'email_subject_generation'
-        }
-      });
-
-      return aiSubject || this.getFallbackSubjectLine(stage, lead.first_name);
+      const aiResponse = unifiedAIResponseEngine.generateResponse(messageContext);
+      
+      return aiResponse?.message || this.getFallbackSubjectLine(stage, lead.first_name);
     } catch (error) {
       console.error('Error generating smart subject line:', error);
       return 'Following up on your inquiry';
