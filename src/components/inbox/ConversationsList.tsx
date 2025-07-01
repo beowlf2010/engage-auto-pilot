@@ -9,19 +9,34 @@ import { ConversationListItem } from '@/types/conversation';
 
 interface ConversationsListProps {
   conversations: ConversationListItem[];
-  selectedConversationId: string | null;
+  selectedConversationId?: string | null;
+  selectedLead?: string | null; // Add this for backward compatibility
   onSelectConversation: (conversation: ConversationListItem) => void;
-  userRole: string;
-  userId: string;
+  userRole?: string;
+  userId?: string;
+  canReply?: (conversation: ConversationListItem) => boolean;
+  markAsRead?: (leadId: string) => Promise<void>;
+  markingAsRead?: string | null;
+  showUrgencyIndicator?: boolean;
+  showTimestamps?: boolean;
 }
 
 const ConversationsList = ({
   conversations,
   selectedConversationId,
+  selectedLead,
   onSelectConversation,
-  userRole,
-  userId
+  userRole = 'user',
+  userId = '',
+  canReply = () => true,
+  markAsRead,
+  markingAsRead,
+  showUrgencyIndicator = false,
+  showTimestamps = false
 }: ConversationsListProps) => {
+  // Use either selectedConversationId or selectedLead for compatibility
+  const selectedId = selectedConversationId || selectedLead;
+
   if (conversations.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-8">
@@ -41,7 +56,7 @@ const ConversationsList = ({
           <Card 
             key={conversation.leadId}
             className={`cursor-pointer transition-all hover:shadow-md ${
-              selectedConversationId === conversation.leadId ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+              selectedId === conversation.leadId ? 'ring-2 ring-blue-500 bg-blue-50' : ''
             }`}
             onClick={() => onSelectConversation(conversation)}
           >
@@ -55,6 +70,11 @@ const ConversationsList = ({
                     {conversation.unreadCount > 0 && (
                       <Badge variant="destructive" className="text-xs">
                         {conversation.unreadCount}
+                      </Badge>
+                    )}
+                    {showUrgencyIndicator && conversation.unreadCount > 3 && (
+                      <Badge variant="destructive" className="text-xs bg-red-600">
+                        URGENT
                       </Badge>
                     )}
                   </div>
@@ -76,7 +96,28 @@ const ConversationsList = ({
                     <div className="flex items-center space-x-1 text-xs text-gray-500">
                       <Clock className="h-3 w-3" />
                       <span>{conversation.lastMessageTime}</span>
+                      {showTimestamps && conversation.lastMessageDate && (
+                        <span className="ml-2">
+                          ({formatDistanceToNow(conversation.lastMessageDate, { addSuffix: true })})
+                        </span>
+                      )}
                     </div>
+                    
+                    {conversation.unreadCount > 0 && markAsRead && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAsRead(conversation.leadId);
+                        }}
+                        disabled={markingAsRead === conversation.leadId}
+                        className="text-xs h-6 px-2"
+                      >
+                        <CheckCheck className="h-3 w-3 mr-1" />
+                        {markingAsRead === conversation.leadId ? 'Marking...' : 'Mark Read'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

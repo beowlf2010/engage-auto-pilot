@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationOperations } from '@/hooks/useConversationOperations';
@@ -11,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, MessageSquare, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ConversationListItem } from '@/types/conversation';
 
 interface ConsolidatedSmartInboxProps {
   onLeadsRefresh?: () => void;
