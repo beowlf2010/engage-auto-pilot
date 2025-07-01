@@ -9,6 +9,21 @@ interface UseOptimizedInboxProps {
   onLeadsRefresh?: () => void;
 }
 
+// Type definitions for realtime payloads
+interface RealtimePayload {
+  eventType: string;
+  new?: {
+    lead_id?: string;
+    direction?: string;
+    [key: string]: any;
+  };
+  old?: {
+    lead_id?: string;
+    direction?: string;
+    [key: string]: any;
+  };
+}
+
 export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {}) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -38,6 +53,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           id,
           first_name,
           last_name,
+          email,
           phone_numbers!inner (
             number,
             is_primary
@@ -45,6 +61,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           vehicle_interest,
           status,
           salesperson_id,
+          source,
           conversations (
             id,
             body,
@@ -86,11 +103,20 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           leadId: lead.id,
           leadName: `${lead.first_name} ${lead.last_name}`,
           leadPhone: lead.phone_numbers?.[0]?.number || '',
+          primaryPhone: lead.phone_numbers?.[0]?.number || '',
+          leadEmail: lead.email || '',
           vehicleInterest: lead.vehicle_interest || '',
+          leadSource: lead.source || 'Unknown',
+          leadType: 'prospect',
           lastMessage: lastMessage?.body || '',
+          lastMessageTime: lastMessage?.sent_at 
+            ? new Date(lastMessage.sent_at).toLocaleString()
+            : '',
           lastMessageAt: lastMessage?.sent_at || '',
-          lastMessageDirection: lastMessage?.direction || 'out',
+          lastMessageDirection: lastMessage?.direction as 'in' | 'out' | null,
+          lastMessageDate: lastMessage ? new Date(lastMessage.sent_at) : new Date(0),
           unreadCount,
+          messageCount: conversations.length,
           status: lead.status || 'active',
           salespersonId: lead.salesperson_id || null,
           aiGenerated: lastMessage?.ai_generated || false
@@ -126,7 +152,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           schema: 'public',
           table: 'conversations'
         },
-        (payload) => {
+        (payload: RealtimePayload) => {
           console.log('🔄 [OPTIMIZED INBOX] Real-time event:', {
             event: payload.eventType,
             leadId: payload.new?.lead_id || payload.old?.lead_id,
@@ -157,7 +183,7 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
           schema: 'public',
           table: 'leads'
         },
-        (payload) => {
+        (payload: RealtimePayload) => {
           console.log('🔄 [OPTIMIZED INBOX] Lead updated:', payload.eventType);
           refetchConversations();
           if (onLeadsRefresh) {

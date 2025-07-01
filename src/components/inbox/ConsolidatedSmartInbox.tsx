@@ -189,7 +189,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({ onLeads
         <div className="flex-1 overflow-auto">
           <ConversationsList
             conversations={conversations}
-            selectedConversation={selectedConversation}
+            selectedConversationId={selectedConversation?.leadId || null}
             onSelectConversation={onSelectConversation}
             userRole={profile?.role || 'user'}
             userId={profile?.id || ''}
