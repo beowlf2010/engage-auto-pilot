@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +9,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import LeadDetailHeader from "./streamlined/LeadDetailHeader";
 import ChatContainer from "./streamlined/ChatContainer";
 import LeadDetailSidebar from "./streamlined/LeadDetailSidebar";
+import EnhancedUnifiedAIPanel from "./streamlined/EnhancedUnifiedAIPanel";
 import type { Lead } from "@/types/lead";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
@@ -145,6 +147,17 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
           isSending={isSending || isLeadClosed}
           unreadCount={transformedLead.unreadCount}
         />
+        
+        {/* Enhanced AI Intelligence Panel */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <EnhancedUnifiedAIPanel
+            leadId={lead.id}
+            leadName={`${lead.firstName} ${lead.lastName}`}
+            messages={conversationMessages}
+            vehicleInterest={lead.vehicleInterest}
+            onSendMessage={sendMessage}
+          />
+        </div>
         
         {isLeadClosed && (
           <div className="bg-gray-100 border rounded-lg p-4 text-center">

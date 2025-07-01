@@ -1,12 +1,11 @@
 
-import React, { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, Mail, Calendar, Car, TrendingUp } from 'lucide-react';
-import EnhancedMessageThread from './EnhancedMessageThread';
-import EnhancedEmailTab from './EnhancedEmailTab';
-import VehicleRecommendationsTab from './VehicleRecommendationsTab';
-import AppointmentsList from '../../appointments/AppointmentsList';
-import AppointmentScheduler from '../../appointments/AppointmentScheduler';
+import React, { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MessageCircle, Bot, BarChart3, Calendar, User } from "lucide-react";
+import EnhancedMessageThread from "./EnhancedMessageThread";
+import EnhancedUnifiedAIPanel from "./streamlined/EnhancedUnifiedAIPanel";
+import LeadNotesSection from "./LeadNotesSection";
+import LeadHistorySection from "./LeadHistorySection";
 
 interface LeadDetailTabsSectionProps {
   lead: any;
@@ -15,81 +14,83 @@ interface LeadDetailTabsSectionProps {
   onSendMessage: (message: string) => Promise<void>;
 }
 
-const LeadDetailTabsSection = ({ 
-  lead, 
-  messages, 
-  messagesLoading, 
-  onSendMessage 
-}: LeadDetailTabsSectionProps) => {
-  const [activeTab, setActiveTab] = useState('messages');
-  const [showAppointmentScheduler, setShowAppointmentScheduler] = useState(false);
-
-  const handleScheduleAppointment = () => {
-    setShowAppointmentScheduler(true);
-  };
-
-  const leadName = `${lead.firstName} ${lead.lastName}`;
+const LeadDetailTabsSection: React.FC<LeadDetailTabsSectionProps> = ({
+  lead,
+  messages,
+  messagesLoading,
+  onSendMessage
+}) => {
+  const [activeTab, setActiveTab] = useState("messages");
 
   return (
-    <>
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-        <div className="px-6 pt-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="messages" className="flex items-center space-x-2">
-              <MessageSquare className="h-4 w-4" />
-              <span>Messages</span>
-            </TabsTrigger>
-            <TabsTrigger value="appointments" className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4" />
-              <span>Appointments</span>
-            </TabsTrigger>
-            <TabsTrigger value="email" className="flex items-center space-x-2">
-              <Mail className="h-4 w-4" />
-              <span>Email</span>
-            </TabsTrigger>
-            <TabsTrigger value="vehicles" className="flex items-center space-x-2">
-              <Car className="h-4 w-4" />
-              <span>Vehicles</span>
-            </TabsTrigger>
-          </TabsList>
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+      <TabsList className="grid w-full grid-cols-5 mb-4">
+        <TabsTrigger value="messages" className="flex items-center gap-2">
+          <MessageCircle className="h-4 w-4" />
+          Messages
+        </TabsTrigger>
+        <TabsTrigger value="ai-intelligence" className="flex items-center gap-2">
+          <Bot className="h-4 w-4" />
+          AI Intelligence
+        </TabsTrigger>
+        <TabsTrigger value="analytics" className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4" />
+          Analytics
+        </TabsTrigger>
+        <TabsTrigger value="notes" className="flex items-center gap-2">
+          <User className="h-4 w-4" />
+          Notes
+        </TabsTrigger>
+        <TabsTrigger value="history" className="flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          History
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="messages" className="h-[calc(100%-3rem)] overflow-hidden">
+        <EnhancedMessageThread
+          leadId={lead.id}
+          leadName={`${lead.firstName || ''} ${lead.lastName || ''}`.trim()}
+          messages={messages}
+          loading={messagesLoading}
+          onSendMessage={onSendMessage}
+        />
+      </TabsContent>
+
+      <TabsContent value="ai-intelligence" className="h-[calc(100%-3rem)] overflow-auto p-4">
+        <EnhancedUnifiedAIPanel
+          leadId={lead.id}
+          leadName={`${lead.firstName || ''} ${lead.lastName || ''}`.trim()}
+          messages={messages}
+          vehicleInterest={lead.vehicleInterest || ''}
+          onSendMessage={onSendMessage}
+        />
+      </TabsContent>
+
+      <TabsContent value="analytics" className="h-[calc(100%-3rem)] overflow-auto p-4">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Lead Analytics</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium text-blue-900">Message Count</h4>
+              <p className="text-2xl font-bold text-blue-800">{messages.length}</p>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h4 className="font-medium text-green-900">Status</h4>
+              <p className="text-lg font-semibold text-green-800 capitalize">{lead.status}</p>
+            </div>
+          </div>
         </div>
+      </TabsContent>
 
-        <div className="flex-1 overflow-hidden">
-          <TabsContent value="messages" className="h-full m-0">
-            <EnhancedMessageThread
-              messages={messages}
-              onSendMessage={onSendMessage}
-              isLoading={messagesLoading}
-              leadName={leadName}
-            />
-          </TabsContent>
+      <TabsContent value="notes" className="h-[calc(100%-3rem)] overflow-auto">
+        <LeadNotesSection leadId={lead.id} />
+      </TabsContent>
 
-          <TabsContent value="appointments" className="h-full m-0 p-6">
-            <AppointmentsList
-              leadId={lead.id}
-              onScheduleNew={handleScheduleAppointment}
-              maxHeight="calc(100vh - 300px)"
-            />
-          </TabsContent>
-
-          <TabsContent value="email" className="h-full m-0">
-            <EnhancedEmailTab leadId={lead.id} />
-          </TabsContent>
-
-          <TabsContent value="vehicles" className="h-full m-0">
-            <VehicleRecommendationsTab lead={lead} />
-          </TabsContent>
-        </div>
-      </Tabs>
-
-      {/* Appointment Scheduler Dialog */}
-      <AppointmentScheduler
-        isOpen={showAppointmentScheduler}
-        onClose={() => setShowAppointmentScheduler(false)}
-        leadId={lead.id}
-        leadName={leadName}
-      />
-    </>
+      <TabsContent value="history" className="h-[calc(100%-3rem)] overflow-auto">
+        <LeadHistorySection leadId={lead.id} />
+      </TabsContent>
+    </Tabs>
   );
 };
 
