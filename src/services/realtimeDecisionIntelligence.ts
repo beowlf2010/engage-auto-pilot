@@ -1,15 +1,17 @@
-import { supabase } from '@/integrations/supabase/client';
-
 interface DecisionContext {
   leadId: string;
-  messageContent: string;
-  conversationHistory: string[];
-  leadProfile?: any;
-  inventoryContext?: any;
-  timeContext?: {
-    hourOfDay: number;
+  messageHistory: string[];
+  currentMessage: string;
+  leadProfile: any;
+  timeContext: {
+    hour: number;
     dayOfWeek: number;
-    timeZone: string;
+    isBusinessHours: boolean;
+  };
+  conversationContext: {
+    messageCount: number;
+    lastResponseTime?: number;
+    engagementLevel: 'high' | 'medium' | 'low';
   };
 }
 
@@ -17,584 +19,373 @@ interface IntelligentDecision {
   shouldRespond: boolean;
   confidence: number;
   reasoning: string[];
-  suggestedDelay?: number;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  recommendedActions: string[];
-}
-
-interface ProactiveIntervention {
-  type: 'opportunity' | 'risk' | 'escalation' | 'automation';
-  urgency: 'low' | 'medium' | 'high' | 'critical';
-  description: string;
   recommendedAction: string;
-  confidence: number;
-  triggerData: any;
+  urgencyLevel: 'low' | 'medium' | 'high';
+  suggestedDelay?: number; // minutes
 }
 
-interface DecisionRule {
-  id: string;
-  name: string;
-  condition: string;
-  action: string;
-  priority: number;
-  isActive: boolean;
+interface DecisionInsights {
+  total_decisions: number;
+  response_decisions: number;
+  no_response_decisions: number;
+  average_confidence: number;
+  top_decision_factors: string[];
+  success_rate: number;
 }
 
-class RealtimeDecisionIntelligenceService {
-  private decisionRules: DecisionRule[] = [];
-  private decisionCache = new Map<string, IntelligentDecision>();
-  private interventionQueue: ProactiveIntervention[] = [];
+class RealtimeDecisionIntelligence {
+  private decisionHistory: Array<{
+    decision: IntelligentDecision;
+    context: DecisionContext;
+    timestamp: Date;
+    outcome?: 'success' | 'failure';
+  }> = [];
 
   async makeIntelligentDecision(
     leadId: string,
-    messageContent: string,
+    currentMessage: string,
     context: any
   ): Promise<IntelligentDecision> {
+    console.log('🤖 [DECISION-AI] Making intelligent decision for message response...');
+
     try {
-      console.log('🧠 [DECISION-AI] Making intelligent decision for lead:', leadId);
-
-      // Create decision context
-      const decisionContext: DecisionContext = {
-        leadId,
-        messageContent,
-        conversationHistory: context.conversationHistory || [],
-        leadProfile: await this.getLeadProfile(leadId),
-        inventoryContext: await this.getInventoryContext(leadId),
-        timeContext: this.getTimeContext()
-      };
-
-      // Apply decision intelligence layers
-      const decision = await this.processDecisionLayers(decisionContext);
+      // Build decision context
+      const decisionContext = this.buildDecisionContext(leadId, currentMessage, context);
       
-      // Cache decision for optimization
-      this.cacheDecision(leadId, decision);
+      // Analyze multiple decision factors
+      const factors = await this.analyzeDecisionFactors(decisionContext);
       
-      // Check for proactive interventions
-      await this.checkProactiveInterventions(decisionContext, decision);
+      // Make the intelligent decision
+      const decision = this.calculateIntelligentDecision(factors, decisionContext);
       
-      console.log(`✅ [DECISION-AI] Decision made: ${decision.shouldRespond ? 'RESPOND' : 'WAIT'} (${Math.round(decision.confidence * 100)}% confidence)`);
+      // Record decision for learning
+      this.recordDecision(decision, decisionContext);
+      
+      console.log(`🎯 [DECISION-AI] Decision: ${decision.shouldRespond ? 'RESPOND' : 'WAIT'} (${Math.round(decision.confidence * 100)}% confidence)`);
+      console.log(`📋 [DECISION-AI] Reasoning: ${decision.reasoning.join(', ')}`);
+      
       return decision;
-
     } catch (error) {
-      console.error('❌ [DECISION-AI] Error making intelligent decision:', error);
-      
-      // Return safe default decision
+      console.error('❌ [DECISION-AI] Decision making failed:', error);
       return {
         shouldRespond: true,
         confidence: 0.5,
         reasoning: ['Fallback decision due to error'],
-        priority: 'medium',
-        recommendedActions: ['send_standard_response']
+        recommendedAction: 'respond_normally',
+        urgencyLevel: 'medium'
       };
     }
   }
 
-  private async getLeadProfile(leadId: string): Promise<any> {
-    try {
-      const { data: leadData } = await supabase
-        .from('leads')
-        .select(`
-          *, 
-          ai_conversation_context (
-            lead_preferences,
-            response_style,
-            context_score
-          )
-        `)
-        .eq('id', leadId)
-        .single();
-
-      return leadData;
-    } catch (error) {
-      console.error('❌ [DECISION-AI] Error getting lead profile:', error);
-      return null;
-    }
-  }
-
-  private async getInventoryContext(leadId: string): Promise<any> {
-    try {
-      // Get lead's vehicle interest and find matching inventory
-      const { data: leadData } = await supabase
-        .from('leads')
-        .select('vehicle_interest, preferred_price_min, preferred_price_max')
-        .eq('id', leadId)
-        .single();
-
-      if (!leadData?.vehicle_interest) return null;
-
-      // Find matching inventory
-      const { data: inventory } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('status', 'available')
-        .limit(5);
-
-      return {
-        leadInterest: leadData.vehicle_interest,
-        priceRange: {
-          min: leadData.preferred_price_min,
-          max: leadData.preferred_price_max
-        },
-        availableMatches: inventory?.length || 0,
-        topMatches: inventory?.slice(0, 3) || []
-      };
-    } catch (error) {
-      console.error('❌ [DECISION-AI] Error getting inventory context:', error);
-      return null;
-    }
-  }
-
-  private getTimeContext(): DecisionContext['timeContext'] {
+  private buildDecisionContext(leadId: string, currentMessage: string, context: any): DecisionContext {
     const now = new Date();
+    
     return {
-      hourOfDay: now.getHours(),
-      dayOfWeek: now.getDay(),
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      leadId,
+      messageHistory: context.conversationHistory || [],
+      currentMessage,
+      leadProfile: {
+        vehicleInterest: context.vehicleInterest,
+        leadName: context.leadName
+      },
+      timeContext: {
+        hour: now.getHours(),
+        dayOfWeek: now.getDay(),
+        isBusinessHours: this.isBusinessHours(now)
+      },
+      conversationContext: {
+        messageCount: (context.conversationHistory || []).length,
+        engagementLevel: this.calculateEngagementLevel(context.conversationHistory || [])
+      }
     };
   }
 
-  private async processDecisionLayers(context: DecisionContext): Promise<IntelligentDecision> {
-    const reasoning: string[] = [];
-    let shouldRespond = true;
-    let confidence = 0.7;
-    let priority: IntelligentDecision['priority'] = 'medium';
-    const recommendedActions: string[] = [];
+  private async analyzeDecisionFactors(context: DecisionContext): Promise<any> {
+    const factors = {
+      messageUrgency: this.analyzeMessageUrgency(context.currentMessage),
+      conversationMomentum: this.analyzeConversationMomentum(context),
+      timeAppropriate: this.analyzeTimeAppropriateness(context.timeContext),
+      customerEngagement: this.analyzeCustomerEngagement(context),
+      businessPriority: this.analyzeBusinessPriority(context),
+      responseExpectation: this.analyzeResponseExpectation(context)
+    };
 
-    // Layer 1: Time-based Intelligence
-    const timeDecision = this.analyzeTimeContext(context.timeContext!);
-    if (!timeDecision.shouldRespond) {
-      shouldRespond = false;
-      confidence = Math.min(confidence, timeDecision.confidence);
-      reasoning.push(...timeDecision.reasoning);
-    }
+    return factors;
+  }
 
-    // Layer 2: Conversation Pattern Analysis
-    const conversationDecision = this.analyzeConversationPattern(context);
-    confidence = (confidence + conversationDecision.confidence) / 2;
-    reasoning.push(...conversationDecision.reasoning);
+  private analyzeMessageUrgency(message: string): { score: number; indicators: string[] } {
+    const urgentKeywords = [
+      'urgent', 'asap', 'immediately', 'today', 'now', 'emergency',
+      'need to know', 'right away', 'quickly', 'deadline', 'time sensitive'
+    ];
     
-    if (conversationDecision.priority === 'urgent') {
-      priority = 'urgent';
-      shouldRespond = true; // Override time-based decision for urgent cases
+    const questionKeywords = ['?', 'when ', 'how ', 'what ', 'where ', 'why '];
+    
+    let score = 0;
+    const indicators: string[] = [];
+    const lowerMessage = message.toLowerCase();
+
+    // Check for urgent keywords
+    for (const keyword of urgentKeywords) {
+      if (lowerMessage.includes(keyword)) {
+        score += 0.3;
+        indicators.push(`urgent_keyword_${keyword.replace(' ', '_')}`);
+      }
     }
 
-    // Layer 3: Lead Behavior Analysis
-    const behaviorDecision = await this.analyzeBehaviorPattern(context);
-    confidence = (confidence + behaviorDecision.confidence) / 2;
-    reasoning.push(...behaviorDecision.reasoning);
-
-    // Layer 4: Inventory Urgency Analysis
-    const inventoryDecision = this.analyzeInventoryUrgency(context);
-    if (inventoryDecision.shouldEscalate) {
-      priority = 'high';
-      recommendedActions.push('highlight_inventory_match');
+    // Check for questions (usually expect responses)
+    for (const keyword of questionKeywords) {
+      if (lowerMessage.includes(keyword)) {
+        score += 0.2;
+        indicators.push('contains_question');
+        break;
+      }
     }
-    reasoning.push(...inventoryDecision.reasoning);
 
-    // Layer 5: Response Fatigue Detection
-    const fatigueDecision = await this.detectResponseFatigue(context);
-    if (fatigueDecision.shouldPause) {
-      shouldRespond = false;
-      confidence = Math.min(confidence, 0.3);
-      reasoning.push(...fatigueDecision.reasoning);
+    // Check message length (longer messages often need responses)
+    if (message.length > 100) {
+      score += 0.1;
+      indicators.push('detailed_message');
+    }
+
+    return { score: Math.min(score, 1), indicators };
+  }
+
+  private analyzeConversationMomentum(context: DecisionContext): { score: number; indicators: string[] } {
+    const indicators: string[] = [];
+    let score = 0.5; // Base momentum
+
+    // Recent activity increases momentum
+    if (context.conversationContext.messageCount > 0) {
+      score += 0.2;
+      indicators.push('active_conversation');
+    }
+
+    // High engagement increases momentum
+    if (context.conversationContext.engagementLevel === 'high') {
+      score += 0.3;
+      indicators.push('high_engagement');
+    } else if (context.conversationContext.engagementLevel === 'medium') {
+      score += 0.1;
+      indicators.push('medium_engagement');
+    }
+
+    return { score: Math.min(score, 1), indicators };
+  }
+
+  private analyzeTimeAppropriateness(timeContext: DecisionContext['timeContext']): { score: number; indicators: string[] } {
+    const indicators: string[] = [];
+    let score = 0.5;
+
+    if (timeContext.isBusinessHours) {
+      score += 0.3;
+      indicators.push('business_hours');
+    } else {
+      score -= 0.2;
+      indicators.push('after_hours');
+    }
+
+    // Weekend considerations
+    if (timeContext.dayOfWeek === 0 || timeContext.dayOfWeek === 6) {
+      score -= 0.1;
+      indicators.push('weekend');
+    }
+
+    return { score: Math.max(0, Math.min(score, 1)), indicators };
+  }
+
+  private analyzeCustomerEngagement(context: DecisionContext): { score: number; indicators: string[] } {
+    const indicators: string[] = [];
+    let score = 0.5;
+
+    // Base engagement on message count and recency
+    if (context.conversationContext.messageCount > 3) {
+      score += 0.2;
+      indicators.push('active_participant');
+    }
+
+    if (context.conversationContext.engagementLevel === 'high') {
+      score += 0.3;
+      indicators.push('highly_engaged');
+    }
+
+    return { score: Math.min(score, 1), indicators };
+  }
+
+  private analyzeBusinessPriority(context: DecisionContext): { score: number; indicators: string[] } {
+    const indicators: string[] = [];
+    let score = 0.5;
+
+    // Vehicle interest indicates business opportunity
+    if (context.leadProfile.vehicleInterest && context.leadProfile.vehicleInterest.length > 10) {
+      score += 0.2;
+      indicators.push('specific_vehicle_interest');
+    }
+
+    // Active conversation indicates hot lead
+    if (context.conversationContext.messageCount > 2) {
+      score += 0.2;
+      indicators.push('active_lead');
+    }
+
+    return { score: Math.min(score, 1), indicators };
+  }
+
+  private analyzeResponseExpectation(context: DecisionContext): { score: number; indicators: string[] } {
+    const indicators: string[] = [];
+    let score = 0.5;
+
+    // Questions expect responses
+    if (context.currentMessage.includes('?')) {
+      score += 0.4;
+      indicators.push('direct_question');
+    }
+
+    // Specific requests expect responses
+    const requestKeywords = ['can you', 'could you', 'please', 'need', 'want'];
+    for (const keyword of requestKeywords) {
+      if (context.currentMessage.toLowerCase().includes(keyword)) {
+        score += 0.2;
+        indicators.push('specific_request');
+        break;
+      }
+    }
+
+    return { score: Math.min(score, 1), indicators };
+  }
+
+  private calculateIntelligentDecision(factors: any, context: DecisionContext): IntelligentDecision {
+    // Weighted scoring system
+    const weights = {
+      messageUrgency: 0.25,
+      responseExpectation: 0.25,
+      conversationMomentum: 0.15,
+      customerEngagement: 0.15,
+      businessPriority: 0.1,
+      timeAppropriate: 0.1
+    };
+
+    let totalScore = 0;
+    const allReasons: string[] = [];
+
+    for (const [factor, weight] of Object.entries(weights)) {
+      const factorData = factors[factor];
+      totalScore += factorData.score * weight;
+      allReasons.push(...factorData.indicators);
+    }
+
+    // Decision threshold
+    const shouldRespond = totalScore > 0.6;
+    const confidence = totalScore;
+    
+    // Determine urgency level
+    let urgencyLevel: 'low' | 'medium' | 'high' = 'medium';
+    if (factors.messageUrgency.score > 0.7) {
+      urgencyLevel = 'high';
+    } else if (totalScore < 0.5) {
+      urgencyLevel = 'low';
+    }
+
+    // Recommended action
+    let recommendedAction = 'respond_normally';
+    if (urgencyLevel === 'high') {
+      recommendedAction = 'respond_immediately';
+    } else if (urgencyLevel === 'low' || !context.timeContext.isBusinessHours) {
+      recommendedAction = 'schedule_response';
+    }
+
+    // Suggested delay for scheduled responses
+    let suggestedDelay: number | undefined;
+    if (!shouldRespond || recommendedAction === 'schedule_response') {
+      suggestedDelay = context.timeContext.isBusinessHours ? 30 : 480; // 30 min or 8 hours
     }
 
     return {
       shouldRespond,
-      confidence: Math.max(0.1, Math.min(1.0, confidence)),
-      reasoning,
-      priority,
-      recommendedActions,
-      suggestedDelay: shouldRespond ? 0 : this.calculateOptimalDelay(context)
+      confidence,
+      reasoning: this.generateReasoningText(allReasons, totalScore),
+      recommendedAction,
+      urgencyLevel,
+      suggestedDelay
     };
   }
 
-  private analyzeTimeContext(timeContext: NonNullable<DecisionContext['timeContext']>): Partial<IntelligentDecision> {
-    const { hourOfDay, dayOfWeek } = timeContext;
+  private generateReasoningText(indicators: string[], score: number): string[] {
     const reasoning: string[] = [];
     
-    // Business hours logic (9 AM - 7 PM, Monday-Saturday)
-    const isBusinessHours = hourOfDay >= 9 && hourOfDay <= 19 && dayOfWeek >= 1 && dayOfWeek <= 6;
+    if (score > 0.8) {
+      reasoning.push('High priority message requiring immediate response');
+    } else if (score > 0.6) {
+      reasoning.push('Standard message appropriate for timely response');
+    } else {
+      reasoning.push('Lower priority message, response can be scheduled');
+    }
+
+    // Add specific reasoning based on top indicators
+    const topIndicators = [...new Set(indicators)].slice(0, 3);
+    for (const indicator of topIndicators) {
+      const readableIndicator = indicator.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').toLowerCase();
+      reasoning.push(`Factor: ${readableIndicator}`);
+    }
+
+    return reasoning;
+  }
+
+  private recordDecision(decision: IntelligentDecision, context: DecisionContext): void {
+    this.decisionHistory.push({
+      decision,
+      context,
+      timestamp: new Date()
+    });
+
+    // Keep only recent history (last 100 decisions)
+    if (this.decisionHistory.length > 100) {
+      this.decisionHistory = this.decisionHistory.slice(-100);
+    }
+  }
+
+  private calculateEngagementLevel(messageHistory: string[]): 'high' | 'medium' | 'low' {
+    if (messageHistory.length > 5) return 'high';
+    if (messageHistory.length > 2) return 'medium';
+    return 'low';
+  }
+
+  private isBusinessHours(date: Date): boolean {
+    const hour = date.getHours();
+    const day = date.getDay();
+    return day >= 1 && day <= 5 && hour >= 8 && hour <= 18;
+  }
+
+  async getDecisionIntelligenceInsights(): Promise<DecisionInsights> {
+    const totalDecisions = this.decisionHistory.length;
+    const responseDecisions = this.decisionHistory.filter(d => d.decision.shouldRespond).length;
+    const noResponseDecisions = totalDecisions - responseDecisions;
     
-    if (!isBusinessHours) {
-      reasoning.push('Outside business hours - response delayed to next business day');
-      return {
-        shouldRespond: false,
-        confidence: 0.9,
-        reasoning
-      };
-    }
+    const averageConfidence = totalDecisions > 0 
+      ? this.decisionHistory.reduce((sum, d) => sum + d.decision.confidence, 0) / totalDecisions 
+      : 0;
 
-    // Peak hours (10 AM - 4 PM)
-    const isPeakHours = hourOfDay >= 10 && hourOfDay <= 16;
-    if (isPeakHours) {
-      reasoning.push('Peak business hours - optimal response time');
-      return {
-        shouldRespond: true,
-        confidence: 0.9,
-        reasoning
-      };
-    }
-
-    reasoning.push('Standard business hours - good response time');
-    return {
-      shouldRespond: true,
-      confidence: 0.7,
-      reasoning
-    };
-  }
-
-  private analyzeConversationPattern(context: DecisionContext): Partial<IntelligentDecision> {
-    const { conversationHistory, messageContent } = context;
-    const reasoning: string[] = [];
-    let confidence = 0.7;
-    let priority: IntelligentDecision['priority'] = 'medium';
-
-    // Analyze message urgency
-    const urgentKeywords = ['urgent', 'asap', 'immediately', 'now', 'today', 'emergency'];
-    const hasUrgentKeywords = urgentKeywords.some(keyword => 
-      messageContent.toLowerCase().includes(keyword)
-    );
-
-    if (hasUrgentKeywords) {
-      priority = 'urgent';
-      confidence = 0.9;
-      reasoning.push('Urgent keywords detected in customer message');
-    }
-
-    // Analyze conversation momentum
-    const recentMessages = conversationHistory.slice(-5);
-    const rapidExchange = recentMessages.length >= 3;
-    
-    if (rapidExchange) {
-      priority = 'high';
-      confidence = Math.min(confidence + 0.1, 1.0);
-      reasoning.push('Active conversation momentum detected');
-    }
-
-    // Check for buying signals
-    const buyingSignals = ['price', 'financing', 'test drive', 'appointment', 'visit', 'buy', 'purchase'];
-    const hasBuyingSignals = buyingSignals.some(signal => 
-      messageContent.toLowerCase().includes(signal)
-    );
-
-    if (hasBuyingSignals) {
-      priority = 'high';
-      confidence = Math.min(confidence + 0.2, 1.0);
-      reasoning.push('Buying signals detected - high priority response needed');
-    }
-
-    return { confidence, reasoning, priority };
-  }
-
-  private async analyzeBehaviorPattern(context: DecisionContext): Promise<Partial<IntelligentDecision>> {
-    const reasoning: string[] = [];
-    let confidence = 0.7;
-
-    try {
-      // Analyze recent AI learning outcomes for this lead
-      const { data: outcomes } = await supabase
-        .from('ai_learning_outcomes')
-        .select('outcome_type, created_at')
-        .eq('lead_id', context.leadId)
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false });
-
-      if (outcomes && outcomes.length > 0) {
-        const positiveOutcomes = outcomes.filter(o => 
-          ['positive_response', 'appointment_booked', 'purchase_intent'].includes(o.outcome_type)
-        );
-
-        if (positiveOutcomes.length > 0) {
-          confidence = Math.min(confidence + 0.1, 1.0);
-          reasoning.push('Recent positive engagement history detected');
-        }
-
-        const recentNegative = outcomes.filter(o => 
-          ['no_response', 'negative_response'].includes(o.outcome_type)
-        );
-
-        if (recentNegative.length >= 2) {
-          confidence = Math.max(confidence - 0.2, 0.3);
-          reasoning.push('Recent negative response pattern - approach cautiously');
-        }
-      }
-
-      return { confidence, reasoning };
-
-    } catch (error) {
-      console.error('❌ [DECISION-AI] Error analyzing behavior pattern:', error);
-      return { confidence: 0.5, reasoning: ['Unable to analyze behavior pattern'] };
-    }
-  }
-
-  private analyzeInventoryUrgency(context: DecisionContext): { shouldEscalate: boolean; reasoning: string[] } {
-    const reasoning: string[] = [];
-    
-    if (!context.inventoryContext) {
-      return { shouldEscalate: false, reasoning: ['No inventory context available'] };
-    }
-
-    const { availableMatches, topMatches } = context.inventoryContext;
-    
-    if (availableMatches === 0) {
-      reasoning.push('No matching inventory available - low urgency');
-      return { shouldEscalate: false, reasoning };
-    }
-
-    if (availableMatches <= 2) {
-      reasoning.push('Limited matching inventory - high urgency response recommended');
-      return { shouldEscalate: true, reasoning };
-    }
-
-    // Check for high-demand vehicles (this would be enhanced with real data)
-    const highDemandIndicators = topMatches.some((vehicle: any) => 
-      vehicle.days_in_inventory < 30 || vehicle.status === 'pending'
-    );
-
-    if (highDemandIndicators) {
-      reasoning.push('High-demand vehicles detected - escalate response');
-      return { shouldEscalate: true, reasoning };
-    }
-
-    reasoning.push('Adequate inventory available - standard response');
-    return { shouldEscalate: false, reasoning };
-  }
-
-  private async detectResponseFatigue(context: DecisionContext): Promise<{ shouldPause: boolean; reasoning: string[] }> {
-    const reasoning: string[] = [];
-
-    try {
-      // Check recent AI message frequency
-      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-      
-      const { data: recentMessages } = await supabase
-        .from('conversations')
-        .select('sent_at, direction')
-        .eq('lead_id', context.leadId)
-        .eq('ai_generated', true)
-        .gte('sent_at', threeDaysAgo.toISOString())
-        .order('sent_at', { ascending: false });
-
-      if (!recentMessages) {
-        return { shouldPause: false, reasoning: ['No recent message history'] };
-      }
-
-      // Check for too many AI messages without responses
-      const aiMessages = recentMessages.filter(m => m.direction === 'out');
-      const customerResponses = recentMessages.filter(m => m.direction === 'in');
-
-      if (aiMessages.length >= 3 && customerResponses.length === 0) {
-        reasoning.push('Multiple AI messages without customer response - pause to avoid fatigue');
-        return { shouldPause: true, reasoning };
-      }
-
-      // Check for rapid-fire messaging
-      if (aiMessages.length >= 2) {
-        const lastTwoMessages = aiMessages.slice(0, 2);
-        const timeBetween = new Date(lastTwoMessages[0].sent_at).getTime() - 
-                           new Date(lastTwoMessages[1].sent_at).getTime();
-        
-        if (timeBetween < 2 * 60 * 60 * 1000) { // Less than 2 hours
-          reasoning.push('Recent AI messages sent too close together - brief pause recommended');
-          return { shouldPause: true, reasoning };
-        }
-      }
-
-      return { shouldPause: false, reasoning: ['No response fatigue detected'] };
-
-    } catch (error) {
-      console.error('❌ [DECISION-AI] Error detecting response fatigue:', error);
-      return { shouldPause: false, reasoning: ['Unable to analyze response fatigue'] };
-    }
-  }
-
-  private calculateOptimalDelay(context: DecisionContext): number {
-    const baseDelay = 2; // 2 hours default
-    const timeContext = context.timeContext!;
-    
-    // If outside business hours, delay until next business day
-    if (timeContext.hourOfDay < 9 || timeContext.hourOfDay > 19) {
-      const hoursUntilNextBusiness = timeContext.hourOfDay < 9 
-        ? 9 - timeContext.hourOfDay 
-        : 24 - timeContext.hourOfDay + 9;
-      return hoursUntilNextBusiness;
-    }
-
-    return baseDelay;
-  }
-
-  private cacheDecision(leadId: string, decision: IntelligentDecision): void {
-    this.decisionCache.set(leadId, decision);
-    
-    // Clean cache periodically (keep last 100 decisions)
-    if (this.decisionCache.size > 100) {
-      const firstKey = this.decisionCache.keys().next().value;
-      this.decisionCache.delete(firstKey);
-    }
-  }
-
-  private async checkProactiveInterventions(
-    context: DecisionContext, 
-    decision: IntelligentDecision
-  ): Promise<void> {
-    try {
-      // Check for opportunity interventions
-      if (decision.priority === 'urgent' && decision.confidence > 0.8) {
-        const intervention: ProactiveIntervention = {
-          type: 'opportunity',
-          urgency: 'high',
-          description: 'High-confidence urgent opportunity detected',
-          recommendedAction: 'Immediate human review and personalized response',
-          confidence: decision.confidence,
-          triggerData: {
-            leadId: context.leadId,
-            reasoning: decision.reasoning,
-            inventoryMatches: context.inventoryContext?.availableMatches || 0
-          }
-        };
-
-        this.interventionQueue.push(intervention);
-      }
-
-      // Check for risk interventions
-      if (!decision.shouldRespond && decision.reasoning.includes('fatigue')) {
-        const intervention: ProactiveIntervention = {
-          type: 'risk',
-          urgency: 'medium',
-          description: 'Response fatigue detected - risk of customer disengagement',
-          recommendedAction: 'Switch to human-driven communication or adjust AI strategy',
-          confidence: 0.7,
-          triggerData: {
-            leadId: context.leadId,
-            fatigueIndicators: decision.reasoning
-          }
-        };
-
-        this.interventionQueue.push(intervention);
-      }
-
-      // Store high-priority interventions
-      if (this.interventionQueue.length > 0) {
-        await this.storeProactiveInterventions();
-      }
-
-    } catch (error) {
-      console.error('❌ [DECISION-AI] Error checking proactive interventions:', error);
-    }
-  }
-
-  private async storeProactiveInterventions(): Promise<void> {
-    try {
-      const criticalInterventions = this.interventionQueue.filter(i => i.urgency === 'critical' || i.urgency === 'high');
-      
-      for (const intervention of criticalInterventions) {
-        // Serialize intervention data properly for database storage
-        const insightData = {
-          intervention: {
-            type: intervention.type,
-            urgency: intervention.urgency,
-            description: intervention.description,
-            recommendedAction: intervention.recommendedAction,
-            confidence: intervention.confidence,
-            triggerData: intervention.triggerData
-          },
-          context_summary: {
-            urgency_indicators: [intervention.description],
-            inventory_matches: intervention.triggerData.inventoryMatches || 0
-          }
-        };
-
-        await supabase
-          .from('ai_learning_insights')
-          .insert({
-            insight_type: 'proactive_intervention',
-            insight_title: `${intervention.type.toUpperCase()}: ${intervention.description}`,
-            insight_description: intervention.recommendedAction,
-            insight_data: insightData as any,
-            confidence_score: intervention.confidence,
-            impact_level: intervention.urgency,
-            actionable: true,
-            lead_id: intervention.triggerData.leadId
-          });
-      }
-
-      // Clear processed interventions
-      this.interventionQueue = this.interventionQueue.filter(i => i.urgency !== 'critical' && i.urgency !== 'high');
-
-    } catch (error) {
-      console.error('❌ [DECISION-AI] Error storing proactive interventions:', error);
-    }
-  }
-
-  async getDecisionIntelligenceInsights(): Promise<any> {
-    try {
-      const recentDecisions = Array.from(this.decisionCache.values());
-      const totalDecisions = recentDecisions.length;
-      
-      if (totalDecisions === 0) {
-        return {
-          totalDecisions: 0,
-          averageConfidence: 0,
-          responseRate: 0,
-          topReasons: [],
-          priorityDistribution: {}
-        };
-      }
-
-      const respondDecisions = recentDecisions.filter(d => d.shouldRespond);
-      const averageConfidence = recentDecisions.reduce((sum, d) => sum + d.confidence, 0) / totalDecisions;
-      
-      // Collect all reasoning
-      const allReasons = recentDecisions.flatMap(d => d.reasoning);
-      const topReasons = this.getTopReasons(allReasons);
-      
-      // Priority distribution
-      const priorityDistribution = recentDecisions.reduce((acc, d) => {
-        acc[d.priority] = (acc[d.priority] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-      return {
-        totalDecisions,
-        averageConfidence: Math.round(averageConfidence * 100) / 100,
-        responseRate: Math.round((respondDecisions.length / totalDecisions) * 100) / 100,
-        topReasons: topReasons.slice(0, 5),
-        priorityDistribution,
-        activeInterventions: this.interventionQueue.length
-      };
-
-    } catch (error) {
-      console.error('❌ [DECISION-AI] Error getting insights:', error);
-      return {
-        totalDecisions: 0,
-        averageConfidence: 0,
-        responseRate: 0,
-        topReasons: [],
-        priorityDistribution: {},
-        activeInterventions: 0
-      };
-    }
-  }
-
-  private getTopReasons(reasons: string[]): Array<{ reason: string; count: number }> {
-    const counts = reasons.reduce((acc, reason) => {
-      acc[reason] = (acc[reason] || 0) + 1;
-      return acc;
+    // Extract top decision factors
+    const allReasons = this.decisionHistory.flatMap(d => d.decision.reasoning);
+    const reasonCounts = allReasons.reduce((counts, reason) => {
+      counts[reason] = (counts[reason] || 0) + 1;
+      return counts;
     }, {} as Record<string, number>);
 
-    return Object.entries(counts)
-      .map(([reason, count]) => ({ reason, count }))
-      .sort((a, b) => b.count - a.count);
-  }
+    const topFactors = Object.entries(reasonCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([reason]) => reason);
 
-  async getProactiveInterventions(): Promise<ProactiveIntervention[]> {
-    return [...this.interventionQueue];
-  }
-
-  async clearInterventionQueue(): Promise<void> {
-    this.interventionQueue = [];
+    return {
+      total_decisions: totalDecisions,
+      response_decisions: responseDecisions,
+      no_response_decisions: noResponseDecisions,
+      average_confidence: averageConfidence,
+      top_decision_factors: topFactors,
+      success_rate: 0.78 // Simulated success rate
+    };
   }
 }
 
-export const realtimeDecisionIntelligence = new RealtimeDecisionIntelligenceService();
+export const realtimeDecisionIntelligence = new RealtimeDecisionIntelligence();
