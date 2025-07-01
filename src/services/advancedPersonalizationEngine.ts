@@ -1,73 +1,74 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { crossConversationIntelligence } from './crossConversationIntelligence';
 
 interface PersonalizationProfile {
-  leadId: string;
-  communicationStyle: 'formal' | 'casual' | 'enthusiastic' | 'direct';
-  preferredTopics: string[];
-  responsePatterns: any;
-  emotionalProfile: any;
-  engagementLevel: number;
+  communicationStyle: string;
+  preferredTone: string;
+  responseLength: string;
+  personalityType: string;
+  buyingStage: string;
+  priceRange?: { min: number; max: number };
+  vehiclePreferences: string[];
+  urgencyLevel: number;
+  lastUpdated: Date;
+}
+
+interface PersonalizationContext {
+  customerMessage: string;
+  conversationHistory: string[];
+  vehicleInterest?: string;
+  previousResponses?: string[];
 }
 
 interface PersonalizedResponse {
   message: string;
   confidence: number;
   personalizationFactors: string[];
-  emotionalTone: string;
+  styleAdjustments: string[];
 }
 
-class AdvancedPersonalizationEngine {
+class AdvancedPersonalizationEngineService {
   private profileCache = new Map<string, PersonalizationProfile>();
 
   async generatePersonalizedResponse(
     leadId: string,
     baseMessage: string,
-    context: {
-      customerMessage?: string;
-      conversationHistory?: string[];
-      vehicleInterest?: string;
-    }
+    context: PersonalizationContext
   ): Promise<PersonalizedResponse> {
     try {
-      console.log('🎯 [PERSONALIZATION] Generating personalized response for:', leadId);
+      console.log('🎯 [PERSONALIZATION] Generating personalized response for lead:', leadId);
 
-      // Get or build personalization profile
+      // Get or create personalization profile
       const profile = await this.getPersonalizationProfile(leadId);
       
       // Apply personalization layers
-      let personalizedMessage = baseMessage;
-      const factors: string[] = [];
+      let personalizedMessage = await this.applyPersonalizationLayers(baseMessage, profile, context);
+      
+      // Calculate confidence and track factors
+      const personalizationFactors = this.getAppliedPersonalizationFactors(profile);
+      const confidence = this.calculatePersonalizationConfidence(profile, context);
 
-      // Layer 1: Communication style adaptation
-      personalizedMessage = this.adaptCommunicationStyle(personalizedMessage, profile, factors);
-
-      // Layer 2: Emotional tone adjustment
-      personalizedMessage = this.adjustEmotionalTone(personalizedMessage, profile, context, factors);
-
-      // Layer 3: Content personalization
-      personalizedMessage = await this.personalizeContent(personalizedMessage, profile, context, factors);
-
-      // Layer 4: Timing and urgency adjustment
-      personalizedMessage = this.adjustTimingAndUrgency(personalizedMessage, profile, factors);
-
-      const confidence = this.calculatePersonalizationConfidence(profile, factors);
-
-      return {
+      const response: PersonalizedResponse = {
         message: personalizedMessage,
         confidence,
-        personalizationFactors: factors,
-        emotionalTone: profile.emotionalProfile?.dominantTone || 'neutral'
+        personalizationFactors,
+        styleAdjustments: this.getStyleAdjustments(profile)
       };
+
+      // Track personalization usage
+      await this.trackPersonalizationUsage(leadId, response);
+
+      console.log('✅ [PERSONALIZATION] Generated personalized response with confidence:', Math.round(confidence * 100) + '%');
+      return response;
 
     } catch (error) {
       console.error('❌ [PERSONALIZATION] Error generating personalized response:', error);
+      
+      // Return minimally personalized response as fallback
       return {
         message: baseMessage,
         confidence: 0.5,
         personalizationFactors: ['fallback'],
-        emotionalTone: 'neutral'
+        styleAdjustments: []
       };
     }
   }
@@ -79,404 +80,493 @@ class AdvancedPersonalizationEngine {
     }
 
     try {
-      // Build profile from conversation history and lead data
-      const { data: conversations } = await supabase
-        .from('conversations')
+      // Get existing profile from conversation context
+      const { data: contextData } = await supabase
+        .from('ai_conversation_context')
         .select('*')
         .eq('lead_id', leadId)
-        .order('sent_at', { ascending: true });
-
-      const { data: lead } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('id', leadId)
         .single();
 
-      if (!conversations || !lead) {
-        return this.createDefaultProfile(leadId);
+      let profile: PersonalizationProfile;
+
+      if (contextData && contextData.lead_preferences) {
+        // Use existing profile
+        profile = {
+          communicationStyle: contextData.lead_preferences.communicationStyle || 'professional',
+          preferredTone: contextData.lead_preferences.preferredTone || 'friendly',
+          responseLength: contextData.lead_preferences.responseLength || 'medium',
+          personalityType: contextData.lead_preferences.personalityType || 'analytical',
+          buyingStage: contextData.response_style || 'research',
+          vehiclePreferences: contextData.lead_preferences.vehiclePreferences || [],
+          urgencyLevel: contextData.context_score || 5,
+          lastUpdated: new Date(contextData.updated_at)
+        };
+      } else {
+        // Create new profile with intelligent defaults
+        profile = await this.createIntelligentProfile(leadId);
       }
 
-      const profile = this.analyzeConversationPatterns(leadId, conversations, lead);
-      
       // Cache the profile
       this.profileCache.set(leadId, profile);
+      return profile;
+
+    } catch (error) {
+      console.error('❌ [PERSONALIZATION] Error getting profile:', error);
+      
+      // Return default profile
+      return {
+        communicationStyle: 'professional',
+        preferredTone: 'friendly',
+        responseLength: 'medium',
+        personalityType: 'analytical',
+        buyingStage: 'research',
+        vehiclePreferences: [],
+        urgencyLevel: 5,
+        lastUpdated: new Date()
+      };
+    }
+  }
+
+  private async createIntelligentProfile(leadId: string): Promise<PersonalizationProfile> {
+    try {
+      // Analyze recent conversations to infer preferences
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('body, direction, sent_at')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: false })
+        .limit(10);
+
+      const profile: PersonalizationProfile = {
+        communicationStyle: this.inferCommunicationStyle(conversations || []),
+        preferredTone: this.inferPreferredTone(conversations || []),
+        responseLength: this.inferResponseLength(conversations || []),
+        personalityType: this.inferPersonalityType(conversations || []),
+        buyingStage: this.inferBuyingStage(conversations || []),
+        vehiclePreferences: this.inferVehiclePreferences(conversations || []),
+        urgencyLevel: this.inferUrgencyLevel(conversations || []),
+        lastUpdated: new Date()
+      };
+
+      // Save initial profile
+      await this.saveProfileToContext(leadId, profile);
       
       return profile;
 
     } catch (error) {
-      console.error('❌ [PERSONALIZATION] Error building profile:', error);
-      return this.createDefaultProfile(leadId);
+      console.error('❌ [PERSONALIZATION] Error creating intelligent profile:', error);
+      throw error;
     }
   }
 
-  private createDefaultProfile(leadId: string): PersonalizationProfile {
-    return {
-      leadId,
-      communicationStyle: 'casual',
-      preferredTopics: [],
-      responsePatterns: {},
-      emotionalProfile: { dominantTone: 'neutral', enthusiasm: 0.5 },
-      engagementLevel: 0.5
-    };
-  }
-
-  private analyzeConversationPatterns(leadId: string, conversations: any[], lead: any): PersonalizationProfile {
+  private inferCommunicationStyle(conversations: any[]): string {
     const customerMessages = conversations.filter(c => c.direction === 'in');
     
-    // Analyze communication style from customer messages
-    const communicationStyle = this.determineCommunicationStyle(customerMessages);
+    if (customerMessages.length === 0) return 'professional';
     
-    // Extract preferred topics
-    const preferredTopics = this.extractPreferredTopics(customerMessages, lead.vehicle_interest);
+    const avgLength = customerMessages.reduce((sum, msg) => sum + msg.body.length, 0) / customerMessages.length;
+    const hasSlang = customerMessages.some(msg => /\b(hey|yeah|gonna|wanna)\b/i.test(msg.body));
     
-    // Analyze emotional profile
-    const emotionalProfile = this.analyzeEmotionalProfile(customerMessages);
+    if (avgLength < 50 && hasSlang) return 'casual';
+    if (avgLength > 150) return 'detailed';
     
-    // Calculate engagement level
-    const engagementLevel = this.calculateEngagementLevel(conversations);
-
-    return {
-      leadId,
-      communicationStyle,
-      preferredTopics,
-      responsePatterns: this.extractResponsePatterns(conversations),
-      emotionalProfile,
-      engagementLevel
-    };
+    return 'professional';
   }
 
-  private determineCommunicationStyle(messages: any[]): PersonalizationProfile['communicationStyle'] {
-    if (messages.length === 0) return 'casual';
-
-    const messageTexts = messages.map(m => m.body.toLowerCase());
-    const totalLength = messageTexts.join(' ').length;
-    const avgLength = totalLength / messages.length;
-
-    // Analyze formality indicators
-    const formalWords = ['please', 'thank you', 'could you', 'would you', 'appreciate'];
-    const casualWords = ['hey', 'yeah', 'cool', 'awesome', 'thanks'];
-    const directWords = ['need', 'want', 'how much', 'when', 'where'];
-
-    const formalScore = this.countWordsInTexts(messageTexts, formalWords);
-    const casualScore = this.countWordsInTexts(messageTexts, casualWords);
-    const directScore = this.countWordsInTexts(messageTexts, directWords);
-
-    // Long messages often indicate formal communication
-    if (avgLength > 100 || formalScore > casualScore + directScore) {
-      return 'formal';
-    } else if (directScore > formalScore + casualScore) {
-      return 'direct';
-    } else if (casualScore > 0 || avgLength < 50) {
-      return 'casual';
-    }
-
-    return 'casual';
-  }
-
-  private countWordsInTexts(texts: string[], words: string[]): number {
-    return texts.reduce((count, text) => {
-      return count + words.reduce((wordCount, word) => {
-        return wordCount + (text.includes(word) ? 1 : 0);
-      }, 0);
-    }, 0);
-  }
-
-  private extractPreferredTopics(messages: any[], vehicleInterest: string): string[] {
-    const topics = new Set<string>();
-
-    // Add vehicle interest as primary topic
-    if (vehicleInterest) topics.add('vehicle_specs');
-
-    const messageText = messages.map(m => m.body.toLowerCase()).join(' ');
-
-    // Topic detection
-    if (messageText.includes('financing') || messageText.includes('payment')) {
-      topics.add('financing');
-    }
-    if (messageText.includes('trade') || messageText.includes('current car')) {
-      topics.add('trade_in');
-    }
-    if (messageText.includes('warranty') || messageText.includes('service')) {
-      topics.add('warranty_service');
-    }
-    if (messageText.includes('features') || messageText.includes('options')) {
-      topics.add('vehicle_features');
-    }
-
-    return Array.from(topics);
-  }
-
-  private analyzeEmotionalProfile(messages: any[]): any {
-    const messageText = messages.map(m => m.body.toLowerCase()).join(' ');
+  private inferPreferredTone(conversations: any[]): string {
+    const customerMessages = conversations.filter(c => c.direction === 'in');
     
-    // Simple sentiment analysis
-    const positiveWords = ['great', 'awesome', 'perfect', 'love', 'excited', 'interested'];
-    const negativeWords = ['concerned', 'worried', 'expensive', 'problem', 'issue'];
-    const enthusiasticWords = ['wow', 'amazing', 'fantastic', '!', 'really'];
-
-    const positiveScore = this.countWordsInTexts([messageText], positiveWords);
-    const negativeScore = this.countWordsInTexts([messageText], negativeWords);
-    const enthusiasmScore = this.countWordsInTexts([messageText], enthusiasticWords);
-
-    let dominantTone = 'neutral';
-    if (positiveScore > negativeScore + 1) dominantTone = 'positive';
-    else if (negativeScore > positiveScore + 1) dominantTone = 'cautious';
-
-    return {
-      dominantTone,
-      enthusiasm: Math.min(enthusiasmScore / Math.max(messages.length, 1), 1),
-      positivity: positiveScore / Math.max(positiveScore + negativeScore, 1)
-    };
-  }
-
-  private extractResponsePatterns(conversations: any[]): any {
-    const outgoingMessages = conversations.filter(c => c.direction === 'out');
-    const incomingMessages = conversations.filter(c => c.direction === 'in');
-
-    return {
-      avgResponseTime: this.calculateAvgResponseTime(conversations),
-      responseRate: incomingMessages.length / Math.max(outgoingMessages.length, 1),
-      preferredMessageLength: incomingMessages.reduce((sum, m) => sum + m.body.length, 0) / Math.max(incomingMessages.length, 1)
-    };
-  }
-
-  private calculateAvgResponseTime(conversations: any[]): number {
-    // Calculate average time between outgoing and incoming messages
-    let totalTime = 0;
-    let responseCount = 0;
-
-    for (let i = 0; i < conversations.length - 1; i++) {
-      if (conversations[i].direction === 'out' && conversations[i + 1].direction === 'in') {
-        const timeDiff = new Date(conversations[i + 1].sent_at).getTime() - new Date(conversations[i].sent_at).getTime();
-        totalTime += timeDiff;
-        responseCount++;
-      }
-    }
-
-    return responseCount > 0 ? totalTime / responseCount / (1000 * 60 * 60) : 24; // Return in hours
-  }
-
-  private calculateEngagementLevel(conversations: any[]): number {
-    const recentDays = 7;
-    const recentDate = new Date(Date.now() - recentDays * 24 * 60 * 60 * 1000);
-    const recentMessages = conversations.filter(c => new Date(c.sent_at) > recentDate);
+    if (customerMessages.length === 0) return 'friendly';
     
-    const totalMessages = conversations.length;
-    const recentEngagement = recentMessages.length / Math.max(recentDays, 1);
+    const hasUrgentKeywords = customerMessages.some(msg => 
+      /\b(urgent|asap|quickly|soon|now)\b/i.test(msg.body)
+    );
     
-    return Math.min(recentEngagement / 2, 1); // Normalize to 0-1 scale
+    const hasPoliteKeywords = customerMessages.some(msg => 
+      /\b(please|thank you|appreciate|grateful)\b/i.test(msg.body)
+    );
+    
+    if (hasUrgentKeywords) return 'direct';
+    if (hasPoliteKeywords) return 'courteous';
+    
+    return 'friendly';
   }
 
-  private adaptCommunicationStyle(
-    message: string, 
-    profile: PersonalizationProfile, 
-    factors: string[]
-  ): string {
-    let adapted = message;
+  private inferResponseLength(conversations: any[]): string {
+    const ourMessages = conversations.filter(c => c.direction === 'out');
+    
+    if (ourMessages.length === 0) return 'medium';
+    
+    const avgLength = ourMessages.reduce((sum, msg) => sum + msg.body.length, 0) / ourMessages.length;
+    
+    if (avgLength < 100) return 'short';
+    if (avgLength > 200) return 'detailed';
+    
+    return 'medium';
+  }
 
-    switch (profile.communicationStyle) {
-      case 'formal':
-        adapted = this.makeFormal(adapted);
-        factors.push('formal_communication');
-        break;
-      case 'casual':
-        adapted = this.makeCasual(adapted);
-        factors.push('casual_communication');
-        break;
-      case 'direct':
-        adapted = this.makeDirect(adapted);
-        factors.push('direct_communication');
-        break;
-      case 'enthusiastic':
-        adapted = this.makeEnthusiastic(adapted);
-        factors.push('enthusiastic_communication');
-        break;
+  private inferPersonalityType(conversations: any[]): string {
+    const customerMessages = conversations.filter(c => c.direction === 'in');
+    
+    if (customerMessages.length === 0) return 'analytical';
+    
+    const hasDetailQuestions = customerMessages.some(msg => 
+      /\b(spec|detail|feature|option|comparison)\b/i.test(msg.body)
+    );
+    
+    const hasEmotionalWords = customerMessages.some(msg => 
+      /\b(love|hate|excited|worried|dream|feel)\b/i.test(msg.body)
+    );
+    
+    if (hasDetailQuestions) return 'analytical';
+    if (hasEmotionalWords) return 'emotional';
+    
+    return 'balanced';
+  }
+
+  private inferBuyingStage(conversations: any[]): string {
+    const allMessages = conversations.map(c => c.body.toLowerCase()).join(' ');
+    
+    if (/\b(financing|payment|loan|credit|down payment)\b/.test(allMessages)) return 'financing';
+    if (/\b(test drive|visit|appointment|see|look at)\b/.test(allMessages)) return 'consideration';
+    if (/\b(buy|purchase|deal|ready|decided)\b/.test(allMessages)) return 'decision';
+    
+    return 'research';
+  }
+
+  private inferVehiclePreferences(conversations: any[]): string[] {
+    const allMessages = conversations.map(c => c.body.toLowerCase()).join(' ');
+    const preferences: string[] = [];
+    
+    if (/\b(suv|truck|crossover)\b/.test(allMessages)) preferences.push('SUV/Truck');
+    if (/\b(sedan|car)\b/.test(allMessages)) preferences.push('Sedan');
+    if (/\b(new|latest|2024|2025)\b/.test(allMessages)) preferences.push('New');
+    if (/\b(used|pre-owned|certified)\b/.test(allMessages)) preferences.push('Used');
+    if (/\b(fuel|mpg|gas|efficient)\b/.test(allMessages)) preferences.push('Fuel Efficient');
+    if (/\b(luxury|premium|loaded)\b/.test(allMessages)) preferences.push('Luxury');
+    
+    return preferences;
+  }
+
+  private inferUrgencyLevel(conversations: any[]): number {
+    const allMessages = conversations.map(c => c.body.toLowerCase()).join(' ');
+    
+    if (/\b(urgent|asap|immediately|today)\b/.test(allMessages)) return 9;
+    if (/\b(soon|quickly|this week)\b/.test(allMessages)) return 7;
+    if (/\b(looking|interested|considering)\b/.test(allMessages)) return 5;
+    if (/\b(maybe|someday|future)\b/.test(allMessages)) return 3;
+    
+    return 5; // Default medium urgency
+  }
+
+  private async saveProfileToContext(leadId: string, profile: PersonalizationProfile): Promise<void> {
+    try {
+      await supabase
+        .from('ai_conversation_context')
+        .upsert({
+          lead_id: leadId,
+          lead_preferences: profile as any,
+          response_style: profile.buyingStage,
+          context_score: profile.urgencyLevel,
+          updated_at: new Date().toISOString()
+        });
+    } catch (error) {
+      console.error('❌ [PERSONALIZATION] Error saving profile:', error);
     }
-
-    return adapted;
   }
 
-  private makeFormal(message: string): string {
-    return message
-      .replace(/Hi\s/gi, 'Good day ')
-      .replace(/Thanks/gi, 'Thank you')
-      .replace(/\bhey\b/gi, 'hello')
-      .replace(/!+/g, '.');
-  }
-
-  private makeCasual(message: string): string {
-    return message
-      .replace(/Good day/gi, 'Hi')
-      .replace(/Thank you very much/gi, 'Thanks')
-      .replace(/I would be/gi, "I'd be")
-      .replace(/cannot/gi, "can't");
-  }
-
-  private makeDirect(message: string): string {
-    return message
-      .replace(/I'd be happy to help you with/gi, 'Let me help with')
-      .replace(/Would you like me to/gi, 'I can')
-      .replace(/Perhaps we could/gi, 'We can');
-  }
-
-  private makeEnthusiastic(message: string): string {
-    return message
-      .replace(/\./g, '!')
-      .replace(/That's good/gi, "That's fantastic")
-      .replace(/I can help/gi, "I'd love to help");
-  }
-
-  private adjustEmotionalTone(
-    message: string,
+  private async applyPersonalizationLayers(
+    baseMessage: string,
     profile: PersonalizationProfile,
-    context: any,
-    factors: string[]
-  ): string {
-    let adjusted = message;
+    context: PersonalizationContext
+  ): Promise<string> {
+    let message = baseMessage;
 
-    if (profile.emotionalProfile?.dominantTone === 'cautious') {
-      adjusted = this.addReassurance(adjusted);
-      factors.push('reassuring_tone');
-    } else if (profile.emotionalProfile?.dominantTone === 'positive') {
-      adjusted = this.amplifyPositivity(adjusted);
-      factors.push('positive_tone');
-    }
-
-    if (profile.emotionalProfile?.enthusiasm > 0.7) {
-      adjusted = this.addEnthusiasm(adjusted);
-      factors.push('enthusiastic_tone');
-    }
-
-    return adjusted;
-  }
-
-  private addReassurance(message: string): string {
-    if (!message.toLowerCase().includes('no pressure')) {
-      return message + ' No pressure at all - we\'re here when you\'re ready.';
-    }
+    // Layer 1: Communication style adjustment
+    message = this.adjustCommunicationStyle(message, profile.communicationStyle);
+    
+    // Layer 2: Tone adjustment
+    message = this.adjustTone(message, profile.preferredTone);
+    
+    // Layer 3: Length adjustment
+    message = this.adjustLength(message, profile.responseLength);
+    
+    // Layer 4: Personality-based adjustments
+    message = this.adjustForPersonality(message, profile.personalityType);
+    
+    // Layer 5: Buying stage contextual adjustments
+    message = this.adjustForBuyingStage(message, profile.buyingStage, context);
+    
     return message;
   }
 
-  private amplifyPositivity(message: string): string {
-    return message
-      .replace(/good/gi, 'great')
-      .replace(/okay/gi, 'perfect')
-      .replace(/help/gi, 'assist');
-  }
-
-  private addEnthusiasm(message: string): string {
-    return message.replace(/(\w+)(\s*!)/, '$1$2').replace(/\.$/, '!');
-  }
-
-  private async personalizeContent(
-    message: string,
-    profile: PersonalizationProfile,
-    context: any,
-    factors: string[]
-  ): Promise<string> {
-    let personalized = message;
-
-    // Add topic-specific personalization
-    if (profile.preferredTopics.includes('financing') && !message.toLowerCase().includes('financing')) {
-      personalized += ' I can also discuss financing options if that would be helpful.';
-      factors.push('financing_focus');
-    }
-
-    if (profile.preferredTopics.includes('trade_in') && !message.toLowerCase().includes('trade')) {
-      personalized += ' And we can definitely talk about your trade-in when you\'re ready.';
-      factors.push('trade_in_awareness');
-    }
-
-    // Use global learning insights
-    try {
-      const optimized = await crossConversationIntelligence.optimizeResponseWithGlobalLearning(
-        personalized,
-        { leadId: profile.leadId, messageType: 'personalized' }
-      );
+  private adjustCommunicationStyle(message: string, style: string): string {
+    switch (style) {
+      case 'casual':
+        return message
+          .replace(/\bI would like to\b/g, "I'd like to")
+          .replace(/\bYou are\b/g, "You're")
+          .replace(/\bWe have\b/g, "We've got");
       
-      if (optimized !== personalized) {
-        factors.push('global_optimization');
-        personalized = optimized;
-      }
-    } catch (error) {
-      console.log('Global optimization not available, continuing with personalized response');
+      case 'detailed':
+        // Add more context and explanations
+        if (message.includes('available')) {
+          return message.replace('available', 'currently available in our inventory');
+        }
+        return message;
+      
+      case 'professional':
+      default:
+        return message;
     }
-
-    return personalized;
   }
 
-  private adjustTimingAndUrgency(
-    message: string,
-    profile: PersonalizationProfile,
-    factors: string[]
-  ): string {
-    let adjusted = message;
-
-    // Adjust urgency based on engagement level
-    if (profile.engagementLevel > 0.8 && !message.toLowerCase().includes('when')) {
-      adjusted += ' When would be a good time to continue our conversation?';
-      factors.push('high_engagement_urgency');
-    } else if (profile.engagementLevel < 0.3) {
-      adjusted = adjusted.replace(/Let me know/gi, 'Feel free to reach out whenever you\'re ready');
-      factors.push('low_pressure_approach');
+  private adjustTone(message: string, tone: string): string {
+    switch (tone) {
+      case 'direct':
+        return message
+          .replace(/\bI hope\b/g, "I believe")
+          .replace(/\bmight be\b/g, "is")
+          .replace(/\bcould be\b/g, "would be");
+      
+      case 'courteous':
+        if (!message.includes('please') && !message.includes('thank you')) {
+          return message + ' Please let me know if you have any questions.';
+        }
+        return message;
+      
+      case 'friendly':
+      default:
+        return message;
     }
-
-    return adjusted;
   }
 
-  private calculatePersonalizationConfidence(
-    profile: PersonalizationProfile,
-    factors: string[]
-  ): number {
+  private adjustLength(message: string, length: string): string {
+    switch (length) {
+      case 'short':
+        // Keep only essential information
+        return message.split('.')[0] + '.';
+      
+      case 'detailed':
+        // Add more context if message is too short
+        if (message.length < 100) {
+          return message + ' I\'d be happy to provide more details about any specific aspects you\'re interested in.';
+        }
+        return message;
+      
+      case 'medium':
+      default:
+        return message;
+    }
+  }
+
+  private adjustForPersonality(message: string, personality: string): string {
+    switch (personality) {
+      case 'analytical':
+        // Add specific details and features
+        return message.replace(/\bgreat\b/g, 'excellent value with competitive features');
+      
+      case 'emotional':
+        // Add emotional language
+        return message.replace(/\bavailable\b/g, 'perfect for you');
+      
+      case 'balanced':
+      default:
+        return message;
+    }
+  }
+
+  private adjustForBuyingStage(message: string, stage: string, context: PersonalizationContext): string {
+    switch (stage) {
+      case 'research':
+        // Focus on information and education
+        return message + ' I can provide detailed specifications and comparisons if that would be helpful.';
+      
+      case 'consideration':
+        // Focus on scheduling and viewing
+        if (!message.includes('test drive') && !message.includes('visit')) {
+          return message + ' Would you like to schedule a test drive?';
+        }
+        return message;
+      
+      case 'financing':
+        // Focus on payment options
+        return message + ' I can also discuss financing options that might work for your budget.';
+      
+      case 'decision':
+        // Focus on closing and next steps
+        return message + ' I\'m here to help make this process as smooth as possible for you.';
+      
+      default:
+        return message;
+    }
+  }
+
+  private getAppliedPersonalizationFactors(profile: PersonalizationProfile): string[] {
+    const factors: string[] = [];
+    
+    factors.push(`communication_${profile.communicationStyle}`);
+    factors.push(`tone_${profile.preferredTone}`);
+    factors.push(`length_${profile.responseLength}`);
+    factors.push(`personality_${profile.personalityType}`);
+    factors.push(`stage_${profile.buyingStage}`);
+    
+    if (profile.urgencyLevel > 7) factors.push('high_urgency');
+    if (profile.vehiclePreferences.length > 0) factors.push('vehicle_preferences');
+    
+    return factors;
+  }
+
+  private calculatePersonalizationConfidence(profile: PersonalizationProfile, context: PersonalizationContext): number {
     let confidence = 0.5; // Base confidence
-
-    // More conversation history = higher confidence
-    if (profile.responsePatterns?.responseRate > 0.5) confidence += 0.2;
-    if (profile.engagementLevel > 0.6) confidence += 0.15;
-    if (profile.preferredTopics.length > 2) confidence += 0.1;
-    if (factors.length > 3) confidence += 0.05;
-
-    return Math.min(confidence, 0.95);
+    
+    // Increase confidence based on profile completeness
+    if (profile.vehiclePreferences.length > 0) confidence += 0.1;
+    if (profile.lastUpdated > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) confidence += 0.1;
+    
+    // Increase confidence based on context richness
+    if (context.conversationHistory.length > 3) confidence += 0.1;
+    if (context.vehicleInterest) confidence += 0.1;
+    
+    // Increase confidence based on profile age (more interactions = better profile)
+    const profileAge = Date.now() - profile.lastUpdated.getTime();
+    if (profileAge > 24 * 60 * 60 * 1000) confidence += 0.1; // Profile older than 1 day
+    
+    return Math.min(confidence, 1.0);
   }
 
-  async updatePersonalizationProfile(leadId: string, feedback: {
-    responseReceived?: boolean;
-    engagementType?: string;
-    satisfactionLevel?: number;
-  }): Promise<void> {
+  private getStyleAdjustments(profile: PersonalizationProfile): string[] {
+    const adjustments: string[] = [];
+    
+    if (profile.communicationStyle !== 'professional') {
+      adjustments.push(`Applied ${profile.communicationStyle} communication style`);
+    }
+    
+    if (profile.preferredTone !== 'friendly') {
+      adjustments.push(`Adjusted tone to ${profile.preferredTone}`);
+    }
+    
+    if (profile.responseLength !== 'medium') {
+      adjustments.push(`Optimized for ${profile.responseLength} response length`);
+    }
+    
+    return adjustments;
+  }
+
+  private async trackPersonalizationUsage(leadId: string, response: PersonalizedResponse): Promise<void> {
     try {
-      const profile = this.profileCache.get(leadId);
-      if (!profile) return;
+      // Use proper JSON serialization for database storage
+      const learningData = {
+        personalization_factors: response.personalizationFactors,
+        confidence_score: response.confidence,
+        style_adjustments: response.styleAdjustments
+      };
 
-      // Update engagement level based on feedback
-      if (feedback.responseReceived) {
-        profile.engagementLevel = Math.min(profile.engagementLevel + 0.1, 1);
-      }
-
-      // Store learning data
       await supabase
         .from('ai_learning_outcomes')
         .insert({
           lead_id: leadId,
-          outcome_type: 'personalization_feedback',
-          outcome_value: feedback.satisfactionLevel,
-          message_characteristics: {
-            personalization_factors: profile,
-            feedback: feedback
-          }
+          outcome_type: 'personalization_applied',
+          outcome_value: response.confidence,
+          success_factors: learningData as any
         });
 
-      console.log('✅ [PERSONALIZATION] Updated profile for:', leadId);
+    } catch (error) {
+      console.error('❌ [PERSONALIZATION] Error tracking usage:', error);
+      // Don't throw - tracking is non-critical
+    }
+  }
 
+  async updatePersonalizationProfile(
+    leadId: string, 
+    feedback: { 
+      responseReceived?: boolean; 
+      engagementType?: string; 
+      satisfactionLevel?: number; 
+    }
+  ): Promise<void> {
+    try {
+      const profile = await this.getPersonalizationProfile(leadId);
+      
+      // Update profile based on feedback
+      if (feedback.responseReceived) {
+        profile.urgencyLevel = Math.min(profile.urgencyLevel + 1, 10);
+      }
+      
+      if (feedback.satisfactionLevel) {
+        // Adjust communication style based on satisfaction
+        if (feedback.satisfactionLevel < 3 && profile.communicationStyle === 'casual') {
+          profile.communicationStyle = 'professional';
+        }
+      }
+      
+      profile.lastUpdated = new Date();
+      
+      // Save updated profile
+      await this.saveProfileToContext(leadId, profile);
+      
+      // Update cache
+      this.profileCache.set(leadId, profile);
+      
+      console.log('✅ [PERSONALIZATION] Updated profile for lead:', leadId);
+      
     } catch (error) {
       console.error('❌ [PERSONALIZATION] Error updating profile:', error);
     }
   }
 
-  clearCache(): void {
-    this.profileCache.clear();
-    console.log('🧹 [PERSONALIZATION] Cache cleared');
+  async getPersonalizationInsights(): Promise<any> {
+    try {
+      // Get global personalization insights
+      const { data: contextData } = await supabase
+        .from('ai_conversation_context')
+        .select('lead_preferences, response_style, context_score')
+        .not('lead_preferences', 'is', null)
+        .limit(100);
+
+      if (!contextData) {
+        return {
+          totalProfiles: 0,
+          topCommunicationStyles: [],
+          averageUrgencyLevel: 5,
+          topVehiclePreferences: []
+        };
+      }
+
+      // Analyze patterns
+      const communicationStyles = contextData.map(d => d.lead_preferences?.communicationStyle).filter(Boolean);
+      const urgencyLevels = contextData.map(d => d.context_score).filter(Boolean);
+      const vehiclePrefs = contextData.flatMap(d => d.lead_preferences?.vehiclePreferences || []);
+
+      return {
+        totalProfiles: contextData.length,
+        topCommunicationStyles: this.getTopItems(communicationStyles),
+        averageUrgencyLevel: urgencyLevels.reduce((sum, level) => sum + level, 0) / urgencyLevels.length || 5,
+        topVehiclePreferences: this.getTopItems(vehiclePrefs)
+      };
+
+    } catch (error) {
+      console.error('❌ [PERSONALIZATION] Error getting insights:', error);
+      return {
+        totalProfiles: 0,
+        topCommunicationStyles: [],
+        averageUrgencyLevel: 5,
+        topVehiclePreferences: []
+      };
+    }
+  }
+
+  private getTopItems(items: string[]): Array<{ item: string; count: number }> {
+    const counts = items.reduce((acc, item) => {
+      acc[item] = (acc[item] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(counts)
+      .map(([item, count]) => ({ item, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
   }
 }
 
-export const advancedPersonalizationEngine = new AdvancedPersonalizationEngine();
+export const advancedPersonalizationEngine = new AdvancedPersonalizationEngineService();

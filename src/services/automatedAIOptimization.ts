@@ -1,417 +1,433 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-interface OptimizationMetric {
-  metric_name: string;
-  current_value: number;
-  target_value: number;
-  trend_direction: 'improving' | 'declining' | 'stable';
-  last_updated: Date;
-}
-
-interface AutomatedTest {
-  test_id: string;
-  test_type: 'response_template' | 'timing' | 'targeting';
-  control_group: any;
-  test_group: any;
-  start_date: Date;
-  end_date?: Date;
-  results?: any;
-  status: 'running' | 'completed' | 'paused';
-}
-
 interface OptimizationRecommendation {
-  recommendation_type: string;
+  type: 'template_adjustment' | 'timing_change' | 'personalization_update' | 'response_strategy';
+  priority: 'low' | 'medium' | 'high' | 'critical';
   description: string;
-  expected_impact: number;
-  confidence: number;
-  auto_implementable: boolean;
-  implementation_steps: string[];
+  expectedImpact: number;
+  implementation: string;
+  testingRequired: boolean;
+}
+
+interface PerformanceMetrics {
+  responseRate: number;
+  conversionRate: number;
+  engagementScore: number;
+  averageResponseTime: number;
+  customerSatisfaction: number;
+}
+
+interface OptimizationRule {
+  id: string;
+  name: string;
+  condition: string;
+  action: string;
+  isActive: boolean;
+  priority: number;
 }
 
 class AutomatedAIOptimizationService {
-  private activeTests = new Map<string, AutomatedTest>();
-  private optimizationMetrics: OptimizationMetric[] = [];
+  private optimizationRules: OptimizationRule[] = [];
+  private performanceBaseline: PerformanceMetrics | null = null;
+  private lastOptimizationRun: Date | null = null;
 
-  async runOptimizationCycle(): Promise<void> {
+  async processAutomaticOptimizations(): Promise<void> {
     try {
-      console.log('🔄 [AUTO-OPTIMIZATION] Starting optimization cycle');
+      console.log('🔧 [AUTO-OPT] Starting automated optimization cycle');
 
-      // Step 1: Collect current performance metrics
-      await this.collectPerformanceMetrics();
-
-      // Step 2: Analyze performance trends
-      const insights = await this.analyzePerformanceTrends();
+      // Step 1: Analyze current performance
+      const currentMetrics = await this.analyzeCurrentPerformance();
+      
+      // Step 2: Compare against baseline
+      const needsOptimization = await this.detectOptimizationOpportunities(currentMetrics);
+      
+      if (needsOptimization.length === 0) {
+        console.log('✅ [AUTO-OPT] No optimization opportunities detected');
+        return;
+      }
 
       // Step 3: Generate optimization recommendations
-      const recommendations = await this.generateOptimizationRecommendations(insights);
-
-      // Step 4: Auto-implement safe optimizations
-      await this.autoImplementSafeOptimizations(recommendations);
-
-      // Step 5: Schedule A/B tests for riskier changes
-      await this.scheduleABTests(recommendations);
-
-      console.log('✅ [AUTO-OPTIMIZATION] Optimization cycle completed');
+      const recommendations = await this.generateOptimizationRecommendations(needsOptimization);
+      
+      // Step 4: Apply safe optimizations automatically
+      await this.applyAutomaticOptimizations(recommendations);
+      
+      // Step 5: Store insights for manual review
+      await this.storeOptimizationInsights(recommendations);
+      
+      this.lastOptimizationRun = new Date();
+      console.log(`✅ [AUTO-OPT] Completed optimization cycle with ${recommendations.length} recommendations`);
 
     } catch (error) {
-      console.error('❌ [AUTO-OPTIMIZATION] Error in optimization cycle:', error);
+      console.error('❌ [AUTO-OPT] Error in optimization cycle:', error);
     }
   }
 
-  private async collectPerformanceMetrics(): Promise<void> {
+  private async analyzeCurrentPerformance(): Promise<PerformanceMetrics> {
     try {
-      // Get AI message performance from last 7 days
-      const { data: recentMessages } = await supabase
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+      // Get conversation data for analysis
+      const { data: conversations } = await supabase
         .from('conversations')
-        .select(`
-          id, sent_at, ai_generated, lead_id,
-          leads!inner (
-            id,
-            ai_learning_outcomes (outcome_type, outcome_value, created_at)
-          )
-        `)
-        .eq('ai_generated', true)
-        .gte('sent_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        .select('direction, sent_at, ai_generated')
+        .gte('sent_at', thirtyDaysAgo.toISOString())
+        .order('sent_at', { ascending: false });
 
-      if (!recentMessages) return;
+      if (!conversations || conversations.length === 0) {
+        return this.getDefaultMetrics();
+      }
 
-      // Calculate key metrics
-      const totalAIMessages = recentMessages.length;
-      const messagesWithResponses = recentMessages.filter(msg => 
-        msg.leads?.ai_learning_outcomes?.some((outcome: any) => 
-          outcome.outcome_type === 'positive_response' &&
-          new Date(outcome.created_at) > new Date(msg.sent_at)
-        )
-      ).length;
+      // Calculate response rate
+      const outboundMessages = conversations.filter(c => c.direction === 'out' && c.ai_generated);
+      const inboundResponses = conversations.filter(c => c.direction === 'in');
+      const responseRate = inboundResponses.length / Math.max(outboundMessages.length, 1);
 
-      const responseRate = totalAIMessages > 0 ? messagesWithResponses / totalAIMessages : 0;
+      // Get learning outcomes for conversion analysis
+      const { data: outcomes } = await supabase
+        .from('ai_learning_outcomes')
+        .select('outcome_type')
+        .gte('created_at', thirtyDaysAgo.toISOString());
 
-      // Update metrics
-      this.optimizationMetrics = [
-        {
-          metric_name: 'ai_response_rate',
-          current_value: responseRate,
-          target_value: 0.4, // 40% target
-          trend_direction: this.calculateTrend('ai_response_rate', responseRate),
-          last_updated: new Date()
-        },
-        {
-          metric_name: 'ai_message_volume',
-          current_value: totalAIMessages,
-          target_value: totalAIMessages * 1.1, // 10% growth target
-          trend_direction: this.calculateTrend('ai_message_volume', totalAIMessages),
-          last_updated: new Date()
-        }
-      ];
+      const conversions = outcomes?.filter(o => 
+        ['appointment_booked', 'positive_response', 'purchase_intent'].includes(o.outcome_type)
+      ).length || 0;
+      
+      const conversionRate = conversions / Math.max(outboundMessages.length, 1);
 
-      console.log('📊 [AUTO-OPTIMIZATION] Collected metrics:', {
-        totalAIMessages,
-        responseRate: Math.round(responseRate * 100) + '%'
-      });
+      // Calculate engagement score based on message frequency and length
+      const avgResponseTime = this.calculateAverageResponseTime(conversations);
+      const engagementScore = Math.min(responseRate * 100, 100);
 
-    } catch (error) {
-      console.error('❌ [AUTO-OPTIMIZATION] Error collecting metrics:', error);
-    }
-  }
-
-  private calculateTrend(metricName: string, currentValue: number): 'improving' | 'declining' | 'stable' {
-    // Simple trend calculation - in a real system this would use historical data
-    const random = Math.random();
-    if (random < 0.33) return 'improving';
-    if (random < 0.66) return 'stable';
-    return 'declining';
-  }
-
-  private async analyzePerformanceTrends(): Promise<any> {
-    try {
-      const insights = {
-        declining_metrics: this.optimizationMetrics.filter(m => m.trend_direction === 'declining'),
-        improving_metrics: this.optimizationMetrics.filter(m => m.trend_direction === 'improving'),
-        underperforming_metrics: this.optimizationMetrics.filter(m => m.current_value < m.target_value * 0.8),
-        areas_for_improvement: [] as string[]
+      const metrics: PerformanceMetrics = {
+        responseRate: Math.round(responseRate * 100) / 100,
+        conversionRate: Math.round(conversionRate * 100) / 100,
+        engagementScore: Math.round(engagementScore),
+        averageResponseTime: avgResponseTime,
+        customerSatisfaction: 7.5 // Default - would come from feedback in production
       };
 
-      // Identify specific areas needing attention
-      if (insights.declining_metrics.find(m => m.metric_name === 'ai_response_rate')) {
-        insights.areas_for_improvement.push('response_quality');
+      // Set baseline if not exists
+      if (!this.performanceBaseline) {
+        this.performanceBaseline = metrics;
       }
 
-      if (insights.underperforming_metrics.length > 0) {
-        insights.areas_for_improvement.push('overall_performance');
-      }
-
-      return insights;
+      return metrics;
 
     } catch (error) {
-      console.error('❌ [AUTO-OPTIMIZATION] Error analyzing trends:', error);
-      return { declining_metrics: [], improving_metrics: [], underperforming_metrics: [], areas_for_improvement: [] };
+      console.error('❌ [AUTO-OPT] Error analyzing performance:', error);
+      return this.getDefaultMetrics();
     }
   }
 
-  private async generateOptimizationRecommendations(insights: any): Promise<OptimizationRecommendation[]> {
+  private calculateAverageResponseTime(conversations: any[]): number {
+    const conversationPairs = [];
+    
+    for (let i = 0; i < conversations.length - 1; i++) {
+      const current = conversations[i];
+      const next = conversations[i + 1];
+      
+      if (current.direction === 'in' && next.direction === 'out') {
+        const responseTime = new Date(next.sent_at).getTime() - new Date(current.sent_at).getTime();
+        conversationPairs.push(responseTime / (1000 * 60 * 60)); // Convert to hours
+      }
+    }
+    
+    return conversationPairs.length > 0 
+      ? conversationPairs.reduce((sum, time) => sum + time, 0) / conversationPairs.length 
+      : 2; // Default 2 hours
+  }
+
+  private getDefaultMetrics(): PerformanceMetrics {
+    return {
+      responseRate: 0.3,
+      conversionRate: 0.1,
+      engagementScore: 50,
+      averageResponseTime: 2,
+      customerSatisfaction: 7
+    };
+  }
+
+  private async detectOptimizationOpportunities(metrics: PerformanceMetrics): Promise<string[]> {
+    const opportunities: string[] = [];
+    
+    if (!this.performanceBaseline) {
+      return opportunities;
+    }
+
+    // Check for declining response rates
+    if (metrics.responseRate < this.performanceBaseline.responseRate * 0.9) {
+      opportunities.push('low_response_rate');
+    }
+
+    // Check for slow response times
+    if (metrics.averageResponseTime > 4) {
+      opportunities.push('slow_response_time');
+    }
+
+    // Check for low engagement
+    if (metrics.engagementScore < 40) {
+      opportunities.push('low_engagement');
+    }
+
+    // Check for low conversion rates
+    if (metrics.conversionRate < this.performanceBaseline.conversionRate * 0.8) {
+      opportunities.push('low_conversion');
+    }
+
+    return opportunities;
+  }
+
+  private async generateOptimizationRecommendations(opportunities: string[]): Promise<OptimizationRecommendation[]> {
     const recommendations: OptimizationRecommendation[] = [];
 
-    // Generate recommendations based on insights
-    if (insights.areas_for_improvement.includes('response_quality')) {
-      recommendations.push({
-        recommendation_type: 'response_template_optimization',
-        description: 'Optimize response templates based on high-performing patterns',
-        expected_impact: 0.15, // 15% improvement expected
-        confidence: 0.8,
-        auto_implementable: true,
-        implementation_steps: [
-          'Analyze top-performing response patterns',
-          'Update template library with successful elements',
-          'Test new templates with small user group'
-        ]
-      });
-    }
+    for (const opportunity of opportunities) {
+      switch (opportunity) {
+        case 'low_response_rate':
+          recommendations.push({
+            type: 'template_adjustment',
+            priority: 'high',
+            description: 'Response rates have declined. Consider adjusting message templates to be more engaging.',
+            expectedImpact: 0.15,
+            implementation: 'Update message templates with more personalized and engaging content',
+            testingRequired: true
+          });
+          break;
 
-    if (insights.declining_metrics.length > 0) {
-      recommendations.push({
-        recommendation_type: 'timing_optimization',
-        description: 'Adjust AI response timing based on engagement patterns',
-        expected_impact: 0.10, // 10% improvement expected
-        confidence: 0.7,
-        auto_implementable: false,
-        implementation_steps: [
-          'Analyze optimal response timing patterns',
-          'Create A/B test for different timing strategies',
-          'Implement winning timing strategy'
-        ]
-      });
-    }
+        case 'slow_response_time':
+          recommendations.push({
+            type: 'timing_change',
+            priority: 'medium',
+            description: 'Response times are slower than optimal. Consider adjusting AI trigger timing.',
+            expectedImpact: 0.1,
+            implementation: 'Reduce AI response delay and optimize scheduling',
+            testingRequired: false
+          });
+          break;
 
-    // Always recommend continuous improvement
-    recommendations.push({
-      recommendation_type: 'continuous_learning',
-      description: 'Implement continuous learning from conversation outcomes',
-      expected_impact: 0.05, // 5% gradual improvement
-      confidence: 0.9,
-      auto_implementable: true,
-      implementation_steps: [
-        'Enhanced outcome tracking',
-        'Automated pattern recognition',
-        'Real-time template adjustment'
-      ]
-    });
+        case 'low_engagement':
+          recommendations.push({
+            type: 'personalization_update',
+            priority: 'high',
+            description: 'Engagement scores are low. Increase personalization depth.',
+            expectedImpact: 0.2,
+            implementation: 'Enhance personalization engine with more customer data points',
+            testingRequired: true
+          });
+          break;
+
+        case 'low_conversion':
+          recommendations.push({
+            type: 'response_strategy',
+            priority: 'critical',
+            description: 'Conversion rates have dropped significantly. Review response strategy.',
+            expectedImpact: 0.25,
+            implementation: 'Analyze successful conversation patterns and adapt strategy',
+            testingRequired: true
+          });
+          break;
+      }
+    }
 
     return recommendations;
   }
 
-  private async autoImplementSafeOptimizations(recommendations: OptimizationRecommendation[]): Promise<void> {
-    const safeRecommendations = recommendations.filter(r => r.auto_implementable && r.confidence > 0.75);
+  private async applyAutomaticOptimizations(recommendations: OptimizationRecommendation[]): Promise<void> {
+    const safeOptimizations = recommendations.filter(r => !r.testingRequired && r.priority !== 'critical');
 
-    for (const recommendation of safeRecommendations) {
+    for (const optimization of safeOptimizations) {
       try {
-        console.log(`🚀 [AUTO-OPTIMIZATION] Auto-implementing: ${recommendation.recommendation_type}`);
-
-        switch (recommendation.recommendation_type) {
-          case 'response_template_optimization':
-            await this.optimizeResponseTemplates();
-            break;
-          case 'continuous_learning':
-            await this.enhanceContinuousLearning();
-            break;
-        }
-
-        // Log the implementation
-        await this.logOptimizationAction(recommendation, 'auto_implemented');
-
+        await this.implementOptimization(optimization);
+        console.log(`✅ [AUTO-OPT] Applied optimization: ${optimization.description}`);
       } catch (error) {
-        console.error(`❌ [AUTO-OPTIMIZATION] Error implementing ${recommendation.recommendation_type}:`, error);
+        console.error(`❌ [AUTO-OPT] Failed to apply optimization: ${optimization.description}`, error);
       }
     }
   }
 
-  private async optimizeResponseTemplates(): Promise<void> {
+  private async implementOptimization(optimization: OptimizationRecommendation): Promise<void> {
+    switch (optimization.type) {
+      case 'timing_change':
+        // Adjust AI scheduling parameters
+        await this.optimizeSchedulingParameters();
+        break;
+
+      case 'template_adjustment':
+        // Update template performance scores
+        await this.updateTemplatePerformance();
+        break;
+
+      default:
+        console.log(`[AUTO-OPT] Optimization type ${optimization.type} requires manual implementation`);
+        break;
+    }
+  }
+
+  private async optimizeSchedulingParameters(): Promise<void> {
     try {
-      // Get high-performing response patterns
-      const { data: highPerformingMessages } = await supabase
-        .from('conversations')
-        .select(`
-          body, lead_id,
-          leads!inner (
-            ai_learning_outcomes!inner (outcome_type, outcome_value)
-          )
-        `)
-        .eq('ai_generated', true)
-        .gte('sent_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+      // Update AI schedule config to be more responsive
+      const { data: configs } = await supabase
+        .from('ai_schedule_config')
+        .select('*')
+        .eq('is_active', true);
 
-      if (!highPerformingMessages) return;
+      if (configs) {
+        for (const config of configs) {
+          // Reduce day offset for faster responses
+          const newOffset = Math.max(config.day_offset - 1, 0);
+          
+          await supabase
+            .from('ai_schedule_config')
+            .update({ 
+              day_offset: newOffset,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', config.id);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [AUTO-OPT] Error optimizing scheduling:', error);
+    }
+  }
 
-      // Filter for successful messages
-      const successfulMessages = highPerformingMessages.filter(msg =>
-        msg.leads?.ai_learning_outcomes?.some((outcome: any) => 
-          outcome.outcome_type === 'positive_response' && outcome.outcome_value > 0.7
-        )
-      );
+  private async updateTemplatePerformance(): Promise<void> {
+    try {
+      // Analyze recent template performance and boost high-performing ones
+      const { data: templates } = await supabase
+        .from('ai_template_performance')
+        .select('*')
+        .gte('last_used_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order('response_rate', { ascending: false });
 
-      // Extract common successful patterns
-      const commonPatterns = this.extractSuccessfulPatterns(successfulMessages.map(m => m.body));
-
-      // Update AI template performance data
-      for (const pattern of commonPatterns) {
+      if (templates && templates.length > 0) {
+        const topPerformer = templates[0];
+        
+        // Boost performance score of top performer
         await supabase
           .from('ai_template_performance')
-          .upsert({
-            template_content: pattern,
-            template_variant: 'auto_optimized',
-            performance_score: 0.8,
-            usage_count: 1,
-            response_rate: 0.6
+          .update({
+            performance_score: Math.min(topPerformer.performance_score + 0.1, 1.0),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', topPerformer.id);
+      }
+    } catch (error) {
+      console.error('❌ [AUTO-OPT] Error updating template performance:', error);
+    }
+  }
+
+  private async storeOptimizationInsights(recommendations: OptimizationRecommendation[]): Promise<void> {
+    try {
+      for (const recommendation of recommendations) {
+        // Serialize the recommendation properly for database storage
+        const insightData = {
+          recommendation: {
+            type: recommendation.type,
+            priority: recommendation.priority,
+            description: recommendation.description,
+            expectedImpact: recommendation.expectedImpact,
+            implementation: recommendation.implementation,
+            testingRequired: recommendation.testingRequired
+          },
+          action: 'optimization_recommended',
+          timestamp: new Date().toISOString()
+        };
+
+        await supabase
+          .from('ai_learning_insights')
+          .insert({
+            insight_type: 'automated_optimization',
+            insight_title: `Optimization: ${recommendation.type}`,
+            insight_description: recommendation.description,
+            insight_data: insightData as any,
+            confidence_score: recommendation.expectedImpact,
+            impact_level: recommendation.priority,
+            actionable: true,
+            applies_globally: true
           });
       }
-
-      console.log('✅ [AUTO-OPTIMIZATION] Updated response templates with successful patterns');
-
     } catch (error) {
-      console.error('❌ [AUTO-OPTIMIZATION] Error optimizing templates:', error);
+      console.error('❌ [AUTO-OPT] Error storing optimization insights:', error);
     }
   }
 
-  private extractSuccessfulPatterns(messages: string[]): string[] {
-    // Extract common phrases and structures from successful messages
-    const patterns = new Set<string>();
-
-    messages.forEach(message => {
-      const sentences = message.split(/[.!?]+/).filter(s => s.trim().length > 10);
-      sentences.forEach(sentence => {
-        if (sentence.trim().length > 20 && sentence.trim().length < 100) {
-          patterns.add(sentence.trim());
-        }
-      });
-    });
-
-    return Array.from(patterns).slice(0, 5); // Top 5 patterns
-  }
-
-  private async enhanceContinuousLearning(): Promise<void> {
+  async getOptimizationStatus(): Promise<any> {
     try {
-      // Update learning metrics to be more responsive
-      await supabase
-        .from('ai_learning_metrics')
-        .upsert({
-          metric_date: new Date().toISOString().split('T')[0],
-          total_interactions: 0,
-          successful_interactions: 0,
-          learning_events_processed: 1,
-          optimization_triggers: 1,
-          template_improvements: 1,
-          average_confidence_score: 0.8,
-          response_rate_improvement: 0.05
-        });
+      const currentMetrics = await this.analyzeCurrentPerformance();
+      const recentInsights = await this.getRecentOptimizationInsights();
 
-      console.log('✅ [AUTO-OPTIMIZATION] Enhanced continuous learning mechanisms');
-
-    } catch (error) {
-      console.error('❌ [AUTO-OPTIMIZATION] Error enhancing continuous learning:', error);
-    }
-  }
-
-  private async scheduleABTests(recommendations: OptimizationRecommendation[]): Promise<void> {
-    const testableRecommendations = recommendations.filter(r => !r.auto_implementable || r.confidence < 0.75);
-
-    for (const recommendation of testableRecommendations) {
-      const testId = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      const test: AutomatedTest = {
-        test_id: testId,
-        test_type: recommendation.recommendation_type as any,
-        control_group: { current_implementation: true },
-        test_group: { optimized_implementation: recommendation.implementation_steps },
-        start_date: new Date(),
-        status: 'running'
+      return {
+        currentPerformance: currentMetrics,
+        baseline: this.performanceBaseline,
+        lastOptimizationRun: this.lastOptimizationRun,
+        activeOptimizations: recentInsights.length,
+        optimizationHealth: this.calculateOptimizationHealth(currentMetrics),
+        recommendations: recentInsights.slice(0, 3)
       };
 
-      this.activeTests.set(testId, test);
-      
-      console.log(`🧪 [AUTO-OPTIMIZATION] Scheduled A/B test: ${testId} for ${recommendation.recommendation_type}`);
-      
-      // Log the test scheduling
-      await this.logOptimizationAction(recommendation, 'ab_test_scheduled');
-    }
-  }
-
-  private async logOptimizationAction(recommendation: OptimizationRecommendation, action: string): Promise<void> {
-    try {
-      await supabase
-        .from('ai_learning_insights')
-        .insert({
-          insight_type: 'automated_optimization',
-          insight_title: `${action}: ${recommendation.recommendation_type}`,
-          insight_description: recommendation.description,
-          confidence_score: recommendation.confidence,
-          actionable: true,
-          implemented: action === 'auto_implemented',
-          insight_data: {
-            recommendation,
-            action,
-            timestamp: new Date().toISOString()
-          }
-        });
-
     } catch (error) {
-      console.error('❌ [AUTO-OPTIMIZATION] Error logging optimization action:', error);
+      console.error('❌ [AUTO-OPT] Error getting optimization status:', error);
+      return {
+        currentPerformance: this.getDefaultMetrics(),
+        baseline: null,
+        lastOptimizationRun: null,
+        activeOptimizations: 0,
+        optimizationHealth: 'unknown',
+        recommendations: []
+      };
     }
   }
 
-  async getOptimizationStatus(): Promise<{
-    metrics: OptimizationMetric[];
-    activeTests: AutomatedTest[];
-    recentOptimizations: any[];
-  }> {
+  private async getRecentOptimizationInsights(): Promise<any[]> {
     try {
-      // Get recent optimization insights
-      const { data: recentOptimizations } = await supabase
+      const { data: insights } = await supabase
         .from('ai_learning_insights')
         .select('*')
         .eq('insight_type', 'automated_optimization')
+        .eq('actionable', true)
         .order('created_at', { ascending: false })
         .limit(10);
 
-      return {
-        metrics: this.optimizationMetrics,
-        activeTests: Array.from(this.activeTests.values()),
-        recentOptimizations: recentOptimizations || []
-      };
-
+      return insights || [];
     } catch (error) {
-      console.error('❌ [AUTO-OPTIMIZATION] Error getting optimization status:', error);
-      return {
-        metrics: this.optimizationMetrics,
-        activeTests: [],
-        recentOptimizations: []
-      };
+      console.error('❌ [AUTO-OPT] Error getting recent insights:', error);
+      return [];
     }
   }
 
-  async processAutomaticOptimizations(): Promise<void> {
+  private calculateOptimizationHealth(metrics: PerformanceMetrics): string {
+    if (!this.performanceBaseline) return 'baseline_needed';
+
+    const responseImprovement = metrics.responseRate / this.performanceBaseline.responseRate;
+    const conversionImprovement = metrics.conversionRate / this.performanceBaseline.conversionRate;
+    const engagementImprovement = metrics.engagementScore / this.performanceBaseline.engagementScore;
+
+    const avgImprovement = (responseImprovement + conversionImprovement + engagementImprovement) / 3;
+
+    if (avgImprovement >= 1.1) return 'excellent';
+    if (avgImprovement >= 1.05) return 'good';
+    if (avgImprovement >= 0.95) return 'stable';
+    if (avgImprovement >= 0.9) return 'declining';
+    
+    return 'needs_attention';
+  }
+
+  async triggerManualOptimization(optimizationType: string): Promise<void> {
     try {
-      console.log('🤖 [AUTO-OPTIMIZATION] Processing automatic optimizations');
+      console.log(`🔧 [AUTO-OPT] Triggering manual optimization: ${optimizationType}`);
 
-      // Run optimization cycle every hour
-      const lastRun = this.getLastOptimizationRun();
-      const hoursSinceLastRun = (Date.now() - lastRun) / (1000 * 60 * 60);
+      const currentMetrics = await this.analyzeCurrentPerformance();
+      const opportunities = [optimizationType];
+      const recommendations = await this.generateOptimizationRecommendations(opportunities);
 
-      if (hoursSinceLastRun >= 1) {
-        await this.runOptimizationCycle();
-        this.setLastOptimizationRun(Date.now());
-      }
+      await this.storeOptimizationInsights(recommendations);
+      
+      console.log(`✅ [AUTO-OPT] Manual optimization triggered for: ${optimizationType}`);
 
     } catch (error) {
-      console.error('❌ [AUTO-OPTIMIZATION] Error in automatic optimization:', error);
+      console.error('❌ [AUTO-OPT] Error triggering manual optimization:', error);
     }
-  }
-
-  private getLastOptimizationRun(): number {
-    const stored = localStorage.getItem('last_ai_optimization_run');
-    return stored ? parseInt(stored) : 0;
-  }
-
-  private setLastOptimizationRun(timestamp: number): void {
-    localStorage.setItem('last_ai_optimization_run', timestamp.toString());
   }
 }
 
