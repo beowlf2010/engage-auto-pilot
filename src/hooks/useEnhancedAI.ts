@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { generateEnhancedIntelligentResponse, IntelligentAIResponse } from '@/services/intelligentConversationAI';
+import { unifiedAIResponseEngine, MessageContext, UnifiedAIResponse } from '@/services/unifiedAIResponseEngine';
 import { messageQualityService } from '@/services/messageQualityService';
 import { intelligentSchedulingService } from '@/services/intelligentSchedulingService';
 
@@ -21,56 +21,42 @@ export interface EnhancedAIRequest {
   };
 }
 
-export interface EnhancedAIResponse {
-  message: string;
-  confidence: number;
-  reasoning: string;
-  customerIntent?: any;
-  answerGuidance?: any;
-  messageType?: string;
-}
-
 export const useEnhancedAI = () => {
   const [loading, setLoading] = useState(false);
-  const [lastResponse, setLastResponse] = useState<EnhancedAIResponse | null>(null);
+  const [lastResponse, setLastResponse] = useState<UnifiedAIResponse | null>(null);
   const [qualityMetrics, setQualityMetrics] = useState<any>(null);
 
-  // Generate enhanced AI message with quality scoring
   const generateEnhancedMessage = useCallback(async (request: EnhancedAIRequest) => {
     setLoading(true);
     try {
-      // Generate enhanced response using the consolidated service
-      const response = await generateEnhancedIntelligentResponse({
+      const messageContext: MessageContext = {
         leadId: request.leadId,
-        leadName: '', // Will be populated from lead data
-        vehicleInterest: request.vehicleInterest,
-        messages: request.messages,
-        leadInfo: request.leadInfo || { phone: '', status: 'new' }
-      });
+        leadName: '', // Will be populated from lead data if needed
+        latestMessage: request.messages.filter(m => m.direction === 'in').slice(-1)[0]?.body || '',
+        conversationHistory: request.messages.map(m => m.body),
+        vehicleInterest: request.vehicleInterest
+      };
+
+      const response = unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (response) {
-        const enhancedResponse: EnhancedAIResponse = {
-          message: response.message,
-          confidence: response.confidence,
-          reasoning: response.reasoning,
-          customerIntent: response.customerIntent,
-          answerGuidance: response.answerGuidance,
-          messageType: 'enhanced'
-        };
+        setLastResponse(response);
         
-        setLastResponse(enhancedResponse);
+        const quality = unifiedAIResponseEngine.validateResponseQuality(response.message);
         
-        // Mock quality metrics for now
-        const quality = {
+        setQualityMetrics({
           score: response.confidence,
-          factors: ['conversational_awareness', 'intent_detection']
-        };
-        
-        setQualityMetrics(quality);
+          factors: ['unified_intent_detection', 'professional_templates', 'context_awareness'],
+          isValid: quality.isValid,
+          issues: quality.issues
+        });
         
         return {
-          ...enhancedResponse,
-          qualityMetrics: quality
+          ...response,
+          qualityMetrics: {
+            score: response.confidence,
+            factors: ['unified_intent_detection', 'professional_templates']
+          }
         };
       }
       
@@ -83,7 +69,6 @@ export const useEnhancedAI = () => {
     }
   }, []);
 
-  // Schedule message with intelligent timing
   const scheduleIntelligentMessage = useCallback(async (
     leadId: string,
     messageContent: string,
@@ -110,7 +95,6 @@ export const useEnhancedAI = () => {
     }
   }, []);
 
-  // Track message performance for learning
   const trackMessagePerformance = useCallback(async (
     messageId: string,
     leadId: string,
@@ -129,7 +113,6 @@ export const useEnhancedAI = () => {
     }
   }, []);
 
-  // Get quality insights for optimization
   const getQualityInsights = useCallback(async () => {
     try {
       return await messageQualityService.getQualityInsights();

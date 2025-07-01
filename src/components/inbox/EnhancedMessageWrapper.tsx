@@ -1,3 +1,4 @@
+
 import React, { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -107,16 +108,15 @@ export const useEnhancedMessageWrapper = ({ onMessageSent, onLeadsRefresh }: Enh
     isTemplate?: boolean
   ) => {
     try {
-      console.log('📤 [ENHANCED WRAPPER] Starting complete message send process');
+      console.log('📤 [ENHANCED WRAPPER] Starting message send process');
       console.log('📤 [ENHANCED WRAPPER] Lead ID:', leadId);
       console.log('📤 [ENHANCED WRAPPER] Message preview:', messageContent.substring(0, 50) + '...');
-      console.log('📤 [ENHANCED WRAPPER] Profile available:', !!profile);
 
       if (!profile) {
         throw new Error('User profile not available - cannot send message');
       }
 
-      // Get recent conversation to check for unknown AI scenarios (learning data)
+      // Get recent conversation for learning data
       const { data: recentMessages } = await supabase
         .from('conversations')
         .select('*')
@@ -124,19 +124,16 @@ export const useEnhancedMessageWrapper = ({ onMessageSent, onLeadsRefresh }: Enh
         .order('sent_at', { ascending: false })
         .limit(10);
 
-      // Check if the most recent customer message was unhandled by AI
       const customerMessages = recentMessages?.filter(msg => msg.direction === 'in') || [];
       const lastCustomerMessage = customerMessages[0];
       
       if (lastCustomerMessage) {
-        // Check if AI failed to respond to this message
         const aiResponseAfter = recentMessages?.find(msg => 
           msg.direction === 'out' && 
           msg.ai_generated && 
           new Date(msg.sent_at) > new Date(lastCustomerMessage.sent_at)
         );
 
-        // If no AI response exists, this human response is learning data
         if (!aiResponseAfter) {
           console.log('🧠 [ENHANCED WRAPPER] Capturing human response as learning data');
           
@@ -149,30 +146,25 @@ export const useEnhancedMessageWrapper = ({ onMessageSent, onLeadsRefresh }: Enh
             );
           } catch (learningError) {
             console.warn('⚠️ [ENHANCED WRAPPER] Learning capture failed:', learningError);
-            // Don't block message sending if learning fails
           }
         }
       }
 
-      // Send the actual message using the complete fixed message service
       console.log('📤 [ENHANCED WRAPPER] Sending message via fixed service...');
       await fixedSendMessage(leadId, messageContent.trim(), profile, false);
 
-      console.log('✅ [ENHANCED WRAPPER] Message sent successfully via complete flow');
+      console.log('✅ [ENHANCED WRAPPER] Message sent successfully');
       
-      // Trigger callbacks for UI updates
       if (onMessageSent) {
-        console.log('🔄 [ENHANCED WRAPPER] Triggering onMessageSent callback');
         onMessageSent();
       }
       
       if (onLeadsRefresh) {
-        console.log('🔄 [ENHANCED WRAPPER] Triggering onLeadsRefresh callback');
         onLeadsRefresh();
       }
 
     } catch (error) {
-      console.error('❌ [ENHANCED WRAPPER] Complete message send failed:', error);
+      console.error('❌ [ENHANCED WRAPPER] Message send failed:', error);
       throw error;
     }
   }, [profile, onMessageSent, onLeadsRefresh]);

@@ -2,13 +2,12 @@
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Navigate } from "react-router-dom";
 import { useEffect } from "react";
-import { backgroundAIProcessor } from "@/services/backgroundAIProcessor";
+import { unifiedAI } from "@/services/unifiedAIService";
 import ConsolidatedSmartInbox from "@/components/inbox/ConsolidatedSmartInbox";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
 
-  // Request notification permission when the page loads
   useEffect(() => {
     const requestNotificationPermission = async () => {
       if ('Notification' in window && Notification.permission === 'default') {
@@ -20,15 +19,23 @@ const SmartInboxPage = () => {
     requestNotificationPermission();
   }, []);
 
-  // Start background AI processor when profile is available
   useEffect(() => {
     if (profile?.id) {
-      console.log('🤖 Starting background AI processor for profile:', profile.id);
-      backgroundAIProcessor.start(profile.id);
+      console.log('🤖 Starting unified AI processor for profile:', profile.id);
+      
+      // Start processing with unified AI service
+      const processInterval = setInterval(async () => {
+        try {
+          await unifiedAI.processAllPendingResponses(profile);
+          unifiedAI.cleanupProcessedMessages();
+        } catch (error) {
+          console.error('❌ Unified AI processing error:', error);
+        }
+      }, 30000); // Process every 30 seconds
 
       return () => {
-        console.log('🤖 Stopping background AI processor');
-        backgroundAIProcessor.stop();
+        console.log('🤖 Stopping unified AI processor');
+        clearInterval(processInterval);
       };
     }
   }, [profile?.id]);
@@ -50,7 +57,6 @@ const SmartInboxPage = () => {
   }
 
   const handleLeadsRefresh = () => {
-    // This will be passed to the ConsolidatedSmartInbox component
     window.location.reload();
   };
 
