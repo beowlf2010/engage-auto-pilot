@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { aiServiceGuard, AI_SERVICE_IDS } from './aiServiceGuard';
+import { contextAwareResponseService, MessageContext } from './contextAwareResponseService';
 
 // The ONLY AI service that should generate responses - prevents conflicts and repetitive introductions
 class ConsolidatedAIService {
@@ -69,7 +69,7 @@ class ConsolidatedAIService {
     this.isProcessing = true;
 
     try {
-      console.log('🤖 [CONSOLIDATED AI] Generating conversation-aware response for lead:', leadId);
+      console.log('🤖 [CONSOLIDATED AI] Generating context-aware response for lead:', leadId);
 
       // Get lead data
       const { data: lead } = await supabase
@@ -106,22 +106,43 @@ class ConsolidatedAIService {
         return null;
       }
 
-      // Format conversation history for the edge function
-      const conversationHistory = conversations
-        .map(msg => `${msg.direction === 'in' ? 'Customer' : 'You'}: ${msg.body}`)
-        .join('\n');
+      console.log('📨 [CONSOLIDATED AI] Processing customer message:', lastCustomerMessage.body.substring(0, 100));
 
-      console.log('📞 [CONSOLIDATED AI] Calling intelligent-conversation-ai with direct message context');
-      console.log('📝 [CONSOLIDATED AI] Customer message:', lastCustomerMessage.body.substring(0, 100) + '...');
+      // Use the new context-aware response service
+      const messageContext: MessageContext = {
+        leadId,
+        leadName: `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'there',
+        latestMessage: lastCustomerMessage.body,
+        conversationHistory: conversations.map(c => c.body),
+        vehicleInterest: lead.vehicle_interest
+      };
 
-      // Call the conversation-aware edge function with the actual customer message
+      const contextResponse = contextAwareResponseService.generateResponse(messageContext);
+
+      if (contextResponse.message) {
+        // Mark this message as processed
+        this.processedMessages.add(lastCustomerMessage.id);
+        
+        console.log(`✅ [CONSOLIDATED AI] Generated context-aware response:`, {
+          intent: contextResponse.intent.primary,
+          strategy: contextResponse.responseStrategy,
+          confidence: contextResponse.confidence,
+          message: contextResponse.message.substring(0, 100) + '...'
+        });
+        
+        return contextResponse.message;
+      }
+
+      // If context-aware service fails, fall back to edge function
+      console.log('🔄 [CONSOLIDATED AI] Falling back to edge function...');
+      
       const { data: aiResponse, error: aiError } = await supabase.functions.invoke('intelligent-conversation-ai', {
         body: {
           leadId,
-          leadName: `${lead.first_name} ${lead.last_name}`,
-          messageBody: lastCustomerMessage.body, // Pass the actual customer message
-          latestCustomerMessage: lastCustomerMessage.body, // Alternative parameter
-          conversationHistory,
+          leadName: messageContext.leadName,
+          messageBody: lastCustomerMessage.body,
+          latestCustomerMessage: lastCustomerMessage.body,
+          conversationHistory: conversations.map(c => `${c.direction === 'in' ? 'Customer' : 'You'}: ${c.body}`).join('\n'),
           hasConversationalSignals: false,
           leadSource: lead.source,
           leadSourceData: null,
@@ -137,8 +158,7 @@ class ConsolidatedAIService {
       if (aiResponse?.message) {
         // Mark this message as processed
         this.processedMessages.add(lastCustomerMessage.id);
-        console.log(`✅ [CONSOLIDATED AI] Generated contextual response:`, aiResponse.message.substring(0, 100) + '...');
-        console.log(`🎯 [CONSOLIDATED AI] Response reasoning:`, aiResponse.reasoning);
+        console.log(`✅ [CONSOLIDATED AI] Generated fallback response:`, aiResponse.message.substring(0, 100) + '...');
         
         return aiResponse.message;
       } else {

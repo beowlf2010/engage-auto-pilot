@@ -4,6 +4,7 @@ import { UnknownMessageContext } from '@/services/unknownMessageLearning';
 import { formatProperName, formatFullName } from '@/utils/nameFormatter';
 import { generateVehicleIntelligentResponse } from './vehicleIntelligence/enhancedConversationAI';
 import { responseVariationService } from './responseVariationService';
+import { contextAwareResponseService, MessageContext } from './contextAwareResponseService';
 
 export interface ConversationContext {
   leadId: string;
@@ -32,6 +33,22 @@ export interface AIResponse {
   customerIntent?: any;
   answerGuidance?: any;
   sourceStrategy?: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  body: string;
+  direction: 'in' | 'out';
+  sentAt: string;
+  aiGenerated: boolean;
+}
+
+export interface IntelligentResponse {
+  message: string;
+  confidence: number;
+  reasoning: string;
+  shouldSend: boolean;
+  responseStrategy: string;
 }
 
 // Simple conversational awareness detection
@@ -76,15 +93,85 @@ export interface IntelligentAIResponse {
   answerGuidance?: any;
 }
 
+export const shouldGenerateResponse = (context: ConversationContext): boolean => {
+  const customerMessages = context.messages.filter(msg => msg.direction === 'in');
+  if (customerMessages.length === 0) return false;
+
+  const lastCustomerMessage = customerMessages[customerMessages.length - 1];
+  const lastAIMessage = context.messages
+    .filter(msg => msg.direction === 'out' && msg.aiGenerated)
+    .pop();
+
+  // Only respond if the customer's last message is newer than our last AI response
+  if (lastAIMessage && new Date(lastCustomerMessage.sentAt) <= new Date(lastAIMessage.sentAt)) {
+    return false;
+  }
+
+  return true;
+};
+
 export const generateEnhancedIntelligentResponse = async (
   context: ConversationContext
 ): Promise<IntelligentAIResponse | null> => {
   try {
     console.log('🤖 [ENHANCED AI] Generating contextually aware response for lead:', context.leadId);
 
+    if (!shouldGenerateResponse(context)) {
+      console.log('🚫 [ENHANCED AI] No response needed - customer has not sent new message');
+      return null;
+    }
+
+    // Get the latest customer message
+    const customerMessages = context.messages.filter(msg => msg.direction === 'in');
+    const latestMessage = customerMessages[customerMessages.length - 1];
+
+    if (!latestMessage) {
+      console.log('❌ [ENHANCED AI] No customer message found');
+      return null;
+    }
+
+    console.log('📨 [ENHANCED AI] Processing customer message:', latestMessage.body.substring(0, 100));
+
+    // Create message context for the context-aware service
+    const messageContext: MessageContext = {
+      leadId: context.leadId,
+      leadName: context.leadName || 'there',
+      latestMessage: latestMessage.body,
+      conversationHistory: context.messages.map(m => m.body),
+      vehicleInterest: context.vehicleInterest,
+      previousIntent: undefined // Could be enhanced with conversation memory
+    };
+
+    // Generate context-aware response
+    const response = contextAwareResponseService.generateResponse(messageContext);
+
+    // Validate response quality
+    const qualityCheck = contextAwareResponseService.validateResponseQuality(response.message);
+    
+    if (!qualityCheck.isValid) {
+      console.warn('⚠️ [ENHANCED AI] Response quality issues:', qualityCheck.issues);
+      // Could fall back to a safer template here
+    }
+
+    console.log('✅ [ENHANCED AI] Generated intelligent response:', {
+      intent: response.intent.primary,
+      strategy: response.responseStrategy,
+      confidence: response.confidence,
+      message: response.message.substring(0, 100) + '...'
+    });
+
+    return {
+      message: response.message,
+      confidence: response.confidence,
+      reasoning: response.reasoning,
+      sourceStrategy: response.responseStrategy,
+      customerIntent: response.intent,
+      answerGuidance: response.followUpAction
+    };
+
     // Try response variation service first for maximum diversity
     try {
-      const response = responseVariationService.generateContextualResponse({
+      const variationResponse = responseVariationService.generateContextualResponse({
         leadId: context.leadId,
         leadName: context.leadName,
         vehicleInterest: context.vehicleInterest,
@@ -92,10 +179,10 @@ export const generateEnhancedIntelligentResponse = async (
         conversationStage: context.messages.length <= 2 ? 'initial' : 'follow_up'
       });
       
-      if (response && response.length > 20) {
+      if (variationResponse && variationResponse.length > 20) {
         console.log(`✅ [ENHANCED AI] Using response variation service with high diversity`);
         return {
-          message: response,
+          message: variationResponse,
           confidence: 0.9,
           reasoning: 'Response variation service - maximum diversity',
           sourceStrategy: 'response_variation',
@@ -271,22 +358,4 @@ const generateSimpleFallback = (leadName: string): IntelligentAIResponse => {
     reasoning: 'Simple fallback response to prevent infinite loops',
     sourceStrategy: 'fallback'
   };
-};
-
-export const shouldGenerateResponse = (context: ConversationContext): boolean => {
-  const lastCustomerMessage = context.messages
-    .filter(msg => msg.direction === 'in')
-    .slice(-1)[0];
-
-  if (!lastCustomerMessage) return false;
-
-  // Check if already responded
-  const messagesAfterCustomer = context.messages.filter(msg => 
-    new Date(msg.sentAt) > new Date(lastCustomerMessage.sentAt) && msg.direction === 'out'
-  );
-
-  if (messagesAfterCustomer.length > 0) return false;
-
-  // Always attempt to respond to ANY inbound customer message
-  return true;
 };

@@ -1,20 +1,85 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
-import { analyzeEnhancedCustomerIntent } from './enhancedIntentAnalysis.ts';
-import { detectEnhancedObjectionSignals, generateEnhancedObjectionResponse } from './enhancedObjectionDetection.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
+// Enhanced Intent Recognition - inline implementation
+const analyzeCustomerIntent = (message: string) => {
+  const text = message.toLowerCase().trim();
+  
+  // Financing patterns
+  const financingPatterns = [
+    { pattern: /\b(down payment|downpayment|dp)\b/i, type: 'down_payment', confidence: 0.9 },
+    { pattern: /\b(monthly payment|payments|monthly)\b/i, type: 'monthly_payment', confidence: 0.8 },
+    { pattern: /\b(saving up|save up|saving money)\b/i, type: 'saving_up', confidence: 0.9 },
+    { pattern: /\b(credit|financing|finance|loan)\b/i, type: 'credit_concern', confidence: 0.7 },
+    { pattern: /\b(budget|afford|expensive|cost)\b/i, type: 'budget_constraint', confidence: 0.6 }
+  ];
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  // Check for financing signals
+  for (const pattern of financingPatterns) {
+    if (pattern.pattern.test(text)) {
+      return {
+        primary: `financing_${pattern.type}`,
+        confidence: pattern.confidence,
+        financingType: pattern.type,
+        isFinancingRelated: true
+      };
+    }
+  }
+
+  // Check for buying signals
+  if (/\b(ready|purchase|buy|take it|let's do this)\b/i.test(text)) {
+    return {
+      primary: 'buying_signal',
+      confidence: 0.9,
+      isFinancingRelated: false
+    };
+  }
+
+  // Check for objections
+  if (/\b(not interested|not ready|think about it|too expensive)\b/i.test(text)) {
+    return {
+      primary: 'objection',
+      confidence: 0.8,
+      isFinancingRelated: text.includes('expensive') || text.includes('cost')
+    };
+  }
+
+  return {
+    primary: 'general_inquiry',
+    confidence: 0.5,
+    isFinancingRelated: false
+  };
+};
+
+// Professional Response Templates
+const getResponseTemplate = (intent: any, leadName: string, customerMessage: string) => {
+  const templates = {
+    financing_saving_up: `I completely understand, ${leadName} - saving up shows you're being smart about this decision. When you're ready, we'll have financing options that can help minimize your upfront costs. What timeline are you thinking?`,
+    
+    financing_down_payment: `Great question about the down payment, ${leadName}! We have several programs that can help - some as low as $0 down for qualified buyers. Would you like me to check what options might work for your situation?`,
+    
+    financing_monthly_payment: `Let's find a payment that fits your budget comfortably, ${leadName}. What monthly range were you hoping to stay within? We have flexible terms that might surprise you.`,
+    
+    financing_budget_constraint: `I appreciate you sharing your budget considerations, ${leadName}. Let's work together to find something that fits both your needs and your financial comfort zone. What's most important to you in a vehicle?`,
+    
+    financing_credit_concern: `We work with customers of all credit situations, ${leadName}. Let me connect you with our finance team to explore your options - you might be surprised what we can do.`,
+    
+    buying_signal: `That's great to hear, ${leadName}! Let's get you moving forward. When would be a good time to finalize everything? I can have all the paperwork ready.`,
+    
+    objection: `I understand, ${leadName}. What would need to change for this to feel like the right time? I'm here to help when you're ready.`,
+    
+    general_inquiry: `Hi ${leadName}! I'd be happy to help you with that. What specific details would be most helpful for your decision?`
+  };
+
+  return templates[intent.primary as keyof typeof templates] || templates.general_inquiry;
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,217 +87,77 @@ serve(async (req) => {
   }
 
   try {
-    const {
-      leadId,
-      leadName,
-      vehicleInterest,
-      conversationHistory,
-      messageBody,  // NEW: Direct customer message
-      latestCustomerMessage,  // NEW: Alternative parameter name
-      isInitialContact,
-      salespersonName = 'Finn',
-      dealershipName = 'Jason Pilger Chevrolet'
-    } = await req.json();
+    const { leadId, leadName, messageBody, latestCustomerMessage, conversationHistory, vehicleInterest } = await req.json();
 
-    console.log('🤖 Enhanced AI processing for lead:', leadId, leadName);
+    console.log('🤖 [INTELLIGENT-AI] Processing request for:', leadName);
+    console.log('📨 [INTELLIGENT-AI] Customer message:', messageBody || latestCustomerMessage);
+
+    // Use the most recent customer message
+    const customerMessage = latestCustomerMessage || messageBody;
     
-    // Get the actual customer message - prioritize direct parameters over parsing
-    let customerMessage = messageBody || latestCustomerMessage;
-    
-    // If no direct message provided, try to extract from conversation history
-    if (!customerMessage && conversationHistory) {
-      console.log('📝 Extracting customer message from conversation history');
-      const messages = conversationHistory.split('\n').filter((line: string) => line.trim());
-      const lastCustomerLine = messages
-        .filter((line: string) => line.toLowerCase().includes('customer:'))
-        .pop();
-      
-      if (lastCustomerLine) {
-        customerMessage = lastCustomerLine.replace(/^customer:\s*/i, '').trim();
-      }
-    }
-
-    console.log('📝 Processing customer message:', customerMessage);
-
     if (!customerMessage) {
-      console.log('⚠️ No customer message found to process');
-      return new Response(JSON.stringify({
-        error: 'No customer message provided for analysis'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.log('❌ [INTELLIGENT-AI] No customer message provided');
+      return new Response(
+        JSON.stringify({ error: 'No customer message provided' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Enhanced intent analysis with the actual customer message
-    const intentAnalysis = analyzeEnhancedCustomerIntent(
-      customerMessage,
-      conversationHistory || '',
-      vehicleInterest || '',
-      leadName || ''
+    // Analyze the customer's intent from their latest message
+    const intent = analyzeCustomerIntent(customerMessage);
+    
+    console.log('🧠 [INTELLIGENT-AI] Detected intent:', {
+      primary: intent.primary,
+      confidence: intent.confidence,
+      isFinancingRelated: intent.isFinancingRelated
+    });
+
+    // Generate appropriate response using professional templates
+    const responseMessage = getResponseTemplate(intent, leadName || 'there', customerMessage);
+
+    // Validate response quality
+    const hasPlaceholders = responseMessage.includes('{') || responseMessage.includes('[') || 
+                           responseMessage.includes('undefined') || responseMessage.includes('null') ||
+                           responseMessage.toLowerCase().includes('not specified');
+
+    if (hasPlaceholders) {
+      console.warn('⚠️ [INTELLIGENT-AI] Response contains placeholders, using fallback');
+      const fallback = `Hi ${leadName || 'there'}! I understand your question about "${customerMessage.substring(0, 50)}..." Let me help you with that. What would be most helpful to know?`;
+      
+      return new Response(
+        JSON.stringify({
+          message: fallback,
+          confidence: 0.7,
+          reasoning: `Professional fallback response to avoid placeholders. Intent: ${intent.primary}`
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const response = {
+      message: responseMessage,
+      confidence: intent.confidence,
+      reasoning: `Context-aware response to ${intent.primary} with ${intent.confidence * 100}% confidence. Directly addressed customer's latest message about ${intent.isFinancingRelated ? 'financing' : 'general inquiry'}.`,
+      intent: intent.primary,
+      isFinancingRelated: intent.isFinancingRelated,
+      responseStrategy: intent.isFinancingRelated ? 'empathetic_financing' : 'professional_assistance'
+    };
+
+    console.log('✅ [INTELLIGENT-AI] Generated response:', response.message.substring(0, 100) + '...');
+
+    return new Response(
+      JSON.stringify(response),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-    console.log('🎯 Intent analysis result:', {
-      primaryIntent: intentAnalysis.primaryIntent,
-      confidence: intentAnalysis.confidence,
-      strategy: intentAnalysis.responseStrategy,
-      customerMessage: customerMessage.substring(0, 100) + '...',
-      hasObjections: intentAnalysis.objectionSignals?.length || 0
-    });
-
-    // If competitor purchase is detected, return graceful exit response immediately
-    if (intentAnalysis.primaryIntent === 'competitor_purchase') {
-      console.log('🏆 Competitor purchase detected - generating congratulatory response');
-      
-      const response = intentAnalysis.suggestedResponse || 
-        `Congratulations on your new vehicle, ${leadName || 'there'}! I'm sure you'll love it. Thank you for considering us during your search. If you ever need service, parts, or have friends or family looking for their next vehicle, please don't hesitate to reach out. We'd love to help in the future!`;
-
-      return new Response(JSON.stringify({
-        message: response,
-        confidence: intentAnalysis.confidence,
-        reasoning: 'Customer has purchased from competitor - providing graceful, congratulatory exit response',
-        intentAnalysis: {
-          strategy: 'congratulate_competitor_purchase',
-          primaryIntent: 'competitor_purchase',
-          urgencyLevel: 'low'
-        },
-        customerIntent: {
-          type: 'competitor_purchase',
-          confidence: intentAnalysis.confidence
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Check for other objections that need special handling
-    if (intentAnalysis.objectionSignals && intentAnalysis.objectionSignals.length > 0) {
-      console.log('🛡️ Objection detected:', intentAnalysis.objectionSignals[0].type);
-      
-      const objectionResponse = generateEnhancedObjectionResponse(
-        intentAnalysis.objectionSignals,
-        customerMessage,
-        vehicleInterest || '',
-        leadName || ''
-      );
-
-      if (objectionResponse) {
-        return new Response(JSON.stringify({
-          message: objectionResponse,
-          confidence: intentAnalysis.objectionSignals[0].confidence,
-          reasoning: `Addressing ${intentAnalysis.objectionSignals[0].type} objection with specialized response`,
-          intentAnalysis: {
-            strategy: intentAnalysis.objectionSignals[0].suggestedResponse,
-            primaryIntent: intentAnalysis.primaryIntent,
-            urgencyLevel: intentAnalysis.customerContext.urgencyLevel
-          },
-          customerIntent: {
-            type: intentAnalysis.objectionSignals[0].type,
-            confidence: intentAnalysis.objectionSignals[0].confidence
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
-    // Use enhanced contextual response if available
-    if (intentAnalysis.suggestedResponse) {
-      console.log('💡 Using enhanced contextual response');
-      
-      return new Response(JSON.stringify({
-        message: intentAnalysis.suggestedResponse,
-        confidence: intentAnalysis.confidence,
-        reasoning: `Enhanced contextual response for ${intentAnalysis.primaryIntent} based on: "${customerMessage.substring(0, 50)}..."`,
-        intentAnalysis: {
-          strategy: intentAnalysis.responseStrategy,
-          primaryIntent: intentAnalysis.primaryIntent,
-          urgencyLevel: intentAnalysis.customerContext.urgencyLevel
-        },
-        customerIntent: {
-          type: intentAnalysis.primaryIntent,
-          confidence: intentAnalysis.confidence
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Enhanced OpenAI fallback with better context
-    console.log('🤖 Using enhanced OpenAI generation with customer message context');
-    
-    const prompt = `You are Finn, a professional and helpful automotive sales consultant at ${dealershipName}. 
-
-Customer: ${leadName || 'Customer'}
-Vehicle Interest: ${vehicleInterest || 'Not specified'}
-Customer's Latest Message: "${customerMessage}"
-
-Context from conversation:
-${conversationHistory || 'This is the beginning of the conversation.'}
-
-IMPORTANT INSTRUCTIONS:
-- Respond directly to what the customer just said: "${customerMessage}"
-- Be professional, helpful, and build rapport
-- Don't be overly enthusiastic or pushy
-- Focus on understanding their needs and being genuinely helpful
-- If they ask about pricing, acknowledge that and offer to help with pricing information
-- If they want to schedule something, respond appropriately to their scheduling request
-- Match their communication style (formal vs. casual)
-- Don't assume they're excited or ready to buy unless they indicate that
-
-Generate a natural, conversational response that directly addresses their message.`;
-
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are Finn, a professional automotive sales consultant who focuses on building rapport and being genuinely helpful rather than pushy. Always respond directly to what the customer is saying.'
-          },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 200,
-        temperature: 0.7,
-      }),
-    });
-
-    const aiData = await openAIResponse.json();
-    const aiMessage = aiData.choices?.[0]?.message?.content || 'I\'d be happy to help! What questions do you have?';
-
-    console.log('✅ Generated contextual OpenAI response:', aiMessage.substring(0, 100) + '...');
-
-    return new Response(JSON.stringify({
-      message: aiMessage,
-      confidence: 0.8,
-      reasoning: `Professional OpenAI response directly addressing: "${customerMessage.substring(0, 50)}..."`,
-      intentAnalysis: {
-        strategy: intentAnalysis.responseStrategy,
-        primaryIntent: intentAnalysis.primaryIntent,
-        urgencyLevel: intentAnalysis.customerContext.urgencyLevel
-      },
-      customerIntent: {
-        type: 'contextual_response',
-        confidence: 0.8
-      }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
   } catch (error) {
-    console.error('❌ Error in intelligent conversation AI:', error);
-    
-    return new Response(JSON.stringify({
-      error: 'Failed to generate AI response',
-      details: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('❌ [INTELLIGENT-AI] Error:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   }
 });
