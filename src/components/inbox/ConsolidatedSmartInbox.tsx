@@ -19,10 +19,12 @@ import type { ConversationListItem } from '@/hooks/conversation/conversationType
 
 interface ConsolidatedSmartInboxProps {
   onLeadsRefresh: () => void;
+  preselectedLeadId?: string | null;
 }
 
 const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
-  onLeadsRefresh
+  onLeadsRefresh,
+  preselectedLeadId
 }) => {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState("unread");
@@ -73,6 +75,17 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
     onMessageUpdate: handleMessageUpdate,
     onConversationUpdate: handleConversationUpdate
   });
+
+  // Auto-select conversation from URL parameter
+  useEffect(() => {
+    if (preselectedLeadId && conversations.length > 0) {
+      const leadExists = conversations.some(conv => conv.leadId === preselectedLeadId);
+      if (leadExists && selectedLead !== preselectedLeadId) {
+        console.log('🎯 [SMART INBOX] Auto-selecting lead from URL:', preselectedLeadId);
+        setSelectedLead(preselectedLeadId);
+      }
+    }
+  }, [preselectedLeadId, conversations, selectedLead]);
 
   // Load messages when a lead is selected with enhanced reliability
   useEffect(() => {

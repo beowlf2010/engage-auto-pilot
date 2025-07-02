@@ -1,12 +1,14 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { unifiedAI } from "@/services/unifiedAIService";
 import ConsolidatedSmartInbox from "@/components/inbox/ConsolidatedSmartInbox";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const leadId = searchParams.get('leadId');
 
   useEffect(() => {
     const requestNotificationPermission = async () => {
@@ -70,7 +72,10 @@ const SmartInboxPage = () => {
           </p>
         </div>
 
-        <ConsolidatedSmartInbox onLeadsRefresh={handleLeadsRefresh} />
+        <ConsolidatedSmartInbox 
+          onLeadsRefresh={handleLeadsRefresh} 
+          preselectedLeadId={leadId}
+        />
       </div>
     </div>
   );

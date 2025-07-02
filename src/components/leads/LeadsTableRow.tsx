@@ -82,7 +82,15 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
       
       <TableCell className="font-medium">
         <div className="flex items-center space-x-2">
-          <span>{lead.firstName} {lead.lastName}</span>
+          <Button
+            variant="link"
+            className="p-0 h-auto font-medium text-left hover:text-blue-600 transition-colors"
+            onClick={() => {
+              window.open(`/smart-inbox?leadId=${lead.id}`, '_blank');
+            }}
+          >
+            {lead.firstName} {lead.lastName}
+          </Button>
           {isFresh && (
             <Badge variant="secondary" className="text-xs">
               <Sparkles className="w-3 h-3 mr-1" />
