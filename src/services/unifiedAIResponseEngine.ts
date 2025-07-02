@@ -87,7 +87,9 @@ class UnifiedAIResponseEngine {
   private analyzeMessageIntent(message: string): string {
     const lowerMessage = message.toLowerCase();
     
-    if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('payment')) {
+    if (lowerMessage.includes('pic') || lowerMessage.includes('photo') || lowerMessage.includes('image') || lowerMessage.includes('pictures')) {
+      return 'photo_request';
+    } else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('payment')) {
       return 'price_inquiry';
     } else if (lowerMessage.includes('available') || lowerMessage.includes('in stock')) {
       return 'availability_inquiry';
@@ -147,6 +149,11 @@ class UnifiedAIResponseEngine {
 
   private generateBaseResponse(context: MessageContext, intent: string): BaseResponse {
     const responses = {
+      photo_request: {
+        message: `Hi ${context.leadName}! I'd love to get you photos of ${context.vehicleInterest || 'the vehicle'}. While I don't have photos available to send right now, I can schedule a time for you to see the vehicle in person or provide detailed specifications. Would you prefer to come in for a quick look?`,
+        confidence: 0.85,
+        responseType: 'vehicle_inquiry' as const
+      },
       price_inquiry: {
         message: `Hi ${context.leadName}! I'd be happy to discuss pricing with you. Let me get you the most current information on ${context.vehicleInterest || 'the vehicles you\'re interested in'}.`,
         confidence: 0.8,
