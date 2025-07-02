@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -13,13 +14,16 @@ import {
   CheckSquare,
   MessageSquare,
   Archive,
-  UserPlus
+  UserPlus,
+  Search,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useInboxFilters } from '@/hooks/useInboxFilters';
 import { SmartFilterBar } from './SmartFilterBar';
 import { EnhancedConversationCard } from './EnhancedConversationCard';
 import { InlineAIAssistant } from './InlineAIAssistant';
+import { ChatInterface } from '../chat/ChatInterface';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ConversationListItem } from '@/types/conversation';
@@ -171,26 +175,27 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
       <div className="border-b bg-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">Smart Inbox</h1>
-              <Badge variant="outline">
+        <div className="p-3 md:p-4">
+          <div className="flex items-center justify-between mb-3 md:mb-4">
+            <div className="flex items-center gap-2 md:gap-3">
+              <h1 className="text-xl md:text-2xl font-bold">Smart Inbox</h1>
+              <Badge variant="outline" className="text-xs">
                 {filteredConversations.length} of {totalConversations}
               </Badge>
               {unreadCount > 0 && (
-                <Badge variant="destructive">
+                <Badge variant="destructive" className="text-xs">
                   {unreadCount} unread
                 </Badge>
               )}
             </div>
             
             <div className="flex items-center gap-2">
-              {/* Layout Controls */}
+              {/* Layout Controls - Hidden on mobile */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="hidden md:flex"
               >
                 <PanelLeft className="h-4 w-4" />
               </Button>
@@ -199,43 +204,55 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => setAiPanelCollapsed(!aiPanelCollapsed)}
+                className="hidden lg:flex"
               >
                 <PanelRight className="h-4 w-4" />
               </Button>
 
-              <Select value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="list">
-                    <Layout className="h-3 w-3 mr-1" />
-                    List
-                  </SelectItem>
-                  <SelectItem value="grid">
-                    <Layout className="h-3 w-3 mr-1" />
-                    Grid
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Refresh Button - Always visible */}
+              {onRefresh && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRefresh}
+                  className="hidden sm:flex"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              )}
 
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="hidden md:flex">
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Smart Filter Bar */}
-          <SmartFilterBar
-            filters={filters}
-            conversations={conversations}
-            onFiltersChange={handleFiltersChange}
-            onSearch={handleSearchChange}
-            searchQuery={searchQuery}
-            onClearAll={clearFilters}
-            hasActiveFilters={hasActiveFilters}
-            onRefresh={onRefresh}
-          />
+          {/* Smart Filter Bar - Responsive */}
+          <div className="hidden md:block">
+            <SmartFilterBar
+              filters={filters}
+              conversations={conversations}
+              onFiltersChange={handleFiltersChange}
+              onSearch={handleSearchChange}
+              searchQuery={searchQuery}
+              onClearAll={clearFilters}
+              hasActiveFilters={hasActiveFilters}
+              onRefresh={onRefresh}
+            />
+          </div>
+          
+          {/* Mobile Search Only */}
+          <div className="md:hidden">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-10 bg-background"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Batch Actions Bar */}
@@ -289,8 +306,16 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
 
       {/* Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Conversations List */}
-        <div className={`${sidebarCollapsed ? 'w-16' : 'w-96'} border-r bg-card transition-all duration-200`}>
+        {/* Conversations List - Responsive */}
+        <div className={`${
+          sidebarCollapsed 
+            ? 'w-16 md:w-16' 
+            : 'w-full md:w-96'
+        } ${
+          selectedConversation && !sidebarCollapsed 
+            ? 'hidden md:block' 
+            : 'block'
+        } border-r bg-card transition-all duration-200`}>
           <div className="h-full overflow-auto p-4">
             {isLoading ? (
               <div className="space-y-3">
@@ -338,39 +363,36 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
           </div>
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex">
-          {/* Chat/Detail View */}
-          <div className="flex-1 bg-background">
-            {selectedConversation ? (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center">
-                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-medium mb-2">Chat View</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Selected: {getCurrentConversation()?.leadName}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center max-w-md">
-                  <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h2 className="text-xl font-semibold mb-2">Welcome to Smart Inbox</h2>
-                  <p className="text-muted-foreground mb-6">
-                    Select a conversation to start chatting. Use the smart filters to find exactly what you need.
-                  </p>
-                  <div className="text-sm text-muted-foreground">
-                    <p>💡 Tip: Use Ctrl+F to search, Ctrl+A to select all</p>
-                  </div>
-                </div>
-              </div>
-            )}
+        
+        {/* Mobile Back Button */}
+        {selectedConversation && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="md:hidden absolute top-4 left-4 z-10"
+            onClick={() => onSelectConversation?.('')}
+          >
+            ← Back
+          </Button>
+        )}
+
+        {/* Main Content Area - Responsive */}
+        <div className={`${
+          selectedConversation 
+            ? 'flex-1' 
+            : 'hidden md:flex md:flex-1'
+        } flex transition-all duration-200`}>
+          {/* Chat Interface */}
+          <div className="flex-1 bg-background relative">
+            <ChatInterface
+              conversation={getCurrentConversation()}
+              onMessageSent={onRefresh}
+            />
           </div>
 
-          {/* AI Assistant Panel */}
+          {/* AI Assistant Panel - Hidden on mobile */}
           {!aiPanelCollapsed && (
-            <div className="w-80 border-l bg-card">
+            <div className="hidden lg:block w-80 border-l bg-card">
               <div className="h-full overflow-auto p-4">
                 <InlineAIAssistant
                   conversation={getCurrentConversation()}
