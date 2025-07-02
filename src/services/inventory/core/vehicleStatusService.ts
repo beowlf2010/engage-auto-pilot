@@ -1,12 +1,11 @@
 
 export const isVehicleAvailable = (vehicle: any): boolean => {
-  // GM Global orders should never be considered "sold" in the traditional sense
+  // Only vehicles with status 5000 are considered available
   if (vehicle.source_report === 'orders_all') {
     const statusNum = parseInt(vehicle.status);
-    // Available: 6000 (CTP) + 5000-5999 (Available for delivery)
-    return statusNum === 6000 || (statusNum >= 5000 && statusNum <= 5999);
+    return statusNum === 5000;
   }
-  return vehicle.status === 'available';
+  return vehicle.status === '5000' || vehicle.status === 5000;
 };
 
 export const getVehicleStatusDisplay = (vehicle: any) => {
