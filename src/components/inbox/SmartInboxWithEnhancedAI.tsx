@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useInboxFilters, InboxFilters } from '@/hooks/useInboxFilters';
+import { EnhancedSmartInbox } from './enhanced/EnhancedSmartInbox';
 import SmartFilters from './SmartFilters';
 import FilterRestorationBanner from './FilterRestorationBanner';
 import { Badge } from '@/components/ui/badge';
@@ -87,110 +88,22 @@ const SmartInboxWithEnhancedAI = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
+    <div className="h-full bg-background">
       <FilterRestorationBanner
         isRestored={isRestored}
         onClearFilters={handleClearRestoredFilters}
         onDismiss={handleDismissRestorationBanner}
       />
-
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col">
-          {/* Header with stats and controls */}
-          <div className="bg-white border-b px-6 py-4">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold text-slate-800">Smart Inbox</h1>
-              <div className="flex items-center gap-4">
-                <Badge variant="outline" className="text-slate-600">
-                  {stats.total} conversations
-                </Badge>
-                {stats.unread > 0 && (
-                  <Button
-                    onClick={handleUnreadBadgeClick}
-                    variant="ghost"
-                    size="sm"
-                    className={`h-auto p-0 hover:bg-transparent ${
-                      filters.unreadOnly 
-                        ? 'ring-2 ring-red-400 ring-offset-1' 
-                        : ''
-                    }`}
-                    title={filters.unreadOnly ? 'Click to show all messages' : 'Click to filter unread messages'}
-                  >
-                    <Badge 
-                      variant="destructive" 
-                      className={`cursor-pointer transition-all hover:bg-red-600 ${
-                        filters.unreadOnly 
-                          ? 'bg-red-600 shadow-md' 
-                          : 'bg-red-500'
-                      }`}
-                    >
-                      {stats.unread} unread
-                    </Badge>
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Smart Filters */}
-            <SmartFilters
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              conversations={conversations}
-              filteredConversations={filteredConversations}
-              hasActiveFilters={hasActiveFilters}
-              filterSummary={getFilterSummary()}
-              onClearFilters={clearFilters}
-              userRole={profile?.role}
-            />
-          </div>
-
-          {/* Conversations list */}
-          <div className="flex-1 overflow-auto p-6">
-            {filteredConversations.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No conversations match the current filters.</p>
-                {hasActiveFilters && (
-                  <Button
-                    variant="outline"
-                    onClick={clearFilters}
-                    className="mt-4"
-                  >
-                    Clear Filters
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <ul className="space-y-4">
-                {filteredConversations.map(conv => (
-                  <li key={conv.leadId} className="bg-white p-4 rounded-lg shadow-sm border hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-center">
-                      <div className="flex-1">
-                        <p className="font-semibold text-slate-800">{conv.leadName || 'Unknown Customer'}</p>
-                        <p className="text-sm text-slate-600 mt-1">{conv.lastMessage || 'No messages yet'}</p>
-                        {conv.vehicleInterest && (
-                          <p className="text-xs text-blue-600 mt-1">Interest: {conv.vehicleInterest}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {conv.unreadCount > 0 && (
-                          <Badge variant="destructive" className="text-xs">
-                            {conv.unreadCount} unread
-                          </Badge>
-                        )}
-                        {conv.status && (
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {conv.status}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
+      
+      <EnhancedSmartInbox
+        conversations={filteredConversations}
+        onSelectConversation={(leadId) => {
+          console.log('Selected conversation:', leadId);
+          // Handle conversation selection
+        }}
+        selectedConversation={null}
+        isLoading={authLoading}
+      />
     </div>
   );
 };
