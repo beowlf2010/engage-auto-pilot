@@ -26,6 +26,12 @@ interface Deal {
   original_gross_profit?: number;
   original_fi_profit?: number;
   original_total_profit?: number;
+  inventory?: {
+    year?: number;
+    make?: string;
+    model?: string;
+    trim?: string;
+  }[];
 }
 
 interface DealRowProps {
@@ -59,6 +65,32 @@ const DealRow = ({
 
   const adjustedTotalProfit = getAdjustedTotalProfit(deal, localPackAdjustment);
 
+  // Get vehicle description from inventory data or fallback
+  const getVehicleDescription = () => {
+    const inventoryItem = deal.inventory?.[0];
+    if (inventoryItem && inventoryItem.year && inventoryItem.make && inventoryItem.model) {
+      const parts = [
+        inventoryItem.year,
+        inventoryItem.make,
+        inventoryItem.model,
+        inventoryItem.trim
+      ].filter(Boolean);
+      return parts.join(' ');
+    }
+    
+    // Fallback to year_model if available
+    if (deal.year_model) {
+      return deal.year_model;
+    }
+    
+    // Last fallback - show stock number if available
+    if (deal.stock_number) {
+      return `Vehicle ${deal.stock_number}`;
+    }
+    
+    return 'Unknown Vehicle';
+  };
+
   return (
     <TableRow className="hover:bg-slate-50">
       <TableCell>
@@ -71,7 +103,7 @@ const DealRow = ({
       
       <TableCell>
         <div className="font-medium text-slate-800">
-          {deal.year_model || 'Unknown Vehicle'}
+          {getVehicleDescription()}
         </div>
       </TableCell>
       

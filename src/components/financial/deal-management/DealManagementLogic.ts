@@ -27,10 +27,13 @@ export const useDealManagement = () => {
     try {
       setLoading(true);
       
-      // Build date filter conditions
+      // Build date filter conditions with inventory join
       let query = supabase
         .from('deals')
-        .select('*');
+        .select(`
+          *,
+          inventory:inventory!left(year, make, model, trim)
+        `);
 
       // Apply date filtering based on selected filter
       if (dateFilter !== 'all') {
