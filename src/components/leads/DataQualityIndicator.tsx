@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckCircle, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { assessLeadDataQuality, type DataQualityAssessment } from '@/services/unifiedDataQualityService';
 
 interface DataQualityIndicatorProps {
   leadId: string;
@@ -19,26 +20,69 @@ const DataQualityIndicator: React.FC<DataQualityIndicatorProps> = ({
   vehicleInterest,
   onEditClick
 }) => {
-  // This would normally check against original upload data
-  // For now, we'll do some basic validation
-  const hasValidName = firstName && lastName && firstName.length > 1 && lastName.length > 1;
-  const hasValidVehicle = vehicleInterest && vehicleInterest !== 'Unknown' && vehicleInterest.length > 5;
-  const hasGenericVehicle = vehicleInterest?.includes('Make Unknown') || vehicleInterest?.includes('Model Unknown');
-  
-  const getQualityScore = () => {
-    let score = 0;
-    if (hasValidName) score += 50;
-    if (hasValidVehicle && !hasGenericVehicle) score += 50;
-    return score;
-  };
+  const [dataQuality, setDataQuality] = useState<DataQualityAssessment | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const qualityScore = getQualityScore();
+  useEffect(() => {
+    const assessQuality = async () => {
+      setIsLoading(true);
+      try {
+        const assessment = await assessLeadDataQuality(firstName, vehicleInterest);
+        setDataQuality(assessment);
+      } catch (error) {
+        console.error('Error assessing data quality:', error);
+        // Fallback to simple assessment if unified service fails
+        setDataQuality({
+          overallQualityScore: 0.5,
+          nameValidation: {
+            isValidPersonalName: Boolean(firstName && firstName.length > 1),
+            confidence: 0.5,
+            detectedType: 'unknown',
+            suggestions: { useGenericGreeting: true }
+          },
+          vehicleValidation: {
+            isValid: Boolean(vehicleInterest && vehicleInterest.length > 5),
+            confidence: 0.5,
+            detectedIssue: 'Assessment failed'
+          },
+          messageStrategy: 'fully_generic',
+          recommendations: {
+            usePersonalGreeting: false,
+            useSpecificVehicle: false
+          }
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    assessQuality();
+  }, [firstName, vehicleInterest]);
+
+  if (isLoading || !dataQuality) {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 bg-gray-300 rounded animate-pulse" />
+          <Badge className="text-xs bg-gray-100 text-gray-500 border-0">
+            Analyzing...
+          </Badge>
+        </div>
+      </div>
+    );
+  }
+
+  // Convert 0-1 score to percentage
+  const qualityScore = Math.round(dataQuality.overallQualityScore * 100);
   
   const getQualityBadge = () => {
     if (qualityScore >= 80) {
+      return { icon: CheckCircle, text: 'Excellent', color: 'bg-green-100 text-green-800' };
+    }
+    if (qualityScore >= 60) {
       return { icon: CheckCircle, text: 'Good', color: 'bg-green-100 text-green-800' };
     }
-    if (qualityScore >= 50) {
+    if (qualityScore >= 40) {
       return { icon: AlertTriangle, text: 'Needs Review', color: 'bg-yellow-100 text-yellow-800' };
     }
     return { icon: AlertTriangle, text: 'Poor', color: 'bg-red-100 text-red-800' };
@@ -57,18 +101,18 @@ const DataQualityIndicator: React.FC<DataQualityIndicatorProps> = ({
       </div>
       
       <div className="text-xs text-gray-500">
-        {qualityScore}% complete
+        {qualityScore}% confidence
       </div>
       
-      {!hasValidName && (
+      {!dataQuality.nameValidation.isValidPersonalName && (
         <div className="text-xs text-red-500">
-          Name incomplete
+          Name needs review
         </div>
       )}
       
-      {hasGenericVehicle && (
+      {!dataQuality.vehicleValidation.isValid && dataQuality.vehicleValidation.detectedIssue !== 'None' && (
         <div className="text-xs text-orange-500">
-          Vehicle generic
+          {dataQuality.vehicleValidation.detectedIssue}
         </div>
       )}
       
