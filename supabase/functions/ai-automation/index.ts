@@ -211,9 +211,8 @@ serve(async (req) => {
           console.error(`❌ [AI-AUTOMATION] Error handling status transition for lead ${lead.id}:`, statusTransitionError);
         }
 
-        // Schedule next message
-        const nextSendTime = new Date();
-        nextSendTime.setDate(nextSendTime.getDate() + 1); // Schedule for next day
+        // Schedule next message with tiered scheduling for fresh leads
+        const nextSendTime = await calculateNextSendTime(lead, supabaseClient);
 
         const { error: scheduleError } = await supabaseClient
           .from('leads')
@@ -283,6 +282,78 @@ serve(async (req) => {
     });
   }
 });
+
+// Calculate next send time based on lead characteristics (fresh vs regular)
+const calculateNextSendTime = async (lead: any, supabaseClient: any): Promise<Date> => {
+  const nextSendTime = new Date();
+  
+  try {
+    // Get full lead details to determine fresh lead status
+    const { data: fullLead, error: leadError } = await supabaseClient
+      .from('leads')
+      .select('id, created_at, message_intensity, ai_messages_sent, ai_stage')
+      .eq('id', lead.id)
+      .single();
+
+    if (leadError || !fullLead) {
+      console.warn(`⚠️ [AI-AUTOMATION] Could not fetch lead details for ${lead.id}, using default 24h schedule`);
+      nextSendTime.setDate(nextSendTime.getDate() + 1);
+      return nextSendTime;
+    }
+
+    const leadCreatedAt = new Date(fullLead.created_at);
+    const hoursSinceCreated = (Date.now() - leadCreatedAt.getTime()) / (1000 * 60 * 60);
+    const messagesCount = fullLead.ai_messages_sent || 0;
+    const isDay1 = hoursSinceCreated <= 24;
+    const isSuperAggressive = fullLead.message_intensity === 'super_aggressive' || 
+                             fullLead.ai_stage === 'super_aggressive_followup';
+
+    console.log(`⏰ [AI-AUTOMATION] Scheduling logic for lead ${lead.id}:`, {
+      hoursSinceCreated: hoursSinceCreated.toFixed(1),
+      messagesCount,
+      isDay1,
+      isSuperAggressive,
+      messageIntensity: fullLead.message_intensity,
+      aiStage: fullLead.ai_stage
+    });
+
+    // Fresh leads on day 1 with super aggressive intensity get shorter intervals
+    if (isDay1 && (isSuperAggressive || messagesCount < 3)) {
+      if (messagesCount === 1) {
+        // Second message: 4-6 hours after first
+        const hoursToAdd = 4 + Math.random() * 2; // 4-6 hours
+        nextSendTime.setHours(nextSendTime.getHours() + hoursToAdd);
+        console.log(`🚀 [AI-AUTOMATION] FRESH LEAD - Second message scheduled in ${hoursToAdd.toFixed(1)} hours`);
+      } else if (messagesCount === 2) {
+        // Third message: 6-8 hours after second
+        const hoursToAdd = 6 + Math.random() * 2; // 6-8 hours
+        nextSendTime.setHours(nextSendTime.getHours() + hoursToAdd);
+        console.log(`🚀 [AI-AUTOMATION] FRESH LEAD - Third message scheduled in ${hoursToAdd.toFixed(1)} hours`);
+      } else if (messagesCount >= 3 && isDay1) {
+        // After 3 messages, wait until next day
+        nextSendTime.setDate(nextSendTime.getDate() + 1);
+        console.log(`📅 [AI-AUTOMATION] FRESH LEAD - Switching to daily schedule after 3 messages`);
+      } else {
+        // Default fresh lead spacing: 8-12 hours
+        const hoursToAdd = 8 + Math.random() * 4; // 8-12 hours
+        nextSendTime.setHours(nextSendTime.getHours() + hoursToAdd);
+        console.log(`🚀 [AI-AUTOMATION] FRESH LEAD - Next message scheduled in ${hoursToAdd.toFixed(1)} hours`);
+      }
+    } else {
+      // Regular leads or day 2+ leads: standard 24-hour schedule
+      nextSendTime.setDate(nextSendTime.getDate() + 1);
+      console.log(`📅 [AI-AUTOMATION] REGULAR SCHEDULE - Next message scheduled for tomorrow`);
+    }
+
+    return nextSendTime;
+
+  } catch (error) {
+    console.error(`❌ [AI-AUTOMATION] Error calculating next send time for lead ${lead.id}:`, error);
+    // Fallback to 24-hour schedule
+    nextSendTime.setDate(nextSendTime.getDate() + 1);
+    return nextSendTime;
+  }
+};
 
 const generateGentleMessage = (leadName: string, vehicleInterest: string): string => {
   const validation = validateVehicleInterest(vehicleInterest);
