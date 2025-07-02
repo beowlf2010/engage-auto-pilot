@@ -4,7 +4,9 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationsList } from '@/hooks/conversation/useConversationsList';
 import { useMessagesOperations } from '@/hooks/conversation/useMessagesOperations';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
-import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { useEnhancedRealtimeMessages } from '@/hooks/messaging/useEnhancedRealtimeMessages';
+import { useRobustMessageLoader } from '@/hooks/messaging/useRobustMessageLoader';
+import { useSmartMessageSync } from '@/hooks/messaging/useSmartMessageSync';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, AlertCircle, Inbox } from "lucide-react";
@@ -12,7 +14,7 @@ import ConversationsList from './ConversationsList';
 import { ConversationListSkeleton } from '@/components/ui/skeletons/ConversationSkeleton';
 import EnhancedChatView from './EnhancedChatView';
 import LeadContextPanel from './LeadContextPanel';
-import MessageSyncDebugPanel from '@/components/debug/MessageSyncDebugPanel';
+import EnhancedMessageSyncDebugPanel from '@/components/debug/EnhancedMessageSyncDebugPanel';
 import type { ConversationListItem } from '@/hooks/conversation/conversationTypes';
 
 interface ConsolidatedSmartInboxProps {
@@ -33,40 +35,54 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
     refetchConversations
   } = useConversationsList();
 
+  // Enhanced message loading with retry and caching
   const { 
-    messages, 
+    messages: robustMessages, 
+    loadingState, 
+    loadMessages: robustLoadMessages,
+    forceReload 
+  } = useRobustMessageLoader();
+
+  const { 
     sendMessage, 
-    loadMessages,
     sendingMessage 
   } = useMessagesOperations();
 
   const { markAsRead, isMarkingAsRead } = useMarkAsRead();
 
-  // Real-time message synchronization
+  // Smart message synchronization
+  const { debouncedRefreshConversations, deduplicatedUpdate } = useSmartMessageSync();
+
+  // Real-time message synchronization with enhanced reliability
   const handleMessageUpdate = useCallback((leadId: string) => {
-    console.log('📨 Real-time message update for lead:', leadId);
+    console.log('📨 [ENHANCED INBOX] Real-time message update for lead:', leadId);
+    deduplicatedUpdate(leadId, 'message');
+    
     if (selectedLead === leadId) {
-      loadMessages(leadId);
+      robustLoadMessages(leadId);
     }
-  }, [selectedLead, loadMessages]);
+  }, [selectedLead, robustLoadMessages, deduplicatedUpdate]);
 
   const handleConversationUpdate = useCallback(() => {
-    console.log('🔄 Real-time conversation update');
-    refetchConversations();
+    console.log('🔄 [ENHANCED INBOX] Real-time conversation update');
+    debouncedRefreshConversations();
     onLeadsRefresh();
-  }, [refetchConversations, onLeadsRefresh]);
+  }, [debouncedRefreshConversations, onLeadsRefresh]);
 
-  const { reconnect } = useRealtimeMessages({
+  const { connectionStatus, forceReconnect, isConnected } = useEnhancedRealtimeMessages({
     onMessageUpdate: handleMessageUpdate,
     onConversationUpdate: handleConversationUpdate
   });
 
-  // Load messages when a lead is selected
+  // Load messages when a lead is selected with enhanced reliability
   useEffect(() => {
     if (selectedLead) {
-      loadMessages(selectedLead);
+      console.log('🎯 [ENHANCED INBOX] Loading messages for selected lead:', selectedLead);
+      robustLoadMessages(selectedLead).catch(error => {
+        console.error('❌ [ENHANCED INBOX] Failed to load messages:', error);
+      });
     }
-  }, [selectedLead, loadMessages]);
+  }, [selectedLead, robustLoadMessages]);
 
   const handleSelectConversation = async (leadId: string) => {
     console.log('🎯 Selecting conversation for lead:', leadId);
@@ -231,7 +247,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
         <div className="flex-1 min-w-0">
           <EnhancedChatView
             selectedConversation={selectedConversation}
-            messages={messages}
+            messages={robustMessages}
             onSendMessage={handleSendMessage}
             showTemplates={false}
             onToggleTemplates={() => {}}
@@ -239,7 +255,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
               role: profile.role,
               id: profile.id
             }}
-            isLoading={sendingMessage}
+            isLoading={sendingMessage || loadingState.isLoading}
           />
         </div>
 
@@ -247,7 +263,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
         <div className="w-80 flex-shrink-0">
           <LeadContextPanel
             conversation={selectedConversation}
-            messages={messages}
+            messages={robustMessages}
             onSendMessage={handleSendMessage}
             onScheduleAppointment={() => {
               // Handle appointment scheduling
@@ -257,11 +273,13 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
         </div>
       </div>
 
-      {/* Debug Panel */}
-      <MessageSyncDebugPanel
+      {/* Enhanced Debug Panel */}
+      <EnhancedMessageSyncDebugPanel
         isOpen={debugPanelOpen}
         onToggle={() => setDebugPanelOpen(!debugPanelOpen)}
         selectedLeadId={selectedLead}
+        connectionStatus={connectionStatus}
+        frontendMessages={robustMessages}
       />
     </div>
   );

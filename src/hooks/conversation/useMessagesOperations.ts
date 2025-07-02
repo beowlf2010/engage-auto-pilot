@@ -6,59 +6,9 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import type { MessageData } from './conversationTypes';
 
 export const useMessagesOperations = () => {
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<MessageData[]>([]);
   const [sendingMessage, setSendingMessage] = useState(false);
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-
-  // Load messages for selected lead
-  const loadMessages = useCallback(async (leadId: string) => {
-    if (!leadId) return;
-
-    try {
-      console.log(`📨 [STABLE CONV] Loading messages for lead: ${leadId}`);
-      
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('sent_at', { ascending: true });
-
-      if (error) throw error;
-
-      const transformedMessages: MessageData[] = data.map(msg => ({
-        id: msg.id,
-        leadId: msg.lead_id,
-        body: msg.body,
-        direction: msg.direction as 'in' | 'out',
-        sentAt: msg.sent_at,
-        smsStatus: msg.sms_status || 'delivered',
-        aiGenerated: msg.ai_generated || false
-      }));
-
-      setMessages(transformedMessages);
-      setSelectedLeadId(leadId);
-
-      // Mark incoming messages as read
-      const unreadIncoming = data.filter(msg => msg.direction === 'in' && !msg.read_at);
-      if (unreadIncoming.length > 0) {
-        await supabase
-          .from('conversations')
-          .update({ read_at: new Date().toISOString() })
-          .in('id', unreadIncoming.map(msg => msg.id));
-
-        // Refresh conversations to update unread counts
-        queryClient.invalidateQueries({ queryKey: ['stable-conversations'] });
-      }
-
-      console.log(`✅ [STABLE CONV] Loaded ${transformedMessages.length} messages`);
-
-    } catch (err) {
-      console.error('❌ [STABLE CONV] Error loading messages:', err);
-      throw err;
-    }
-  }, [queryClient]);
 
   // Enhanced send message with proper profile handling and retry logic
   const sendMessage = useCallback(async (leadId: string, messageBody: string, retryCount: number = 0) => {
@@ -145,10 +95,10 @@ export const useMessagesOperations = () => {
       // Refresh data
       queryClient.invalidateQueries({ queryKey: ['stable-conversations'] });
       
-      // Reload messages for current lead to show the new message immediately
-      if (selectedLeadId === leadId) {
-        await loadMessages(leadId);
-      }
+      // Trigger message refresh via event
+      window.dispatchEvent(new CustomEvent('lead-messages-update', { 
+        detail: { leadId } 
+      }));
 
       console.log('✅ [STABLE CONV] Message sent successfully');
 
@@ -166,13 +116,10 @@ export const useMessagesOperations = () => {
     } finally {
       setSendingMessage(false);
     }
-  }, [profile, queryClient, selectedLeadId, loadMessages, sendingMessage]);
+  }, [profile, queryClient, sendingMessage]);
 
   return {
-    selectedLeadId,
-    messages,
     sendingMessage,
-    loadMessages,
     sendMessage
   };
 };
