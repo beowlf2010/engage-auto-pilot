@@ -1,6 +1,8 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { validatePersonalName } from '@/services/nameValidationService';
+import { validateVehicleInterest } from '@/services/vehicleInterestValidationService';
 
 export interface AIAnalysisState {
   isAnalyzing: boolean;
@@ -41,23 +43,42 @@ export const useAIAnalysis = (leadId: string) => {
       // Simulate analysis delay
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Mock data quality analysis
+      console.log('🔍 [AI ANALYSIS] Running real validation analysis...');
+
+      // Real name validation using actual service
+      const nameValidation = await validatePersonalName(lead.first_name || '');
+      console.log('📝 [AI ANALYSIS] Name validation result:', nameValidation);
+
+      // Real vehicle validation using actual service
+      const vehicleValidation = validateVehicleInterest(lead.vehicle_interest);
+      console.log('🚗 [AI ANALYSIS] Vehicle validation result:', vehicleValidation);
+
+      // Build data quality object using real validation results
       const dataQuality = {
         nameValidation: {
-          quality: 'good',
-          confidence: 0.9,
-          suggestedName: lead.first_name || 'Customer',
-          isValidPersonalName: true,
-          detectedType: 'personal_name'
+          quality: nameValidation.confidence > 0.7 ? 'good' : nameValidation.confidence > 0.4 ? 'fair' : 'poor',
+          confidence: nameValidation.confidence,
+          suggestedName: nameValidation.isValidPersonalName ? lead.first_name : 'Customer',
+          isValidPersonalName: nameValidation.isValidPersonalName,
+          detectedType: nameValidation.detectedType,
+          timesApproved: nameValidation.timesApproved || 0,
+          timesRejected: nameValidation.timesRejected || 0,
+          timesSeen: nameValidation.timesSeen || 0,
+          userOverride: nameValidation.userOverride || false,
+          contextualGreeting: nameValidation.suggestions.contextualGreeting,
+          leadSourceHint: nameValidation.suggestions.leadSourceHint
         },
         vehicleValidation: {
-          quality: lead.vehicle_interest ? 'good' : 'poor',
-          confidence: lead.vehicle_interest ? 0.8 : 0.3,
-          suggestedVehicle: lead.vehicle_interest || 'the right vehicle',
-          isValidVehicleInterest: !!lead.vehicle_interest,
-          detectedIssue: lead.vehicle_interest ? 'None' : 'Missing vehicle interest'
+          quality: vehicleValidation.isValid ? 'good' : 'poor',
+          confidence: vehicleValidation.isValid ? 0.8 : 0.3,
+          suggestedVehicle: vehicleValidation.sanitizedMessage,
+          isValidVehicleInterest: vehicleValidation.isValid,
+          detectedIssue: vehicleValidation.reason || 'None',
+          originalValue: vehicleValidation.originalValue
         }
       };
+
+      console.log('✅ [AI ANALYSIS] Final data quality assessment:', dataQuality);
 
       setState(prev => ({
         ...prev,
