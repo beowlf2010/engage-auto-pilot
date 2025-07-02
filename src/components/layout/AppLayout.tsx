@@ -21,6 +21,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     if (pathname.startsWith('/inventory-dashboard')) return 'inventory-dashboard';
     if (pathname.startsWith('/upload-inventory')) return 'upload-inventory';
     if (pathname.startsWith('/rpo-insights')) return 'rpo-insights';
+    if (pathname.startsWith('/rpo-database')) return 'rpo-database';
     if (pathname.startsWith('/financial-dashboard')) return 'financial-dashboard';
     if (pathname.startsWith('/ai-monitor')) return 'ai-monitor';
     if (pathname.startsWith('/sales-dashboard')) return 'sales-dashboard';
@@ -71,7 +72,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           user={user}
           activeView={activeView}
           onViewChange={setActiveView}
-          unreadCount={0}
+          unreadCount={0} // TODO: Implement real unread count
         />
         <main className="flex-1 overflow-auto">
           {children}

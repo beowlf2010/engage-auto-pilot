@@ -21,7 +21,7 @@ export interface NavigationItem {
 export const navigationItems: NavigationItem[] = [
   {
     label: 'Dashboard',
-    href: '/',
+    href: '/dashboard',
     icon: BarChart3,
     access: ['admin', 'manager', 'sales']
   },
@@ -45,8 +45,8 @@ export const navigationItems: NavigationItem[] = [
     access: ['admin', 'manager', 'sales']
   },
   {
-    label: 'RPO Database',
-    href: '/rpo-database',
+    label: 'RPO Insights',
+    href: '/rpo-insights',
     icon: Brain,
     access: ['admin', 'manager']
   },

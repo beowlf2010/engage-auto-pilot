@@ -12,6 +12,7 @@ import SmartInboxPage from './pages/SmartInboxPage';
 import InventoryDashboardPage from './pages/InventoryDashboardPage';
 import InventoryUploadPage from './pages/InventoryUploadPage';
 import RPOInsightsPage from './pages/RPOInsightsPage';
+import RPODatabasePage from './pages/RPODatabasePage';
 import FinancialDashboardPage from './pages/FinancialDashboardPage';
 import AIMonitorPage from './pages/AIMonitorPage';
 import SalesDashboardPage from './pages/SalesDashboardPage';
@@ -98,6 +99,14 @@ const AppContent = () => {
           <ProtectedRoute>
             <AppLayout>
               <RPOInsightsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/rpo-database" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <RPODatabasePage />
             </AppLayout>
           </ProtectedRoute>
         } />
