@@ -67,6 +67,32 @@ const EnhancedLeadsList = () => {
     updateFilters({ status });
   };
 
+  // Stats card click handler
+  const handleStatsCardClick = (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled') => {
+    switch (filterType) {
+      case 'fresh':
+        updateFilters({ dateFilter: 'today', status: 'all' });
+        break;
+      case 'all':
+        clearFilters();
+        break;
+      case 'no_contact':
+        updateFilters({ status: 'new' });
+        break;
+      case 'contact_attempted':
+        updateFilters({ status: 'all' }); // Will show leads with outgoingCount > 0
+        break;
+      case 'response_received':
+        updateFilters({ status: 'all' }); // Will show leads with incomingCount > 0  
+        break;
+      case 'ai_enabled':
+        updateFilters({ aiOptIn: true, status: 'all' });
+        break;
+      default:
+        break;
+    }
+  };
+
   // Check if we have active filters
   const hasActiveFilters = filters.status !== 'all' || 
     filters.search !== '' ||
@@ -185,6 +211,14 @@ const EnhancedLeadsList = () => {
       {/* Stats Cards */}
       <LeadsStatsCards 
         stats={calculateStats()}
+        onCardClick={handleStatsCardClick}
+        activeFilter={
+          filters.dateFilter === 'today' ? 'fresh' :
+          filters.status === 'new' ? 'no_contact' :
+          filters.aiOptIn === true ? 'ai_enabled' :
+          filters.status === 'all' && !hasActiveFilters ? 'all' :
+          null
+        }
       />
 
       {/* Bulk Actions Panel */}
