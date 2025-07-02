@@ -12,26 +12,80 @@ export const useDealManagement = () => {
   const [showProfitChanges, setShowProfitChanges] = useState(false);
   const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
   const [bulkDealType, setBulkDealType] = useState<string>("");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
+  const [dateField, setDateField] = useState<string>("upload_date");
   
   const { toast } = useToast();
 
   useEffect(() => {
     fetchDeals();
-  }, []);
+  }, [dateFilter, customStartDate, customEndDate, dateField]);
 
   const fetchDeals = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Build date filter conditions
+      let query = supabase
         .from('deals')
-        .select('*')
+        .select('*');
+
+      // Apply date filtering based on selected filter
+      if (dateFilter !== 'all') {
+        const now = new Date();
+        let startDate: string | null = null;
+        let endDate: string | null = null;
+
+        switch (dateFilter) {
+          case 'month_to_date':
+            startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+            endDate = now.toISOString().split('T')[0];
+            break;
+          case 'previous_month':
+            const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+            startDate = prevMonth.toISOString().split('T')[0];
+            endDate = lastDayPrevMonth.toISOString().split('T')[0];
+            break;
+          case 'year_to_date':
+            startDate = `${now.getFullYear()}-01-01`;
+            endDate = now.toISOString().split('T')[0];
+            break;
+          case 'last_30_days':
+            const thirty = new Date(now);
+            thirty.setDate(thirty.getDate() - 30);
+            startDate = thirty.toISOString().split('T')[0];
+            endDate = now.toISOString().split('T')[0];
+            break;
+          case 'last_90_days':
+            const ninety = new Date(now);
+            ninety.setDate(ninety.getDate() - 90);
+            startDate = ninety.toISOString().split('T')[0];
+            endDate = now.toISOString().split('T')[0];
+            break;
+          case 'custom':
+            startDate = customStartDate;
+            endDate = customEndDate;
+            break;
+        }
+
+        if (startDate && endDate) {
+          query = query
+            .gte(dateField, startDate)
+            .lte(dateField, endDate);
+        }
+      }
+
+      const { data, error } = await query
         .order('upload_date', { ascending: false })
         .limit(500);
 
       if (error) throw error;
       
       console.log('Fetched deals:', data?.length);
-      console.log('Sample deal:', data?.[0]);
+      console.log('Date filter applied:', dateFilter, 'Field:', dateField);
       
       setDeals(data || []);
     } catch (error) {
@@ -195,6 +249,14 @@ export const useDealManagement = () => {
     setSelectedDeals,
     bulkDealType,
     setBulkDealType,
+    dateFilter,
+    setDateFilter,
+    customStartDate,
+    setCustomStartDate,
+    customEndDate,
+    setCustomEndDate,
+    dateField,
+    setDateField,
     handleDealTypeUpdate,
     handleUnlockDeal,
     handleBulkDealTypeUpdate,

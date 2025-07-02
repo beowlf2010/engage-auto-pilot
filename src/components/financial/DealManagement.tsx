@@ -34,6 +34,14 @@ const DealManagement = ({
     selectedDeals,
     bulkDealType,
     setBulkDealType,
+    dateFilter,
+    setDateFilter,
+    customStartDate,
+    setCustomStartDate,
+    customEndDate,
+    setCustomEndDate,
+    dateField,
+    setDateField,
     handleDealTypeUpdate,
     handleUnlockDeal,
     handleBulkDealTypeUpdate,
@@ -183,6 +191,14 @@ const DealManagement = ({
                 setFilterType={setFilterType}
                 showProfitChanges={showProfitChanges}
                 setShowProfitChanges={setShowProfitChanges}
+                dateFilter={dateFilter}
+                setDateFilter={setDateFilter}
+                customStartDate={customStartDate}
+                setCustomStartDate={setCustomStartDate}
+                customEndDate={customEndDate}
+                setCustomEndDate={setCustomEndDate}
+                dateField={dateField}
+                setDateField={setDateField}
               />
 
               <BulkActions
