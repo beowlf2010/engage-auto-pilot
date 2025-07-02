@@ -29,6 +29,21 @@ const INVALID_PATTERNS = [
 
 const FALLBACK_MESSAGE = "I see you're still exploring options—happy to help you find the right fit!";
 
+// Name formatting function (inline since we can't import from frontend utils)
+const formatProperName = (name: string | null | undefined): string => {
+  if (!name || typeof name !== 'string') {
+    return 'there';
+  }
+  
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    return 'there';
+  }
+  
+  // Convert to proper case: first letter uppercase, rest lowercase
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
+
 const validateVehicleInterest = (vehicleInterest: string | null | undefined) => {
   // Check for null, undefined, or empty
   if (!vehicleInterest || typeof vehicleInterest !== 'string') {
@@ -91,8 +106,11 @@ serve(async (req) => {
       originalValue: leadData?.vehicle_interest
     });
 
-    // Get lead name with validation
-    const leadName = leadData?.first_name || 'there';
+    // Get lead name with proper formatting
+    const rawName = leadData?.first_name;
+    const leadName = formatProperName(rawName);
+    
+    console.log(`👤 [AI MESSAGE] Name formatting: "${rawName}" → "${leadName}"`);
     
     // Prepare the context for AI generation
     const aiContext = {
