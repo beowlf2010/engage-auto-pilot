@@ -130,9 +130,12 @@ export class ConversationAdvancementService {
     const recentMessages = conversations.slice(0, 3);
     const messageText = recentMessages.map(m => m.body.toLowerCase()).join(' ');
 
-    if (messageText.includes('rate') || messageText.includes('interest') || messageText.includes('financing') || messageText.includes('months')) {
+    // Enhanced detection for finance inquiries including basic responses
+    if (messageText.includes('rate') || messageText.includes('interest') || messageText.includes('financing') || 
+        messageText.includes('months') || messageText.includes('payment') || messageText.includes('finance') ||
+        messageText.includes('thx') || messageText.includes('thanks') || messageText.includes('thank')) {
       return 'finance_inquiry';
-    } else if (messageText.includes('price') || messageText.includes('cost') || messageText.includes('payment')) {
+    } else if (messageText.includes('price') || messageText.includes('cost')) {
       return 'pricing_discussion';
     } else if (messageText.includes('feature') || messageText.includes('trim') || messageText.includes('ltz') || messageText.includes('silverado')) {
       return 'feature_interest';

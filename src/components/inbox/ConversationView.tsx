@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Send, MessageSquare, Phone, Clock, CheckCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { ConversationAdvancementButton } from './ConversationAdvancementButton';
 
 interface ConversationViewProps {
   conversation: any;
@@ -142,6 +143,17 @@ const ConversationView = ({
         )}
         <div ref={messagesEndRef} />
       </CardContent>
+
+      {/* Conversation Advancement */}
+      {messages.length > 0 && (
+        <div className="border-t border-b bg-muted/30 p-3">
+          <ConversationAdvancementButton
+            leadId={conversation.leadId}
+            lastMessageDirection={messages[messages.length - 1]?.direction || 'in'}
+            timeSinceLastMessage={Math.floor((Date.now() - new Date(messages[messages.length - 1]?.sentAt || Date.now()).getTime()) / (1000 * 60 * 60))}
+          />
+        </div>
+      )}
 
       {/* Message Input */}
       {canReply && (
