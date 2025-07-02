@@ -94,7 +94,18 @@ class UnifiedAIResponseEngine {
   private analyzeMessageIntent(message: string): string {
     const lowerMessage = message.toLowerCase();
     
-    if (lowerMessage.includes('pic') || lowerMessage.includes('photo') || lowerMessage.includes('image') || lowerMessage.includes('pictures')) {
+    // Check for timing/budget objections FIRST (highest priority)
+    if (lowerMessage.includes('hold off') || lowerMessage.includes('holding off') || 
+        lowerMessage.includes('save up') || lowerMessage.includes('saving up') ||
+        lowerMessage.includes('need to save') || lowerMessage.includes('not ready')) {
+      return 'timing_objection';
+    } else if (lowerMessage.includes('too expensive') || lowerMessage.includes('can\'t afford') || 
+               lowerMessage.includes('over budget')) {
+      return 'budget_objection';
+    } else if (lowerMessage.includes('think about') || lowerMessage.includes('need time') || 
+               lowerMessage.includes('get back to you')) {
+      return 'consideration_pause';
+    } else if (lowerMessage.includes('pic') || lowerMessage.includes('photo') || lowerMessage.includes('image') || lowerMessage.includes('pictures')) {
       return 'photo_request';
     } else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('payment')) {
       return 'price_inquiry';
@@ -125,6 +136,10 @@ class UnifiedAIResponseEngine {
 
   private determineResponseStrategy(intent: string, context: MessageContext): string {
     switch (intent) {
+      case 'timing_objection':
+      case 'budget_objection': 
+      case 'consideration_pause':
+        return 'empathetic_understanding';
       case 'price_inquiry':
         return 'value_focused';
       case 'availability_inquiry':
@@ -156,6 +171,21 @@ class UnifiedAIResponseEngine {
 
   private generateBaseResponse(context: MessageContext, intent: string): BaseResponse {
     const responses = {
+      timing_objection: {
+        message: `Hi ${context.leadName}! I completely understand - timing is everything with a major purchase like this. Thanks for letting me know your situation. When you're ready to move forward, I'll be here to help. In the meantime, if you have any questions or want to stay updated on what's available, just let me know!`,
+        confidence: 0.95,
+        responseType: 'follow_up' as const
+      },
+      budget_objection: {
+        message: `Hi ${context.leadName}! I totally understand - budget is important. Thanks for being upfront with me. When you're ready to explore options, I'd be happy to discuss different vehicles and financing options that might work better for your situation. No pressure at all!`,
+        confidence: 0.95,
+        responseType: 'follow_up' as const
+      },
+      consideration_pause: {
+        message: `Hi ${context.leadName}! That's completely understandable - this is a big decision and you should take the time you need. I'm here whenever you're ready to discuss further. Feel free to reach out with any questions that come up!`,
+        confidence: 0.9,
+        responseType: 'follow_up' as const
+      },
       photo_request: {
         message: `Hi ${context.leadName}! I'd love to get you photos of ${context.vehicleInterest || 'the vehicle'}. While I don't have photos available to send right now, I can schedule a time for you to see the vehicle in person or provide detailed specifications. Would you prefer to come in for a quick look?`,
         confidence: 0.85,

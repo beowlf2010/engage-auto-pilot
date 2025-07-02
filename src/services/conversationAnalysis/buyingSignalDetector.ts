@@ -75,6 +75,9 @@ export const detectBuyingSignals = (
     { pattern: /\b(too expensive|can't afford|over budget)\b/i, strength: 0.9 },
     { pattern: /\b(think about it|need time|not sure)\b/i, strength: 0.6 },
     { pattern: /\b(wife|husband|spouse).*(talk|discuss)\b/i, strength: 0.7 },
+    { pattern: /\b(hold off|holding off|wait|waiting)\b/i, strength: 0.8 },
+    { pattern: /\b(save up|saving up|need to save|save money)\b/i, strength: 0.85 },
+    { pattern: /\b(not ready|timing|right time)\b/i, strength: 0.7 },
   ];
 
   objectionPatterns.forEach(({ pattern, strength }) => {
