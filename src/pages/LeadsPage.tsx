@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import LeadsList from '@/components/LeadsList';
+import { OptimizedLeadsList } from '@/components/leads/OptimizedLeadsList';
 import MultiFileLeadUploadModal from '@/components/leads/MultiFileLeadUploadModal';
 import PostSaleFollowUpPanel from '@/components/leads/PostSaleFollowUpPanel';
 
@@ -70,7 +70,7 @@ const LeadsPage = () => {
         </div>
       )}
 
-      <LeadsList key={refreshTrigger} />
+      <OptimizedLeadsList key={refreshTrigger} />
 
       {/* Upload Modal */}
       <MultiFileLeadUploadModal
