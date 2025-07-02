@@ -22,6 +22,7 @@ const EnhancedLeadsList = () => {
     filters,
     selectedLeads,
     stats,
+    databaseStats,
     updateFilters,
     clearFilters,
     loadMore,
@@ -116,19 +117,14 @@ const EnhancedLeadsList = () => {
     filters.doNotContact !== undefined ? 1 : 0
   ].reduce((sum, count) => sum + count, 0);
 
-  // Calculate stats for LeadsStatsCards
-  const calculateStats = () => {
-    const today = new Date();
-    const todayString = today.toDateString();
-    
-    return {
-      total: stats.total,
-      noContact: leads.filter(lead => lead.status === 'new').length,
-      contacted: leads.filter(lead => lead.outgoingCount > 0).length,
-      responded: leads.filter(lead => lead.incomingCount > 0).length,
-      aiEnabled: leads.filter(lead => lead.aiOptIn).length,
-      fresh: leads.filter(lead => new Date(lead.createdAt).toDateString() === todayString).length
-    };
+  // Use database stats instead of calculating from paginated leads
+  const statsForCards = {
+    total: databaseStats.total,
+    noContact: databaseStats.noContact,
+    contacted: databaseStats.contacted,
+    responded: databaseStats.responded,
+    aiEnabled: databaseStats.aiEnabled,
+    fresh: databaseStats.fresh
   };
 
   // Engagement score calculation (simplified)
@@ -210,7 +206,7 @@ const EnhancedLeadsList = () => {
 
       {/* Stats Cards */}
       <LeadsStatsCards 
-        stats={calculateStats()}
+        stats={statsForCards}
         onCardClick={handleStatsCardClick}
         activeFilter={
           filters.dateFilter === 'today' ? 'fresh' :

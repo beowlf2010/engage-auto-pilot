@@ -23,6 +23,15 @@ export interface PaginationConfig {
   total: number;
 }
 
+export interface DatabaseStats {
+  total: number;
+  aiEnabled: number;
+  noContact: number;
+  contacted: number;
+  responded: number;
+  fresh: number;
+}
+
 interface LeadsResponse {
   data: Lead[];
   count: number;
@@ -47,6 +56,14 @@ export const useOptimizedLeads = () => {
   });
 
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+  const [databaseStats, setDatabaseStats] = useState<DatabaseStats>({
+    total: 0,
+    aiEnabled: 0,
+    noContact: 0,
+    contacted: 0,
+    responded: 0,
+    fresh: 0
+  });
 
   // Build optimized database query with server-side filtering
   const buildQuery = useCallback((currentFilters: LeadFilters, page: number, pageSize: number) => {
@@ -218,6 +235,72 @@ export const useOptimizedLeads = () => {
     }
   }, [filters, pagination.pageSize, buildQuery]);
 
+  // Fetch database-wide stats
+  const fetchDatabaseStats = useCallback(async (): Promise<void> => {
+    try {
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+
+      // Get total count
+      const { count: totalCount } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .or('is_hidden.is.null,is_hidden.eq.false');
+
+      // Get AI enabled count
+      const { count: aiEnabledCount } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('ai_opt_in', true)
+        .or('is_hidden.is.null,is_hidden.eq.false');
+
+      // Get no contact count (status = 'new')
+      const { count: noContactCount } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'new')
+        .or('is_hidden.is.null,is_hidden.eq.false');
+
+      // Get fresh leads count (created today)
+      const { count: freshCount } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', todayStart)
+        .or('is_hidden.is.null,is_hidden.eq.false');
+
+      // Get leads with outgoing messages (contacted)
+      const { data: contactedLeads } = await supabase
+        .from('conversations')
+        .select('lead_id')
+        .eq('direction', 'out')
+        .not('lead_id', 'is', null);
+
+      const contactedLeadIds = [...new Set(contactedLeads?.map(c => c.lead_id) || [])];
+      const contactedCount = contactedLeadIds.length;
+
+      // Get leads with incoming messages (responded)
+      const { data: respondedLeads } = await supabase
+        .from('conversations')
+        .select('lead_id')
+        .eq('direction', 'in')
+        .not('lead_id', 'is', null);
+
+      const respondedLeadIds = [...new Set(respondedLeads?.map(c => c.lead_id) || [])];
+      const respondedCount = respondedLeadIds.length;
+
+      setDatabaseStats({
+        total: totalCount || 0,
+        aiEnabled: aiEnabledCount || 0,
+        noContact: noContactCount || 0,
+        contacted: contactedCount,
+        responded: respondedCount,
+        fresh: freshCount || 0
+      });
+    } catch (error) {
+      console.error('Error fetching database stats:', error);
+    }
+  }, []);
+
   // Load initial data
   const loadLeads = useCallback(async (newFilters?: LeadFilters) => {
     try {
@@ -235,12 +318,15 @@ export const useOptimizedLeads = () => {
       if (newFilters) {
         setFilters(newFilters);
       }
+
+      // Fetch database stats whenever filters change
+      await fetchDatabaseStats();
     } catch (err) {
       // Error already handled in fetchLeads
     } finally {
       setLoading(false);
     }
-  }, [filters, fetchLeads]);
+  }, [filters, fetchLeads, fetchDatabaseStats]);
 
   // Load more data for infinite scroll
   const loadMore = useCallback(async () => {
@@ -318,6 +404,7 @@ export const useOptimizedLeads = () => {
     pagination,
     selectedLeads,
     stats,
+    databaseStats,
     
     // Actions
     updateFilters,
