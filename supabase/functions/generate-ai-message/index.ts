@@ -98,28 +98,49 @@ serve(async (req) => {
 
     console.log(`🤖 [AI MESSAGE] Generating message for lead ${leadId}, type: ${messageType}`);
 
-    // Validate vehicle interest and get appropriate message
-    const vehicleValidation = validateVehicleInterest(leadData?.vehicle_interest);
-    console.log(`🔍 [AI MESSAGE] Vehicle validation:`, {
-      isValid: vehicleValidation.isValid,
-      reason: vehicleValidation.reason,
-      originalValue: leadData?.vehicle_interest
-    });
+    // Check user decisions first - they override AI validation
+    let shouldUsePersonalName = true;
+    let shouldUseSpecificVehicle = true;
+    let vehicleMessage = '';
+    let leadName = '';
 
-    // Get lead name with proper formatting
-    const rawName = leadData?.first_name;
-    const leadName = formatProperName(rawName);
-    
-    console.log(`👤 [AI MESSAGE] Name formatting: "${rawName}" → "${leadName}"`);
+    // Handle name decision
+    if (nameDecision === 'denied') {
+      shouldUsePersonalName = false;
+      leadName = 'there';
+      console.log(`👤 [AI MESSAGE] Name denied by user, using generic greeting`);
+    } else {
+      const rawName = leadData?.first_name;
+      leadName = formatProperName(rawName);
+      console.log(`👤 [AI MESSAGE] Name approved/auto: "${rawName}" → "${leadName}"`);
+    }
+
+    // Handle vehicle decision
+    if (vehicleDecision === 'denied') {
+      shouldUseSpecificVehicle = false;
+      vehicleMessage = FALLBACK_MESSAGE;
+      console.log(`🚗 [AI MESSAGE] Vehicle denied by user, using generic message`);
+    } else {
+      // Only run vehicle validation if user approved or no decision made
+      const vehicleValidation = validateVehicleInterest(leadData?.vehicle_interest);
+      shouldUseSpecificVehicle = vehicleValidation.isValid;
+      vehicleMessage = vehicleValidation.message;
+      console.log(`🚗 [AI MESSAGE] Vehicle validation:`, {
+        isValid: vehicleValidation.isValid,
+        reason: vehicleValidation.reason,
+        originalValue: leadData?.vehicle_interest
+      });
+    }
     
     // Prepare the context for AI generation
     const aiContext = {
       leadName,
-      vehicleMessage: vehicleValidation.message,
+      vehicleMessage,
       messageType: messageType || 'initial_contact',
       nameDecision,
       vehicleDecision,
-      usesFallback: !vehicleValidation.isValid
+      shouldUsePersonalName,
+      shouldUseSpecificVehicle
     };
 
     console.log(`📝 [AI MESSAGE] Context prepared:`, aiContext);
@@ -130,11 +151,19 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    const prompt = vehicleValidation.isValid 
-      ? `Generate a warm, professional initial message for ${leadName} about ${vehicleValidation.message}. Keep it conversational and helpful, around 1-2 sentences. Include a question to engage them.`
-      : `Generate a warm, professional initial message for ${leadName}. Use this exact phrase: "${FALLBACK_MESSAGE}" and add a brief follow-up question to engage them about what they're looking for.`;
+    // Create decision-based prompts
+    let prompt = '';
+    if (shouldUsePersonalName && shouldUseSpecificVehicle) {
+      prompt = `Generate a warm, professional initial message for ${leadName} about ${vehicleMessage}. Keep it conversational and helpful, around 1-2 sentences. Include a question to engage them.`;
+    } else if (shouldUsePersonalName && !shouldUseSpecificVehicle) {
+      prompt = `Generate a warm, professional initial message for ${leadName}. Use this exact phrase: "${FALLBACK_MESSAGE}" and add a brief follow-up question to engage them about what they're looking for.`;
+    } else if (!shouldUsePersonalName && shouldUseSpecificVehicle) {
+      prompt = `Generate a warm, professional initial message using "Hello!" as greeting about ${vehicleMessage}. Keep it conversational and helpful, around 1-2 sentences. Include a question to engage them.`;
+    } else {
+      prompt = `Generate a warm, professional initial message using "Hello!" as greeting. Use this exact phrase: "${FALLBACK_MESSAGE}" and add a brief follow-up question to engage them about what they're looking for.`;
+    }
 
-    console.log(`🎯 [AI MESSAGE] Using prompt for ${vehicleValidation.isValid ? 'valid' : 'fallback'} vehicle interest`);
+    console.log(`🎯 [AI MESSAGE] Using ${shouldUsePersonalName ? 'personal' : 'generic'} name + ${shouldUseSpecificVehicle ? 'specific' : 'generic'} vehicle prompt`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -179,8 +208,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         message: generatedMessage,
-        context: aiContext,
-        validation: vehicleValidation
+        context: aiContext
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
