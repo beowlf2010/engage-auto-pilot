@@ -187,6 +187,30 @@ serve(async (req) => {
         console.log(`💬 [AI-AUTOMATION] Sent message to lead ${lead.id}: ${gentleMessage}`);
         successfulCount++;
 
+        // Handle lead status transition after sending AI message
+        try {
+          const { data: leadStatus, error: statusError } = await supabaseClient
+            .from('leads')
+            .select('status')
+            .eq('id', lead.id)
+            .single();
+
+          if (!statusError && leadStatus?.status === 'new') {
+            const { error: transitionError } = await supabaseClient
+              .from('leads')
+              .update({ status: 'engaged' })
+              .eq('id', lead.id);
+
+            if (transitionError) {
+              console.error(`❌ [AI-AUTOMATION] Error transitioning lead status for ${lead.id}:`, transitionError);
+            } else {
+              console.log(`🔄 [AI-AUTOMATION] Transitioned lead ${lead.id} from 'new' to 'engaged'`);
+            }
+          }
+        } catch (statusTransitionError) {
+          console.error(`❌ [AI-AUTOMATION] Error handling status transition for lead ${lead.id}:`, statusTransitionError);
+        }
+
         // Schedule next message
         const nextSendTime = new Date();
         nextSendTime.setDate(nextSendTime.getDate() + 1); // Schedule for next day

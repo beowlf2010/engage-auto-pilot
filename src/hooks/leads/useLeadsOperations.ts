@@ -1,18 +1,33 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { transitionLeadStatus } from '@/services/leadStatusTransitionService';
 
 export const useLeadsOperations = () => {
   const { toast } = useToast();
 
   const updateAiOptIn = async (leadId: string, aiOptIn: boolean) => {
     try {
+      // First get the current lead status
+      const { data: leadData, error: fetchError } = await supabase
+        .from('leads')
+        .select('status')
+        .eq('id', leadId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       const { error } = await supabase
         .from('leads')
         .update({ ai_opt_in: aiOptIn })
         .eq('id', leadId);
 
       if (error) throw error;
+
+      // If enabling AI and lead is still 'new', transition to 'engaged'
+      if (aiOptIn && leadData?.status === 'new') {
+        await transitionLeadStatus(leadId, 'engaged', 'AI messaging enabled');
+      }
 
       toast({
         title: "Success",
