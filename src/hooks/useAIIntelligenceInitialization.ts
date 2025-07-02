@@ -1,43 +1,39 @@
-
 import { useEffect, useState } from 'react';
-import { aiIntelligenceInitializer } from '@/services/aiIntelligenceInitializer';
+import { aiIntelligenceHub } from '@/services/aiIntelligenceHub';
 
 export const useAIIntelligenceInitialization = () => {
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [initializationError, setInitializationError] = useState<string | null>(null);
 
   useEffect(() => {
-    const initializeAI = async () => {
-      if (isInitialized || isInitializing) return;
-
-      setIsInitializing(true);
-      setInitializationError(null);
-
+    const initializeIntelligence = async () => {
       try {
-        await aiIntelligenceInitializer.initialize();
+        console.log('🚀 [AI INIT] Initializing AI Intelligence Hub...');
+        setIsInitializing(true);
+        setInitializationError(null);
+        
+        await aiIntelligenceHub.initializeIntelligenceServices();
+        
+        console.log('✅ [AI INIT] AI Intelligence Hub initialized successfully');
         setIsInitialized(true);
-        console.log('🎯 [AI-HOOK] AI Intelligence system ready');
       } catch (error) {
-        console.error('❌ [AI-HOOK] AI Intelligence initialization failed:', error);
+        console.error('❌ [AI INIT] Failed to initialize AI Intelligence Hub:', error);
         setInitializationError(error instanceof Error ? error.message : 'Unknown error');
       } finally {
         setIsInitializing(false);
       }
     };
 
-    initializeAI();
-  }, [isInitialized, isInitializing]);
-
-  const retryInitialization = async () => {
-    setIsInitialized(false);
-    setInitializationError(null);
-  };
+    initializeIntelligence();
+  }, []);
 
   return {
     isInitialized,
     isInitializing,
     initializationError,
-    retryInitialization
+    getIntelligenceInsights: () => aiIntelligenceHub.getIntelligenceInsights(),
+    processIntelligenceFeedback: (leadId: string, responseId: string, feedback: any) => 
+      aiIntelligenceHub.processIntelligenceFeedback(leadId, responseId, feedback)
   };
 };

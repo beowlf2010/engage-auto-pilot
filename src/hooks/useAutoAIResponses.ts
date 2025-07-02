@@ -1,7 +1,8 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
+import { aiIntelligenceHub } from '@/services/aiIntelligenceHub';
+import { MessageContext } from '@/services/unifiedAIResponseEngine';
 import { toast } from '@/hooks/use-toast';
 
 interface UseAutoAIResponsesProps {
@@ -88,9 +89,9 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
         return;
       }
 
-      console.log('🤖 [AUTO AI] Generating AI response preview for:', leadId);
+      console.log('🎯 [INTELLIGENCE HUB] Generating intelligent AI response preview for:', leadId);
 
-      // Generate AI response PREVIEW (don't send)
+      // Generate intelligent AI response using the full AI stack
       const messageContext: MessageContext = {
         leadId,
         leadName: context.leadName,
@@ -99,21 +100,30 @@ export const useAutoAIResponses = ({ profileId, onResponseGenerated, onResponseP
         vehicleInterest: context.vehicleInterest
       };
 
-      const aiResponse = unifiedAIResponseEngine.generateResponse(messageContext);
+      const intelligentResponse = await aiIntelligenceHub.generateIntelligentResponse(messageContext);
       
-      if (!aiResponse?.message) {
-        console.log('🤖 [AUTO AI] No AI response generated for:', leadId);
+      if (!intelligentResponse?.message) {
+        console.log('🤖 [INTELLIGENCE HUB] No intelligent response generated for:', leadId);
         return;
       }
 
-      console.log('🤖 [AUTO AI] Generated response preview:', aiResponse.message);
+      console.log('✅ [INTELLIGENCE HUB] Generated intelligent response:', {
+        message: intelligentResponse.message.substring(0, 100) + '...',
+        confidence: Math.round(intelligentResponse.confidence * 100) + '%',
+        factors: intelligentResponse.intelligence_factors.length,
+        personalized: intelligentResponse.personalization_applied
+      });
 
-      // Show preview instead of auto-sending
+      // Show enhanced preview with intelligence insights
       if (onResponsePreview) {
         onResponsePreview(leadId, {
-          message: aiResponse.message,
-          confidence: aiResponse.confidence,
-          reasoning: aiResponse.reasoning, // Now this property exists
+          message: intelligentResponse.message,
+          confidence: intelligentResponse.confidence,
+          reasoning: intelligentResponse.decision_reasoning,
+          intelligenceFactors: intelligentResponse.intelligence_factors,
+          personalizationApplied: intelligentResponse.personalization_applied,
+          inventoryRecommendations: intelligentResponse.inventory_recommendations,
+          optimizationApplied: intelligentResponse.optimization_applied,
           leadName: lead.first_name,
           context: context
         });
