@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Sidebar from "@/components/Sidebar";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children }: AppLayoutProps) => {
   const { profile, loading } = useAuth();
+  const { unreadCount } = useGlobalUnreadCount();
   const location = useLocation();
   
   // Determine active view based on current route
@@ -72,7 +74,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           user={user}
           activeView={activeView}
           onViewChange={setActiveView}
-          unreadCount={0} // TODO: Implement real unread count
+          unreadCount={unreadCount}
         />
         <main className="flex-1 overflow-auto">
           {children}

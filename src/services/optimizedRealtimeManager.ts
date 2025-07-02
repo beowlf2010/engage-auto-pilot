@@ -218,6 +218,15 @@ class OptimizedRealtimeManager {
       }
     });
   }
+
+  // Cleanup method for proper resource management
+  cleanup(): void {
+    console.log('🧹 [OPTIMIZED REALTIME] Cleaning up resources...');
+    this.disconnect();
+    this.subscriptions.clear();
+    this.statusCallbacks.clear();
+  }
 }
 
+// Export singleton instance
 export const optimizedRealtimeManager = new OptimizedRealtimeManager();
