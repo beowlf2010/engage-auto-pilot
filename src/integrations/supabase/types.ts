@@ -4897,6 +4897,10 @@ export type Database = {
           price: number
         }[]
       }
+      fix_failed_upload_insertion: {
+        Args: { p_upload_id: string }
+        Returns: Json
+      }
       generate_booking_token: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -4932,6 +4936,15 @@ export type Database = {
           gm_status_description: string
           delivery_variance_days: number
           is_overdue: boolean
+        }[]
+      }
+      get_inventory_status_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          status_name: string
+          vehicle_count: number
+          latest_upload_date: string
+          oldest_upload_date: string
         }[]
       }
       get_rpo_analytics: {
@@ -4984,6 +4997,10 @@ export type Database = {
       normalize_phone: {
         Args: { phone_input: string }
         Returns: string
+      }
+      repair_upload_inconsistencies: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       schedule_next_touch: {
         Args: { lead_uuid: string }

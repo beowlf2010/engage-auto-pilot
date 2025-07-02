@@ -116,8 +116,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
       });
 
-      // NO AUTOMATIC SYNC - inventory uploads should not mark vehicles as sold
-      // Only financial data should determine sold status
+      // Post-upload processing
       if (condition === 'gm_global') {
         try {
           const { error } = await supabase.rpc('calculate_delivery_variance');
@@ -126,6 +125,28 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         } catch (error) {
           console.error('Failed to update delivery variances:', error);
         }
+      }
+
+      // CRITICAL: Check if vehicles were actually inserted and trigger cleanup if successful
+      if (validationResult.successCount > 0 && validationResult.insertedVehicleIds.length > 0) {
+        console.log(`✅ Upload successful with ${validationResult.insertedVehicleIds.length} vehicles actually inserted`);
+        
+        // Import and trigger automatic cleanup after a brief delay
+        const triggerCleanup = async () => {
+          try {
+            await import('@/services/inventory/core/inventoryCleanupService').then(module => {
+              console.log('🧹 Triggering automatic inventory cleanup after successful upload...');
+              return module.cleanupInventoryData();
+            });
+          } catch (error) {
+            console.error('Error during automatic cleanup:', error);
+          }
+        };
+        
+        // Trigger cleanup after 3 seconds to ensure upload is fully complete
+        setTimeout(triggerCleanup, 3000);
+      } else {
+        console.warn(`⚠️ Upload insertion may have failed: reported ${validationResult.successCount} successes but ${validationResult.insertedVehicleIds.length} vehicles actually inserted`);
       }
 
       setUploadResult({

@@ -120,7 +120,7 @@ export const validateUploadBeforeCleanup = async (uploadIds: string[]) => {
 
 export const cleanupInventoryData = async () => {
   try {
-    console.log('🧹 Starting enhanced "today vs yesterday" inventory cleanup logic...');
+    console.log('🧹 Starting enhanced inventory cleanup with automatic validation...');
     
     // Check if cleanup should be skipped due to active upload session
     if (uploadSessionService.shouldSkipAutoCleanup()) {
@@ -128,85 +128,118 @@ export const cleanupInventoryData = async () => {
       return { success: true, message: 'Cleanup skipped - upload session active' };
     }
     
-    // Get today's and yesterday's uploads
-    const { todayUploadIds, yesterdayUploadIds } = await getTodayAndYesterdayUploads();
-    
-    if (todayUploadIds.length === 0) {
+    // Get today's uploads that have ACTUAL vehicles in the inventory table
+    const { data: todayValidUploads, error: todayError } = await supabase
+      .from('upload_history')
+      .select(`
+        id,
+        original_filename,
+        successful_imports,
+        created_at
+      `)
+      .gte('created_at', new Date().toISOString().split('T')[0] + 'T00:00:00.000Z')
+      .order('created_at', { ascending: false });
+
+    if (todayError) throw todayError;
+
+    if (!todayValidUploads || todayValidUploads.length === 0) {
       console.log('No uploads from today found, skipping cleanup');
       return { success: true, message: 'No uploads from today found' };
     }
 
-    // CRITICAL: Enhanced validation before proceeding with cleanup
-    const validation = await validateUploadBeforeCleanup(todayUploadIds);
-    if (!validation.isValid) {
-      console.error('🚨 Enhanced validation failed:', validation.reason);
-      toast({
-        title: "Cleanup Blocked",
-        description: `Cleanup prevented due to upload validation failure: ${validation.reason}`,
-        variant: "destructive"
-      });
-      return { success: false, message: `Cleanup blocked: ${validation.reason}` };
+    // Filter for uploads that actually have vehicles in the inventory table
+    const validTodayUploadIds: string[] = [];
+    for (const upload of todayValidUploads) {
+      const { data: vehicleCount } = await supabase
+        .from('inventory')
+        .select('id', { count: 'exact' })
+        .eq('upload_history_id', upload.id);
+      
+      if ((vehicleCount?.length || 0) > 0) {
+        validTodayUploadIds.push(upload.id);
+        console.log(`✅ Upload ${upload.original_filename} has ${vehicleCount?.length} actual vehicles`);
+      } else {
+        console.warn(`⚠️ Upload ${upload.original_filename} reported ${upload.successful_imports} successes but has 0 actual vehicles - skipping`);
+      }
     }
 
+    if (validTodayUploadIds.length === 0) {
+      console.log('No valid uploads from today found (uploads exist but no vehicles were actually inserted)');
+      return { success: false, message: 'Upload insertion failure detected - no vehicles actually stored' };
+    }
+
+    // Get yesterday's uploads for comparison
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const { data: yesterdayUploads, error: yesterdayError } = await supabase
+      .from('upload_history')
+      .select('id')
+      .gte('created_at', yesterday + 'T00:00:00.000Z')
+      .lt('created_at', yesterday + 'T23:59:59.999Z');
+
+    if (yesterdayError) throw yesterdayError;
+
+    const yesterdayUploadIds = yesterdayUploads?.map(u => u.id) || [];
+
     console.log('✅ Enhanced validation passed - proceeding with cleanup');
-    console.log('Today upload IDs:', todayUploadIds);
+    console.log('Valid today upload IDs:', validTodayUploadIds);
     console.log('Yesterday upload IDs:', yesterdayUploadIds);
 
     // Get vehicles that are in today's uploads (these should stay available)
-    const { data: todayVehicles, error: todayError } = await supabase
+    const { data: todayVehicles, error: todayVehicleError } = await supabase
       .from('inventory')
       .select('id, vin, stock_number')
-      .in('upload_history_id', todayUploadIds as string[]);
+      .in('upload_history_id', validTodayUploadIds);
 
-    if (todayError) throw todayError;
+    if (todayVehicleError) throw todayVehicleError;
 
-    console.log(`Found ${todayVehicles.length} vehicles in today's uploads`);
+    console.log(`Found ${todayVehicles?.length || 0} vehicles in today's uploads`);
 
     // If we have yesterday's uploads, find vehicles that were available yesterday but not in today's upload
     let vehiclesToMarkSold = [];
     
     if (yesterdayUploadIds.length > 0) {
-      const { data: yesterdayVehicles, error: yesterdayError } = await supabase
+      const { data: yesterdayVehicles, error: yesterdayVehicleError } = await supabase
         .from('inventory')
         .select('id, vin, stock_number, make, model, year, source_report, condition')
-        .in('upload_history_id', yesterdayUploadIds as string[])
+        .in('upload_history_id', yesterdayUploadIds)
         .eq('status', 'available')
         .neq('source_report', 'orders_all'); // Don't mark GM Global orders as sold
 
-      if (yesterdayError) throw yesterdayError;
+      if (yesterdayVehicleError) throw yesterdayVehicleError;
 
-      console.log(`Found ${yesterdayVehicles.length} available vehicles from yesterday`);
+      console.log(`Found ${yesterdayVehicles?.length || 0} available vehicles from yesterday`);
 
-      // Create sets for efficient comparison
-      const todayVINs = new Set<string>();
-      const todayStockNumbers = new Set<string>();
+      if (yesterdayVehicles && yesterdayVehicles.length > 0 && todayVehicles && todayVehicles.length > 0) {
+        // Create sets for efficient comparison
+        const todayVINs = new Set<string>();
+        const todayStockNumbers = new Set<string>();
 
-      todayVehicles.forEach(vehicle => {
-        if (vehicle.vin && typeof vehicle.vin === 'string') {
-          todayVINs.add(vehicle.vin);
-        }
-        if (vehicle.stock_number && typeof vehicle.stock_number === 'string') {
-          todayStockNumbers.add(vehicle.stock_number);
-        }
-      });
+        todayVehicles.forEach(vehicle => {
+          if (vehicle.vin && typeof vehicle.vin === 'string') {
+            todayVINs.add(vehicle.vin);
+          }
+          if (vehicle.stock_number && typeof vehicle.stock_number === 'string') {
+            todayStockNumbers.add(vehicle.stock_number);
+          }
+        });
 
-      // Find vehicles from yesterday that are not in today's upload
-      // IMPORTANT: Enhanced protection for used inventory
-      vehiclesToMarkSold = yesterdayVehicles.filter(vehicle => {
-        const hasVIN = vehicle.vin && todayVINs.has(vehicle.vin);
-        const hasStock = vehicle.stock_number && todayStockNumbers.has(vehicle.stock_number);
-        const notFound = !hasVIN && !hasStock;
-        
-        // Enhanced safety: Don't mark used vehicles as sold if they're from recent uploads
-        if (notFound && vehicle.condition === 'used') {
-          console.log(`⚠️ Enhanced protection: Skipping used vehicle ${vehicle.make} ${vehicle.model} (${vehicle.stock_number}) - preventing incorrect used inventory cleanup`);
-          return false;
-        }
-        
-        return notFound;
-      });
+        // Find vehicles from yesterday that are not in today's upload
+        vehiclesToMarkSold = yesterdayVehicles.filter(vehicle => {
+          const hasVIN = vehicle.vin && todayVINs.has(vehicle.vin);
+          const hasStock = vehicle.stock_number && todayStockNumbers.has(vehicle.stock_number);
+          const notFound = !hasVIN && !hasStock;
+          
+          // Enhanced safety: Don't mark used vehicles as sold if they're from recent uploads
+          if (notFound && vehicle.condition === 'used') {
+            console.log(`⚠️ Enhanced protection: Skipping used vehicle ${vehicle.make} ${vehicle.model} (${vehicle.stock_number}) - preventing incorrect used inventory cleanup`);
+            return false;
+          }
+          
+          return notFound;
+        });
 
-      console.log(`Found ${vehiclesToMarkSold.length} vehicles from yesterday that are missing from today's upload`);
+        console.log(`Found ${vehiclesToMarkSold.length} vehicles from yesterday that are missing from today's upload`);
+      }
     } else {
       console.log('No yesterday uploads found, skipping sold marking');
     }
@@ -252,7 +285,7 @@ export const cleanupInventoryData = async () => {
       success: true,
       message: `Enhanced inventory update: ${totalUpdated} vehicles from yesterday marked as sold (validated upload success)`,
       totalProcessed: totalUpdated,
-      todayUploads: todayUploadIds.length,
+      todayUploads: validTodayUploadIds.length,
       yesterdayUploadIds: yesterdayUploadIds.length
     };
 

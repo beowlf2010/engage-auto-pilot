@@ -60,23 +60,44 @@ export const validateAndProcessInventoryRows = async (
       }
 
       if (vehiclesToInsert.length > 0) {
-        // Insert batch with explicit error handling
+        console.log(`🔄 Attempting to insert ${vehiclesToInsert.length} vehicles in batch ${Math.floor(i/batchSize) + 1}`);
+        console.log('Sample vehicle data:', JSON.stringify(vehiclesToInsert[0], null, 2));
+        
+        // Remove the temporary ID before insertion - let database assign real UUID
+        const cleanVehicles = vehiclesToInsert.map(vehicle => {
+          const { id, ...vehicleWithoutId } = vehicle;
+          return vehicleWithoutId;
+        });
+        
+        // Insert batch with explicit error handling and detailed logging
         const { data, error } = await supabase
           .from('inventory')
-          .insert(vehiclesToInsert)
+          .insert(cleanVehicles)
           .select('id');
 
         if (error) {
-          console.error('Supabase insertion error:', error);
+          console.error('🚨 Supabase insertion error:', error);
+          console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          });
           
-          // Handle specific database errors
+          // Handle specific database errors with better context
           if (error.message?.includes('column') && error.message?.includes('does not exist')) {
             const missingColumn = error.message.match(/column "([^"]+)" does not exist/)?.[1];
             errors.push(`Database schema error: Column "${missingColumn}" missing. Contact admin.`);
+            console.error(`❌ Missing column: ${missingColumn}`);
           } else if (error.message?.includes('duplicate key')) {
             errors.push(`Duplicate vehicle found in batch ${Math.floor(i/batchSize) + 1}`);
+            console.error(`❌ Duplicate key violation in batch ${Math.floor(i/batchSize) + 1}`);
+          } else if (error.message?.includes('null value')) {
+            errors.push(`Required field missing in batch ${Math.floor(i/batchSize) + 1}: ${error.message}`);
+            console.error(`❌ Null value constraint violation:`, error.message);
           } else {
             errors.push(`Database error in batch ${Math.floor(i/batchSize) + 1}: ${error.message}`);
+            console.error(`❌ General database error:`, error.message);
           }
           
           errorCount += vehiclesToInsert.length;
@@ -87,10 +108,12 @@ export const validateAndProcessInventoryRows = async (
           successCount += data.length;
           insertedVehicleIds.push(...data.map(item => item.id));
           console.log(`✅ Successfully inserted ${data.length} vehicles in batch ${Math.floor(i/batchSize) + 1}`);
+          console.log(`🆔 Batch ${Math.floor(i/batchSize) + 1} inserted IDs:`, data.map(item => item.id).slice(0, 3));
         } else {
-          console.warn(`⚠️ Batch ${Math.floor(i/batchSize) + 1}: No data returned from insert`);
+          console.warn(`⚠️ Batch ${Math.floor(i/batchSize) + 1}: Insert command succeeded but no data returned`);
+          console.warn('This indicates a potential database configuration issue');
           errorCount += vehiclesToInsert.length;
-          errors.push(`Batch ${Math.floor(i/batchSize) + 1}: Insert succeeded but no IDs returned`);
+          errors.push(`Batch ${Math.floor(i/batchSize) + 1}: Insert succeeded but no IDs returned - potential RLS or trigger issue`);
         }
       }
 

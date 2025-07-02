@@ -118,22 +118,26 @@ export const mapRowToInventoryItem = (
       finalCondition = condition;
     }
 
-    // Generate a temporary ID for the database to use
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Ensure required fields have valid values including timestamps
+    // Build clean inventory item without temporary ID - let database assign real UUID
     const inventoryItem: InventoryItem = {
-      id: tempId, // Temporary ID, database will assign real UUID
       make: cleanedMake!,
       model: cleanedModel!,
-      vin: mappedData.vin || '',
+      vin: mappedData.vin || null,
       condition: mappedData.condition || finalCondition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
       created_at: currentTimestamp,
       updated_at: currentTimestamp,
-      ...mappedData
-    };
+      // Spread other mapped data while filtering out undefined values
+      ...Object.fromEntries(
+        Object.entries(mappedData).filter(([key, value]) => 
+          key !== 'id' && // Don't include any id field
+          value !== undefined && 
+          value !== null &&
+          value !== ''
+        )
+      )
+    } as InventoryItem;
 
     // Set source_report based on condition and data type
     if (condition === 'gm_global' || mappedData.gm_order_number) {
