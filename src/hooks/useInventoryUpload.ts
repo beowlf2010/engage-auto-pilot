@@ -99,12 +99,13 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         console.log('Detected GM Global fields:', gmFields);
       }
       
-      // Validate and process all rows
+      // Validate and process all rows with user context
       const validationResult = await validateAndProcessInventoryRows(
         parsed.rows,
         condition,
         uploadRecord.id,
-        mapRowToInventoryItem
+        mapRowToInventoryItem,
+        userId
       );
 
       // Update upload history with results

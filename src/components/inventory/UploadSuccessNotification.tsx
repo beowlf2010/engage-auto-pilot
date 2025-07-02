@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, AlertTriangle, Info, Upload } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Info, Upload, Database, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface UploadSuccessNotificationProps {
@@ -14,14 +14,24 @@ const UploadSuccessNotification: React.FC<UploadSuccessNotificationProps> = ({ o
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-green-800">
             <CheckCircle className="h-5 w-5" />
-            System Fixed & Ready
+            ✅ Inventory RLS Issue Fixed!
           </CardTitle>
         </CardHeader>
-        <CardContent className="text-green-700">
-          <p>
-            The inventory upload and sync system has been repaired. Old vehicles have been properly marked as sold, 
-            and the system is now ready to accept your current inventory.
-          </p>
+        <CardContent className="text-green-700 space-y-3">
+          <div className="flex items-start gap-3">
+            <Shield className="h-5 w-5 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Authentication Context Restored</p>
+              <p className="text-sm">Created security definer function that preserves user authentication during inventory uploads</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <Database className="h-5 w-5 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">RLS Policies Updated</p>
+              <p className="text-sm">Fixed Row Level Security policies to properly handle upload permissions</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -29,13 +39,14 @@ const UploadSuccessNotification: React.FC<UploadSuccessNotificationProps> = ({ o
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
             <Info className="h-5 w-5" />
-            What Happened
+            Root Cause Analysis
           </CardTitle>
         </CardHeader>
         <CardContent className="text-blue-700 space-y-2">
-          <p><strong>Problem:</strong> Today's uploads (175 vehicles) were recorded but not inserted into the inventory table.</p>
-          <p><strong>Root Cause:</strong> Upload insertion logic was failing silently.</p>
-          <p><strong>Solution:</strong> Fixed insertion logic and cleaned up inconsistent data.</p>
+          <p><strong>Issue:</strong> Upload processing reported success but vehicles weren't actually inserted</p>
+          <p><strong>Cause:</strong> RLS policies failed silently when <code>auth.uid()</code> was null during batch operations</p>
+          <p><strong>Fix:</strong> Implemented security definer function with explicit user context tracking</p>
+          <p><strong>Prevention:</strong> Added upload context validation and enhanced error reporting</p>
         </CardContent>
       </Card>
 
@@ -43,23 +54,24 @@ const UploadSuccessNotification: React.FC<UploadSuccessNotificationProps> = ({ o
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-amber-800">
             <AlertTriangle className="h-5 w-5" />
-            Next Steps Required
+            Action Required: Re-Upload Files
           </CardTitle>
         </CardHeader>
         <CardContent className="text-amber-700 space-y-3">
           <p>
-            <strong>You need to re-upload today's inventory files</strong> to get your current 175 vehicles into the system.
+            <strong>Today's failed uploads need to be re-processed</strong> using the fixed insertion logic.
           </p>
-          <div className="bg-white p-3 rounded border border-amber-200">
-            <p className="font-medium text-amber-800 mb-2">Files to re-upload:</p>
-            <ul className="text-sm space-y-1">
-              <li>• NEW CAR MAIN VIEW-Jason Pilger Chevrolet-2025-07-02-0938.xls (87 vehicles)</li>
-              <li>• Tommy Merch-Inv View-Jason Pilger Chevrolet-2025-07-02-0937.xls (88 vehicles)</li>
+          <div className="bg-white p-4 rounded border border-amber-200">
+            <p className="font-medium text-amber-800 mb-2">Failed uploads from July 2nd:</p>
+            <ul className="text-sm space-y-1 font-mono">
+              <li>• NEW CAR MAIN VIEW-Jason Pilger Chevrolet-2025-07-02-0938.xls</li>
+              <li>• Tommy Merch-Inv View-Jason Pilger Chevrolet-2025-07-02-0937.xls</li>
             </ul>
+            <p className="text-xs text-amber-600 mt-2">Total: 175 vehicles that need proper insertion</p>
           </div>
           <Button onClick={onReUpload} className="w-full" size="lg">
             <Upload className="h-4 w-4 mr-2" />
-            Re-Upload Today's Files
+            Start Re-Upload Process
           </Button>
         </CardContent>
       </Card>
@@ -68,13 +80,15 @@ const UploadSuccessNotification: React.FC<UploadSuccessNotificationProps> = ({ o
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-slate-800">
             <Info className="h-5 w-5" />
-            What to Expect
+            Improvements Implemented
           </CardTitle>
         </CardHeader>
         <CardContent className="text-slate-700 space-y-2">
-          <p><strong>After re-upload:</strong> Available count will show 175 vehicles (your current inventory)</p>
-          <p><strong>Automatic cleanup:</strong> System will now properly maintain accurate counts daily</p>
-          <p><strong>Validation:</strong> Upload process now includes enhanced error detection and reporting</p>
+          <p><strong>✅ Security Definer Function:</strong> Bypasses RLS issues during bulk operations</p>
+          <p><strong>✅ Context Validation:</strong> Verifies user permissions before processing</p>
+          <p><strong>✅ Enhanced Error Reporting:</strong> No more silent failures - all errors are logged</p>
+          <p><strong>✅ User Tracking:</strong> Each uploaded vehicle is linked to the uploading user</p>
+          <p><strong>✅ Robust RLS Policies:</strong> Better handling of authentication edge cases</p>
         </CardContent>
       </Card>
     </div>

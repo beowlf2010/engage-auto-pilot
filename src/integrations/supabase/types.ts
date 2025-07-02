@@ -1979,6 +1979,7 @@ export type Database = {
           turn_goal_days: number | null
           updated_at: string
           upload_history_id: string | null
+          uploaded_by: string | null
           vehicle_history_report: string | null
           velocity_category: string | null
           vin: string | null
@@ -2089,6 +2090,7 @@ export type Database = {
           turn_goal_days?: number | null
           updated_at?: string
           upload_history_id?: string | null
+          uploaded_by?: string | null
           vehicle_history_report?: string | null
           velocity_category?: string | null
           vin?: string | null
@@ -2199,6 +2201,7 @@ export type Database = {
           turn_goal_days?: number | null
           updated_at?: string
           upload_history_id?: string | null
+          uploaded_by?: string | null
           vehicle_history_report?: string | null
           velocity_category?: string | null
           vin?: string | null
@@ -4986,6 +4989,14 @@ export type Database = {
         }
         Returns: Json
       }
+      insert_inventory_with_context: {
+        Args: {
+          p_vehicles: Json
+          p_upload_history_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       make_current_user_admin: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -5000,6 +5011,10 @@ export type Database = {
       }
       repair_upload_inconsistencies: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      reprocess_failed_upload: {
+        Args: { p_upload_id: string }
         Returns: Json
       }
       schedule_next_touch: {
@@ -5111,6 +5126,10 @@ export type Database = {
       user_is_authenticated_simple: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      validate_upload_context: {
+        Args: { p_user_id: string }
+        Returns: Json
       }
     }
     Enums: {
