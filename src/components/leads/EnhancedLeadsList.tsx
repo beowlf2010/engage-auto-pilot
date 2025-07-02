@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useOptimizedLeads } from '@/hooks/leads/useOptimizedLeads';
 import { useLeadsOperations } from '@/hooks/leads/useLeadsOperations';
+import { useIsMobile } from '@/hooks/use-mobile';
 import LeadsStatsCards from '@/components/leads/LeadsStatsCards';
 import LeadsStatusTabs from '@/components/leads/LeadsStatusTabs';
 import LeadQuickView from '@/components/leads/LeadQuickView';
 import BulkActionsPanel from '@/components/leads/BulkActionsPanel';
 import FilterRestorationBanner from '@/components/leads/FilterRestorationBanner';
+import MobileLeadsList from '@/components/leads/MobileLeadsList';
 import { InlineLoading } from '@/components/ui/loading/InlineLoading';
 import { InlineErrorState } from '@/components/ui/error/InlineErrorState';
 import { Lead } from '@/types/lead';
@@ -197,6 +199,123 @@ const EnhancedLeadsList = () => {
     );
   }
 
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <div className="h-full">
+        {/* Mobile Layout */}
+        <div className="mobile-container space-y-4">
+          {/* Filter Restoration Banner */}
+          {hasActiveFilters && (
+            <FilterRestorationBanner
+              onClearFilters={clearFilters}
+              filtersCount={filtersCount}
+            />
+          )}
+
+          {/* Mobile Stats Cards - 2x4 Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <LeadsStatsCards 
+              stats={statsForCards}
+              onCardClick={handleStatsCardClick}
+              activeFilter={
+                filters.dateFilter === 'today' && filters.status === 'all' ? 'fresh' :
+                filters.status === 'new' ? 'no_contact' :
+                filters.aiOptIn === true && filters.status === 'all' ? 'ai_enabled' :
+                !hasActiveFilters ? 'all' :
+                null
+              }
+            />
+          </div>
+
+          {/* Mobile Bulk Actions */}
+          {selectedLeads.length > 0 && (
+            <BulkActionsPanel
+              selectedLeads={selectedLeadObjects}
+              onClearSelection={clearSelection}
+              onBulkStatusUpdate={handleBulkStatusUpdate}
+              onBulkDelete={handleBulkDelete}
+              onBulkMessage={handleBulkMessage}
+              onRefresh={() => {
+                setRefreshKey(prev => prev + 1);
+                refetch();
+              }}
+            />
+          )}
+
+          {/* Mobile Status Tabs - Scrollable */}
+          <div className="overflow-x-auto mobile-scroll">
+            <LeadsStatusTabs
+              statusFilter={filters.status || 'all'}
+              setStatusFilter={handleStatusFilterChange}
+              finalFilteredLeads={leads}
+              loading={loading}
+              selectedLeads={selectedLeads}
+              selectAllFiltered={selectAllVisible}
+              toggleLeadSelection={toggleLeadSelection}
+              handleAiOptInChange={handleAiOptInChange}
+              handleDoNotContactChange={handleDoNotContactChange}
+              canEdit={canEdit}
+              searchTerm={filters.search || ''}
+              onQuickView={showQuickView}
+              getEngagementScore={getEngagementScore}
+              onToggleHidden={handleToggleHidden}
+            />
+          </div>
+        </div>
+
+        {/* Mobile Leads List */}
+        <MobileLeadsList
+          leads={leads}
+          selectedLeads={selectedLeads}
+          onLeadSelect={toggleLeadSelection}
+          onQuickView={showQuickView}
+          getEngagementScore={getEngagementScore}
+          isFresh={(lead) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const createdAt = new Date(lead.createdAt);
+            return createdAt >= today;
+          }}
+          canEdit={canEdit}
+        />
+
+        {/* Mobile Load More */}
+        {stats.hasMore && !loading && (
+          <div className="p-4">
+            <button
+              onClick={loadMore}
+              className="w-full py-3 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary/10 transition-colors touch-target"
+            >
+              Load More Leads ({stats.total - stats.visible} remaining)
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Loading */}
+        {loading && leads.length > 0 && (
+          <div className="p-4">
+            <InlineLoading text="Loading more leads..." />
+          </div>
+        )}
+
+        {/* Mobile Quick View Modal */}
+        {quickViewLead && (
+          <LeadQuickView
+            lead={quickViewLead}
+            onClose={hideQuickView}
+            onMessage={() => {}}
+            onCall={() => {}}
+            onSchedule={() => {}}
+            
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Desktop Layout
   return (
     <div className="space-y-6" key={refreshKey}>
       {/* Filter Restoration Banner */}

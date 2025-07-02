@@ -3,12 +3,15 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { unifiedAI } from "@/services/unifiedAIService";
+import { useIsMobile } from "@/hooks/use-mobile";
 import ConsolidatedSmartInbox from "@/components/inbox/ConsolidatedSmartInbox";
+import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
   const [searchParams] = useSearchParams();
   const leadId = searchParams.get('leadId');
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const requestNotificationPermission = async () => {
@@ -62,10 +65,21 @@ const SmartInboxPage = () => {
     window.location.reload();
   };
 
+  if (isMobile) {
+    return (
+      <div className="h-full bg-background">
+        <MobileSmartInbox 
+          onLeadsRefresh={handleLeadsRefresh} 
+          preselectedLeadId={leadId}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-6">
+        <div className="mb-6 mobile-hidden">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Smart Inbox</h1>
           <p className="text-slate-600">
             AI-powered conversation management with intelligent insights and automated actions

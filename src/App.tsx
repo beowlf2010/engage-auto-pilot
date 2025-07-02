@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import AuthPage from './components/auth/AuthPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
+import { useIsMobile } from './hooks/use-mobile';
 import LeadsPage from './pages/LeadsPage';
 import UploadLeadsPage from './pages/UploadLeadsPage';
 import DashboardPage from './pages/DashboardPage';
@@ -29,6 +30,7 @@ const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { user, loading } = useAuth();
+  const isMobile = useIsMobile();
 
   if (loading) {
     return (

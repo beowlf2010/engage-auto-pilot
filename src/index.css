@@ -141,3 +141,69 @@
     color: #2563eb !important;
   }
 }
+
+/* Mobile-First Responsive Design */
+@layer base {
+  /* Touch-friendly minimum sizes */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Mobile typography */
+  @media (max-width: 768px) {
+    body {
+      font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    h1 {
+      @apply text-2xl;
+    }
+    
+    h2 {
+      @apply text-xl;
+    }
+    
+    h3 {
+      @apply text-lg;
+    }
+  }
+  
+  /* Mobile spacing */
+  .mobile-container {
+    @apply px-4 py-3;
+  }
+  
+  .mobile-card {
+    @apply p-4 rounded-lg border bg-card;
+  }
+  
+  /* Mobile-optimized scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Mobile-specific utility classes */
+@layer utilities {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .mobile-hidden {
+    @media (max-width: 768px) {
+      display: none;
+    }
+  }
+  
+  .desktop-hidden {
+    @media (min-width: 769px) {
+      display: none;
+    }
+  }
+}
