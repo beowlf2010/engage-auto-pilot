@@ -69,7 +69,7 @@ const EnhancedLeadsList = () => {
   };
 
   // Stats card click handler
-  const handleStatsCardClick = (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled') => {
+  const handleStatsCardClick = (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled' | 'sold_customers') => {
     switch (filterType) {
       case 'fresh':
         updateFilters({ dateFilter: 'today', status: 'all' });
@@ -88,6 +88,9 @@ const EnhancedLeadsList = () => {
         break;
       case 'ai_enabled':
         updateFilters({ aiOptIn: true, status: 'all' });
+        break;
+      case 'sold_customers':
+        updateFilters({ status: 'sold_customers' });
         break;
       default:
         break;

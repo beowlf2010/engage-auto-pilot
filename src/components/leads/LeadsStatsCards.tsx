@@ -11,7 +11,8 @@ import {
   CheckCircle, 
   Bot,
   Calendar,
-  Settings
+  Settings,
+  ShoppingCart
 } from 'lucide-react';
 
 interface LeadsStatsCardsProps {
@@ -22,8 +23,9 @@ interface LeadsStatsCardsProps {
     responded: number;
     aiEnabled: number;
     fresh: number;
+    soldCustomers?: number;
   };
-  onCardClick?: (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled') => void;
+  onCardClick?: (filterType: 'fresh' | 'all' | 'no_contact' | 'contact_attempted' | 'response_received' | 'ai_enabled' | 'sold_customers') => void;
   activeFilter?: string | null;
 }
 
@@ -91,6 +93,16 @@ const LeadsStatsCards = ({ stats, onCardClick, activeFilter }: LeadsStatsCardsPr
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
       clickable: true
+    },
+    {
+      id: 'sold_customers',
+      title: 'Sold Customers',
+      value: stats.soldCustomers || 0,
+      description: 'Customer service',
+      icon: ShoppingCart,
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-50',
+      clickable: true
     }
   ];
 
@@ -115,7 +127,7 @@ const LeadsStatsCards = ({ stats, onCardClick, activeFilter }: LeadsStatsCardsPr
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
         {cards.map((card) => (
           <Card 
             key={card.id}

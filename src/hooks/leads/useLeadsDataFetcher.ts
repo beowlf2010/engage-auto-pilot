@@ -27,6 +27,10 @@ export const fetchLeadsData = async (showHidden: boolean) => {
   if (!showHidden) {
     query = query.or('is_hidden.is.null,is_hidden.eq.false');
   }
+  
+  // FILTER OUT INACTIVE LEADS BY DEFAULT (unless explicitly showing them)
+  // This ensures main leads views only show workable leads
+  query = query.not('status', 'in', '(lost)');
 
   const { data: leadsData, error: leadsError } = await query;
 

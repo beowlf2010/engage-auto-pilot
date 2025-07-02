@@ -12,6 +12,7 @@ import ContactPreferenceToggles from "./ContactPreferenceToggles";
 import AISequenceStatus from "./AISequenceStatus";
 import QuickAIActions from "./QuickAIActions";
 import HideLeadButton from "./HideLeadButton";
+import SoldCustomerActions from "./SoldCustomerActions";
 
 interface LeadsTableRowProps {
   lead: Lead;
@@ -175,35 +176,45 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
       </TableCell>
       
       <TableCell>
-        <div className="flex items-center space-x-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onQuickView(lead)}
-            className="h-6 w-6 p-0"
-          >
-            <Eye className="h-3 w-3" />
-          </Button>
-          
-          {onEditData && (
+        {lead.status === 'closed' ? (
+          <SoldCustomerActions 
+            lead={lead} 
+            onAction={(action, leadId) => {
+              console.log(`Customer service action: ${action} for lead ${leadId}`);
+              // TODO: Implement customer service actions
+            }}
+          />
+        ) : (
+          <div className="flex items-center space-x-1">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onEditData(lead.id)}
+              onClick={() => onQuickView(lead)}
               className="h-6 w-6 p-0"
             >
-              <Edit2 className="h-3 w-3" />
+              <Eye className="h-3 w-3" />
             </Button>
-          )}
-          
-          {onToggleHidden && (
-            <HideLeadButton
-              leadId={lead.id}
-              isHidden={lead.is_hidden || false}
-              onToggleHidden={onToggleHidden}
-            />
-          )}
-        </div>
+            
+            {onEditData && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEditData(lead.id)}
+                className="h-6 w-6 p-0"
+              >
+                <Edit2 className="h-3 w-3" />
+              </Button>
+            )}
+            
+            {onToggleHidden && (
+              <HideLeadButton
+                leadId={lead.id}
+                isHidden={lead.is_hidden || false}
+                onToggleHidden={onToggleHidden}
+              />
+            )}
+          </div>
+        )}
       </TableCell>
     </TableRow>
   );

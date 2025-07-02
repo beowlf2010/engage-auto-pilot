@@ -30,6 +30,7 @@ export interface DatabaseStats {
   contacted: number;
   responded: number;
   fresh: number;
+  soldCustomers: number;
 }
 
 interface LeadsResponse {
@@ -62,7 +63,8 @@ export const useOptimizedLeads = () => {
     noContact: 0,
     contacted: 0,
     responded: 0,
-    fresh: 0
+    fresh: 0,
+    soldCustomers: 0
   });
 
   // Build optimized database query with server-side filtering
@@ -84,6 +86,12 @@ export const useOptimizedLeads = () => {
           last_name
         )
       `, { count: 'exact' });
+
+    // FILTER OUT INACTIVE LEADS BY DEFAULT (unless specifically requesting them)
+    if (currentFilters.status !== 'lost' && currentFilters.status !== 'closed' && currentFilters.status !== 'sold_customers') {
+      // For main leads view, exclude inactive statuses
+      query = query.not('status', 'in', '(lost,closed)');
+    }
 
     // Search filter (server-side ILIKE for better performance)
     if (currentFilters.search) {
@@ -109,6 +117,9 @@ export const useOptimizedLeads = () => {
           .eq('do_not_mail', false);
       } else if (currentFilters.status === 'do_not_contact') {
         query = query.or('do_not_call.eq.true,do_not_email.eq.true,do_not_mail.eq.true');
+      } else if (currentFilters.status === 'sold_customers') {
+        // Show sold/closed customers for customer service
+        query = query.eq('status', 'closed');
       } else {
         query = query.eq('status', currentFilters.status);
       }
@@ -241,31 +252,34 @@ export const useOptimizedLeads = () => {
       const today = new Date();
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
 
-      // Get total count
+      // Get total count (ACTIVE LEADS ONLY - exclude lost/closed)
       const { count: totalCount } = await supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
+        .not('status', 'in', '(lost,closed)')
         .or('is_hidden.is.null,is_hidden.eq.false');
 
-      // Get AI enabled count
+      // Get AI enabled count (ACTIVE LEADS ONLY)
       const { count: aiEnabledCount } = await supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
         .eq('ai_opt_in', true)
+        .not('status', 'in', '(lost,closed)')
         .or('is_hidden.is.null,is_hidden.eq.false');
 
-      // Get no contact count (status = 'new')
+      // Get no contact count (status = 'new', ACTIVE ONLY)
       const { count: noContactCount } = await supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'new')
         .or('is_hidden.is.null,is_hidden.eq.false');
 
-      // Get fresh leads count (created today)
+      // Get fresh leads count (created today, ACTIVE ONLY)
       const { count: freshCount } = await supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
         .gte('created_at', todayStart)
+        .not('status', 'in', '(lost,closed)')
         .or('is_hidden.is.null,is_hidden.eq.false');
 
       // Get leads with outgoing messages (contacted)
@@ -288,13 +302,21 @@ export const useOptimizedLeads = () => {
       const respondedLeadIds = [...new Set(respondedLeads?.map(c => c.lead_id) || [])];
       const respondedCount = respondedLeadIds.length;
 
+      // Get sold customers count
+      const { count: soldCount } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'closed')
+        .or('is_hidden.is.null,is_hidden.eq.false');
+
       setDatabaseStats({
         total: totalCount || 0,
         aiEnabled: aiEnabledCount || 0,
         noContact: noContactCount || 0,
         contacted: contactedCount,
         responded: respondedCount,
-        fresh: freshCount || 0
+        fresh: freshCount || 0,
+        soldCustomers: soldCount || 0
       });
     } catch (error) {
       console.error('Error fetching database stats:', error);
