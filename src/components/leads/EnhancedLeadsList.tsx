@@ -209,10 +209,10 @@ const EnhancedLeadsList = () => {
         stats={statsForCards}
         onCardClick={handleStatsCardClick}
         activeFilter={
-          filters.dateFilter === 'today' ? 'fresh' :
+          filters.dateFilter === 'today' && filters.status === 'all' ? 'fresh' :
           filters.status === 'new' ? 'no_contact' :
-          filters.aiOptIn === true ? 'ai_enabled' :
-          filters.status === 'all' && !hasActiveFilters ? 'all' :
+          filters.aiOptIn === true && filters.status === 'all' ? 'ai_enabled' :
+          !hasActiveFilters ? 'all' :
           null
         }
       />
