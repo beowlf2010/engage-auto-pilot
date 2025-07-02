@@ -4,6 +4,13 @@ export interface MessageContext {
   latestMessage: string;
   conversationHistory: string[];
   vehicleInterest: string;
+  conversationMetadata?: {
+    totalMessages: number;
+    lastResponseTime?: string;
+    appointmentHistory: any[];
+    leadSource?: string;
+    leadStatus?: string;
+  };
 }
 
 export interface UnifiedAIResponse {
