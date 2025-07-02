@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   UserCheck, 
   Users, 
@@ -48,8 +49,12 @@ const LeadAssignmentControls = ({
   const handleQuickAssign = async (leadId: string, salespersonId: string) => {
     setIsAssigning(true);
     try {
-      // TODO: Implement actual assignment logic
-      console.log('Assigning lead', leadId, 'to', salespersonId);
+      const { error } = await supabase
+        .from('leads')
+        .update({ salesperson_id: salespersonId })
+        .eq('id', leadId);
+
+      if (error) throw error;
       
       toast({
         title: "Lead Assigned",
@@ -58,6 +63,7 @@ const LeadAssignmentControls = ({
       
       onAssignmentChange();
     } catch (error) {
+      console.error('Assignment error:', error);
       toast({
         title: "Error",
         description: "Failed to assign lead",
@@ -73,8 +79,12 @@ const LeadAssignmentControls = ({
     
     setIsAssigning(true);
     try {
-      // TODO: Implement bulk assignment logic
-      console.log('Bulk assigning leads', selectedUnassigned, 'to', selectedSalesperson);
+      const { error } = await supabase
+        .from('leads')
+        .update({ salesperson_id: selectedSalesperson })
+        .in('id', selectedUnassigned);
+
+      if (error) throw error;
       
       toast({
         title: "Bulk Assignment Complete",
@@ -84,6 +94,7 @@ const LeadAssignmentControls = ({
       setShowBulkAssign(false);
       onAssignmentChange();
     } catch (error) {
+      console.error('Bulk assignment error:', error);
       toast({
         title: "Error",
         description: "Failed to bulk assign leads",
@@ -97,8 +108,24 @@ const LeadAssignmentControls = ({
   const handleAutoAssign = async () => {
     setIsAssigning(true);
     try {
-      // TODO: Implement auto-assignment logic based on workload
-      console.log('Auto-assigning unassigned leads');
+      // Distribute leads evenly based on current workload
+      const leadIds = unassignedConversations.map(c => c.leadId);
+      const sortedSalespeople = [...salespeople].sort((a, b) => a.activeLeads - b.activeLeads);
+      
+      const assignments = leadIds.map((leadId, index) => {
+        const salesperson = sortedSalespeople[index % sortedSalespeople.length];
+        return { leadId, salespersonId: salesperson.id };
+      });
+
+      // Execute assignments in batches to avoid overwhelming the database
+      for (const assignment of assignments) {
+        const { error } = await supabase
+          .from('leads')
+          .update({ salesperson_id: assignment.salespersonId })
+          .eq('id', assignment.leadId);
+        
+        if (error) throw error;
+      }
       
       toast({
         title: "Auto-Assignment Complete",
@@ -107,6 +134,7 @@ const LeadAssignmentControls = ({
       
       onAssignmentChange();
     } catch (error) {
+      console.error('Auto-assignment error:', error);
       toast({
         title: "Error",
         description: "Failed to auto-assign leads",

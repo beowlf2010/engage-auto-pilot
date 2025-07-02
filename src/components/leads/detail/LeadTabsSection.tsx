@@ -1,5 +1,6 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from '@/integrations/supabase/client';
 import LeadMessaging from '@/components/leads/LeadMessaging';
 import EmailTab from './EmailTab';
 import ActivityTimelineComponent from './ActivityTimelineComponent';
@@ -31,8 +32,18 @@ const LeadTabsSection = ({ lead }: LeadTabsSectionProps) => {
   ];
 
   const handleAIOptInChange = async (enabled: boolean) => {
-    // TODO: Implement AI opt-in change logic
-    console.log('AI opt-in changed:', enabled);
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ ai_opt_in: enabled })
+        .eq('id', lead.id);
+
+      if (error) throw error;
+      
+      console.log('AI opt-in updated successfully:', enabled);
+    } catch (error) {
+      console.error('Failed to update AI opt-in:', error);
+    }
   };
 
   return (

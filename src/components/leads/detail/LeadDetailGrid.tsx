@@ -1,6 +1,7 @@
 
 import React from "react";
 import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 import LeadSummaryCard from "./LeadSummaryCard";
 import ContactInfoCard from "./ContactInfoCard";
 import VehicleInfoCard from "./VehicleInfoCard";
@@ -28,8 +29,18 @@ const LeadDetailGrid: React.FC<LeadDetailGridProps> = ({
   onSendMessage
 }) => {
   const handleAIOptInChange = async (enabled: boolean): Promise<void> => {
-    console.log("AI opt-in changed:", enabled);
-    // TODO: Implementation would update the lead's AI opt-in status
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ ai_opt_in: enabled })
+        .eq('id', lead.id);
+
+      if (error) throw error;
+      
+      console.log("AI opt-in updated successfully:", enabled);
+    } catch (error) {
+      console.error("Failed to update AI opt-in:", error);
+    }
   };
 
   return (
