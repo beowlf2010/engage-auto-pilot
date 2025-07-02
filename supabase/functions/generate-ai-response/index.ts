@@ -93,7 +93,7 @@ Vehicle Interest: ${conversation.vehicleInterest || 'General inquiry'}`;
 
 ${conversationContext}
 
-Generate a natural, helpful response that moves the conversation forward.`;
+Generate a natural, helpful response that moves the conversation forward. Use only the customer's first name, not their full name.`;
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

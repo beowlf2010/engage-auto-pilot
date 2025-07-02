@@ -170,54 +170,57 @@ class UnifiedAIResponseEngine {
   }
 
   private generateBaseResponse(context: MessageContext, intent: string): BaseResponse {
+    // Extract just the first name for more personal responses
+    const firstName = context.leadName.split(' ')[0] || context.leadName;
+    
     const responses = {
       timing_objection: {
-        message: `Hi ${context.leadName}! I completely understand - timing is everything with a major purchase like this. Thanks for letting me know your situation. When you're ready to move forward, I'll be here to help. In the meantime, if you have any questions or want to stay updated on what's available, just let me know!`,
+        message: `Hi ${firstName}! I completely understand - timing is everything with a major purchase like this. Thanks for letting me know your situation. When you're ready to move forward, I'll be here to help. In the meantime, if you have any questions or want to stay updated on what's available, just let me know!`,
         confidence: 0.95,
         responseType: 'follow_up' as const
       },
       budget_objection: {
-        message: `Hi ${context.leadName}! I totally understand - budget is important. Thanks for being upfront with me. When you're ready to explore options, I'd be happy to discuss different vehicles and financing options that might work better for your situation. No pressure at all!`,
+        message: `Hi ${firstName}! I totally understand - budget is important. Thanks for being upfront with me. When you're ready to explore options, I'd be happy to discuss different vehicles and financing options that might work better for your situation. No pressure at all!`,
         confidence: 0.95,
         responseType: 'follow_up' as const
       },
       consideration_pause: {
-        message: `Hi ${context.leadName}! That's completely understandable - this is a big decision and you should take the time you need. I'm here whenever you're ready to discuss further. Feel free to reach out with any questions that come up!`,
+        message: `Hi ${firstName}! That's completely understandable - this is a big decision and you should take the time you need. I'm here whenever you're ready to discuss further. Feel free to reach out with any questions that come up!`,
         confidence: 0.9,
         responseType: 'follow_up' as const
       },
       photo_request: {
-        message: `Hi ${context.leadName}! I'd love to get you photos of ${context.vehicleInterest || 'the vehicle'}. While I don't have photos available to send right now, I can schedule a time for you to see the vehicle in person or provide detailed specifications. Would you prefer to come in for a quick look?`,
+        message: `Hi ${firstName}! I'd love to get you photos of ${context.vehicleInterest || 'the vehicle'}. While I don't have photos available to send right now, I can schedule a time for you to see the vehicle in person or provide detailed specifications. Would you prefer to come in for a quick look?`,
         confidence: 0.85,
         responseType: 'vehicle_inquiry' as const
       },
       price_inquiry: {
-        message: `Hi ${context.leadName}! I'd be happy to discuss pricing with you. Let me get you the most current information on ${context.vehicleInterest || 'the vehicles you\'re interested in'}.`,
+        message: `Hi ${firstName}! I'd be happy to discuss pricing with you. Let me get you the most current information on ${context.vehicleInterest || 'the vehicles you\'re interested in'}.`,
         confidence: 0.8,
         responseType: 'vehicle_inquiry' as const
       },
       availability_inquiry: {
-        message: `Hi ${context.leadName}! Let me check our current inventory for ${context.vehicleInterest || 'the vehicle you\'re looking for'}. I'll get back to you with availability right away.`,
+        message: `Hi ${firstName}! Let me check our current inventory for ${context.vehicleInterest || 'the vehicle you\'re looking for'}. I'll get back to you with availability right away.`,
         confidence: 0.85,
         responseType: 'vehicle_inquiry' as const
       },
       appointment_request: {
-        message: `Hi ${context.leadName}! I'd be happy to schedule a time for you to come in. When works best for your schedule?`,
+        message: `Hi ${firstName}! I'd be happy to schedule a time for you to come in. When works best for your schedule?`,
         confidence: 0.9,
         responseType: 'follow_up' as const
       },
       question: {
-        message: `Hi ${context.leadName}! Thanks for your question. I'm here to help with any information you need about ${context.vehicleInterest || 'our vehicles'}.`,
+        message: `Hi ${firstName}! Thanks for your question. I'm here to help with any information you need about ${context.vehicleInterest || 'our vehicles'}.`,
         confidence: 0.75,
         responseType: 'question_response' as const
       },
       greeting: {
-        message: `Hello ${context.leadName}! Thanks for reaching out. How can I help you with ${context.vehicleInterest || 'finding the right vehicle'} today?`,
+        message: `Hello ${firstName}! Thanks for reaching out. How can I help you with ${context.vehicleInterest || 'finding the right vehicle'} today?`,
         confidence: 0.7,
         responseType: 'greeting' as const
       },
       general_inquiry: {
-        message: `Hi ${context.leadName}! Thanks for your message. I'm here to help you with ${context.vehicleInterest || 'finding the perfect vehicle'}. What questions can I answer for you?`,
+        message: `Hi ${firstName}! Thanks for your message. I'm here to help you with ${context.vehicleInterest || 'finding the perfect vehicle'}. What questions can I answer for you?`,
         confidence: 0.65,
         responseType: 'general' as const
       }
