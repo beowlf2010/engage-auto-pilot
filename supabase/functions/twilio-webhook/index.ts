@@ -203,13 +203,10 @@ serve(async (req) => {
     console.log('✅ Webhook processed successfully');
     console.log('=== TWILIO WEBHOOK END ===');
     
-    // Return empty response with 200 status
-    return new Response('OK', { 
+    // Return empty response with 200 status to prevent Twilio auto-replies
+    return new Response('', { 
       status: 200, 
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/plain'
-      }
+      headers: corsHeaders
     })
 
   } catch (error) {

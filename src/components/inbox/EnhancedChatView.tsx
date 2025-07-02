@@ -119,7 +119,7 @@ const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
   }
 
   const latestInbound = findLatestInboundMessage();
-  const canReply = selectedConversation.lastMessageDirection === 'in' || selectedConversation.unreadCount > 0;
+  const canReply = true; // Always allow replies
 
   return (
     <Card className="h-full flex flex-col">
