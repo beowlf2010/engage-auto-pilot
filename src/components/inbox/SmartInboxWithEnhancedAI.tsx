@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useInboxFilters, InboxFilters } from '@/hooks/useInboxFilters';
+import { useRealDataInbox } from '@/hooks/useRealDataInbox';
+import { useSmartInboxAI } from '@/hooks/useSmartInboxAI';
 import { EnhancedSmartInbox } from './enhanced/EnhancedSmartInbox';
-import SmartFilters from './SmartFilters';
 import FilterRestorationBanner from './FilterRestorationBanner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,39 +27,65 @@ const SmartInboxWithEnhancedAI = () => {
     filtersLoaded
   } = useInboxFilters(profile?.id, profile?.role);
 
-  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
-  const [filteredConversations, setFilteredConversations] = useState<ConversationListItem[]>([]);
-  const [stats, setStats] = useState({ total: 0, unread: 0 });
+  // Real data hook with enhanced filters
+  const {
+    conversations,
+    loading: inboxLoading,
+    error: inboxError,
+    hasMore,
+    loadMore,
+    refresh,
+    markAsRead,
+    sendMessage,
+    setSearchQuery: setInboxSearch,
+    setFilters: setInboxFilters,
+    searchQuery,
+    totalConversations,
+    unreadCount
+  } = useRealDataInbox({ 
+    pageSize: 50, 
+    enableVirtualization: true 
+  });
 
-  // Fetch conversations - TODO: Replace with actual data fetching logic
-  useEffect(() => {
-    const fetchConversations = async () => {
-      const data: ConversationListItem[] = [];
-      setConversations(data);
-    };
-    fetchConversations();
-  }, []);
+  // AI analysis for conversations
+  const {
+    prioritizedConversations,
+    aiInsights,
+    isAnalyzing,
+    generateAIResponse,
+    getConversationInsights,
+    refreshAnalysis
+  } = useSmartInboxAI({ 
+    conversations,
+    autoUpdate: true,
+    updateInterval: 30000
+  });
 
-  // Apply filters whenever conversations or filters change
-  useEffect(() => {
-    const filtered = applyFilters(conversations);
-    setFilteredConversations(filtered);
-
-    setStats({
-      total: conversations.length,
-      unread: conversations.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0)
-    });
-  }, [conversations, applyFilters]);
+  // Apply local filters to conversations
+  const filteredConversations = applyFilters(prioritizedConversations.length > 0 ? prioritizedConversations : conversations);
 
   const handleFiltersChange = useCallback((newFilters: Partial<InboxFilters>) => {
     Object.entries(newFilters).forEach(([key, value]) => {
       updateFilter(key as keyof InboxFilters, value);
     });
-  }, [updateFilter]);
+    
+    // Also sync with inbox data hook
+    setInboxFilters(newFilters);
+  }, [updateFilter, setInboxFilters]);
 
-  const handleUnreadBadgeClick = useCallback(() => {
-    updateFilter('unreadOnly', !filters.unreadOnly);
-  }, [filters.unreadOnly, updateFilter]);
+  const handleConversationSelect = useCallback(async (leadId: string) => {
+    try {
+      await markAsRead(leadId);
+      console.log('Selected conversation:', leadId);
+    } catch (error) {
+      console.error('Error marking conversation as read:', error);
+    }
+  }, [markAsRead]);
+
+  const handleRefresh = useCallback(() => {
+    refresh();
+    refreshAnalysis();
+  }, [refresh, refreshAnalysis]);
 
   const handleClearRestoredFilters = useCallback(() => {
     clearFilters();
@@ -68,12 +95,28 @@ const SmartInboxWithEnhancedAI = () => {
     // Banner dismissal handled by useInboxFilters hook
   }, []);
 
-  if (authLoading) {
+  if (authLoading || inboxLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-lg font-medium text-gray-700">Loading inbox...</p>
+          <p className="text-lg font-medium text-gray-700">
+            {authLoading ? 'Loading inbox...' : 'Fetching conversations...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (inboxError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-medium text-red-600">Error loading conversations</p>
+          <p className="text-sm text-gray-600 mt-2">{inboxError}</p>
+          <Button onClick={handleRefresh} className="mt-4">
+            Try Again
+          </Button>
         </div>
       </div>
     );
@@ -97,12 +140,17 @@ const SmartInboxWithEnhancedAI = () => {
       
       <EnhancedSmartInbox
         conversations={filteredConversations}
-        onSelectConversation={(leadId) => {
-          console.log('Selected conversation:', leadId);
-          // Handle conversation selection
-        }}
+        onSelectConversation={handleConversationSelect}
         selectedConversation={null}
-        isLoading={authLoading}
+        isLoading={inboxLoading || isAnalyzing}
+        hasMore={hasMore}
+        onLoadMore={loadMore}
+        onRefresh={handleRefresh}
+        totalConversations={totalConversations}
+        unreadCount={unreadCount}
+        aiInsights={aiInsights}
+        onSearch={setInboxSearch}
+        searchQuery={searchQuery}
       />
     </div>
   );

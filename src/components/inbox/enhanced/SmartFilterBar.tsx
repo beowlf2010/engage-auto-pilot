@@ -16,7 +16,8 @@ import {
   Eye,
   Heart,
   Target,
-  Settings
+  Settings,
+  RefreshCw
 } from 'lucide-react';
 import { InboxFilters } from '@/hooks/useInboxFilters';
 import type { ConversationListItem } from '@/types/conversation';
@@ -39,6 +40,7 @@ interface SmartFilterBarProps {
   searchQuery?: string;
   onClearAll: () => void;
   hasActiveFilters: boolean;
+  onRefresh?: () => void;
 }
 
 export const SmartFilterBar: React.FC<SmartFilterBarProps> = ({
@@ -48,7 +50,8 @@ export const SmartFilterBar: React.FC<SmartFilterBarProps> = ({
   onSearch,
   searchQuery = '',
   onClearAll,
-  hasActiveFilters
+  hasActiveFilters,
+  onRefresh
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -194,6 +197,18 @@ export const SmartFilterBar: React.FC<SmartFilterBarProps> = ({
             <SelectItem value="activity">Most Active</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Refresh Button */}
+        {onRefresh && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        )}
 
         {/* Advanced Filters Toggle */}
         <Button

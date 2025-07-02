@@ -29,21 +29,48 @@ interface EnhancedSmartInboxProps {
   onSelectConversation?: (leadId: string) => void;
   selectedConversation?: string | null;
   isLoading?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  onRefresh?: () => void;
+  totalConversations?: number;
+  unreadCount?: number;
+  aiInsights?: Record<string, any>;
+  onSearch?: (query: string) => void;
+  searchQuery?: string;
 }
 
 export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
   conversations = [],
   onSelectConversation,
   selectedConversation,
-  isLoading = false
+  isLoading = false,
+  hasMore = false,
+  onLoadMore,
+  onRefresh,
+  totalConversations = 0,
+  unreadCount = 0,
+  aiInsights = {},
+  onSearch,
+  searchQuery: externalSearchQuery = ''
 }) => {
   const { profile } = useAuth();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(externalSearchQuery);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [aiPanelCollapsed, setAiPanelCollapsed] = useState(false);
   const [showBatchActions, setShowBatchActions] = useState(false);
+
+  // Sync external search query
+  useEffect(() => {
+    setSearchQuery(externalSearchQuery);
+  }, [externalSearchQuery]);
+
+  // Handle search changes
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+    onSearch?.(query);
+  }, [onSearch]);
 
   const {
     filters,
@@ -149,8 +176,13 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">Smart Inbox</h1>
               <Badge variant="outline">
-                {filteredConversations.length} of {conversations.length}
+                {filteredConversations.length} of {totalConversations}
               </Badge>
+              {unreadCount > 0 && (
+                <Badge variant="destructive">
+                  {unreadCount} unread
+                </Badge>
+              )}
             </div>
             
             <div className="flex items-center gap-2">
@@ -198,10 +230,11 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
             filters={filters}
             conversations={conversations}
             onFiltersChange={handleFiltersChange}
-            onSearch={setSearchQuery}
+            onSearch={handleSearchChange}
             searchQuery={searchQuery}
             onClearAll={clearFilters}
             hasActiveFilters={hasActiveFilters}
+            onRefresh={onRefresh}
           />
         </div>
 
@@ -292,8 +325,8 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
                     onSelect={onSelectConversation || (() => {})}
                     onCheck={handleSelectItem}
                     showAIInsights={true}
-                    aiInsights={{
-                      confidence: Math.random() * 0.4 + 0.6, // Mock data
+                    aiInsights={aiInsights[conversation.leadId] || {
+                      confidence: Math.random() * 0.4 + 0.6,
                       urgencyLevel: conversation.unreadCount > 2 ? 'high' : 'medium',
                       buyingSignals: conversation.vehicleInterest ? ['vehicle interest'] : [],
                       nextBestAction: 'Send follow-up message'
