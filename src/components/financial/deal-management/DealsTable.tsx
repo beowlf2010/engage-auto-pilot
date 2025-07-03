@@ -29,6 +29,7 @@ interface DealsTableProps {
   onSelectAll: () => void;
   onDealTypeUpdate: (dealId: string, newType: string, forceUnlock?: boolean) => void;
   onUnlockDeal: (dealId: string) => void;
+  onManagersUpdate: (dealId: string, managerIds: string[]) => void;
   getAdjustedGrossProfit: (deal: Deal) => number;
   formatCurrency: (amount: number) => string;
   packAdjustmentEnabled: boolean;
@@ -42,6 +43,7 @@ const DealsTable = ({
   onSelectAll,
   onDealTypeUpdate,
   onUnlockDeal,
+  onManagersUpdate,
   getAdjustedGrossProfit,
   formatCurrency,
   packAdjustmentEnabled,
@@ -67,6 +69,7 @@ const DealsTable = ({
               onSelectDeal={onSelectDeal}
               onDealTypeUpdate={onDealTypeUpdate}
               onUnlockDeal={onUnlockDeal}
+              onManagersUpdate={onManagersUpdate}
               getAdjustedGrossProfit={getAdjustedGrossProfit}
               formatCurrency={formatCurrency}
               packAdjustmentEnabled={packAdjustmentEnabled}

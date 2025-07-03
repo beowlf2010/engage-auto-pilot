@@ -46,7 +46,8 @@ const DealManagement = ({
     handleUnlockDeal,
     handleBulkDealTypeUpdate,
     handleSelectDeal,
-    handleSelectAll
+    handleSelectAll,
+    handleManagersUpdate
   } = useDealManagement();
 
   // Check permissions
@@ -216,6 +217,7 @@ const DealManagement = ({
                 onSelectAll={() => handleSelectAll(filteredDeals)}
                 onDealTypeUpdate={handleDealTypeUpdate}
                 onUnlockDeal={handleUnlockDeal}
+                onManagersUpdate={handleManagersUpdate}
                 getAdjustedGrossProfit={(deal) => getAdjustedGrossProfit(deal, packAdjustment)}
                 formatCurrency={formatCurrency}
                 packAdjustmentEnabled={packAdjustmentEnabled}

@@ -16,6 +16,15 @@ export interface Deal {
   original_gross_profit?: number;
   original_fi_profit?: number;
   original_total_profit?: number;
+  manager_id?: string;
+  assigned_managers?: string[];
+  inventory?: {
+    year?: number;
+    make?: string;
+    model?: string;
+    trim?: string;
+    status?: string;
+  }[];
 }
 
 export interface SummaryTotals {

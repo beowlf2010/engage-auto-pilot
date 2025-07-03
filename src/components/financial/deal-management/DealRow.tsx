@@ -1,12 +1,14 @@
 
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import VehicleIdentifier from "@/components/shared/VehicleIdentifier";
 import DealTypeCell from "./DealTypeCell";
 import ProfitCell from "./ProfitCell";
 import PackAdjustmentCell from "./PackAdjustmentCell";
 import ActionsCell from "./ActionsCell";
 import CustomerNameLink from "./CustomerNameLink";
+import ManagerSelection from "./ManagerSelection";
 import { getAdjustedTotalProfit } from "./DealManagementUtils";
 
 interface Deal {
@@ -26,11 +28,13 @@ interface Deal {
   original_gross_profit?: number;
   original_fi_profit?: number;
   original_total_profit?: number;
+  assigned_managers?: string[];
   inventory?: {
     year?: number;
     make?: string;
     model?: string;
     trim?: string;
+    status?: string;
   }[];
 }
 
@@ -40,6 +44,7 @@ interface DealRowProps {
   onSelectDeal: (dealId: string) => void;
   onDealTypeUpdate: (dealId: string, newType: string, forceUnlock?: boolean) => void;
   onUnlockDeal: (dealId: string) => void;
+  onManagersUpdate: (dealId: string, managerIds: string[]) => void;
   getAdjustedGrossProfit: (deal: Deal) => number;
   formatCurrency: (amount: number) => string;
   packAdjustmentEnabled: boolean;
@@ -52,6 +57,7 @@ const DealRow = ({
   onSelectDeal,
   onDealTypeUpdate,
   onUnlockDeal,
+  onManagersUpdate,
   getAdjustedGrossProfit,
   formatCurrency,
   packAdjustmentEnabled,
@@ -108,15 +114,25 @@ const DealRow = ({
       </TableCell>
       
       <TableCell>
-        {deal.stock_number ? (
-          <VehicleIdentifier 
-            stockNumber={deal.stock_number}
-            variant="badge"
-            showIcon={true}
-          />
-        ) : (
-          <span className="text-slate-500">No Stock #</span>
-        )}
+        <div className="space-y-1">
+          {deal.stock_number ? (
+            <VehicleIdentifier 
+              stockNumber={deal.stock_number}
+              variant="badge"
+              showIcon={true}
+            />
+          ) : (
+            <span className="text-slate-500 text-xs">No Stock #</span>
+          )}
+          {deal.inventory?.[0]?.status && (
+            <Badge 
+              variant={deal.inventory[0].status === 'sold' ? 'default' : 'secondary'}
+              className="text-xs"
+            >
+              {deal.inventory[0].status}
+            </Badge>
+          )}
+        </div>
       </TableCell>
       
       <TableCell>
@@ -132,9 +148,11 @@ const DealRow = ({
       </TableCell>
       
       <TableCell>
-        <div className="font-medium">
-          {deal.sale_amount || '-'}
-        </div>
+        <ManagerSelection
+          dealId={deal.id}
+          assignedManagerIds={deal.assigned_managers || []}
+          onManagersUpdate={onManagersUpdate}
+        />
       </TableCell>
       
       <TableCell className="text-right">

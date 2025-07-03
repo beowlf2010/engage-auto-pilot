@@ -25,10 +25,10 @@ const DealsTableHeader = ({
           />
         </TableHead>
         <TableHead className="font-semibold">Vehicle</TableHead>
-        <TableHead className="font-semibold">Stock #</TableHead>
+        <TableHead className="font-semibold">Stock # / Status</TableHead>
         <TableHead className="font-semibold">Customer</TableHead>
         <TableHead className="font-semibold">Deal Type</TableHead>
-        <TableHead className="font-semibold">Salesperson Code</TableHead>
+        <TableHead className="font-semibold">Assigned Managers</TableHead>
         <TableHead className="font-semibold text-right">Gross Profit</TableHead>
         <TableHead className="font-semibold text-right">Pack Adjustment</TableHead>
         <TableHead className="font-semibold text-right">F&I Profit</TableHead>

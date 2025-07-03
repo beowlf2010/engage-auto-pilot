@@ -1478,6 +1478,7 @@ export type Database = {
       deals: {
         Row: {
           age: number | null
+          assigned_managers: Json | null
           buyer_name: string | null
           cost_amount: number | null
           created_at: string
@@ -1487,6 +1488,7 @@ export type Database = {
           first_reported_date: string | null
           gross_profit: number | null
           id: string
+          manager_id: string | null
           original_fi_profit: number | null
           original_gross_profit: number | null
           original_total_profit: number | null
@@ -1500,6 +1502,7 @@ export type Database = {
         }
         Insert: {
           age?: number | null
+          assigned_managers?: Json | null
           buyer_name?: string | null
           cost_amount?: number | null
           created_at?: string
@@ -1509,6 +1512,7 @@ export type Database = {
           first_reported_date?: string | null
           gross_profit?: number | null
           id?: string
+          manager_id?: string | null
           original_fi_profit?: number | null
           original_gross_profit?: number | null
           original_total_profit?: number | null
@@ -1522,6 +1526,7 @@ export type Database = {
         }
         Update: {
           age?: number | null
+          assigned_managers?: Json | null
           buyer_name?: string | null
           cost_amount?: number | null
           created_at?: string
@@ -1531,6 +1536,7 @@ export type Database = {
           first_reported_date?: string | null
           gross_profit?: number | null
           id?: string
+          manager_id?: string | null
           original_fi_profit?: number | null
           original_gross_profit?: number | null
           original_total_profit?: number | null
@@ -1543,6 +1549,13 @@ export type Database = {
           year_model?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "deals_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_deals_inventory_stock_number"
             columns: ["stock_number"]

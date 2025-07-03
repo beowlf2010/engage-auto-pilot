@@ -32,7 +32,7 @@ export const useDealManagement = () => {
         .from('deals')
         .select(`
           *,
-          inventory:inventory!left(year, make, model, trim)
+          inventory:inventory!left(year, make, model, trim, status)
         `);
 
       // Apply date filtering based on selected filter
@@ -90,7 +90,18 @@ export const useDealManagement = () => {
       console.log('Fetched deals:', data?.length);
       console.log('Date filter applied:', dateFilter, 'Field:', dateField);
       
-      setDeals(data || []);
+      // Transform the data to handle Json type for assigned_managers and inventory array
+      const transformedDeals = (data || []).map(deal => ({
+        ...deal,
+        assigned_managers: Array.isArray(deal.assigned_managers) 
+          ? deal.assigned_managers 
+          : deal.assigned_managers 
+            ? JSON.parse(deal.assigned_managers as string)
+            : [],
+        inventory: deal.inventory ? [deal.inventory] : []
+      })) as Deal[];
+      
+      setDeals(transformedDeals);
     } catch (error) {
       console.error('Error fetching deals:', error);
       toast({
@@ -239,6 +250,38 @@ export const useDealManagement = () => {
     }
   };
 
+  const handleManagersUpdate = async (dealId: string, managerIds: string[]) => {
+    try {
+      const { error } = await supabase
+        .from('deals')
+        .update({ assigned_managers: managerIds })
+        .eq('id', dealId);
+
+      if (error) throw error;
+
+      setDeals(prevDeals => 
+        prevDeals.map(deal => 
+          deal.id === dealId ? { 
+            ...deal, 
+            assigned_managers: managerIds
+          } : deal
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Managers updated successfully"
+      });
+    } catch (error) {
+      console.error('Error updating managers:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update managers",
+        variant: "destructive"
+      });
+    }
+  };
+
   return {
     deals,
     loading,
@@ -265,6 +308,7 @@ export const useDealManagement = () => {
     handleBulkDealTypeUpdate,
     handleSelectDeal,
     handleSelectAll,
+    handleManagersUpdate,
     toast
   };
 };
