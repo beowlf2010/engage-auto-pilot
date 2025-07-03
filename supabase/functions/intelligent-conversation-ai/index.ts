@@ -8,9 +8,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enhanced Intent Recognition - consistent with unified service
+// Enhanced Intent Recognition with multi-intent support
 const analyzeCustomerIntent = (message: string) => {
   const text = message.toLowerCase().trim();
+  
+  // Check for identity questions FIRST (highest priority)
+  if (/\b(who are you|who is you|who am i talking to|who is this|what is your name|your name)\b/i.test(text)) {
+    const secondary = detectSecondaryIntent(text);
+    return {
+      primary: 'identity_question',
+      secondary,
+      confidence: 0.95,
+      isMultiIntent: !!secondary,
+      isFinancingRelated: false
+    };
+  }
   
   // Financing patterns - consistent with unifiedAIResponseEngine
   const financingPatterns = [
@@ -28,9 +40,20 @@ const analyzeCustomerIntent = (message: string) => {
         primary: `financing_${pattern.type}`,
         confidence: pattern.confidence,
         financingType: pattern.type,
-        isFinancingRelated: true
+        isFinancingRelated: true,
+        isMultiIntent: false
       };
     }
+  }
+
+  // Check for price inquiries
+  if (/\b(price|cost|payment|pricing)\b/i.test(text)) {
+    return {
+      primary: 'price_inquiry',
+      confidence: 0.8,
+      isFinancingRelated: false,
+      isMultiIntent: false
+    };
   }
 
   // Check for buying signals
@@ -38,7 +61,8 @@ const analyzeCustomerIntent = (message: string) => {
     return {
       primary: 'buying_signal',
       confidence: 0.9,
-      isFinancingRelated: false
+      isFinancingRelated: false,
+      isMultiIntent: false
     };
   }
 
@@ -47,20 +71,57 @@ const analyzeCustomerIntent = (message: string) => {
     return {
       primary: 'objection',
       confidence: 0.8,
-      isFinancingRelated: text.includes('expensive') || text.includes('cost')
+      isFinancingRelated: text.includes('expensive') || text.includes('cost'),
+      isMultiIntent: false
     };
   }
 
   return {
     primary: 'general_inquiry',
     confidence: 0.5,
-    isFinancingRelated: false
+    isFinancingRelated: false,
+    isMultiIntent: false
   };
 };
 
-// Professional Response Templates - consistent with unified service
-const getResponseTemplate = (intent: any, leadName: string, customerMessage: string) => {
+// Detect secondary intents in mixed questions
+const detectSecondaryIntent = (text: string) => {
+  if (/\b(price|cost|payment|pricing)\b/i.test(text)) return 'price_inquiry';
+  if (/\b(available|in stock|availability)\b/i.test(text)) return 'availability_inquiry';
+  if (/\b(schedule|appointment|visit)\b/i.test(text)) return 'appointment_request';
+  if (/\b(trade|exchange)\b/i.test(text)) return 'trade_inquiry';
+  if (/\b(finance|loan|financing)\b/i.test(text)) return 'financing_inquiry';
+  return null;
+};
+
+// Professional Response Templates with composite response support
+const getResponseTemplate = (intent: any, leadName: string, customerMessage: string, vehicleInterest?: string) => {
+  // Handle composite responses for mixed questions
+  if (intent.primary === 'identity_question' && intent.secondary) {
+    if (intent.secondary === 'price_inquiry') {
+      const vehicleContext = vehicleInterest && vehicleInterest !== 'finding the right vehicle for your needs' 
+        ? ` on ${vehicleInterest}` 
+        : '';
+      
+      return `Hi ${leadName}! I'm your sales consultant here at the dealership. I'd be happy to help you with pricing information${vehicleContext}. To give you the most accurate pricing, could you let me know which vehicle you're interested in? I want to make sure I get you the right details.`;
+    }
+    
+    const secondaryActions = {
+      availability_inquiry: 'and check our current inventory for you',
+      appointment_request: 'and schedule a time for you to visit',
+      trade_inquiry: 'and discuss your trade-in options',
+      financing_inquiry: 'and explore financing options that work for you'
+    };
+    
+    const secondaryAction = secondaryActions[intent.secondary as keyof typeof secondaryActions] || 'and answer any questions you have';
+    return `Hi ${leadName}! I'm your sales consultant here at the dealership. I'd be happy to introduce myself properly ${secondaryAction}. What would be most helpful for you today?`;
+  }
+  
   const templates = {
+    identity_question: `Hi ${leadName}! I'm your sales consultant here at the dealership. I'd be happy to help you with any questions you have about our vehicles. What would you like to know?`,
+    
+    price_inquiry: `Hi ${leadName}! I'd be happy to discuss pricing with you. To give you the most accurate information, could you let me know which vehicle you're interested in? I want to make sure I get you the right details.`,
+    
     financing_saving_up: `I completely understand, ${leadName} - saving up shows you're being smart about this decision. When you're ready, we'll have financing options that can help minimize your upfront costs. What timeline are you thinking?`,
     
     financing_down_payment: `Great question about the down payment, ${leadName}! We have several programs that can help - some as low as $0 down for qualified buyers. Would you like me to check what options might work for your situation?`,
@@ -108,12 +169,14 @@ serve(async (req) => {
     
     console.log('🧠 [INTELLIGENT-AI] Detected intent:', {
       primary: intent.primary,
+      secondary: intent.secondary,
       confidence: intent.confidence,
+      isMultiIntent: intent.isMultiIntent,
       isFinancingRelated: intent.isFinancingRelated
     });
 
     // Generate appropriate response using professional templates
-    const responseMessage = getResponseTemplate(intent, leadName || 'there', customerMessage);
+    const responseMessage = getResponseTemplate(intent, leadName || 'there', customerMessage, vehicleInterest);
 
     // Validate response quality
     const hasPlaceholders = responseMessage.includes('{') || responseMessage.includes('[') || 

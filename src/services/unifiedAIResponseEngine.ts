@@ -94,7 +94,14 @@ class UnifiedAIResponseEngine {
   private analyzeMessageIntent(message: string): string {
     const lowerMessage = message.toLowerCase();
     
-    // Check for timing/budget objections FIRST (highest priority)
+    // Check for identity questions FIRST (new priority)
+    if (lowerMessage.includes('who are you') || lowerMessage.includes('who is you') || 
+        lowerMessage.includes('who am i talking to') || lowerMessage.includes('who is this') ||
+        lowerMessage.includes('what is your name') || lowerMessage.includes('your name')) {
+      return 'identity_question';
+    }
+    
+    // Check for timing/budget objections (high priority)
     if (lowerMessage.includes('hold off') || lowerMessage.includes('holding off') || 
         lowerMessage.includes('save up') || lowerMessage.includes('saving up') ||
         lowerMessage.includes('need to save') || lowerMessage.includes('not ready')) {
@@ -125,10 +132,17 @@ class UnifiedAIResponseEngine {
   private detectSecondaryIntent(message: string): string | undefined {
     const lowerMessage = message.toLowerCase();
     
-    if (lowerMessage.includes('trade') || lowerMessage.includes('exchange')) {
+    // Enhanced secondary intent detection for mixed questions
+    if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('payment')) {
+      return 'price_inquiry';
+    } else if (lowerMessage.includes('trade') || lowerMessage.includes('exchange')) {
       return 'trade_inquiry';
     } else if (lowerMessage.includes('finance') || lowerMessage.includes('loan')) {
       return 'financing_inquiry';
+    } else if (lowerMessage.includes('available') || lowerMessage.includes('in stock')) {
+      return 'availability_inquiry';
+    } else if (lowerMessage.includes('schedule') || lowerMessage.includes('appointment') || lowerMessage.includes('visit')) {
+      return 'appointment_request';
     }
     
     return undefined;
@@ -136,6 +150,8 @@ class UnifiedAIResponseEngine {
 
   private determineResponseStrategy(intent: string, context: MessageContext): string {
     switch (intent) {
+      case 'identity_question':
+        return 'professional_introduction';
       case 'timing_objection':
       case 'budget_objection': 
       case 'consideration_pause':
@@ -172,8 +188,19 @@ class UnifiedAIResponseEngine {
   private generateBaseResponse(context: MessageContext, intent: string): BaseResponse {
     // Extract just the first name for more personal responses
     const firstName = context.leadName.split(' ')[0] || context.leadName;
+    const secondaryIntent = this.detectSecondaryIntent(context.latestMessage);
+    
+    // Handle composite responses for mixed questions
+    if (intent === 'identity_question' && secondaryIntent) {
+      return this.generateCompositeResponse(context, intent, secondaryIntent);
+    }
     
     const responses = {
+      identity_question: {
+        message: `Hi ${firstName}! I'm your sales consultant here at the dealership. I'd be happy to help you with any questions you have about our vehicles. What would you like to know?`,
+        confidence: 0.9,
+        responseType: 'question_response' as const
+      },
       timing_objection: {
         message: `Hi ${firstName}! I completely understand - timing is everything with a major purchase like this. Thanks for letting me know your situation. When you're ready to move forward, I'll be here to help. In the meantime, if you have any questions or want to stay updated on what's available, just let me know!`,
         confidence: 0.95,
@@ -227,6 +254,39 @@ class UnifiedAIResponseEngine {
     };
 
     return responses[intent as keyof typeof responses] || responses.general_inquiry;
+  }
+
+  private generateCompositeResponse(context: MessageContext, primaryIntent: string, secondaryIntent: string): BaseResponse {
+    const firstName = context.leadName.split(' ')[0] || context.leadName;
+    
+    // Handle identity + price inquiry (the specific case from the example)
+    if (primaryIntent === 'identity_question' && secondaryIntent === 'price_inquiry') {
+      const vehicleContext = context.vehicleInterest && context.vehicleInterest !== 'finding the right vehicle for your needs' 
+        ? `on ${context.vehicleInterest}` 
+        : '';
+      
+      return {
+        message: `Hi ${firstName}! I'm your sales consultant here at the dealership. I'd be happy to help you with pricing information${vehicleContext}. To give you the most accurate pricing, could you let me know which vehicle you're interested in? I want to make sure I get you the right details.`,
+        confidence: 0.95,
+        responseType: 'question_response' as const
+      };
+    }
+    
+    // Handle identity + other secondary intents
+    const secondaryMessages = {
+      availability_inquiry: `and check our current inventory for you`,
+      appointment_request: `and schedule a time for you to visit`,
+      trade_inquiry: `and discuss your trade-in options`,
+      financing_inquiry: `and explore financing options that work for you`
+    };
+    
+    const secondaryAction = secondaryMessages[secondaryIntent as keyof typeof secondaryMessages] || 'and answer any questions you have';
+    
+    return {
+      message: `Hi ${firstName}! I'm your sales consultant here at the dealership. I'd be happy to introduce myself properly ${secondaryAction}. What would be most helpful for you today?`,
+      confidence: 0.9,
+      responseType: 'question_response' as const
+    };
   }
 }
 
