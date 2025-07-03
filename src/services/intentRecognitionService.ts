@@ -1,10 +1,16 @@
 
 export interface DetectedIntent {
-  type: 'buying_signal' | 'objection' | 'information_request' | 'scheduling' | 'pricing_inquiry' | 'comparison_request' | 'browsing_stage';
+  type: 'buying_signal' | 'objection' | 'information_request' | 'scheduling' | 'pricing_inquiry' | 'comparison_request' | 'browsing_stage' | 'identity_question' | 'vehicle_specific';
   confidence: number;
   keywords: string[];
   context: string;
   urgency: 'low' | 'medium' | 'high' | 'critical';
+  vehicleDetails?: {
+    make?: string;
+    model?: string;
+    year?: number;
+    extractedText?: string;
+  };
 }
 
 export interface ConversationIntent {
@@ -15,6 +21,12 @@ export interface ConversationIntent {
 }
 
 class IntentRecognitionService {
+  private identityPatterns = [
+    { pattern: /\b(who are you|who is you|who am i talking to|who is this)\b/i, confidence: 0.95, urgency: 'high' as const },
+    { pattern: /\b(what is your name|your name|introduce yourself)\b/i, confidence: 0.9, urgency: 'medium' as const },
+    { pattern: /\b(who am i speaking with|what's your name)\b/i, confidence: 0.85, urgency: 'medium' as const }
+  ];
+
   private browsingStagePatterns = [
     { pattern: /\b(just looking|just browsing|shopping around|getting a feel|seeing what's out there)\b/i, confidence: 0.95, urgency: 'low' as const },
     { pattern: /\b(researching|comparing|looking around|window shopping)\b/i, confidence: 0.85, urgency: 'low' as const },
@@ -29,10 +41,11 @@ class IntentRecognitionService {
   ];
 
   private objectionPatterns = [
-    { pattern: /\b(too expensive|can't afford|over budget|too much money)\b/i, confidence: 0.9, urgency: 'high' as const },
-    { pattern: /\b(think about it|need time|not ready|maybe later)\b/i, confidence: 0.8, urgency: 'medium' as const },
-    { pattern: /\b(not interested|not looking|stop calling|remove me)\b/i, confidence: 0.9, urgency: 'critical' as const },
-    { pattern: /\b(but|however|concerned|worried|problem)\b/i, confidence: 0.5, urgency: 'medium' as const }
+    { pattern: /\b(too expensive|can't afford|over budget|too much money|out of my price range)\b/i, confidence: 0.9, urgency: 'high' as const },
+    { pattern: /\b(think about it|need time|not ready|maybe later|need to discuss)\b/i, confidence: 0.8, urgency: 'medium' as const },
+    { pattern: /\b(not interested|not looking|stop calling|remove me|don't call)\b/i, confidence: 0.9, urgency: 'critical' as const },
+    { pattern: /\b(concerned about|worried about|problem with|issue with)\b/i, confidence: 0.7, urgency: 'high' as const },
+    { pattern: /\b(but|however|unfortunately|disappointing)\b/i, confidence: 0.4, urgency: 'medium' as const }
   ];
 
   private informationRequestPatterns = [
@@ -42,8 +55,10 @@ class IntentRecognitionService {
   ];
 
   private schedulingPatterns = [
-    { pattern: /\b(schedule|appointment|meet|visit|come in|see)\b/i, confidence: 0.8, urgency: 'high' as const },
-    { pattern: /\b(when are you|what time|available|open)\b/i, confidence: 0.7, urgency: 'medium' as const }
+    { pattern: /\b(schedule|appointment|meet|visit|come in|see|book)\b/i, confidence: 0.8, urgency: 'high' as const },
+    { pattern: /\b(when are you|what time|available|open|hours)\b/i, confidence: 0.7, urgency: 'medium' as const },
+    { pattern: /\b(today|tomorrow|this week|next week|weekend)\b/i, confidence: 0.6, urgency: 'high' as const },
+    { pattern: /\b(test drive|drive|try out|look at)\b/i, confidence: 0.85, urgency: 'high' as const }
   ];
 
   private pricingPatterns = [
@@ -60,7 +75,21 @@ class IntentRecognitionService {
     const detectedIntents: DetectedIntent[] = [];
     const text = messageText.toLowerCase();
 
-    // Analyze browsing stage signals FIRST (highest priority for customer experience)
+    // Analyze identity questions FIRST (highest priority for composite responses)
+    this.identityPatterns.forEach(({ pattern, confidence, urgency }) => {
+      const matches = text.match(pattern);
+      if (matches) {
+        detectedIntents.push({
+          type: 'identity_question',
+          confidence,
+          keywords: Array.from(matches),
+          context: this.extractContext(messageText, matches[0]),
+          urgency
+        });
+      }
+    });
+
+    // Analyze browsing stage signals SECOND (high priority for customer experience)
     this.browsingStagePatterns.forEach(({ pattern, confidence, urgency }) => {
       const matches = text.match(pattern);
       if (matches) {
@@ -200,18 +229,22 @@ class IntentRecognitionService {
 
   private generateNextBestAction(primaryIntent: DetectedIntent, conversationHistory?: string): string {
     switch (primaryIntent.type) {
+      case 'identity_question':
+        return 'Provide professional introduction and ask what would be most helpful';
       case 'browsing_stage':
         return 'Acknowledge browsing stage, remove pressure, offer light assistance';
       case 'buying_signal':
         return 'Schedule immediate appointment or begin closing process';
       case 'objection':
-        return 'Address objection directly with empathy and solutions';
+        return 'Address objection with empathy, explore underlying concerns, offer solutions';
       case 'scheduling':
-        return 'Provide available appointment times immediately';
+        return 'Provide available appointment times and confirm details immediately';
       case 'pricing_inquiry':
-        return 'Provide transparent pricing with financing options';
+        return 'Provide transparent pricing with financing options and value proposition';
       case 'comparison_request':
         return 'Highlight unique value propositions and competitive advantages';
+      case 'vehicle_specific':
+        return 'Provide detailed vehicle information and offer demonstration';
       case 'information_request':
       default:
         return 'Provide detailed information and ask qualifying questions';

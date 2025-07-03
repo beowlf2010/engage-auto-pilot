@@ -1,3 +1,6 @@
+import { vehicleExtractionService, type VehicleDetails } from './vehicleExtractionService';
+import { appointmentSchedulingService, type SchedulingIntent } from './appointmentSchedulingService';
+
 export interface MessageContext {
   leadId: string;
   leadName: string;
@@ -20,9 +23,12 @@ export interface UnifiedAIResponse {
   intent: {
     primary: string;
     secondary?: string;
+    tertiary?: string;
   };
   responseStrategy: string;
   reasoning: string[];
+  vehicleContext?: VehicleDetails;
+  schedulingContext?: SchedulingIntent;
 }
 
 interface BaseResponse {
@@ -36,11 +42,19 @@ class UnifiedAIResponseEngine {
     console.log('🎤 [UNIFIED-AI] Generating unified AI response...');
 
     try {
-      // Analyze message intent
+      // Analyze message intent with enhanced detection
       const intent = this.analyzeMessageIntent(context.latestMessage);
+      const secondaryIntent = this.detectSecondaryIntent(context.latestMessage);
+      const tertiaryIntent = this.detectTertiaryIntent(context.latestMessage, intent, secondaryIntent);
       
-      // Generate appropriate response
-      const baseResponse = this.generateBaseResponse(context, intent);
+      // Extract vehicle information
+      const vehicleContext = vehicleExtractionService.extractVehicleInfo(context.latestMessage);
+      
+      // Analyze scheduling intent
+      const schedulingContext = appointmentSchedulingService.analyzeSchedulingIntent(context.latestMessage);
+      
+      // Generate appropriate response with enhanced context
+      const baseResponse = this.generateEnhancedResponse(context, intent, secondaryIntent, tertiaryIntent, vehicleContext, schedulingContext);
       
       // Create unified response with all required properties
       const unifiedResponse: UnifiedAIResponse = {
@@ -49,10 +63,13 @@ class UnifiedAIResponseEngine {
         responseType: baseResponse.responseType,
         intent: {
           primary: intent,
-          secondary: this.detectSecondaryIntent(context.latestMessage)
+          secondary: secondaryIntent,
+          tertiary: tertiaryIntent
         },
         responseStrategy: this.determineResponseStrategy(intent, context),
-        reasoning: this.generateReasoningSteps(intent, context)
+        reasoning: this.generateReasoningSteps(intent, context, vehicleContext, schedulingContext),
+        vehicleContext: vehicleContext.primary || undefined,
+        schedulingContext: schedulingContext.hasSchedulingRequest ? schedulingContext : undefined
       };
       
       console.log(`✅ [UNIFIED-AI] Generated ${unifiedResponse.responseType} response with ${Math.round(unifiedResponse.confidence * 100)}% confidence`);
@@ -141,16 +158,43 @@ class UnifiedAIResponseEngine {
     const lowerMessage = message.toLowerCase();
     
     // Enhanced secondary intent detection for mixed questions
-    if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('payment')) {
-      return 'price_inquiry';
-    } else if (lowerMessage.includes('trade') || lowerMessage.includes('exchange')) {
-      return 'trade_inquiry';
-    } else if (lowerMessage.includes('finance') || lowerMessage.includes('loan')) {
-      return 'financing_inquiry';
-    } else if (lowerMessage.includes('available') || lowerMessage.includes('in stock')) {
-      return 'availability_inquiry';
-    } else if (lowerMessage.includes('schedule') || lowerMessage.includes('appointment') || lowerMessage.includes('visit')) {
-      return 'appointment_request';
+    const intentPatterns = [
+      { pattern: /\b(price|cost|payment|pricing|how much)\b/i, intent: 'price_inquiry' },
+      { pattern: /\b(trade|exchange|trade-in|tradein)\b/i, intent: 'trade_inquiry' },
+      { pattern: /\b(finance|loan|financing|credit|monthly)\b/i, intent: 'financing_inquiry' },
+      { pattern: /\b(available|in stock|inventory|have)\b/i, intent: 'availability_inquiry' },
+      { pattern: /\b(schedule|appointment|visit|come in|meet)\b/i, intent: 'appointment_request' },
+      { pattern: /\b(features|specs|options|equipment)\b/i, intent: 'feature_inquiry' },
+      { pattern: /\b(color|colors|exterior|interior)\b/i, intent: 'color_inquiry' },
+      { pattern: /\b(warranty|service|maintenance)\b/i, intent: 'service_inquiry' }
+    ];
+    
+    for (const { pattern, intent } of intentPatterns) {
+      if (pattern.test(lowerMessage)) {
+        return intent;
+      }
+    }
+    
+    return undefined;
+  }
+
+  private detectTertiaryIntent(message: string, primary: string, secondary?: string): string | undefined {
+    const lowerMessage = message.toLowerCase();
+    
+    // Skip if already detected as primary or secondary
+    const alreadyDetected = [primary, secondary].filter(Boolean);
+    
+    const intentPatterns = [
+      { pattern: /\b(when|what time|today|tomorrow|weekend)\b/i, intent: 'timing_inquiry' },
+      { pattern: /\b(compare|versus|vs|difference|better)\b/i, intent: 'comparison_request' },
+      { pattern: /\b(test drive|drive|try)\b/i, intent: 'test_drive_request' },
+      { pattern: /\b(lease|leasing|rent)\b/i, intent: 'lease_inquiry' }
+    ];
+    
+    for (const { pattern, intent } of intentPatterns) {
+      if (pattern.test(lowerMessage) && !alreadyDetected.includes(intent)) {
+        return intent;
+      }
     }
     
     return undefined;
@@ -179,12 +223,25 @@ class UnifiedAIResponseEngine {
     }
   }
 
-  private generateReasoningSteps(intent: string, context: MessageContext): string[] {
+  private generateReasoningSteps(
+    intent: string, 
+    context: MessageContext, 
+    vehicleContext?: any, 
+    schedulingContext?: SchedulingIntent
+  ): string[] {
     const steps = [
       `Detected intent: ${intent}`,
       `Lead has vehicle interest: ${context.vehicleInterest}`,
       `Conversation history length: ${context.conversationHistory.length} messages`
     ];
+    
+    if (vehicleContext?.hasSpecificVehicle) {
+      steps.push(`Specific vehicle detected: ${vehicleContext.extractedText}`);
+    }
+    
+    if (schedulingContext?.hasSchedulingRequest) {
+      steps.push(`Scheduling request for: ${schedulingContext.appointmentType.type}`);
+    }
     
     if (context.conversationHistory.length > 5) {
       steps.push('Established conversation - using personalized approach');
@@ -195,14 +252,30 @@ class UnifiedAIResponseEngine {
     return steps;
   }
 
-  private generateBaseResponse(context: MessageContext, intent: string): BaseResponse {
+  private generateEnhancedResponse(
+    context: MessageContext, 
+    intent: string, 
+    secondaryIntent?: string, 
+    tertiaryIntent?: string,
+    vehicleContext?: any,
+    schedulingContext?: SchedulingIntent
+  ): BaseResponse {
     // Extract just the first name for more personal responses
     const firstName = context.leadName.split(' ')[0] || context.leadName;
-    const secondaryIntent = this.detectSecondaryIntent(context.latestMessage);
     
-    // Handle composite responses for mixed questions
+    // Handle composite responses for mixed questions (2+ intents)
     if (intent === 'identity_question' && secondaryIntent) {
-      return this.generateCompositeResponse(context, intent, secondaryIntent);
+      return this.generateCompositeResponse(context, intent, secondaryIntent, tertiaryIntent, vehicleContext);
+    }
+    
+    // Handle enhanced objection responses
+    if (intent.includes('objection')) {
+      return this.generateObjectionResponse(context, intent, vehicleContext);
+    }
+    
+    // Handle scheduling responses
+    if (schedulingContext?.hasSchedulingRequest) {
+      return this.generateSchedulingResponse(context, schedulingContext, vehicleContext);
     }
     
     const responses = {
@@ -271,34 +344,104 @@ class UnifiedAIResponseEngine {
     return responses[intent as keyof typeof responses] || responses.general_inquiry;
   }
 
-  private generateCompositeResponse(context: MessageContext, primaryIntent: string, secondaryIntent: string): BaseResponse {
+  private generateObjectionResponse(context: MessageContext, intent: string, vehicleContext?: any): BaseResponse {
+    const firstName = context.leadName.split(' ')[0] || context.leadName;
+    const vehicleMention = vehicleContext?.hasSpecificVehicle ? ` regarding the ${vehicleContext.extractedText}` : '';
+    
+    const objectionResponses = {
+      budget_objection: {
+        message: `I completely understand, ${firstName}. Budget is one of the most important factors in this decision${vehicleMention}. Let's explore some options that might work better for you - we have various financing programs and sometimes different vehicles that could meet your needs within your comfort zone. What would feel like a reasonable monthly payment for you?`,
+        confidence: 0.9,
+        responseType: 'follow_up' as const
+      },
+      timing_objection: {
+        message: `That makes perfect sense, ${firstName}. Timing is everything with a purchase like this${vehicleMention}. I appreciate you being upfront about where you are in the process. When you mentioned you need more time, what would need to happen for the timing to feel right for you?`,
+        confidence: 0.9,
+        responseType: 'follow_up' as const
+      },
+      consideration_pause: {
+        message: `Absolutely, ${firstName} - this is a significant decision and you should take all the time you need${vehicleMention}. I respect that you want to think it through carefully. Is there any specific information or concerns I could help address while you're considering your options?`,
+        confidence: 0.85,
+        responseType: 'follow_up' as const
+      }
+    };
+    
+    return objectionResponses[intent as keyof typeof objectionResponses] || {
+      message: `I understand your concerns, ${firstName}${vehicleMention}. What would be most helpful in addressing them?`,
+      confidence: 0.7,
+      responseType: 'question_response' as const
+    };
+  }
+
+  private generateSchedulingResponse(context: MessageContext, schedulingContext: SchedulingIntent, vehicleContext?: any): BaseResponse {
+    const firstName = context.leadName.split(' ')[0] || context.leadName;
+    const vehicleMention = vehicleContext?.hasSpecificVehicle ? ` for the ${vehicleContext.extractedText}` : '';
+    
+    return {
+      message: `${schedulingContext.suggestedResponse.replace('I\'d be happy to schedule', `Hi ${firstName}! I'd be happy to schedule`)}${vehicleMention}`,
+      confidence: schedulingContext.confidence,
+      responseType: 'follow_up' as const
+    };
+  }
+
+  private generateCompositeResponse(
+    context: MessageContext, 
+    primaryIntent: string, 
+    secondaryIntent: string, 
+    tertiaryIntent?: string,
+    vehicleContext?: any
+  ): BaseResponse {
     const firstName = context.leadName.split(' ')[0] || context.leadName;
     
-    // Handle identity + price inquiry (the specific case from the example)
+    // Handle identity + price inquiry with enhanced vehicle context
     if (primaryIntent === 'identity_question' && secondaryIntent === 'price_inquiry') {
-      const vehicleContext = context.vehicleInterest && context.vehicleInterest !== 'finding the right vehicle for your needs' 
-        ? `on ${context.vehicleInterest}` 
-        : '';
+      let vehicleContextText = '';
+      
+      if (vehicleContext?.hasSpecificVehicle) {
+        vehicleContextText = ` on the ${vehicleContext.extractedText}`;
+      } else if (context.vehicleInterest && context.vehicleInterest !== 'finding the right vehicle for your needs') {
+        vehicleContextText = ` on ${context.vehicleInterest}`;
+      }
+      
+      // Add tertiary intent handling
+      let additionalAction = '';
+      if (tertiaryIntent === 'timing_inquiry') {
+        additionalAction = ' and discuss timing that works for you';
+      } else if (tertiaryIntent === 'test_drive_request') {
+        additionalAction = ' and arrange a test drive';
+      }
       
       return {
-        message: `Hi ${firstName}! I'm your sales consultant here at the dealership. I'd be happy to help you with pricing information${vehicleContext}. To give you the most accurate pricing, could you let me know which vehicle you're interested in? I want to make sure I get you the right details.`,
+        message: `Hi ${firstName}! I'm your sales consultant here at the dealership. I'd be happy to help you with pricing information${vehicleContextText}${additionalAction}. ${vehicleContext?.hasSpecificVehicle ? 'I can get you specific pricing details on that vehicle.' : 'To give you the most accurate pricing, could you let me know which vehicle you\'re most interested in?'}`,
         confidence: 0.95,
         responseType: 'question_response' as const
       };
     }
     
-    // Handle identity + other secondary intents
+    // Handle identity + other secondary intents with enhanced context
     const secondaryMessages = {
-      availability_inquiry: `and check our current inventory for you`,
-      appointment_request: `and schedule a time for you to visit`,
+      availability_inquiry: `and check our current inventory${vehicleContext?.hasSpecificVehicle ? ` for the ${vehicleContext.extractedText}` : ''} for you`,
+      appointment_request: `and schedule a time for you to visit${vehicleContext?.hasSpecificVehicle ? ` and see the ${vehicleContext.extractedText}` : ''}`,
       trade_inquiry: `and discuss your trade-in options`,
-      financing_inquiry: `and explore financing options that work for you`
+      financing_inquiry: `and explore financing options that work for you`,
+      feature_inquiry: `and go over the features${vehicleContext?.hasSpecificVehicle ? ` of the ${vehicleContext.extractedText}` : ''} you're interested in`
     };
     
     const secondaryAction = secondaryMessages[secondaryIntent as keyof typeof secondaryMessages] || 'and answer any questions you have';
     
+    // Add tertiary intent if present
+    let tertiaryAction = '';
+    if (tertiaryIntent && tertiaryIntent !== secondaryIntent) {
+      const tertiaryMessages = {
+        timing_inquiry: ', and find a time that works perfectly for your schedule',
+        comparison_request: ', and help you compare your options',
+        test_drive_request: ', and arrange a test drive when you\'re ready'
+      };
+      tertiaryAction = tertiaryMessages[tertiaryIntent as keyof typeof tertiaryMessages] || '';
+    }
+    
     return {
-      message: `Hi ${firstName}! I'm your sales consultant here at the dealership. I'd be happy to introduce myself properly ${secondaryAction}. What would be most helpful for you today?`,
+      message: `Hi ${firstName}! I'm your sales consultant here at the dealership. I'd be happy to introduce myself properly ${secondaryAction}${tertiaryAction}. What would be most helpful for you today?`,
       confidence: 0.9,
       responseType: 'question_response' as const
     };
