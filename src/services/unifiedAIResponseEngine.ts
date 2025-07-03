@@ -94,7 +94,15 @@ class UnifiedAIResponseEngine {
   private analyzeMessageIntent(message: string): string {
     const lowerMessage = message.toLowerCase();
     
-    // Check for identity questions FIRST (new priority)
+    // Check for browsing stage intent FIRST (highest priority for customer experience)
+    if (lowerMessage.includes('just looking') || lowerMessage.includes('just browsing') || 
+        lowerMessage.includes('shopping around') || lowerMessage.includes('getting a feel') ||
+        lowerMessage.includes('seeing what\'s out there') || lowerMessage.includes('researching') ||
+        lowerMessage.includes('comparing') || lowerMessage.includes('looking around')) {
+      return 'browsing_stage';
+    }
+    
+    // Check for identity questions SECOND (new priority)
     if (lowerMessage.includes('who are you') || lowerMessage.includes('who is you') || 
         lowerMessage.includes('who am i talking to') || lowerMessage.includes('who is this') ||
         lowerMessage.includes('what is your name') || lowerMessage.includes('your name')) {
@@ -150,6 +158,8 @@ class UnifiedAIResponseEngine {
 
   private determineResponseStrategy(intent: string, context: MessageContext): string {
     switch (intent) {
+      case 'browsing_stage':
+        return 'supportive_non_pressuring';
       case 'identity_question':
         return 'professional_introduction';
       case 'timing_objection':
@@ -196,6 +206,11 @@ class UnifiedAIResponseEngine {
     }
     
     const responses = {
+      browsing_stage: {
+        message: `Hi ${firstName}! That's perfectly fine - browsing is smart! No pressure at all. I'm here if you have any questions as you look around, or if you'd like me to share what's popular right now. Take your time!`,
+        confidence: 0.95,
+        responseType: 'follow_up' as const
+      },
       identity_question: {
         message: `Hi ${firstName}! I'm your sales consultant here at the dealership. I'd be happy to help you with any questions you have about our vehicles. What would you like to know?`,
         confidence: 0.9,
@@ -247,7 +262,7 @@ class UnifiedAIResponseEngine {
         responseType: 'greeting' as const
       },
       general_inquiry: {
-        message: `Hi ${firstName}! Thanks for your message. I'm here to help you with ${context.vehicleInterest || 'finding the perfect vehicle'}. What questions can I answer for you?`,
+        message: `Hi ${firstName}! Thanks for your message. I'm here to help you with any questions you might have about vehicles. What would be most helpful to know?`,
         confidence: 0.65,
         responseType: 'general' as const
       }

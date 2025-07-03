@@ -12,7 +12,17 @@ const corsHeaders = {
 const analyzeCustomerIntent = (message: string) => {
   const text = message.toLowerCase().trim();
   
-  // Check for identity questions FIRST (highest priority)
+  // Check for browsing stage intent FIRST (highest priority for customer experience)
+  if (/\b(just looking|just browsing|shopping around|getting a feel|seeing what's out there|researching|comparing|looking around)\b/i.test(text)) {
+    return {
+      primary: 'browsing_stage',
+      confidence: 0.95,
+      isMultiIntent: false,
+      isFinancingRelated: false
+    };
+  }
+  
+  // Check for identity questions SECOND (new priority)
   if (/\b(who are you|who is you|who am i talking to|who is this|what is your name|your name)\b/i.test(text)) {
     const secondary = detectSecondaryIntent(text);
     return {
@@ -118,6 +128,8 @@ const getResponseTemplate = (intent: any, leadName: string, customerMessage: str
   }
   
   const templates = {
+    browsing_stage: `Hi ${leadName}! That's perfectly fine - browsing is smart! No pressure at all. I'm here if you have any questions as you look around, or if you'd like me to share what's popular right now. Take your time!`,
+    
     identity_question: `Hi ${leadName}! I'm your sales consultant here at the dealership. I'd be happy to help you with any questions you have about our vehicles. What would you like to know?`,
     
     price_inquiry: `Hi ${leadName}! I'd be happy to discuss pricing with you. To give you the most accurate information, could you let me know which vehicle you're interested in? I want to make sure I get you the right details.`,
@@ -136,7 +148,7 @@ const getResponseTemplate = (intent: any, leadName: string, customerMessage: str
     
     objection: `I understand, ${leadName}. What would need to change for this to feel like the right time? I'm here to help when you're ready.`,
     
-    general_inquiry: `Hi ${leadName}! I'd be happy to help you with that. What specific details would be most helpful for your decision?`
+    general_inquiry: `Hi ${leadName}! I'd be happy to help you with any questions you might have about vehicles. What would be most helpful to know?`
   };
 
   return templates[intent.primary as keyof typeof templates] || templates.general_inquiry;

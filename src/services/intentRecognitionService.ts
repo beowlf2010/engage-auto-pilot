@@ -1,6 +1,6 @@
 
 export interface DetectedIntent {
-  type: 'buying_signal' | 'objection' | 'information_request' | 'scheduling' | 'pricing_inquiry' | 'comparison_request';
+  type: 'buying_signal' | 'objection' | 'information_request' | 'scheduling' | 'pricing_inquiry' | 'comparison_request' | 'browsing_stage';
   confidence: number;
   keywords: string[];
   context: string;
@@ -15,6 +15,12 @@ export interface ConversationIntent {
 }
 
 class IntentRecognitionService {
+  private browsingStagePatterns = [
+    { pattern: /\b(just looking|just browsing|shopping around|getting a feel|seeing what's out there)\b/i, confidence: 0.95, urgency: 'low' as const },
+    { pattern: /\b(researching|comparing|looking around|window shopping)\b/i, confidence: 0.85, urgency: 'low' as const },
+    { pattern: /\b(not ready to buy|not buying today|just exploring)\b/i, confidence: 0.9, urgency: 'low' as const }
+  ];
+
   private buyingSignalPatterns = [
     { pattern: /\b(ready to buy|want to purchase|interested in buying|let's do this|i'll take it)\b/i, confidence: 0.9, urgency: 'critical' as const },
     { pattern: /\b(when can i|schedule|appointment|come in|test drive)\b/i, confidence: 0.8, urgency: 'high' as const },
@@ -53,6 +59,20 @@ class IntentRecognitionService {
   analyzeIntent(messageText: string, conversationHistory?: string): ConversationIntent {
     const detectedIntents: DetectedIntent[] = [];
     const text = messageText.toLowerCase();
+
+    // Analyze browsing stage signals FIRST (highest priority for customer experience)
+    this.browsingStagePatterns.forEach(({ pattern, confidence, urgency }) => {
+      const matches = text.match(pattern);
+      if (matches) {
+        detectedIntents.push({
+          type: 'browsing_stage',
+          confidence,
+          keywords: Array.from(matches),
+          context: this.extractContext(messageText, matches[0]),
+          urgency
+        });
+      }
+    });
 
     // Analyze buying signals
     this.buyingSignalPatterns.forEach(({ pattern, confidence, urgency }) => {
@@ -180,6 +200,8 @@ class IntentRecognitionService {
 
   private generateNextBestAction(primaryIntent: DetectedIntent, conversationHistory?: string): string {
     switch (primaryIntent.type) {
+      case 'browsing_stage':
+        return 'Acknowledge browsing stage, remove pressure, offer light assistance';
       case 'buying_signal':
         return 'Schedule immediate appointment or begin closing process';
       case 'objection':
