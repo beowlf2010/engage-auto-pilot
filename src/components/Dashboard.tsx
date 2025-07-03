@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useConversationData } from '@/hooks/useConversationData';
 import { getCorrectLeadCounts } from '@/services/leadStatusTransitionService';
 import AIInsightsWidget from './dashboard/AIInsightsWidget';
+import { useDailyMessageStats } from '@/hooks/useDailyMessageStats';
 
 interface DashboardProps {
   user: {
@@ -32,6 +33,7 @@ interface DashboardProps {
 const Dashboard = ({ user }: DashboardProps) => {
   const navigate = useNavigate();
   const { messages } = useConversationData();
+  const { stats: messageStats, loading: statsLoading } = useDailyMessageStats();
   const [leadCounts, setLeadCounts] = useState({
     totalLeads: 0,
     newLeads: 0,
@@ -126,7 +128,47 @@ const Dashboard = ({ user }: DashboardProps) => {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Messages Sent</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {statsLoading ? '-' : (messageStats?.messages_sent || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {messageStats?.change_sent && messageStats.change_sent !== 0 && (
+                <span className={messageStats.change_sent > 0 ? 'text-green-600' : 'text-red-600'}>
+                  {messageStats.change_sent > 0 ? '+' : ''}{messageStats.change_sent}% from yesterday
+                </span>
+              )}
+              {(!messageStats?.change_sent || messageStats.change_sent === 0) && 'Today\'s outbound messages'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Replies Received</CardTitle>
+            <Mail className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {statsLoading ? '-' : (messageStats?.replies_in || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {messageStats?.change_replies && messageStats.change_replies !== 0 && (
+                <span className={messageStats.change_replies > 0 ? 'text-green-600' : 'text-red-600'}>
+                  {messageStats.change_replies > 0 ? '+' : ''}{messageStats.change_replies}% from yesterday
+                </span>
+              )}
+              {(!messageStats?.change_replies || messageStats.change_replies === 0) && 'Today\'s inbound messages'}
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
