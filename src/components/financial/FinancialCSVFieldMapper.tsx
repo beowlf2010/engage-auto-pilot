@@ -15,7 +15,7 @@ export interface FinancialFieldMapping {
   salePrice: string;
   customer: string;
   grossProfit: string;
-  financeProfit?: string;
+  financeProfit: string; // Now required
   totalProfit: string;
 }
 
@@ -57,7 +57,7 @@ const FinancialCSVFieldMapper = ({
         autoMapping.customer = header;
       } else if (lowerHeader.includes('gross') || lowerHeader === 'gross') {
         autoMapping.grossProfit = header;
-      } else if (lowerHeader.includes('fi') || lowerHeader.includes('finance') || lowerHeader === 'fi') {
+      } else if (lowerHeader.includes('fi') || lowerHeader.includes('finance') || lowerHeader === 'fi' || lowerHeader.includes('f&i') || lowerHeader.includes('f & i')) {
         autoMapping.financeProfit = header;
       } else if (lowerHeader.includes('total') || lowerHeader === 'total') {
         autoMapping.totalProfit = header;
@@ -73,15 +73,15 @@ const FinancialCSVFieldMapper = ({
     { key: 'vehicle' as keyof FinancialFieldMapping, label: 'Vehicle Description', required: true },
     { key: 'salePrice' as keyof FinancialFieldMapping, label: 'Sale Price (SLP)', required: true },
     { key: 'customer' as keyof FinancialFieldMapping, label: 'Customer Name', required: true },
-    { key: 'grossProfit' as keyof FinancialFieldMapping, label: 'Gross Profit', required: true },
+    { key: 'grossProfit' as keyof FinancialFieldMapping, label: 'Front End Gross Profit', required: true },
+    { key: 'financeProfit' as keyof FinancialFieldMapping, label: 'Finance Profit (FI) - Required', required: true },
     { key: 'totalProfit' as keyof FinancialFieldMapping, label: 'Total Profit', required: true }
   ];
 
   const optionalFields = [
     { key: 'age' as keyof FinancialFieldMapping, label: 'Age (Days in Inventory)', required: false },
     { key: 'vin6' as keyof FinancialFieldMapping, label: 'VIN (Last 6 digits)', required: false },
-    { key: 'trade' as keyof FinancialFieldMapping, label: 'Trade Value', required: false },
-    { key: 'financeProfit' as keyof FinancialFieldMapping, label: 'Finance Profit (FI)', required: false }
+    { key: 'trade' as keyof FinancialFieldMapping, label: 'Trade Value', required: false }
   ];
 
   const handleMappingChange = (fieldKey: keyof FinancialFieldMapping, value: string) => {
@@ -114,7 +114,7 @@ const FinancialCSVFieldMapper = ({
           <span>Map Financial Data Fields</span>
         </CardTitle>
         <p className="text-sm text-slate-600">
-          Map your file's columns to the required financial data fields. Required fields must be mapped to proceed.
+          Map your file's columns to the required financial data fields. Finance Profit (FI) is now mandatory and must be mapped to proceed.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
