@@ -1,5 +1,5 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
 
 // Enhanced inventory validation to prevent AI from claiming non-existent vehicles
 export const validateInventoryAccuracy = async (vehicleInterest: string, leadId?: string) => {
