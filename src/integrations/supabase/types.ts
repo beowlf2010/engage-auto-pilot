@@ -1542,7 +1542,15 @@ export type Database = {
           upload_history_id?: string | null
           year_model?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_deals_inventory_stock_number"
+            columns: ["stock_number"]
+            isOneToOne: true
+            referencedRelation: "inventory"
+            referencedColumns: ["stock_number"]
+          },
+        ]
       }
       email_campaigns: {
         Row: {
