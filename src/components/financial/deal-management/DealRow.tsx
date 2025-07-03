@@ -35,7 +35,7 @@ interface Deal {
     model?: string;
     trim?: string;
     status?: string;
-  }[];
+  } | null;
 }
 
 interface DealRowProps {
@@ -73,7 +73,7 @@ const DealRow = ({
 
   // Get vehicle description from inventory data or fallback
   const getVehicleDescription = () => {
-    const inventoryItem = deal.inventory?.[0];
+    const inventoryItem = deal.inventory;
     if (inventoryItem && inventoryItem.year && inventoryItem.make && inventoryItem.model) {
       const parts = [
         inventoryItem.year,
@@ -89,12 +89,20 @@ const DealRow = ({
       return deal.year_model;
     }
     
-    // Last fallback - show stock number if available
-    if (deal.stock_number) {
-      return `Vehicle ${deal.stock_number}`;
+    // Last fallback - show customer and deal info
+    if (deal.buyer_name && deal.stock_number) {
+      return `${deal.buyer_name} - Stock #${deal.stock_number}`;
     }
     
-    return 'Unknown Vehicle';
+    if (deal.stock_number) {
+      return `Stock #${deal.stock_number}`;
+    }
+    
+    if (deal.buyer_name) {
+      return `Deal for ${deal.buyer_name}`;
+    }
+    
+    return 'Vehicle Deal';
   };
 
   return (
@@ -124,12 +132,12 @@ const DealRow = ({
           ) : (
             <span className="text-slate-500 text-xs">No Stock #</span>
           )}
-          {deal.inventory?.[0]?.status && (
+          {deal.inventory?.status && (
             <Badge 
-              variant={deal.inventory[0].status === 'sold' ? 'default' : 'secondary'}
+              variant={deal.inventory.status === 'sold' ? 'default' : 'secondary'}
               className="text-xs"
             >
-              {deal.inventory[0].status}
+              {deal.inventory.status}
             </Badge>
           )}
         </div>

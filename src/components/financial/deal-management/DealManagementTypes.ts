@@ -24,7 +24,7 @@ export interface Deal {
     model?: string;
     trim?: string;
     status?: string;
-  }[];
+  } | null;
 }
 
 export interface SummaryTotals {

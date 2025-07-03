@@ -90,7 +90,7 @@ export const useDealManagement = () => {
       console.log('Fetched deals:', data?.length);
       console.log('Date filter applied:', dateFilter, 'Field:', dateField);
       
-      // Transform the data to handle Json type for assigned_managers and inventory array
+      // Transform the data to handle Json type for assigned_managers and keep inventory as single object
       const transformedDeals = (data || []).map(deal => ({
         ...deal,
         assigned_managers: Array.isArray(deal.assigned_managers) 
@@ -98,7 +98,7 @@ export const useDealManagement = () => {
           : deal.assigned_managers 
             ? JSON.parse(deal.assigned_managers as string)
             : [],
-        inventory: deal.inventory ? [deal.inventory] : []
+        inventory: deal.inventory || null
       })) as Deal[];
       
       setDeals(transformedDeals);
