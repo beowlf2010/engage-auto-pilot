@@ -1,6 +1,6 @@
 
 export interface DetectedIntent {
-  type: 'buying_signal' | 'objection' | 'information_request' | 'scheduling' | 'pricing_inquiry' | 'comparison_request' | 'browsing_stage' | 'identity_question' | 'vehicle_specific';
+  type: 'buying_signal' | 'objection' | 'information_request' | 'scheduling' | 'pricing_inquiry' | 'comparison_request' | 'browsing_stage' | 'identity_question' | 'vehicle_specific' | 'transportation_need';
   confidence: number;
   keywords: string[];
   context: string;
@@ -31,6 +31,13 @@ class IntentRecognitionService {
     { pattern: /\b(just looking|just browsing|shopping around|getting a feel|seeing what's out there)\b/i, confidence: 0.95, urgency: 'low' as const },
     { pattern: /\b(researching|comparing|looking around|window shopping)\b/i, confidence: 0.85, urgency: 'low' as const },
     { pattern: /\b(not ready to buy|not buying today|just exploring)\b/i, confidence: 0.9, urgency: 'low' as const }
+  ];
+
+  private transportationNeedPatterns = [
+    { pattern: /\b(just need one to get me|need something to get|need reliable transportation|basic transportation)\b/i, confidence: 0.95, urgency: 'medium' as const },
+    { pattern: /\b(just need wheels|need a car to get to|need to get around|get me where)\b/i, confidence: 0.9, urgency: 'medium' as const },
+    { pattern: /\b(transportation|commute|daily driving|work commute)\b/i, confidence: 0.8, urgency: 'medium' as const },
+    { pattern: /\b(practical|dependable|reliable|economy|fuel efficient)\b/i, confidence: 0.7, urgency: 'low' as const }
   ];
 
   private buyingSignalPatterns = [
@@ -89,7 +96,21 @@ class IntentRecognitionService {
       }
     });
 
-    // Analyze browsing stage signals SECOND (high priority for customer experience)
+    // Analyze transportation need patterns SECOND (high priority for practical customers)
+    this.transportationNeedPatterns.forEach(({ pattern, confidence, urgency }) => {
+      const matches = text.match(pattern);
+      if (matches) {
+        detectedIntents.push({
+          type: 'transportation_need',
+          confidence,
+          keywords: Array.from(matches),
+          context: this.extractContext(messageText, matches[0]),
+          urgency
+        });
+      }
+    });
+
+    // Analyze browsing stage signals THIRD (high priority for customer experience)
     this.browsingStagePatterns.forEach(({ pattern, confidence, urgency }) => {
       const matches = text.match(pattern);
       if (matches) {
@@ -231,6 +252,8 @@ class IntentRecognitionService {
     switch (primaryIntent.type) {
       case 'identity_question':
         return 'Provide professional introduction and ask what would be most helpful';
+      case 'transportation_need':
+        return 'Acknowledge practical need, focus on reliability and daily use patterns';
       case 'browsing_stage':
         return 'Acknowledge browsing stage, remove pressure, offer light assistance';
       case 'buying_signal':

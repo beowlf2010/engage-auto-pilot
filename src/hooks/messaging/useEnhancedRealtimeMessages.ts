@@ -90,7 +90,8 @@ export const useEnhancedRealtimeMessages = ({
       status: 'connecting'
     }));
 
-    console.log(`📡 [ENHANCED RT] Setting up enhanced real-time subscription (attempt ${connectionStatus.reconnectAttempts + 1})`);
+    const currentAttempts = connectionStatus.reconnectAttempts;
+    console.log(`📡 [ENHANCED RT] Setting up enhanced real-time subscription (attempt ${currentAttempts + 1})`);
     
     const channelName = `enhanced-messages-${profile.id}-${Date.now()}`;
     const channel = supabase
@@ -173,15 +174,15 @@ export const useEnhancedRealtimeMessages = ({
               reconnectAttempts: prev.reconnectAttempts + 1
             }));
             
-            // Exponential backoff for reconnection
-            const delay = Math.min(5000 * Math.pow(2, connectionStatus.reconnectAttempts), 60000);
+            // Exponential backoff for reconnection - use current attempts to avoid stale state
+            const delay = Math.min(5000 * Math.pow(2, currentAttempts), 60000);
             scheduleReconnect(delay);
             break;
         }
       });
 
     channelRef.current = channel;
-  }, [profile, onMessageUpdate, onConversationUpdate, connectionStatus.reconnectAttempts, cleanup, startHeartbeat, scheduleReconnect]);
+  }, [profile, onMessageUpdate, onConversationUpdate, cleanup, startHeartbeat, scheduleReconnect]);
 
   // Setup subscription on mount and profile change
   useEffect(() => {

@@ -111,7 +111,15 @@ class UnifiedAIResponseEngine {
   private analyzeMessageIntent(message: string): string {
     const lowerMessage = message.toLowerCase();
     
-    // Check for browsing stage intent FIRST (highest priority for customer experience)
+    // Check for transportation need intent FIRST (highest priority for practical customers)
+    if (lowerMessage.includes('just need one to get me') || lowerMessage.includes('need something to get') || 
+        lowerMessage.includes('need reliable transportation') || lowerMessage.includes('basic transportation') ||
+        lowerMessage.includes('just need wheels') || lowerMessage.includes('need a car to get to') ||
+        lowerMessage.includes('need to get around') || lowerMessage.includes('get me where')) {
+      return 'transportation_need';
+    }
+    
+    // Check for browsing stage intent SECOND (high priority for customer experience)
     if (lowerMessage.includes('just looking') || lowerMessage.includes('just browsing') || 
         lowerMessage.includes('shopping around') || lowerMessage.includes('getting a feel') ||
         lowerMessage.includes('seeing what\'s out there') || lowerMessage.includes('researching') ||
@@ -202,6 +210,8 @@ class UnifiedAIResponseEngine {
 
   private determineResponseStrategy(intent: string, context: MessageContext): string {
     switch (intent) {
+      case 'transportation_need':
+        return 'practical_focused';
       case 'browsing_stage':
         return 'supportive_non_pressuring';
       case 'identity_question':
@@ -279,6 +289,11 @@ class UnifiedAIResponseEngine {
     }
     
     const responses = {
+      transportation_need: {
+        message: `Hi ${firstName}! I completely understand - you need reliable transportation to get where you need to go. Let's find you something practical and dependable that fits your budget. What type of daily driving do you do most - city commuting, highway, or a mix of both?`,
+        confidence: 0.95,
+        responseType: 'vehicle_inquiry' as const
+      },
       browsing_stage: {
         message: `Hi ${firstName}! That's perfectly fine - browsing is smart! No pressure at all. I'm here if you have any questions as you look around, or if you'd like me to share what's popular right now. Take your time!`,
         confidence: 0.95,
@@ -335,7 +350,7 @@ class UnifiedAIResponseEngine {
         responseType: 'greeting' as const
       },
       general_inquiry: {
-        message: `Hi ${firstName}! Thanks for your message. I'm here to help you with any questions you might have about vehicles. What would be most helpful to know?`,
+        message: `Hi ${firstName}! Thanks for reaching out. I'd be happy to help you find the right vehicle for your needs. What's most important to you in your next vehicle - are you looking for something specific or just getting started in your search?`,
         confidence: 0.65,
         responseType: 'general' as const
       }

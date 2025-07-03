@@ -30,7 +30,18 @@ const analyzeCustomerIntent = (message: string) => {
     };
   }
   
-  // Check for browsing stage intent SECOND (high priority for customer experience)
+  // Check for transportation need intent SECOND (highest priority for practical customers)
+  if (/\b(just need one to get me|need something to get|need reliable transportation|basic transportation|just need wheels|need a car to get to|need to get around|get me where)\b/i.test(text)) {
+    return {
+      primary: 'transportation_need',
+      confidence: 0.95,
+      isMultiIntent: false,
+      isFinancingRelated: false,
+      vehicleInfo
+    };
+  }
+  
+  // Check for browsing stage intent THIRD (high priority for customer experience)
   if (/\b(just looking|just browsing|shopping around|getting a feel|seeing what's out there|researching|comparing|looking around)\b/i.test(text)) {
     return {
       primary: 'browsing_stage',
@@ -277,6 +288,8 @@ const getResponseTemplate = (intent: any, leadName: string, customerMessage: str
   const vehicleMention = intent.vehicleInfo ? ` regarding the ${buildVehicleString(intent.vehicleInfo)}` : '';
   
   const templates = {
+    transportation_need: `Hi ${leadName}! I completely understand - you need reliable transportation to get where you need to go. Let's find you something practical and dependable that fits your budget. What type of daily driving do you do most - city commuting, highway, or a mix of both?`,
+    
     browsing_stage: `Hi ${leadName}! That's perfectly fine - browsing is smart! No pressure at all. I'm here if you have any questions as you look around${vehicleMention ? ` about the ${buildVehicleString(intent.vehicleInfo)}` : ''}, or if you'd like me to share what's popular right now. Take your time!`,
     
     identity_question: `Hi ${leadName}! I'm your sales consultant here at the dealership. I'd be happy to help you with any questions you have about our vehicles${vehicleMention}. What would you like to know?`,
