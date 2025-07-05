@@ -32,6 +32,8 @@ const ContactInfoCard = ({ lead, phoneNumbers, primaryPhone, onPhoneSelect }: Co
             primaryPhone={primaryPhone}
             onPhoneSelect={onPhoneSelect}
             compact={false}
+            leadId={lead.id}
+            leadName={`${lead.firstName} ${lead.lastName}`}
           />
         </div>
         <Separator />

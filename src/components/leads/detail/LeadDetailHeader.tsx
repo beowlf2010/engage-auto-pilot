@@ -10,6 +10,7 @@ import QuickControlsCard from "./QuickControlsCard";
 import MarkLostConfirmDialog from "../MarkLostConfirmDialog";
 import MarkSoldConfirmDialog from "../MarkSoldConfirmDialog";
 import { markLeadAsLost, markLeadAsSold } from "@/services/leadStatusService";
+import CallButton from "@/components/calling/CallButton";
 
 interface Lead {
   id: string;
@@ -22,6 +23,7 @@ interface Lead {
   state?: string;
   created_at: string;
   aiOptIn?: boolean;
+  primaryPhone?: string;
 }
 
 interface LeadDetailHeaderProps {
@@ -166,10 +168,21 @@ const LeadDetailHeader = ({ lead, onSendMessage, onAIOptInChange, onLeadUpdate }
             </Badge>
             
             <div className="flex space-x-2">
-              <Button size="sm" variant="outline">
-                <Phone className="w-4 h-4 mr-2" />
-                Call
-              </Button>
+              {lead.primaryPhone ? (
+                <CallButton
+                  leadId={lead.id}
+                  phoneNumber={lead.primaryPhone}
+                  leadName={`${lead.first_name} ${lead.last_name}`}
+                  size="sm"
+                  variant="outline"
+                  showQueueOption={true}
+                />
+              ) : (
+                <Button size="sm" variant="outline" disabled>
+                  <Phone className="w-4 h-4 mr-2" />
+                  Call
+                </Button>
+              )}
               
               <Button size="sm" variant="outline" onClick={onSendMessage}>
                 <MessageSquare className="w-4 h-4 mr-2" />

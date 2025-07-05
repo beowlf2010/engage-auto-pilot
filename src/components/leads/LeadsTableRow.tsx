@@ -13,6 +13,7 @@ import AISequenceStatus from "./AISequenceStatus";
 import QuickAIActions from "./QuickAIActions";
 import HideLeadButton from "./HideLeadButton";
 import SoldCustomerActions from "./SoldCustomerActions";
+import CallButton from "@/components/calling/CallButton";
 
 interface LeadsTableRowProps {
   lead: Lead;
@@ -107,8 +108,21 @@ const LeadsTableRow: React.FC<LeadsTableRowProps> = ({
       
       <TableCell>
         <div className="flex items-center space-x-2">
-          <Phone className="w-4 h-4 text-gray-400" />
-          <span className="text-sm">{lead.primaryPhone}</span>
+          {lead.primaryPhone ? (
+            <CallButton
+              leadId={lead.id}
+              phoneNumber={lead.primaryPhone}
+              leadName={`${lead.firstName} ${lead.lastName}`}
+              size="sm"
+              variant="ghost"
+              showQueueOption={false}
+            />
+          ) : (
+            <div className="flex items-center space-x-2 text-gray-400">
+              <Phone className="w-4 h-4" />
+              <span className="text-sm">No phone</span>
+            </div>
+          )}
         </div>
       </TableCell>
       

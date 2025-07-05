@@ -8,9 +8,11 @@ interface QuickContactCardProps {
   phoneNumbers: PhoneNumber[];
   primaryPhone: string;
   onPhoneSelect: (phoneNumber: string) => void;
+  leadId?: string;
+  leadName?: string;
 }
 
-const QuickContactCard = ({ phoneNumbers, primaryPhone, onPhoneSelect }: QuickContactCardProps) => {
+const QuickContactCard = ({ phoneNumbers, primaryPhone, onPhoneSelect, leadId, leadName }: QuickContactCardProps) => {
   return (
     <Card>
       <CardHeader>
@@ -22,6 +24,8 @@ const QuickContactCard = ({ phoneNumbers, primaryPhone, onPhoneSelect }: QuickCo
           primaryPhone={primaryPhone}
           onPhoneSelect={onPhoneSelect}
           compact={true}
+          leadId={leadId}
+          leadName={leadName}
         />
       </CardContent>
     </Card>

@@ -4,19 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Phone, PhoneCall } from "lucide-react";
 import { PhoneNumber } from "@/types/lead";
 import { formatPhoneForDisplay } from "@/utils/phoneUtils";
+import CallButton from "@/components/calling/CallButton";
 
 interface PhoneNumberDisplayProps {
   phoneNumbers: PhoneNumber[];
   primaryPhone: string;
   onPhoneSelect?: (phone: string) => void;
   compact?: boolean;
+  leadId?: string;
+  leadName?: string;
 }
 
 const PhoneNumberDisplay = ({ 
   phoneNumbers, 
   primaryPhone, 
   onPhoneSelect,
-  compact = false 
+  compact = false,
+  leadId,
+  leadName 
 }: PhoneNumberDisplayProps) => {
   const getPhoneTypeColor = (type: string) => {
     switch (type) {
@@ -80,7 +85,17 @@ const PhoneNumberDisplay = ({
             </Badge>
           )}
         </div>
-        {onPhoneSelect && (
+        {leadId && leadName ? (
+          <CallButton
+            leadId={leadId}
+            phoneNumber={activePhone.number}
+            leadName={leadName}
+            size="sm"
+            variant="outline"
+            className="px-2"
+            showQueueOption={false}
+          />
+        ) : onPhoneSelect && (
           <Button
             size="sm"
             variant="outline"
@@ -128,7 +143,17 @@ const PhoneNumberDisplay = ({
               </div>
             </div>
           </div>
-          {onPhoneSelect && phone.status === 'active' && (
+          {leadId && leadName && phone.status === 'active' ? (
+            <CallButton
+              leadId={leadId}
+              phoneNumber={phone.number}
+              leadName={leadName}
+              size="sm"
+              variant="outline"
+              className="px-2 ml-2"
+              showQueueOption={true}
+            />
+          ) : onPhoneSelect && phone.status === 'active' && (
             <Button
               size="sm"
               variant="outline"
