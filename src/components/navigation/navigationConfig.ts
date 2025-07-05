@@ -7,7 +7,8 @@ import {
   Bot,
   TrendingUp,
   Settings,
-  Brain
+  Brain,
+  Phone
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -36,6 +37,12 @@ export const navigationItems: NavigationItem[] = [
     label: 'Leads',
     href: '/leads',
     icon: Users,
+    access: ['admin', 'manager', 'sales']
+  },
+  {
+    label: 'Auto-Dialing',
+    href: '/auto-dialing',
+    icon: Phone,
     access: ['admin', 'manager', 'sales']
   },
   {

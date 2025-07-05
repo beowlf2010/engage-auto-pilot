@@ -6,7 +6,8 @@ import ApiKeysSettings from '@/components/settings/ApiKeysSettings';
 import EmailSettings from '@/components/settings/EmailSettings';
 import AISettingsPanel from '@/components/settings/AISettingsPanel';
 import NotificationSettings from '@/components/settings/NotificationSettings';
-import { Settings as SettingsIcon, Key, Mail, Bot, Bell } from 'lucide-react';
+import TwilioSettings from '@/components/settings/TwilioSettings';
+import { Settings as SettingsIcon, Key, Mail, Bot, Bell, Phone } from 'lucide-react';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('api-keys');
@@ -23,7 +24,7 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="api-keys" className="flex items-center space-x-2">
             <Key className="h-4 w-4" />
             <span>API Keys</span>
@@ -39,6 +40,10 @@ const Settings = () => {
           <TabsTrigger value="ai" className="flex items-center space-x-2">
             <Bot className="h-4 w-4" />
             <span>AI Settings</span>
+          </TabsTrigger>
+          <TabsTrigger value="twilio" className="flex items-center space-x-2">
+            <Phone className="h-4 w-4" />
+            <span>Twilio</span>
           </TabsTrigger>
         </TabsList>
 
@@ -56,6 +61,10 @@ const Settings = () => {
 
         <TabsContent value="ai" className="mt-6">
           <AISettingsPanel />
+        </TabsContent>
+
+        <TabsContent value="twilio" className="mt-6">
+          <TwilioSettings userRole={userRole} />
         </TabsContent>
       </Tabs>
     </div>

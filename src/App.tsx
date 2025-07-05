@@ -23,6 +23,7 @@ import MessageExportPage from './pages/MessageExportPage';
 import PersonalizationPage from './pages/PersonalizationPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import ManagerDashboardPage from './pages/ManagerDashboardPage';
+import AutoDialingPage from './pages/AutoDialingPage';
 import SettingsPage from './pages/SettingsPage';
 import { Toaster } from '@/components/ui/toaster';
 
@@ -67,6 +68,14 @@ const AppContent = () => {
           <ProtectedRoute>
             <AppLayout>
               <UploadLeadsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/auto-dialing" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AutoDialingPage />
             </AppLayout>
           </ProtectedRoute>
         } />
