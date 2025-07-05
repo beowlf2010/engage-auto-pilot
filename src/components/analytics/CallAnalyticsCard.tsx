@@ -36,8 +36,49 @@ const CallAnalyticsCard = ({ showPersonal = false }: CallAnalyticsCardProps) => 
     try {
       setLoading(true);
       
-      // For now, show placeholder data since call_queue table doesn't exist yet
-      // This will be populated with real data once the full call system is implemented
+      // Get call outcomes for statistics
+      let query = supabase.from('call_outcomes').select('*');
+      
+      if (showPersonal && profile?.id) {
+        query = query.eq('created_by', profile.id);
+      }
+      
+      const { data: outcomes, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching call outcomes:', error);
+        return;
+      }
+      
+      // Calculate statistics from real data
+      const totalCalls = outcomes?.length || 0;
+      const completedCalls = outcomes?.filter(o => 
+        ['answered', 'appointment_scheduled', 'callback_requested'].includes(o.outcome)
+      ).length || 0;
+      
+      const callsToday = outcomes?.filter(o => {
+        const callDate = new Date(o.created_at).toDateString();
+        const today = new Date().toDateString();
+        return callDate === today;
+      }).length || 0;
+      
+      const durations = outcomes?.filter(o => o.duration_seconds).map(o => o.duration_seconds) || [];
+      const avgDuration = durations.length > 0 
+        ? Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length)
+        : 0;
+      
+      const successRate = totalCalls > 0 ? Math.round((completedCalls / totalCalls) * 100) : 0;
+
+      setStats({
+        total_calls: totalCalls,
+        completed_calls: completedCalls,
+        success_rate: successRate,
+        avg_duration: avgDuration,
+        calls_today: callsToday
+      });
+    } catch (error) {
+      console.error('Error fetching call analytics:', error);
+      // Fallback to placeholder data
       const placeholderStats = {
         total_calls: showPersonal ? 12 : 47,
         completed_calls: showPersonal ? 8 : 31,
@@ -45,10 +86,7 @@ const CallAnalyticsCard = ({ showPersonal = false }: CallAnalyticsCardProps) => 
         avg_duration: showPersonal ? 142 : 156,
         calls_today: showPersonal ? 3 : 14
       };
-
       setStats(placeholderStats);
-    } catch (error) {
-      console.error('Error fetching call analytics:', error);
     } finally {
       setLoading(false);
     }

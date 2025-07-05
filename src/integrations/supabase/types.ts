@@ -1241,6 +1241,205 @@ export type Database = {
           },
         ]
       }
+      call_history: {
+        Row: {
+          call_cost: number | null
+          call_direction: string
+          call_recording_url: string | null
+          call_status: string
+          created_at: string
+          created_by: string | null
+          duration_seconds: number | null
+          id: string
+          lead_id: string
+          notes: string | null
+          outcome: string | null
+          phone_number: string
+          phone_type: string
+          twilio_call_sid: string | null
+          updated_at: string
+        }
+        Insert: {
+          call_cost?: number | null
+          call_direction?: string
+          call_recording_url?: string | null
+          call_status: string
+          created_at?: string
+          created_by?: string | null
+          duration_seconds?: number | null
+          id?: string
+          lead_id: string
+          notes?: string | null
+          outcome?: string | null
+          phone_number: string
+          phone_type?: string
+          twilio_call_sid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          call_cost?: number | null
+          call_direction?: string
+          call_recording_url?: string | null
+          call_status?: string
+          created_at?: string
+          created_by?: string | null
+          duration_seconds?: number | null
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          outcome?: string | null
+          phone_number?: string
+          phone_type?: string
+          twilio_call_sid?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_outcomes: {
+        Row: {
+          appointment_scheduled: boolean | null
+          call_cost: number | null
+          call_queue_id: string | null
+          call_recording_url: string | null
+          callback_scheduled_at: string | null
+          created_at: string
+          created_by: string | null
+          duration_seconds: number | null
+          id: string
+          lead_id: string
+          next_action: string | null
+          notes: string | null
+          outcome: string
+          phone_number: string
+          twilio_call_sid: string | null
+        }
+        Insert: {
+          appointment_scheduled?: boolean | null
+          call_cost?: number | null
+          call_queue_id?: string | null
+          call_recording_url?: string | null
+          callback_scheduled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_seconds?: number | null
+          id?: string
+          lead_id: string
+          next_action?: string | null
+          notes?: string | null
+          outcome: string
+          phone_number: string
+          twilio_call_sid?: string | null
+        }
+        Update: {
+          appointment_scheduled?: boolean | null
+          call_cost?: number | null
+          call_queue_id?: string | null
+          call_recording_url?: string | null
+          callback_scheduled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_seconds?: number | null
+          id?: string
+          lead_id?: string
+          next_action?: string | null
+          notes?: string | null
+          outcome?: string
+          phone_number?: string
+          twilio_call_sid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_outcomes_call_queue_id_fkey"
+            columns: ["call_queue_id"]
+            isOneToOne: false
+            referencedRelation: "call_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_outcomes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_queue: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          compliance_reason: string | null
+          compliance_status: string
+          created_at: string
+          created_by: string | null
+          id: string
+          lead_id: string
+          max_attempts: number
+          next_attempt_at: string | null
+          phone_number: string
+          phone_type: string
+          priority_score: number
+          scheduled_at: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          compliance_reason?: string | null
+          compliance_status?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_id: string
+          max_attempts?: number
+          next_attempt_at?: string | null
+          phone_number: string
+          phone_type?: string
+          priority_score?: number
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          compliance_reason?: string | null
+          compliance_status?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_id?: string
+          max_attempts?: number
+          next_attempt_at?: string | null
+          phone_number?: string
+          phone_type?: string
+          priority_score?: number
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitive_analysis: {
         Row: {
           analysis_date: string
@@ -3253,6 +3452,7 @@ export type Database = {
           ai_strategy_last_updated: string | null
           ai_takeover_delay_minutes: number | null
           ai_takeover_enabled: boolean | null
+          call_priority: number | null
           city: string | null
           conversion_probability: number | null
           created_at: string
@@ -3271,15 +3471,18 @@ export type Database = {
           human_response_deadline: string | null
           id: string
           is_hidden: boolean | null
+          last_call_attempt: string | null
           last_name: string | null
           last_prediction_update: string | null
           last_reply_at: string | null
           lead_source_name: string | null
           lead_status_type_name: string | null
+          lead_temperature: number | null
           lead_type_name: string | null
           message_intensity: string | null
           middle_name: string | null
           next_ai_send_at: string | null
+          next_call_scheduled: string | null
           next_email_send_at: string | null
           original_row_index: number | null
           original_status: string | null
@@ -3300,6 +3503,7 @@ export type Database = {
           state: string | null
           status: string
           status_mapping_log: Json | null
+          temperature_last_updated: string | null
           temperature_score: number | null
           trade_decision_timeline: string | null
           trade_financing_bank: string | null
@@ -3331,6 +3535,7 @@ export type Database = {
           ai_strategy_last_updated?: string | null
           ai_takeover_delay_minutes?: number | null
           ai_takeover_enabled?: boolean | null
+          call_priority?: number | null
           city?: string | null
           conversion_probability?: number | null
           created_at?: string
@@ -3349,15 +3554,18 @@ export type Database = {
           human_response_deadline?: string | null
           id?: string
           is_hidden?: boolean | null
+          last_call_attempt?: string | null
           last_name?: string | null
           last_prediction_update?: string | null
           last_reply_at?: string | null
           lead_source_name?: string | null
           lead_status_type_name?: string | null
+          lead_temperature?: number | null
           lead_type_name?: string | null
           message_intensity?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
+          next_call_scheduled?: string | null
           next_email_send_at?: string | null
           original_row_index?: number | null
           original_status?: string | null
@@ -3378,6 +3586,7 @@ export type Database = {
           state?: string | null
           status?: string
           status_mapping_log?: Json | null
+          temperature_last_updated?: string | null
           temperature_score?: number | null
           trade_decision_timeline?: string | null
           trade_financing_bank?: string | null
@@ -3409,6 +3618,7 @@ export type Database = {
           ai_strategy_last_updated?: string | null
           ai_takeover_delay_minutes?: number | null
           ai_takeover_enabled?: boolean | null
+          call_priority?: number | null
           city?: string | null
           conversion_probability?: number | null
           created_at?: string
@@ -3427,15 +3637,18 @@ export type Database = {
           human_response_deadline?: string | null
           id?: string
           is_hidden?: boolean | null
+          last_call_attempt?: string | null
           last_name?: string | null
           last_prediction_update?: string | null
           last_reply_at?: string | null
           lead_source_name?: string | null
           lead_status_type_name?: string | null
+          lead_temperature?: number | null
           lead_type_name?: string | null
           message_intensity?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
+          next_call_scheduled?: string | null
           next_email_send_at?: string | null
           original_row_index?: number | null
           original_status?: string | null
@@ -3456,6 +3669,7 @@ export type Database = {
           state?: string | null
           status?: string
           status_mapping_log?: Json | null
+          temperature_last_updated?: string | null
           temperature_score?: number | null
           trade_decision_timeline?: string | null
           trade_financing_bank?: string | null

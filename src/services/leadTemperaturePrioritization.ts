@@ -23,326 +23,177 @@ export interface PrioritizedLead {
   last_contact_attempt?: Date;
 }
 
-export const calculateLeadPriority = async (leadIds?: string[]): Promise<PrioritizedLead[]> => {
+// Overloaded function signatures
+export async function calculateLeadPriority(leadId: string): Promise<number>;
+export async function calculateLeadPriority(leadIds: string[]): Promise<PrioritizedLead[]>;
+export async function calculateLeadPriority(leadIdInput: string | string[]): Promise<number | PrioritizedLead[]> {
+  const isArray = Array.isArray(leadIdInput);
+  const leadIds = isArray ? leadIdInput : [leadIdInput];
+  
   try {
-    let query = supabase
+    const { data: leads, error } = await supabase
       .from('leads')
       .select(`
-        id, first_name, last_name, phone, 
-        last_reply_at, created_at, source, lead_source_name, 
-        vehicle_interest, state, city, do_not_call,
-        conversations(direction, sent_at)
-      `);
+        id, first_name, last_name, status, created_at, updated_at, last_reply_at,
+        source, vehicle_interest, lead_temperature, call_priority, last_call_attempt,
+        phone_numbers!inner(number, is_primary)
+      `)
+      .in('id', leadIds);
 
-    if (leadIds && leadIds.length > 0) {
-      query = query.in('id', leadIds);
-    } else {
-      // Default: get active leads that might need calling
-      query = query
-        .eq('do_not_call', false)
-        .in('status', ['new', 'contacted', 'engaged'])
-        .limit(100);
-    }
+    if (error) throw error;
 
-    const { data: leads, error } = await query;
-
-    if (error) {
-      console.error('Error fetching leads for prioritization:', error);
-      return [];
-    }
-
-    if (!leads) return [];
-
-    // Calculate priority for each lead
     const prioritizedLeads: PrioritizedLead[] = [];
 
-    for (const lead of leads) {
-      const factors = await calculatePriorityFactors(lead);
-      const priorityScore = calculatePriorityScore(factors);
+    for (const lead of leads || []) {
+      const primaryPhone = lead.phone_numbers?.find(p => p.is_primary)?.number || 
+                          lead.phone_numbers?.[0]?.number || '';
+      
+      const temperature = lead.lead_temperature || 50;
+      const daysSinceCreated = Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      const daysSinceLastReply = lead.last_reply_at 
+        ? Math.floor((new Date().getTime() - new Date(lead.last_reply_at).getTime()) / (1000 * 60 * 60 * 24))
+        : 999;
+      
+      // Calculate priority score (0-100)
+      let priorityScore = temperature; // Base on lead temperature
+      
+      // Adjust for recency of creation (newer leads get priority)
+      if (daysSinceCreated <= 1) priorityScore += 15;
+      else if (daysSinceCreated <= 3) priorityScore += 10;
+      else if (daysSinceCreated <= 7) priorityScore += 5;
+      else if (daysSinceCreated > 30) priorityScore -= 10;
+      
+      // Adjust for response history
+      if (daysSinceLastReply <= 1) priorityScore += 20;
+      else if (daysSinceLastReply <= 3) priorityScore += 10;
+      else if (daysSinceLastReply > 14) priorityScore -= 15;
+      
+      // Source-based adjustments
+      const sourcePriority = getSourcePriority(lead.source || '');
+      priorityScore += sourcePriority;
+      
+      // Status-based adjustments
+      if (lead.status === 'hot') priorityScore += 20;
+      else if (lead.status === 'warm') priorityScore += 10;
+      else if (lead.status === 'cold') priorityScore -= 5;
+      
+      // Ensure score is within bounds
+      priorityScore = Math.max(0, Math.min(100, priorityScore));
+      
+      const urgencyReason = determineUrgencyReason(temperature, daysSinceCreated, daysSinceLastReply, lead.source);
       
       prioritizedLeads.push({
         id: lead.id,
-        first_name: lead.first_name,
-        last_name: lead.last_name,
-        primary_phone: lead.phone,
+        first_name: lead.first_name || '',
+        last_name: lead.last_name || '',
+        primary_phone: primaryPhone,
         priority_score: priorityScore,
-        temperature: factors.temperature,
-        urgency_reason: generateUrgencyReason(factors),
-        compliance_status: lead.do_not_call ? 'non_compliant' : 'compliant',
-        last_contact_attempt: getLastContactAttempt(lead.conversations)
+        temperature: temperature,
+        urgency_reason: urgencyReason,
+        compliance_status: 'unknown',
+        last_contact_attempt: lead.last_call_attempt ? new Date(lead.last_call_attempt) : undefined
       });
     }
 
-    // Sort by priority score (highest first)
-    return prioritizedLeads.sort((a, b) => b.priority_score - a.priority_score);
-
+    // Sort by priority score descending
+    prioritizedLeads.sort((a, b) => b.priority_score - a.priority_score);
+    
+    return isArray ? prioritizedLeads : prioritizedLeads[0]?.priority_score || 0;
   } catch (error) {
-    console.error('Error in calculateLeadPriority:', error);
+    console.error('Error calculating lead priority:', error);
+    return isArray ? [] : 0;
+  }
+}
+
+const getSourcePriority = (source: string): number => {
+  const sourceLower = source.toLowerCase();
+  
+  if (sourceLower.includes('referral')) return 15;
+  if (sourceLower.includes('website') || sourceLower.includes('dealer')) return 10;
+  if (sourceLower.includes('autotrader') || sourceLower.includes('cars.com')) return 8;
+  if (sourceLower.includes('facebook') || sourceLower.includes('google')) return 5;
+  if (sourceLower.includes('phone') || sourceLower.includes('call')) return 12;
+  
+  return 0; // Default for unknown sources
+};
+
+const determineUrgencyReason = (temperature: number, daysSinceCreated: number, daysSinceLastReply: number, source?: string): string => {
+  if (temperature >= 80) return 'High lead temperature';
+  if (daysSinceCreated <= 1) return 'New lead - immediate attention needed';
+  if (daysSinceLastReply <= 1) return 'Recent response - hot prospect';
+  if (source?.toLowerCase().includes('referral')) return 'Referral lead - high value';
+  if (daysSinceCreated <= 3) return 'Fresh lead - good timing';
+  if (daysSinceLastReply <= 7) return 'Active conversation';
+  
+  return 'Standard follow-up';
+};
+
+// Legacy function for backward compatibility
+export const prioritizeLeadsForCalling = async (limit: number = 20): Promise<PrioritizedLead[]> => {
+  try {
+    const { data: leads, error } = await supabase
+      .from('leads')
+      .select(`
+        id, first_name, last_name, status, created_at, updated_at, last_reply_at,
+        source, vehicle_interest, lead_temperature, call_priority, last_call_attempt,
+        phone_numbers!inner(number, is_primary)
+      `)
+      .eq('do_not_call', false)
+      .not('phone_numbers', 'is', null)
+      .limit(limit)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const leadIds = leads?.map(lead => lead.id) || [];
+    return await calculateLeadPriority(leadIds) as PrioritizedLead[];
+  } catch (error) {
+    console.error('Error prioritizing leads for calling:', error);
     return [];
   }
 };
 
-const calculatePriorityFactors = async (lead: any): Promise<LeadPriorityFactors> => {
-  const now = new Date();
-  const conversations = lead.conversations || [];
-  
-  // Calculate temperature (use existing or calculate)
-  const temperature = await calculateTemperatureScore(lead);
-  
-  // Calculate engagement score based on conversation activity
-  const engagementScore = calculateEngagementScore(conversations, lead.created_at);
-  
-  // Days since last contact
-  const lastContact = lead.last_reply_at ? new Date(lead.last_reply_at) : new Date(lead.created_at);
-  const daysSinceLastContact = Math.floor((now.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
-  
-  // Response rate calculation
-  const outgoingMessages = conversations.filter((c: any) => c.direction === 'out').length;
-  const incomingMessages = conversations.filter((c: any) => c.direction === 'in').length;
-  const responseRate = outgoingMessages > 0 ? incomingMessages / outgoingMessages : 0;
-  
-  // Source priority (marketplace leads often need faster response)
-  const sourcePriority = calculateSourcePriority(lead.source, lead.lead_source_name);
-  
-  // Urgency indicators
-  const urgencyIndicators = identifyUrgencyIndicators(lead, daysSinceLastContact);
-  
-  // Call history score (placeholder - would need call_queue data)
-  const callHistoryScore = 50; // Default neutral score
-
-  return {
-    temperature,
-    engagement_score: engagementScore,
-    days_since_last_contact: daysSinceLastContact,
-    response_rate: responseRate,
-    source_priority: sourcePriority,
-    urgency_indicators: urgencyIndicators,
-    call_history_score: callHistoryScore
-  };
-};
-
-const calculateTemperatureScore = async (lead: any): Promise<number> => {
+// Utility function to update lead temperature in the database
+export const updateLeadTemperature = async (leadId: string, newTemperature: number): Promise<boolean> => {
   try {
-    const { data, error } = await supabase.rpc('calculate_lead_temperature', {
-      p_lead_id: lead.id
-    });
+    const clampedTemperature = Math.max(0, Math.min(100, newTemperature));
+    
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        lead_temperature: clampedTemperature,
+        temperature_last_updated: new Date().toISOString()
+      })
+      .eq('id', leadId);
 
     if (error) {
-      console.error('Error calculating temperature:', error);
-      return 50; // Default neutral temperature
+      console.error('Error updating lead temperature:', error);
+      return false;
     }
 
-    return typeof data === 'number' ? data : 50;
+    return true;
   } catch (error) {
-    console.error('Error in calculateTemperatureScore:', error);
-    return 50;
+    console.error('Error updating lead temperature:', error);
+    return false;
   }
 };
 
-const calculateEngagementScore = (conversations: any[], createdAt: string): number => {
-  if (!conversations.length) return 0;
-
-  const now = new Date();
-  const leadAge = Math.floor((now.getTime() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
-  const conversationCount = conversations.length;
-  
-  // Recent conversations get higher scores
-  const recentConversations = conversations.filter(c => {
-    const messageDate = new Date(c.sent_at);
-    const daysAgo = Math.floor((now.getTime() - messageDate.getTime()) / (1000 * 60 * 60 * 24));
-    return daysAgo <= 7;
-  }).length;
-
-  // Base score on conversation frequency and recency
-  let score = Math.min(100, (conversationCount / Math.max(1, leadAge / 7)) * 20); // Conversations per week * 20
-  score += recentConversations * 10; // Bonus for recent activity
-  
-  return Math.min(100, Math.round(score));
-};
-
-const calculateSourcePriority = (source?: string, leadSourceName?: string): number => {
-  const sourceString = (source || leadSourceName || '').toLowerCase();
-  
-  // Marketplace leads - high priority (need fast response)
-  if (sourceString.includes('autotrader') || sourceString.includes('cars.com') || 
-      sourceString.includes('cargurus') || sourceString.includes('carmax')) {
-    return 90;
-  }
-  
-  // Phone inquiries - very high priority
-  if (sourceString.includes('phone') || sourceString.includes('call')) {
-    return 95;
-  }
-  
-  // Website forms - high priority
-  if (sourceString.includes('website') || sourceString.includes('form')) {
-    return 80;
-  }
-  
-  // GM/Finance leads - medium-high priority
-  if (sourceString.includes('gm') || sourceString.includes('finance')) {
-    return 70;
-  }
-  
-  // Referrals - medium priority (already warmer)
-  if (sourceString.includes('referral')) {
-    return 60;
-  }
-  
-  // Trade-in tools - medium priority
-  if (sourceString.includes('trade')) {
-    return 65;
-  }
-  
-  // Default medium priority
-  return 50;
-};
-
-const identifyUrgencyIndicators = (lead: any, daysSinceLastContact: number): string[] => {
-  const indicators: string[] = [];
-  
-  // Time-based urgency
-  if (daysSinceLastContact === 0) {
-    indicators.push('New lead - immediate response needed');
-  } else if (daysSinceLastContact === 1) {
-    indicators.push('24-hour follow-up window');
-  } else if (daysSinceLastContact >= 7) {
-    indicators.push('Risk of lead going cold');
-  }
-  
-  // Vehicle interest urgency
-  const vehicleInterest = (lead.vehicle_interest || '').toLowerCase();
-  if (vehicleInterest.includes('urgent') || vehicleInterest.includes('asap') || 
-      vehicleInterest.includes('soon') || vehicleInterest.includes('immediate')) {
-    indicators.push('Customer indicates urgency');
-  }
-  
-  // Source-based urgency
-  const source = (lead.source || lead.lead_source_name || '').toLowerCase();
-  if (source.includes('phone') || source.includes('call')) {
-    indicators.push('Inbound phone lead');
-  }
-  
-  if (source.includes('autotrader') || source.includes('cars.com')) {
-    indicators.push('Marketplace lead - competitive response needed');
-  }
-  
-  return indicators;
-};
-
-const calculatePriorityScore = (factors: LeadPriorityFactors): number => {
-  let score = 0;
-  
-  // Temperature score (0-100, higher = hotter)
-  score += factors.temperature * 0.3;
-  
-  // Engagement score (0-100)
-  score += factors.engagement_score * 0.2;
-  
-  // Source priority (0-100)
-  score += factors.source_priority * 0.2;
-  
-  // Time urgency (inverse relationship with days since contact)
-  const timeUrgency = Math.max(0, 100 - (factors.days_since_last_contact * 5));
-  score += timeUrgency * 0.15;
-  
-  // Response rate bonus (0-100+ based on response ratio)
-  score += Math.min(100, factors.response_rate * 100) * 0.1;
-  
-  // Urgency indicators bonus
-  score += factors.urgency_indicators.length * 5;
-  
-  // Call history adjustment
-  score += (factors.call_history_score - 50) * 0.05; // -2.5 to +2.5 adjustment
-  
-  return Math.min(100, Math.round(score));
-};
-
-const generateUrgencyReason = (factors: LeadPriorityFactors): string => {
-  if (factors.urgency_indicators.length > 0) {
-    return factors.urgency_indicators[0];
-  }
-  
-  if (factors.temperature >= 80) {
-    return 'Hot lead - high engagement';
-  }
-  
-  if (factors.days_since_last_contact === 0) {
-    return 'New lead requiring immediate attention';
-  }
-  
-  if (factors.source_priority >= 90) {
-    return 'High-priority lead source';
-  }
-  
-  if (factors.engagement_score >= 70) {
-    return 'Highly engaged prospect';
-  }
-  
-  if (factors.days_since_last_contact >= 7) {
-    return 'Follow-up needed to maintain engagement';
-  }
-  
-  return 'Standard priority follow-up';
-};
-
-const getLastContactAttempt = (conversations: any[]): Date | undefined => {
-  if (!conversations || conversations.length === 0) return undefined;
-  
-  const sortedConversations = conversations
-    .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime());
-  
-  return new Date(sortedConversations[0].sent_at);
-};
-
-export const updateLeadTemperatureScores = async (): Promise<{ updated: number; errors: number }> => {
+// Function to get leads due for temperature recalculation
+export const getLeadsDueForTemperatureUpdate = async (): Promise<string[]> => {
   try {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
     const { data: leads, error } = await supabase
       .from('leads')
       .select('id')
-      .eq('do_not_call', false)
-      .in('status', ['new', 'contacted', 'engaged'])
-      .limit(50); // Process in batches
+      .or(`temperature_last_updated.is.null,temperature_last_updated.lt.${oneDayAgo}`)
+      .limit(100);
 
-    if (error) {
-      console.error('Error fetching leads for temperature update:', error);
-      return { updated: 0, errors: 1 };
-    }
+    if (error) throw error;
 
-    let updated = 0;
-    let errors = 0;
-
-    for (const lead of leads || []) {
-      try {
-        const { data: temperature, error: tempError } = await supabase.rpc('calculate_lead_temperature', {
-          p_lead_id: lead.id
-        });
-
-        if (tempError) {
-          console.error('Error calculating temperature for lead:', lead.id, tempError);
-          errors++;
-          continue;
-        }
-
-        await supabase
-          .from('leads')
-          .update({ 
-            // For now, just update the updated_at timestamp since lead_temperature field doesn't exist
-            // In a full implementation, this would update the lead_temperature field
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', lead.id);
-
-        updated++;
-      } catch (error) {
-        console.error('Error updating temperature for lead:', lead.id, error);
-        errors++;
-      }
-    }
-
-    return { updated, errors };
+    return leads?.map(lead => lead.id) || [];
   } catch (error) {
-    console.error('Error in updateLeadTemperatureScores:', error);
-    return { updated: 0, errors: 1 };
+    console.error('Error getting leads due for temperature update:', error);
+    return [];
   }
 };

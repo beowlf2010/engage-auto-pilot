@@ -21,9 +21,25 @@ export interface CallProgressionData {
 
 export const recordCallOutcome = async (outcome: CallOutcome): Promise<{ success: boolean; error?: string }> => {
   try {
-    // For now, we'll store call outcomes in a simplified way since call_queue table doesn't exist yet
-    // In a full implementation, this would update the actual call_queue table
-    console.log('Recording call outcome:', outcome);
+    // Insert call outcome into the database
+    const { error: insertError } = await supabase
+      .from('call_outcomes')
+      .insert({
+        lead_id: outcome.lead_id,
+        phone_number: outcome.call_id.includes('_') ? outcome.call_id.split('_')[1] : 'unknown',
+        outcome: outcome.outcome,
+        duration_seconds: outcome.duration,
+        notes: outcome.notes,
+        next_action: outcome.next_action,
+        callback_scheduled_at: outcome.callback_scheduled_at,
+        appointment_scheduled: outcome.appointment_scheduled || false,
+        created_by: (await supabase.auth.getUser()).data.user?.id
+      });
+
+    if (insertError) {
+      console.error('Error inserting call outcome:', insertError);
+      throw insertError;
+    }
 
     // Update lead progression based on outcome
     const progressionData = calculateLeadProgression(outcome);
@@ -107,8 +123,18 @@ const updateLeadProgression = async (progression: CallProgressionData) => {
     }
 
     if (progression.temperature_change !== 0) {
-      // We'll update temperature via a separate function that calculates it properly
-      await updateLeadTemperature(progression.lead_id, progression.temperature_change);
+      // Update lead temperature directly in the database
+      const { data: currentLead } = await supabase
+        .from('leads')
+        .select('lead_temperature')
+        .eq('id', progression.lead_id)
+        .single();
+      
+      const currentTemp = currentLead?.lead_temperature || 50;
+      const newTemp = Math.max(0, Math.min(100, currentTemp + progression.temperature_change));
+      
+      updates.lead_temperature = newTemp;
+      updates.temperature_last_updated = new Date().toISOString();
     }
 
     if (progression.priority_adjustment !== 0) {
@@ -152,25 +178,26 @@ const updateLeadProgression = async (progression: CallProgressionData) => {
 
 const updateLeadTemperature = async (leadId: string, temperatureChange: number) => {
   try {
-    // Use the existing calculate_lead_temperature function and adjust by the change
-    const { data, error } = await supabase.rpc('calculate_lead_temperature', {
-      p_lead_id: leadId
-    });
-
-    if (!error && typeof data === 'number') {
-      const newTemperature = Math.max(0, Math.min(100, data + temperatureChange));
-      
-      // For now, we'll just log the temperature change since the field doesn't exist
-      console.log(`Lead ${leadId} temperature would be updated to ${newTemperature}`);
-      
-      // In a full implementation, this would update the lead_temperature field
-      // await supabase
-      //   .from('leads')
-      //   .update({ 
-      //     lead_temperature: newTemperature,
-      //     temperature_last_updated: new Date().toISOString()
-      //   })
-      //   .eq('id', leadId);
+    // Get current temperature and update it
+    const { data: currentLead } = await supabase
+      .from('leads')
+      .select('lead_temperature')
+      .eq('id', leadId)
+      .single();
+    
+    const currentTemp = currentLead?.lead_temperature || 50;
+    const newTemperature = Math.max(0, Math.min(100, currentTemp + temperatureChange));
+    
+    const { error } = await supabase
+      .from('leads')
+      .update({ 
+        lead_temperature: newTemperature,
+        temperature_last_updated: new Date().toISOString()
+      })
+      .eq('id', leadId);
+    
+    if (error) {
+      console.error('Error updating lead temperature:', error);
     }
   } catch (error) {
     console.error('Error updating lead temperature:', error);
@@ -202,18 +229,27 @@ const scheduleFollowUpAppointment = async (leadId: string, scheduledAt: string) 
 
 export const getCallOutcomeStats = async (leadId?: string) => {
   try {
-    // For now, return placeholder data since call_queue table doesn't exist
-    // In a full implementation, this would query the actual call_queue table
+    let query = supabase.from('call_outcomes').select('*');
     
-    const placeholderStats = {
-      total_calls: leadId ? 3 : 28,
-      successful_calls: leadId ? 2 : 18,
-      voicemails: leadId ? 1 : 6,
-      no_answers: leadId ? 0 : 4,
-      average_duration: leadId ? 156 : 142
+    if (leadId) {
+      query = query.eq('lead_id', leadId);
+    }
+    
+    const { data: outcomes, error } = await query;
+    
+    if (error) throw error;
+    
+    const stats = {
+      total_calls: outcomes?.length || 0,
+      successful_calls: outcomes?.filter(o => ['answered', 'appointment_scheduled'].includes(o.outcome)).length || 0,
+      voicemails: outcomes?.filter(o => o.outcome === 'voicemail').length || 0,
+      no_answers: outcomes?.filter(o => o.outcome === 'no_answer').length || 0,
+      average_duration: outcomes && outcomes.length > 0 
+        ? Math.round(outcomes.reduce((sum, o) => sum + (o.duration_seconds || 0), 0) / outcomes.length)
+        : 0
     };
 
-    return placeholderStats;
+    return stats;
   } catch (error) {
     console.error('Error in getCallOutcomeStats:', error);
     return null;
