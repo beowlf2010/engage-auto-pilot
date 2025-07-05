@@ -148,6 +148,50 @@ export type Database = {
           },
         ]
       }
+      ai_conversation_preferences: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          id: string
+          last_validated_at: string | null
+          lead_id: string
+          learned_from: string | null
+          preference_type: string
+          preference_value: Json
+          updated_at: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          last_validated_at?: string | null
+          lead_id: string
+          learned_from?: string | null
+          preference_type: string
+          preference_value?: Json
+          updated_at?: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          last_validated_at?: string | null
+          lead_id?: string
+          learned_from?: string | null
+          preference_type?: string
+          preference_value?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversation_preferences_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_emergency_settings: {
         Row: {
           ai_disabled: boolean
@@ -174,6 +218,116 @@ export type Database = {
           disabled_at?: string | null
           disabled_by?: string | null
           id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_engagement_predictions: {
+        Row: {
+          acted_upon: boolean | null
+          confidence_level: number
+          contributing_factors: Json | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          lead_id: string
+          outcome_tracked: boolean | null
+          prediction_date: string
+          prediction_type: string
+          recommended_actions: Json | null
+          risk_score: number
+          updated_at: string
+        }
+        Insert: {
+          acted_upon?: boolean | null
+          confidence_level?: number
+          contributing_factors?: Json | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          lead_id: string
+          outcome_tracked?: boolean | null
+          prediction_date?: string
+          prediction_type: string
+          recommended_actions?: Json | null
+          risk_score?: number
+          updated_at?: string
+        }
+        Update: {
+          acted_upon?: boolean | null
+          confidence_level?: number
+          contributing_factors?: Json | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          lead_id?: string
+          outcome_tracked?: boolean | null
+          prediction_date?: string
+          prediction_type?: string
+          recommended_actions?: Json | null
+          risk_score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_engagement_predictions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_learning_experiments: {
+        Row: {
+          control_group_config: Json
+          control_success_rate: number | null
+          created_at: string
+          end_date: string | null
+          experiment_name: string
+          experiment_type: string
+          id: string
+          results: Json | null
+          sample_size: number | null
+          start_date: string
+          statistical_significance: number | null
+          status: string
+          test_group_config: Json
+          test_success_rate: number | null
+          updated_at: string
+        }
+        Insert: {
+          control_group_config: Json
+          control_success_rate?: number | null
+          created_at?: string
+          end_date?: string | null
+          experiment_name: string
+          experiment_type: string
+          id?: string
+          results?: Json | null
+          sample_size?: number | null
+          start_date?: string
+          statistical_significance?: number | null
+          status?: string
+          test_group_config: Json
+          test_success_rate?: number | null
+          updated_at?: string
+        }
+        Update: {
+          control_group_config?: Json
+          control_success_rate?: number | null
+          created_at?: string
+          end_date?: string | null
+          experiment_name?: string
+          experiment_type?: string
+          id?: string
+          results?: Json | null
+          sample_size?: number | null
+          start_date?: string
+          statistical_significance?: number | null
+          status?: string
+          test_group_config?: Json
+          test_success_rate?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -609,6 +763,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_personalization_rules: {
+        Row: {
+          condition_criteria: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          priority: number | null
+          response_modifications: Json
+          rule_name: string
+          rule_type: string
+          success_metrics: Json | null
+          updated_at: string
+        }
+        Insert: {
+          condition_criteria: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number | null
+          response_modifications: Json
+          rule_name: string
+          rule_type: string
+          success_metrics?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          condition_criteria?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number | null
+          response_modifications?: Json
+          rule_name?: string
+          rule_type?: string
+          success_metrics?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_prompt_evolution: {
         Row: {
           activated_at: string | null
@@ -662,6 +855,65 @@ export type Database = {
           test_duration_days?: number | null
         }
         Relationships: []
+      }
+      ai_quality_scores: {
+        Row: {
+          approved_for_sending: boolean | null
+          compliance_score: number | null
+          created_at: string
+          id: string
+          improvement_suggestions: Json | null
+          lead_id: string
+          message_content: string
+          message_id: string | null
+          overall_score: number
+          personalization_score: number | null
+          quality_factors: Json | null
+          relevance_score: number | null
+          reviewed_by_human: boolean | null
+          tone_appropriateness_score: number | null
+        }
+        Insert: {
+          approved_for_sending?: boolean | null
+          compliance_score?: number | null
+          created_at?: string
+          id?: string
+          improvement_suggestions?: Json | null
+          lead_id: string
+          message_content: string
+          message_id?: string | null
+          overall_score?: number
+          personalization_score?: number | null
+          quality_factors?: Json | null
+          relevance_score?: number | null
+          reviewed_by_human?: boolean | null
+          tone_appropriateness_score?: number | null
+        }
+        Update: {
+          approved_for_sending?: boolean | null
+          compliance_score?: number | null
+          created_at?: string
+          id?: string
+          improvement_suggestions?: Json | null
+          lead_id?: string
+          message_content?: string
+          message_id?: string | null
+          overall_score?: number
+          personalization_score?: number | null
+          quality_factors?: Json | null
+          relevance_score?: number | null
+          reviewed_by_human?: boolean | null
+          tone_appropriateness_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_quality_scores_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_schedule_config: {
         Row: {
@@ -757,6 +1009,53 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "ai_message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_template_variants: {
+        Row: {
+          base_template_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          success_rate: number | null
+          updated_at: string
+          usage_count: number | null
+          variant_content: string
+          variant_name: string
+          variant_type: string
+        }
+        Insert: {
+          base_template_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          success_rate?: number | null
+          updated_at?: string
+          usage_count?: number | null
+          variant_content: string
+          variant_name: string
+          variant_type?: string
+        }
+        Update: {
+          base_template_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          success_rate?: number | null
+          updated_at?: string
+          usage_count?: number | null
+          variant_content?: string
+          variant_name?: string
+          variant_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_template_variants_base_template_id_fkey"
+            columns: ["base_template_id"]
+            isOneToOne: false
+            referencedRelation: "ai_template_performance"
             referencedColumns: ["id"]
           },
         ]
