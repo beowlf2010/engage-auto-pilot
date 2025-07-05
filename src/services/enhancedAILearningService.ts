@@ -16,6 +16,7 @@ interface LearningExperiment {
   control_group_config: any;
   test_group_config: any;
   status: 'active' | 'completed' | 'paused';
+  sample_size: number;
   control_success_rate: number;
   test_success_rate: number;
   statistical_significance: number;
