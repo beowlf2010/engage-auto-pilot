@@ -40,7 +40,7 @@ export class AutoDialingService {
   ): Promise<string> {
     console.log('📞 [AUTO-DIAL] Adding lead to queue:', leadId, phoneNumber);
 
-    const { data, error } = await supabase.rpc('add_lead_to_dial_queue', {
+    const { data, error } = await (supabase as any).rpc('add_lead_to_dial_queue', {
       p_lead_id: leadId,
       p_phone_number: phoneNumber,
       p_priority: priority,
@@ -52,12 +52,12 @@ export class AutoDialingService {
       throw error;
     }
 
-    return data;
+    return data as string;
   }
 
   // Get next calls to make
   async getNextCallsToMake(limit: number = 10): Promise<CallQueueItem[]> {
-    const { data, error } = await supabase.rpc('get_next_calls_to_make', {
+    const { data, error } = await (supabase as any).rpc('get_next_calls_to_make', {
       p_limit: limit
     });
 
@@ -66,7 +66,7 @@ export class AutoDialingService {
       throw error;
     }
 
-    return data || [];
+    return (data as CallQueueItem[]) || [];
   }
 
   // Make a call
@@ -92,7 +92,7 @@ export class AutoDialingService {
 
   // Get call logs for a lead
   async getCallLogs(leadId: string): Promise<CallLog[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('call_logs')
       .select('*')
       .eq('lead_id', leadId)
@@ -103,7 +103,7 @@ export class AutoDialingService {
       throw error;
     }
 
-    return data || [];
+    return (data as CallLog[]) || [];
   }
 
   // Get call queue status
@@ -113,7 +113,7 @@ export class AutoDialingService {
     completed: number;
     failed: number;
   }> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('auto_dial_queue')
       .select('status')
       .not('status', 'eq', 'paused');
@@ -123,7 +123,7 @@ export class AutoDialingService {
       return { queued: 0, calling: 0, completed: 0, failed: 0 };
     }
 
-    const statusCounts = data.reduce((acc, item) => {
+    const statusCounts = (data as any[]).reduce((acc: any, item: any) => {
       acc[item.status as keyof typeof acc] = (acc[item.status as keyof typeof acc] || 0) + 1;
       return acc;
     }, { queued: 0, calling: 0, completed: 0, failed: 0 });
@@ -133,7 +133,7 @@ export class AutoDialingService {
 
   // Update call queue item priority
   async updateCallPriority(queueId: string, priority: number): Promise<void> {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('auto_dial_queue')
       .update({ 
         priority,
@@ -149,7 +149,7 @@ export class AutoDialingService {
 
   // Pause/Resume dialing for a lead
   async pauseDialing(leadId: string, doNotCallUntil?: Date): Promise<void> {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('auto_dial_queue')
       .update({
         status: 'paused',
@@ -165,7 +165,7 @@ export class AutoDialingService {
   }
 
   async resumeDialing(leadId: string): Promise<void> {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('auto_dial_queue')
       .update({
         status: 'queued',
@@ -185,7 +185,7 @@ export class AutoDialingService {
     console.log('🔥 [AUTO-DIAL] Prioritizing hot leads...');
 
     // Update priorities based on lead temperature and recent activity
-    const { error } = await supabase.rpc('prioritize_hot_leads_in_queue');
+    const { error } = await (supabase as any).rpc('prioritize_hot_leads_in_queue');
 
     if (error) {
       console.error('Failed to prioritize hot leads:', error);
@@ -201,7 +201,7 @@ export class AutoDialingService {
     successRate: number;
     outcomeBreakdown: Record<string, number>;
   }> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('call_logs')
       .select('call_outcome, duration_seconds')
       .gte('created_at', dateRange.start.toISOString())
@@ -218,12 +218,13 @@ export class AutoDialingService {
       };
     }
 
-    const totalCalls = data.length;
-    const successfulCalls = data.filter(call => call.call_outcome === 'answered').length;
-    const averageDuration = data.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) / totalCalls;
+    const logs = data as any[];
+    const totalCalls = logs.length;
+    const successfulCalls = logs.filter((call: any) => call.call_outcome === 'answered').length;
+    const averageDuration = logs.reduce((sum: number, call: any) => sum + (call.duration_seconds || 0), 0) / totalCalls;
     const successRate = totalCalls > 0 ? (successfulCalls / totalCalls) * 100 : 0;
 
-    const outcomeBreakdown = data.reduce((acc, call) => {
+    const outcomeBreakdown = logs.reduce((acc: Record<string, number>, call: any) => {
       const outcome = call.call_outcome || 'unknown';
       acc[outcome] = (acc[outcome] || 0) + 1;
       return acc;
