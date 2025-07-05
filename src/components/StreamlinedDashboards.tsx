@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import CallAnalyticsCard from '@/components/analytics/CallAnalyticsCard';
 
 interface KPI {
   date: string;
@@ -95,6 +96,10 @@ const SalesDashboard = () => {
           <p className="text-sm text-slate-600 mt-1">leads with overdue AI messages</p>
         </CardContent>
       </Card>
+
+      <div className="col-span-2">
+        <CallAnalyticsCard showPersonal={true} />
+      </div>
     </div>
   );
 };
@@ -193,22 +198,26 @@ const ManagerDashboard = () => {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Team Performance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={teamStats}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="salesperson_name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="leads" fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Team Performance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={teamStats}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="salesperson_name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="leads" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <CallAnalyticsCard showPersonal={false} />
+      </div>
     </div>
   );
 };

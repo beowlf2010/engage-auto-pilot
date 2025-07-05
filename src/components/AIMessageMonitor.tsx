@@ -11,7 +11,8 @@ import EnhancedAnalyticsTab from '@/components/ai-monitor/EnhancedAnalyticsTab';
 import AILearningDashboard from '@/components/ai-monitor/AILearningDashboard';
 import SettingsTab from '@/components/ai-monitor/SettingsTab';
 import ReportsExportPanel from '@/components/ai-monitor/ReportsExportPanel';
-import { MessageSquare, Calendar, Clock, Activity, BarChart3, Brain, Settings, FileText } from 'lucide-react';
+import CallAnalyticsCard from '@/components/analytics/CallAnalyticsCard';
+import { MessageSquare, Calendar, Clock, Activity, BarChart3, Brain, Settings, FileText, Phone } from 'lucide-react';
 
 const AIMessageMonitor = () => {
   const [activeTab, setActiveTab] = useState('queue');
@@ -46,7 +47,7 @@ const AIMessageMonitor = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="p-6">
-        <TabsList className="grid w-full grid-cols-8 mb-6">
+        <TabsList className="grid w-full grid-cols-9 mb-6">
           <TabsTrigger value="queue" className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4" />
             AI Queue
@@ -66,6 +67,10 @@ const AIMessageMonitor = () => {
           <TabsTrigger value="activity" className="flex items-center gap-2">
             <Activity className="w-4 h-4" />
             Activity
+          </TabsTrigger>
+          <TabsTrigger value="calls" className="flex items-center gap-2">
+            <Phone className="w-4 h-4" />
+            Calls
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
@@ -99,6 +104,12 @@ const AIMessageMonitor = () => {
 
         <TabsContent value="activity">
           <RecentActivityTab />
+        </TabsContent>
+
+        <TabsContent value="calls">
+          <div className="space-y-6">
+            <CallAnalyticsCard showPersonal={false} />
+          </div>
         </TabsContent>
 
         <TabsContent value="analytics">
