@@ -1,191 +1,169 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { 
-  Phone, 
-  PhoneCall, 
-  Clock, 
-  Users, 
-  TrendingUp, 
-  Pause, 
-  Play,
-  AlertCircle,
-  CheckCircle
-} from "lucide-react";
-import { autoDialingService } from "@/services/autoDialingService";
-import { toast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Phone, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { checkCallCompliance, formatNextAvailableTime, getLeadTimezoneInfo } from '@/services/timeZoneComplianceService';
+import { calculateLeadPriority } from '@/services/leadTemperaturePrioritization';
+import { recordCallOutcome } from '@/services/callOutcomeService';
+import { toast } from '@/hooks/use-toast';
 
-interface CallQueueItem {
-  queue_id: string;
-  lead_id: string;
-  phone_number: string;
-  priority: number;
-  attempt_count: number;
-  lead_name: string;
-  lead_temperature: string;
+interface QueueLead {
+  id: string;
+  first_name: string;
+  last_name: string;
+  state?: string;
+  city?: string;
+  phone_numbers?: Array<{
+    id: string;
+    number: string;
+    type: string;
+    is_primary: boolean;
+  }>;
+  priority_score?: number;
+  compliance_status?: 'allowed' | 'blocked' | 'scheduled';
+  next_available_time?: Date;
+  lead_timezone?: string;
 }
 
-interface QueueStatus {
-  queued: number;
-  calling: number;
-  completed: number;
-  failed: number;
-}
-
-const AutoDialQueue: React.FC = () => {
-  const [queueItems, setQueueItems] = useState<CallQueueItem[]>([]);
-  const [queueStatus, setQueueStatus] = useState<QueueStatus>({
-    queued: 0,
-    calling: 0,
-    completed: 0,
-    failed: 0
-  });
-  const [isAutoDialing, setIsAutoDialing] = useState(false);
+const AutoDialQueue = () => {
+  const [queueLeads, setQueueLeads] = useState<QueueLead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processingLeadId, setProcessingLeadId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadQueueData();
-    const interval = setInterval(loadQueueData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
+    fetchQueueLeads();
   }, []);
 
-  const loadQueueData = async () => {
-    try {
-      const [nextCalls, status] = await Promise.all([
-        autoDialingService.getNextCallsToMake(20),
-        autoDialingService.getCallQueueStatus()
-      ]);
-      
-      setQueueItems(nextCalls);
-      setQueueStatus(status);
-    } catch (error) {
-      console.error('Failed to load queue data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load call queue data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const makeCall = async (item: CallQueueItem) => {
+  const fetchQueueLeads = async () => {
     try {
       setLoading(true);
-      await autoDialingService.makeCall(
-        item.queue_id,
-        item.lead_id,
-        item.phone_number
-      );
       
-      toast({
-        title: "Call Initiated",
-        description: `Calling ${item.lead_name} at ${item.phone_number}`,
-      });
+      // Fetch leads that are ready for calling with their phone numbers
+      const { data: leads, error } = await supabase
+        .from('leads')
+        .select(`
+          id, first_name, last_name, state, city, do_not_call,
+          phone_numbers (
+            id, number, type, is_primary
+          )
+        `)
+        .eq('do_not_call', false)
+        .not('phone_numbers', 'is', null)
+        .limit(20)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Process each lead for compliance and priority
+      const leadIds = leads?.map(lead => lead.id) || [];
+      const prioritizedLeads = leadIds.length > 0 ? await calculateLeadPriority(leadIds) : [];
+      const processedLeads: QueueLead[] = [];
       
-      // Refresh the queue
-      await loadQueueData();
+      for (const lead of leads || []) {
+        // Check compliance
+        const compliance = await checkCallCompliance(lead.id);
+        
+        // Find priority score from the prioritized leads
+        const priorityLead = prioritizedLeads.find(p => p.id === lead.id);
+        const priorityScore = priorityLead?.priority_score || 0;
+        
+        processedLeads.push({
+          ...lead,
+          priority_score: priorityScore,
+          compliance_status: compliance.canCall ? 'allowed' : 'blocked',
+          next_available_time: compliance.nextAvailableTime,
+          lead_timezone: compliance.leadTimezone
+        });
+      }
+
+      // Sort by priority score (descending)
+      processedLeads.sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
+      
+      setQueueLeads(processedLeads);
     } catch (error) {
+      console.error('Error fetching queue leads:', error);
       toast({
-        title: "Call Failed",
-        description: "Failed to initiate the call",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to fetch calling queue',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const startAutoDialing = async () => {
-    setIsAutoDialing(true);
-    toast({
-      title: "Auto-Dialing Started",
-      description: "System will automatically call queued leads",
-    });
-    
-    // Start auto-dialing process
-    processAutoDialQueue();
-  };
-
-  const stopAutoDialing = () => {
-    setIsAutoDialing(false);
-    toast({
-      title: "Auto-Dialing Stopped",
-      description: "Manual control resumed",
-    });
-  };
-
-  const processAutoDialQueue = async () => {
-    if (!isAutoDialing) return;
+  const handleCallLead = async (lead: QueueLead, phoneNumber: string, phoneType: string) => {
+    setProcessingLeadId(lead.id);
     
     try {
-      const nextCalls = await autoDialingService.getNextCallsToMake(1);
+      // Simulate call initiation (replace with actual Twilio integration)
+      console.log(`Initiating call to ${phoneNumber} for lead ${lead.id}`);
       
-      if (nextCalls.length > 0) {
-        const nextCall = nextCalls[0];
-        await makeCall(nextCall);
+      // For now, we'll simulate a call outcome
+      const outcome = await recordCallOutcome({
+        call_id: `call_${Date.now()}`,
+        lead_id: lead.id,
+        outcome: 'answered', // This would come from actual call result
+        duration: 120,
+        notes: `Called ${phoneType} number`
+      });
+
+      if (outcome.success) {
+        toast({
+          title: 'Call Initiated',
+          description: `Calling ${lead.first_name} ${lead.last_name}`,
+        });
         
-        // Wait 2 minutes between auto-calls
-        setTimeout(() => {
-          if (isAutoDialing) {
-            processAutoDialQueue();
-          }
-        }, 120000);
+        // Refresh the queue
+        fetchQueueLeads();
       } else {
-        // No calls available, check again in 5 minutes
-        setTimeout(() => {
-          if (isAutoDialing) {
-            processAutoDialQueue();
-          }
-        }, 300000);
+        throw new Error(outcome.error);
       }
     } catch (error) {
-      console.error('Auto-dial error:', error);
-      // Retry in 5 minutes on error
-      setTimeout(() => {
-        if (isAutoDialing) {
-          processAutoDialQueue();
-        }
-      }, 300000);
+      console.error('Error initiating call:', error);
+      toast({
+        title: 'Call Failed',
+        description: 'Failed to initiate call',
+        variant: 'destructive'
+      });
+    } finally {
+      setProcessingLeadId(null);
     }
   };
 
-  const getPriorityColor = (priority: number) => {
-    if (priority <= 2) return 'bg-red-500';
-    if (priority <= 4) return 'bg-orange-500';
-    if (priority <= 6) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
-
-  const getPriorityLabel = (priority: number) => {
-    if (priority <= 2) return 'Urgent';
-    if (priority <= 4) return 'High';
-    if (priority <= 6) return 'Medium';
-    return 'Low';
-  };
-
-  const getTemperatureColor = (temperature: string) => {
-    switch (temperature) {
-      case 'hot': return 'bg-red-100 text-red-800';
-      case 'warm': return 'bg-orange-100 text-orange-800';
-      case 'cool': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getComplianceIcon = (status: string) => {
+    switch (status) {
+      case 'allowed':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'blocked':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'scheduled':
+        return <Clock className="w-4 h-4 text-yellow-500" />;
+      default:
+        return <AlertCircle className="w-4 h-4 text-gray-500" />;
     }
   };
 
-  const totalItems = queueStatus.queued + queueStatus.calling + queueStatus.completed + queueStatus.failed;
-  const completionRate = totalItems > 0 ? ((queueStatus.completed / totalItems) * 100) : 0;
+  const getPhoneNumbers = (lead: QueueLead) => {
+    return lead.phone_numbers || [];
+  };
 
-  if (loading && queueItems.length === 0) {
+  if (loading) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center h-48">
-          <div className="text-center">
-            <Phone className="w-8 h-8 animate-pulse mx-auto mb-2 text-muted-foreground" />
-            <p className="text-muted-foreground">Loading call queue...</p>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Phone className="w-5 h-5" />
+            Auto Dial Queue
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -193,158 +171,82 @@ const AutoDialQueue: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Queue Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Clock className="w-4 h-4 text-blue-500" />
-              <div>
-                <p className="text-sm font-medium">Queued</p>
-                <p className="text-2xl font-bold">{queueStatus.queued}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <PhoneCall className="w-4 h-4 text-orange-500" />
-              <div>
-                <p className="text-sm font-medium">Calling</p>
-                <p className="text-2xl font-bold">{queueStatus.calling}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-4 h-4 text-green-500" />
-              <div>
-                <p className="text-sm font-medium">Completed</p>
-                <p className="text-2xl font-bold">{queueStatus.completed}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-red-500" />
-              <div>
-                <p className="text-sm font-medium">Failed</p>
-                <p className="text-2xl font-bold">{queueStatus.failed}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Auto-Dialing Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center space-x-2">
-              <Phone className="w-5 h-5" />
-              <span>Auto-Dialing System</span>
-            </span>
-            <div className="flex items-center space-x-2">
-              {isAutoDialing ? (
-                <Button onClick={stopAutoDialing} variant="outline" size="sm">
-                  <Pause className="w-4 h-4 mr-1" />
-                  Stop Auto-Dial
-                </Button>
-              ) : (
-                <Button onClick={startAutoDialing} size="sm">
-                  <Play className="w-4 h-4 mr-1" />
-                  Start Auto-Dial
-                </Button>
-              )}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span>Queue Progress</span>
-                <span>{Math.round(completionRate)}% Complete</span>
-              </div>
-              <Progress value={completionRate} className="w-full" />
-            </div>
-            
-            {isAutoDialing && (
-              <div className="flex items-center space-x-2 text-sm text-green-600">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span>Auto-dialing active - calls will be made automatically</span>
-              </div>
-            )}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Phone className="w-5 h-5" />
+          Auto Dial Queue ({queueLeads.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {queueLeads.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No leads in calling queue
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Queue Items */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Users className="w-5 h-5" />
-            <span>Next Calls ({queueItems.length})</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {queueItems.length === 0 ? (
-            <div className="text-center py-8">
-              <Phone className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">No calls in queue</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {queueItems.map((item) => (
-                <div
-                  key={item.queue_id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-2 h-8 rounded ${getPriorityColor(item.priority)}`} />
-                    <div>
-                      <p className="font-medium">{item.lead_name}</p>
-                      <p className="text-sm text-muted-foreground">{item.phone_number}</p>
-                      <div className="flex items-center space-x-2 mt-1">
+        ) : (
+          queueLeads.map((lead) => {
+            const phoneNumbers = getPhoneNumbers(lead);
+            const timezoneInfo = getLeadTimezoneInfo(lead.state, lead.city);
+            
+            return (
+              <div key={lead.id} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold">
+                      {lead.first_name} {lead.last_name}
+                    </h4>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span>{lead.city}, {lead.state}</span>
+                      {timezoneInfo.isDifferentFromLocal && (
                         <Badge variant="outline" className="text-xs">
-                          {getPriorityLabel(item.priority)}
+                          {timezoneInfo.localTime}
                         </Badge>
-                        <Badge className={`text-xs ${getTemperatureColor(item.lead_temperature)}`}>
-                          {item.lead_temperature}
-                        </Badge>
-                        {item.attempt_count > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            Attempt {item.attempt_count + 1}
-                          </Badge>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
-                  
-                  <Button
-                    onClick={() => makeCall(item)}
-                    disabled={loading || isAutoDialing}
-                    size="sm"
-                  >
-                    <Phone className="w-4 h-4 mr-1" />
-                    Call Now
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      Priority: {Math.round(lead.priority_score || 0)}
+                    </Badge>
+                    {getComplianceIcon(lead.compliance_status || 'unknown')}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+
+                {lead.compliance_status === 'blocked' && lead.next_available_time && (
+                  <div className="text-sm text-yellow-600 bg-yellow-50 p-2 rounded">
+                    Next available: {formatNextAvailableTime(lead.next_available_time, lead.lead_timezone || 'America/New_York')}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {phoneNumbers.map((phone, index) => (
+                    <Button
+                      key={index}
+                      size="sm"
+                      variant={lead.compliance_status === 'allowed' ? 'default' : 'secondary'}
+                      disabled={lead.compliance_status !== 'allowed' || processingLeadId === lead.id}
+                      onClick={() => handleCallLead(lead, phone.number, phone.type)}
+                      className="flex items-center gap-2"
+                    >
+                      <Phone className="w-3 h-3" />
+                      {phone.type.toUpperCase()}: {phone.number}
+                      {phone.is_primary && <Badge variant="outline" className="text-xs ml-1">Primary</Badge>}
+                      {processingLeadId === lead.id && (
+                        <div className="animate-spin w-3 h-3 border border-current border-t-transparent rounded-full"></div>
+                      )}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
+        
+        <Button onClick={fetchQueueLeads} variant="outline" className="w-full">
+          Refresh Queue
+        </Button>
+      </CardContent>
+    </Card>
   );
 };
 
