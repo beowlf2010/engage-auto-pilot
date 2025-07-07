@@ -1,8 +1,8 @@
 import React from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useUnreadCount } from '@/hooks/useUnreadCount';
-import Sidebar from '@/components/Sidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppSidebar } from './AppSidebar';
 import MobileLayout from './MobileLayout';
 
 interface AppLayoutProps {
@@ -18,28 +18,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     return <MobileLayout />;
   }
 
-  // Desktop layout
+  // Desktop layout with modern sidebar
   return (
-    <div className="min-h-screen bg-background flex">
-      {profile && (
-        <Sidebar
-          user={{
-            id: profile.id,
-            email: profile.email || '',
-            role: profile.role,
-            firstName: profile.first_name || 'User',
-            lastName: profile.last_name || ''
-          }}
-          activeView=""
-          onViewChange={() => {}}
-          unreadCount={unreadCount}
-        />
-      )}
-      
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        {profile && <AppSidebar unreadCount={unreadCount} />}
+        
+        <div className="flex-1 flex flex-col">
+          <header className="h-12 flex items-center border-b border-border bg-background px-4">
+            <SidebarTrigger className="mr-4" />
+            <div className="flex-1" />
+          </header>
+          
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 };
 
