@@ -18,10 +18,22 @@ export interface LearnedNameValidation {
 
 export const getLearnedNameValidation = async (name: string): Promise<LearnedNameValidation | null> => {
   try {
+    // Handle null, undefined, or empty names
+    if (!name || typeof name !== 'string') {
+      console.log('🚨 [NAME VALIDATION] Invalid name provided:', name);
+      return null;
+    }
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      console.log('🚨 [NAME VALIDATION] Empty name after trimming');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('ai_name_validations')
       .select('*')
-      .eq('name_text', name.trim())
+      .eq('name_text', trimmedName)
       .maybeSingle();
 
     if (error) {
@@ -63,7 +75,17 @@ export const saveNameValidationDecision = async (
   reason?: string
 ): Promise<void> => {
   try {
+    // Handle null, undefined, or empty names
+    if (!originalName || typeof originalName !== 'string') {
+      console.error('❌ [NAME VALIDATION] Invalid name provided for decision:', originalName);
+      return;
+    }
+
     const name = originalName.trim();
+    if (!name) {
+      console.error('❌ [NAME VALIDATION] Empty name after trimming');
+      return;
+    }
     
     const { data: existing } = await supabase
       .from('ai_name_validations')
@@ -119,7 +141,17 @@ export const saveVehicleValidationDecision = async (
   reason?: string
 ): Promise<void> => {
   try {
+    // Handle null, undefined, or empty vehicle text
+    if (!vehicleText || typeof vehicleText !== 'string') {
+      console.error('❌ [VEHICLE VALIDATION] Invalid vehicle text provided for decision:', vehicleText);
+      return;
+    }
+
     const vehicle = vehicleText.trim();
+    if (!vehicle) {
+      console.error('❌ [VEHICLE VALIDATION] Empty vehicle text after trimming');
+      return;
+    }
     
     const { data: existing } = await supabase
       .from('ai_vehicle_validations')

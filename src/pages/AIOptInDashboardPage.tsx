@@ -139,29 +139,45 @@ const AIOptInDashboardPage = () => {
     for (const lead of leadsData) {
       if (!lead.ai_opt_in) { // Only check validation for non-AI-enabled leads
         try {
-          // Check name validation
-          const nameValidation = await getLearnedNameValidation(lead.first_name);
+          // Safely get first name with null/undefined checks
+          const firstName = lead.first_name || '';
+          const vehicleInterest = lead.vehicle_interest || '';
+          
+          // Check name validation only if we have a valid first name
+          let nameValidation = null;
+          if (firstName && firstName.trim()) {
+            nameValidation = await getLearnedNameValidation(firstName);
+          }
+          
           const nameThreshold = 0.6;
           const vehicleThreshold = 0.6;
           
-          // Simple heuristics for vehicle validation (you can enhance this)
-          const vehicleConfidence = lead.vehicle_interest && lead.vehicle_interest.length > 10 ? 0.8 : 0.3;
+          // Simple heuristics for vehicle validation
+          const vehicleConfidence = vehicleInterest && vehicleInterest.length > 10 ? 0.8 : 0.3;
+          
+          // Safe name validation with null checks
+          const hasValidName = firstName && firstName.trim().length > 2;
+          const nameConfidence = nameValidation?.confidence || (hasValidName ? 0.7 : 0.3);
           
           statusMap.set(lead.id, {
-            nameValidation: nameValidation ? nameValidation.confidence >= nameThreshold : lead.first_name.length > 2,
+            nameValidation: nameValidation ? nameValidation.confidence >= nameThreshold : hasValidName,
             vehicleValidation: vehicleConfidence >= vehicleThreshold,
-            nameConfidence: nameValidation?.confidence || (lead.first_name.length > 2 ? 0.7 : 0.3),
+            nameConfidence,
             vehicleConfidence,
             hasLearningData: !!nameValidation
           });
         } catch (error) {
           console.error('Error fetching validation for lead:', lead.id, error);
-          // Fallback to simple validation
+          // Safe fallback validation with null checks
+          const firstName = lead.first_name || '';
+          const vehicleInterest = lead.vehicle_interest || '';
+          const hasValidName = firstName && firstName.trim().length > 2;
+          
           statusMap.set(lead.id, {
-            nameValidation: lead.first_name.length > 2,
-            vehicleValidation: !!lead.vehicle_interest && lead.vehicle_interest.length > 10,
-            nameConfidence: lead.first_name.length > 2 ? 0.7 : 0.3,
-            vehicleConfidence: lead.vehicle_interest && lead.vehicle_interest.length > 10 ? 0.8 : 0.3,
+            nameValidation: hasValidName,
+            vehicleValidation: vehicleInterest && vehicleInterest.length > 10,
+            nameConfidence: hasValidName ? 0.7 : 0.3,
+            vehicleConfidence: vehicleInterest && vehicleInterest.length > 10 ? 0.8 : 0.3,
             hasLearningData: false
           });
         }
