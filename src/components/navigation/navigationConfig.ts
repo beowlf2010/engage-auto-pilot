@@ -9,7 +9,11 @@ import {
   Settings,
   Brain,
   Phone,
-  User
+  User,
+  Upload,
+  Shield,
+  Palette,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -41,6 +45,12 @@ export const navigationItems: NavigationItem[] = [
     access: ['admin', 'manager', 'sales']
   },
   {
+    label: 'Upload Leads',
+    href: '/upload-leads',
+    icon: FileSpreadsheet,
+    access: ['admin', 'manager']
+  },
+  {
     label: 'Auto-Dialing',
     href: '/auto-dialing',
     icon: Phone,
@@ -51,6 +61,12 @@ export const navigationItems: NavigationItem[] = [
     href: '/inventory-dashboard',
     icon: Package,
     access: ['admin', 'manager', 'sales']
+  },
+  {
+    label: 'Upload Inventory',
+    href: '/upload-inventory',
+    icon: Upload,
+    access: ['admin', 'manager']
   },
   {
     label: 'RPO Insights',
@@ -83,9 +99,45 @@ export const navigationItems: NavigationItem[] = [
     access: ['admin', 'manager']
   },
   {
+    label: 'Sales Dashboard',
+    href: '/sales-dashboard',
+    icon: TrendingUp,
+    access: ['admin', 'manager', 'sales']
+  },
+  {
     label: 'Analytics',
     href: '/analytics',
     icon: TrendingUp,
+    access: ['admin', 'manager']
+  },
+  {
+    label: 'Predictive Analytics',
+    href: '/predictive-analytics',
+    icon: Brain,
+    access: ['admin', 'manager']
+  },
+  {
+    label: 'Message Export',
+    href: '/message-export',
+    icon: Upload,
+    access: ['admin', 'manager']
+  },
+  {
+    label: 'Personalization',
+    href: '/personalization',
+    icon: Palette,
+    access: ['admin', 'manager']
+  },
+  {
+    label: 'Admin Dashboard',
+    href: '/admin-dashboard',
+    icon: Shield,
+    access: ['admin']
+  },
+  {
+    label: 'Manager Dashboard',
+    href: '/manager-dashboard',
+    icon: BarChart3,
     access: ['admin', 'manager']
   },
   {

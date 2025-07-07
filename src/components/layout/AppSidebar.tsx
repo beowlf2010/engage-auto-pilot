@@ -40,11 +40,11 @@ export function AppSidebar({ unreadCount = 0 }: AppSidebarProps) {
 
   // Group navigation items
   const primaryItems = navigationItems.filter(item => 
-    ['Dashboard', 'Smart Inbox', 'Leads', 'Auto-Dialing'].includes(item.label) && hasAccess(item)
+    ['Dashboard', 'Smart Inbox', 'Leads', 'Upload Leads', 'Auto-Dialing'].includes(item.label) && hasAccess(item)
   );
 
   const inventoryItems = navigationItems.filter(item => 
-    ['Inventory', 'RPO Insights'].includes(item.label) && hasAccess(item)
+    ['Inventory', 'Upload Inventory', 'RPO Insights'].includes(item.label) && hasAccess(item)
   );
 
   const aiItems = navigationItems.filter(item => 
@@ -52,7 +52,15 @@ export function AppSidebar({ unreadCount = 0 }: AppSidebarProps) {
   );
 
   const analyticsItems = navigationItems.filter(item => 
-    ['Financial', 'Analytics'].includes(item.label) && hasAccess(item)
+    ['Financial', 'Sales Dashboard', 'Analytics'].includes(item.label) && hasAccess(item)
+  );
+
+  const toolsItems = navigationItems.filter(item => 
+    ['Predictive Analytics', 'Message Export', 'Personalization'].includes(item.label) && hasAccess(item)
+  );
+
+  const adminItems = navigationItems.filter(item => 
+    ['Admin Dashboard', 'Manager Dashboard'].includes(item.label) && hasAccess(item)
   );
 
   const profileItems = navigationItems.filter(item => 
@@ -124,6 +132,8 @@ export function AppSidebar({ unreadCount = 0 }: AppSidebarProps) {
         {renderGroup("Inventory", inventoryItems)}
         {renderGroup("AI Intelligence", aiItems)}
         {renderGroup("Analytics", analyticsItems)}
+        {renderGroup("Tools", toolsItems)}
+        {renderGroup("Admin", adminItems)}
         {renderGroup("Profile", profileItems)}
       </SidebarContent>
 
