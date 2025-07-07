@@ -2,13 +2,8 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Mail, 
-  Package, 
-  BarChart3 
-} from 'lucide-react';
+import { navigationItems } from '@/components/navigation/navigationConfig';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 interface MobileBottomNavProps {
   unreadCount: number;
@@ -16,40 +11,31 @@ interface MobileBottomNavProps {
 
 const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ unreadCount }) => {
   const location = useLocation();
+  const { profile } = useAuth();
 
-  const navItems = [
-    {
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      label: 'Dashboard'
-    },
-    {
-      href: '/leads',
-      icon: Users,
-      label: 'Leads'
-    },
-    {
-      href: '/smart-inbox',
-      icon: Mail,
-      label: 'Inbox',
-      badge: unreadCount > 0 ? unreadCount : null
-    },
-    {
-      href: '/inventory-dashboard',
-      icon: Package,
-      label: 'Inventory'
-    },
-    {
-      href: '/sales-dashboard',
-      icon: BarChart3,
-      label: 'Analytics'
-    }
-  ];
+  // Filter navigation items for mobile bottom nav (most important 5)
+  const mobileNavItems = navigationItems
+    .filter(item => {
+      // Check access permissions
+      if (!profile?.role || !item.access.includes(profile.role)) return false;
+      
+      // Select most important items for mobile bottom nav
+      return ['Dashboard', 'Smart Inbox', 'Leads', 'Inventory', 'Analytics'].includes(item.label);
+    })
+    .map(item => ({
+      href: item.href,
+      icon: item.icon,
+      label: item.label === 'Smart Inbox' ? 'Inbox' : 
+             item.label === 'Inventory' ? 'Inventory' :
+             item.label === 'Analytics' ? 'Analytics' : item.label,
+      badge: item.badge?.type === 'unread' && unreadCount > 0 ? unreadCount : null
+    }))
+    .slice(0, 5); // Ensure max 5 items for mobile
 
   return (
     <nav className="sticky bottom-0 bg-background border-t px-2 py-1">
       <div className="flex justify-around">
-        {navItems.map(({ href, icon: Icon, label, badge }) => {
+        {mobileNavItems.map(({ href, icon: Icon, label, badge }) => {
           const isActive = location.pathname === href;
           
           return (
