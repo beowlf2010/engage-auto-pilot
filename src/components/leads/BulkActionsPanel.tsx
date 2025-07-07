@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import BulkEmailAction from "./BulkEmailAction";
-import BulkAIOptInAction from "./BulkAIOptInAction";
+import EnhancedBulkAIOptIn from "./EnhancedBulkAIOptIn";
 import MarkLostConfirmDialog from "./MarkLostConfirmDialog";
 import { markMultipleLeadsAsLost } from "@/services/leadStatusService";
 
@@ -113,7 +113,7 @@ const BulkActionsPanel = ({
             <Separator orientation="vertical" className="h-6" />
             
             <div className="flex items-center space-x-2">
-              <BulkAIOptInAction
+              <EnhancedBulkAIOptIn
                 selectedLeads={selectedLeads}
                 onComplete={handleAIActionComplete}
               />
