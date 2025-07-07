@@ -174,9 +174,20 @@ export const useEnhancedRealtimeMessages = ({
               reconnectAttempts: prev.reconnectAttempts + 1
             }));
             
-            // Exponential backoff for reconnection - use current attempts to avoid stale state
-            const delay = Math.min(5000 * Math.pow(2, currentAttempts), 60000);
-            scheduleReconnect(delay);
+            // Reset attempts after max attempts to prevent infinite backoff
+            const maxAttempts = 5;
+            if (currentAttempts >= maxAttempts) {
+              console.log(`🔄 [ENHANCED RT] Max attempts (${maxAttempts}) reached, resetting and trying with shorter delay`);
+              setConnectionStatus(prev => ({
+                ...prev,
+                reconnectAttempts: 0
+              }));
+              scheduleReconnect(5000); // Reset to 5 second delay
+            } else {
+              // Exponential backoff for reconnection - cap at 30 seconds instead of 60
+              const delay = Math.min(5000 * Math.pow(2, currentAttempts), 30000);
+              scheduleReconnect(delay);
+            }
             break;
         }
       });
