@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -25,51 +25,51 @@ interface AppSidebarProps {
   unreadCount?: number;
 }
 
-export function AppSidebar({ unreadCount = 0 }: AppSidebarProps) {
+export const AppSidebar = React.memo(function AppSidebar({ unreadCount = 0 }: AppSidebarProps) {
   const { profile, signOut } = useAuth();
   const { state } = useSidebar();
   const location = useLocation();
   const collapsed = state === 'collapsed';
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = useCallback((path: string) => location.pathname === path, [location.pathname]);
   
-  const hasAccess = (item: any) => {
+  const hasAccess = useCallback((item: any) => {
     if (!profile?.role) return false;
     return item.access.includes(profile.role);
-  };
+  }, [profile?.role]);
 
-  // Group navigation items
-  const primaryItems = navigationItems.filter(item => 
-    ['Dashboard', 'Smart Inbox', 'Leads', 'Upload Leads', 'Auto-Dialing'].includes(item.label) && hasAccess(item)
-  );
+  // Memoize navigation groups for performance
+  const navigationGroups = useMemo(() => {
+    const filteredItems = navigationItems.filter(hasAccess);
+    
+    return {
+      primary: filteredItems.filter(item => 
+        ['Dashboard', 'Smart Inbox', 'Leads', 'Upload Leads', 'Auto-Dialing'].includes(item.label)
+      ),
+      inventory: filteredItems.filter(item => 
+        ['Inventory', 'Upload Inventory', 'RPO Insights', 'RPO Database'].includes(item.label)
+      ),
+      ai: filteredItems.filter(item => 
+        ['AI Monitor', 'AI Performance', 'AI Training'].includes(item.label)
+      ),
+      analytics: filteredItems.filter(item => 
+        ['Financial', 'Sales Dashboard', 'Analytics'].includes(item.label)
+      ),
+      tools: filteredItems.filter(item => 
+        ['Predictive Analytics', 'Message Export', 'Personalization'].includes(item.label)
+      ),
+      admin: filteredItems.filter(item => 
+        ['Admin Dashboard', 'Manager Dashboard'].includes(item.label)
+      ),
+      profile: filteredItems.filter(item => 
+        ['Sales Profile', 'Settings'].includes(item.label)
+      )
+    };
+  }, [hasAccess]);
 
-  const inventoryItems = navigationItems.filter(item => 
-    ['Inventory', 'Upload Inventory', 'RPO Insights', 'RPO Database'].includes(item.label) && hasAccess(item)
-  );
-
-  const aiItems = navigationItems.filter(item => 
-    ['AI Monitor', 'AI Performance', 'AI Training'].includes(item.label) && hasAccess(item)
-  );
-
-  const analyticsItems = navigationItems.filter(item => 
-    ['Financial', 'Sales Dashboard', 'Analytics'].includes(item.label) && hasAccess(item)
-  );
-
-  const toolsItems = navigationItems.filter(item => 
-    ['Predictive Analytics', 'Message Export', 'Personalization'].includes(item.label) && hasAccess(item)
-  );
-
-  const adminItems = navigationItems.filter(item => 
-    ['Admin Dashboard', 'Manager Dashboard'].includes(item.label) && hasAccess(item)
-  );
-
-  const profileItems = navigationItems.filter(item => 
-    ['Sales Profile', 'Settings'].includes(item.label) && hasAccess(item)
-  );
-
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     await signOut();
-  };
+  }, [signOut]);
 
   const renderNavItem = (item: any) => {
     const active = isActive(item.href);
@@ -128,13 +128,13 @@ export function AppSidebar({ unreadCount = 0 }: AppSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent>
-        {renderGroup("Main", primaryItems)}
-        {renderGroup("Inventory", inventoryItems)}
-        {renderGroup("AI Intelligence", aiItems)}
-        {renderGroup("Analytics", analyticsItems)}
-        {renderGroup("Tools", toolsItems)}
-        {renderGroup("Admin", adminItems)}
-        {renderGroup("Profile", profileItems)}
+        {renderGroup("Main", navigationGroups.primary)}
+        {renderGroup("Inventory", navigationGroups.inventory)}
+        {renderGroup("AI Intelligence", navigationGroups.ai)}
+        {renderGroup("Analytics", navigationGroups.analytics)}
+        {renderGroup("Tools", navigationGroups.tools)}
+        {renderGroup("Admin", navigationGroups.admin)}
+        {renderGroup("Profile", navigationGroups.profile)}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-border p-4">
@@ -152,4 +152,4 @@ export function AppSidebar({ unreadCount = 0 }: AppSidebarProps) {
       </SidebarFooter>
     </Sidebar>
   );
-}
+});
