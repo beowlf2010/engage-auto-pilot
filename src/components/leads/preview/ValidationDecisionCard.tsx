@@ -39,7 +39,7 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
   const nameConfidence = nameValidation?.confidence || 0;
   const vehicleConfidence = vehicleValidation?.confidence || 0;
   const nameIsValid = nameValidation?.isValidPersonalName ?? false;
-  const vehicleIsValid = nameValidation?.isValidVehicleInterest ?? false;
+  const vehicleIsValid = vehicleValidation?.isValidVehicleInterest ?? false;
 
   return (
     <Card>

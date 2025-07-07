@@ -768,6 +768,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_name_validations: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          decided_by: string | null
+          decision: string
+          decision_reason: string | null
+          detected_type: string | null
+          id: string
+          name_text: string
+          times_approved: number
+          times_denied: number
+          times_seen: number
+          updated_at: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          decided_by?: string | null
+          decision: string
+          decision_reason?: string | null
+          detected_type?: string | null
+          id?: string
+          name_text: string
+          times_approved?: number
+          times_denied?: number
+          times_seen?: number
+          updated_at?: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          decided_by?: string | null
+          decision?: string
+          decision_reason?: string | null
+          detected_type?: string | null
+          id?: string
+          name_text?: string
+          times_approved?: number
+          times_denied?: number
+          times_seen?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_personalization_rules: {
         Row: {
           condition_criteria: Json
@@ -1112,6 +1157,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_vehicle_validations: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          decided_by: string | null
+          decision: string
+          decision_reason: string | null
+          detected_issue: string | null
+          id: string
+          times_approved: number
+          times_denied: number
+          times_seen: number
+          updated_at: string
+          vehicle_text: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          decided_by?: string | null
+          decision: string
+          decision_reason?: string | null
+          detected_issue?: string | null
+          id?: string
+          times_approved?: number
+          times_denied?: number
+          times_seen?: number
+          updated_at?: string
+          vehicle_text: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          decided_by?: string | null
+          decision?: string
+          decision_reason?: string | null
+          detected_issue?: string | null
+          id?: string
+          times_approved?: number
+          times_denied?: number
+          times_seen?: number
+          updated_at?: string
+          vehicle_text?: string
+        }
+        Relationships: []
       }
       appointment_slots: {
         Row: {

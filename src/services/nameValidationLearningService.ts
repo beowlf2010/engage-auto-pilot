@@ -18,10 +18,39 @@ export interface LearnedNameValidation {
 
 export const getLearnedNameValidation = async (name: string): Promise<LearnedNameValidation | null> => {
   try {
-    // For now, return null since the ai_name_validations table doesn't exist
-    // This will fall back to the original validation logic
-    console.log(`🧠 [NAME VALIDATION] Checking learned validation for "${name}" - table not available, using fallback`);
-    return null;
+    const { data, error } = await supabase
+      .from('ai_name_validations')
+      .select('*')
+      .eq('name_text', name.trim())
+      .maybeSingle();
+
+    if (error) {
+      console.error('❌ [NAME VALIDATION] Error fetching learned validation:', error);
+      return null;
+    }
+
+    if (!data) {
+      console.log(`🧠 [NAME VALIDATION] No learned data for "${name}"`);
+      return null;
+    }
+
+    // Calculate confidence based on decision history
+    const totalDecisions = data.times_approved + data.times_denied;
+    const approvalRate = totalDecisions > 0 ? data.times_approved / totalDecisions : 0;
+    
+    return {
+      isValidPersonalName: data.times_approved > data.times_denied,
+      confidence: Math.min(0.9, 0.5 + (approvalRate * 0.4) + (Math.min(totalDecisions, 10) * 0.05)),
+      detectedType: 'learned_override',
+      userOverride: true,
+      timesApproved: data.times_approved,
+      timesRejected: data.times_denied,
+      timesSeen: data.times_seen,
+      suggestions: {
+        useGenericGreeting: data.times_denied > data.times_approved,
+        contextualGreeting: data.times_approved > data.times_denied ? `Hi ${name}` : 'Hello there'
+      }
+    };
   } catch (error) {
     console.error('❌ [NAME VALIDATION] Error checking learned validation:', error);
     return null;
@@ -34,9 +63,108 @@ export const saveNameValidationDecision = async (
   reason?: string
 ): Promise<void> => {
   try {
-    // For now, just log the decision since the table doesn't exist
-    console.log(`📝 [NAME VALIDATION] Would save decision for "${originalName}": ${decision}${reason ? ` (${reason})` : ''}`);
+    const name = originalName.trim();
+    
+    const { data: existing } = await supabase
+      .from('ai_name_validations')
+      .select('*')
+      .eq('name_text', name)
+      .maybeSingle();
+
+    if (existing) {
+      // Update existing record
+      const updates = {
+        decision,
+        decision_reason: reason,
+        times_approved: decision === 'approved' ? existing.times_approved + 1 : existing.times_approved,
+        times_denied: decision === 'denied' ? existing.times_denied + 1 : existing.times_denied,
+        times_seen: existing.times_seen + 1,
+        decided_by: (await supabase.auth.getUser()).data.user?.id
+      };
+
+      const { error } = await supabase
+        .from('ai_name_validations')
+        .update(updates)
+        .eq('id', existing.id);
+
+      if (error) throw error;
+      
+      console.log(`✅ [NAME VALIDATION] Updated decision for "${name}": ${decision} (${updates.times_approved}/${updates.times_denied})`);
+    } else {
+      // Create new record
+      const { error } = await supabase
+        .from('ai_name_validations')
+        .insert({
+          name_text: name,
+          decision,
+          decision_reason: reason,
+          times_approved: decision === 'approved' ? 1 : 0,
+          times_denied: decision === 'denied' ? 1 : 0,
+          times_seen: 1,
+          decided_by: (await supabase.auth.getUser()).data.user?.id
+        });
+
+      if (error) throw error;
+      
+      console.log(`✅ [NAME VALIDATION] Saved new decision for "${name}": ${decision}`);
+    }
   } catch (error) {
     console.error('❌ [NAME VALIDATION] Error saving decision:', error);
+  }
+};
+
+export const saveVehicleValidationDecision = async (
+  vehicleText: string,
+  decision: 'approved' | 'denied',
+  reason?: string
+): Promise<void> => {
+  try {
+    const vehicle = vehicleText.trim();
+    
+    const { data: existing } = await supabase
+      .from('ai_vehicle_validations')
+      .select('*')
+      .eq('vehicle_text', vehicle)
+      .maybeSingle();
+
+    if (existing) {
+      // Update existing record
+      const updates = {
+        decision,
+        decision_reason: reason,
+        times_approved: decision === 'approved' ? existing.times_approved + 1 : existing.times_approved,
+        times_denied: decision === 'denied' ? existing.times_denied + 1 : existing.times_denied,
+        times_seen: existing.times_seen + 1,
+        decided_by: (await supabase.auth.getUser()).data.user?.id
+      };
+
+      const { error } = await supabase
+        .from('ai_vehicle_validations')
+        .update(updates)
+        .eq('id', existing.id);
+
+      if (error) throw error;
+      
+      console.log(`✅ [VEHICLE VALIDATION] Updated decision for "${vehicle}": ${decision} (${updates.times_approved}/${updates.times_denied})`);
+    } else {
+      // Create new record
+      const { error } = await supabase
+        .from('ai_vehicle_validations')
+        .insert({
+          vehicle_text: vehicle,
+          decision,
+          decision_reason: reason,
+          times_approved: decision === 'approved' ? 1 : 0,
+          times_denied: decision === 'denied' ? 1 : 0,
+          times_seen: 1,
+          decided_by: (await supabase.auth.getUser()).data.user?.id
+        });
+
+      if (error) throw error;
+      
+      console.log(`✅ [VEHICLE VALIDATION] Saved new decision for "${vehicle}": ${decision}`);
+    }
+  } catch (error) {
+    console.error('❌ [VEHICLE VALIDATION] Error saving vehicle decision:', error);
   }
 };
