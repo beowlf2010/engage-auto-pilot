@@ -8,7 +8,8 @@ import {
   TrendingUp,
   Settings,
   Brain,
-  Phone
+  Phone,
+  User
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -74,6 +75,12 @@ export const navigationItems: NavigationItem[] = [
     href: '/analytics',
     icon: TrendingUp,
     access: ['admin', 'manager']
+  },
+  {
+    label: 'Sales Profile',
+    href: '/sales-profile',
+    icon: User,
+    access: ['admin', 'manager', 'sales']
   },
   {
     label: 'Settings',

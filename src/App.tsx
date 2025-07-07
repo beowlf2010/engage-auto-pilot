@@ -25,6 +25,8 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import ManagerDashboardPage from './pages/ManagerDashboardPage';
 import AutoDialingPage from './pages/AutoDialingPage';
 import SettingsPage from './pages/SettingsPage';
+import SalesProfilePage from './pages/SalesProfilePage';
+import PublicSalesProfile from './components/sales-profiles/PublicSalesProfile';
 import { Toaster } from '@/components/ui/toaster';
 
 const queryClient = new QueryClient();
@@ -205,6 +207,18 @@ const AppContent = () => {
             </AppLayout>
           </ProtectedRoute>
         } />
+        
+        {/* Sales Profile Management */}
+        <Route path="/sales-profile" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <SalesProfilePage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Public Sales Profile - No Layout */}
+        <Route path="/profile/:profileSlug" element={<PublicSalesProfile />} />
         
         {/* Default redirect to dashboard */}
         <Route path="/" element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} />
