@@ -1336,6 +1336,113 @@ export type Database = {
           },
         ]
       }
+      auto_dial_queue: {
+        Row: {
+          attempt_count: number
+          campaign_id: string | null
+          created_at: string
+          do_not_call_until: string | null
+          id: string
+          last_attempt_at: string | null
+          last_attempt_outcome: string | null
+          lead_id: string
+          max_attempts: number
+          phone_number: string
+          priority: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          campaign_id?: string | null
+          created_at?: string
+          do_not_call_until?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_attempt_outcome?: string | null
+          lead_id: string
+          max_attempts?: number
+          phone_number: string
+          priority?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          campaign_id?: string | null
+          created_at?: string
+          do_not_call_until?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_attempt_outcome?: string | null
+          lead_id?: string
+          max_attempts?: number
+          phone_number?: string
+          priority?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_dial_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auto_dial_sessions: {
+        Row: {
+          call_pacing_seconds: number
+          completed_calls: number
+          created_at: string
+          current_lead_id: string | null
+          ended_at: string | null
+          id: string
+          session_name: string | null
+          started_at: string
+          started_by: string | null
+          status: string
+          successful_connects: number
+          total_leads: number
+          updated_at: string
+          voicemails_dropped: number
+        }
+        Insert: {
+          call_pacing_seconds?: number
+          completed_calls?: number
+          created_at?: string
+          current_lead_id?: string | null
+          ended_at?: string | null
+          id?: string
+          session_name?: string | null
+          started_at?: string
+          started_by?: string | null
+          status?: string
+          successful_connects?: number
+          total_leads?: number
+          updated_at?: string
+          voicemails_dropped?: number
+        }
+        Update: {
+          call_pacing_seconds?: number
+          completed_calls?: number
+          created_at?: string
+          current_lead_id?: string | null
+          ended_at?: string | null
+          id?: string
+          session_name?: string | null
+          started_at?: string
+          started_by?: string | null
+          status?: string
+          successful_connects?: number
+          total_leads?: number
+          updated_at?: string
+          voicemails_dropped?: number
+        }
+        Relationships: []
+      }
       call_history: {
         Row: {
           call_cost: number | null
@@ -1391,6 +1498,83 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "call_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_logs: {
+        Row: {
+          call_cost: number | null
+          call_direction: string
+          call_outcome: string | null
+          call_status: string
+          campaign_id: string | null
+          created_at: string
+          created_by: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          lead_id: string
+          notes: string | null
+          phone_number: string
+          recording_url: string | null
+          scheduled_at: string | null
+          started_at: string | null
+          twilio_call_id: string | null
+          voicemail_detected: boolean | null
+          voicemail_dropped: boolean | null
+          voicemail_url: string | null
+        }
+        Insert: {
+          call_cost?: number | null
+          call_direction?: string
+          call_outcome?: string | null
+          call_status: string
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          lead_id: string
+          notes?: string | null
+          phone_number: string
+          recording_url?: string | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          twilio_call_id?: string | null
+          voicemail_detected?: boolean | null
+          voicemail_dropped?: boolean | null
+          voicemail_url?: string | null
+        }
+        Update: {
+          call_cost?: number | null
+          call_direction?: string
+          call_outcome?: string | null
+          call_status?: string
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          phone_number?: string
+          recording_url?: string | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          twilio_call_id?: string | null
+          voicemail_detected?: boolean | null
+          voicemail_dropped?: boolean | null
+          voicemail_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_logs_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
@@ -5656,6 +5840,45 @@ export type Database = {
           updated_at?: string
           velocity_trend?: string
           year?: number | null
+        }
+        Relationships: []
+      }
+      voicemail_templates: {
+        Row: {
+          attempt_number: number
+          audio_url: string | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          script_content: string
+          template_name: string
+          updated_at: string
+          variables: Json | null
+        }
+        Insert: {
+          attempt_number?: number
+          audio_url?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          script_content: string
+          template_name: string
+          updated_at?: string
+          variables?: Json | null
+        }
+        Update: {
+          attempt_number?: number
+          audio_url?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          script_content?: string
+          template_name?: string
+          updated_at?: string
+          variables?: Json | null
         }
         Relationships: []
       }

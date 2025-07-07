@@ -11,6 +11,8 @@ interface CallRequest {
   leadId: string;
   phoneNumber: string;
   campaignId?: string;
+  enableVoicemailDetection?: boolean;
+  voicemailTemplate?: string;
 }
 
 serve(async (req) => {
@@ -27,8 +29,8 @@ serve(async (req) => {
     )
 
     // Get request data
-    const { queueId, leadId, phoneNumber, campaignId }: CallRequest = await req.json()
-    console.log('📞 Making call to:', phoneNumber, 'for lead:', leadId);
+    const { queueId, leadId, phoneNumber, campaignId, enableVoicemailDetection, voicemailTemplate }: CallRequest = await req.json()
+    console.log('📞 Making call to:', phoneNumber, 'for lead:', leadId, 'with voicemail detection:', enableVoicemailDetection);
 
     // Get Twilio credentials from Supabase secrets or settings
     const { data: settings } = await supabase
@@ -89,6 +91,21 @@ serve(async (req) => {
       Record: 'true',
       RecordingStatusCallback: `${webhookUrl}?callLogId=${callLog.id}&leadId=${leadId}&event=recording`
     })
+
+    // Add voicemail detection if enabled
+    if (enableVoicemailDetection) {
+      callPayload.append('MachineDetection', 'Enable')
+      callPayload.append('MachineDetectionTimeout', '30')
+      callPayload.append('MachineDetectionSpeechThreshold', '2400')
+      callPayload.append('MachineDetectionSpeechEndThreshold', '1200')
+      callPayload.append('MachineDetectionSilenceTimeout', '5000')
+      
+      if (voicemailTemplate) {
+        // Create TwiML for voicemail drop
+        const twimlUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/voicemail-twiml?message=${encodeURIComponent(voicemailTemplate)}`
+        callPayload.set('Url', twimlUrl)
+      }
+    }
 
     const twilioResponse = await fetch(twilioUrl, {
       method: 'POST',

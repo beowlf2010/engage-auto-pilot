@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Phone, Clock, AlertCircle, CheckCircle, XCircle, Car, MessageSquare, Calendar, FileText, Eye } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Phone, Clock, AlertCircle, CheckCircle, XCircle, Car, MessageSquare, Calendar, FileText, Eye, Play, Pause, Square, PhoneCall } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { checkCallCompliance, formatNextAvailableTime, getLeadTimezoneInfo } from '@/services/timeZoneComplianceService';
 import { calculateLeadPriority } from '@/services/leadTemperaturePrioritization';
 import { recordCallOutcome } from '@/services/callOutcomeService';
+import { enhancedAutoDialingService } from '@/services/enhancedAutoDialingService';
 import { toast } from '@/hooks/use-toast';
 
 interface QueueLead {
@@ -57,10 +59,22 @@ const AutoDialQueue = () => {
   const [queueLeads, setQueueLeads] = useState<QueueLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingLeadId, setProcessingLeadId] = useState<string | null>(null);
+  const [autoDialSession, setAutoDialSession] = useState<any>(null);
+  const [isDialing, setIsDialing] = useState(false);
+  const [callPacing, setCallPacing] = useState(30);
+  const [selectedOutcome, setSelectedOutcome] = useState<string>('');
 
   useEffect(() => {
     fetchQueueLeads();
+    checkCurrentSession();
   }, []);
+
+  const checkCurrentSession = () => {
+    const session = enhancedAutoDialingService.getCurrentSession();
+    const dialing = enhancedAutoDialingService.isCurrentlyDialing();
+    setAutoDialSession(session);
+    setIsDialing(dialing);
+  };
 
   const fetchQueueLeads = async () => {
     try {
@@ -184,6 +198,140 @@ const AutoDialQueue = () => {
       });
     } finally {
       setProcessingLeadId(null);
+    }
+  };
+
+  const handleStartAutoDialing = async () => {
+    try {
+      setLoading(true);
+      
+      // Add current leads to queue first
+      const leadIds = queueLeads.map(lead => lead.id);
+      if (leadIds.length === 0) {
+        toast({
+          title: 'No Leads',
+          description: 'No leads available to add to dialing queue',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      await enhancedAutoDialingService.addLeadsToQueue(leadIds, 5);
+      
+      const session = await enhancedAutoDialingService.startAutoDialing(
+        `Auto Dial Session ${new Date().toLocaleTimeString()}`,
+        callPacing
+      );
+      
+      setAutoDialSession(session);
+      setIsDialing(true);
+      
+      toast({
+        title: 'Auto-Dialing Started',
+        description: `Started dialing ${leadIds.length} leads with ${callPacing}s pacing`,
+      });
+      
+    } catch (error) {
+      console.error('Error starting auto-dialing:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to start auto-dialing session',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStopAutoDialing = async () => {
+    try {
+      await enhancedAutoDialingService.stopAutoDialing();
+      setAutoDialSession(null);
+      setIsDialing(false);
+      
+      toast({
+        title: 'Auto-Dialing Stopped',
+        description: 'Dialing session has been stopped',
+      });
+      
+      fetchQueueLeads(); // Refresh the queue
+    } catch (error) {
+      console.error('Error stopping auto-dialing:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to stop auto-dialing session',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handlePauseAutoDialing = async () => {
+    try {
+      await enhancedAutoDialingService.pauseAutoDialing();
+      setIsDialing(false);
+      
+      toast({
+        title: 'Auto-Dialing Paused',
+        description: 'Dialing session has been paused',
+      });
+    } catch (error) {
+      console.error('Error pausing auto-dialing:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to pause auto-dialing session',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleResumeAutoDialing = async () => {
+    try {
+      await enhancedAutoDialingService.resumeAutoDialing();
+      setIsDialing(true);
+      
+      toast({
+        title: 'Auto-Dialing Resumed',
+        description: 'Dialing session has been resumed',
+      });
+    } catch (error) {
+      console.error('Error resuming auto-dialing:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to resume auto-dialing session',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleRecordOutcome = async (queueId: string) => {
+    if (!selectedOutcome) {
+      toast({
+        title: 'Select Outcome',
+        description: 'Please select a call outcome',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      await enhancedAutoDialingService.recordCallOutcome(queueId, {
+        outcome: selectedOutcome as any
+      });
+      
+      toast({
+        title: 'Outcome Recorded',
+        description: `Call outcome "${selectedOutcome}" has been recorded`,
+      });
+      
+      setSelectedOutcome('');
+      fetchQueueLeads();
+    } catch (error) {
+      console.error('Error recording outcome:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to record call outcome',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -400,10 +548,102 @@ const AutoDialQueue = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Phone className="w-5 h-5" />
-          Auto Dial Queue ({queueLeads.length})
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Phone className="w-5 h-5" />
+            Auto Dial Queue ({queueLeads.length})
+          </div>
+          {autoDialSession && (
+            <Badge variant={isDialing ? "default" : "secondary"}>
+              {isDialing ? 'Dialing' : 'Paused'} - {autoDialSession.completed_calls}/{autoDialSession.total_leads}
+            </Badge>
+          )}
         </CardTitle>
+        
+        {/* Auto-Dialing Controls */}
+        <div className="flex items-center gap-4 mt-4">
+          {!autoDialSession ? (
+            <>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">Call Pacing:</label>
+                <Select value={callPacing.toString()} onValueChange={(value) => setCallPacing(parseInt(value))}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15s</SelectItem>
+                    <SelectItem value="30">30s</SelectItem>
+                    <SelectItem value="45">45s</SelectItem>
+                    <SelectItem value="60">60s</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button 
+                onClick={handleStartAutoDialing}
+                disabled={loading || queueLeads.length === 0}
+                className="flex items-center gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Start Calls
+              </Button>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              {isDialing ? (
+                <Button 
+                  onClick={handlePauseAutoDialing}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Pause className="w-4 h-4" />
+                  Pause
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleResumeAutoDialing}
+                  className="flex items-center gap-2"
+                >
+                  <Play className="w-4 h-4" />
+                  Resume
+                </Button>
+              )}
+              <Button 
+                onClick={handleStopAutoDialing}
+                variant="destructive"
+                className="flex items-center gap-2"
+              >
+                <Square className="w-4 h-4" />
+                Stop
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Session Stats */}
+        {autoDialSession && (
+          <div className="grid grid-cols-4 gap-4 mt-4 p-4 bg-gray-50 rounded-lg">
+            <div className="text-center">
+              <div className="text-lg font-semibold">{autoDialSession.completed_calls}</div>
+              <div className="text-xs text-gray-500">Calls Made</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold">{autoDialSession.successful_connects}</div>
+              <div className="text-xs text-gray-500">Connected</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold">{autoDialSession.voicemails_dropped}</div>
+              <div className="text-xs text-gray-500">Voicemails</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold">
+                {autoDialSession.completed_calls > 0 
+                  ? Math.round((autoDialSession.successful_connects / autoDialSession.completed_calls) * 100)
+                  : 0}%
+              </div>
+              <div className="text-xs text-gray-500">Connect Rate</div>
+            </div>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {queueLeads.length === 0 ? (
@@ -504,21 +744,58 @@ const AutoDialQueue = () => {
                   <LeadHistoryModal lead={lead} />
                   
                   {phoneNumbers.map((phone, index) => (
-                    <Button
-                      key={index}
-                      size="sm"
-                      variant={lead.compliance_status === 'allowed' ? 'default' : 'secondary'}
-                      disabled={lead.compliance_status !== 'allowed' || processingLeadId === lead.id}
-                      onClick={() => handleCallLead(lead, phone.number, phone.type)}
-                      className="flex items-center gap-2"
-                    >
-                      <Phone className="w-3 h-3" />
-                      {phone.type.toUpperCase()}: {phone.number}
-                      {phone.is_primary && <Badge variant="outline" className="text-xs ml-1">Primary</Badge>}
-                      {processingLeadId === lead.id && (
-                        <div className="animate-spin w-3 h-3 border border-current border-t-transparent rounded-full"></div>
+                    <div key={index} className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={lead.compliance_status === 'allowed' ? 'default' : 'secondary'}
+                        disabled={lead.compliance_status !== 'allowed' || processingLeadId === lead.id}
+                        onClick={() => handleCallLead(lead, phone.number, phone.type)}
+                        className="flex items-center gap-2"
+                      >
+                        <Phone className="w-3 h-3" />
+                        {phone.type.toUpperCase()}: {phone.number}
+                        {phone.is_primary && <Badge variant="outline" className="text-xs ml-1">Primary</Badge>}
+                        {processingLeadId === lead.id && (
+                          <div className="animate-spin w-3 h-3 border border-current border-t-transparent rounded-full"></div>
+                        )}
+                      </Button>
+                      
+                      {/* Quick Outcome Buttons for Auto-Dialing */}
+                      {autoDialSession && !processingLeadId && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRecordOutcome(lead.id)}
+                            className="px-2 py-1 text-xs bg-green-50 hover:bg-green-100"
+                          >
+                            ✓ Connected
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedOutcome('voicemail');
+                              handleRecordOutcome(lead.id);
+                            }}
+                            className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100"
+                          >
+                            📧 VM
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedOutcome('no_answer');
+                              handleRecordOutcome(lead.id);
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-50 hover:bg-gray-100"
+                          >
+                            ❌ No Answer
+                          </Button>
+                        </div>
                       )}
-                    </Button>
+                    </div>
                   ))}
                 </div>
               </div>
