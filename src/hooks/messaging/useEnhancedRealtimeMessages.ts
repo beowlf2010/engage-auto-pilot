@@ -91,31 +91,36 @@ export const useEnhancedRealtimeMessages = ({
     }));
 
     const currentAttempts = connectionStatus.reconnectAttempts;
-    console.log(`📡 [ENHANCED RT] Setting up enhanced real-time subscription (attempt ${currentAttempts + 1})`);
+    console.log(`📡 [ENHANCED RT] Setting up simplified real-time subscription (attempt ${currentAttempts + 1})`);
     
-    const channelName = `enhanced-messages-${profile.id}-${Date.now()}`;
+    // Simplified channel name - just use profile ID
+    const channelName = `messages-${profile.id}`;
     const channel = supabase
-      .channel(channelName)
+      .channel(channelName, {
+        config: {
+          presence: { key: profile.id }
+        }
+      })
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen to all events
           schema: 'public',
           table: 'conversations'
         },
         (payload) => {
-          console.log('📨 [ENHANCED RT] New message received:', payload);
+          console.log('📨 [ENHANCED RT] Database change received:', payload.eventType, payload);
           
           if (payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new) {
-            const newMessage = payload.new as { lead_id: string; direction: string };
+            const message = payload.new as { lead_id: string; direction: string };
             
-            // Immediate UI updates
+            // Always update UI for any conversation change
             onConversationUpdate();
-            onMessageUpdate(newMessage.lead_id);
+            onMessageUpdate(message.lead_id);
             
-            // Browser notification for incoming messages
-            if (newMessage.direction === 'in') {
-              console.log('🔔 [ENHANCED RT] Incoming message detected');
+            // Browser notification for new incoming messages only
+            if (payload.eventType === 'INSERT' && message.direction === 'in') {
+              console.log('🔔 [ENHANCED RT] New incoming message detected');
               window.dispatchEvent(new CustomEvent('unread-count-changed'));
               
               // Show browser notification if permitted
@@ -129,71 +134,74 @@ export const useEnhancedRealtimeMessages = ({
           }
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations'
-        },
-        (payload) => {
-          console.log('📝 [ENHANCED RT] Message updated:', payload);
-          
-          if (payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new) {
-            const updatedMessage = payload.new as { lead_id: string; read_at?: string };
-            
-            // If message was marked as read, update counts
-            if (updatedMessage.read_at && !payload.old?.read_at) {
-              onConversationUpdate();
-              window.dispatchEvent(new CustomEvent('unread-count-changed'));
-            }
-          }
-        }
-      )
       .subscribe((status) => {
         console.log(`📡 [ENHANCED RT] Subscription status: ${status}`);
         
         switch (status) {
           case 'SUBSCRIBED':
-            setConnectionStatus(prev => ({
+            console.log('✅ [ENHANCED RT] Successfully connected to real-time!');
+            setConnectionStatus({
               status: 'connected',
               lastConnected: new Date(),
               reconnectAttempts: 0,
               lastError: null
-            }));
+            });
             startHeartbeat();
             break;
             
           case 'CHANNEL_ERROR':
-          case 'TIMED_OUT':
-          case 'CLOSED':
+            console.error('❌ [ENHANCED RT] Channel error - checking RLS policies and table permissions');
             setConnectionStatus(prev => ({
               ...prev,
               status: 'error',
-              lastError: `Connection ${status}`,
+              lastError: 'Channel configuration error',
               reconnectAttempts: prev.reconnectAttempts + 1
             }));
+            handleReconnection(currentAttempts);
+            break;
             
-            // Reset attempts after max attempts to prevent infinite backoff
-            const maxAttempts = 5;
-            if (currentAttempts >= maxAttempts) {
-              console.log(`🔄 [ENHANCED RT] Max attempts (${maxAttempts}) reached, resetting and trying with shorter delay`);
-              setConnectionStatus(prev => ({
-                ...prev,
-                reconnectAttempts: 0
-              }));
-              scheduleReconnect(5000); // Reset to 5 second delay
-            } else {
-              // Exponential backoff for reconnection - cap at 30 seconds instead of 60
-              const delay = Math.min(5000 * Math.pow(2, currentAttempts), 30000);
-              scheduleReconnect(delay);
-            }
+          case 'TIMED_OUT':
+            console.warn('⏰ [ENHANCED RT] Connection timed out - network or server issue');
+            setConnectionStatus(prev => ({
+              ...prev,
+              status: 'error',
+              lastError: 'Connection timeout',
+              reconnectAttempts: prev.reconnectAttempts + 1
+            }));
+            handleReconnection(currentAttempts);
+            break;
+            
+          case 'CLOSED':
+            console.log('🔒 [ENHANCED RT] Connection closed');
+            setConnectionStatus(prev => ({
+              ...prev,
+              status: 'error',
+              lastError: 'Connection closed'
+            }));
             break;
         }
       });
 
     channelRef.current = channel;
-  }, [profile, onMessageUpdate, onConversationUpdate, cleanup, startHeartbeat, scheduleReconnect]);
+  }, [profile, onMessageUpdate, onConversationUpdate, cleanup, startHeartbeat]);
+
+  const handleReconnection = useCallback((currentAttempts: number) => {
+    const maxAttempts = 3; // Reduced max attempts
+    if (currentAttempts >= maxAttempts) {
+      console.log(`🔄 [ENHANCED RT] Max attempts (${maxAttempts}) reached, switching to longer delay`);
+      setConnectionStatus(prev => ({
+        ...prev,
+        reconnectAttempts: 0,
+        status: 'error'
+      }));
+      // Try again in 30 seconds after max attempts
+      scheduleReconnect(30000);
+    } else {
+      // Quick retry for first few attempts
+      const delay = currentAttempts === 0 ? 2000 : 5000;
+      scheduleReconnect(delay);
+    }
+  }, [scheduleReconnect]);
 
   // Setup subscription on mount and profile change
   useEffect(() => {
