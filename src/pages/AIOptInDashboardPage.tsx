@@ -136,6 +136,57 @@ const AIOptInDashboardPage = () => {
   const fetchValidationStatuses = async (leadsData: Lead[]) => {
     const statusMap = new Map<string, ValidationStatus>();
     
+    // Helper function to validate vehicle interest
+    const validateVehicleInterest = (vehicleText: string): { confidence: number; isValid: boolean; issue?: string } => {
+      if (!vehicleText || !vehicleText.trim()) {
+        return { confidence: 0.1, isValid: false, issue: 'No vehicle interest provided' };
+      }
+
+      const text = vehicleText.toLowerCase().trim();
+      
+      // Check for poor data quality indicators
+      const poorQualityPatterns = [
+        'make unknown',
+        'model unknown', 
+        'year unknown',
+        'unknown make',
+        'unknown model',
+        'unknown year',
+        'not specified',
+        'n/a',
+        'none',
+        'test',
+        'sample',
+        'demo'
+      ];
+
+      for (const pattern of poorQualityPatterns) {
+        if (text.includes(pattern)) {
+          return { confidence: 0.2, isValid: false, issue: `Contains "${pattern}" - poor data quality` };
+        }
+      }
+
+      // Check minimum length
+      if (text.length < 8) {
+        return { confidence: 0.3, isValid: false, issue: 'Too short - needs more specific vehicle info' };
+      }
+
+      // Check for reasonable vehicle patterns
+      const hasYear = /\b(19|20)\d{2}\b/.test(text);
+      const hasMake = /\b(toyota|ford|honda|nissan|chevrolet|gmc|jeep|ram|dodge|hyundai|kia|mazda|subaru|volkswagen|audi|bmw|mercedes|lexus|acura|infiniti|cadillac|buick|lincoln|volvo|porsche|tesla|ferrari|lamborghini|bentley|rolls|maserati|jaguar|land|range|mini|fiat|alfa|genesis|mitsubishi)\b/i.test(text);
+      
+      // Good quality indicators
+      if (hasYear && hasMake && text.length > 12) {
+        return { confidence: 0.9, isValid: true };
+      } else if ((hasYear || hasMake) && text.length > 10) {
+        return { confidence: 0.75, isValid: true };
+      } else if (text.length > 15) {
+        return { confidence: 0.65, isValid: true };
+      } else {
+        return { confidence: 0.4, isValid: false, issue: 'Lacks specific make/model/year information' };
+      }
+    };
+    
     for (const lead of leadsData) {
       if (!lead.ai_opt_in) { // Only check validation for non-AI-enabled leads
         try {
@@ -152,8 +203,8 @@ const AIOptInDashboardPage = () => {
           const nameThreshold = 0.6;
           const vehicleThreshold = 0.6;
           
-          // Simple heuristics for vehicle validation
-          const vehicleConfidence = vehicleInterest && vehicleInterest.length > 10 ? 0.8 : 0.3;
+          // Enhanced vehicle validation
+          const vehicleValidationResult = validateVehicleInterest(vehicleInterest);
           
           // Safe name validation with null checks
           const hasValidName = firstName && firstName.trim().length > 2;
@@ -161,9 +212,9 @@ const AIOptInDashboardPage = () => {
           
           statusMap.set(lead.id, {
             nameValidation: nameValidation ? nameValidation.confidence >= nameThreshold : hasValidName,
-            vehicleValidation: vehicleConfidence >= vehicleThreshold,
+            vehicleValidation: vehicleValidationResult.confidence >= vehicleThreshold,
             nameConfidence,
-            vehicleConfidence,
+            vehicleConfidence: vehicleValidationResult.confidence,
             hasLearningData: !!nameValidation
           });
         } catch (error) {
@@ -175,9 +226,9 @@ const AIOptInDashboardPage = () => {
           
           statusMap.set(lead.id, {
             nameValidation: hasValidName,
-            vehicleValidation: vehicleInterest && vehicleInterest.length > 10,
+            vehicleValidation: false, // Default to failed validation on error
             nameConfidence: hasValidName ? 0.7 : 0.3,
-            vehicleConfidence: vehicleInterest && vehicleInterest.length > 10 ? 0.8 : 0.3,
+            vehicleConfidence: 0.3,
             hasLearningData: false
           });
         }
