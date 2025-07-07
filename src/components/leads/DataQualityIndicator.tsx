@@ -41,7 +41,7 @@ const DataQualityIndicator: React.FC<DataQualityIndicatorProps> = ({
             suggestions: { useGenericGreeting: true }
           },
           vehicleValidation: {
-            isValid: Boolean(vehicleInterest && vehicleInterest.length > 5),
+            isValidVehicleInterest: Boolean(vehicleInterest && vehicleInterest.length > 5),
             confidence: 0.5,
             detectedIssue: 'Assessment failed'
           },
@@ -110,7 +110,7 @@ const DataQualityIndicator: React.FC<DataQualityIndicatorProps> = ({
         </div>
       )}
       
-      {!dataQuality.vehicleValidation.isValid && dataQuality.vehicleValidation.detectedIssue !== 'None' && (
+      {!dataQuality.vehicleValidation.isValidVehicleInterest && dataQuality.vehicleValidation.detectedIssue !== 'None' && (
         <div className="text-xs text-orange-500">
           {dataQuality.vehicleValidation.detectedIssue}
         </div>

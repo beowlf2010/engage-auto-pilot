@@ -1,28 +1,25 @@
 
 /**
  * Vehicle Interest Validation Service
- * Handles validation and sanitization of vehicle interest data
+ * Handles validation and sanitization of vehicle interest data with confidence scoring
  */
 
-// Invalid patterns that should trigger fallback message
-const INVALID_PATTERNS = [
-  // Null/empty checks handled separately
-  /^not specified$/i,
-  /^unknown$/i,
-  /^n\/a$/i,
-  /^na$/i,
-  /^null$/i,
-  /^undefined$/i,
-  /^none$/i,
-  /^test$/i,
-  /^sample$/i,
-  /^demo$/i,
-  /^vehicle$/i,
-  /^car$/i,
-  /^auto$/i,
-  /^automobile$/i,
-  /^\s*-+\s*$/,  // Just dashes
-  /^\s*\.+\s*$/,  // Just periods
+// Poor data quality patterns that should trigger low confidence
+const POOR_QUALITY_PATTERNS = [
+  'make unknown',
+  'model unknown', 
+  'year unknown',
+  'unknown make',
+  'unknown model',
+  'unknown year',
+  'not specified',
+  'n/a',
+  'none',
+  'test',
+  'sample',
+  'demo',
+  'null',
+  'undefined'
 ];
 
 // The fallback message to use when vehicle interest is invalid
@@ -33,53 +30,84 @@ export interface VehicleInterestValidation {
   sanitizedMessage: string;
   originalValue: string;
   reason?: string;
+  confidence?: number;
+}
+
+export interface VehicleValidationResult {
+  isValidVehicleInterest: boolean;
+  confidence: number;
+  detectedIssue?: string;
 }
 
 /**
- * Validates vehicle interest and returns appropriate message
+ * Enhanced vehicle interest validation with confidence scoring
  */
-export const validateVehicleInterest = (vehicleInterest: string | null | undefined): VehicleInterestValidation => {
-  const originalValue = vehicleInterest || '';
+export const validateVehicleInterestWithConfidence = (vehicleText: string | null | undefined): VehicleValidationResult => {
+  if (!vehicleText || !vehicleText.trim()) {
+    return { 
+      isValidVehicleInterest: false, 
+      confidence: 0.1, 
+      detectedIssue: 'No vehicle interest provided' 
+    };
+  }
+
+  const text = vehicleText.toLowerCase().trim();
   
-  // Check for null, undefined, or empty
-  if (!vehicleInterest || typeof vehicleInterest !== 'string') {
-    return {
-      isValid: false,
-      sanitizedMessage: FALLBACK_MESSAGE,
-      originalValue,
-      reason: 'Null or undefined value'
-    };
-  }
-
-  // Check for empty or whitespace-only strings
-  const trimmed = vehicleInterest.trim();
-  if (trimmed.length === 0) {
-    return {
-      isValid: false,
-      sanitizedMessage: FALLBACK_MESSAGE,
-      originalValue,
-      reason: 'Empty or whitespace-only string'
-    };
-  }
-
-  // Check against invalid patterns
-  for (const pattern of INVALID_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return {
-        isValid: false,
-        sanitizedMessage: FALLBACK_MESSAGE,
-        originalValue,
-        reason: `Matched invalid pattern: ${pattern.source}`
+  // Check for poor data quality indicators
+  for (const pattern of POOR_QUALITY_PATTERNS) {
+    if (text.includes(pattern)) {
+      return { 
+        isValidVehicleInterest: false, 
+        confidence: 0.2, 
+        detectedIssue: `Contains "${pattern}" - poor data quality` 
       };
     }
   }
 
-  // If we get here, the vehicle interest appears valid
+  // Check minimum length
+  if (text.length < 8) {
+    return { 
+      isValidVehicleInterest: false, 
+      confidence: 0.3, 
+      detectedIssue: 'Too short - needs more specific vehicle info' 
+    };
+  }
+
+  // Check for reasonable vehicle patterns
+  const hasYear = /\b(19|20)\d{2}\b/.test(text);
+  const hasMake = /\b(toyota|ford|honda|nissan|chevrolet|gmc|jeep|ram|dodge|hyundai|kia|mazda|subaru|volkswagen|audi|bmw|mercedes|lexus|acura|infiniti|cadillac|buick|lincoln|volvo|porsche|tesla|ferrari|lamborghini|bentley|rolls|maserati|jaguar|land|range|mini|fiat|alfa|genesis|mitsubishi)\b/i.test(text);
+  
+  // Good quality indicators
+  if (hasYear && hasMake && text.length > 12) {
+    return { isValidVehicleInterest: true, confidence: 0.9 };
+  } else if ((hasYear || hasMake) && text.length > 10) {
+    return { isValidVehicleInterest: true, confidence: 0.75 };
+  } else if (text.length > 15) {
+    return { isValidVehicleInterest: true, confidence: 0.65 };
+  } else {
+    return { 
+      isValidVehicleInterest: false, 
+      confidence: 0.4, 
+      detectedIssue: 'Lacks specific make/model/year information' 
+    };
+  }
+};
+
+/**
+ * Legacy validation function for backward compatibility
+ */
+export const validateVehicleInterest = (vehicleInterest: string | null | undefined): VehicleInterestValidation => {
+  const result = validateVehicleInterestWithConfidence(vehicleInterest);
+  const originalValue = vehicleInterest || '';
+  
   return {
-    isValid: true,
-    sanitizedMessage: `your interest in ${trimmed}`,
+    isValid: result.isValidVehicleInterest,
+    sanitizedMessage: result.isValidVehicleInterest 
+      ? `your interest in ${vehicleInterest?.trim()}` 
+      : FALLBACK_MESSAGE,
     originalValue,
-    reason: 'Valid vehicle interest'
+    reason: result.detectedIssue || (result.isValidVehicleInterest ? 'Valid vehicle interest' : 'Invalid vehicle interest'),
+    confidence: result.confidence
   };
 };
 

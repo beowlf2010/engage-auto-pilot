@@ -1,14 +1,11 @@
 
 import { validatePersonalName, type NameValidationResult } from './nameValidationService';
+import { validateVehicleInterestWithConfidence, type VehicleValidationResult } from './vehicleInterestValidationService';
 
 export interface DataQualityAssessment {
   overallQualityScore: number;
   nameValidation: NameValidationResult;
-  vehicleValidation: {
-    isValid: boolean;
-    confidence: number;
-    detectedIssue: string;
-  };
+  vehicleValidation: VehicleValidationResult;
   messageStrategy: 'personal_with_vehicle' | 'personal_generic_vehicle' | 'generic_with_vehicle' | 'fully_generic';
   recommendations: {
     usePersonalGreeting: boolean;
@@ -27,8 +24,8 @@ export const assessLeadDataQuality = async (
     // Validate the name
     const nameValidation = await validatePersonalName(firstName);
     
-    // Validate vehicle interest
-    const vehicleValidation = assessVehicleInterest(vehicleInterest);
+    // Validate vehicle interest using enhanced validation
+    const vehicleValidation = validateVehicleInterestWithConfidence(vehicleInterest);
     
     // Calculate overall quality score
     const nameScore = nameValidation.confidence;
@@ -37,7 +34,7 @@ export const assessLeadDataQuality = async (
     
     // Determine message strategy
     const usePersonalGreeting = nameValidation.isValidPersonalName && nameScore > 0.7;
-    const useSpecificVehicle = vehicleValidation.isValid && vehicleScore > 0.6;
+    const useSpecificVehicle = vehicleValidation.isValidVehicleInterest && vehicleScore > 0.6;
     
     let messageStrategy: DataQualityAssessment['messageStrategy'];
     if (usePersonalGreeting && useSpecificVehicle) {
@@ -85,7 +82,7 @@ export const assessLeadDataQuality = async (
         }
       },
       vehicleValidation: {
-        isValid: false,
+        isValidVehicleInterest: false,
         confidence: 0.5,
         detectedIssue: 'Generic vehicle interest'
       },
@@ -99,65 +96,3 @@ export const assessLeadDataQuality = async (
   }
 };
 
-const assessVehicleInterest = (vehicleInterest?: string): {
-  isValid: boolean;
-  confidence: number;
-  detectedIssue: string;
-} => {
-  if (!vehicleInterest || vehicleInterest.trim() === '') {
-    return {
-      isValid: false,
-      confidence: 0.1,
-      detectedIssue: 'No vehicle interest specified'
-    };
-  }
-  
-  const cleanVehicle = vehicleInterest.trim().toLowerCase();
-  
-  // Check for generic phrases
-  const genericPhrases = [
-    'finding the right vehicle',
-    'finding the right vehicle for your needs',
-    'not specified',
-    'unknown',
-    'car',
-    'truck',
-    'vehicle',
-    'auto'
-  ];
-  
-  if (genericPhrases.some(phrase => cleanVehicle.includes(phrase))) {
-    return {
-      isValid: false,
-      confidence: 0.3,
-      detectedIssue: 'Generic vehicle interest phrase'
-    };
-  }
-  
-  // Check for specific vehicle information
-  const hasYear = /\b(19|20)\d{2}\b/.test(cleanVehicle);
-  const hasMake = /\b(chevrolet|chevy|ford|toyota|honda|nissan|hyundai|kia|bmw|mercedes|audi)\b/.test(cleanVehicle);
-  const hasModel = /\b(equinox|malibu|silverado|cruze|tahoe|suburban|camaro|corvette|pacifica)\b/.test(cleanVehicle);
-  
-  let confidence = 0.5;
-  if (hasYear) confidence += 0.2;
-  if (hasMake) confidence += 0.2;
-  if (hasModel) confidence += 0.3;
-  
-  // Cap at 0.9 to leave room for improvement
-  confidence = Math.min(confidence, 0.9);
-  
-  if (confidence > 0.6) {
-    return {
-      isValid: true,
-      confidence,
-      detectedIssue: 'None'
-    };
-  }
-  
-  return {
-    isValid: false,
-    confidence,
-    detectedIssue: 'Insufficient vehicle details'
-  };
-};
