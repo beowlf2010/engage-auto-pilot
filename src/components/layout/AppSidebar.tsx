@@ -44,7 +44,7 @@ export function AppSidebar({ unreadCount = 0 }: AppSidebarProps) {
   );
 
   const inventoryItems = navigationItems.filter(item => 
-    ['Inventory', 'Upload Inventory', 'RPO Insights'].includes(item.label) && hasAccess(item)
+    ['Inventory', 'Upload Inventory', 'RPO Insights', 'RPO Database'].includes(item.label) && hasAccess(item)
   );
 
   const aiItems = navigationItems.filter(item => 

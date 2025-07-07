@@ -75,6 +75,12 @@ export const navigationItems: NavigationItem[] = [
     access: ['admin', 'manager']
   },
   {
+    label: 'RPO Database',
+    href: '/rpo-database',
+    icon: Package,
+    access: ['admin', 'manager']
+  },
+  {
     label: 'Financial',
     href: '/financial-dashboard',
     icon: DollarSign,
