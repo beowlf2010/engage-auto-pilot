@@ -5246,6 +5246,78 @@ export type Database = {
           },
         ]
       }
+      twilio_health_logs: {
+        Row: {
+          account_status: string | null
+          api_status: string
+          check_timestamp: string
+          created_at: string
+          error_message: string | null
+          id: string
+          phone_number_valid: boolean | null
+          response_time_ms: number | null
+          success_rate: number | null
+        }
+        Insert: {
+          account_status?: string | null
+          api_status?: string
+          check_timestamp?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          phone_number_valid?: boolean | null
+          response_time_ms?: number | null
+          success_rate?: number | null
+        }
+        Update: {
+          account_status?: string | null
+          api_status?: string
+          check_timestamp?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          phone_number_valid?: boolean | null
+          response_time_ms?: number | null
+          success_rate?: number | null
+        }
+        Relationships: []
+      }
+      twilio_monitoring_settings: {
+        Row: {
+          alert_emails: string[] | null
+          alert_phone_numbers: string[] | null
+          check_interval_minutes: number
+          created_at: string
+          failure_threshold: number
+          id: string
+          last_alert_sent: string | null
+          monitoring_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          alert_emails?: string[] | null
+          alert_phone_numbers?: string[] | null
+          check_interval_minutes?: number
+          created_at?: string
+          failure_threshold?: number
+          id?: string
+          last_alert_sent?: string | null
+          monitoring_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          alert_emails?: string[] | null
+          alert_phone_numbers?: string[] | null
+          check_interval_minutes?: number
+          created_at?: string
+          failure_threshold?: number
+          id?: string
+          last_alert_sent?: string | null
+          monitoring_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       upload_history: {
         Row: {
           created_at: string
