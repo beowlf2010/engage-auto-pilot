@@ -17,12 +17,17 @@ import {
   MessageSquare,
   Search,
   Filter,
-  Download
+  Download,
+  XCircle,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { OptimizedLoading } from '@/components/ui/OptimizedLoading';
 import EnhancedBulkAIOptIn from '@/components/leads/EnhancedBulkAIOptIn';
+import EnhancedAIPreview from '@/components/leads/EnhancedAIPreview';
 import { toast } from '@/hooks/use-toast';
+import { getLearnedNameValidation } from '@/services/nameValidationLearningService';
 
 interface Lead {
   id: string;
@@ -37,6 +42,14 @@ interface Lead {
   created_at: string;
   ai_strategy_bucket?: string;
   message_intensity?: string;
+}
+
+interface ValidationStatus {
+  nameValidation: boolean;
+  vehicleValidation: boolean;
+  nameConfidence: number;
+  vehicleConfidence: number;
+  hasLearningData: boolean;
 }
 
 interface AIStats {
@@ -60,6 +73,8 @@ const AIOptInDashboardPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [aiStatusFilter, setAIStatusFilter] = useState<string>('all');
   const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
+  const [validationStatuses, setValidationStatuses] = useState<Map<string, ValidationStatus>>(new Map());
+  const [previewLeadId, setPreviewLeadId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -82,6 +97,9 @@ const AIOptInDashboardPage = () => {
       if (leadsError) throw leadsError;
 
       setLeads(leadsData || []);
+
+      // Fetch validation statuses for all leads
+      await fetchValidationStatuses(leadsData || []);
 
       // Calculate AI statistics
       const totalAIEnabled = leadsData?.filter(lead => lead.ai_opt_in).length || 0;
@@ -113,6 +131,44 @@ const AIOptInDashboardPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchValidationStatuses = async (leadsData: Lead[]) => {
+    const statusMap = new Map<string, ValidationStatus>();
+    
+    for (const lead of leadsData) {
+      if (!lead.ai_opt_in) { // Only check validation for non-AI-enabled leads
+        try {
+          // Check name validation
+          const nameValidation = await getLearnedNameValidation(lead.first_name);
+          const nameThreshold = 0.6;
+          const vehicleThreshold = 0.6;
+          
+          // Simple heuristics for vehicle validation (you can enhance this)
+          const vehicleConfidence = lead.vehicle_interest && lead.vehicle_interest.length > 10 ? 0.8 : 0.3;
+          
+          statusMap.set(lead.id, {
+            nameValidation: nameValidation ? nameValidation.confidence >= nameThreshold : lead.first_name.length > 2,
+            vehicleValidation: vehicleConfidence >= vehicleThreshold,
+            nameConfidence: nameValidation?.confidence || (lead.first_name.length > 2 ? 0.7 : 0.3),
+            vehicleConfidence,
+            hasLearningData: !!nameValidation
+          });
+        } catch (error) {
+          console.error('Error fetching validation for lead:', lead.id, error);
+          // Fallback to simple validation
+          statusMap.set(lead.id, {
+            nameValidation: lead.first_name.length > 2,
+            vehicleValidation: !!lead.vehicle_interest && lead.vehicle_interest.length > 10,
+            nameConfidence: lead.first_name.length > 2 ? 0.7 : 0.3,
+            vehicleConfidence: lead.vehicle_interest && lead.vehicle_interest.length > 10 ? 0.8 : 0.3,
+            hasLearningData: false
+          });
+        }
+      }
+    }
+    
+    setValidationStatuses(statusMap);
   };
 
   const filteredLeads = useMemo(() => {
@@ -172,6 +228,34 @@ const AIOptInDashboardPage = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handlePreviewOpen = (leadId: string) => {
+    setPreviewLeadId(leadId);
+  };
+
+  const handlePreviewClose = () => {
+    setPreviewLeadId(null);
+  };
+
+  const handleAIEnabled = () => {
+    fetchData(); // Refresh data after AI is enabled
+  };
+
+  const getValidationIcon = (isValid: boolean, confidence: number) => {
+    const threshold = 0.6;
+    if (isValid && confidence >= threshold) {
+      return <CheckCircle className="w-4 h-4 text-green-600" />;
+    }
+    return <XCircle className="w-4 h-4 text-amber-600" />;
+  };
+
+  const getValidationBadge = (isValid: boolean, confidence: number) => {
+    const threshold = 0.6;
+    if (isValid && confidence >= threshold) {
+      return <Badge className="bg-green-100 text-green-800">Pass</Badge>;
+    }
+    return <Badge className="bg-amber-100 text-amber-800">Review</Badge>;
   };
 
   const getDataQualityScore = (lead: Lead) => {
@@ -353,6 +437,8 @@ const AIOptInDashboardPage = () => {
                     <TableHead className="w-12">Select</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Vehicle Interest</TableHead>
+                    <TableHead>Name Quality</TableHead>
+                    <TableHead>Vehicle Quality</TableHead>
                     <TableHead>AI Status</TableHead>
                     <TableHead>Data Quality</TableHead>
                     <TableHead>Strategy</TableHead>
@@ -360,56 +446,100 @@ const AIOptInDashboardPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLeads.map((lead) => (
-                    <TableRow key={lead.id}>
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selectedLeads.find(l => l.id === lead.id) !== undefined}
-                          onChange={() => toggleLeadSelection(lead)}
-                          className="rounded"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{lead.first_name} {lead.last_name}</div>
-                          <div className="text-sm text-muted-foreground">{lead.email}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-xs truncate">
-                          {lead.vehicle_interest || 'Not specified'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {lead.ai_opt_in ? (
-                          <Badge className="bg-green-100 text-green-800">
-                            {lead.ai_stage === 'scheduled' ? 'Active' : 'Enabled'}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Disabled</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {getQualityBadge(getDataQualityScore(lead))}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{lead.ai_strategy_bucket || 'Not set'}</div>
-                          <div className="text-muted-foreground">{lead.message_intensity}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant={lead.ai_opt_in ? "outline" : "default"}
-                          onClick={() => handleAIToggle(lead.id, !lead.ai_opt_in)}
-                        >
-                          {lead.ai_opt_in ? 'Disable AI' : 'Enable AI'}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredLeads.map((lead) => {
+                    const validation = validationStatuses.get(lead.id);
+                    return (
+                      <TableRow key={lead.id}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedLeads.find(l => l.id === lead.id) !== undefined}
+                            onChange={() => toggleLeadSelection(lead)}
+                            className="rounded"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{lead.first_name} {lead.last_name}</div>
+                            <div className="text-sm text-muted-foreground">{lead.email}</div>
+                            {validation?.hasLearningData && (
+                              <Badge variant="outline" className="text-xs mt-1">
+                                Previously Seen
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-xs truncate">
+                            {lead.vehicle_interest || 'Not specified'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {!lead.ai_opt_in && validation ? (
+                            <div className="flex items-center gap-2">
+                              {getValidationIcon(validation.nameValidation, validation.nameConfidence)}
+                              {getValidationBadge(validation.nameValidation, validation.nameConfidence)}
+                              <span className="text-xs text-muted-foreground">
+                                {Math.round(validation.nameConfidence * 100)}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {!lead.ai_opt_in && validation ? (
+                            <div className="flex items-center gap-2">
+                              {getValidationIcon(validation.vehicleValidation, validation.vehicleConfidence)}
+                              {getValidationBadge(validation.vehicleValidation, validation.vehicleConfidence)}
+                              <span className="text-xs text-muted-foreground">
+                                {Math.round(validation.vehicleConfidence * 100)}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {lead.ai_opt_in ? (
+                            <Badge className="bg-green-100 text-green-800">
+                              {lead.ai_stage === 'scheduled' ? 'Active' : 'Enabled'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Disabled</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {getQualityBadge(getDataQualityScore(lead))}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{lead.ai_strategy_bucket || 'Not set'}</div>
+                            <div className="text-muted-foreground">{lead.message_intensity}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {lead.ai_opt_in ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAIToggle(lead.id, false)}
+                            >
+                              Disable AI
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handlePreviewOpen(lead.id)}
+                            >
+                              Enable AI with Preview
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -507,6 +637,29 @@ const AIOptInDashboardPage = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Enhanced AI Preview Modal */}
+      {previewLeadId && (
+        <EnhancedAIPreview
+          leadId={previewLeadId}
+          leadName={
+            (() => {
+              const lead = leads.find(l => l.id === previewLeadId);
+              return lead ? `${lead.first_name} ${lead.last_name}` : 'Unknown Lead';
+            })()
+          }
+          vehicleInterest={
+            (() => {
+              const lead = leads.find(l => l.id === previewLeadId);
+              return lead?.vehicle_interest;
+            })()
+          }
+          isOpen={!!previewLeadId}
+          onClose={handlePreviewClose}
+          onAIEnabled={handleAIEnabled}
+          autoGenerate={true}
+        />
+      )}
     </div>
   );
 };
