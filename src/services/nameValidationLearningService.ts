@@ -69,6 +69,71 @@ export const getLearnedNameValidation = async (name: string): Promise<LearnedNam
   }
 };
 
+/**
+ * Batch fetch name validations for multiple names (Performance optimization)
+ * Reduces N+1 queries to a single database call
+ */
+export const getBatchLearnedNameValidations = async (names: string[]): Promise<Map<string, LearnedNameValidation>> => {
+  const resultsMap = new Map<string, LearnedNameValidation>();
+  
+  if (!names || names.length === 0) {
+    return resultsMap;
+  }
+
+  try {
+    // Filter and normalize names
+    const validNames = names
+      .filter(name => name && typeof name === 'string' && name.trim())
+      .map(name => name.trim());
+
+    if (validNames.length === 0) {
+      return resultsMap;
+    }
+
+    console.log(`🚀 [BATCH NAME VALIDATION] Fetching validations for ${validNames.length} names`);
+
+    // Single batch query using IN clause
+    const { data: validations, error } = await supabase
+      .from('ai_name_validations')
+      .select('*')
+      .in('name_text', validNames);
+
+    if (error) {
+      console.error('❌ [BATCH NAME VALIDATION] Error fetching batch validations:', error);
+      return resultsMap;
+    }
+
+    // Process results into map
+    if (validations) {
+      validations.forEach(data => {
+        const totalDecisions = data.times_approved + data.times_denied;
+        const approvalRate = totalDecisions > 0 ? data.times_approved / totalDecisions : 0;
+        
+        resultsMap.set(data.name_text, {
+          isValidPersonalName: data.times_approved > data.times_denied,
+          confidence: Math.min(0.9, 0.5 + (approvalRate * 0.4) + (Math.min(totalDecisions, 10) * 0.05)),
+          detectedType: 'learned_override',
+          userOverride: true,
+          timesApproved: data.times_approved,
+          timesRejected: data.times_denied,
+          timesSeen: data.times_seen,
+          suggestions: {
+            useGenericGreeting: data.times_denied > data.times_approved,
+            contextualGreeting: data.times_approved > data.times_denied ? `Hi ${data.name_text}` : 'Hello there'
+          }
+        });
+      });
+    }
+
+    console.log(`✅ [BATCH NAME VALIDATION] Retrieved ${resultsMap.size} validations from ${validNames.length} names`);
+    return resultsMap;
+
+  } catch (error) {
+    console.error('❌ [BATCH NAME VALIDATION] Error in batch validation:', error);
+    return resultsMap;
+  }
+};
+
 export const saveNameValidationDecision = async (
   originalName: string,
   decision: 'approved' | 'denied',

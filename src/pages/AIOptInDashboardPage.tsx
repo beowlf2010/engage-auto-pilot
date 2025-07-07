@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +29,7 @@ import EnhancedAIPreview from '@/components/leads/EnhancedAIPreview';
 import HideLeadButton from '@/components/leads/HideLeadButton';
 import ShowHiddenLeadsToggle from '@/components/leads/ShowHiddenLeadsToggle';
 import { toast } from '@/hooks/use-toast';
-import { getLearnedNameValidation } from '@/services/nameValidationLearningService';
+import { getBatchValidationStatuses, type OptimizedValidationStatus } from '@/services/optimizedValidationService';
 
 interface Lead {
   id: string;
@@ -47,13 +47,8 @@ interface Lead {
   is_hidden?: boolean;
 }
 
-interface ValidationStatus {
-  nameValidation: boolean;
-  vehicleValidation: boolean;
-  nameConfidence: number;
-  vehicleConfidence: number;
-  hasLearningData: boolean;
-}
+// Use OptimizedValidationStatus from service
+type ValidationStatus = OptimizedValidationStatus;
 
 interface AIStats {
   totalAIEnabled: number;
@@ -138,108 +133,22 @@ const AIOptInDashboardPage = () => {
   };
 
   const fetchValidationStatuses = async (leadsData: Lead[]) => {
-    const statusMap = new Map<string, ValidationStatus>();
+    console.log('🚀 [PERFORMANCE] Starting optimized batch validation for', leadsData.length, 'leads');
+    const startTime = performance.now();
     
-    // Helper function to validate vehicle interest
-    const validateVehicleInterest = (vehicleText: string): { confidence: number; isValid: boolean; issue?: string } => {
-      if (!vehicleText || !vehicleText.trim()) {
-        return { confidence: 0.1, isValid: false, issue: 'No vehicle interest provided' };
-      }
-
-      const text = vehicleText.toLowerCase().trim();
+    try {
+      // Use optimized batch validation service
+      const statusMap = await getBatchValidationStatuses(leadsData);
+      setValidationStatuses(statusMap);
       
-      // Check for poor data quality indicators
-      const poorQualityPatterns = [
-        'make unknown',
-        'model unknown', 
-        'year unknown',
-        'unknown make',
-        'unknown model',
-        'unknown year',
-        'not specified',
-        'n/a',
-        'none',
-        'test',
-        'sample',
-        'demo'
-      ];
-
-      for (const pattern of poorQualityPatterns) {
-        if (text.includes(pattern)) {
-          return { confidence: 0.2, isValid: false, issue: `Contains "${pattern}" - poor data quality` };
-        }
-      }
-
-      // Check minimum length
-      if (text.length < 8) {
-        return { confidence: 0.3, isValid: false, issue: 'Too short - needs more specific vehicle info' };
-      }
-
-      // Check for reasonable vehicle patterns
-      const hasYear = /\b(19|20)\d{2}\b/.test(text);
-      const hasMake = /\b(toyota|ford|honda|nissan|chevrolet|gmc|jeep|ram|dodge|hyundai|kia|mazda|subaru|volkswagen|audi|bmw|mercedes|lexus|acura|infiniti|cadillac|buick|lincoln|volvo|porsche|tesla|ferrari|lamborghini|bentley|rolls|maserati|jaguar|land|range|mini|fiat|alfa|genesis|mitsubishi)\b/i.test(text);
-      
-      // Good quality indicators
-      if (hasYear && hasMake && text.length > 12) {
-        return { confidence: 0.9, isValid: true };
-      } else if ((hasYear || hasMake) && text.length > 10) {
-        return { confidence: 0.75, isValid: true };
-      } else if (text.length > 15) {
-        return { confidence: 0.65, isValid: true };
-      } else {
-        return { confidence: 0.4, isValid: false, issue: 'Lacks specific make/model/year information' };
-      }
-    };
-    
-    for (const lead of leadsData) {
-      if (!lead.ai_opt_in) { // Only check validation for non-AI-enabled leads
-        try {
-          // Safely get first name with null/undefined checks
-          const firstName = lead.first_name || '';
-          const vehicleInterest = lead.vehicle_interest || '';
-          
-          // Check name validation only if we have a valid first name
-          let nameValidation = null;
-          if (firstName && firstName.trim()) {
-            nameValidation = await getLearnedNameValidation(firstName);
-          }
-          
-          const nameThreshold = 0.6;
-          const vehicleThreshold = 0.6;
-          
-          // Enhanced vehicle validation
-          const vehicleValidationResult = validateVehicleInterest(vehicleInterest);
-          
-          // Safe name validation with null checks
-          const hasValidName = firstName && firstName.trim().length > 2;
-          const nameConfidence = nameValidation?.confidence || (hasValidName ? 0.7 : 0.3);
-          
-          statusMap.set(lead.id, {
-            nameValidation: nameValidation ? nameValidation.confidence >= nameThreshold : hasValidName,
-            vehicleValidation: vehicleValidationResult.confidence >= vehicleThreshold,
-            nameConfidence,
-            vehicleConfidence: vehicleValidationResult.confidence,
-            hasLearningData: !!nameValidation
-          });
-        } catch (error) {
-          console.error('Error fetching validation for lead:', lead.id, error);
-          // Safe fallback validation with null checks
-          const firstName = lead.first_name || '';
-          const vehicleInterest = lead.vehicle_interest || '';
-          const hasValidName = firstName && firstName.trim().length > 2;
-          
-          statusMap.set(lead.id, {
-            nameValidation: hasValidName,
-            vehicleValidation: false, // Default to failed validation on error
-            nameConfidence: hasValidName ? 0.7 : 0.3,
-            vehicleConfidence: 0.3,
-            hasLearningData: false
-          });
-        }
-      }
+      const endTime = performance.now();
+      console.log(`✅ [PERFORMANCE] Batch validation completed in ${Math.round(endTime - startTime)}ms`);
+      console.log(`📊 [PERFORMANCE] Processed ${statusMap.size} validations from ${leadsData.length} leads`);
+    } catch (error) {
+      console.error('❌ [PERFORMANCE] Error in batch validation:', error);
+      // Fallback to empty map - UI will handle gracefully
+      setValidationStatuses(new Map());
     }
-    
-    setValidationStatuses(statusMap);
   };
 
   const filteredLeads = useMemo(() => {
@@ -261,23 +170,24 @@ const AIOptInDashboardPage = () => {
     });
   }, [leads, searchTerm, aiStatusFilter, showHidden]);
 
-  const toggleLeadSelection = (lead: Lead) => {
+  // Memoized callbacks to prevent unnecessary re-renders
+  const toggleLeadSelection = useCallback((lead: Lead) => {
     setSelectedLeads(prev => 
       prev.find(l => l.id === lead.id)
         ? prev.filter(l => l.id !== lead.id)
         : [...prev, lead]
     );
-  };
+  }, []);
 
-  const selectAllFiltered = () => {
+  const selectAllFiltered = useCallback(() => {
     setSelectedLeads(filteredLeads);
-  };
+  }, [filteredLeads]);
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedLeads([]);
-  };
+  }, []);
 
-  const handleAIToggle = async (leadId: string, enable: boolean) => {
+  const handleAIToggle = useCallback(async (leadId: string, enable: boolean) => {
     try {
       const { error } = await supabase
         .from('leads')
@@ -301,21 +211,21 @@ const AIOptInDashboardPage = () => {
         variant: "destructive"
       });
     }
-  };
+  }, []);
 
-  const handlePreviewOpen = (leadId: string) => {
+  const handlePreviewOpen = useCallback((leadId: string) => {
     setPreviewLeadId(leadId);
-  };
+  }, []);
 
-  const handlePreviewClose = () => {
+  const handlePreviewClose = useCallback(() => {
     setPreviewLeadId(null);
-  };
+  }, []);
 
-  const handleAIEnabled = () => {
+  const handleAIEnabled = useCallback(() => {
     fetchData(); // Refresh data after AI is enabled
-  };
+  }, []);
 
-  const handleToggleHidden = async (leadId: string, hidden: boolean) => {
+  const handleToggleHidden = useCallback(async (leadId: string, hidden: boolean) => {
     // Update local state optimistically
     setLeads(prev => prev.map(lead => 
       lead.id === leadId ? { ...lead, is_hidden: hidden } : lead
@@ -323,40 +233,46 @@ const AIOptInDashboardPage = () => {
     
     // Refresh data to get updated state
     fetchData();
-  };
+  }, []);
 
-  const hiddenCount = leads.filter(lead => lead.is_hidden).length;
+  // Memoized computations
+  const hiddenCount = useMemo(() => 
+    leads.filter(lead => lead.is_hidden).length, 
+    [leads]
+  );
 
-  const getValidationIcon = (isValid: boolean, confidence: number) => {
+  // Memoized utility functions
+  const getValidationIcon = useCallback((isValid: boolean, confidence: number) => {
     const threshold = 0.6;
     if (isValid && confidence >= threshold) {
       return <CheckCircle className="w-4 h-4 text-green-600" />;
     }
     return <XCircle className="w-4 h-4 text-amber-600" />;
-  };
+  }, []);
 
-  const getValidationBadge = (isValid: boolean, confidence: number) => {
+  const getValidationBadge = useCallback((isValid: boolean, confidence: number) => {
     const threshold = 0.6;
     if (isValid && confidence >= threshold) {
       return <Badge className="bg-green-100 text-green-800">Pass</Badge>;
     }
     return <Badge className="bg-amber-100 text-amber-800">Review</Badge>;
-  };
+  }, []);
 
-  const getDataQualityScore = (lead: Lead) => {
+  const getDataQualityScore = useCallback((lead: Lead) => {
     let score = 0;
     if (lead.first_name && lead.first_name.length > 1) score += 25;
     if (lead.last_name && lead.last_name.length > 1) score += 25;
     if (lead.email && lead.email.includes('@')) score += 25;
     if (lead.vehicle_interest && lead.vehicle_interest.length > 10) score += 25;
     return score;
-  };
+  }, []);
 
-  const getQualityBadge = (score: number) => {
+  const getQualityBadge = useCallback((score: number) => {
     if (score >= 75) return <Badge className="bg-green-100 text-green-800">High</Badge>;
     if (score >= 50) return <Badge className="bg-yellow-100 text-yellow-800">Medium</Badge>;
     return <Badge className="bg-red-100 text-red-800">Poor</Badge>;
-  };
+  }, []);
+
 
   if (loading) {
     return <OptimizedLoading variant="dashboard" />;
