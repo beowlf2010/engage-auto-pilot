@@ -4,7 +4,7 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { unifiedAI } from "@/services/unifiedAIService";
 import { useIsMobile } from "@/hooks/use-mobile";
-import ConsolidatedSmartInbox from "@/components/inbox/ConsolidatedSmartInbox";
+import OptimizedConsolidatedSmartInbox from "@/components/inbox/OptimizedConsolidatedSmartInbox";
 import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
 
 const SmartInboxPage = () => {
@@ -86,7 +86,7 @@ const SmartInboxPage = () => {
           </p>
         </div>
 
-        <ConsolidatedSmartInbox 
+        <OptimizedConsolidatedSmartInbox 
           onLeadsRefresh={handleLeadsRefresh} 
           preselectedLeadId={leadId}
         />
