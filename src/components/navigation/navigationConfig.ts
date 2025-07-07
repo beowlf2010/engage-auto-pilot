@@ -71,6 +71,18 @@ export const navigationItems: NavigationItem[] = [
     access: ['admin', 'manager']
   },
   {
+    label: 'AI Performance',
+    href: '/ai-performance',
+    icon: Brain,
+    access: ['admin', 'manager']
+  },
+  {
+    label: 'AI Training',
+    href: '/ai-training',
+    icon: TrendingUp,
+    access: ['admin', 'manager']
+  },
+  {
     label: 'Analytics',
     href: '/analytics',
     icon: TrendingUp,

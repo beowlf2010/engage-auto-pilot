@@ -27,6 +27,8 @@ import AutoDialingPage from './pages/AutoDialingPage';
 import SettingsPage from './pages/SettingsPage';
 import SalesProfilePage from './pages/SalesProfilePage';
 import PublicSalesProfile from './components/sales-profiles/PublicSalesProfile';
+import AIPerformanceDashboardPage from './pages/AIPerformanceDashboardPage';
+import AITrainingCenterPage from './pages/AITrainingCenterPage';
 import { Toaster } from '@/components/ui/toaster';
 
 const queryClient = new QueryClient();
@@ -213,6 +215,24 @@ const AppContent = () => {
           <ProtectedRoute>
             <AppLayout>
               <SalesProfilePage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+        
+        {/* AI Performance Dashboard */}
+        <Route path="/ai-performance" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AIPerformanceDashboardPage />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
+
+        {/* AI Training Center */}
+        <Route path="/ai-training" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AITrainingCenterPage />
             </AppLayout>
           </ProtectedRoute>
         } />
