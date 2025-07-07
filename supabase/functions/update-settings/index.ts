@@ -47,23 +47,25 @@ Deno.serve(async (req) => {
     console.log('✓ User authenticated:', user.id);
 
     console.log('Checking admin role...');
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
+    // Check if user has admin role in user_roles table
+    const { data: userRoles, error: rolesError } = await supabase
+      .from('user_roles')
       .select('role')
-      .eq('id', user.id)
-      .single()
+      .eq('user_id', user.id)
 
-    if (profileError) {
-      console.error('❌ Profile lookup error:', profileError)
+    if (rolesError) {
+      console.error('❌ User roles lookup error:', rolesError)
       return new Response(
-        JSON.stringify({ error: 'Failed to verify user role' }),
+        JSON.stringify({ error: 'Failed to verify user roles' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    if (!profile || profile.role !== 'admin') {
-      console.log('❌ User is not admin. Role:', profile?.role);
+    // Check if user has admin role
+    const hasAdminRole = userRoles && userRoles.some(role => role.role === 'admin');
+    if (!hasAdminRole) {
+      const roles = userRoles ? userRoles.map(r => r.role).join(', ') : 'none';
+      console.log('❌ User is not admin. Roles:', roles);
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
