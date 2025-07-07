@@ -26,6 +26,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { OptimizedLoading } from '@/components/ui/OptimizedLoading';
 import EnhancedBulkAIOptIn from '@/components/leads/EnhancedBulkAIOptIn';
 import EnhancedAIPreview from '@/components/leads/EnhancedAIPreview';
+import HideLeadButton from '@/components/leads/HideLeadButton';
+import ShowHiddenLeadsToggle from '@/components/leads/ShowHiddenLeadsToggle';
 import { toast } from '@/hooks/use-toast';
 import { getLearnedNameValidation } from '@/services/nameValidationLearningService';
 
@@ -42,6 +44,7 @@ interface Lead {
   created_at: string;
   ai_strategy_bucket?: string;
   message_intensity?: string;
+  is_hidden?: boolean;
 }
 
 interface ValidationStatus {
@@ -75,6 +78,7 @@ const AIOptInDashboardPage = () => {
   const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
   const [validationStatuses, setValidationStatuses] = useState<Map<string, ValidationStatus>>(new Map());
   const [previewLeadId, setPreviewLeadId] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -90,7 +94,7 @@ const AIOptInDashboardPage = () => {
         .select(`
           id, first_name, last_name, email, vehicle_interest, 
           ai_opt_in, ai_stage, last_reply_at, status, created_at,
-          ai_strategy_bucket, message_intensity
+          ai_strategy_bucket, message_intensity, is_hidden
         `)
         .order('created_at', { ascending: false });
 
@@ -251,9 +255,11 @@ const AIOptInDashboardPage = () => {
         (aiStatusFilter === 'active' && lead.ai_opt_in && lead.ai_stage === 'scheduled') ||
         (aiStatusFilter === 'paused' && lead.ai_opt_in && lead.ai_stage === 'paused');
 
-      return matchesSearch && matchesAIFilter;
+      const matchesHiddenFilter = showHidden || !lead.is_hidden;
+
+      return matchesSearch && matchesAIFilter && matchesHiddenFilter;
     });
-  }, [leads, searchTerm, aiStatusFilter]);
+  }, [leads, searchTerm, aiStatusFilter, showHidden]);
 
   const toggleLeadSelection = (lead: Lead) => {
     setSelectedLeads(prev => 
@@ -308,6 +314,18 @@ const AIOptInDashboardPage = () => {
   const handleAIEnabled = () => {
     fetchData(); // Refresh data after AI is enabled
   };
+
+  const handleToggleHidden = async (leadId: string, hidden: boolean) => {
+    // Update local state optimistically
+    setLeads(prev => prev.map(lead => 
+      lead.id === leadId ? { ...lead, is_hidden: hidden } : lead
+    ));
+    
+    // Refresh data to get updated state
+    fetchData();
+  };
+
+  const hiddenCount = leads.filter(lead => lead.is_hidden).length;
 
   const getValidationIcon = (isValid: boolean, confidence: number) => {
     const threshold = 0.6;
@@ -474,6 +492,13 @@ const AIOptInDashboardPage = () => {
             )}
           </div>
 
+          {/* Show Hidden Leads Toggle */}
+          <ShowHiddenLeadsToggle 
+            showHidden={showHidden}
+            onToggle={setShowHidden}
+            hiddenCount={hiddenCount}
+          />
+
           {/* Selection Actions */}
           {selectedLeads.length > 0 && (
             <Card className="p-4">
@@ -586,23 +611,30 @@ const AIOptInDashboardPage = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {lead.ai_opt_in ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleAIToggle(lead.id, false)}
-                            >
-                              Disable AI
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handlePreviewOpen(lead.id)}
-                            >
-                              Enable AI with Preview
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {lead.ai_opt_in ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAIToggle(lead.id, false)}
+                              >
+                                Disable AI
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handlePreviewOpen(lead.id)}
+                              >
+                                Enable AI with Preview
+                              </Button>
+                            )}
+                            <HideLeadButton
+                              leadId={lead.id}
+                              isHidden={!!lead.is_hidden}
+                              onToggleHidden={handleToggleHidden}
+                            />
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
