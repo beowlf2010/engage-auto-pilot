@@ -105,6 +105,12 @@ export const navigationItems: NavigationItem[] = [
     access: ['admin', 'manager']
   },
   {
+    label: 'AI Opt-In Management',
+    href: '/ai-opt-ins',
+    icon: Bot,
+    access: ['admin', 'manager']
+  },
+  {
     label: 'Sales Dashboard',
     href: '/sales-dashboard',
     icon: TrendingUp,

@@ -32,6 +32,7 @@ const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const SalesProfilePage = lazy(() => import('@/pages/SalesProfilePage'));
 const AIPerformanceDashboardPage = lazy(() => import('@/pages/AIPerformanceDashboardPage'));
 const AITrainingCenterPage = lazy(() => import('@/pages/AITrainingCenterPage'));
+const AIOptInDashboardPage = lazy(() => import('@/pages/AIOptInDashboardPage'));
 const PublicSalesProfile = lazy(() => import('@/components/sales-profiles/PublicSalesProfile'));
 
 import { RouteWrapper } from '@/components/routes/RouteWrapper';
@@ -141,6 +142,12 @@ const AppRoutes = () => {
         <Route path="/ai-training" element={
           <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Training">
             <AITrainingCenterPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/ai-opt-ins" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Opt-In Management">
+            <AIOptInDashboardPage />
           </RouteWrapper>
         } />
         
