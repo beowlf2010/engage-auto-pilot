@@ -1,9 +1,11 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useIsMobile } from '@/hooks/use-mobile';
 import AuthPage from '@/components/auth/AuthPage';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AppLayout from '@/components/layout/AppLayout';
+import MobileLayout from '@/components/layout/MobileLayout';
 
 // Pages
 import LeadsPage from '@/pages/LeadsPage';
@@ -32,6 +34,10 @@ import AITrainingCenterPage from '@/pages/AITrainingCenterPage';
 
 const AppRoutes = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+
+  // Mobile users get a different layout wrapper
+  const LayoutComponent = isMobile ? MobileLayout : AppLayout;
 
   return (
     <Routes>
@@ -40,186 +46,186 @@ const AppRoutes = () => {
       {/* Dashboard */}
       <Route path="/dashboard" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <DashboardPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* Leads */}
       <Route path="/leads" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <LeadsPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/upload-leads" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <UploadLeadsPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/auto-dialing" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <AutoDialingPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* Smart Inbox */}
       <Route path="/smart-inbox" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <SmartInboxPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* Inventory */}
       <Route path="/inventory-dashboard" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <InventoryDashboardPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/upload-inventory" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <InventoryUploadPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/rpo-insights" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <RPOInsightsPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/rpo-database" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <RPODatabasePage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* Analytics */}
       <Route path="/financial-dashboard" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <FinancialDashboardPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/ai-monitor" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <AIMonitorPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/sales-dashboard" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <SalesDashboardPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/analytics" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <AdvancedAnalyticsPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* AI Performance & Training */}
       <Route path="/ai-performance" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <AIPerformanceDashboardPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
 
       <Route path="/ai-training" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <AITrainingCenterPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* Tools */}
       <Route path="/predictive-analytics" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <PredictiveAnalyticsPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/message-export" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <MessageExportPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/personalization" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <PersonalizationPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* Admin */}
       <Route path="/admin-dashboard" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <AdminDashboardPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       <Route path="/manager-dashboard" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <ManagerDashboardPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* Settings */}
       <Route path="/settings" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <SettingsPage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       
       {/* Sales Profile Management */}
       <Route path="/sales-profile" element={
         <ProtectedRoute>
-          <AppLayout>
+          <LayoutComponent>
             <SalesProfilePage />
-          </AppLayout>
+          </LayoutComponent>
         </ProtectedRoute>
       } />
       

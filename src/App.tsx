@@ -11,7 +11,6 @@ const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { loading } = useAuth();
-  const isMobile = useIsMobile();
 
   if (loading) {
     return (
@@ -19,10 +18,6 @@ const AppContent = () => {
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
-
-  if (isMobile) {
-    return <MobileLayout />;
   }
 
   return (

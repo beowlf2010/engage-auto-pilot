@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -9,15 +8,14 @@ import MobileBottomNav from './MobileBottomNav';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 
-const MobileLayout = () => {
+interface MobileLayoutProps {
+  children: React.ReactNode;
+}
+
+const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
   const { profile } = useAuth();
-  const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const unreadCount = useUnreadCount();
-
-  if (!isMobile) {
-    return null; // Use regular layout for desktop
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -53,7 +51,7 @@ const MobileLayout = () => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <Outlet />
+        {children}
       </main>
 
       {/* Mobile Bottom Navigation */}
