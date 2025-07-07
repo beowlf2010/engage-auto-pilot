@@ -50,7 +50,7 @@ export const AppSidebar = React.memo(function AppSidebar({ unreadCount = 0 }: Ap
         ['Inventory', 'Upload Inventory', 'RPO Insights', 'RPO Database'].includes(item.label)
       ),
       ai: filteredItems.filter(item => 
-        ['AI Monitor', 'AI Performance', 'AI Training'].includes(item.label)
+        ['AI Monitor', 'AI Performance', 'AI Training', 'AI Opt-In Management'].includes(item.label)
       ),
       analytics: filteredItems.filter(item => 
         ['Financial', 'Sales Dashboard', 'Analytics'].includes(item.label)
