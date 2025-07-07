@@ -2,6 +2,8 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // Enhanced message service with better error handling and debugging
+import { processOutboundMessage } from './outboundMessageMonitor';
+
 export const sendMessage = async (
   leadId: string,
   messageBody: string,
@@ -62,6 +64,7 @@ export const sendMessage = async (
         first_name,
         last_name,
         status,
+        vehicle_interest,
         phone_numbers (
           number,
           is_primary
@@ -99,11 +102,33 @@ export const sendMessage = async (
 
     console.log(`📱 [FIXED MESSAGES] Using phone number: ${primaryPhone}`);
 
-    // Create conversation record with enhanced error handling
+    // ===== PRE-SEND MESSAGE VALIDATION AND MONITORING =====
+    console.log(`🔍 [FIXED MESSAGES] Validating message content for generic names...`);
+    
+    // Process message through monitoring system
+    const { processedMessage, modifications } = await processOutboundMessage(messageBody, {
+      id: leadId,
+      first_name: lead.first_name,
+      last_name: lead.last_name,
+      vehicle_interest: lead.vehicle_interest
+    });
+
+    // Use the processed (potentially fixed) message
+    const finalMessageBody = processedMessage;
+
+    if (modifications.length > 0) {
+      console.log(`🔧 [FIXED MESSAGES] Message modified by monitoring system:`, modifications);
+      console.log(`📝 [FIXED MESSAGES] Original: "${messageBody}"`);
+      console.log(`📝 [FIXED MESSAGES] Final: "${finalMessageBody}"`);
+    } else {
+      console.log(`✅ [FIXED MESSAGES] Message passed validation without modifications`);
+    }
+
+    // Create conversation record with enhanced error handling (using processed message)
     const conversationData = {
       lead_id: leadId,
       profile_id: cleanProfileId,
-      body: messageBody.trim(),
+      body: finalMessageBody.trim(),
       direction: 'out',
       sent_at: new Date().toISOString(),
       ai_generated: isAIGenerated,
@@ -138,7 +163,7 @@ export const sendMessage = async (
     const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
       body: {
         to: primaryPhone,
-        body: messageBody.trim(),
+        body: finalMessageBody.trim(),
         conversationId: conversation.id
       }
     });
