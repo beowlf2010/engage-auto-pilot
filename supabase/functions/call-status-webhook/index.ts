@@ -60,17 +60,26 @@ serve(async (req) => {
     const callStatus = webhookData.CallStatus
     const callDuration = parseInt(webhookData.CallDuration || '0')
     const callSid = webhookData.CallSid
+    const answeredBy = webhookData.AnsweredBy // 'human' or 'machine'
+    const machineDetectionDuration = webhookData.MachineDetectionDuration
 
-    console.log('📞 Call status update:', callStatus, 'Duration:', callDuration);
+    console.log('📞 Call status update:', callStatus, 'Duration:', callDuration, 'AnsweredBy:', answeredBy);
 
-    // Determine call outcome based on status
+    // Determine call outcome based on status and voicemail detection
     let outcome = null
     let queueStatus = 'calling'
     let shouldScheduleRetry = false
+    let voicemailDetected = false
+    let voicemailDropped = false
 
     switch (callStatus) {
       case 'completed':
-        if (callDuration > 30) {
+        if (answeredBy === 'machine') {
+          outcome = 'voicemail_left'
+          voicemailDetected = true
+          voicemailDropped = true
+          queueStatus = 'completed'
+        } else if (callDuration > 30) {
           outcome = 'answered'
           queueStatus = 'completed'
         } else {
@@ -102,6 +111,8 @@ serve(async (req) => {
     const callLogUpdate: any = {
       call_status: callStatus,
       duration_seconds: callDuration,
+      voicemail_detected: voicemailDetected,
+      voicemail_dropped: voicemailDropped,
       updated_at: new Date().toISOString()
     }
 
@@ -111,6 +122,12 @@ serve(async (req) => {
 
     if (callStatus === 'completed' || callStatus === 'failed' || callStatus === 'canceled') {
       callLogUpdate.ended_at = new Date().toISOString()
+    }
+
+    // Log voicemail detection details
+    if (voicemailDetected) {
+      console.log('🎤 Voicemail detected - Duration:', machineDetectionDuration, 'Dropped:', voicemailDropped);
+      callLogUpdate.notes = `Voicemail detected (${machineDetectionDuration}ms detection time)`
     }
 
     await supabase

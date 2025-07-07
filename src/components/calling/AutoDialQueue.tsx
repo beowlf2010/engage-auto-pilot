@@ -11,6 +11,7 @@ import { checkCallCompliance, formatNextAvailableTime, getLeadTimezoneInfo } fro
 import { calculateLeadPriority } from '@/services/leadTemperaturePrioritization';
 import { recordCallOutcome } from '@/services/callOutcomeService';
 import { enhancedAutoDialingService } from '@/services/enhancedAutoDialingService';
+import VoicemailTemplateManager from './VoicemailTemplateManager';
 import { toast } from '@/hooks/use-toast';
 
 interface QueueLead {
@@ -807,6 +808,19 @@ const AutoDialQueue = () => {
           Refresh Queue
         </Button>
       </CardContent>
+      
+      <Tabs defaultValue="queue" className="mt-6">
+        <TabsList>
+          <TabsTrigger value="queue">Queue</TabsTrigger>
+          <TabsTrigger value="voicemail">Voicemail Templates</TabsTrigger>
+        </TabsList>
+        <TabsContent value="queue">
+          {/* Queue content is above */}
+        </TabsContent>
+        <TabsContent value="voicemail">
+          <VoicemailTemplateManager />
+        </TabsContent>
+      </Tabs>
     </Card>
   );
 };
