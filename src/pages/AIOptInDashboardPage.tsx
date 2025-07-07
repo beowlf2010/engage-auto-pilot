@@ -71,7 +71,7 @@ const AIOptInDashboardPage = () => {
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [aiStatusFilter, setAIStatusFilter] = useState<string>('all');
+  const [aiStatusFilter, setAIStatusFilter] = useState<string>('disabled');
   const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
   const [validationStatuses, setValidationStatuses] = useState<Map<string, ValidationStatus>>(new Map());
   const [previewLeadId, setPreviewLeadId] = useState<string | null>(null);
