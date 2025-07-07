@@ -1,442 +1,302 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Lead } from '@/types/lead';
+import { fetchLeadsData, fetchConversationsData } from './useLeadsDataFetcher';
 import { processLeadData } from './useLeadsDataProcessor';
+import { useLeadsOperations } from './useLeadsOperations';
 
-export interface LeadFilters {
-  search?: string;
-  status?: string;
-  aiOptIn?: boolean;
-  doNotContact?: boolean;
-  source?: string;
-  vehicleInterest?: string;
-  city?: string;
-  state?: string;
-  dateFilter?: 'today' | 'yesterday' | 'this_week' | 'all';
-  hiddenLeads?: boolean;
-}
-
-export interface PaginationConfig {
-  page: number;
-  pageSize: number;
-  hasMore: boolean;
-  total: number;
-}
-
-export interface DatabaseStats {
-  total: number;
-  aiEnabled: number;
-  noContact: number;
-  contacted: number;
-  responded: number;
-  fresh: number;
-  soldCustomers: number;
-}
-
-interface LeadsResponse {
+interface LeadsCache {
   data: Lead[];
-  count: number;
-  hasMore: boolean;
+  timestamp: number;
+  filters: string;
 }
 
-export const useOptimizedLeads = () => {
+interface UseOptimizedLeadsOptions {
+  pageSize?: number;
+  enableVirtualization?: boolean;
+  cacheTimeout?: number;
+  prefetchNextPage?: boolean;
+}
+
+export const useOptimizedLeads = (options: UseOptimizedLeadsOptions = {}) => {
+  const {
+    pageSize = 50,
+    enableVirtualization = true,
+    cacheTimeout = 5 * 60 * 1000, // 5 minutes
+    prefetchNextPage = true
+  } = options;
+
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [filters, setFilters] = useState<LeadFilters>({
-    status: 'all',
-    dateFilter: 'all',
-    hiddenLeads: false
-  });
-  
-  const [pagination, setPagination] = useState<PaginationConfig>({
-    page: 0,
-    pageSize: 50,
-    hasMore: true,
-    total: 0
-  });
+  const [showHidden, setShowHidden] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
-  const [databaseStats, setDatabaseStats] = useState<DatabaseStats>({
-    total: 0,
-    aiEnabled: 0,
-    noContact: 0,
-    contacted: 0,
-    responded: 0,
-    fresh: 0,
-    soldCustomers: 0
-  });
+  // Caching
+  const cacheRef = useRef<Map<string, LeadsCache>>(new Map());
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const backgroundFetchRef = useRef<Promise<any> | null>(null);
 
-  // Build optimized database query with server-side filtering
-  const buildQuery = useCallback((currentFilters: LeadFilters, page: number, pageSize: number) => {
-    let query = supabase
-      .from('leads')
-      .select(`
-        *,
-        phone_numbers (
-          id,
-          number,
-          type,
-          priority,
-          status,
-          is_primary
-        ),
-        profiles (
-          first_name,
-          last_name
-        )
-      `, { count: 'exact' });
+  const { updateAiOptIn: updateAiOptInOperation, updateDoNotContact: updateDoNotContactOperation } = useLeadsOperations();
 
-    // FILTER OUT INACTIVE LEADS BY DEFAULT (unless specifically requesting them)
-    if (currentFilters.status !== 'lost' && currentFilters.status !== 'closed' && currentFilters.status !== 'sold_customers') {
-      // For main leads view, exclude inactive statuses
-      query = query.not('status', 'in', '(lost,closed)');
-    }
-
-    // Search filter (server-side ILIKE for better performance)
-    if (currentFilters.search) {
-      const searchTerm = currentFilters.search.trim();
-      if (searchTerm) {
-        query = query.or(`
-          first_name.ilike.%${searchTerm}%,
-          last_name.ilike.%${searchTerm}%,
-          email.ilike.%${searchTerm}%,
-          vehicle_interest.ilike.%${searchTerm}%
-        `);
-      }
-    }
-
-    // Status filter
-    if (currentFilters.status && currentFilters.status !== 'all') {
-      if (currentFilters.status === 'needs_ai') {
-        query = query
-          .in('status', ['new', 'engaged', 'active'])
-          .eq('ai_opt_in', false)
-          .eq('do_not_call', false)
-          .eq('do_not_email', false)
-          .eq('do_not_mail', false);
-      } else if (currentFilters.status === 'do_not_contact') {
-        query = query.or('do_not_call.eq.true,do_not_email.eq.true,do_not_mail.eq.true');
-      } else if (currentFilters.status === 'sold_customers') {
-        // Show sold/closed customers for customer service
-        query = query.eq('status', 'closed');
-      } else {
-        query = query.eq('status', currentFilters.status);
-      }
-    }
-
-    // AI opt-in filter
-    if (currentFilters.aiOptIn !== undefined) {
-      query = query.eq('ai_opt_in', currentFilters.aiOptIn);
-    }
-
-    // Do not contact filter
-    if (currentFilters.doNotContact !== undefined) {
-      if (currentFilters.doNotContact) {
-        query = query.or('do_not_call.eq.true,do_not_email.eq.true,do_not_mail.eq.true');
-      } else {
-        query = query
-          .eq('do_not_call', false)
-          .eq('do_not_email', false)
-          .eq('do_not_mail', false);
-      }
-    }
-
-    // Source filter
-    if (currentFilters.source) {
-      query = query.ilike('source', `%${currentFilters.source}%`);
-    }
-
-    // Vehicle interest filter
-    if (currentFilters.vehicleInterest) {
-      query = query.ilike('vehicle_interest', `%${currentFilters.vehicleInterest}%`);
-    }
-
-    // City filter
-    if (currentFilters.city) {
-      query = query.ilike('city', `%${currentFilters.city}%`);
-    }
-
-    // State filter
-    if (currentFilters.state) {
-      query = query.ilike('state', `%${currentFilters.state}%`);
-    }
-
-    // Date filter
-    if (currentFilters.dateFilter && currentFilters.dateFilter !== 'all') {
-      const now = new Date();
-      let startDate: Date;
-
-      switch (currentFilters.dateFilter) {
-        case 'today':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          break;
-        case 'yesterday':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-          const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          query = query.gte('created_at', startDate.toISOString()).lt('created_at', endDate.toISOString());
-          break;
-        case 'this_week':
-          startDate = new Date(now);
-          startDate.setDate(now.getDate() - now.getDay());
-          startDate.setHours(0, 0, 0, 0);
-          query = query.gte('created_at', startDate.toISOString());
-          break;
-        default:
-          break;
-      }
-
-      if (currentFilters.dateFilter === 'today') {
-        query = query.gte('created_at', startDate.toISOString());
-      }
-    }
-
-    // Hidden leads filter
-    if (!currentFilters.hiddenLeads) {
-      query = query.or('is_hidden.is.null,is_hidden.eq.false');
-    }
-
-    // Pagination
-    query = query
-      .range(page * pageSize, (page + 1) * pageSize - 1)
-      .order('created_at', { ascending: false });
-
-    return query;
+  // Memoized cache key generator
+  const getCacheKey = useCallback((page: number, hidden: boolean, filters?: any) => {
+    return `leads_${page}_${hidden}_${JSON.stringify(filters || {})}`;
   }, []);
 
-  // Fetch leads with server-side filtering and pagination
-  const fetchLeads = useCallback(async (
-    currentFilters: LeadFilters = filters,
-    page: number = 0,
-    append: boolean = false
-  ): Promise<LeadsResponse> => {
+  // Optimized data fetcher with caching and abort controller
+  const fetchLeadsPage = useCallback(async (page: number, append = false, signal?: AbortSignal): Promise<Lead[]> => {
+    const cacheKey = getCacheKey(page, showHidden);
+    const cached = cacheRef.current.get(cacheKey);
+    
+    // Return cached data if valid and not expired
+    if (cached && Date.now() - cached.timestamp < cacheTimeout) {
+      console.log(`📦 [OPTIMIZED LEADS] Using cached data for page ${page}`);
+      return cached.data;
+    }
+
+    console.log(`🔄 [OPTIMIZED LEADS] Fetching page ${page} (append: ${append})`);
+    
+    try {
+      // Fetch leads data with standard fetcher (pagination will be handled later)
+      const [leadsData, conversationsData] = await Promise.all([
+        fetchLeadsData(showHidden),
+        page === 0 ? fetchConversationsData() : Promise.resolve([]) // Only fetch conversations for first page
+      ]);
+
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
+      }
+
+      const processedLeads = processLeadData(leadsData, conversationsData);
+      
+      // Implement client-side pagination for now
+      const startIndex = page * pageSize;
+      const endIndex = startIndex + pageSize;
+      const pageData = processedLeads.slice(startIndex, endIndex);
+      
+      // Cache the result
+      cacheRef.current.set(cacheKey, {
+        data: pageData,
+        timestamp: Date.now(),
+        filters: cacheKey
+      });
+
+      // Cleanup old cache entries (keep last 10)
+      if (cacheRef.current.size > 10) {
+        const entries = Array.from(cacheRef.current.entries());
+        entries.slice(0, -10).forEach(([key]) => cacheRef.current.delete(key));
+      }
+
+      return pageData;
+    } catch (err) {
+      if (signal?.aborted) {
+        console.log('🚫 [OPTIMIZED LEADS] Request aborted');
+        return [];
+      }
+      throw err;
+    }
+  }, [showHidden, pageSize, getCacheKey, cacheTimeout]);
+
+  // Optimized fetch with progressive loading
+  const fetchLeads = useCallback(async (page = 0, append = false) => {
+    // Abort previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       if (!append) {
         setLoading(true);
         setError(null);
+      } else {
+        setLoadingMore(true);
       }
 
-      const query = buildQuery(currentFilters, page, pagination.pageSize);
-      const { data: leadsData, error: leadsError, count } = await query;
+      const pageData = await fetchLeadsPage(page, append, abortController.signal);
 
-      if (leadsError) throw leadsError;
+      if (abortController.signal.aborted) {
+        return;
+      }
 
-      // Fetch conversation counts for these leads
-      const leadIds = leadsData?.map(lead => lead.id) || [];
-      const { data: conversationCounts, error: countError } = await supabase
-        .from('conversations')
-        .select('lead_id, direction, read_at, body, sent_at')
-        .in('lead_id', leadIds);
-
-      if (countError) throw countError;
-
-      const processedLeads = processLeadData(leadsData || [], conversationCounts || []);
-      const hasMore = count ? ((page + 1) * pagination.pageSize) < count : false;
-
-      return {
-        data: processedLeads,
-        count: count || 0,
-        hasMore
-      };
-    } catch (err) {
-      console.error('Error fetching leads:', err);
-      const error = err instanceof Error ? err : new Error('Failed to fetch leads');
-      setError(error);
-      throw error;
-    }
-  }, [filters, pagination.pageSize, buildQuery]);
-
-  // Fetch database-wide stats
-  const fetchDatabaseStats = useCallback(async (): Promise<void> => {
-    try {
-      const today = new Date();
-      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-
-      // Get total count (ACTIVE LEADS ONLY - exclude lost/closed)
-      const { count: totalCount } = await supabase
-        .from('leads')
-        .select('*', { count: 'exact', head: true })
-        .not('status', 'in', '(lost,closed)')
-        .or('is_hidden.is.null,is_hidden.eq.false');
-
-      // Get AI enabled count (ACTIVE LEADS ONLY)
-      const { count: aiEnabledCount } = await supabase
-        .from('leads')
-        .select('*', { count: 'exact', head: true })
-        .eq('ai_opt_in', true)
-        .not('status', 'in', '(lost,closed)')
-        .or('is_hidden.is.null,is_hidden.eq.false');
-
-      // Get no contact count (status = 'new', ACTIVE ONLY)
-      const { count: noContactCount } = await supabase
-        .from('leads')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'new')
-        .or('is_hidden.is.null,is_hidden.eq.false');
-
-      // Get fresh leads count (created today, ACTIVE ONLY)
-      const { count: freshCount } = await supabase
-        .from('leads')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', todayStart)
-        .not('status', 'in', '(lost,closed)')
-        .or('is_hidden.is.null,is_hidden.eq.false');
-
-      // Get leads with outgoing messages (contacted)
-      const { data: contactedLeads } = await supabase
-        .from('conversations')
-        .select('lead_id')
-        .eq('direction', 'out')
-        .not('lead_id', 'is', null);
-
-      const contactedLeadIds = [...new Set(contactedLeads?.map(c => c.lead_id) || [])];
-      const contactedCount = contactedLeadIds.length;
-
-      // Get leads with incoming messages (responded)
-      const { data: respondedLeads } = await supabase
-        .from('conversations')
-        .select('lead_id')
-        .eq('direction', 'in')
-        .not('lead_id', 'is', null);
-
-      const respondedLeadIds = [...new Set(respondedLeads?.map(c => c.lead_id) || [])];
-      const respondedCount = respondedLeadIds.length;
-
-      // Get sold customers count
-      const { count: soldCount } = await supabase
-        .from('leads')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'closed')
-        .or('is_hidden.is.null,is_hidden.eq.false');
-
-      setDatabaseStats({
-        total: totalCount || 0,
-        aiEnabled: aiEnabledCount || 0,
-        noContact: noContactCount || 0,
-        contacted: contactedCount,
-        responded: respondedCount,
-        fresh: freshCount || 0,
-        soldCustomers: soldCount || 0
+      setLeads(prevLeads => {
+        if (append) {
+          // Avoid duplicates when appending
+          const existingIds = new Set(prevLeads.map(lead => lead.id));
+          const newLeads = pageData.filter(lead => !existingIds.has(lead.id));
+          return [...prevLeads, ...newLeads];
+        } else {
+          return pageData;
+        }
       });
-    } catch (error) {
-      console.error('Error fetching database stats:', error);
-    }
-  }, []);
 
-  // Load initial data
-  const loadLeads = useCallback(async (newFilters?: LeadFilters) => {
-    try {
-      const filtersToUse = newFilters || filters;
-      const response = await fetchLeads(filtersToUse, 0, false);
-      
-      setLeads(response.data);
-      setPagination(prev => ({
-        ...prev,
-        page: 0,
-        hasMore: response.hasMore,
-        total: response.count
-      }));
+      setHasMore(pageData.length === pageSize);
+      setCurrentPage(page);
 
-      if (newFilters) {
-        setFilters(newFilters);
+      // Background prefetch next page if enabled
+      if (prefetchNextPage && pageData.length === pageSize && !append) {
+        backgroundFetchRef.current = fetchLeadsPage(page + 1, false, abortController.signal)
+          .catch(err => {
+            if (!abortController.signal.aborted) {
+              console.warn('Background prefetch failed:', err);
+            }
+          });
       }
 
-      // Fetch database stats whenever filters change
-      await fetchDatabaseStats();
     } catch (err) {
-      // Error already handled in fetchLeads
+      if (!abortController.signal.aborted) {
+        console.error('Error fetching leads:', err);
+        setError(err instanceof Error ? err : new Error('Failed to fetch leads'));
+      }
     } finally {
-      setLoading(false);
+      if (!abortController.signal.aborted) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
-  }, [filters, fetchLeads, fetchDatabaseStats]);
+  }, [fetchLeadsPage, pageSize, prefetchNextPage]);
 
-  // Load more data for infinite scroll
+  // Load more leads for infinite scroll
   const loadMore = useCallback(async () => {
-    if (!pagination.hasMore || loading) return;
+    if (loadingMore || !hasMore) return;
+    await fetchLeads(currentPage + 1, true);
+  }, [fetchLeads, currentPage, loadingMore, hasMore]);
 
-    try {
-      const nextPage = pagination.page + 1;
-      const response = await fetchLeads(filters, nextPage, true);
-      
-      setLeads(prev => [...prev, ...response.data]);
-      setPagination(prev => ({
-        ...prev,
-        page: nextPage,
-        hasMore: response.hasMore
-      }));
-    } catch (err) {
-      // Error already handled in fetchLeads
-    }
-  }, [pagination.hasMore, pagination.page, loading, fetchLeads, filters]);
-
-  // Update filters and reload
-  const updateFilters = useCallback((newFilters: Partial<LeadFilters>) => {
-    const updatedFilters = { ...filters, ...newFilters };
-    loadLeads(updatedFilters);
-  }, [filters, loadLeads]);
-
-  // Clear filters
-  const clearFilters = useCallback(() => {
-    const defaultFilters: LeadFilters = {
-      status: 'all',
-      dateFilter: 'all',
-      hiddenLeads: false
-    };
-    loadLeads(defaultFilters);
-  }, [loadLeads]);
-
-  // Selection functions
-  const toggleLeadSelection = useCallback((leadId: string) => {
-    setSelectedLeads(prev => 
-      prev.includes(leadId) 
-        ? prev.filter(id => id !== leadId)
-        : [...prev, leadId]
+  // Optimistic lead updates
+  const updateLeadOptimistically = useCallback((leadId: string, updates: Partial<Lead>) => {
+    setLeads(prevLeads => 
+      prevLeads.map(lead => 
+        lead.id === leadId ? { ...lead, ...updates } : lead
+      )
     );
   }, []);
 
-  const selectAllVisible = useCallback(() => {
-    const visibleIds = leads.map(lead => lead.id);
-    setSelectedLeads(visibleIds);
-  }, [leads]);
-
-  const clearSelection = useCallback(() => {
-    setSelectedLeads([]);
+  // Revert optimistic update
+  const revertOptimisticUpdate = useCallback((leadId: string, revertUpdates: Partial<Lead>) => {
+    setLeads(prevLeads => 
+      prevLeads.map(lead => 
+        lead.id === leadId ? { ...lead, ...revertUpdates } : lead
+      )
+    );
   }, []);
 
-  // Calculate stats
-  const stats = useMemo(() => {
-    return {
-      total: pagination.total,
-      visible: leads.length,
-      selected: selectedLeads.length,
-      hasMore: pagination.hasMore
-    };
-  }, [pagination.total, leads.length, selectedLeads.length, pagination.hasMore]);
+  // Optimized AI opt-in with rollback
+  const updateAiOptIn = useCallback(async (leadId: string, aiOptIn: boolean) => {
+    console.log('🔄 [OPTIMIZED LEADS] Updating AI opt-in:', { leadId, aiOptIn });
+    
+    const originalLead = leads.find(lead => lead.id === leadId);
+    if (!originalLead) return false;
 
-  // Initialize data on mount
+    // Optimistic update
+    updateLeadOptimistically(leadId, { aiOptIn });
+
+    try {
+      const success = await updateAiOptInOperation(leadId, aiOptIn);
+      
+      if (!success) {
+        console.error('❌ [OPTIMIZED LEADS] Failed to update AI opt-in, reverting');
+        revertOptimisticUpdate(leadId, { aiOptIn: originalLead.aiOptIn });
+        return false;
+      }
+      
+      console.log('✅ [OPTIMIZED LEADS] AI opt-in updated successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ [OPTIMIZED LEADS] Error updating AI opt-in:', error);
+      revertOptimisticUpdate(leadId, { aiOptIn: originalLead.aiOptIn });
+      return false;
+    }
+  }, [leads, updateAiOptInOperation, updateLeadOptimistically, revertOptimisticUpdate]);
+
+  // Optimized do not contact with rollback
+  const updateDoNotContact = useCallback(async (leadId: string, field: 'doNotCall' | 'doNotEmail' | 'doNotMail', value: boolean) => {
+    const originalLead = leads.find(lead => lead.id === leadId);
+    if (!originalLead) return false;
+
+    // Optimistic update
+    updateLeadOptimistically(leadId, { [field]: value });
+
+    try {
+      const success = await updateDoNotContactOperation(leadId, field, value);
+      
+      if (!success) {
+        revertOptimisticUpdate(leadId, { [field]: originalLead[field] });
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('❌ [OPTIMIZED LEADS] Error updating do not contact:', error);
+      revertOptimisticUpdate(leadId, { [field]: originalLead[field] });
+      return false;
+    }
+  }, [leads, updateDoNotContactOperation, updateLeadOptimistically, revertOptimisticUpdate]);
+
+  // Toggle lead hidden with optimistic update
+  const toggleLeadHidden = useCallback((leadId: string, hidden: boolean) => {
+    updateLeadOptimistically(leadId, { is_hidden: hidden });
+    
+    if (hidden && !showHidden) {
+      // Remove from list if hiding and not showing hidden
+      setLeads(prevLeads => prevLeads.filter(lead => lead.id !== leadId));
+    }
+  }, [showHidden, updateLeadOptimistically]);
+
+  // Memoized stats calculation
+  const stats = useMemo(() => {
+    const today = new Date().toDateString();
+    
+    return {
+      total: leads.length,
+      noContact: leads.filter(lead => lead.status === 'new').length,
+      contacted: leads.filter(lead => lead.outgoingCount > 0).length,
+      responded: leads.filter(lead => lead.incomingCount > 0).length,
+      aiEnabled: leads.filter(lead => lead.aiOptIn).length,
+      fresh: leads.filter(lead => new Date(lead.createdAt).toDateString() === today).length,
+      hiddenCount: leads.filter(lead => lead.is_hidden).length
+    };
+  }, [leads]);
+
+  // Clear cache when showHidden changes
   useEffect(() => {
-    loadLeads();
-  }, []); // Only run once on mount
+    cacheRef.current.clear();
+    setCurrentPage(0);
+    fetchLeads(0, false);
+  }, [showHidden, fetchLeads]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   return {
     leads,
     loading,
+    loadingMore,
     error,
-    filters,
-    pagination,
-    selectedLeads,
+    hasMore,
     stats,
-    databaseStats,
-    
-    // Actions
-    updateFilters,
-    clearFilters,
+    currentPage,
+    showHidden,
+    setShowHidden,
+    refetch: () => {
+      cacheRef.current.clear();
+      return fetchLeads(0, false);
+    },
     loadMore,
-    refetch: () => loadLeads(),
-    
-    // Selection
-    toggleLeadSelection,
-    selectAllVisible,
-    clearSelection
+    updateAiOptIn,
+    updateDoNotContact,
+    toggleLeadHidden,
+    clearCache: () => {
+      cacheRef.current.clear();
+    }
   };
 };

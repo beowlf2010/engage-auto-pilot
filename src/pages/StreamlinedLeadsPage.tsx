@@ -1,6 +1,6 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import LeadsList from "@/components/LeadsList";
+import OptimizedLeadsList from "@/components/leads/OptimizedLeadsList";
 import { Navigate } from "react-router-dom";
 
 const StreamlinedLeadsPage = () => {
@@ -21,7 +21,7 @@ const StreamlinedLeadsPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  return <LeadsList />;
+  return <OptimizedLeadsList />;
 };
 
 export default StreamlinedLeadsPage;
