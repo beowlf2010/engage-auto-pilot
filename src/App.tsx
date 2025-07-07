@@ -220,6 +220,9 @@ const AppContent = () => {
         {/* Public Sales Profile - No Layout */}
         <Route path="/profile/:profileSlug" element={<PublicSalesProfile />} />
         
+        {/* Index route redirect */}
+        <Route path="/index" element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} />
+        
         {/* Default redirect to dashboard */}
         <Route path="/" element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} />
       </Routes>
