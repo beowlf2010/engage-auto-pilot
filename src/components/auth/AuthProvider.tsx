@@ -80,9 +80,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Helper function to determine highest role
+  const determineHighestRole = (roles: string[]): string => {
+    const roleHierarchy = ['admin', 'manager', 'sales', 'user'];
+    for (const role of roleHierarchy) {
+      if (roles.includes(role)) {
+        return role;
+      }
+    }
+    return 'user';
+  };
+
   // Helper function to fetch user profile
   const fetchUserProfile = async (userId: string) => {
     try {
+      // Fetch profile data
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -94,6 +106,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return null;
       }
       
+      // Fetch user roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+      }
+
       // If no profile exists, initialize the user
       if (!profileData) {
         console.log('No profile found, initializing user');
@@ -106,10 +128,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .select('*')
             .eq('id', userId)
             .single();
+          
+          // Refetch roles after initialization
+          const { data: newUserRoles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId);
+
+          if (newProfile && newUserRoles) {
+            const roles = newUserRoles.map(r => r.role);
+            const highestRole = determineHighestRole(roles);
+            return { ...newProfile, role: highestRole, userRoles: roles };
+          }
+          
           return newProfile;
         }
         
         return null;
+      }
+      
+      // Determine highest role and return enhanced profile
+      if (userRoles) {
+        const roles = userRoles.map(r => r.role);
+        const highestRole = determineHighestRole(roles);
+        return { ...profileData, role: highestRole, userRoles: roles };
       }
       
       return profileData;
