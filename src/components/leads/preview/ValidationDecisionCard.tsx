@@ -41,6 +41,19 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
   const nameIsValid = nameValidation?.isValidPersonalName ?? false;
   const vehicleIsValid = vehicleValidation?.isValidVehicleInterest ?? false;
 
+  // Validation thresholds and status
+  const NAME_THRESHOLD = 0.6;
+  const VEHICLE_THRESHOLD = 0.6;
+  const namePassesThreshold = nameConfidence >= NAME_THRESHOLD;
+  const vehiclePassesThreshold = vehicleConfidence >= VEHICLE_THRESHOLD;
+
+  // Determine border colors based on validation status
+  const getValidationBorderColor = (isValid: boolean, passesThreshold: boolean) => {
+    if (isValid && passesThreshold) return 'border-green-200 bg-green-50/30';
+    if (!isValid || !passesThreshold) return 'border-amber-200 bg-amber-50/30';
+    return 'border-gray-200';
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -51,7 +64,7 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Name Decision */}
-        <div className="border rounded-lg p-3 space-y-3">
+        <div className={`rounded-lg p-3 space-y-3 border-2 transition-colors ${getValidationBorderColor(nameIsValid, namePassesThreshold)}`}>
           <div className="flex items-center justify-between">
             <div>
               <span className="font-medium">Name: "{safeFirstName}"</span>
@@ -61,25 +74,40 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-1 text-sm text-gray-600">
-              {nameIsValid ? (
-                <CheckCircle className="w-4 h-4 text-green-600" />
-              ) : (
-                <XCircle className="w-4 h-4 text-red-600" />
-              )}
-              AI: {Math.round(nameConfidence * 100)}%
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 text-sm">
+                {nameIsValid && namePassesThreshold ? (
+                  <div className="flex items-center gap-1 text-green-700 font-medium">
+                    <CheckCircle className="w-4 h-4" />
+                    PASSES
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-amber-700 font-medium">
+                    <XCircle className="w-4 h-4" />
+                    REVIEW
+                  </div>
+                )}
+              </div>
+              <div className="text-sm text-gray-600">
+                AI: {Math.round(nameConfidence * 100)}%
+              </div>
             </div>
           </div>
           
-          <div className="text-sm text-gray-600">
-            Detected as: <span className="font-medium">{nameValidation?.detectedType || 'Unknown'}</span>
-            {nameValidation?.userOverride && (
-              <span className="ml-2">
-                (Seen {nameValidation.timesSeen || 0} times, 
-                 Approved {nameValidation.timesApproved || 0}, 
-                 Denied {nameValidation.timesRejected || 0})
-              </span>
-            )}
+          <div className="flex items-center justify-between text-sm">
+            <div className="text-gray-600">
+              Detected as: <span className="font-medium">{nameValidation?.detectedType || 'Unknown'}</span>
+              {nameValidation?.userOverride && (
+                <span className="ml-2">
+                  (Seen {nameValidation.timesSeen || 0} times, 
+                   Approved {nameValidation.timesApproved || 0}, 
+                   Denied {nameValidation.timesRejected || 0})
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-gray-500">
+              Threshold: ≥{Math.round(NAME_THRESHOLD * 100)}%
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -105,23 +133,38 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
         </div>
 
         {/* Vehicle Decision */}
-        <div className="border rounded-lg p-3 space-y-3">
+        <div className={`rounded-lg p-3 space-y-3 border-2 transition-colors ${getValidationBorderColor(vehicleIsValid, vehiclePassesThreshold)}`}>
           <div className="flex items-center justify-between">
             <div>
               <span className="font-medium">Vehicle: "{safeVehicleInterest}"</span>
             </div>
-            <div className="flex items-center gap-1 text-sm text-gray-600">
-              {vehicleIsValid ? (
-                <CheckCircle className="w-4 h-4 text-green-600" />
-              ) : (
-                <XCircle className="w-4 h-4 text-red-600" />
-              )}
-              AI: {Math.round(vehicleConfidence * 100)}%
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 text-sm">
+                {vehicleIsValid && vehiclePassesThreshold ? (
+                  <div className="flex items-center gap-1 text-green-700 font-medium">
+                    <CheckCircle className="w-4 h-4" />
+                    PASSES
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-amber-700 font-medium">
+                    <XCircle className="w-4 h-4" />
+                    REVIEW
+                  </div>
+                )}
+              </div>
+              <div className="text-sm text-gray-600">
+                AI: {Math.round(vehicleConfidence * 100)}%
+              </div>
             </div>
           </div>
           
-          <div className="text-sm text-gray-600">
-            Detected issue: <span className="font-medium">{vehicleValidation?.detectedIssue || 'None'}</span>
+          <div className="flex items-center justify-between text-sm">
+            <div className="text-gray-600">
+              Detected issue: <span className="font-medium">{vehicleValidation?.detectedIssue || 'None'}</span>
+            </div>
+            <div className="text-xs text-gray-500">
+              Threshold: ≥{Math.round(VEHICLE_THRESHOLD * 100)}%
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -147,17 +190,19 @@ const ValidationDecisionCard: React.FC<ValidationDecisionCardProps> = ({
         </div>
 
         {/* Generate Button */}
-        <div className="pt-2">
-          <Button
-            onClick={onGenerate}
-            disabled={!canGenerate || isGenerating}
-            className="w-full"
-            size="lg"
-          >
-            {isGenerating ? 'Generating Message...' : 'Generate Message with My Decisions'}
-          </Button>
+        <div className="pt-2 space-y-3">
+          <div className="flex gap-2">
+            <Button
+              onClick={onGenerate}
+              disabled={!canGenerate || isGenerating}
+              className="flex-1"
+              size="lg"
+            >
+              {isGenerating ? 'Generating Message...' : 'Generate Message with My Decisions'}
+            </Button>
+          </div>
           {!canGenerate && (
-            <p className="text-sm text-gray-500 text-center mt-2">
+            <p className="text-sm text-gray-500 text-center">
               Please make decisions for both name and vehicle to continue
             </p>
           )}

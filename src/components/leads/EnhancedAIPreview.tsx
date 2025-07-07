@@ -57,6 +57,18 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
     }
   });
 
+  // Auto-hide after both decisions are approved
+  useEffect(() => {
+    if (nameDecision === 'approved' && vehicleDecision === 'approved' && showDecisionStep && !isGenerating) {
+      console.log('✅ [AI PREVIEW] Both validations approved - auto-generating message');
+      const timer = setTimeout(() => {
+        generateWithDecisions();
+      }, 1000); // 1 second delay to show the approved state
+      
+      return () => clearTimeout(timer);
+    }
+  }, [nameDecision, vehicleDecision, showDecisionStep, isGenerating, generateWithDecisions]);
+
   // Auto-start analysis when modal opens if autoGenerate is true
   useEffect(() => {
     if (isOpen && autoGenerate && !isAnalyzing && !showDecisionStep && !showPreview && !error) {
