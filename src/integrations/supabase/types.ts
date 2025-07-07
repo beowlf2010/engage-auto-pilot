@@ -4166,6 +4166,51 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_featured_vehicles: {
+        Row: {
+          created_at: string
+          custom_description: string | null
+          feature_order: number | null
+          id: string
+          inventory_id: string | null
+          is_active: boolean | null
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_description?: string | null
+          feature_order?: number | null
+          id?: string
+          inventory_id?: string | null
+          is_active?: boolean | null
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_description?: string | null
+          feature_order?: number | null
+          id?: string
+          inventory_id?: string | null
+          is_active?: boolean | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_featured_vehicles_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_featured_vehicles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "sales_professional_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -4618,6 +4663,140 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      sales_professional_profiles: {
+        Row: {
+          background_image_url: string | null
+          bio: string | null
+          created_at: string
+          custom_message: string | null
+          display_name: string
+          email: string | null
+          id: string
+          is_active: boolean | null
+          languages_spoken: string[] | null
+          lead_capture_settings: Json | null
+          leads_generated: number | null
+          page_views: number | null
+          personal_brand_colors: Json | null
+          phone_number: string | null
+          profile_image_url: string | null
+          profile_slug: string
+          qr_code_data: string | null
+          show_inventory: boolean | null
+          show_testimonials: boolean | null
+          social_links: Json | null
+          specialties: string[] | null
+          title: string | null
+          updated_at: string
+          user_id: string
+          years_experience: number | null
+        }
+        Insert: {
+          background_image_url?: string | null
+          bio?: string | null
+          created_at?: string
+          custom_message?: string | null
+          display_name: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          languages_spoken?: string[] | null
+          lead_capture_settings?: Json | null
+          leads_generated?: number | null
+          page_views?: number | null
+          personal_brand_colors?: Json | null
+          phone_number?: string | null
+          profile_image_url?: string | null
+          profile_slug: string
+          qr_code_data?: string | null
+          show_inventory?: boolean | null
+          show_testimonials?: boolean | null
+          social_links?: Json | null
+          specialties?: string[] | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          years_experience?: number | null
+        }
+        Update: {
+          background_image_url?: string | null
+          bio?: string | null
+          created_at?: string
+          custom_message?: string | null
+          display_name?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          languages_spoken?: string[] | null
+          lead_capture_settings?: Json | null
+          leads_generated?: number | null
+          page_views?: number | null
+          personal_brand_colors?: Json | null
+          phone_number?: string | null
+          profile_image_url?: string | null
+          profile_slug?: string
+          qr_code_data?: string | null
+          show_inventory?: boolean | null
+          show_testimonials?: boolean | null
+          social_links?: Json | null
+          specialties?: string[] | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          years_experience?: number | null
+        }
+        Relationships: []
+      }
+      sales_professional_testimonials: {
+        Row: {
+          created_at: string
+          customer_location: string | null
+          customer_name: string
+          id: string
+          is_approved: boolean | null
+          is_featured: boolean | null
+          profile_id: string
+          purchase_date: string | null
+          rating: number | null
+          testimonial_text: string
+          vehicle_purchased: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_location?: string | null
+          customer_name: string
+          id?: string
+          is_approved?: boolean | null
+          is_featured?: boolean | null
+          profile_id: string
+          purchase_date?: string | null
+          rating?: number | null
+          testimonial_text: string
+          vehicle_purchased?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_location?: string | null
+          customer_name?: string
+          id?: string
+          is_approved?: boolean | null
+          is_featured?: boolean | null
+          profile_id?: string
+          purchase_date?: string | null
+          rating?: number | null
+          testimonial_text?: string
+          vehicle_purchased?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_professional_testimonials_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "sales_professional_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
