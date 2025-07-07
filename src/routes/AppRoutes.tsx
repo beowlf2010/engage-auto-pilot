@@ -7,6 +7,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AppLayout from '@/components/layout/AppLayout';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { SimpleLoading } from '@/components/ui/SimpleLoading';
+import { AppErrorBoundary } from '@/components/error/AppErrorBoundary';
 
 // Lazy load pages for better performance
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
@@ -43,162 +44,164 @@ const AppRoutes = () => {
   const LayoutComponent = isMobile ? MobileLayout : AppLayout;
 
   return (
-    <Routes>
-      <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
-      
-      {/* Dashboard */}
-      <Route path="/dashboard" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <DashboardPage />
-        </RouteWrapper>
-      } />
-      
-      {/* Leads */}
-      <Route path="/leads" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <LeadsPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/upload-leads" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <UploadLeadsPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/auto-dialing" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <AutoDialingPage />
-        </RouteWrapper>
-      } />
-      
-      {/* Smart Inbox */}
-      <Route path="/smart-inbox" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <SmartInboxPage />
-        </RouteWrapper>
-      } />
-      
-      {/* Inventory */}
-      <Route path="/inventory-dashboard" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <InventoryDashboardPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/upload-inventory" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <InventoryUploadPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/rpo-insights" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <RPOInsightsPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/rpo-database" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <RPODatabasePage />
-        </RouteWrapper>
-      } />
-      
-      {/* Analytics */}
-      <Route path="/financial-dashboard" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <FinancialDashboardPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/ai-monitor" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <AIMonitorPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/sales-dashboard" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <SalesDashboardPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/analytics" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <AdvancedAnalyticsPage />
-        </RouteWrapper>
-      } />
-      
-      {/* AI Performance & Training */}
-      <Route path="/ai-performance" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <AIPerformanceDashboardPage />
-        </RouteWrapper>
-      } />
+    <AppErrorBoundary showDetails={process.env.NODE_ENV === 'development'}>
+      <Routes>
+        <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+        
+        {/* Dashboard */}
+        <Route path="/dashboard" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Dashboard">
+            <DashboardPage />
+          </RouteWrapper>
+        } />
+        
+        {/* Leads */}
+        <Route path="/leads" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Leads">
+            <LeadsPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/upload-leads" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Upload Leads">
+            <UploadLeadsPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/auto-dialing" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Auto-Dialing">
+            <AutoDialingPage />
+          </RouteWrapper>
+        } />
+        
+        {/* Smart Inbox */}
+        <Route path="/smart-inbox" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Smart Inbox">
+            <SmartInboxPage />
+          </RouteWrapper>
+        } />
+        
+        {/* Inventory */}
+        <Route path="/inventory-dashboard" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Inventory Dashboard">
+            <InventoryDashboardPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/upload-inventory" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Upload Inventory">
+            <InventoryUploadPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/rpo-insights" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="RPO Insights">
+            <RPOInsightsPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/rpo-database" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="RPO Database">
+            <RPODatabasePage />
+          </RouteWrapper>
+        } />
+        
+        {/* Analytics */}
+        <Route path="/financial-dashboard" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Financial Dashboard">
+            <FinancialDashboardPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/ai-monitor" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Monitor">
+            <AIMonitorPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/sales-dashboard" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Sales Dashboard">
+            <SalesDashboardPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/analytics" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Analytics">
+            <AdvancedAnalyticsPage />
+          </RouteWrapper>
+        } />
+        
+        {/* AI Performance & Training */}
+        <Route path="/ai-performance" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Performance">
+            <AIPerformanceDashboardPage />
+          </RouteWrapper>
+        } />
 
-      <Route path="/ai-training" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <AITrainingCenterPage />
-        </RouteWrapper>
-      } />
-      
-      {/* Tools */}
-      <Route path="/predictive-analytics" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <PredictiveAnalyticsPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/message-export" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <MessageExportPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/personalization" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <PersonalizationPage />
-        </RouteWrapper>
-      } />
-      
-      {/* Admin */}
-      <Route path="/admin-dashboard" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <AdminDashboardPage />
-        </RouteWrapper>
-      } />
-      
-      <Route path="/manager-dashboard" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <ManagerDashboardPage />
-        </RouteWrapper>
-      } />
-      
-      {/* Settings */}
-      <Route path="/settings" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <SettingsPage />
-        </RouteWrapper>
-      } />
-      
-      {/* Sales Profile Management */}
-      <Route path="/sales-profile" element={
-        <RouteWrapper LayoutComponent={LayoutComponent}>
-          <SalesProfilePage />
-        </RouteWrapper>
-      } />
-      
-      {/* Public Sales Profile - No Layout */}
-      <Route path="/profile/:profileSlug" element={
-        <Suspense fallback={<SimpleLoading message="Loading profile..." />}>
-          <PublicSalesProfile />
-        </Suspense>
-      } />
-      
-      {/* Default redirects */}
-      <Route path="/index" element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} />
-      <Route path="/" element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} />
-    </Routes>
+        <Route path="/ai-training" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Training">
+            <AITrainingCenterPage />
+          </RouteWrapper>
+        } />
+        
+        {/* Tools */}
+        <Route path="/predictive-analytics" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Predictive Analytics">
+            <PredictiveAnalyticsPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/message-export" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Message Export">
+            <MessageExportPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/personalization" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Personalization">
+            <PersonalizationPage />
+          </RouteWrapper>
+        } />
+        
+        {/* Admin */}
+        <Route path="/admin-dashboard" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Admin Dashboard">
+            <AdminDashboardPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/manager-dashboard" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Manager Dashboard">
+            <ManagerDashboardPage />
+          </RouteWrapper>
+        } />
+        
+        {/* Settings */}
+        <Route path="/settings" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Settings">
+            <SettingsPage />
+          </RouteWrapper>
+        } />
+        
+        {/* Sales Profile Management */}
+        <Route path="/sales-profile" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Sales Profile">
+            <SalesProfilePage />
+          </RouteWrapper>
+        } />
+        
+        {/* Public Sales Profile - No Layout */}
+        <Route path="/profile/:profileSlug" element={
+          <Suspense fallback={<SimpleLoading message="Loading profile..." />}>
+            <PublicSalesProfile />
+          </Suspense>
+        } />
+        
+        {/* Default redirects */}
+        <Route path="/index" element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} />
+        <Route path="/" element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} />
+      </Routes>
+    </AppErrorBoundary>
   );
 };
 
