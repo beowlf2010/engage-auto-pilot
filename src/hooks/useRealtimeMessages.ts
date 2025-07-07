@@ -14,11 +14,9 @@ export const useRealtimeMessages = ({ onMessageUpdate, onConversationUpdate }: U
 
   const setupRealtimeSubscription = useCallback(() => {
     if (!profile || channelRef.current) return;
-
-    console.log('📡 Setting up real-time message subscription');
     
     const channel = supabase
-      .channel('smart-inbox-messages')
+      .channel(`smart-inbox-messages-${profile.id}`)
       .on(
         'postgres_changes',
         {
@@ -27,8 +25,6 @@ export const useRealtimeMessages = ({ onMessageUpdate, onConversationUpdate }: U
           table: 'conversations'
         },
         (payload) => {
-          console.log('📨 New message received via real-time:', payload);
-          
           if (payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new) {
             const newMessage = payload.new as { lead_id: string; direction: string };
             
@@ -40,7 +36,6 @@ export const useRealtimeMessages = ({ onMessageUpdate, onConversationUpdate }: U
             
             // Show browser notification for incoming messages
             if (newMessage.direction === 'in') {
-              console.log('🔔 Incoming message detected, triggering notifications');
               window.dispatchEvent(new CustomEvent('unread-count-changed'));
             }
           }
@@ -54,8 +49,6 @@ export const useRealtimeMessages = ({ onMessageUpdate, onConversationUpdate }: U
           table: 'conversations'
         },
         (payload) => {
-          console.log('📝 Message updated via real-time:', payload);
-          
           if (payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new) {
             const updatedMessage = payload.new as { lead_id: string; read_at?: string };
             
@@ -67,16 +60,13 @@ export const useRealtimeMessages = ({ onMessageUpdate, onConversationUpdate }: U
           }
         }
       )
-      .subscribe((status) => {
-        console.log('📡 Real-time subscription status:', status);
-      });
+      .subscribe();
 
     channelRef.current = channel;
   }, [profile, onMessageUpdate, onConversationUpdate]);
 
   const cleanupRealtimeSubscription = useCallback(() => {
     if (channelRef.current) {
-      console.log('🧹 Cleaning up real-time subscription');
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }

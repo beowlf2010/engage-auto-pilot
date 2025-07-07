@@ -1,23 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { 
-  Users, 
-  MessageSquare, 
-  TrendingUp, 
-  Calendar,
-  Phone,
-  Mail,
-  CheckCircle,
-  Clock,
-  ArrowRight
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConversationData } from '@/hooks/useConversationData';
 import { getCorrectLeadCounts } from '@/services/leadStatusTransitionService';
-import AIInsightsWidget from './dashboard/AIInsightsWidget';
 import { useDailyMessageStats } from '@/hooks/useDailyMessageStats';
+import { OptimizedLoading } from '@/components/ui/OptimizedLoading';
+import { DashboardStats } from './dashboard/DashboardStats';
+import { QuickActions } from './dashboard/QuickActions';
+import { RecentActivity } from './dashboard/RecentActivity';
+import AIInsightsWidget from './dashboard/AIInsightsWidget';
 
 interface DashboardProps {
   user: {
@@ -30,7 +20,7 @@ interface DashboardProps {
   };
 }
 
-const Dashboard = ({ user }: DashboardProps) => {
+const Dashboard = React.memo(({ user }: DashboardProps) => {
   const navigate = useNavigate();
   const { messages } = useConversationData();
   const { stats: messageStats, loading: statsLoading } = useDailyMessageStats();
@@ -43,74 +33,38 @@ const Dashboard = ({ user }: DashboardProps) => {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchLeadCounts = async () => {
-      try {
-        const counts = await getCorrectLeadCounts();
-        setLeadCounts(counts);
-      } catch (error) {
-        console.error('Error fetching lead counts:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeadCounts();
+  const fetchLeadCounts = useCallback(async () => {
+    try {
+      const counts = await getCorrectLeadCounts();
+      setLeadCounts(counts);
+    } catch (error) {
+      console.error('Error fetching lead counts:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const unreadMessages = messages.filter(msg => !msg.readAt && msg.direction === 'in').length;
+  useEffect(() => {
+    fetchLeadCounts();
+  }, [fetchLeadCounts]);
 
-  const quickActions = [
-    {
-      title: 'Smart Inbox',
-      description: 'View and respond to messages',
-      icon: MessageSquare,
-      action: () => navigate('/smart-inbox'),
-      badge: unreadMessages > 0 ? unreadMessages : null,
-      color: 'bg-blue-500'
-    },
-    {
-      title: 'Leads',
-      description: 'Manage your leads',
-      icon: Users,
-      action: () => navigate('/leads'),
-      badge: leadCounts.needsAttention > 0 ? leadCounts.needsAttention : null,
-      color: 'bg-green-500'
-    },
-    {
-      title: 'AI Monitor',
-      description: 'Advanced AI analytics',
-      icon: TrendingUp,
-      action: () => navigate('/ai-monitor'),
-      badge: null,
-      color: 'bg-purple-500'
-    },
-    {
-      title: 'Schedule',
-      description: 'View appointments',
-      icon: Calendar,
-      action: () => navigate('/schedule'),
-      badge: null,
-      color: 'bg-orange-500'
-    }
-  ];
+  const unreadMessages = useMemo(() => 
+    messages.filter(msg => !msg.readAt && msg.direction === 'in').length,
+    [messages]
+  );
+
+  const handleNavigate = useCallback((path: string) => {
+    navigate(path);
+  }, [navigate]);
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white">
+        <div className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 rounded-lg p-6 text-primary-foreground">
           <h1 className="text-2xl font-bold mb-2">Welcome back, {user.firstName}!</h1>
-          <p className="text-blue-100">Loading your automotive sales dashboard...</p>
+          <p className="text-primary-foreground/80">Loading your automotive sales dashboard...</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-16 bg-gray-200 rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <OptimizedLoading variant="dashboard" />
       </div>
     );
   }
@@ -118,148 +72,32 @@ const Dashboard = ({ user }: DashboardProps) => {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white">
+      <div className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 rounded-lg p-6 text-primary-foreground">
         <h1 className="text-2xl font-bold mb-2">
           Welcome back, {user.firstName}!
         </h1>
-        <p className="text-blue-100">
+        <p className="text-primary-foreground/80">
           Here's what's happening with your automotive sales today
         </p>
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Messages Sent</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {statsLoading ? '-' : (messageStats?.messages_sent || 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {messageStats?.change_sent && messageStats.change_sent !== 0 && (
-                <span className={messageStats.change_sent > 0 ? 'text-green-600' : 'text-red-600'}>
-                  {messageStats.change_sent > 0 ? '+' : ''}{messageStats.change_sent}% from yesterday
-                </span>
-              )}
-              {(!messageStats?.change_sent || messageStats.change_sent === 0) && 'Today\'s outbound messages'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Replies Received</CardTitle>
-            <Mail className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {statsLoading ? '-' : (messageStats?.replies_in || 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {messageStats?.change_replies && messageStats.change_replies !== 0 && (
-                <span className={messageStats.change_replies > 0 ? 'text-green-600' : 'text-red-600'}>
-                  {messageStats.change_replies > 0 ? '+' : ''}{messageStats.change_replies}% from yesterday
-                </span>
-              )}
-              {(!messageStats?.change_replies || messageStats.change_replies === 0) && 'Today\'s inbound messages'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{leadCounts.totalLeads}</div>
-            <p className="text-xs text-muted-foreground">
-              {leadCounts.aiEnabledLeads} with Finn AI enabled
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Need Attention</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{leadCounts.needsAttention}</div>
-            <p className="text-xs text-muted-foreground">
-              New leads not yet contacted
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Engaged</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{leadCounts.engagedLeads}</div>
-            <p className="text-xs text-muted-foreground">
-              Active conversations
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unread Messages</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{unreadMessages}</div>
-            <p className="text-xs text-muted-foreground">
-              Awaiting response
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardStats 
+        messageStats={messageStats}
+        leadCounts={leadCounts}
+        unreadMessages={unreadMessages}
+        statsLoading={statsLoading}
+      />
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
         <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                {quickActions.map((action, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    className="h-auto p-4 flex flex-col items-start gap-3 relative"
-                    onClick={action.action}
-                  >
-                    <div className="flex items-center gap-3 w-full">
-                      <div className={`p-2 rounded-lg ${action.color} text-white`}>
-                        <action.icon className="w-4 h-4" />
-                      </div>
-                      <div className="text-left">
-                        <div className="font-medium">{action.title}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {action.description}
-                        </div>
-                      </div>
-                    </div>
-                    {action.badge && (
-                      <Badge className="absolute top-2 right-2" variant="destructive">
-                        {action.badge}
-                      </Badge>
-                    )}
-                  </Button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <QuickActions 
+            unreadMessages={unreadMessages}
+            needsAttention={leadCounts.needsAttention}
+            onNavigate={handleNavigate}
+          />
         </div>
 
         {/* AI Insights Widget */}
@@ -269,59 +107,13 @@ const Dashboard = ({ user }: DashboardProps) => {
       </div>
 
       {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {leadCounts.needsAttention > 0 && (
-              <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
-                <Clock className="w-5 h-5 text-orange-600" />
-                <div>
-                  <p className="font-medium">{leadCounts.needsAttention} new leads need attention</p>
-                  <p className="text-sm text-muted-foreground">
-                    These leads haven't been contacted yet
-                  </p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => navigate('/leads')}>
-                  Review
-                </Button>
-              </div>
-            )}
-
-            {unreadMessages > 0 && (
-              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                <MessageSquare className="w-5 h-5 text-blue-600" />
-                <div>
-                  <p className="font-medium">{unreadMessages} unread messages</p>
-                  <p className="text-sm text-muted-foreground">
-                    Customer inquiries awaiting response
-                  </p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => navigate('/smart-inbox')}>
-                  View
-                </Button>
-              </div>
-            )}
-
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <div>
-                <p className="font-medium">AI automation working</p>
-                <p className="text-sm text-muted-foreground">
-                  {leadCounts.aiEnabledLeads} leads have Finn AI enabled and are being nurtured
-                </p>
-              </div>
-              <Button size="sm" variant="outline" onClick={() => navigate('/ai-monitor')}>
-                Monitor
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <RecentActivity 
+        leadCounts={leadCounts}
+        unreadMessages={unreadMessages}
+        onNavigate={handleNavigate}
+      />
     </div>
   );
-};
+});
 
 export default Dashboard;
