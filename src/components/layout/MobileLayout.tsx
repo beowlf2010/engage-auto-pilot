@@ -4,7 +4,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, X } from 'lucide-react';
-import Sidebar from '@/components/Sidebar';
+import { AppSidebar } from './AppSidebar';
 import MobileBottomNav from './MobileBottomNav';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
@@ -13,7 +13,7 @@ const MobileLayout = () => {
   const { profile } = useAuth();
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const unreadCount = 0; // Simplified for now
+  const unreadCount = useUnreadCount();
 
   if (!isMobile) {
     return null; // Use regular layout for desktop
@@ -41,18 +41,7 @@ const MobileLayout = () => {
               </Button>
             </div>
             {profile && (
-              <Sidebar
-                user={{
-                  id: profile.id,
-                  email: profile.email || '',
-                  role: profile.role,
-                  firstName: profile.first_name || 'User',
-                  lastName: profile.last_name || ''
-                }}
-                activeView=""
-                onViewChange={() => setSidebarOpen(false)}
-                unreadCount={unreadCount}
-              />
+              <AppSidebar unreadCount={unreadCount} />
             )}
           </SheetContent>
         </Sheet>

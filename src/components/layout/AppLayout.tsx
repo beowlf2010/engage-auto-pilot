@@ -1,9 +1,8 @@
 import React from 'react';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
-import MobileLayout from './MobileLayout';
+import { useUnreadCount } from '@/hooks/useUnreadCount';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,12 +10,7 @@ interface AppLayoutProps {
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { profile } = useAuth();
-  const isMobile = useIsMobile();
-  const unreadCount = 0; // Simplified for now
-
-  if (isMobile) {
-    return <MobileLayout />;
-  }
+  const unreadCount = useUnreadCount();
 
   // Desktop layout with modern sidebar
   return (
