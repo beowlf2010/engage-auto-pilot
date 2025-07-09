@@ -237,8 +237,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        // Log failed login attempt for security monitoring
+        console.warn('🔒 [AUTH] Failed login attempt:', email);
+        
+        // Note: In a real app, you'd want to log this server-side to avoid client manipulation
+        // For now, we'll just log it locally
+        try {
+          await supabase.rpc('log_failed_login_attempt', {
+            p_email: email,
+            p_ip_address: null, // Would need server-side implementation to get real IP
+            p_user_agent: navigator.userAgent
+          });
+        } catch (logError) {
+          console.error('Failed to log security event:', logError);
+        }
+      } else {
+        console.log('✅ [AUTH] Successful login:', email);
+      }
+      
+      return { error };
+    } catch (error) {
+      console.error('💥 [AUTH] Login error:', error);
+      return { error };
+    }
   };
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {

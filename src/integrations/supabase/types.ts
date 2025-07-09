@@ -5688,6 +5688,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          ip_address: unknown | null
+          is_active: boolean | null
+          last_accessed_at: string | null
+          session_token: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          session_token: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          session_token?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       vehicle_duplicates: {
         Row: {
           confidence_score: number
@@ -6019,6 +6055,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      detect_suspicious_activity: {
+        Args: { p_user_id: string; p_time_window_minutes?: number }
+        Returns: boolean
+      }
       detect_vehicle_duplicates: {
         Args: { p_upload_history_id: string }
         Returns: number
@@ -6145,6 +6185,10 @@ export type Database = {
         }
         Returns: Json
       }
+      log_failed_login_attempt: {
+        Args: { p_email: string; p_ip_address?: unknown; p_user_agent?: string }
+        Returns: undefined
+      }
       log_security_event: {
         Args: {
           p_action: string
@@ -6163,7 +6207,7 @@ export type Database = {
         Returns: string
       }
       promote_user_to_admin: {
-        Args: { target_user_id: string }
+        Args: { target_user_id: string; justification?: string }
         Returns: Json
       }
       repair_upload_inconsistencies: {
@@ -6173,6 +6217,10 @@ export type Database = {
       reprocess_failed_upload: {
         Args: { p_upload_id: string }
         Returns: Json
+      }
+      revoke_all_user_sessions: {
+        Args: { p_user_id: string }
+        Returns: number
       }
       schedule_next_touch: {
         Args: { lead_uuid: string }
@@ -6202,11 +6250,7 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      upload_csv_leads_bypass_rls: {
-        Args: { p_leads: Json; p_upload_history_id?: string }
-        Returns: Json
-      }
-      upload_csv_leads_v2: {
+      upload_csv_leads_secure: {
         Args: { p_leads: Json; p_upload_history_id?: string }
         Returns: Json
       }

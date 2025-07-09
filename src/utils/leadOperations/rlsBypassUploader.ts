@@ -17,11 +17,11 @@ export const uploadLeadsWithRLSBypass = async (
   uploadHistoryId?: string
 ): Promise<BypassUploadResult> => {
   try {
-    console.log('🚀 [CACHE-BUSTING V2] Starting cache-busting RLS bypass upload for', leads.length, 'leads');
+    console.log('🔒 [SECURE UPLOAD] Starting secure lead upload for', leads.length, 'leads');
 
     // Transform leads to the expected format with enhanced data validation
     const transformedLeads = leads.map((lead, index) => {
-      console.log(`📝 [CACHE-BUSTING V2] Transforming lead ${index + 1}:`, {
+      console.log(`📝 [SECURE UPLOAD] Transforming lead ${index + 1}:`, {
         name: `${lead.firstName} ${lead.lastName}`,
         email: lead.email,
         phoneCount: lead.phoneNumbers?.length || 0
@@ -58,35 +58,33 @@ export const uploadLeadsWithRLSBypass = async (
       };
     });
 
-    console.log('🔄 [CACHE-BUSTING V2] Calling NEW cache-busting function with', transformedLeads.length, 'transformed leads');
+    console.log('🔒 [SECURE UPLOAD] Calling secure upload function with', transformedLeads.length, 'transformed leads');
 
-    // Call the NEW cache-busting bypass function
-    const { data, error } = await supabase.rpc('upload_csv_leads_v2', {
+    // Call the NEW secure upload function
+    const { data, error } = await supabase.rpc('upload_csv_leads_secure', {
       p_leads: transformedLeads,
       p_upload_history_id: uploadHistoryId || null
     });
 
     if (error) {
-      console.error('❌ [CACHE-BUSTING V2] Function call failed:', error);
+      console.error('❌ [SECURE UPLOAD] Function call failed:', error);
       
-      // Check if this is still the old session_replication_role error
-      if (error.message?.includes('session_replication_role')) {
-        console.error('🔄 [CACHE-BUSTING V2] Still getting session_replication_role error - trying fallback');
-        throw new Error('Cache issue persists. Please try refreshing the page and attempting the upload again.');
-      }
-      
-      // Enhanced error handling for common Supabase issues
+      // Enhanced error handling for security-related issues
       let errorMessage = error.message || 'Unknown database error';
       if (error.code === '42501') {
-        errorMessage = 'Database permission error. Please contact administrator.';
+        errorMessage = 'Insufficient permissions. Manager or admin role required.';
       } else if (error.code === '23505') {
         errorMessage = 'Duplicate data detected. Some leads may already exist.';
+      } else if (error.message?.includes('Rate limit exceeded')) {
+        errorMessage = 'Too many upload attempts. Please wait before trying again.';
+      } else if (error.message?.includes('Authentication required')) {
+        errorMessage = 'Please log in to upload leads.';
       }
       
       throw new Error(errorMessage);
     }
 
-    console.log('✅ [CACHE-BUSTING V2] Cache-busting bypass upload completed:', data);
+    console.log('✅ [SECURE UPLOAD] Secure upload completed:', data);
 
     // Type assertion and enhanced result processing
     const result = data as any;
@@ -102,7 +100,7 @@ export const uploadLeadsWithRLSBypass = async (
     };
 
   } catch (error) {
-    console.error('💥 [CACHE-BUSTING V2] Cache-busting bypass upload failed:', error);
+    console.error('💥 [SECURE UPLOAD] Secure upload failed:', error);
     
     // Enhanced error handling with more details
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -116,7 +114,7 @@ export const uploadLeadsWithRLSBypass = async (
         error: errorMessage,
         details: errorDetails,
         timestamp: new Date().toISOString(),
-        context: 'Cache-busting RLS bypass uploader V2'
+        context: 'Secure lead uploader'
       }],
       errorCount: 1,
       message: `Upload failed: ${errorMessage}`
@@ -124,12 +122,25 @@ export const uploadLeadsWithRLSBypass = async (
   }
 };
 
-export const promoteToAdmin = async (): Promise<{ success: boolean; message: string }> => {
+export const promoteToAdmin = async (
+  targetUserId?: string,
+  justification?: string
+): Promise<{ success: boolean; message: string }> => {
   try {
-    console.log('👑 [ADMIN PROMOTION] Promoting current user to admin');
+    console.log('👑 [ADMIN PROMOTION] Promoting user to admin with enhanced security');
+    
+    const userId = targetUserId || (await supabase.auth.getUser()).data.user?.id;
+    
+    if (!userId) {
+      return {
+        success: false,
+        message: 'User ID is required for admin promotion'
+      };
+    }
     
     const { data, error } = await supabase.rpc('promote_user_to_admin', {
-      target_user_id: (await supabase.auth.getUser()).data.user?.id
+      target_user_id: userId,
+      justification: justification || 'Self-promotion via application'
     });
     
     if (error) {
