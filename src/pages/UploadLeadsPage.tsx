@@ -10,6 +10,7 @@ import PhonePriorityCard from "@/components/upload-leads/PhonePriorityCard";
 import CSVTemplateCard from "@/components/upload-leads/CSVTemplateCard";
 import UploadInfoPanel from "@/components/leads/upload/UploadInfoPanel";
 import EnhancedBypassUploadButton from "@/components/upload-leads/EnhancedBypassUploadButton";
+import SoldCustomerSummary from "@/components/upload-leads/SoldCustomerSummary";
 import { useCSVUpload } from "@/hooks/useCSVUpload";
 import { useEnhancedUserProfile } from "@/hooks/useEnhancedUserProfile";
 
@@ -113,34 +114,59 @@ const UploadLeadsPage = () => {
                 </div>
                 
                 {processedData && processedData.processedLeads.length > 0 && (
-                  <div className="pt-4 border-t bg-green-50 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-green-800">
-                          ✅ CSV Processed Successfully!
-                        </p>
-                        <p className="text-sm text-green-600">
-                          {processedData.processedLeads.length} leads ready for enhanced bypass upload
-                        </p>
-                        {processedData.duplicates.length > 0 && (
-                          <p className="text-xs text-orange-600">
-                            {processedData.duplicates.length} potential duplicates detected in CSV
+                  <div className="pt-4 border-t space-y-4">
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-800">
+                            ✅ CSV Processed Successfully!
                           </p>
-                        )}
-                        {processedData.errors.length > 0 && (
-                          <p className="text-xs text-red-600">
-                            {processedData.errors.length} rows had errors
+                          <p className="text-sm text-green-600">
+                            {processedData.processedLeads.length} leads ready for enhanced bypass upload
                           </p>
-                        )}
-                        <p className="text-xs text-blue-600 mt-1">
-                          ℹ️ Database duplicate check will be performed before upload
-                        </p>
+                          {processedData.duplicates.length > 0 && (
+                            <p className="text-xs text-orange-600">
+                              {processedData.duplicates.length} potential duplicates detected in CSV
+                            </p>
+                          )}
+                          {processedData.errors.length > 0 && (
+                            <p className="text-xs text-red-600">
+                              {processedData.errors.length} rows had errors
+                            </p>
+                          )}
+                          {processedData.soldCustomersCount > 0 && (
+                            <p className="text-xs text-blue-600">
+                              🛍️ {processedData.soldCustomersCount} sold customers detected
+                            </p>
+                          )}
+                          <p className="text-xs text-blue-600 mt-1">
+                            ℹ️ Database duplicate check will be performed before upload
+                          </p>
+                        </div>
+                        <EnhancedBypassUploadButton 
+                          leads={processedData.processedLeads}
+                          disabled={uploading}
+                        />
                       </div>
-                      <EnhancedBypassUploadButton 
-                        leads={processedData.processedLeads}
-                        disabled={uploading}
-                      />
                     </div>
+                    
+                    {processedData.soldCustomersCount > 0 && (
+                      <SoldCustomerSummary 
+                        summary={{
+                          totalSoldCustomers: processedData.soldCustomersCount,
+                          soldCustomersData: processedData.soldCustomers.map(customer => ({
+                            firstName: customer.firstName,
+                            lastName: customer.lastName,
+                            source: customer.source,
+                            uploadedAt: new Date().toISOString(),
+                            assignedToPostSale: false,
+                            vehicleInterest: customer.vehicleInterest
+                          })),
+                          postSaleAssignments: 0,
+                          duplicateSoldCustomers: 0
+                        }}
+                      />
+                    )}
                   </div>
                 )}
               </div>

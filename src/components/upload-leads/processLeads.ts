@@ -14,6 +14,8 @@ export interface ProcessingResult {
     rowIndex: number;
     error: string;
   }>;
+  soldCustomers: ProcessedLead[];
+  soldCustomersCount: number;
 }
 
 // Map VIN Evolution and other external statuses to our system statuses
@@ -63,6 +65,7 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
   const validLeads: ProcessedLead[] = [];
   const duplicates: ProcessingResult['duplicates'] = [];
   const errors: ProcessingResult['errors'] = [];
+  const soldCustomers: ProcessedLead[] = [];
 
   console.log('Processing leads with cleaned CSV data. Sample row:', csvData.sample);
 
@@ -150,6 +153,13 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
         console.log(`Duplicate found at row ${index + 1}: ${duplicateCheck.duplicateType} conflict`);
       } else {
         validLeads.push(newLead);
+        
+        // Track sold customers separately
+        if (newLead.status === 'sold') {
+          soldCustomers.push(newLead);
+          console.log(`✅ Sold customer processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Source: ${newLead.source})`);
+        }
+        
         console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status}, Factors: ${leadStatusTypeName}/${leadTypeName}/${leadSourceName})`);
       }
 
@@ -161,9 +171,13 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
     }
   });
 
+  console.log(`📊 [PROCESS LEADS] Summary: ${validLeads.length} valid leads, ${soldCustomers.length} sold customers, ${duplicates.length} duplicates, ${errors.length} errors`);
+
   return {
     validLeads,
     duplicates,
-    errors
+    errors,
+    soldCustomers,
+    soldCustomersCount: soldCustomers.length
   };
 };

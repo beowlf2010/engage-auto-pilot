@@ -4,10 +4,13 @@ import { uploadLeadsWithRLSBypass, promoteToAdmin, BypassUploadResult } from '@/
 import { checkForDatabaseDuplicates, DuplicateCheckResult } from '@/utils/leadOperations/enhancedDuplicateChecker';
 import { ProcessedLead } from '@/components/upload-leads/duplicateDetection';
 import { toast } from '@/hooks/use-toast';
+import { soldCustomerTracker, SoldCustomerUploadSummary } from '@/services/soldCustomerTracker';
+import { createUploadHistory } from '@/utils/leadOperations/uploadHistoryService';
 
 export interface EnhancedUploadResult extends BypassUploadResult {
   duplicateCheckResult?: DuplicateCheckResult;
   skippedDuplicates?: number;
+  soldCustomerSummary?: SoldCustomerUploadSummary;
 }
 
 export const useEnhancedBypassUpload = () => {
@@ -44,12 +47,32 @@ export const useEnhancedBypassUpload = () => {
         });
       }
       
-      // Step 2: Upload only unique leads if any exist
+      // Step 2: Identify and track sold customers
+      const soldCustomers = soldCustomerTracker.identifySoldCustomers(leads);
+      console.log('🛍️ [ENHANCED BYPASS] Found', soldCustomers.length, 'sold customers');
+      
+      // Step 3: Create upload history record if we have leads to upload
+      let finalUploadHistoryId = uploadHistoryId;
+      if (!finalUploadHistoryId && (duplicateCheckResult.uniqueLeads.length > 0 || soldCustomers.length > 0)) {
+        try {
+          finalUploadHistoryId = await createUploadHistory(
+            `leads_${Date.now()}.csv`,
+            0,
+            'text/csv',
+            {}
+          );
+          console.log('📁 [ENHANCED BYPASS] Created upload history:', finalUploadHistoryId);
+        } catch (error) {
+          console.error('Error creating upload history:', error);
+        }
+      }
+
+      // Step 4: Upload only unique leads if any exist
       let uploadResult: BypassUploadResult;
       
       if (duplicateCheckResult.uniqueLeads.length > 0) {
         console.log('📤 [ENHANCED BYPASS] Uploading', duplicateCheckResult.uniqueLeads.length, 'unique leads');
-        uploadResult = await uploadLeadsWithRLSBypass(duplicateCheckResult.uniqueLeads, uploadHistoryId);
+        uploadResult = await uploadLeadsWithRLSBypass(duplicateCheckResult.uniqueLeads, finalUploadHistoryId);
       } else {
         console.log('⏭️ [ENHANCED BYPASS] No unique leads to upload, all were duplicates');
         uploadResult = {
@@ -61,21 +84,52 @@ export const useEnhancedBypassUpload = () => {
         };
       }
 
-      // Step 3: Combine results
+      // Step 5: Track sold customers in upload history
+      let soldCustomerSummary: SoldCustomerUploadSummary | undefined;
+      if (finalUploadHistoryId && soldCustomers.length > 0) {
+        try {
+          soldCustomerSummary = await soldCustomerTracker.trackSoldCustomersInUpload(
+            finalUploadHistoryId,
+            soldCustomers
+          );
+          console.log('✅ [ENHANCED BYPASS] Tracked sold customers:', soldCustomerSummary);
+        } catch (error) {
+          console.error('Error tracking sold customers:', error);
+        }
+      }
+
+      // Step 6: Auto-assign sold customers to post-sale processes
+      if (finalUploadHistoryId && soldCustomers.length > 0) {
+        try {
+          const postSaleAssignments = await soldCustomerTracker.assignSoldCustomersToPostSale(finalUploadHistoryId);
+          if (soldCustomerSummary) {
+            soldCustomerSummary.postSaleAssignments = postSaleAssignments;
+          }
+          console.log('📋 [ENHANCED BYPASS] Post-sale assignments made:', postSaleAssignments);
+        } catch (error) {
+          console.error('Error assigning sold customers to post-sale:', error);
+        }
+      }
+
+      // Step 7: Combine results
       const enhancedResult: EnhancedUploadResult = {
         ...uploadResult,
         duplicateCheckResult,
         skippedDuplicates: duplicateCheckResult.duplicateLeads.length,
+        soldCustomerSummary,
         totalProcessed: leads.length // Override to show original total
       };
 
       setUploadResult(enhancedResult);
 
-      // Step 4: Show appropriate success/info messages
+      // Step 8: Show appropriate success/info messages
       if (enhancedResult.successfulInserts > 0) {
+        const soldInfo = enhancedResult.soldCustomerSummary?.totalSoldCustomers 
+          ? `, ${enhancedResult.soldCustomerSummary.totalSoldCustomers} sold customers tracked`
+          : '';
         toast({
           title: "Upload Successful",
-          description: `${enhancedResult.successfulInserts} new leads uploaded successfully${enhancedResult.skippedDuplicates ? `, ${enhancedResult.skippedDuplicates} duplicates skipped` : ''}`,
+          description: `${enhancedResult.successfulInserts} new leads uploaded successfully${enhancedResult.skippedDuplicates ? `, ${enhancedResult.skippedDuplicates} duplicates skipped` : ''}${soldInfo}`,
         });
       } else if (enhancedResult.skippedDuplicates === leads.length) {
         toast({
@@ -91,6 +145,15 @@ export const useEnhancedBypassUpload = () => {
         });
       }
 
+      // Show sold customer notification if any were found
+      if (enhancedResult.soldCustomerSummary?.totalSoldCustomers > 0) {
+        toast({
+          title: "Sold Customers Detected",
+          description: `${enhancedResult.soldCustomerSummary.totalSoldCustomers} sold customers found and assigned to post-sale follow-up`,
+          variant: "default"
+        });
+      }
+
       return enhancedResult;
     } catch (error) {
       console.error('💥 [ENHANCED BYPASS] Upload error:', error);
@@ -101,7 +164,8 @@ export const useEnhancedBypassUpload = () => {
         successfulInserts: 0,
         errors: [{ error: error instanceof Error ? error.message : 'Unknown error' }],
         message: 'Upload failed',
-        skippedDuplicates: 0
+        skippedDuplicates: 0,
+        soldCustomerSummary: undefined
       };
       
       setUploadResult(errorResult);

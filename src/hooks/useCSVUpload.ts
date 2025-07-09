@@ -17,6 +17,8 @@ export interface ParsedCSVData {
   processedLeads: ProcessedLead[];
   duplicates: any[];
   errors: any[];
+  soldCustomers: ProcessedLead[];
+  soldCustomersCount: number;
 }
 
 export const useCSVUpload = () => {
@@ -55,7 +57,9 @@ export const useCSVUpload = () => {
       const processedData: ParsedCSVData = {
         processedLeads: processResult.validLeads,
         duplicates: processResult.duplicates,
-        errors: processResult.errors
+        errors: processResult.errors,
+        soldCustomers: processResult.soldCustomers,
+        soldCustomersCount: processResult.soldCustomersCount
       };
       
       setProcessedData(processedData);

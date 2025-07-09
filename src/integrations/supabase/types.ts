@@ -5514,9 +5514,12 @@ export type Database = {
           id: string
           inventory_condition: string | null
           original_filename: string
+          post_sale_assignments_made: number | null
           processed_at: string | null
           processing_errors: Json | null
           processing_status: string
+          sold_customers_count: number | null
+          sold_customers_data: Json | null
           source_type: string | null
           stored_filename: string
           successful_imports: number
@@ -5539,9 +5542,12 @@ export type Database = {
           id?: string
           inventory_condition?: string | null
           original_filename: string
+          post_sale_assignments_made?: number | null
           processed_at?: string | null
           processing_errors?: Json | null
           processing_status?: string
+          sold_customers_count?: number | null
+          sold_customers_data?: Json | null
           source_type?: string | null
           stored_filename: string
           successful_imports?: number
@@ -5564,9 +5570,12 @@ export type Database = {
           id?: string
           inventory_condition?: string | null
           original_filename?: string
+          post_sale_assignments_made?: number | null
           processed_at?: string | null
           processing_errors?: Json | null
           processing_status?: string
+          sold_customers_count?: number | null
+          sold_customers_data?: Json | null
           source_type?: string | null
           stored_filename?: string
           successful_imports?: number

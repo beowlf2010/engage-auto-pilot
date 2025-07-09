@@ -21,6 +21,9 @@ export interface UploadHistoryRecord {
   error_details?: string;
   inventory_condition?: string;
   duplicate_count: number;
+  sold_customers_count?: number;
+  sold_customers_data?: any[];
+  post_sale_assignments_made?: number;
 }
 
 export const createUploadHistory = async (
@@ -66,6 +69,9 @@ export const updateUploadHistory = async (
     duplicate_imports?: number;
     processing_errors?: any[];
     upload_status?: 'processing' | 'completed' | 'failed';
+    sold_customers_count?: number;
+    sold_customers_data?: any[];
+    post_sale_assignments_made?: number;
   }
 ): Promise<void> => {
   const updateData: any = { ...updates };
