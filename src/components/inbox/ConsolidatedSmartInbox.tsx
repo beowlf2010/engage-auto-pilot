@@ -5,480 +5,509 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   MessageSquare, 
   Search, 
-  RefreshCw, 
   Phone, 
-  Car, 
-  Clock,
+  Mail, 
+  User, 
+  Clock, 
+  AlertCircle, 
+  CheckCircle2, 
+  XCircle, 
+  RefreshCw, 
   Send,
-  AlertCircle,
   Wifi,
   WifiOff,
-  CheckCircle2,
-  XCircle,
-  RotateCcw
+  Circle
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useCentralizedRealtime } from '@/hooks/useCentralizedRealtime';
-import { useConversationData } from '@/hooks/useConversationData';
-import { useConversationsList } from '@/hooks/conversation/useConversationsList';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useRealDataInbox } from '@/hooks/useRealDataInbox';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { formatDistanceToNow } from 'date-fns';
-import type { ConversationListItem, MessageData } from '@/types/conversation';
+import type { ConversationListItem } from '@/hooks/conversation/conversationTypes';
+import type { MessageData } from '@/types/conversation';
 
-interface ConnectionStatus {
-  isConnected: boolean;
-  lastConnected: Date | null;
-  reconnectAttempts: number;
+interface ConsolidatedSmartInboxProps {
+  onLeadsRefresh: () => void;
+  preselectedLeadId?: string | null;
 }
 
-interface ConnectionStatusIndicatorProps {
-  status: ConnectionStatus;
-  onReconnect: () => void;
-}
-
-const ConnectionStatusIndicator = ({ status, onReconnect }: ConnectionStatusIndicatorProps) => {
-  const getStatusColor = () => {
-    if (status.isConnected) return 'text-green-500';
-    if (status.reconnectAttempts > 0) return 'text-yellow-500';
-    return 'text-red-500';
-  };
-
-  const getStatusIcon = () => {
-    if (status.isConnected) return <Wifi className="h-4 w-4" />;
-    if (status.reconnectAttempts > 0) return <RotateCcw className="h-4 w-4 animate-spin" />;
-    return <WifiOff className="h-4 w-4" />;
-  };
-
-  const getStatusText = () => {
-    if (status.isConnected) return 'Connected';
-    if (status.reconnectAttempts > 0) return `Reconnecting... (${status.reconnectAttempts})`;
-    return 'Disconnected';
-  };
-
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      <div className={`flex items-center gap-1 ${getStatusColor()}`}>
-        {getStatusIcon()}
-        <span>{getStatusText()}</span>
-      </div>
-      {!status.isConnected && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onReconnect}
-          className="h-6 px-2 text-xs"
-        >
-          Reconnect
-        </Button>
-      )}
-    </div>
-  );
-};
-
-export const ConsolidatedSmartInbox = () => {
-  const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
-  const [messageInput, setMessageInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
+  onLeadsRefresh,
+  preselectedLeadId
+}) => {
+  const { profile } = useAuth();
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(preselectedLeadId || null);
+  const [messages, setMessages] = useState<MessageData[]>([]);
+  const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [isPolling, setIsPolling] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
-    isConnected: false,
-    lastConnected: null,
-    reconnectAttempts: 0
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({
+    hasUnread: false,
+    aiOptIn: null as boolean | null
   });
-  
-  const { toast } = useToast();
-  
-  // Use centralized real-time system
-  const { isConnected, forceRefresh, reconnect } = useCentralizedRealtime({
-    onConversationUpdate: () => {
-      console.log('🔄 [CONSOLIDATED INBOX] Conversation update received');
-      refetchConversations();
-    },
-    onMessageUpdate: (leadId: string) => {
-      console.log('💬 [CONSOLIDATED INBOX] Message update for lead:', leadId);
-      if (selectedConversation?.leadId === leadId) {
-        loadMessages(leadId);
-      }
-      refetchConversations();
-    },
-    onUnreadCountUpdate: () => {
-      console.log('📬 [CONSOLIDATED INBOX] Unread count update');
-      refetchConversations();
-    }
-  });
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Get conversations and messages
-  const { conversations, conversationsLoading, refetchConversations } = useConversationsList();
-  const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
+  // Use real data inbox hook
+  const {
+    conversations,
+    loading: conversationsLoading,
+    error: conversationsError,
+    refresh: refreshConversations,
+    markAsRead,
+    sendMessage: sendMessageToLead,
+    setSearchQuery: setInboxSearchQuery,
+    setFilters: setInboxFilters,
+    totalConversations,
+    unreadCount
+  } = useRealDataInbox();
 
-  // Update connection status based on real-time connection
-  useEffect(() => {
-    setConnectionStatus(prev => ({
-      ...prev,
-      isConnected,
-      lastConnected: isConnected ? new Date() : prev.lastConnected,
-      reconnectAttempts: isConnected ? 0 : prev.reconnectAttempts
-    }));
-  }, [isConnected]);
-
-  // Fallback polling when real-time is disconnected
-  useEffect(() => {
-    let pollingInterval: NodeJS.Timeout;
-
-    if (!isConnected && !isPolling) {
-      console.log('📡 [CONSOLIDATED INBOX] Starting fallback polling');
-      setIsPolling(true);
-      
-      pollingInterval = setInterval(() => {
-        console.log('🔄 [CONSOLIDATED INBOX] Polling for updates...');
-        refetchConversations();
-        if (selectedConversation) {
-          loadMessages(selectedConversation.leadId);
-        }
-      }, 15000); // Poll every 15 seconds
-    } else if (isConnected && isPolling) {
-      console.log('📡 [CONSOLIDATED INBOX] Stopping fallback polling - real-time connected');
-      setIsPolling(false);
-    }
-
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
-  }, [isConnected, isPolling, refetchConversations, loadMessages, selectedConversation]);
-
-  // Filter conversations based on search
-  const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
+  // Set up realtime subscriptions
+  const handleMessageUpdate = useCallback((leadId: string) => {
+    console.log('📨 Message update for lead:', leadId);
+    refreshConversations();
     
-    const query = searchQuery.toLowerCase();
-    return conversations.filter(conv =>
-      conv.leadName.toLowerCase().includes(query) ||
-      conv.vehicleInterest.toLowerCase().includes(query) ||
-      conv.lastMessage.toLowerCase().includes(query)
-    );
-  }, [conversations, searchQuery]);
+    // If this is the selected lead, refresh messages
+    if (selectedLeadId === leadId) {
+      loadMessagesForLead(leadId);
+    }
+  }, [selectedLeadId, refreshConversations]);
 
-  // Handle conversation selection
-  const handleConversationSelect = useCallback(async (conversation: ConversationListItem) => {
-    console.log('👆 [CONSOLIDATED INBOX] Selecting conversation:', conversation.leadId);
-    setSelectedConversation(conversation);
-    await loadMessages(conversation.leadId);
-  }, [loadMessages]);
+  const handleConversationUpdate = useCallback(() => {
+    console.log('📨 Conversation update detected');
+    refreshConversations();
+  }, [refreshConversations]);
+
+  useRealtimeMessages({
+    onMessageUpdate: handleMessageUpdate,
+    onConversationUpdate: handleConversationUpdate
+  });
+
+  // Load messages for a specific lead
+  const loadMessagesForLead = useCallback(async (leadId: string) => {
+    if (!leadId) return;
+
+    setLoadingMessages(true);
+    try {
+      console.log('📨 Loading messages for lead:', leadId);
+      
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('sent_at', { ascending: true });
+
+      if (error) {
+        console.error('❌ Error loading messages:', error);
+        throw error;
+      }
+
+      const formattedMessages: MessageData[] = data?.map(msg => ({
+        id: msg.id,
+        leadId: msg.lead_id,
+        direction: msg.direction as 'in' | 'out',
+        body: msg.body,
+        sentAt: msg.sent_at,
+        readAt: msg.read_at,
+        aiGenerated: msg.ai_generated || false,
+        smsStatus: msg.sms_status || 'sent',
+        smsError: msg.sms_error
+      })) || [];
+
+      setMessages(formattedMessages);
+      
+      // Mark messages as read
+      await markAsRead(leadId);
+      
+      console.log(`✅ Loaded ${formattedMessages.length} messages for lead ${leadId}`);
+    } catch (error) {
+      console.error('❌ Error loading messages:', error);
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, [markAsRead]);
+
+  // Handle lead selection
+  const handleLeadSelect = useCallback((leadId: string) => {
+    console.log('👤 Selecting lead:', leadId);
+    setSelectedLeadId(leadId);
+    loadMessagesForLead(leadId);
+  }, [loadMessagesForLead]);
 
   // Handle sending messages
   const handleSendMessage = useCallback(async () => {
-    if (!selectedConversation || !messageInput.trim() || sendingMessage) return;
+    if (!selectedLeadId || !newMessage.trim() || sendingMessage) return;
 
     setSendingMessage(true);
     try {
-      await sendMessage(selectedConversation.leadId, messageInput.trim());
-      setMessageInput('');
-      toast({
-        title: "Message sent",
-        description: "Your message has been sent successfully."
-      });
+      console.log('📤 Sending message to lead:', selectedLeadId);
+      
+      await sendMessageToLead(selectedLeadId, newMessage.trim());
+      setNewMessage('');
+      
+      // Refresh messages after sending
+      await loadMessagesForLead(selectedLeadId);
+      
+      console.log('✅ Message sent successfully');
     } catch (error) {
-      console.error('❌ [CONSOLIDATED INBOX] Send message error:', error);
-      toast({
-        title: "Failed to send message",
-        description: error instanceof Error ? error.message : "Please try again.",
-        variant: "destructive"
-      });
+      console.error('❌ Error sending message:', error);
     } finally {
       setSendingMessage(false);
     }
-  }, [selectedConversation, messageInput, sendingMessage, sendMessage, toast]);
+  }, [selectedLeadId, newMessage, sendingMessage, sendMessageToLead, loadMessagesForLead]);
 
-  // Handle manual refresh with connection retry
-  const handleRefresh = useCallback(async () => {
-    console.log('🔄 [CONSOLIDATED INBOX] Manual refresh triggered');
-    
-    if (!isConnected) {
-      setConnectionStatus(prev => ({
-        ...prev,
-        reconnectAttempts: prev.reconnectAttempts + 1
-      }));
-      reconnect();
-    }
-    
-    await forceRefresh();
-    await refetchConversations();
-    
-    if (selectedConversation) {
-      await loadMessages(selectedConversation.leadId);
-    }
-  }, [isConnected, reconnect, forceRefresh, refetchConversations, selectedConversation, loadMessages]);
+  // Handle search and filters
+  useEffect(() => {
+    setInboxSearchQuery(searchQuery);
+  }, [searchQuery, setInboxSearchQuery]);
 
-  // Connection status for the indicator
-  const indicatorConnectionStatus = useMemo(() => ({
-    isConnected,
-    lastConnected: connectionStatus.lastConnected,
-    reconnectAttempts: connectionStatus.reconnectAttempts
-  }), [isConnected, connectionStatus.lastConnected, connectionStatus.reconnectAttempts]);
+  useEffect(() => {
+    setInboxFilters(filters);
+  }, [filters, setInboxFilters]);
+
+  // Auto-scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Handle preselected lead
+  useEffect(() => {
+    if (preselectedLeadId && preselectedLeadId !== selectedLeadId) {
+      handleLeadSelect(preselectedLeadId);
+    }
+  }, [preselectedLeadId, selectedLeadId, handleLeadSelect]);
+
+  // Filter conversations based on search and filters
+  const filteredConversations = useMemo(() => {
+    return conversations.filter(conv => {
+      const matchesSearch = !searchQuery || 
+        conv.leadName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesUnread = !filters.hasUnread || conv.unreadCount > 0;
+      const matchesAiOptIn = filters.aiOptIn === null || conv.aiOptIn === filters.aiOptIn;
+      
+      return matchesSearch && matchesUnread && matchesAiOptIn;
+    });
+  }, [conversations, searchQuery, filters]);
+
+  // Get selected conversation details
+  const selectedConversation = useMemo(() => {
+    return conversations.find(conv => conv.leadId === selectedLeadId);
+  }, [conversations, selectedLeadId]);
+
+  const formatMessageTime = (timestamp: string) => {
+    try {
+      return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+    } catch {
+      return 'Unknown time';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'hot': return 'bg-red-100 text-red-800';
+      case 'warm': return 'bg-orange-100 text-orange-800';
+      case 'cold': return 'bg-blue-100 text-blue-800';
+      case 'qualified': return 'bg-green-100 text-green-800';
+      case 'unqualified': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (conversationsError) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Error loading conversations: {conversationsError}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b bg-card p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold">Smart Inbox</h1>
-            <Badge variant="secondary" className="ml-2">
-              {filteredConversations.length} conversations
-            </Badge>
+    <div className="h-full flex bg-background">
+      {/* Conversations List */}
+      <div className="w-1/3 border-r border-border flex flex-col">
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Conversations</h2>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">
+                {totalConversations} total
+              </Badge>
+              {unreadCount > 0 && (
+                <Badge variant="destructive">
+                  {unreadCount} unread
+                </Badge>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshConversations}
+                disabled={conversationsLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${conversationsLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <ConnectionStatusIndicator 
-              status={indicatorConnectionStatus}
-              onReconnect={reconnect}
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
             />
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-2 mb-4">
             <Button
-              variant="outline"
+              variant={filters.hasUnread ? "default" : "outline"}
               size="sm"
-              onClick={handleRefresh}
-              disabled={conversationsLoading}
-              className="flex items-center gap-2"
+              onClick={() => setFilters(prev => ({ ...prev, hasUnread: !prev.hasUnread }))}
             >
-              <RefreshCw className={`h-4 w-4 ${conversationsLoading ? 'animate-spin' : ''}`} />
-              Refresh
+              <Circle className="h-3 w-3 mr-1" />
+              Unread
+            </Button>
+            <Button
+              variant={filters.aiOptIn === true ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilters(prev => ({ 
+                ...prev, 
+                aiOptIn: prev.aiOptIn === true ? null : true 
+              }))}
+            >
+              AI Enabled
             </Button>
           </div>
         </div>
-        
-        {/* Search */}
-        <div className="mt-4 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        {/* Fallback polling indicator */}
-        {isPolling && (
-          <Alert className="mt-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Real-time connection lost. Using backup sync every 15 seconds.
-            </AlertDescription>
-          </Alert>
-        )}
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex min-h-0">
         {/* Conversations List */}
-        <div className="w-1/3 border-r bg-card">
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-2">
-              {conversationsLoading ? (
-                <div className="text-center py-8">
-                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-muted-foreground">Loading conversations...</p>
-                </div>
-              ) : filteredConversations.length === 0 ? (
-                <div className="text-center py-8">
-                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    {searchQuery ? 'No conversations match your search' : 'No conversations yet'}
-                  </p>
-                </div>
-              ) : (
-                filteredConversations.map((conversation) => (
-                  <Card
-                    key={conversation.leadId}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
-                      selectedConversation?.leadId === conversation.leadId ? 'ring-2 ring-primary' : ''
-                    }`}
-                    onClick={() => handleConversationSelect(conversation)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback>
-                              {conversation.leadName.split(' ').map(n => n[0]).join('').toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h3 className="font-medium">{conversation.leadName}</h3>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Phone className="h-3 w-3" />
-                              {conversation.leadPhone || conversation.primaryPhone}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col items-end gap-1">
-                          {conversation.unreadCount > 0 && (
-                            <Badge variant="destructive" className="h-5 min-w-5 text-xs">
-                              {conversation.unreadCount}
-                            </Badge>
-                          )}
-                          <div className="flex items-center gap-1">
-                            {conversation.lastMessageDirection === 'in' && (
-                              <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center">
-                                ↓
-                              </Badge>
-                            )}
-                            {conversation.lastMessageDirection === 'out' && (
-                              <Badge variant="outline" className="h-4 w-4 p-0 flex items-center justify-center">
-                                ↑
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Car className="h-3 w-3" />
-                          {conversation.vehicleInterest}
-                        </div>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {conversation.lastMessage}
-                        </p>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {formatDistanceToNow(conversation.lastMessageDate, { addSuffix: true })}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+        <ScrollArea className="flex-1">
+          {conversationsLoading ? (
+            <div className="p-4 text-center">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <p className="text-sm text-muted-foreground">Loading conversations...</p>
             </div>
-          </ScrollArea>
-        </div>
-
-        {/* Messages Area */}
-        <div className="flex-1 flex flex-col">
-          {selectedConversation ? (
-            <>
-              {/* Messages Header */}
-              <div className="flex-shrink-0 border-b bg-card p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="font-semibold">{selectedConversation.leadName}</h2>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {selectedConversation.leadPhone || selectedConversation.primaryPhone}
+          ) : filteredConversations.length === 0 ? (
+            <div className="p-4 text-center">
+              <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No conversations found</p>
+            </div>
+          ) : (
+            <div className="p-2">
+              {filteredConversations.map((conversation) => (
+                <Card
+                  key={conversation.leadId}
+                  className={`mb-2 cursor-pointer transition-colors hover:bg-accent ${
+                    selectedLeadId === conversation.leadId ? 'bg-accent border-primary' : ''
+                  }`}
+                  onClick={() => handleLeadSelect(conversation.leadId)}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback>
+                            {conversation.leadName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h4 className="font-medium text-sm">{conversation.leadName}</h4>
+                          {conversation.vehicleInterest && (
+                            <p className="text-xs text-muted-foreground">{conversation.vehicleInterest}</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Car className="h-3 w-3" />
-                        {selectedConversation.vehicleInterest}
+                      <div className="flex flex-col items-end gap-1">
+                        {conversation.unreadCount > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {conversation.unreadCount}
+                          </Badge>
+                        )}
+                        <Badge className={`text-xs ${getStatusColor(conversation.status)}`}>
+                          {conversation.status}
+                        </Badge>
                       </div>
                     </div>
-                  </div>
-                  <Badge variant="outline">{selectedConversation.status}</Badge>
-                </div>
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 flex flex-col min-h-0">
-                <ScrollArea className="flex-1">
-                  <div className="p-4 space-y-4">
-                    {messagesLoading ? (
-                      <div className="text-center py-8">
-                        <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-muted-foreground">Loading messages...</p>
-                      </div>
-                    ) : messages.length === 0 ? (
-                      <div className="text-center py-8">
-                        <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-muted-foreground">No messages yet</p>
-                      </div>
-                    ) : (
-                      messages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[70%] rounded-lg p-3 ${
-                              message.direction === 'out'
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted'
-                            }`}
-                          >
-                            <p className="text-sm">{message.body}</p>
-                            <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                              <span>
-                                {formatDistanceToNow(new Date(message.sentAt), { addSuffix: true })}
-                              </span>
-                              {message.direction === 'out' && (
-                                <span className="flex items-center gap-1">
-                                  {message.smsStatus === 'delivered' && <CheckCircle2 className="h-3 w-3" />}
-                                  {message.smsStatus === 'failed' && <XCircle className="h-3 w-3" />}
-                                  {message.smsStatus}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
-
-                {/* Message Input */}
-                <div className="flex-shrink-0 border-t bg-card p-4">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Type your message..."
-                      value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      disabled={sendingMessage}
-                      className="flex-1"
-                    />
-                    <Button
-                      onClick={handleSendMessage}
-                      disabled={!messageInput.trim() || sendingMessage}
-                      className="flex items-center gap-2"
-                    >
-                      {sendingMessage ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
+                    
+                    <div className="flex items-center gap-1 mb-2">
+                      {conversation.lastMessageDirection === 'in' ? (
+                        <MessageSquare className="h-3 w-3 text-blue-500" />
                       ) : (
-                        <Send className="h-4 w-4" />
+                        <Send className="h-3 w-3 text-green-500" />
                       )}
-                      Send
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="font-medium mb-2">Select a Conversation</h3>
-                <p className="text-muted-foreground">
-                  Choose a conversation from the list to start messaging
-                </p>
-              </div>
+                      <p className="text-xs text-muted-foreground truncate flex-1">
+                        {conversation.lastMessage}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{formatMessageTime(conversation.lastMessageTime)}</span>
+                      <div className="flex items-center gap-1">
+                        {conversation.aiOptIn && (
+                          <Badge variant="outline" className="text-xs">AI</Badge>
+                        )}
+                        <Clock className="h-3 w-3" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
-        </div>
+        </ScrollArea>
+      </div>
+
+      {/* Messages Panel */}
+      <div className="flex-1 flex flex-col">
+        {selectedConversation ? (
+          <>
+            {/* Header */}
+            <div className="p-4 border-b border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback>
+                      {selectedConversation.leadName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-semibold">{selectedConversation.leadName}</h3>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      {selectedConversation.vehicleInterest && (
+                        <span>{selectedConversation.vehicleInterest}</span>
+                      )}
+                      <Badge className={`text-xs ${getStatusColor(selectedConversation.status)}`}>
+                        {selectedConversation.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {selectedConversation.aiOptIn && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Badge variant="outline" className="text-xs">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            AI Enabled
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>AI responses are enabled for this lead</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  <Button variant="outline" size="sm">
+                    <Phone className="h-4 w-4 mr-1" />
+                    Call
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <ScrollArea className="flex-1 p-4">
+              {loadingMessages ? (
+                <div className="text-center py-8">
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-sm text-muted-foreground">Loading messages...</p>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No messages yet</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[70%] rounded-lg p-3 ${
+                          message.direction === 'out'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <p className="text-sm">{message.body}</p>
+                        <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                          <span>{formatMessageTime(message.sentAt)}</span>
+                          {message.aiGenerated && (
+                            <Badge variant="outline" className="text-xs ml-2">
+                              AI
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </ScrollArea>
+
+            {/* Message Input */}
+            <div className="p-4 border-t border-border">
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Type your message..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  className="min-h-[60px] resize-none"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || sendingMessage}
+                  className="self-end"
+                >
+                  {sendingMessage ? (
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Select a conversation</h3>
+              <p className="text-muted-foreground">
+                Choose a conversation from the list to start messaging
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+export default ConsolidatedSmartInbox;
