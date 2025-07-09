@@ -14,6 +14,7 @@ import {
   AlertCircle,
   ArrowLeft
 } from 'lucide-react';
+import { sanitizeSearchHighlight } from '@/utils/sanitization';
 
 interface ThreadMessage {
   messageId: string;
@@ -255,11 +256,11 @@ const MessageThreadView: React.FC<MessageThreadViewProps> = ({
                 <div 
                   className={`${compact ? 'text-sm' : 'text-base'} leading-relaxed`}
                   dangerouslySetInnerHTML={{ 
-                    __html: highlightContent(
+                    __html: sanitizeSearchHighlight(highlightContent(
                       shouldTruncate 
                         ? message.content.substring(0, 200) + '...' 
                         : message.content
-                    )
+                    ))
                   }}
                 />
 

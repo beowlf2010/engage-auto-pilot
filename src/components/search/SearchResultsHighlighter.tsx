@@ -3,6 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Clock, MessageSquare, Tag, AlertCircle, User } from 'lucide-react';
+import { sanitizeSearchHighlight } from '@/utils/sanitization';
 
 interface SearchResult {
   messageId: string;
@@ -133,7 +134,7 @@ const SearchResultsHighlighter: React.FC<SearchResultsHighlighterProps> = ({
               <div className="space-y-2">
                 <div 
                   className={`${compact ? 'text-sm' : 'text-base'} leading-relaxed`}
-                  dangerouslySetInnerHTML={{ __html: result.highlightedContent }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeSearchHighlight(result.highlightedContent) }}
                 />
                 
                 {/* Matched Terms */}

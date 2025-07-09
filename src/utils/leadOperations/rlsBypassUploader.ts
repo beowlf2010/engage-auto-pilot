@@ -128,7 +128,9 @@ export const promoteToAdmin = async (): Promise<{ success: boolean; message: str
   try {
     console.log('👑 [ADMIN PROMOTION] Promoting current user to admin');
     
-    const { data, error } = await supabase.rpc('make_current_user_admin');
+    const { data, error } = await supabase.rpc('promote_user_to_admin', {
+      target_user_id: (await supabase.auth.getUser()).data.user?.id
+    });
     
     if (error) {
       console.error('❌ [ADMIN PROMOTION] Failed:', error);

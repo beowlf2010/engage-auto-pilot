@@ -5077,6 +5077,42 @@ export type Database = {
           },
         ]
       }
+      security_audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: unknown | null
+          resource_id: string | null
+          resource_type: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          resource_id?: string | null
+          resource_type: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          resource_id?: string | null
+          resource_type?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           created_at: string
@@ -6109,9 +6145,14 @@ export type Database = {
         }
         Returns: Json
       }
-      make_current_user_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
+      log_security_event: {
+        Args: {
+          p_action: string
+          p_resource_type: string
+          p_resource_id?: string
+          p_details?: Json
+        }
+        Returns: undefined
       }
       mark_missing_vehicles_sold: {
         Args: { p_upload_id: string }
@@ -6120,6 +6161,10 @@ export type Database = {
       normalize_phone: {
         Args: { phone_input: string }
         Returns: string
+      }
+      promote_user_to_admin: {
+        Args: { target_user_id: string }
+        Returns: Json
       }
       repair_upload_inconsistencies: {
         Args: Record<PropertyKey, never>
