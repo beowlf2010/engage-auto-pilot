@@ -60,7 +60,7 @@ class AIIntelligenceInitializer {
     if (!this.initialized) {
       await this.initialize();
     }
-    return aiIntelligenceHub.processIntelligenceFeedback(leadId, responseId, feedback);
+    await aiIntelligenceHub.processIntelligenceFeedback(leadId, responseId, feedback);
   }
 }
 

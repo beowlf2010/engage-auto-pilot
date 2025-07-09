@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { sendMessage } from '../messagesService';
 import { addAIConversationNote } from '../vehicleMention/aiConversationNotes';
@@ -113,7 +114,11 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
     // Generate warm initial message using ENHANCED AI with introduction context
     console.log(`🤖 [INITIAL MESSAGE SERVICE] === GENERATING SUPER AGGRESSIVE INITIAL MESSAGE ===`);
     
-    const message = await generateWarmInitialMessage(lead, cleanedProfile);
+    const message = await generateWarmInitialMessage(
+      `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
+      lead.vehicle_interest || '',
+      cleanedProfile
+    );
     
     if (!message) {
       console.error(`❌ [INITIAL MESSAGE SERVICE] === MESSAGE GENERATION FAILED ===`);
