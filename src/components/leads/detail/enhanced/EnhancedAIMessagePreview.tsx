@@ -57,7 +57,7 @@ const EnhancedAIMessagePreview: React.FC<EnhancedAIMessagePreviewProps> = ({
         vehicleInterest: vehicleInterest || ''
       };
 
-      const response = unifiedAIResponseEngine.generateResponse(messageContext);
+      const response = await unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (response?.message) {
         setGeneratedMessage(response.message);

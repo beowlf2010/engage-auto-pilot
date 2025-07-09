@@ -1,71 +1,94 @@
-// Test file to verify AI response improvements for mixed questions
-import { unifiedAIResponseEngine, MessageContext } from './unifiedAIResponseEngine';
 
-export const testMixedQuestionResponse = () => {
-  console.log('🧪 Testing improved AI response for mixed questions...');
-  
-  // Test the exact case from the user's example
-  const testContext: MessageContext = {
-    leadId: 'test-lead-123',
-    leadName: 'Doris',
-    latestMessage: 'Who is you and what\'s the price',
-    conversationHistory: [],
-    vehicleInterest: 'finding the right vehicle for your needs'
-  };
-  
-  const response = unifiedAIResponseEngine.generateResponse(testContext);
-  
-  console.log('📝 Original message:', testContext.latestMessage);
-  console.log('🤖 AI Response:', response.message);
-  console.log('🎯 Intent Analysis:', response.intent);
-  console.log('📊 Confidence:', response.confidence);
-  console.log('🔧 Strategy:', response.responseStrategy);
-  
-  // Test case with specific vehicle interest
-  const testContext2: MessageContext = {
-    leadId: 'test-lead-456',
-    leadName: 'John',
-    latestMessage: 'who are you and how much does the 2024 Honda Civic cost',
-    conversationHistory: [],
-    vehicleInterest: '2024 Honda Civic'
-  };
-  
-  const response2 = unifiedAIResponseEngine.generateResponse(testContext2);
-  
-  console.log('\n📝 Original message 2:', testContext2.latestMessage);
-  console.log('🤖 AI Response 2:', response2.message);
-  console.log('🎯 Intent Analysis 2:', response2.intent);
-  
-  return {
-    test1: { context: testContext, response },
-    test2: { context: testContext2, response: response2 }
-  };
-};
+import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 
-// Test various mixed question scenarios
-export const testVariousMixedQuestions = () => {
-  console.log('🧪 Testing various mixed question scenarios...');
+export async function testAIResponse(
+  leadId: string,
+  leadName: string,
+  customerMessage: string,
+  vehicleInterest: string
+) {
+  console.log('🧪 Testing AI Response Generation...');
   
-  const testCases = [
-    'Who is you and what\'s the price',
-    'what is your name and is the car available',
-    'who am i talking to and can we schedule a meeting',
-    'who are you and do you take trades',
-    'what\'s your name and what financing options do you have'
-  ];
-  
-  testCases.forEach((message, index) => {
-    const context: MessageContext = {
-      leadId: `test-${index}`,
-      leadName: 'Customer',
-      latestMessage: message,
-      conversationHistory: [],
-      vehicleInterest: 'vehicles'
+  try {
+    const messageContext: MessageContext = {
+      leadId,
+      leadName,
+      latestMessage: customerMessage,
+      conversationHistory: [customerMessage],
+      vehicleInterest
     };
+
+    const response = await unifiedAIResponseEngine.generateResponse(messageContext);
     
-    const response = unifiedAIResponseEngine.generateResponse(context);
-    console.log(`\n${index + 1}. "${message}"`);
-    console.log(`   Response: "${response.message}"`);
-    console.log(`   Primary: ${response.intent.primary}, Secondary: ${response.intent.secondary}`);
+    console.log('✅ Test Results:', {
+      message: response?.message,
+      intent: response?.intent,
+      confidence: response?.confidence,
+      responseStrategy: response?.responseStrategy
+    });
+
+    return response;
+  } catch (error) {
+    console.error('❌ AI Response Test Failed:', error);
+    return null;
+  }
+}
+
+export async function testMultipleScenarios() {
+  console.log('🧪 Testing Multiple AI Scenarios...');
+  
+  const scenarios = [
+    {
+      leadId: 'test-1',
+      leadName: 'John Smith',
+      message: 'I am interested in a pickup truck',
+      vehicle: 'pickup truck'
+    },
+    {
+      leadId: 'test-2', 
+      leadName: 'Sarah Johnson',
+      message: 'What financing options do you have?',
+      vehicle: 'SUV'
+    }
+  ];
+
+  for (const scenario of scenarios) {
+    const response = await testAIResponse(
+      scenario.leadId,
+      scenario.leadName,
+      scenario.message,
+      scenario.vehicle
+    );
+    
+    console.log(`📊 Scenario ${scenario.leadId}:`, {
+      message: response?.message,
+      intent: response?.intent
+    });
+  }
+}
+
+export async function testConversationFlow(
+  leadId: string,
+  leadName: string,
+  messages: string[],
+  vehicleInterest: string
+) {
+  console.log('🔄 Testing Conversation Flow...');
+  
+  const messageContext: MessageContext = {
+    leadId,
+    leadName,
+    latestMessage: messages[messages.length - 1],
+    conversationHistory: messages,
+    vehicleInterest
+  };
+
+  const response = await unifiedAIResponseEngine.generateResponse(messageContext);
+  
+  console.log('🔄 Conversation Flow Result:', {
+    message: response?.message,
+    intent: response?.intent?.primary
   });
-};
+
+  return response;
+}

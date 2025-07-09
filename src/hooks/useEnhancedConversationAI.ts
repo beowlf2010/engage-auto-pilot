@@ -3,87 +3,57 @@ import { useState, useCallback } from 'react';
 import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 import { toast } from '@/hooks/use-toast';
 
-// Simplified response interface for compatibility
-interface EnhancedAIResponse {
-  message: string;
-  confidence: number;
-  analysis: {
-    leadTemperature: number;
-    urgencyLevel: string;
-    sentiment: string;
-  }
-}
+export const useEnhancedConversationAI = (leadId: string) => {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [lastResponse, setLastResponse] = useState<string | null>(null);
 
-export const useEnhancedConversationAI = () => {
-  const [loading, setLoading] = useState(false);
-  const [lastAnalysis, setLastAnalysis] = useState<EnhancedAIResponse | null>(null);
-
-  const analyzeConversation = useCallback(async (
-    leadId: string,
-    conversationHistory: string,
-    latestMessage: string,
+  const generateResponse = useCallback(async (
     leadName: string,
-    vehicleInterest: string
+    customerMessage: string,
+    conversationHistory: string[],
+    vehicleInterest?: string
   ) => {
-    setLoading(true);
+    if (!leadId || isGenerating) return null;
+
+    setIsGenerating(true);
     try {
-      console.log('🤖 Simplified conversation analysis using unified AI');
-      
+      console.log('🤖 Generating enhanced conversation AI response');
+
       const messageContext: MessageContext = {
         leadId,
         leadName,
-        latestMessage,
-        conversationHistory: [conversationHistory],
-        vehicleInterest
+        latestMessage: customerMessage,
+        conversationHistory,
+        vehicleInterest: vehicleInterest || ''
       };
 
-      const response = unifiedAIResponseEngine.generateResponse(messageContext);
-
+      const response = await unifiedAIResponseEngine.generateResponse(messageContext);
+      
       if (response?.message) {
-        const analysisResult: EnhancedAIResponse = {
+        setLastResponse(response.message);
+        return {
           message: response.message,
-          confidence: response.confidence || 0.8,
-          analysis: {
-            leadTemperature: 75,
-            urgencyLevel: 'medium',
-            sentiment: 'positive'
-          }
+          confidence: response.confidence || 0.8
         };
-
-        setLastAnalysis(analysisResult);
-        console.log('✅ Simplified AI analysis complete');
-        
-        return analysisResult;
       }
 
       return null;
     } catch (error) {
-      console.error('❌ Error in simplified conversation analysis:', error);
+      console.error('Error generating enhanced conversation AI response:', error);
       toast({
-        title: "Analysis Error",
-        description: "Failed to analyze conversation. Using unified AI instead.",
+        title: "Error",
+        description: "Failed to generate AI response",
         variant: "destructive"
       });
       return null;
     } finally {
-      setLoading(false);
+      setIsGenerating(false);
     }
-  }, []);
-
-  const getResponseSuggestion = useCallback((
-    leadId: string,
-    conversationHistory: string,
-    latestMessage: string,
-    leadName: string,
-    vehicleInterest: string
-  ) => {
-    return analyzeConversation(leadId, conversationHistory, latestMessage, leadName, vehicleInterest);
-  }, [analyzeConversation]);
+  }, [leadId, isGenerating]);
 
   return {
-    loading,
-    lastAnalysis,
-    analyzeConversation,
-    getResponseSuggestion
+    generateResponse,
+    isGenerating,
+    lastResponse
   };
 };
