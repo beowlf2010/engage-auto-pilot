@@ -6230,6 +6230,13 @@ export type Database = {
         Args: { p_lead_id: string; p_phone_id: string }
         Returns: undefined
       }
+      synchronize_user_roles: {
+        Args: {
+          p_user_id: string
+          p_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: undefined
+      }
       update_daily_kpis: {
         Args: { target_date?: string }
         Returns: undefined
