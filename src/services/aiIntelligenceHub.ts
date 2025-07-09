@@ -1,6 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
+import { intelligentAutoApproval } from '@/services/intelligentAutoApproval';
+import { aiAutomationCoordinator } from '@/services/aiAutomationCoordinator';
 
 interface IntelligenceContext {
   leadId: string;
@@ -23,17 +25,21 @@ export class AIIntelligenceHub {
 
   async initializeIntelligenceServices() {
     console.log('🧠 [AI HUB] Initializing intelligence services...');
-    // Mock initialization
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('✅ [AI HUB] Intelligence services initialized');
+    
+    // Start the advanced AI automation system
+    await aiAutomationCoordinator.startAutomation();
+    
+    console.log('✅ [AI HUB] Intelligence services initialized with advanced automation');
   }
 
   async getIntelligenceInsights() {
+    const systemStatus = await aiAutomationCoordinator.getSystemStatus();
+    
     return {
-      totalInsights: 42,
-      activePatterns: 12,
-      learningEfficiency: 0.85,
-      confidenceScore: 0.92
+      totalInsights: systemStatus.performance.total_interactions || 0,
+      activePatterns: systemStatus.queueStats.pending || 0,
+      learningEfficiency: systemStatus.queueStats.autoApprovalRate / 100 || 0,
+      confidenceScore: systemStatus.performance.average_confidence_score / 100 || 0
     };
   }
 
