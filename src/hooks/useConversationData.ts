@@ -84,9 +84,15 @@ export const useConversationData = () => {
       supabase.removeChannel(realtimeChannelRef.current);
     }
 
-    // Set up new channel for conversation updates
+    // Set up new channel for conversation updates with better error handling
     const channel = supabase
-      .channel('conversation-updates')
+      .channel(`conversation-updates-${Date.now()}`, {
+        config: {
+          presence: {
+            key: 'conversation-data'
+          }
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -98,8 +104,11 @@ export const useConversationData = () => {
           console.log('📨 New message received via realtime:', payload);
           
           // Only refresh if this message is for the currently viewed lead
-          if (currentLeadIdRef.current && payload.new.lead_id === currentLeadIdRef.current) {
-            console.log('🔄 Refreshing messages for current lead');
+          // and it's not from our own send operation (to avoid double refresh)
+          if (currentLeadIdRef.current && 
+              payload.new.lead_id === currentLeadIdRef.current &&
+              payload.new.direction === 'in') {
+            console.log('🔄 Refreshing messages for current lead (incoming message)');
             loadMessages(currentLeadIdRef.current);
           }
         }
@@ -116,12 +125,17 @@ export const useConversationData = () => {
           
           // Only refresh if this message is for the currently viewed lead
           if (currentLeadIdRef.current && payload.new.lead_id === currentLeadIdRef.current) {
-            console.log('🔄 Refreshing messages for current lead');
+            console.log('🔄 Refreshing messages for current lead (message update)');
             loadMessages(currentLeadIdRef.current);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+        if (status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('⚠️ Realtime connection lost, messages will still work via immediate refresh');
+        }
+      });
 
     realtimeChannelRef.current = channel;
 
@@ -138,6 +152,22 @@ export const useConversationData = () => {
       throw new Error('Lead ID and message body are required');
     }
 
+    // Create optimistic message to show immediately in UI
+    const optimisticMessage: MessageData = {
+      id: `temp-${Date.now()}`,
+      leadId,
+      body: messageBody.trim(),
+      direction: 'out',
+      sentAt: new Date().toISOString(),
+      smsStatus: 'pending',
+      aiGenerated: false
+    };
+
+    // Add optimistic message immediately
+    if (currentLeadIdRef.current === leadId) {
+      setMessages(prev => [...prev, optimisticMessage]);
+    }
+
     try {
       // Get the phone number for this lead first
       const { data: phoneData, error: phoneError } = await supabase
@@ -148,6 +178,10 @@ export const useConversationData = () => {
         .single();
 
       if (phoneError || !phoneData) {
+        // Remove optimistic message on error
+        if (currentLeadIdRef.current === leadId) {
+          setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+        }
         throw new Error('No primary phone number found for this lead');
       }
 
@@ -167,6 +201,10 @@ export const useConversationData = () => {
 
       if (conversationError) {
         console.error('Error creating conversation record:', conversationError);
+        // Remove optimistic message on error
+        if (currentLeadIdRef.current === leadId) {
+          setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+        }
         throw conversationError;
       }
 
@@ -193,6 +231,12 @@ export const useConversationData = () => {
           })
           .eq('id', conversation.id);
         
+        // Remove optimistic message and refresh to show failed message
+        if (currentLeadIdRef.current === leadId) {
+          setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+          await loadMessages(leadId);
+        }
+        
         throw new Error(error.message || 'Failed to send message');
       }
 
@@ -208,6 +252,12 @@ export const useConversationData = () => {
           })
           .eq('id', conversation.id);
         
+        // Remove optimistic message and refresh to show failed message
+        if (currentLeadIdRef.current === leadId) {
+          setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+          await loadMessages(leadId);
+        }
+        
         throw new Error(data?.error || 'Failed to send message');
       }
 
@@ -222,7 +272,13 @@ export const useConversationData = () => {
         })
         .eq('id', conversation.id);
       
-      // Invalidate relevant queries to refresh data
+      // Immediately refresh messages to show the real message with correct ID and status
+      if (currentLeadIdRef.current === leadId) {
+        console.log('🔄 Immediately refreshing messages after successful send');
+        await loadMessages(leadId);
+      }
+      
+      // Invalidate relevant queries to refresh data elsewhere in the app
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['lead'] });
       queryClient.invalidateQueries({ queryKey: ['unread-count'] });
@@ -233,7 +289,15 @@ export const useConversationData = () => {
       console.error('Error in sendMessage:', error);
       throw error;
     }
-  }, [queryClient]);
+  }, [queryClient, loadMessages, setMessages]);
+
+  // Add manual refresh function for fallback
+  const refreshMessages = useCallback(() => {
+    if (currentLeadIdRef.current) {
+      console.log('🔄 Manual refresh triggered');
+      loadMessages(currentLeadIdRef.current);
+    }
+  }, [loadMessages]);
 
   return {
     messages,
@@ -241,6 +305,7 @@ export const useConversationData = () => {
     messagesError,
     loadMessages,
     sendMessage,
-    setMessages
+    setMessages,
+    refreshMessages
   };
 };
