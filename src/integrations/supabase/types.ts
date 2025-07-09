@@ -729,6 +729,68 @@ export type Database = {
           },
         ]
       }
+      ai_message_schedule: {
+        Row: {
+          a_b_test_variant: string | null
+          actual_sent_at: string | null
+          created_at: string | null
+          engagement_prediction: number | null
+          id: string
+          lead_id: string | null
+          message_type: string
+          randomization_window: number | null
+          scheduled_send_at: string | null
+          sequence_day: number
+          sequence_type: string
+          status: string | null
+          template_content: string
+          tone_variant: string
+          updated_at: string | null
+        }
+        Insert: {
+          a_b_test_variant?: string | null
+          actual_sent_at?: string | null
+          created_at?: string | null
+          engagement_prediction?: number | null
+          id?: string
+          lead_id?: string | null
+          message_type: string
+          randomization_window?: number | null
+          scheduled_send_at?: string | null
+          sequence_day: number
+          sequence_type: string
+          status?: string | null
+          template_content: string
+          tone_variant: string
+          updated_at?: string | null
+        }
+        Update: {
+          a_b_test_variant?: string | null
+          actual_sent_at?: string | null
+          created_at?: string | null
+          engagement_prediction?: number | null
+          id?: string
+          lead_id?: string | null
+          message_type?: string
+          randomization_window?: number | null
+          scheduled_send_at?: string | null
+          sequence_day?: number
+          sequence_type?: string
+          status?: string | null
+          template_content?: string
+          tone_variant?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_message_schedule_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_message_templates: {
         Row: {
           created_at: string
@@ -3725,6 +3787,8 @@ export type Database = {
           ai_pause_reason: string | null
           ai_replies_enabled: boolean | null
           ai_resume_at: string | null
+          ai_send_window_end: string | null
+          ai_send_window_start: string | null
           ai_sequence_paused: boolean | null
           ai_stage: string | null
           ai_strategy_bucket: string | null
@@ -3736,6 +3800,7 @@ export type Database = {
           conversion_probability: number | null
           created_at: string
           data_source_quality_score: number | null
+          detailed_done: boolean | null
           do_not_call: boolean
           do_not_email: boolean
           do_not_mail: boolean
@@ -3751,13 +3816,16 @@ export type Database = {
           id: string
           is_hidden: boolean | null
           last_call_attempt: string | null
+          last_engagement_score: number | null
           last_name: string | null
           last_prediction_update: string | null
           last_reply_at: string | null
+          lead_score: number | null
           lead_source_name: string | null
           lead_status_type_name: string | null
           lead_temperature: number | null
           lead_type_name: string | null
+          message_cadence_preference: string | null
           message_intensity: string | null
           middle_name: string | null
           next_ai_send_at: string | null
@@ -3767,8 +3835,10 @@ export type Database = {
           original_status: string | null
           pending_human_response: boolean | null
           phone: string | null
+          photos_done: boolean | null
           postal_code: string | null
           predicted_close_date: string | null
+          preferred_contact_days: number[] | null
           preferred_mileage_max: number | null
           preferred_price_max: number | null
           preferred_price_min: number | null
@@ -3778,12 +3848,14 @@ export type Database = {
           salesperson_first_name: string | null
           salesperson_id: string | null
           salesperson_last_name: string | null
+          service_done: boolean | null
           source: string
           state: string | null
           status: string
           status_mapping_log: Json | null
           temperature_last_updated: string | null
           temperature_score: number | null
+          timezone_offset: number | null
           trade_decision_timeline: string | null
           trade_financing_bank: string | null
           trade_in_vehicle: string | null
@@ -3808,6 +3880,8 @@ export type Database = {
           ai_pause_reason?: string | null
           ai_replies_enabled?: boolean | null
           ai_resume_at?: string | null
+          ai_send_window_end?: string | null
+          ai_send_window_start?: string | null
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
           ai_strategy_bucket?: string | null
@@ -3819,6 +3893,7 @@ export type Database = {
           conversion_probability?: number | null
           created_at?: string
           data_source_quality_score?: number | null
+          detailed_done?: boolean | null
           do_not_call?: boolean
           do_not_email?: boolean
           do_not_mail?: boolean
@@ -3834,13 +3909,16 @@ export type Database = {
           id?: string
           is_hidden?: boolean | null
           last_call_attempt?: string | null
+          last_engagement_score?: number | null
           last_name?: string | null
           last_prediction_update?: string | null
           last_reply_at?: string | null
+          lead_score?: number | null
           lead_source_name?: string | null
           lead_status_type_name?: string | null
           lead_temperature?: number | null
           lead_type_name?: string | null
+          message_cadence_preference?: string | null
           message_intensity?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
@@ -3850,8 +3928,10 @@ export type Database = {
           original_status?: string | null
           pending_human_response?: boolean | null
           phone?: string | null
+          photos_done?: boolean | null
           postal_code?: string | null
           predicted_close_date?: string | null
+          preferred_contact_days?: number[] | null
           preferred_mileage_max?: number | null
           preferred_price_max?: number | null
           preferred_price_min?: number | null
@@ -3861,12 +3941,14 @@ export type Database = {
           salesperson_first_name?: string | null
           salesperson_id?: string | null
           salesperson_last_name?: string | null
+          service_done?: boolean | null
           source?: string
           state?: string | null
           status?: string
           status_mapping_log?: Json | null
           temperature_last_updated?: string | null
           temperature_score?: number | null
+          timezone_offset?: number | null
           trade_decision_timeline?: string | null
           trade_financing_bank?: string | null
           trade_in_vehicle?: string | null
@@ -3891,6 +3973,8 @@ export type Database = {
           ai_pause_reason?: string | null
           ai_replies_enabled?: boolean | null
           ai_resume_at?: string | null
+          ai_send_window_end?: string | null
+          ai_send_window_start?: string | null
           ai_sequence_paused?: boolean | null
           ai_stage?: string | null
           ai_strategy_bucket?: string | null
@@ -3902,6 +3986,7 @@ export type Database = {
           conversion_probability?: number | null
           created_at?: string
           data_source_quality_score?: number | null
+          detailed_done?: boolean | null
           do_not_call?: boolean
           do_not_email?: boolean
           do_not_mail?: boolean
@@ -3917,13 +4002,16 @@ export type Database = {
           id?: string
           is_hidden?: boolean | null
           last_call_attempt?: string | null
+          last_engagement_score?: number | null
           last_name?: string | null
           last_prediction_update?: string | null
           last_reply_at?: string | null
+          lead_score?: number | null
           lead_source_name?: string | null
           lead_status_type_name?: string | null
           lead_temperature?: number | null
           lead_type_name?: string | null
+          message_cadence_preference?: string | null
           message_intensity?: string | null
           middle_name?: string | null
           next_ai_send_at?: string | null
@@ -3933,8 +4021,10 @@ export type Database = {
           original_status?: string | null
           pending_human_response?: boolean | null
           phone?: string | null
+          photos_done?: boolean | null
           postal_code?: string | null
           predicted_close_date?: string | null
+          preferred_contact_days?: number[] | null
           preferred_mileage_max?: number | null
           preferred_price_max?: number | null
           preferred_price_min?: number | null
@@ -3944,12 +4034,14 @@ export type Database = {
           salesperson_first_name?: string | null
           salesperson_id?: string | null
           salesperson_last_name?: string | null
+          service_done?: boolean | null
           source?: string
           state?: string | null
           status?: string
           status_mapping_log?: Json | null
           temperature_last_updated?: string | null
           temperature_score?: number | null
+          timezone_offset?: number | null
           trade_decision_timeline?: string | null
           trade_financing_bank?: string | null
           trade_in_vehicle?: string | null
@@ -6003,6 +6095,17 @@ export type Database = {
       }
     }
     Views: {
+      ai_dashboard_metrics: {
+        Row: {
+          active_ai_leads: number | null
+          avg_lead_score: number | null
+          overdue_sends: number | null
+          paused_leads: number | null
+          recent_responses: number | null
+          today_scheduled: number | null
+        }
+        Relationships: []
+      }
       v_monthly_retail_summary: {
         Row: {
           dealer_trade_gross_mtd: number | null
@@ -6046,6 +6149,14 @@ export type Database = {
       calculate_leads_count: {
         Args: { p_vin: string; p_stock_number: string }
         Returns: number
+      }
+      calculate_next_ai_send_time: {
+        Args: {
+          p_lead_id: string
+          p_sequence_day: number
+          p_base_interval_hours?: number
+        }
+        Returns: string
       }
       classify_deal_by_stock: {
         Args: { stock_number: string }
