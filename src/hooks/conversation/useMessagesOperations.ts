@@ -92,15 +92,20 @@ export const useMessagesOperations = () => {
         })
         .eq('id', conversation.id);
 
-      // Refresh data
+      // Immediately refresh data for instant UI update
       queryClient.invalidateQueries({ queryKey: ['stable-conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['messages', leadId] });
       
-      // Trigger message refresh via event
+      // Trigger multiple refresh events for all systems
       window.dispatchEvent(new CustomEvent('lead-messages-update', { 
         detail: { leadId } 
       }));
+      window.dispatchEvent(new CustomEvent('conversation-updated', { 
+        detail: { leadId } 
+      }));
 
-      console.log('✅ [STABLE CONV] Message sent successfully');
+      console.log('✅ [STABLE CONV] Message sent successfully and UI refreshed');
 
     } catch (err) {
       console.error('❌ [STABLE CONV] Error sending message:', err);
