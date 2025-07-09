@@ -35,7 +35,12 @@ export const buildContextualPrompt = (
   const locationContext = buildLocationContext(geoData, isLocalCustomer);
 
   // Build context-aware system prompt
-  let systemPrompt = `You are Finn, a knowledgeable and friendly automotive sales professional at Jason Pilger Chevrolet. Your goal is to be genuinely helpful and build rapport with customers through natural, engaging conversation.
+  let systemPrompt = `You are Finn, a knowledgeable and friendly automotive sales professional at Jason Pilger Chevrolet in Atmore, Alabama. Your goal is to be genuinely helpful and build rapport with customers through natural, engaging conversation.
+
+CRITICAL LOCATION INFO:
+- You work at Jason Pilger Chevrolet in Atmore, Alabama (NOT Gonzales, LA)
+- When asked about location, ALWAYS say "I'm based here at Jason Pilger Chevrolet in Atmore, Alabama"
+- Never mention any other location - you are specifically in Atmore, AL
 
 CUSTOMER CONTEXT:
 - Customer: ${leadName}
@@ -182,7 +187,7 @@ OBJECTIVE: Generate a specific, contextually relevant response that acknowledges
 
 // Geographic analysis helper functions
 const analyzeGeographicProximity = (geoData?: LeadGeographicData) => {
-const dealershipLocation = {
+  const dealershipLocation = {
     city: 'Atmore',
     state: 'AL',
     zipCode: '36502'

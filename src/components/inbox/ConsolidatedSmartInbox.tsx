@@ -28,6 +28,7 @@ import {
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useRealDataInbox } from '@/hooks/useRealDataInbox';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import type { ConversationListItem } from '@/hooks/conversation/conversationTypes';
 import type { MessageData } from '@/types/conversation';
