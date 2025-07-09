@@ -1,0 +1,203 @@
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { TrendingUp, TrendingDown, Activity, Target } from 'lucide-react';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+interface TrendsWidgetProps {
+  trends: {
+    weeklyLeads: Array<{ date: string; count: number }>;
+    weeklyMessages: Array<{ date: string; sent: number; received: number }>;
+    conversionRate: number;
+    responseRate: number;
+  };
+  loading?: boolean;
+}
+
+export const TrendsWidget: React.FC<TrendsWidgetProps> = ({ trends, loading }) => {
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Trends & Analytics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 bg-muted rounded animate-pulse" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  };
+
+  const totalLeadsThisWeek = trends.weeklyLeads.reduce((sum, day) => sum + day.count, 0);
+  const totalMessagesThisWeek = trends.weeklyMessages.reduce((sum, day) => sum + day.sent, 0);
+  
+  // Calculate week-over-week changes (simplified)
+  const recentLeads = trends.weeklyLeads.slice(-3).reduce((sum, day) => sum + day.count, 0);
+  const earlierLeads = trends.weeklyLeads.slice(0, 3).reduce((sum, day) => sum + day.count, 0);
+  const leadsChange = earlierLeads > 0 ? ((recentLeads - earlierLeads) / earlierLeads) * 100 : 0;
+
+  const chartData = trends.weeklyLeads.map((day, index) => ({
+    date: formatDate(day.date),
+    leads: day.count,
+    sent: trends.weeklyMessages[index]?.sent || 0,
+    received: trends.weeklyMessages[index]?.received || 0,
+  }));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="h-5 w-5" />
+          Trends & Analytics
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Response Rate</span>
+              <Badge variant={trends.responseRate > 30 ? 'default' : 'secondary'}>
+                {trends.responseRate}%
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1 text-xs">
+              {trends.responseRate > 30 ? (
+                <TrendingUp className="h-3 w-3 text-green-500" />
+              ) : (
+                <TrendingDown className="h-3 w-3 text-orange-500" />
+              )}
+              <span className="text-muted-foreground">
+                {trends.responseRate > 30 ? 'Above average' : 'Needs improvement'}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Conversion</span>
+              <Badge variant={trends.conversionRate > 15 ? 'default' : 'secondary'}>
+                {trends.conversionRate}%
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1 text-xs">
+              <Target className="h-3 w-3 text-blue-500" />
+              <span className="text-muted-foreground">
+                {totalLeadsThisWeek} leads this week
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Weekly Leads Chart */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Weekly Lead Generation</h4>
+          <ResponsiveContainer width="100%" height={120}>
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="leadsGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <XAxis 
+                dataKey="date" 
+                axisLine={false}
+                tickLine={false}
+                fontSize={12}
+                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              />
+              <YAxis hide />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px',
+                  fontSize: '12px'
+                }}
+                labelStyle={{ color: 'hsl(var(--foreground))' }}
+              />
+              <Area
+                type="monotone"
+                dataKey="leads"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                fill="url(#leadsGradient)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{totalLeadsThisWeek} total leads</span>
+            <span className={`flex items-center gap-1 ${leadsChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {leadsChange >= 0 ? (
+                <TrendingUp className="h-3 w-3" />
+              ) : (
+                <TrendingDown className="h-3 w-3" />
+              )}
+              {Math.abs(leadsChange).toFixed(1)}% vs early week
+            </span>
+          </div>
+        </div>
+
+        {/* Message Activity Chart */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Message Activity</h4>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={chartData}>
+              <XAxis 
+                dataKey="date" 
+                axisLine={false}
+                tickLine={false}
+                fontSize={12}
+                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              />
+              <YAxis hide />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px',
+                  fontSize: '12px'
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="sent"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                name="Sent"
+              />
+              <Line
+                type="monotone"
+                dataKey="received"
+                stroke="hsl(var(--secondary))"
+                strokeWidth={2}
+                dot={{ r: 3, fill: 'hsl(var(--secondary))' }}
+                name="Received"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{totalMessagesThisWeek} messages sent</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-primary" />
+                <span>Sent</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-secondary" />
+                <span>Received</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

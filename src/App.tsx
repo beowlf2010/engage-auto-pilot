@@ -1,21 +1,23 @@
 
 import { BrowserRouter as Router } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryProvider } from './providers/QueryProvider';
 import { AuthProvider, useAuth } from './components/auth/AuthProvider';
-import { useIsMobile } from './hooks/use-mobile';
-import MobileLayout from './components/layout/MobileLayout';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from '@/components/ui/toaster';
-
-const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background/50 to-muted">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-muted border-t-primary mx-auto"></div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold text-foreground">Loading Dashboard</h2>
+            <p className="text-sm text-muted-foreground">Setting up your automotive sales platform...</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -29,14 +31,14 @@ const AppContent = () => {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryProvider>
       <AuthProvider>
         <div className="min-h-screen bg-gray-50 w-full">
           <AppContent />
           <Toaster />
         </div>
       </AuthProvider>
-    </QueryClientProvider>
+    </QueryProvider>
   );
 }
 
