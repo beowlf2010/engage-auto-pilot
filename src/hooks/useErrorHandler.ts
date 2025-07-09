@@ -5,6 +5,7 @@ export interface ErrorHandlerOptions {
   showToast?: boolean;
   logError?: boolean;
   fallbackMessage?: string;
+  silent?: boolean;
 }
 
 export const useErrorHandler = () => {
@@ -16,19 +17,20 @@ export const useErrorHandler = () => {
     const {
       showToast = true,
       logError = true,
-      fallbackMessage = 'Something went wrong. Please try again.'
+      fallbackMessage = 'Something went wrong. Please try again.',
+      silent = false
     } = options;
 
     // Extract error message
     const errorMessage = error instanceof Error ? error.message : String(error);
     
     // Log error
-    if (logError) {
+    if (logError && !silent) {
       console.error(`Error in ${context || 'Application'}:`, error);
     }
 
     // Show toast notification
-    if (showToast) {
+    if (showToast && !silent) {
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -52,8 +54,22 @@ export const useErrorHandler = () => {
     }
   }, [handleError]);
 
+  const safeExecute = useCallback(async <T>(
+    fn: () => Promise<T>,
+    fallback: T,
+    context?: string
+  ): Promise<T> => {
+    try {
+      return await fn();
+    } catch (error) {
+      handleError(error, context, { silent: true });
+      return fallback;
+    }
+  }, [handleError]);
+
   return {
     handleError,
-    handleAsyncError
+    handleAsyncError,
+    safeExecute
   };
 };

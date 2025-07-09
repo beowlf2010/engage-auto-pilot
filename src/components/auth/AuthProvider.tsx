@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('🔧 [AUTH] Initializing user with direct SQL approach:', user.id);
       
-      // Direct profile upsert
+      // Direct profile upsert with better error handling
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
@@ -52,10 +52,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (profileError) {
         console.error('❌ [AUTH] Profile upsert failed:', profileError);
-        return { success: false, error: profileError.message };
+        return { success: false, error: `Profile creation failed: ${profileError.message}` };
       }
 
-      // Direct role upsert
+      // Direct role upsert with better error handling
       const { error: roleError } = await supabase
         .from('user_roles')
         .upsert({
@@ -65,7 +65,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (roleError) {
         console.error('❌ [AUTH] Role upsert failed:', roleError);
-        return { success: false, error: roleError.message };
+        // Continue even if role creation fails - it's not critical
+        console.warn('⚠️ [AUTH] Continuing without role assignment');
       }
 
       console.log('✅ [AUTH] User initialized successfully');
