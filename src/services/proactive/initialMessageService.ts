@@ -115,9 +115,8 @@ export const sendInitialMessage = async (leadId: string, profile: any): Promise<
     console.log(`🤖 [INITIAL MESSAGE SERVICE] === GENERATING SUPER AGGRESSIVE INITIAL MESSAGE ===`);
     
     const message = await generateWarmInitialMessage(
-      `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
-      lead.vehicle_interest || '',
-      cleanedProfile
+      leadId,
+      lead
     );
     
     if (!message) {
