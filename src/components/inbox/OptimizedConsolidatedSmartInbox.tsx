@@ -415,7 +415,7 @@ const OptimizedConsolidatedSmartInbox: React.FC<OptimizedConsolidatedSmartInboxP
 
           {/* Optimized tab content with virtualization ready structure */}
           <TabsContent value={activeTab} className="flex-1 h-full mt-0 pt-4">
-            <div className="grid h-full gap-4" style={{ gridTemplateColumns: selectedLead ? '400px 1fr 320px' : '1fr' }}>
+            <div className="grid h-full gap-4" style={{ gridTemplateColumns: selectedLead ? 'minmax(350px, 25%) 1fr minmax(300px, 20%)' : '1fr' }}>
               {/* Conversations List */}
               <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
                 {conversationsLoading && isInitialLoad ? (

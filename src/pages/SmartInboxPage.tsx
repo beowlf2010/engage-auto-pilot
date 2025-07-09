@@ -78,7 +78,7 @@ const SmartInboxPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="w-full h-full p-6">
         <div className="mb-6 mobile-hidden">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Smart Inbox</h1>
           <p className="text-slate-600">
@@ -86,10 +86,12 @@ const SmartInboxPage = () => {
           </p>
         </div>
 
-        <OptimizedConsolidatedSmartInbox 
-          onLeadsRefresh={handleLeadsRefresh} 
-          preselectedLeadId={leadId}
-        />
+        <div className="h-[calc(100vh-8rem)]">
+          <OptimizedConsolidatedSmartInbox 
+            onLeadsRefresh={handleLeadsRefresh} 
+            preselectedLeadId={leadId}
+          />
+        </div>
       </div>
     </div>
   );
