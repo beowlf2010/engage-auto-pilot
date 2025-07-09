@@ -37,7 +37,7 @@ export const useEnhancedAI = () => {
         vehicleInterest: request.vehicleInterest
       };
 
-      const response = unifiedAIResponseEngine.generateResponse(messageContext);
+      const response = await unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (response) {
         setLastResponse(response);

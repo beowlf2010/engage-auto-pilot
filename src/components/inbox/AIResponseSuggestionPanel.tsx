@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,7 +48,7 @@ const AIResponseSuggestionPanel: React.FC<AIResponseSuggestionPanelProps> = ({
       // Generate multiple response variations
       const suggestions: string[] = [];
       for (let i = 0; i < 3; i++) {
-        const response = unifiedAIResponseEngine.generateResponse(messageContext);
+        const response = await unifiedAIResponseEngine.generateResponse(messageContext);
         if (response?.message && !suggestions.includes(response.message)) {
           suggestions.push(response.message);
         }

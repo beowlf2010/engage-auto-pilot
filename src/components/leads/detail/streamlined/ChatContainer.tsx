@@ -77,7 +77,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         vehicleInterest: lead.vehicleInterest || ''
       };
 
-      const aiResponse = unifiedAIResponseEngine.generateResponse(messageContext);
+      const aiResponse = await unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (aiResponse?.message) {
         setNewMessage(aiResponse.message);

@@ -49,7 +49,7 @@ const UnifiedAIPanel: React.FC<UnifiedAIPanelProps> = ({
         vehicleInterest
       };
 
-      const response = unifiedAIResponseEngine.generateResponse(messageContext);
+      const response = await unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (response?.message) {
         setGeneratedMessage(response.message);

@@ -105,9 +105,9 @@ class UnifiedAIService {
         vehicleInterest: lead.vehicle_interest
       };
 
-      const response: UnifiedAIResponse = unifiedAIResponseEngine.generateResponse(messageContext);
+      const response: UnifiedAIResponse | null = await unifiedAIResponseEngine.generateResponse(messageContext);
 
-      if (response.message) {
+      if (response?.message) {
         this.processedMessages.add(lastCustomerMessage.id);
         
         console.log(`✅ [UNIFIED AI] Generated response:`, {

@@ -69,6 +69,27 @@ class UnifiedAIResponseEngine {
     }
   }
 
+  validateResponseQuality(message: string): { isValid: boolean; issues: string[] } {
+    const issues: string[] = [];
+    
+    if (!message || message.trim().length === 0) {
+      issues.push('Message is empty');
+    }
+    
+    if (message.length < 10) {
+      issues.push('Message is too short');
+    }
+    
+    if (message.length > 500) {
+      issues.push('Message is too long');
+    }
+    
+    return {
+      isValid: issues.length === 0,
+      issues
+    };
+  }
+
   private generateFallbackResponse(context: MessageContext): UnifiedAIResponse {
     const message = context.latestMessage.toLowerCase();
     

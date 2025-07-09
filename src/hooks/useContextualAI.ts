@@ -70,7 +70,7 @@ export const useContextualAI = (leadId: string | null) => {
         vehicleInterest: ''
       };
 
-      const response = unifiedAIResponseEngine.generateResponse(messageContext);
+      const response = await unifiedAIResponseEngine.generateResponse(messageContext);
       
       const mockInsights: ContextualInsights = {
         leadTemperature: 75,
@@ -150,7 +150,7 @@ export const useContextualAI = (leadId: string | null) => {
         vehicleInterest: ''
       };
 
-      const response = unifiedAIResponseEngine.generateResponse(messageContext);
+      const response = await unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (response?.message) {
         const messageResponse = {
