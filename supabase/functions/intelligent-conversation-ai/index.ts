@@ -39,6 +39,19 @@ serve(async (req) => {
       vehicleInterest
     } = await req.json();
 
+    // Fetch lead geographical data for location-aware responses
+    const { data: leadGeoData } = await supabase
+      .from('leads')
+      .select('address, city, state, postal_code')
+      .eq('id', leadId)
+      .single();
+
+    console.log('📍 [FINN AI] Lead location:', {
+      city: leadGeoData?.city,
+      state: leadGeoData?.state,
+      hasAddress: !!leadGeoData?.address
+    });
+
     console.log('🤖 [FINN AI] Processing request for lead:', leadId);
     console.log('🤖 [FINN AI] Customer message:', messageBody?.substring(0, 100));
 
@@ -66,14 +79,15 @@ serve(async (req) => {
       .eq('lead_id', leadId)
       .single();
 
-    // Build contextual prompts
+    // Build contextual prompts with geographic awareness
     const { systemPrompt, userPrompt } = buildContextualPrompt(
       leadName,
       vehicleInterest || 'finding the right vehicle',
       messageBody || latestCustomerMessage,
       conversationHistory,
       intentAnalysis,
-      conversationMemory
+      conversationMemory,
+      leadGeoData
     );
 
     console.log('📝 [FINN AI] Generated system prompt length:', systemPrompt.length);

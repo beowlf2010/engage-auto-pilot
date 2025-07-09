@@ -50,10 +50,17 @@ export const analyzeIntentEnhanced = (
   }
   
   // Ready to buy signals
-  if (message.match(/\b(ready|buy|purchase|finance|payment|deal|price|cost|how much|available|test drive|appointment)\b/)) {
+  if (message.match(/\b(ready|buy|purchase|finance|payment|deal|price|cost|how much|available|appointment)\b/)) {
     primaryIntent = 'ready_to_buy';
     confidence = 0.9;
     responseStrategy = 'sales_acceleration';
+  }
+  
+  // Test drive signals (separate from ready to buy due to geographic constraints)
+  if (message.match(/\b(test drive|drive|try|experience)\b/)) {
+    primaryIntent = 'test_drive_request';
+    confidence = 0.85;
+    responseStrategy = 'geographic_assessment';
   }
   
   // Objection patterns
@@ -96,7 +103,8 @@ export const analyzeIntentEnhanced = (
   // Detect buying signals
   const buyingSignals = [];
   if (message.match(/\b(ready|buy|purchase)\b/)) buyingSignals.push('ready_to_buy');
-  if (message.match(/\b(test drive|appointment)\b/)) buyingSignals.push('wants_appointment');
+  if (message.match(/\b(test drive|drive|try)\b/)) buyingSignals.push('wants_test_drive');
+  if (message.match(/\b(appointment|visit|come in)\b/)) buyingSignals.push('wants_appointment');
   if (message.match(/\b(finance|payment|lease)\b/)) buyingSignals.push('discussing_finance');
   if (message.match(/\b(available|in stock|when can)\b/)) buyingSignals.push('checking_availability');
   
