@@ -4,7 +4,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationsList } from '@/hooks/conversation/useConversationsList';
 import { useMessagesOperations } from '@/hooks/conversation/useMessagesOperations';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
-import { useEnhancedRealtimeMessages } from '@/hooks/messaging/useEnhancedRealtimeMessages';
+import { useCentralizedRealtime } from '@/hooks/useCentralizedRealtime';
 import { useRobustMessageLoader } from '@/hooks/messaging/useRobustMessageLoader';
 import { useSmartMessageSync } from '@/hooks/messaging/useSmartMessageSync';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -71,7 +71,7 @@ const ConsolidatedSmartInbox: React.FC<ConsolidatedSmartInboxProps> = ({
     onLeadsRefresh();
   }, [debouncedRefreshConversations, onLeadsRefresh]);
 
-  const { connectionStatus, forceReconnect, isConnected } = useEnhancedRealtimeMessages({
+  const { isConnected, forceRefresh, reconnect } = useCentralizedRealtime({
     onMessageUpdate: handleMessageUpdate,
     onConversationUpdate: handleConversationUpdate
   });

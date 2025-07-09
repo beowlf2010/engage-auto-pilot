@@ -3,13 +3,14 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationsList } from '@/hooks/conversation/useConversationsList';
 import { useMessagesOperations } from '@/hooks/conversation/useMessagesOperations';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
-import { useEnhancedRealtimeMessages } from '@/hooks/messaging/useEnhancedRealtimeMessages';
+import { useCentralizedRealtime } from '@/hooks/useCentralizedRealtime';
 import { useRobustMessageLoader } from '@/hooks/messaging/useRobustMessageLoader';
 import { useSmartMessageSync } from '@/hooks/messaging/useSmartMessageSync';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, AlertCircle, Inbox, Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SimpleConnectionStatus from './SimpleConnectionStatus';
 import ConversationsList from './ConversationsList';
 import { ConversationListSkeleton } from '@/components/ui/skeletons/ConversationSkeleton';
 import EnhancedChatView from './EnhancedChatView';
@@ -198,10 +199,50 @@ const OptimizedConsolidatedSmartInbox: React.FC<OptimizedConsolidatedSmartInboxP
     onLeadsRefresh();
   }, [debouncedRefreshConversations, onLeadsRefresh]);
 
-  const { connectionStatus, forceReconnect, isConnected } = useEnhancedRealtimeMessages({
+  // Use stable centralized realtime with fallback polling
+  const { isConnected, forceRefresh, reconnect } = useCentralizedRealtime({
     onMessageUpdate: handleMessageUpdate,
-    onConversationUpdate: handleConversationUpdate
+    onConversationUpdate: handleConversationUpdate,
+    onUnreadCountUpdate: () => {
+      console.log('🔄 [SMART INBOX] Unread count updated');
+      debouncedRefreshConversations();
+    }
   });
+
+  // Connection state management for SimpleConnectionStatus
+  const [connectionState, setConnectionState] = useState({
+    isConnected,
+    status: isConnected ? 'connected' : 'offline' as 'connecting' | 'connected' | 'reconnecting' | 'offline',
+    lastConnected: isConnected ? new Date() : null,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 5
+  });
+
+  // Update connection state when isConnected changes
+  useEffect(() => {
+    setConnectionState(prev => ({
+      ...prev,
+      isConnected,
+      status: isConnected ? 'connected' : 'offline',
+      lastConnected: isConnected ? new Date() : prev.lastConnected
+    }));
+  }, [isConnected]);
+
+  // Fallback polling when real-time is disconnected
+  useEffect(() => {
+    if (!isConnected) {
+      console.log('🔄 [SMART INBOX] Real-time disconnected, starting fallback polling');
+      const pollInterval = setInterval(() => {
+        console.log('📡 [FALLBACK POLLING] Refreshing conversations');
+        refetchConversations();
+      }, 15000); // Poll every 15 seconds
+
+      return () => {
+        console.log('🛑 [FALLBACK POLLING] Stopping fallback polling');
+        clearInterval(pollInterval);
+      };
+    }
+  }, [isConnected, refetchConversations]);
 
   // Progressive loading and optimization
   useEffect(() => {
@@ -295,13 +336,20 @@ const OptimizedConsolidatedSmartInbox: React.FC<OptimizedConsolidatedSmartInboxP
       {/* Optimized header with connection status */}
       <div className="mb-4 flex-shrink-0 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          {/* Connection status indicator */}
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-sm text-muted-foreground">
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
-          </div>
+          {/* Enhanced connection status */}
+          <SimpleConnectionStatus
+            connectionState={connectionState}
+            onReconnect={() => {
+              console.log('🔄 [SMART INBOX] Manual reconnect triggered');
+              setConnectionState(prev => ({ ...prev, status: 'reconnecting' }));
+              reconnect();
+            }}
+            onForceSync={() => {
+              console.log('🔄 [SMART INBOX] Force sync triggered');
+              forceRefresh();
+              handleRefreshData();
+            }}
+          />
           
           {/* Cache performance indicator */}
           {!isInitialLoad && (
