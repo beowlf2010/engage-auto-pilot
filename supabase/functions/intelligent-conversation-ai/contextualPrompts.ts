@@ -182,10 +182,10 @@ OBJECTIVE: Generate a specific, contextually relevant response that acknowledges
 
 // Geographic analysis helper functions
 const analyzeGeographicProximity = (geoData?: LeadGeographicData) => {
-  const dealershipLocation = {
-    city: 'Cedar Falls',
-    state: 'IA',
-    zipCode: '50613'
+const dealershipLocation = {
+    city: 'Atmore',
+    state: 'AL',
+    zipCode: '36502'
   };
 
   if (!geoData?.state || !geoData?.city) {
@@ -196,22 +196,22 @@ const analyzeGeographicProximity = (geoData?: LeadGeographicData) => {
     };
   }
 
-  // Check if customer is in Iowa (likely within driving distance)
-  const isInIowa = geoData.state?.toLowerCase().includes('ia') || 
-                   geoData.state?.toLowerCase().includes('iowa');
+  // Check if customer is in Alabama (likely within driving distance)
+  const isInAlabama = geoData.state?.toLowerCase().includes('al') || 
+                      geoData.state?.toLowerCase().includes('alabama');
 
   // Check if customer is in neighboring states (could be reasonable)
-  const neighboringStates = ['mn', 'minnesota', 'wi', 'wisconsin', 'il', 'illinois', 'mo', 'missouri', 'sd', 'south dakota', 'ne', 'nebraska'];
+  const neighboringStates = ['fl', 'florida', 'ga', 'georgia', 'tn', 'tennessee', 'ms', 'mississippi'];
   const isNeighboringState = neighboringStates.some(state => 
     geoData.state?.toLowerCase().includes(state)
   );
 
-  // Check if customer is in Cedar Falls area specifically
-  const isLocalArea = isInIowa && (
-    geoData.city?.toLowerCase().includes('cedar falls') ||
-    geoData.city?.toLowerCase().includes('waterloo') ||
-    geoData.city?.toLowerCase().includes('waverly') ||
-    geoData.city?.toLowerCase().includes('hudson')
+  // Check if customer is in Atmore area specifically
+  const isLocalArea = isInAlabama && (
+    geoData.city?.toLowerCase().includes('atmore') ||
+    geoData.city?.toLowerCase().includes('mobile') ||
+    geoData.city?.toLowerCase().includes('bay minette') ||
+    geoData.city?.toLowerCase().includes('brewton')
   );
 
   if (isLocalArea) {
@@ -220,7 +220,7 @@ const analyzeGeographicProximity = (geoData?: LeadGeographicData) => {
       distance: 'local',
       reason: 'same_city_area'
     };
-  } else if (isInIowa) {
+    } else if (isInAlabama) {
     return {
       canVisit: true,
       distance: 'regional',
@@ -258,7 +258,7 @@ const buildLocationContext = (geoData?: LeadGeographicData, proximityInfo?: any)
     
     case 'same_state':
       return `
-- Customer Location: ${location} (REGIONAL - Iowa customer)
+- Customer Location: ${location} (REGIONAL - Alabama customer)
 - Visit Feasibility: Can offer test drives and appointments with reasonable travel`;
     
     case 'neighboring_state':
