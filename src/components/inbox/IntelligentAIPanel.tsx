@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Brain, Loader2, Send, Sparkles, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Brain, Loader2, Send, Sparkles, ChevronDown, ChevronUp, AlertTriangle, Zap } from 'lucide-react';
 import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 import { toast } from '@/hooks/use-toast';
 
@@ -25,7 +25,12 @@ const IntelligentAIPanel = ({
   onToggleCollapse
 }: IntelligentAIPanelProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [lastAIResponse, setLastAIResponse] = useState<string | null>(null);
+  const [aiResponse, setAiResponse] = useState<{
+    message: string;
+    intent: string;
+    confidence: number;
+    strategy: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!conversation || !canReply) return null;
@@ -51,42 +56,49 @@ const IntelligentAIPanel = ({
     
     setIsGenerating(true);
     setError(null);
+    setAiResponse(null);
     
     try {
-      console.log('🤖 Generating QUESTION-FIRST intelligent AI response...');
+      console.log('🤖 [INTELLIGENT AI PANEL] Generating AI response...');
       
       const messageContext: MessageContext = {
         leadId: conversation.leadId,
         leadName: conversation.leadName || 'there',
         latestMessage: lastCustomerMessage?.body || '',
         conversationHistory: messages.map(m => m.body),
-        vehicleInterest: conversation.vehicleInterest || ''
+        vehicleInterest: conversation.vehicleInterest || 'finding the right vehicle'
       };
 
-      const response = unifiedAIResponseEngine.generateResponse(messageContext);
+      const response = await unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (response && response.message) {
-        setLastAIResponse(response.message);
+        setAiResponse({
+          message: response.message,
+          intent: response.intent.primary,
+          confidence: response.confidence,
+          strategy: response.responseStrategy
+        });
+        
         toast({
-          title: "AI Response Generated",
-          description: "Finn has analyzed the conversation and generated a QUESTION-FIRST response",
+          title: "Finn AI Response Generated",
+          description: `AI analyzed the conversation and generated a ${response.intent.primary} response with ${Math.round(response.confidence * 100)}% confidence`,
         });
       } else {
-        setError("Finn determined no response is needed at this time");
+        setError("Finn couldn't generate a response for this conversation");
         toast({
-          title: "No Response Needed",
+          title: "No Response Generated",
           description: "Finn determined no response is needed at this time",
           variant: "default"
         });
       }
     } catch (error) {
-      console.error('❌ Error generating QUESTION-FIRST AI response:', error);
+      console.error('❌ [INTELLIGENT AI PANEL] Error generating AI response:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to generate AI response';
       setError(errorMessage);
       
       toast({
-        title: "Error",
-        description: "Failed to generate AI response. This may be due to database connectivity issues.",
+        title: "AI Generation Error",
+        description: "Failed to generate AI response. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -95,15 +107,15 @@ const IntelligentAIPanel = ({
   };
 
   const handleSendAIResponse = async () => {
-    if (!lastAIResponse) return;
+    if (!aiResponse) return;
     
     try {
-      await onSendMessage(lastAIResponse);
-      setLastAIResponse(null);
+      await onSendMessage(aiResponse.message);
+      setAiResponse(null);
       setError(null);
       toast({
-        title: "AI Response Sent",
-        description: "Finn's QUESTION-FIRST response has been sent to the customer",
+        title: "Finn AI Response Sent",
+        description: "AI-generated response has been sent to the customer",
       });
     } catch (error) {
       toast({
@@ -114,18 +126,22 @@ const IntelligentAIPanel = ({
     }
   };
 
-  // If collapsed, show compact header only
+  // Collapsed view
   if (isCollapsed) {
     return (
       <Card className="border-purple-200 bg-purple-50">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Brain className="h-4 w-4 text-purple-600" />
+              <Zap className="h-4 w-4 text-purple-600" />
               <span className="text-sm font-medium">Finn AI Assistant</span>
+              <Badge variant="outline" className="bg-green-100 text-green-700 text-xs">
+                <Sparkles className="h-3 w-3 mr-1" />
+                AI-Powered
+              </Badge>
               {shouldGenerate() && (
                 <Badge variant="outline" className="bg-orange-100 text-orange-700 text-xs">
-                  Ready to help
+                  Ready
                 </Badge>
               )}
               {error && (
@@ -156,10 +172,11 @@ const IntelligentAIPanel = ({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-sm">
-            <Brain className="h-4 w-4 text-purple-600" />
+            <Zap className="h-4 w-4 text-purple-600" />
             Finn AI Assistant
-            <Badge variant="outline" className="bg-purple-100 text-purple-700">
-              Question-First
+            <Badge variant="outline" className="bg-green-100 text-green-700">
+              <Sparkles className="h-3 w-3 mr-1" />
+              AI-Powered
             </Badge>
           </CardTitle>
           {onToggleCollapse && (
@@ -189,13 +206,13 @@ const IntelligentAIPanel = ({
           </div>
         )}
 
-        {/* Customer Question Display */}
+        {/* Customer Message Display */}
         {lastCustomerMessage && shouldGenerate() && !error && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <Sparkles className="h-4 w-4 text-blue-600 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-blue-800">Customer asked:</p>
+                <p className="text-sm font-medium text-blue-800">Customer Message:</p>
                 <p className="text-sm text-blue-700 mt-1 italic">
                   "{lastCustomerMessage.body}"
                 </p>
@@ -205,14 +222,22 @@ const IntelligentAIPanel = ({
         )}
 
         {/* AI Response Display */}
-        {lastAIResponse && !error && (
+        {aiResponse && !error && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <Brain className="h-4 w-4 text-green-600 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-green-800">Finn suggests:</p>
-                <p className="text-sm text-green-700 mt-1">
-                  "{lastAIResponse}"
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm font-medium text-green-800">Finn's AI Response:</p>
+                  <Badge variant="outline" className="bg-green-100 text-green-700 text-xs">
+                    {aiResponse.intent} • {Math.round(aiResponse.confidence * 100)}%
+                  </Badge>
+                </div>
+                <p className="text-sm text-green-700">
+                  "{aiResponse.message}"
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Strategy: {aiResponse.strategy}
                 </p>
               </div>
             </div>
@@ -221,7 +246,7 @@ const IntelligentAIPanel = ({
 
         {/* Action Buttons */}
         <div className="flex gap-2">
-          {!lastAIResponse && !error && (
+          {!aiResponse && !error && (
             <Button
               size="sm"
               onClick={handleGenerateResponse}
@@ -231,18 +256,18 @@ const IntelligentAIPanel = ({
               {isGenerating ? (
                 <>
                   <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                  Generating...
+                  Finn is thinking...
                 </>
               ) : (
                 <>
-                  <Brain className="h-3 w-3 mr-2" />
-                  Generate Response
+                  <Zap className="h-3 w-3 mr-2" />
+                  Generate AI Response
                 </>
               )}
             </Button>
           )}
 
-          {lastAIResponse && (
+          {aiResponse && (
             <>
               <Button
                 size="sm"
@@ -250,20 +275,34 @@ const IntelligentAIPanel = ({
                 className="flex-1"
               >
                 <Send className="h-3 w-3 mr-2" />
-                Send Response
+                Send AI Response
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setLastAIResponse(null)}
+                onClick={() => setAiResponse(null)}
               >
-                Clear
+                Generate New
               </Button>
             </>
           )}
+
+          {error && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                handleGenerateResponse();
+              }}
+              className="flex-1"
+            >
+              Try Again
+            </Button>
+          )}
         </div>
 
-        {!shouldGenerate() && !lastAIResponse && !error && (
+        {!shouldGenerate() && !aiResponse && !error && (
           <div className="text-center py-4">
             <p className="text-sm text-gray-500">No customer message to respond to</p>
           </div>
