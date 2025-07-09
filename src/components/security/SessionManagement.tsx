@@ -167,7 +167,7 @@ export const SessionManagement: React.FC = () => {
                       )}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>IP: {session.ip_address || 'Unknown'}</span>
+                      <span>IP: {String(session.ip_address) || 'Unknown'}</span>
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         Last active: {new Date(session.last_accessed_at).toLocaleDateString()}
