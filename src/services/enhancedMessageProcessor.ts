@@ -20,7 +20,6 @@ export class EnhancedMessageProcessor {
     try {
       console.log('⚡ [PROCESSOR] Processing incoming message for lead:', leadId);
 
-      // Get conversation history
       const { data: conversations } = await supabase
         .from('conversations')
         .select('body')
@@ -72,3 +71,13 @@ export class EnhancedMessageProcessor {
 }
 
 export const enhancedMessageProcessor = new EnhancedMessageProcessor();
+
+// Export setup function for backward compatibility
+export const setupMessageProcessor = () => {
+  console.log('🔧 [PROCESSOR] Enhanced message processor initialized');
+  
+  // Return cleanup function
+  return () => {
+    console.log('🧹 [PROCESSOR] Enhanced message processor cleaned up');
+  };
+};

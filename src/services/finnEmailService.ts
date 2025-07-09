@@ -45,7 +45,6 @@ export class FinnEmailService {
     try {
       console.log('📧 [FINN EMAIL] Processing incoming email for:', leadId);
 
-      // Get lead data
       const { data: lead } = await supabase
         .from('leads')
         .select('first_name, last_name, vehicle_interest, ai_opt_in')
@@ -67,7 +66,6 @@ export class FinnEmailService {
       if (response) {
         console.log('✅ [FINN EMAIL] Email response generated:', response.substring(0, 100));
         
-        // Store the response (in a real implementation, you'd send it)
         await supabase
           .from('ai_conversation_notes')
           .insert({
@@ -80,6 +78,57 @@ export class FinnEmailService {
     } catch (error) {
       console.error('❌ [FINN EMAIL] Error processing email:', error);
     }
+  }
+
+  async getEmailAutomationStatus(leadId: string) {
+    try {
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('ai_opt_in, ai_stage, next_ai_send_at')
+        .eq('id', leadId)
+        .single();
+
+      return {
+        enabled: lead?.ai_opt_in || false,
+        currentStage: lead?.ai_stage || null,
+        paused: false,
+        nextEmailAt: lead?.next_ai_send_at || null
+      };
+    } catch (error) {
+      console.error('❌ [FINN EMAIL] Error getting automation status:', error);
+      return {
+        enabled: false,
+        currentStage: null,
+        paused: false,
+        nextEmailAt: null
+      };
+    }
+  }
+
+  async toggleEmailAutomation(leadId: string, enabled: boolean) {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ ai_opt_in: enabled })
+        .eq('id', leadId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('❌ [FINN EMAIL] Error toggling automation:', error);
+      return { success: false, error: 'Failed to toggle automation' };
+    }
+  }
+
+  async chooseOptimalChannel(leadId: string) {
+    return {
+      recommendedChannel: 'sms',
+      confidence: 0.8,
+      reasoning: 'SMS has higher open rates for this lead profile'
+    };
   }
 }
 

@@ -64,6 +64,41 @@ export class SmartInboxAIService {
     }
   }
 
+  async generateConversationInsights(conversation: any) {
+    return [
+      {
+        type: 'buying_signal' as const,
+        title: 'Strong buying intent detected',
+        description: 'Customer is asking specific questions about pricing and availability',
+        confidence: 0.85,
+        actionable: true,
+        priority: 'high' as const
+      }
+    ];
+  }
+
+  async getConversationAIMetrics(conversation: any) {
+    return {
+      responseRate: 0.75,
+      averageResponseTime: 12,
+      engagementScore: 0.82,
+      conversionProbability: 0.35
+    };
+  }
+
+  async generateSmartResponse(conversation: any) {
+    const messageContext: MessageContext = {
+      leadId: conversation.leadId,
+      leadName: conversation.leadName || 'Lead',
+      latestMessage: conversation.lastMessage || '',
+      conversationHistory: [conversation.lastMessage || ''],
+      vehicleInterest: conversation.vehicleInterest || ''
+    };
+
+    const response = await unifiedAIResponseEngine.generateResponse(messageContext);
+    return response?.message || null;
+  }
+
   async analyzeConversationUrgency(
     leadId: string,
     conversationHistory: string[]

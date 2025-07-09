@@ -5,28 +5,28 @@ import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIRes
 export class WarmIntroductionService {
   async generateWarmIntroduction(
     leadId: string,
-    leadData: {
-      firstName: string;
-      lastName: string;
-      vehicleInterest: string;
-      source: string;
+    leadData: any,
+    context?: {
+      timeOfDay?: string;
+      daysSinceInquiry?: number;
+      vehicleInterest?: string;
     }
   ): Promise<string | null> {
     try {
-      console.log('🤝 [WARM INTRO] Generating warm introduction for:', leadId);
+      console.log('🌟 [WARM INTRO] Generating warm introduction for:', leadId);
 
       const messageContext: MessageContext = {
         leadId,
-        leadName: `${leadData.firstName} ${leadData.lastName}`,
-        latestMessage: `New lead interested in ${leadData.vehicleInterest}`,
+        leadName: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'there',
+        latestMessage: '',
         conversationHistory: [],
-        vehicleInterest: leadData.vehicleInterest
+        vehicleInterest: context?.vehicleInterest || leadData.vehicle_interest || ''
       };
 
       const response = await unifiedAIResponseEngine.generateResponse(messageContext);
       
       if (response?.message) {
-        console.log('✅ [WARM INTRO] Generated warm introduction:', response.message.substring(0, 100));
+        console.log('✅ [WARM INTRO] Generated warm introduction');
         return response.message;
       }
 
@@ -39,48 +39,36 @@ export class WarmIntroductionService {
 
   async scheduleWarmIntroduction(
     leadId: string,
-    delayMinutes: number = 5
-  ): Promise<void> {
+    delayMinutes: number = 15
+  ): Promise<boolean> {
     try {
-      console.log('⏰ [WARM INTRO] Scheduling warm introduction for:', leadId);
-
-      // Get lead data
-      const { data: lead } = await supabase
+      const scheduledTime = new Date(Date.now() + delayMinutes * 60 * 1000);
+      
+      const { error } = await supabase
         .from('leads')
-        .select('first_name, last_name, vehicle_interest, source, ai_opt_in')
-        .eq('id', leadId)
-        .single();
+        .update({ 
+          next_ai_send_at: scheduledTime.toISOString(),
+          ai_stage: 'warm_introduction'
+        })
+        .eq('id', leadId);
 
-      if (!lead?.ai_opt_in) {
-        console.log('🚫 [WARM INTRO] AI not enabled for lead');
-        return;
+      if (error) {
+        console.error('❌ [WARM INTRO] Error scheduling:', error);
+        return false;
       }
 
-      // Generate the introduction message
-      const message = await this.generateWarmIntroduction(leadId, {
-        firstName: lead.first_name || '',
-        lastName: lead.last_name || '',
-        vehicleInterest: lead.vehicle_interest || '',
-        source: lead.source || ''
-      });
-
-      if (message) {
-        // In a real implementation, you'd schedule this message
-        console.log('📝 [WARM INTRO] Warm introduction ready:', message.substring(0, 100));
-        
-        await supabase
-          .from('ai_conversation_notes')
-          .insert({
-            lead_id: leadId,
-            note_type: 'warm_introduction_generated',
-            note_content: `Warm Introduction: ${message.substring(0, 200)}...`
-          });
-      }
-
+      console.log('📅 [WARM INTRO] Scheduled for:', scheduledTime);
+      return true;
     } catch (error) {
       console.error('❌ [WARM INTRO] Error scheduling warm introduction:', error);
+      return false;
     }
   }
 }
 
 export const warmIntroductionService = new WarmIntroductionService();
+
+// Export function for backward compatibility
+export const generateWarmInitialMessage = async (leadId: string, leadData: any): Promise<string | null> => {
+  return await warmIntroductionService.generateWarmIntroduction(leadId, leadData);
+};
