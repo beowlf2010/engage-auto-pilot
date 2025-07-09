@@ -7,7 +7,8 @@ import EmailSettings from '@/components/settings/EmailSettings';
 import AISettingsPanel from '@/components/settings/AISettingsPanel';
 import NotificationSettings from '@/components/settings/NotificationSettings';
 import TwilioSettings from '@/components/settings/TwilioSettings';
-import { Settings as SettingsIcon, Key, Mail, Bot, Bell, Phone } from 'lucide-react';
+import UserManagementTable from '@/components/user-management/UserManagementTable';
+import { Settings as SettingsIcon, Key, Mail, Bot, Bell, Phone, Users } from 'lucide-react';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('api-keys');
@@ -24,7 +25,7 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="api-keys" className="flex items-center space-x-2">
             <Key className="h-4 w-4" />
             <span>API Keys</span>
@@ -45,6 +46,12 @@ const Settings = () => {
             <Phone className="h-4 w-4" />
             <span>Twilio</span>
           </TabsTrigger>
+          {(['manager', 'admin'].includes(userRole)) && (
+            <TabsTrigger value="users" className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span>Users</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="api-keys" className="mt-6">
@@ -66,6 +73,12 @@ const Settings = () => {
         <TabsContent value="twilio" className="mt-6">
           <TwilioSettings userRole={userRole} />
         </TabsContent>
+
+        {(['manager', 'admin'].includes(userRole)) && (
+          <TabsContent value="users" className="mt-6">
+            <UserManagementTable currentUserRole={userRole} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
