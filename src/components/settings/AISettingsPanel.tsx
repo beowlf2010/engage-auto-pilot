@@ -17,6 +17,7 @@ import {
   Save
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ComprehensiveAIContentGenerator } from './ComprehensiveAIContentGenerator';
 
 const AISettingsPanel = () => {
   const [settings, setSettings] = useState({
@@ -307,6 +308,9 @@ const AISettingsPanel = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Comprehensive AI Content Generator */}
+      <ComprehensiveAIContentGenerator />
 
       {/* Save Button */}
       <div className="flex justify-end">
