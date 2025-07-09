@@ -8,6 +8,7 @@ import {
   TrendingUp, 
   Calendar
 } from 'lucide-react';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 interface QuickAction {
   title: string;
@@ -29,12 +30,21 @@ export const QuickActions = React.memo<QuickActionsProps>(({
   needsAttention, 
   onNavigate 
 }) => {
+  const { handleError } = useErrorHandler();
+
+  const safeNavigate = (path: string) => {
+    try {
+      onNavigate(path);
+    } catch (error) {
+      handleError(error, 'navigate');
+    }
+  };
   const quickActions: QuickAction[] = [
     {
       title: 'Smart Inbox',
       description: 'View and respond to messages',
       icon: MessageSquare,
-      action: () => onNavigate('/smart-inbox'),
+      action: () => safeNavigate('/smart-inbox'),
       badge: unreadMessages > 0 ? unreadMessages : null,
       color: 'bg-blue-500'
     },
@@ -42,7 +52,7 @@ export const QuickActions = React.memo<QuickActionsProps>(({
       title: 'Leads',
       description: 'Manage your leads',
       icon: Users,
-      action: () => onNavigate('/leads'),
+      action: () => safeNavigate('/leads'),
       badge: needsAttention > 0 ? needsAttention : null,
       color: 'bg-green-500'
     },
@@ -50,7 +60,7 @@ export const QuickActions = React.memo<QuickActionsProps>(({
       title: 'AI Monitor',
       description: 'Advanced AI analytics',
       icon: TrendingUp,
-      action: () => onNavigate('/ai-monitor'),
+      action: () => safeNavigate('/ai-monitor'),
       badge: null,
       color: 'bg-purple-500'
     },
@@ -58,7 +68,7 @@ export const QuickActions = React.memo<QuickActionsProps>(({
       title: 'Schedule',
       description: 'View appointments',
       icon: Calendar,
-      action: () => onNavigate('/schedule'),
+      action: () => safeNavigate('/schedule'),
       badge: null,
       color: 'bg-orange-500'
     }

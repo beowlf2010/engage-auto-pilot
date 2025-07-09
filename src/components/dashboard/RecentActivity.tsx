@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, MessageSquare, CheckCircle } from 'lucide-react';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 interface RecentActivityProps {
   leadCounts: {
@@ -17,13 +18,22 @@ export const RecentActivity = React.memo<RecentActivityProps>(({
   unreadMessages, 
   onNavigate 
 }) => {
+  const { handleError } = useErrorHandler();
+
+  const safeNavigate = (path: string) => {
+    try {
+      onNavigate(path);
+    } catch (error) {
+      handleError(error, 'navigate');
+    }
+  };
   const activities = [
     ...(leadCounts.needsAttention > 0 ? [{
       id: 'needs-attention',
       icon: Clock,
       title: `${leadCounts.needsAttention} new leads need attention`,
       description: "These leads haven't been contacted yet",
-      action: () => onNavigate('/leads'),
+      action: () => safeNavigate('/leads'),
       actionText: 'Review',
       bgColor: 'bg-orange-50',
       iconColor: 'text-orange-600'
@@ -33,7 +43,7 @@ export const RecentActivity = React.memo<RecentActivityProps>(({
       icon: MessageSquare,
       title: `${unreadMessages} unread messages`,
       description: 'Customer inquiries awaiting response',
-      action: () => onNavigate('/smart-inbox'),
+      action: () => safeNavigate('/smart-inbox'),
       actionText: 'View',
       bgColor: 'bg-blue-50',
       iconColor: 'text-blue-600'
@@ -43,7 +53,7 @@ export const RecentActivity = React.memo<RecentActivityProps>(({
       icon: CheckCircle,
       title: 'AI automation working',
       description: `${leadCounts.aiEnabledLeads} leads have Finn AI enabled and are being nurtured`,
-      action: () => onNavigate('/ai-monitor'),
+      action: () => safeNavigate('/ai-monitor'),
       actionText: 'Monitor',
       bgColor: 'bg-green-50',
       iconColor: 'text-green-600'

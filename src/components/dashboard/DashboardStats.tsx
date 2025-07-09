@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Mail, Users, Clock, TrendingUp } from 'lucide-react';
+import { OptimizedLoading } from '@/components/ui/OptimizedLoading';
 
 interface DashboardStatsProps {
   messageStats: {
@@ -34,6 +35,11 @@ export const DashboardStats = React.memo<DashboardStatsProps>(({
     );
   };
 
+  // Show loading state
+  if (statsLoading) {
+    return <OptimizedLoading variant="stats" />;
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
       <Card>
@@ -43,7 +49,7 @@ export const DashboardStats = React.memo<DashboardStatsProps>(({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {statsLoading ? '-' : (messageStats?.messages_sent || 0)}
+            {messageStats?.messages_sent || 0}
           </div>
           <p className="text-xs text-muted-foreground">
             {formatChangeText(messageStats?.change_sent, "Today's outbound messages")}
@@ -58,7 +64,7 @@ export const DashboardStats = React.memo<DashboardStatsProps>(({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {statsLoading ? '-' : (messageStats?.replies_in || 0)}
+            {messageStats?.replies_in || 0}
           </div>
           <p className="text-xs text-muted-foreground">
             {formatChangeText(messageStats?.change_replies, "Today's inbound messages")}

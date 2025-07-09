@@ -2,13 +2,15 @@ import React from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface OptimizedLoadingProps {
-  variant?: 'dashboard' | 'list' | 'card' | 'table';
+  variant?: 'dashboard' | 'list' | 'card' | 'table' | 'stats' | 'messages';
   count?: number;
+  message?: string;
 }
 
 export const OptimizedLoading: React.FC<OptimizedLoadingProps> = ({ 
   variant = 'dashboard', 
-  count = 1 
+  count = 1,
+  message 
 }) => {
   const renderSkeleton = () => {
     switch (variant) {
@@ -95,11 +97,48 @@ export const OptimizedLoading: React.FC<OptimizedLoadingProps> = ({
             ))}
           </div>
         );
+
+      case 'stats':
+        return (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-lg border p-6 space-y-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'messages':
+        return (
+          <div className="space-y-4">
+            {Array.from({ length: count || 3 }).map((_, i) => (
+              <div key={i} className="flex items-start space-x-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-16 w-full max-w-md" />
+                </div>
+              </div>
+            ))}
+          </div>
+        );
         
       default:
         return <Skeleton className="h-32 w-full" />;
     }
   };
 
-  return <div className="animate-pulse">{renderSkeleton()}</div>;
+  return (
+    <div className="animate-pulse">
+      {renderSkeleton()}
+      {message && (
+        <div className="text-center mt-4">
+          <p className="text-sm text-muted-foreground">{message}</p>
+        </div>
+      )}
+    </div>
+  );
 };

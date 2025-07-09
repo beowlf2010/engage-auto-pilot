@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { MessageData } from '@/types/conversation';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 export const useConversationData = () => {
   const [messages, setMessages] = useState<MessageData[]>([]);
@@ -10,6 +11,7 @@ export const useConversationData = () => {
   const queryClient = useQueryClient();
   const currentLeadIdRef = useRef<string | null>(null);
   const realtimeChannelRef = useRef<any>(null);
+  const { safeExecute, handleError } = useErrorHandler();
 
   const loadMessages = useCallback(async (leadId: string) => {
     if (!leadId) return;
@@ -18,59 +20,62 @@ export const useConversationData = () => {
     setMessagesError(null);
     currentLeadIdRef.current = leadId;
     
-    try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('sent_at', { ascending: true });
-
-      if (error) {
-        console.error('Error loading messages:', error);
-        setMessagesError(error.message);
-        return;
-      }
-
-      const transformedMessages: MessageData[] = data.map(msg => ({
-        id: msg.id,
-        leadId: msg.lead_id,
-        body: msg.body,
-        direction: msg.direction as 'in' | 'out',
-        sentAt: msg.sent_at,
-        smsStatus: msg.sms_status || 'delivered',
-        aiGenerated: msg.ai_generated || false
-      }));
-
-      setMessages(transformedMessages);
-      
-      // Mark incoming messages as read
-      const unreadIncoming = data.filter(msg => msg.direction === 'in' && !msg.read_at);
-      if (unreadIncoming.length > 0) {
-        console.log('🔍 [UNREAD COUNT DEBUG] Marking', unreadIncoming.length, 'messages as read for lead:', leadId);
-        
-        await supabase
+    const result = await safeExecute(
+      async () => {
+        const { data, error } = await supabase
           .from('conversations')
-          .update({ read_at: new Date().toISOString() })
-          .in('id', unreadIncoming.map(msg => msg.id));
+          .select('*')
+          .eq('lead_id', leadId)
+          .order('sent_at', { ascending: true });
 
-        console.log('✅ [UNREAD COUNT DEBUG] Messages marked as read, triggering unread count refresh');
-        
-        // Force refresh of unread count queries immediately
-        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-        queryClient.invalidateQueries({ queryKey: ['global-unread-count'] });
-        queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        
-        // Additional manual trigger for global unread count refresh
-        window.dispatchEvent(new CustomEvent('unread-count-changed', { detail: { leadId } }));
-      }
-      
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      setMessagesError(error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, [queryClient]);
+        if (error) {
+          throw error;
+        }
+
+        if (!data) {
+          return [];
+        }
+
+        const transformedMessages: MessageData[] = data.map(msg => ({
+          id: msg.id,
+          leadId: msg.lead_id,
+          body: msg.body,
+          direction: msg.direction as 'in' | 'out',
+          sentAt: msg.sent_at,
+          smsStatus: msg.sms_status || 'delivered',
+          aiGenerated: msg.ai_generated || false
+        }));
+
+        // Mark incoming messages as read
+        const unreadIncoming = data.filter(msg => msg.direction === 'in' && !msg.read_at);
+        if (unreadIncoming.length > 0) {
+          console.log('🔍 [UNREAD COUNT DEBUG] Marking', unreadIncoming.length, 'messages as read for lead:', leadId);
+          
+          await supabase
+            .from('conversations')
+            .update({ read_at: new Date().toISOString() })
+            .in('id', unreadIncoming.map(msg => msg.id));
+
+          console.log('✅ [UNREAD COUNT DEBUG] Messages marked as read, triggering unread count refresh');
+          
+          // Force refresh of unread count queries immediately
+          queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+          queryClient.invalidateQueries({ queryKey: ['global-unread-count'] });
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          
+          // Additional manual trigger for global unread count refresh
+          window.dispatchEvent(new CustomEvent('unread-count-changed', { detail: { leadId } }));
+        }
+
+        return transformedMessages;
+      },
+      [], // fallback to empty array
+      'Load conversation messages'
+    );
+
+    setMessages(result);
+    setMessagesLoading(false);
+  }, [queryClient, safeExecute]);
 
   // Set up real-time subscription for conversation updates
   useEffect(() => {

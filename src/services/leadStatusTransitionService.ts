@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 export interface LeadStatusTransition {
   leadId: string;
@@ -94,6 +95,16 @@ export const getCorrectLeadCounts = async () => {
 
     if (error) {
       console.error('❌ [LEAD STATUS] Error getting lead counts:', error);
+      return {
+        totalLeads: 0,
+        newLeads: 0,
+        engagedLeads: 0,
+        aiEnabledLeads: 0,
+        needsAttention: 0
+      };
+    }
+
+    if (!statusCounts || statusCounts.length === 0) {
       return {
         totalLeads: 0,
         newLeads: 0,
