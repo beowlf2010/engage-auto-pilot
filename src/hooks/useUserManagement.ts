@@ -52,10 +52,11 @@ export const useUserManagement = () => {
 
   const updateUserRole = async (userId: string, newRole: 'sales' | 'manager' | 'admin') => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole, updated_at: new Date().toISOString() })
-        .eq('id', userId);
+      // Use the new synchronization function to update both tables atomically
+      const { error } = await supabase.rpc('synchronize_user_roles', {
+        p_user_id: userId,
+        p_role: newRole
+      });
 
       if (error) throw error;
 
@@ -65,7 +66,7 @@ export const useUserManagement = () => {
 
       toast({
         title: "Role Updated",
-        description: "User role has been updated successfully"
+        description: "User role has been synchronized successfully across all systems"
       });
     } catch (error) {
       console.error('Error updating user role:', error);

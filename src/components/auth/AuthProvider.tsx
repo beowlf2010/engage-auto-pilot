@@ -30,16 +30,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize user for CSV operations using direct SQL approach
+  // Initialize user for CSV operations using synchronized approach
   const initializeUserForCSV = async (): Promise<{ success: boolean; error?: string }> => {
     if (!user || !session) {
       return { success: false, error: 'User not authenticated' };
     }
 
     try {
-      console.log('🔧 [AUTH] Initializing user with direct SQL approach:', user.id);
+      console.log('🔧 [AUTH] Initializing user with synchronized approach:', user.id);
       
-      // Direct profile upsert with better error handling
+      // First ensure profile exists
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
@@ -55,21 +55,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { success: false, error: `Profile creation failed: ${profileError.message}` };
       }
 
-      // Direct role upsert with better error handling
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: user.id,
-          role: 'manager'
-        }, { onConflict: 'user_id,role' });
+      // Use the new synchronization function to ensure both tables are in sync
+      const { error: syncError } = await supabase.rpc('synchronize_user_roles', {
+        p_user_id: user.id,
+        p_role: 'manager'
+      });
 
-      if (roleError) {
-        console.error('❌ [AUTH] Role upsert failed:', roleError);
-        // Continue even if role creation fails - it's not critical
-        console.warn('⚠️ [AUTH] Continuing without role assignment');
+      if (syncError) {
+        console.error('❌ [AUTH] Role synchronization failed:', syncError);
+        return { success: false, error: `Role synchronization failed: ${syncError.message}` };
       }
 
-      console.log('✅ [AUTH] User initialized successfully');
+      console.log('✅ [AUTH] User initialized and synchronized successfully');
       
       // Refresh profile data
       await fetchUserProfile(user.id);
@@ -81,14 +78,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Helper function to determine highest role
-  const determineHighestRole = (roles: string[]): string => {
+  // Helper function to determine highest role with better logging
+  const determineHighestRole = (roles: string[], profileRole?: string): string => {
+    console.log('🔍 [AUTH] Determining highest role from:', { roles, profileRole });
+    
     const roleHierarchy = ['admin', 'manager', 'sales', 'user'];
+    
+    // First check user_roles table entries
     for (const role of roleHierarchy) {
       if (roles.includes(role)) {
+        console.log('✅ [AUTH] Found role in user_roles:', role);
         return role;
       }
     }
+    
+    // Fall back to profile role if no user_roles entries
+    if (profileRole && roleHierarchy.includes(profileRole)) {
+      console.log('⚠️ [AUTH] Falling back to profile role:', profileRole);
+      return profileRole;
+    }
+    
+    console.log('🚨 [AUTH] No valid role found, defaulting to user');
     return 'user';
   };
 
@@ -136,11 +146,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .select('role')
             .eq('user_id', userId);
 
-          if (newProfile && newUserRoles) {
-            const roles = newUserRoles.map(r => r.role);
-            const highestRole = determineHighestRole(roles);
-            return { ...newProfile, role: highestRole, userRoles: roles };
-          }
+           if (newProfile && newUserRoles) {
+             const roles = newUserRoles.map(r => r.role);
+             const highestRole = determineHighestRole(roles, newProfile.role);
+             return { ...newProfile, role: highestRole, userRoles: roles };
+           }
           
           return newProfile;
         }
@@ -151,7 +161,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Determine highest role and return enhanced profile
       if (userRoles) {
         const roles = userRoles.map(r => r.role);
-        const highestRole = determineHighestRole(roles);
+        const highestRole = determineHighestRole(roles, profileData.role);
         return { ...profileData, role: highestRole, userRoles: roles };
       }
       
