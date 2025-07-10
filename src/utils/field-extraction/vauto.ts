@@ -51,6 +51,8 @@ export const detectVautoFormat = (row: Record<string, any>): boolean => {
 // Extract vAuto-specific fields from row data
 export const extractVautoFields = (row: Record<string, any>): any => {
   console.log('=== VAUTO FIELDS EXTRACTION ===');
+  console.log('🔍 Available row keys:', Object.keys(row));
+  console.log('🔍 Row values sample:', Object.fromEntries(Object.entries(row).slice(0, 5)));
   
   // Enhanced vAuto vehicle field patterns
   const vehicleFields = [
@@ -58,15 +60,25 @@ export const extractVautoFields = (row: Record<string, any>): any => {
     'Full Vehicle', 'Unit', 'Description', 'Vehicle_Description'
   ];
   
+  console.log('🔍 Looking for vehicle fields:', vehicleFields);
+  
   const vehicleStr = getFieldValue(row, vehicleFields);
+  console.log('🔍 Found vehicle string:', vehicleStr);
+  
   let result: any = {};
   
   if (vehicleStr) {
     const parsedVehicle = parseVautoVehicleField(vehicleStr);
+    console.log('🔍 Parsed vehicle result:', parsedVehicle);
+    
     if (parsedVehicle.make && parsedVehicle.model) {
       result = { ...result, ...parsedVehicle };
       console.log('✅ Successfully parsed vAuto vehicle field:', parsedVehicle);
+    } else {
+      console.warn('❌ Failed to extract make/model from vehicle field:', { vehicleStr, parsedVehicle });
     }
+  } else {
+    console.warn('❌ No vehicle field found in row');
   }
   
   // Look for other vAuto-specific fields

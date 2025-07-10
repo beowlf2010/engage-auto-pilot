@@ -91,14 +91,18 @@ export const validateAndProcessInventoryRows = async (
     try {
       const vehiclesToInsert: any[] = [];
       
-      // Process each row in the batch
+      // Process each row in the batch with detailed logging
       for (const [index, row] of batch.entries()) {
+        console.log(`🔄 Processing CSV row ${i + index + 1}:`, Object.keys(row));
         try {
           const vehicle = mapRowToInventoryItem(row, condition, uploadHistoryId);
           
-          // Enhanced validation
+          // Enhanced validation with detailed logging
+          console.log(`🔍 Processing row ${i + index + 1}:`, { make: vehicle.make, model: vehicle.model, vin: vehicle.vin });
+          
           if (!vehicle.make || !vehicle.model) {
-            errors.push(`Row ${i + index + 1}: Missing required make or model`);
+            console.error(`❌ Row ${i + index + 1}: Missing essential vehicle data - make: "${vehicle.make}", model: "${vehicle.model}"`);
+            errors.push(`Row ${i + index + 1}: Missing required make ("${vehicle.make}") or model ("${vehicle.model}")`);
             errorCount++;
             continue;
           }

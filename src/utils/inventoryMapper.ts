@@ -48,7 +48,13 @@ export const mapRowToInventoryItem = (
   console.log('=== INVENTORY MAPPING DEBUG ===');
   console.log('Condition:', condition);
   console.log('Available columns:', Object.keys(row));
-  console.log('Sample row data:', row);
+  console.log('Sample row data (first 3 columns):', Object.fromEntries(Object.entries(row).slice(0, 3)));
+  console.log('Raw row data sample:', { 
+    firstKey: Object.keys(row)[0], 
+    firstValue: Object.values(row)[0],
+    secondKey: Object.keys(row)[1], 
+    secondValue: Object.values(row)[1] 
+  });
 
   let mappedData: any;
   const currentTimestamp = new Date().toISOString();
@@ -66,6 +72,9 @@ export const mapRowToInventoryItem = (
         // Try vAuto-specific extraction first if this looks like a vAuto file
         const vautoData = extractVautoFields(row);
         const hasVautoData = vautoData.make && vautoData.model;
+        
+        console.log('🔧 [INVENTORY MAPPER] vAuto extraction result:', vautoData);
+        console.log('🔧 [INVENTORY MAPPER] Has valid vAuto data:', hasVautoData);
         
         if (hasVautoData) {
           console.log('✅ [INVENTORY MAPPER] vAuto extraction successful, using as primary data:', vautoData);
