@@ -31,6 +31,25 @@ export const insertFinancialData = async (
   if (validDeals.length === 0) {
     throw new Error('No valid deals found after filtering. Check date parsing and required fields.');
   }
+
+  // PRE-VALIDATION: Check which stock numbers exist in inventory
+  const stockNumbers = validDeals.map(deal => deal.stockNumber).filter(Boolean);
+  console.log(`Checking inventory for ${stockNumbers.length} unique stock numbers`);
+  
+  const { data: existingInventory } = await supabase
+    .from('inventory')
+    .select('stock_number')
+    .in('stock_number', stockNumbers);
+
+  const inventoryStockNumbers = new Set(existingInventory?.map(inv => inv.stock_number) || []);
+  const missingFromInventory = stockNumbers.filter(stockNum => !inventoryStockNumbers.has(stockNum));
+  
+  console.log(`=== INVENTORY VALIDATION RESULTS ===`);
+  console.log(`Stock numbers in inventory: ${inventoryStockNumbers.size}`);
+  console.log(`Stock numbers missing from inventory: ${missingFromInventory.length}`);
+  if (missingFromInventory.length > 0) {
+    console.log(`Missing stock numbers:`, missingFromInventory);
+  }
   
   try {
     // Get existing deals to preserve their deal_type and lock status
@@ -62,11 +81,19 @@ export const insertFinancialData = async (
       const dealDate = deal.saleDate!; // We know it's valid from filtering above
       const existing = existingDealMap.get(deal.stockNumber || '');
       
-      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, existing_type=${existing?.deal_type}, locked=${existing?.deal_type_locked}`);
+      // Handle missing inventory gracefully - set stock_number to null if not in inventory
+      const hasInventory = deal.stockNumber && inventoryStockNumbers.has(deal.stockNumber);
+      const finalStockNumber = hasInventory ? deal.stockNumber : null;
+      
+      if (!hasInventory && deal.stockNumber) {
+        console.warn(`Deal ${deal.stockNumber}: Stock number not found in inventory, will process without inventory link`);
+      }
+      
+      console.log(`Processing deal ${deal.stockNumber}: saleDate=${deal.saleDate}, hasInventory=${hasInventory}, existing_type=${existing?.deal_type}, locked=${existing?.deal_type_locked}`);
       
       return {
         upload_date: dealDate, // Use individual deal date as upload_date for database storage
-        stock_number: deal.stockNumber || null,
+        stock_number: finalStockNumber, // NULL for missing inventory to avoid foreign key constraint
         age: deal.age || null,
         year_model: deal.yearModel || null,
         buyer_name: deal.buyerName || null,
@@ -82,25 +109,52 @@ export const insertFinancialData = async (
         original_gross_profit: deal.grossProfit || null,
         original_fi_profit: deal.fiProfit || null,
         original_total_profit: deal.totalProfit || null,
-        first_reported_date: existing ? undefined : dealDate // Only set for new deals
+        first_reported_date: existing ? undefined : dealDate, // Only set for new deals
+        // Store original stock number for tracking even if we can't link to inventory
+        original_stock_number: deal.stockNumber || null
       };
     });
 
     console.log(`Prepared ${dealRecords.length} deal records for insertion with preserved deal types`);
     console.log('Sample deal record to insert:', dealRecords[0]);
 
-    // Use upsert with the unique constraint on stock_number only
-    const { data: insertedDeals, error: insertError } = await supabase
-      .from('deals')
-      .upsert(dealRecords, {
-        onConflict: 'stock_number',
-        ignoreDuplicates: false
-      })
-      .select();
-
-    if (insertError) {
-      console.error('Deal insertion error:', insertError);
-      throw new Error(`Failed to insert deals: ${insertError.message}`);
+    // Separate deals with and without stock numbers for different insertion strategies
+    const dealsWithStock = dealRecords.filter(deal => deal.stock_number !== null);
+    const dealsWithoutStock = dealRecords.filter(deal => deal.stock_number === null);
+    
+    let insertedDeals = [];
+    
+    // Insert deals with stock numbers using upsert
+    if (dealsWithStock.length > 0) {
+      const { data: stockDeals, error: stockError } = await supabase
+        .from('deals')
+        .upsert(dealsWithStock, {
+          onConflict: 'stock_number',
+          ignoreDuplicates: false
+        })
+        .select();
+        
+      if (stockError) {
+        console.error('Error inserting deals with stock numbers:', stockError);
+        throw new Error(`Failed to insert deals with stock numbers: ${stockError.message}`);
+      }
+      
+      insertedDeals.push(...(stockDeals || []));
+    }
+    
+    // Insert deals without stock numbers using regular insert (no upsert conflict)
+    if (dealsWithoutStock.length > 0) {
+      const { data: nostockDeals, error: nostockError } = await supabase
+        .from('deals')
+        .insert(dealsWithoutStock)
+        .select();
+        
+      if (nostockError) {
+        console.error('Error inserting deals without stock numbers:', nostockError);
+        throw new Error(`Failed to insert deals without stock numbers: ${nostockError.message}`);
+      }
+      
+      insertedDeals.push(...(nostockDeals || []));
     }
 
     const insertedCount = insertedDeals?.length || 0;
@@ -162,7 +216,12 @@ export const insertFinancialData = async (
       dealRecords: dealRecords.length,
       totalExtracted: deals.length,
       skippedDeals: deals.length - validDeals.length,
-      preservedDealTypes: preservedCount
+      preservedDealTypes: preservedCount,
+      // Inventory validation metrics
+      dealsWithInventoryLink: dealsWithStock.length,
+      dealsWithoutInventoryLink: dealsWithoutStock.length,
+      missingFromInventory: missingFromInventory.length,
+      missingStockNumbers: missingFromInventory
     };
 
   } catch (error) {

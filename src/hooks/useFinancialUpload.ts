@@ -12,6 +12,10 @@ interface UploadResult {
   summary?: any;
   reportDate?: string;
   preservedDealTypes?: number;
+  dealsWithInventoryLink?: number;
+  dealsWithoutInventoryLink?: number;
+  missingFromInventory?: number;
+  missingStockNumbers?: string[];
 }
 
 export const useFinancialUpload = (userId: string) => {
@@ -80,7 +84,7 @@ export const useFinancialUpload = (userId: string) => {
         .from('upload_history')
         .update({
           processing_status: 'completed',
-          successful_imports: result.insertedDeals,
+          successful_imports: result.insertedCount,
           processed_at: new Date().toISOString()
         })
         .eq('id', uploadHistory.id);
@@ -89,18 +93,26 @@ export const useFinancialUpload = (userId: string) => {
         ? ` (${result.preservedDealTypes} existing deal types preserved)`
         : '';
 
+      const inventoryMessage = result.missingFromInventory > 0 
+        ? ` (${result.dealsWithoutInventoryLink} deals processed without inventory link due to missing stock numbers)`
+        : '';
+
       setUploadResult({
         status: 'success',
-        message: `Successfully processed ${result.insertedDeals} deals for ${result.reportDate}${preservationMessage}`,
-        dealsProcessed: result.insertedDeals,
+        message: `Successfully processed ${result.insertedCount} deals for ${result.reportDate}${preservationMessage}${inventoryMessage}`,
+        dealsProcessed: result.insertedCount,
         summary: result.summary,
         reportDate: result.reportDate,
-        preservedDealTypes: result.preservedDealTypes
+        preservedDealTypes: result.preservedDealTypes,
+        dealsWithInventoryLink: result.dealsWithInventoryLink,
+        dealsWithoutInventoryLink: result.dealsWithoutInventoryLink,
+        missingFromInventory: result.missingFromInventory,
+        missingStockNumbers: result.missingStockNumbers
       });
 
       toast({
         title: "Upload successful!",
-        description: `Processed ${result.insertedDeals} deals from ${fileName} for ${result.reportDate}${preservationMessage}`,
+        description: `Processed ${result.insertedCount} deals from ${fileName} for ${result.reportDate}${preservationMessage}${inventoryMessage}`,
       });
 
     } catch (error) {

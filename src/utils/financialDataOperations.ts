@@ -23,12 +23,18 @@ export const insertFinancialData = async (
 
     return {
       insertedDeals: insertResult.insertedCount,
+      insertedCount: insertResult.insertedCount, // Add alias for new property name
       summary: snapshotResult.summary,
       reportDate: snapshotResult.reportDate,
       totalExtracted: insertResult.totalExtracted,
       validDeals: insertResult.validDeals.length,
       skippedDeals: insertResult.skippedDeals,
-      preservedDealTypes: insertResult.preservedDealTypes
+      preservedDealTypes: insertResult.preservedDealTypes,
+      // Pass through inventory validation data
+      dealsWithInventoryLink: insertResult.dealsWithInventoryLink,
+      dealsWithoutInventoryLink: insertResult.dealsWithoutInventoryLink,
+      missingFromInventory: insertResult.missingFromInventory,
+      missingStockNumbers: insertResult.missingStockNumbers
     };
 
   } catch (error) {
