@@ -6,6 +6,7 @@ import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 import { useUploadState, type UploadResult } from "@/hooks/useUploadState";
 import { supabase } from "@/integrations/supabase/client";
+import { performInventoryAutoDetection, validateInventoryMapping } from "@/components/inventory-mapper/inventoryFieldUtils";
 
 interface UseInventoryUploadProps {
   userId: string;
@@ -26,7 +27,15 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     sheetsInfo,
     setSheetsInfo,
     pendingFile,
-    setPendingFile
+    setPendingFile,
+    showFieldMapper,
+    setShowFieldMapper,
+    csvHeaders,
+    setCsvHeaders,
+    sampleData,
+    setSampleData,
+    selectedSheet,
+    setSelectedSheet
   } = useUploadState();
 
   const { toast } = useToast();
@@ -48,7 +57,8 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       }
 
       if (result.shouldProcess) {
-        await processFile(file, condition);
+        // Parse the file to check if field mapping is needed
+        await checkAndProcessFile(file, condition);
       }
     } catch (error) {
       toast({
@@ -60,6 +70,58 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     
     // Reset the input
     event.target.value = '';
+  };
+
+  const checkAndProcessFile = async (file: File, condition: 'new' | 'used' | 'gm_global', selectedSheet?: string) => {
+    try {
+      // Parse the file first to get headers and sample data
+      const parsed = await parseEnhancedInventoryFile(file, selectedSheet);
+      console.log('🔍 [FIELD MAPPING CHECK] Parsed file:', {
+        headers: parsed.headers,
+        formatType: parsed.formatType,
+        sampleKeys: Object.keys(parsed.sample)
+      });
+
+      // Try auto-detection
+      const autoMapping = performInventoryAutoDetection(parsed.headers);
+      const { isValid, errors } = validateInventoryMapping(autoMapping);
+      
+      console.log('🔍 [FIELD MAPPING CHECK] Auto-detection result:', {
+        mapping: autoMapping,
+        isValid,
+        errors,
+        mappedFieldsCount: Object.values(autoMapping).filter(v => v).length
+      });
+
+      // Check if we have minimal required fields auto-detected
+      const hasMinimalMapping = (
+        // Either combined vehicle field or separate fields
+        (autoMapping.vehicle) || 
+        (autoMapping.year && autoMapping.make && autoMapping.model)
+      ) && autoMapping.stockNumber;
+
+      if (!hasMinimalMapping) {
+        console.log('🔍 [FIELD MAPPING CHECK] Auto-detection insufficient, showing field mapper');
+        // Store the parsed data for the field mapper
+        setCsvHeaders(parsed.headers);
+        setSampleData(parsed.sample);
+        setSelectedSheet(selectedSheet);
+        setShowFieldMapper(true);
+        return;
+      }
+
+      // Auto-detection was sufficient, proceed with processing
+      console.log('✅ [FIELD MAPPING CHECK] Auto-detection sufficient, proceeding with upload');
+      await processFile(file, condition, selectedSheet);
+
+    } catch (error) {
+      console.error('Error checking file for field mapping:', error);
+      toast({
+        title: "Error analyzing file",
+        description: "Could not analyze the file structure. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const processFile = async (file: File, condition: 'new' | 'used' | 'gm_global', selectedSheet?: string, transformer?: (row: Record<string, any>) => Record<string, any>) => {
@@ -210,7 +272,17 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
 
   const handleSheetSelected = (sheetName: string) => {
     if (pendingFile) {
-      processFile(pendingFile, selectedCondition, sheetName);
+      setSelectedSheet(sheetName);
+      setShowSheetSelector(false);
+      checkAndProcessFile(pendingFile, selectedCondition, sheetName);
+    }
+  };
+
+  const handleFieldMappingComplete = (mapping: any, transformer: (row: Record<string, any>) => Record<string, any>) => {
+    if (pendingFile) {
+      console.log('🎯 [FIELD MAPPING] Mapping completed, proceeding with upload');
+      setShowFieldMapper(false);
+      processFile(pendingFile, selectedCondition, selectedSheet, transformer);
     }
   };
 
@@ -226,6 +298,12 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     pendingFile,
     handleFileUpload,
     handleSheetSelected,
-    processFile // Export processFile for field mapping integration
+    processFile,
+    // Field mapping integration
+    showFieldMapper,
+    setShowFieldMapper,
+    csvHeaders,
+    sampleData,
+    handleFieldMappingComplete
   };
 };

@@ -23,6 +23,12 @@ export const useUploadState = () => {
   const [showSheetSelector, setShowSheetSelector] = useState(false);
   const [sheetsInfo, setSheetsInfo] = useState<SheetInfo[]>([]);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  
+  // Field mapping state
+  const [showFieldMapper, setShowFieldMapper] = useState(false);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [sampleData, setSampleData] = useState<Record<string, string>>({});
+  const [selectedSheet, setSelectedSheet] = useState<string | undefined>(undefined);
 
   return {
     uploading,
@@ -38,6 +44,15 @@ export const useUploadState = () => {
     sheetsInfo,
     setSheetsInfo,
     pendingFile,
-    setPendingFile
+    setPendingFile,
+    // Field mapping state
+    showFieldMapper,
+    setShowFieldMapper,
+    csvHeaders,
+    setCsvHeaders,
+    sampleData,
+    setSampleData,
+    selectedSheet,
+    setSelectedSheet
   };
 };

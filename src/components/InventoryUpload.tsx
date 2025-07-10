@@ -15,6 +15,7 @@ import DragDropFileQueue from "./inventory-upload/DragDropFileQueue";
 import EnhancedBatchUploadResult from "./inventory-upload/EnhancedBatchUploadResult";
 import VehicleScraper from "./inventory-upload/VehicleScraper";
 import UploadSessionControls from "./inventory-upload/UploadSessionControls";
+import InventoryFieldMappingModal from "./InventoryFieldMappingModal";
 import type { QueuedFile } from "./inventory-upload/DragDropFileQueue";
 
 interface InventoryUploadProps {
@@ -33,7 +34,12 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
     setShowSheetSelector,
     sheetsInfo,
     pendingFile,
-    handleSheetSelected
+    handleSheetSelected,
+    showFieldMapper,
+    setShowFieldMapper,
+    csvHeaders,
+    sampleData,
+    handleFieldMappingComplete
   } = useInventoryUpload({ userId: user.id });
 
   const {
@@ -106,6 +112,30 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
           sheets={sheetsInfo} 
           onSheetSelected={handleSheetSelected}
           fileName={pendingFile?.name || ''}
+        />
+      </div>
+    );
+  }
+
+  if (showFieldMapper) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Map Inventory Fields</h2>
+            <p className="text-slate-600 mt-1">Configure how your data columns map to inventory fields</p>
+          </div>
+          <Button onClick={() => setShowFieldMapper(false)} variant="outline">
+            Cancel
+          </Button>
+        </div>
+        
+        <InventoryFieldMappingModal
+          isOpen={showFieldMapper}
+          onClose={() => setShowFieldMapper(false)}
+          csvHeaders={csvHeaders}
+          sampleData={sampleData}
+          onMappingComplete={handleFieldMappingComplete}
         />
       </div>
     );
