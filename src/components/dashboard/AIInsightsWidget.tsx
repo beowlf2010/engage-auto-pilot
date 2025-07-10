@@ -1,77 +1,173 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Package, DollarSign, Brain, AlertTriangle } from 'lucide-react';
-import { usePredictiveAnalytics } from '@/hooks/usePredictiveAnalytics';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import ErrorBoundary from '@/components/ErrorBoundary';
+import { Button } from '@/components/ui/button';
+import { 
+  TrendingUp, TrendingDown, AlertTriangle, Brain, 
+  Target, MessageSquare, Users, Zap, ArrowRight,
+  CheckCircle, Clock, BarChart3 
+} from 'lucide-react';
+import { useAIInsights, AIInsight } from '@/hooks/useAIInsights';
+import { AIInsightsSkeleton } from '@/components/ui/dashboard-skeletons';
+
+const getInsightIcon = (type: AIInsight['type']) => {
+  switch (type) {
+    case 'performance': return BarChart3;
+    case 'opportunity': return Target;
+    case 'risk': return AlertTriangle;
+    case 'optimization': return Zap;
+    default: return Brain;
+  }
+};
+
+const getInsightColor = (priority: AIInsight['priority']) => {
+  switch (priority) {
+    case 'high': return 'text-red-600 bg-red-50 border-red-200';
+    case 'medium': return 'text-orange-600 bg-orange-50 border-orange-200';
+    case 'low': return 'text-blue-600 bg-blue-50 border-blue-200';
+    default: return 'text-gray-600 bg-gray-50 border-gray-200';
+  }
+};
+
+const getPriorityBadgeColor = (priority: AIInsight['priority']) => {
+  switch (priority) {
+    case 'high': return 'bg-red-100 text-red-800';
+    case 'medium': return 'bg-orange-100 text-orange-800';
+    case 'low': return 'bg-blue-100 text-blue-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
+
+const handleInsightAction = (insight: AIInsight) => {
+  switch (insight.actionType) {
+    case 'view_leads':
+      // Navigate to leads page with filter
+      window.location.hash = '#/leads';
+      break;
+    case 'update_templates':
+      // Navigate to templates management
+      window.location.hash = '#/templates';
+      break;
+    case 'schedule_calls':
+      // Navigate to calling interface
+      window.location.hash = '#/calls';
+      break;
+    case 'review_messages':
+      // Navigate to message review
+      window.location.hash = '#/conversations';
+      break;
+  }
+};
 
 const AIInsightsWidget = () => {
-  const { insights, loading, lastUpdated, loadInsights } = usePredictiveAnalytics();
+  const { insights, isLoading, refresh } = useAIInsights();
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center h-32">
-          <LoadingSpinner text="Loading AI insights..." />
-        </CardContent>
-      </Card>
-    );
+  if (isLoading) {
+    return <AIInsightsSkeleton />;
   }
 
-  // Extract different types of insights
-  const conversionInsights = insights.filter(i => i.type === 'conversion_prediction');
-  const churnInsights = insights.filter(i => i.type === 'churn_risk');
-
   return (
-    <ErrorBoundary>
-      <Card>
-        <CardHeader>
-          <CardTitle>AI Insights</CardTitle>
-          {lastUpdated && (
-            <p className="text-sm text-muted-foreground">
-              Last updated: {lastUpdated.toLocaleTimeString()}
+    <Card className="h-full">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+          <Brain className="h-5 w-5 text-primary" />
+          AI Insights
+        </CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={refresh}
+          className="h-8 px-2"
+        >
+          <TrendingUp className="h-4 w-4" />
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {insights.length === 0 ? (
+          <div className="text-center py-8">
+            <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+            <p className="text-sm text-muted-foreground mb-2">
+              Analyzing your data...
             </p>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {conversionInsights.length > 0 && (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">High Conversion Leads</p>
-                <p className="text-2xl font-bold">{conversionInsights.length}</p>
-              </div>
-              <TrendingUp className="w-6 h-6 text-green-500" />
+            <p className="text-xs text-muted-foreground">
+              Insights will appear as you use the system
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {insights.map((insight) => {
+              const IconComponent = getInsightIcon(insight.type);
+              const colorClasses = getInsightColor(insight.priority);
+              const badgeColor = getPriorityBadgeColor(insight.priority);
+              
+              return (
+                <div
+                  key={insight.id}
+                  className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${colorClasses}`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <IconComponent className="h-4 w-4 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-medium text-sm leading-tight">
+                          {insight.title}
+                        </h4>
+                      </div>
+                    </div>
+                    <Badge 
+                      variant="secondary" 
+                      className={`text-xs ml-2 ${badgeColor}`}
+                    >
+                      {insight.priority}
+                    </Badge>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
+                    {insight.description}
+                  </p>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 text-xs">
+                      <CheckCircle className="h-3 w-3" />
+                      <span className="text-muted-foreground">
+                        {Math.round(insight.confidence * 100)}% confidence
+                      </span>
+                    </div>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleInsightAction(insight)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      {insight.actionText}
+                      <ArrowRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  </div>
+                  
+                  {insight.impact && (
+                    <div className="mt-2 pt-2 border-t border-current/10">
+                      <p className="text-xs text-muted-foreground italic">
+                        💡 {insight.impact}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        
+        {insights.length > 0 && (
+          <div className="pt-2 border-t border-muted">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Last updated: {new Date().toLocaleTimeString()}</span>
+              <span>{insights.length} insight{insights.length !== 1 ? 's' : ''}</span>
             </div>
-          )}
-
-          {churnInsights.length > 0 && (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">At-Risk Leads</p>
-                <p className="text-2xl font-bold">{churnInsights.length}</p>
-              </div>
-              <AlertTriangle className="w-6 h-6 text-red-500" />
-            </div>
-          )}
-
-          {insights.length === 0 && (
-            <div className="text-center py-4">
-              <Brain className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">
-                No predictive insights available yet
-              </p>
-              <button
-                onClick={loadInsights}
-                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-              >
-                Generate Insights
-              </button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </ErrorBoundary>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
