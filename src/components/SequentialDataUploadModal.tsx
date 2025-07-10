@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -59,7 +59,7 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
 
   // Upload hooks
   const inventoryUpload = useInventoryUpload({ userId });
-  const { addFiles: addFinancialFiles, processBatch: processFinancialBatch, batchResult: financialResult } = useEnhancedFinancialUpload(userId);
+  const { addFiles: addFinancialFiles, processBatch: processFinancialBatch, batchResult: financialResult, uploading: financialUploading } = useEnhancedFinancialUpload(userId);
   const { addFiles: addLeadFiles, processBatch: processLeadBatch, batchResult: leadResult } = useMultiFileLeadUpload();
 
   const currentStepData = uploadSteps.find(step => step.id === currentStep);
@@ -74,11 +74,8 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
     
     try {
       if (step.fileType === 'inventory' && step.condition) {
-        await inventoryUpload.handleFileUpload(event, step.condition);
-        // Mark step as completed when inventory upload finishes
-        if (inventoryUpload.uploadResult?.status === 'success') {
-          handleStepComplete(inventoryUpload.uploadResult);
-        }
+        // Call the inventory upload handler - completion will be handled by useEffect
+        inventoryUpload.handleFileUpload(event, step.condition);
       } else if (step.fileType === 'financial') {
         // Convert FileList to array for financial upload
         const fileArray = Array.from(files);
@@ -88,13 +85,15 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
           status: 'pending' as const
         }));
         addFinancialFiles(queuedFiles);
-        const result = await processFinancialBatch();
-        handleStepComplete(result);
+        await processFinancialBatch();
+        // Financial upload completion will be handled by useEffect watching financialResult
       } else if (step.fileType === 'leads') {
         // Lead upload uses FileList directly
         addLeadFiles(files);
         const result = await processLeadBatch();
-        handleStepComplete(result);
+        if (result) {
+          handleStepComplete(result);
+        }
       }
     } catch (error) {
       console.error(`Error uploading ${step.title}:`, error);
@@ -112,6 +111,22 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
       setCurrentStep(currentStep + 1);
     }
   };
+
+  // Watch for inventory upload completion
+  useEffect(() => {
+    if (currentStepData?.fileType === 'inventory' && inventoryUpload.uploadResult && !inventoryUpload.uploading) {
+      if (inventoryUpload.uploadResult.status === 'success' || inventoryUpload.uploadResult.status === 'partial') {
+        handleStepComplete(inventoryUpload.uploadResult);
+      }
+    }
+  }, [inventoryUpload.uploadResult, inventoryUpload.uploading, currentStepData?.fileType]);
+
+  // Watch for financial upload completion
+  useEffect(() => {
+    if (currentStepData?.fileType === 'financial' && financialResult && !financialUploading) {
+      handleStepComplete(financialResult);
+    }
+  }, [financialResult, financialUploading, currentStepData?.fileType]);
 
   const handleNext = () => {
     if (currentStep < uploadSteps.length) {
@@ -135,9 +150,7 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
   const canProceed = isCurrentStepCompleted || currentStep === 1;
 
   // Check if current upload is in progress
-  const isUploading = inventoryUpload.uploading || 
-                     (currentStepData?.fileType === 'financial' && financialResult === null) ||
-                     (currentStepData?.fileType === 'leads' && leadResult === null);
+  const isUploading = inventoryUpload.uploading || financialUploading;
 
   if (isComplete) {
     return (
