@@ -53,7 +53,7 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
     setBatchResult,
     processFile,
     processBatch
-  } = useEnhancedMultiFileUpload({ userId: user.id });
+  } = useEnhancedMultiFileUpload({ userId: user.id, duplicateStrategy });
 
   // Check permissions AFTER all hooks are called
   if (!["manager", "admin"].includes(user.role)) {

@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
 import { storeUploadedFile, createUploadHistoryWithoutStorage, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
-import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
+import { validateAndProcessInventoryRowsWithDuplicateHandling } from "@/utils/uploadValidation";
 import { mapRowToInventoryItemEnhanced } from "@/utils/enhancedInventoryMapper";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 import { syncInventoryData } from "@/services/inventoryService";
@@ -42,7 +42,7 @@ export interface EnhancedBatchUploadResult {
   }>;
 }
 
-export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploadProps) => {
+export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' }: UseEnhancedMultiFileUploadProps & { duplicateStrategy?: 'skip' | 'update' | 'replace' }) => {
   const [processing, setProcessing] = useState(false);
   const [batchResult, setBatchResult] = useState<EnhancedBatchUploadResult | null>(null);
   const { toast } = useToast();
@@ -160,87 +160,42 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         console.log('Upload history created without storage, ID:', uploadRecord.id);
       }
       
-      // Enhanced validation and processing with GM Global protection
-      let validationWarnings = 0;
-      let successCount = 0;
-      let errorCount = 0;
-      const errors: string[] = [];
-      
-      const inventoryItemsWithNulls = await Promise.all(
-        parsed.rows.map(async (row, index) => {
-          try {
-            const mappingResult = await mapRowToInventoryItemEnhanced(
-              row, 
-              detection.recommendedCondition, 
-              uploadRecord!.id, 
-              queuedFile.file.name, 
-              parsed.headers,
-              detection
-            );
-            
-            // Additional validation for the mapped item
-            const validation = validateInventoryItem(mappingResult.item, detection.reportType);
-            
-            if (!validation.isValid) {
-              errors.push(`Row ${index + 1}: ${validation.errors.join(', ')}`);
-              errorCount++;
-              return null;
-            }
-            
-            if (validation.warnings.length > 0) {
-              console.warn(`Row ${index + 1} warnings:`, validation.warnings);
-              validationWarnings++;
-            }
-            
-            if (mappingResult.warnings.length > 0) {
-              console.warn(`Row ${index + 1} mapping warnings:`, mappingResult.warnings);
-              validationWarnings++;
-            }
-            
-            successCount++;
-            return validation.correctedData || mappingResult.item;
-            
-          } catch (error) {
-            console.error(`Error processing row ${index + 1}:`, error);
-            errors.push(`Row ${index + 1}: Processing failed - ${error instanceof Error ? error.message : 'Unknown error'}`);
-            errorCount++;
-            return null;
-          }
-        })
+      // Enhanced validation and processing with duplicate handling
+      const validationResult = await validateAndProcessInventoryRowsWithDuplicateHandling(
+        parsed.rows,
+        detection.recommendedCondition,
+        uploadRecord.id,
+        (row, condition, uploadId) => mapRowToInventoryItemEnhanced(
+          row, 
+          condition, 
+          uploadId, 
+          queuedFile.file.name, 
+          parsed.headers,
+          detection
+        ).then(result => result.item),
+        userId,
+        duplicateStrategy
       );
-      
-      const inventoryItems = inventoryItemsWithNulls.filter(item => item !== null);
 
-      console.log(`Processing complete: ${successCount} successful, ${errorCount} errors, ${validationWarnings} warnings`);
+      console.log(`Processing complete: ${validationResult.successCount} new, ${validationResult.updatedCount || 0} updated, ${validationResult.skippedCount || 0} skipped, ${validationResult.errorCount} errors`);
 
-      // Process vehicle history using the enhanced batch method
-      let batchResult = {
+      // Vehicle history tracking for successfully processed vehicles
+      let historyResult = {
         historyRecorded: 0,
         masterRecordsUpserted: 0,
-        duplicatesDetected: 0
+        duplicatesDetected: validationResult.duplicateCount || 0
       };
 
-      if (inventoryItems.length > 0 && mountedRef.current) {
-        try {
-          batchResult = await vehicleHistoryService.processBatch(
-            inventoryItems,
-            uploadRecord.id,
-            detection.sourceReport
-          );
-          console.log('Vehicle history batch processing result:', batchResult);
-        } catch (historyError) {
-          console.error('Vehicle history processing failed, continuing with upload:', historyError);
-        }
-      }
+      // Note: Vehicle history is now handled by the database function
 
       // Update upload history with enhanced results
       if (mountedRef.current) {
         await updateUploadHistory(uploadRecord.id, {
           total_rows: parsed.rows.length,
-          successful_imports: successCount,
-          failed_imports: errorCount,
+          successful_imports: validationResult.successCount,
+          failed_imports: validationResult.errorCount,
           processing_status: 'completed',
-          error_details: errors.length > 0 ? errors.slice(0, 20).join('\n') : undefined
+          error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
         });
       }
 
@@ -248,7 +203,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       const isPreliminaryData = detection.reportType === 'gm_global' || 
                                 queuedFile.file.name.toLowerCase().includes('preliminary');
       
-      if (!isPreliminaryData && successCount > 0 && mountedRef.current) {
+      if (!isPreliminaryData && validationResult.successCount > 0 && mountedRef.current) {
         try {
           console.log(`Triggering enhanced automatic inventory sync with cleanup for ${queuedFile.file.name}...`);
           await syncInventoryData(uploadRecord.id);
@@ -262,12 +217,12 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
 
       // Success notification with enhanced information
       if (mountedRef.current) {
-        const duplicateMsg = batchResult.duplicatesDetected > 0 
-          ? `, ${batchResult.duplicatesDetected} duplicates detected`
+        const duplicateMsg = historyResult.duplicatesDetected > 0 
+          ? `, ${historyResult.duplicatesDetected} duplicates ${duplicateStrategy}ped`
           : '';
         
-        const warningMsg = validationWarnings > 0 
-          ? `, ${validationWarnings} warnings`
+        const updateMsg = validationResult.updatedCount && validationResult.updatedCount > 0
+          ? `, ${validationResult.updatedCount} updated`
           : '';
         
         const cleanupMsg = !isPreliminaryData 
@@ -276,7 +231,7 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         
         toast({
           title: `${queuedFile.file.name} processed successfully`,
-          description: `${successCount} records imported (${detection.reportType}, ${Math.round(detection.confidence)}% confidence)${duplicateMsg}${warningMsg}${cleanupMsg}`,
+          description: `${validationResult.successCount} new records${updateMsg}${duplicateMsg} (${detection.reportType})${cleanupMsg}`,
         });
       }
 
