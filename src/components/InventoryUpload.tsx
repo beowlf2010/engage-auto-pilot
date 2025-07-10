@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { History, Package, BarChart3, Trash2, Globe, Clock, Loader2 } from "lucide-react";
@@ -16,6 +17,7 @@ import EnhancedBatchUploadResult from "./inventory-upload/EnhancedBatchUploadRes
 import VehicleScraper from "./inventory-upload/VehicleScraper";
 import UploadSessionControls from "./inventory-upload/UploadSessionControls";
 import InventoryFieldMapper from "./inventory-mapper/InventoryFieldMapper";
+import DuplicateHandlingControls from "./inventory-upload/DuplicateHandlingControls";
 import type { QueuedFile } from "./inventory-upload/DragDropFileQueue";
 
 interface InventoryUploadProps {
@@ -26,6 +28,9 @@ interface InventoryUploadProps {
 }
 
 const InventoryUpload = ({ user }: InventoryUploadProps) => {
+  const [duplicateStrategy, setDuplicateStrategy] = useState<'skip' | 'update' | 'replace'>('skip');
+  const [clearingInventory, setClearingInventory] = useState(false);
+
   // Always call hooks first, before any early returns
   const {
     showHistory,
@@ -60,6 +65,26 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
       await performInventoryCleanup();
     } catch (error) {
       console.error('Cleanup failed:', error);
+    }
+  };
+
+  const handleClearOldInventory = async () => {
+    setClearingInventory(true);
+    try {
+      await performInventoryCleanup();
+      toast({
+        title: "Old inventory cleared",
+        description: "Previous inventory data has been cleaned up to reduce duplicates",
+      });
+    } catch (error) {
+      console.error('Inventory cleanup failed:', error);
+      toast({
+        title: "Cleanup failed",
+        description: "Could not clear old inventory. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setClearingInventory(false);
     }
   };
 
@@ -236,7 +261,14 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
+            <div className="xl:col-span-2 space-y-6">
+              <DuplicateHandlingControls
+                duplicateStrategy={duplicateStrategy}
+                onStrategyChange={setDuplicateStrategy}
+                duplicatesFound={batchResult?.duplicatesDetected}
+                onClearOldInventory={handleClearOldInventory}
+                clearingInventory={clearingInventory}
+              />
               <DragDropFileQueue 
                 onFilesProcessed={handleFilesProcessed}
                 onFileProcess={handleSingleFileProcess}

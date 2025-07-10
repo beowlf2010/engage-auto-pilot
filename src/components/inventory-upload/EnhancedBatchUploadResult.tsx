@@ -39,27 +39,31 @@ const EnhancedBatchUploadResult = ({ result }: EnhancedBatchUploadResultProps) =
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Summary Statistics */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{result.successfulFiles}</div>
-            <div className="text-sm text-slate-600">Files Processed</div>
+            <div className="text-2xl font-bold text-green-600">{result.successfulRecords}</div>
+            <div className="text-sm text-slate-600">New Records</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{result.successfulRecords}</div>
-            <div className="text-sm text-slate-600">Records Imported</div>
+            <div className="text-2xl font-bold text-blue-600">{result.updatedRecords || 0}</div>
+            <div className="text-sm text-slate-600">Updated Records</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{result.duplicatesDetected}</div>
-            <div className="text-sm text-slate-600">Duplicates Detected</div>
+            <div className="text-2xl font-bold text-orange-600">{result.skippedRecords || 0}</div>
+            <div className="text-sm text-slate-600">Skipped Duplicates</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{result.vehicleHistoryEntries}</div>
+            <div className="text-2xl font-bold text-purple-600">{result.duplicatesDetected}</div>
+            <div className="text-sm text-slate-600">Total Duplicates</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-slate-600">{result.vehicleHistoryEntries}</div>
             <div className="text-sm text-slate-600">History Entries</div>
           </div>
-          {result.failedFiles > 0 && (
+          {result.failedRecords > 0 && (
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{result.failedFiles}</div>
-              <div className="text-sm text-slate-600">Failed Files</div>
+              <div className="text-2xl font-bold text-red-600">{result.failedRecords}</div>
+              <div className="text-sm text-slate-600">Errors</div>
             </div>
           )}
         </div>
@@ -124,10 +128,24 @@ const EnhancedBatchUploadResult = ({ result }: EnhancedBatchUploadResultProps) =
 
         {result.duplicatesDetected > 0 && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <h4 className="font-semibold text-orange-800 mb-2">Duplicate Management</h4>
-            <p className="text-sm text-orange-700">
-              {result.duplicatesDetected} potential duplicates were detected and flagged for review. 
-              These have been recorded in the vehicle history system for manual resolution.
+            <h4 className="font-semibold text-orange-800 mb-2">Duplicate Handling Results</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-orange-700">
+              <div>
+                <strong>Strategy Used:</strong> {result.duplicateStrategy || 'Skip duplicates'}
+              </div>
+              <div>
+                <strong>Duplicates Found:</strong> {result.duplicatesDetected}
+              </div>
+              <div>
+                <strong>Action Taken:</strong> {
+                  result.duplicateStrategy === 'skip' ? `${result.skippedRecords || 0} skipped` :
+                  result.duplicateStrategy === 'update' ? `${result.updatedRecords || 0} updated` :
+                  'Replaced with new data'
+                }
+              </div>
+            </div>
+            <p className="text-sm text-orange-700 mt-2">
+              All duplicate information has been recorded in the vehicle history system for audit purposes.
             </p>
           </div>
         )}

@@ -22,14 +22,19 @@ export interface EnhancedBatchUploadResult {
   failedFiles: number;
   totalRecords: number;
   successfulRecords: number;
+  updatedRecords: number;
+  skippedRecords: number;
   failedRecords: number;
   duplicatesDetected: number;
   vehicleHistoryEntries: number;
   validationWarnings: number;
+  duplicateStrategy?: string;
   results: Array<{
     fileName: string;
     status: 'success' | 'error';
     records?: number;
+    updated?: number;
+    skipped?: number;
     reportType?: string;
     duplicates?: number;
     warnings?: number;
@@ -298,6 +303,8 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         failedFiles: 0,
         totalRecords: 0,
         successfulRecords: 0,
+        updatedRecords: 0,
+        skippedRecords: 0,
         failedRecords: 0,
         duplicatesDetected: 0,
         vehicleHistoryEntries: 0,
@@ -312,6 +319,8 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       failedFiles: 0,
       totalRecords: 0,
       successfulRecords: 0,
+      updatedRecords: 0,
+      skippedRecords: 0,
       failedRecords: 0,
       duplicatesDetected: 0,
       vehicleHistoryEntries: 0,
@@ -374,6 +383,8 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
         failedFiles,
         totalRecords,
         successfulRecords,
+        updatedRecords: 0, // Will be updated when using new validation function
+        skippedRecords: 0, // Will be updated when using new validation function
         failedRecords,
         duplicatesDetected: totalDuplicates,
         vehicleHistoryEntries: totalHistoryEntries,

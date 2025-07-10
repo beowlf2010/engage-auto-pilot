@@ -7238,6 +7238,15 @@ export type Database = {
         }
         Returns: Json
       }
+      insert_inventory_with_duplicate_handling: {
+        Args: {
+          p_vehicles: Json
+          p_upload_history_id: string
+          p_user_id: string
+          p_handle_duplicates?: string
+        }
+        Returns: Json
+      }
       log_failed_login_attempt: {
         Args: { p_email: string; p_ip_address?: unknown; p_user_agent?: string }
         Returns: undefined
