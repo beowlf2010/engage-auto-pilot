@@ -9,6 +9,7 @@ import UploadArea from "./upload-leads/UploadArea";
 import CSVFieldMapper from "./CSVFieldMapper";
 import UploadResult from "./upload-leads/UploadResult";
 import { parseCSVText } from "@/utils/csvParser";
+import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
 import { uploadLeadsWithRLSBypass, promoteToAdmin } from "@/utils/leadOperations/rlsBypassUploader";
 import { processLeads } from "./upload-leads/processLeads";
 import { performAutoDetection } from "./csv-mapper/fieldMappingUtils";
@@ -61,20 +62,23 @@ const UploadLeads = ({ user }: UploadLeadsProps = {}) => {
     if (!files || files.length === 0) {
       toast({
         title: "No files selected",
-        description: "Please select CSV files to upload.",
+        description: "Please select CSV or Excel files to upload.",
         variant: "destructive",
       });
       return;
     }
 
-    // Validate all files are CSV
+    // Validate all files are CSV or Excel
     const fileArray = Array.from(files);
-    const invalidFiles = fileArray.filter(file => !file.name.toLowerCase().endsWith('.csv'));
+    const invalidFiles = fileArray.filter(file => {
+      const name = file.name.toLowerCase();
+      return !name.endsWith('.csv') && !name.endsWith('.xlsx') && !name.endsWith('.xls');
+    });
     
     if (invalidFiles.length > 0) {
       toast({
         title: "Invalid file format",
-        description: `Invalid files: ${invalidFiles.map(f => f.name).join(', ')}. Please select only CSV files.`,
+        description: `Invalid files: ${invalidFiles.map(f => f.name).join(', ')}. Please select CSV or Excel files.`,
         variant: "destructive",
       });
       return;
@@ -89,8 +93,12 @@ const UploadLeads = ({ user }: UploadLeadsProps = {}) => {
       let combinedRows: Record<string, string>[] = [];
       
       for (const file of fileArray) {
-        const text = await file.text();
-        const parsedCSV = parseCSVText(text);
+        // Use enhanced parser for both CSV and Excel files
+        const parsedData = await parseEnhancedInventoryFile(file);
+        const parsedCSV = {
+          headers: parsedData.headers,
+          rows: parsedData.rows
+        };
         
         console.log(`📊 [UPLOAD LEADS] Parsed ${file.name} - headers:`, parsedCSV.headers);
         console.log(`📊 [UPLOAD LEADS] Parsed ${file.name} - rows:`, parsedCSV.rows.length);
@@ -242,7 +250,7 @@ const UploadLeads = ({ user }: UploadLeadsProps = {}) => {
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Upload Leads</h1>
           <p className="text-slate-600 mt-1">
-            Import leads from CSV files with intelligent field mapping using ultimate bypass upload
+            Import leads from CSV and Excel files with intelligent field mapping using ultimate bypass upload
           </p>
         </div>
         <div className="flex space-x-4">
