@@ -189,10 +189,10 @@ export const transformInventoryData = (rowData: Record<string, any>, mapping: In
           result.mileage = parseInt(value) || 0;
           break;
         case 'exteriorColor':
-          result.exterior_color = value;
+          result.color_exterior = value;
           break;
         case 'interiorColor':
-          result.interior_color = value;
+          result.color_interior = value;
           break;
         case 'autowriterDescription':
           result.vehicle_description = value;
