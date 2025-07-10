@@ -283,6 +283,98 @@ export type Database = {
           },
         ]
       }
+      ai_insights: {
+        Row: {
+          action_recommendations: Json | null
+          actionable: boolean
+          applicable_leads: string[] | null
+          confidence_score: number
+          created_at: string
+          description: string
+          expires_at: string | null
+          id: string
+          impact_level: string
+          insight_data: Json | null
+          insight_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          action_recommendations?: Json | null
+          actionable?: boolean
+          applicable_leads?: string[] | null
+          confidence_score?: number
+          created_at?: string
+          description: string
+          expires_at?: string | null
+          id?: string
+          impact_level?: string
+          insight_data?: Json | null
+          insight_type: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          action_recommendations?: Json | null
+          actionable?: boolean
+          applicable_leads?: string[] | null
+          confidence_score?: number
+          created_at?: string
+          description?: string
+          expires_at?: string | null
+          id?: string
+          impact_level?: string
+          insight_data?: Json | null
+          insight_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_lead_scores: {
+        Row: {
+          conversion_probability: number | null
+          created_at: string
+          engagement_level: string
+          id: string
+          last_scored_at: string
+          lead_id: string
+          score: number
+          score_factors: Json | null
+          updated_at: string
+        }
+        Insert: {
+          conversion_probability?: number | null
+          created_at?: string
+          engagement_level?: string
+          id?: string
+          last_scored_at?: string
+          lead_id: string
+          score?: number
+          score_factors?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          conversion_probability?: number | null
+          created_at?: string
+          engagement_level?: string
+          id?: string
+          last_scored_at?: string
+          lead_id?: string
+          score?: number
+          score_factors?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_lead_scores_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_learning_experiments: {
         Row: {
           control_group_config: Json
@@ -1998,6 +2090,63 @@ export type Database = {
           },
         ]
       }
+      conversation_analysis: {
+        Row: {
+          analyzed_at: string
+          conversation_id: string
+          created_at: string
+          id: string
+          intent_categories: string[] | null
+          key_phrases: string[] | null
+          lead_id: string
+          response_quality_score: number | null
+          sentiment_label: string
+          sentiment_score: number
+          urgency_level: string
+        }
+        Insert: {
+          analyzed_at?: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          intent_categories?: string[] | null
+          key_phrases?: string[] | null
+          lead_id: string
+          response_quality_score?: number | null
+          sentiment_label?: string
+          sentiment_score?: number
+          urgency_level?: string
+        }
+        Update: {
+          analyzed_at?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          intent_categories?: string[] | null
+          key_phrases?: string[] | null
+          lead_id?: string
+          response_quality_score?: number | null
+          sentiment_label?: string
+          sentiment_score?: number
+          urgency_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_analysis_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_analysis_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_memory: {
         Row: {
           behavioral_patterns: Json | null
@@ -3132,6 +3281,56 @@ export type Database = {
           },
         ]
       }
+      inventory_predictions: {
+        Row: {
+          accuracy_score: number | null
+          actual_outcome: number | null
+          confidence_level: number
+          created_at: string
+          id: string
+          inventory_id: string
+          predicted_value: number | null
+          prediction_factors: Json | null
+          prediction_type: string
+          updated_at: string
+          valid_until: string
+        }
+        Insert: {
+          accuracy_score?: number | null
+          actual_outcome?: number | null
+          confidence_level?: number
+          created_at?: string
+          id?: string
+          inventory_id: string
+          predicted_value?: number | null
+          prediction_factors?: Json | null
+          prediction_type: string
+          updated_at?: string
+          valid_until: string
+        }
+        Update: {
+          accuracy_score?: number | null
+          actual_outcome?: number | null
+          confidence_level?: number
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          predicted_value?: number | null
+          prediction_factors?: Json | null
+          prediction_type?: string
+          updated_at?: string
+          valid_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_predictions_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       key_moves: {
         Row: {
           action_type: string | null
@@ -3459,6 +3658,59 @@ export type Database = {
             foreignKeyName: "lead_conversion_predictions_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_engagement_metrics: {
+        Row: {
+          avg_response_time_hours: number | null
+          best_contact_times: number[] | null
+          created_at: string
+          engagement_trend: string
+          id: string
+          interaction_quality_score: number | null
+          last_interaction_at: string | null
+          lead_id: string
+          preferred_contact_method: string | null
+          response_rate: number | null
+          total_interactions: number
+          updated_at: string
+        }
+        Insert: {
+          avg_response_time_hours?: number | null
+          best_contact_times?: number[] | null
+          created_at?: string
+          engagement_trend?: string
+          id?: string
+          interaction_quality_score?: number | null
+          last_interaction_at?: string | null
+          lead_id: string
+          preferred_contact_method?: string | null
+          response_rate?: number | null
+          total_interactions?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_response_time_hours?: number | null
+          best_contact_times?: number[] | null
+          created_at?: string
+          engagement_trend?: string
+          id?: string
+          interaction_quality_score?: number | null
+          last_interaction_at?: string | null
+          lead_id?: string
+          preferred_contact_method?: string | null
+          response_rate?: number | null
+          total_interactions?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_engagement_metrics_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
             referencedRelation: "leads"
             referencedColumns: ["id"]
           },
@@ -6142,6 +6394,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      calculate_lead_score: {
+        Args: { p_lead_id: string }
+        Returns: number
+      }
       calculate_lead_temperature: {
         Args: { p_lead_id: string }
         Returns: number
@@ -6206,6 +6462,10 @@ export type Database = {
       generate_booking_token: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      generate_daily_ai_insights: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       get_available_appointment_slots: {
         Args: { start_date?: string; end_date?: string }
@@ -6366,6 +6626,10 @@ export type Database = {
       }
       update_inventory_velocity_tracking: {
         Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_lead_engagement_metrics: {
+        Args: { p_lead_id: string }
         Returns: undefined
       }
       upload_csv_leads_secure: {
