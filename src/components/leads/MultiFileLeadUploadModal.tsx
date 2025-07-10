@@ -72,38 +72,63 @@ const MultiFileLeadUploadModal = ({ isOpen, onClose, onSuccess }: MultiFileLeadU
   const handleMakeAdmin = async () => {
     setPromotingToAdmin(true);
     try {
+      console.log('🔄 [MULTI-FILE] Ensuring admin privileges for bypass upload');
       const result = await promoteToAdmin();
       
       if (result.success) {
+        console.log('✅ [MULTI-FILE] Admin privileges confirmed');
         toast({
-          title: "Admin Promotion",
-          description: "You have been promoted to admin for bypass upload",
+          title: "Admin Access",
+          description: result.message.includes('already') ? "Admin privileges confirmed" : "Admin privileges granted",
         });
       } else {
+        console.error('❌ [MULTI-FILE] Admin promotion failed:', result.message);
         toast({
-          title: "Promotion Failed",
+          title: "Access Issue",
           description: result.message,
           variant: "destructive"
         });
       }
+      return result.success;
     } catch (error) {
-      console.error('💥 Admin promotion error:', error);
+      console.error('💥 [MULTI-FILE] Admin promotion error:', error);
       toast({
-        title: "Promotion Failed",
+        title: "Access Error",
         description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive"
       });
+      return false;
     } finally {
       setPromotingToAdmin(false);
     }
   };
 
   const handleProcessAll = async () => {
-    // First promote to admin for bypass functionality
-    await handleMakeAdmin();
+    console.log('🚀 [MULTI-FILE] Starting batch processing for', queuedFiles.length, 'files');
+    
+    // First ensure admin privileges for bypass functionality
+    const adminSuccess = await handleMakeAdmin();
+    
+    if (!adminSuccess) {
+      console.error('❌ [MULTI-FILE] Cannot proceed without admin privileges');
+      toast({
+        title: "Upload Blocked",
+        description: "Admin privileges required for bypass upload",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Then process the batch
+    console.log('📤 [MULTI-FILE] Admin privileges confirmed, processing files...');
     const result = await processBatch();
+    
+    console.log('✅ [MULTI-FILE] Batch processing completed:', {
+      successfulLeads: result.successfulLeads,
+      failedLeads: result.failedLeads,
+      totalFiles: result.totalFiles
+    });
+    
     if (result.successfulLeads > 0 && onSuccess) {
       onSuccess();
     }

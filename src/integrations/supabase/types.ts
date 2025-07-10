@@ -7248,6 +7248,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      make_current_user_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       mark_missing_vehicles_sold: {
         Args: { p_upload_id: string }
         Returns: undefined

@@ -13,21 +13,35 @@ export const useBypassCSVUpload = () => {
     setUploadResult(null);
 
     try {
-      console.log('🔄 [BYPASS HOOK] Starting upload process');
+      console.log('🔄 [BYPASS HOOK] Starting upload process for', leads.length, 'leads');
+      console.log('📁 [BYPASS HOOK] Upload History ID:', uploadHistoryId || 'Not provided');
       
       const result = await uploadLeadsWithRLSBypass(leads, uploadHistoryId);
       
+      console.log('✅ [BYPASS HOOK] Upload completed:', {
+        success: result.success,
+        totalProcessed: result.totalProcessed,
+        successfulInserts: result.successfulInserts,
+        errorCount: result.errors?.length || 0
+      });
+      
       setUploadResult(result);
 
-      if (result.success) {
+      if (result.success && result.successfulInserts > 0) {
         toast({
           title: "Upload Successful",
           description: `${result.successfulInserts} leads uploaded successfully`,
         });
+      } else if (result.successfulInserts === 0 && result.totalProcessed > 0) {
+        toast({
+          title: "Upload Failed",
+          description: `No leads were uploaded successfully. Check the logs for details.`,
+          variant: "destructive"
+        });
       } else {
         toast({
           title: "Upload Issues",
-          description: `${result.successfulInserts} uploaded, ${result.errors.length} failed`,
+          description: `${result.successfulInserts} uploaded, ${result.errors?.length || 0} failed`,
           variant: "destructive"
         });
       }
@@ -38,7 +52,7 @@ export const useBypassCSVUpload = () => {
       
       const errorResult: BypassUploadResult = {
         success: false,
-        totalProcessed: 0,
+        totalProcessed: leads.length,
         successfulInserts: 0,
         errors: [{ error: error instanceof Error ? error.message : 'Unknown error' }],
         message: 'Upload failed'
