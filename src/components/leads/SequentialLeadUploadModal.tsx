@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Upload, ArrowRight, Check, X, RotateCcw, GripVertical } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { parseCSVFile, type ParsedCSVData } from '@/utils/csvParser';
+import { parseEnhancedInventoryFile, type ParsedInventoryData } from '@/utils/enhancedFileParsingUtils';
 import CSVFieldMapper from '@/components/CSVFieldMapper';
 import { type FieldMapping } from '@/components/csv-mapper/types';
 import { uploadLeadsWithRLSBypass, promoteToAdmin } from '@/utils/leadOperations/rlsBypassUploader';
@@ -19,7 +19,7 @@ interface FileQueueItem {
   id: string;
   file: File;
   status: 'pending' | 'processing' | 'mapping' | 'completed' | 'error';
-  csvData?: ParsedCSVData;
+  csvData?: ParsedInventoryData;
   mapping?: FieldMapping;
   result?: any;
   error?: string;
@@ -93,18 +93,21 @@ const SequentialLeadUploadModal = ({ isOpen, onClose, onSuccess }: SequentialLea
 
   const handleFilesSelected = useCallback(async (files: FileList) => {
     const fileArray = Array.from(files);
-    const csvFiles = fileArray.filter(file => file.name.toLowerCase().endsWith('.csv'));
+    const supportedFiles = fileArray.filter(file => {
+      const name = file.name.toLowerCase();
+      return name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls');
+    });
     
-    if (csvFiles.length === 0) {
+    if (supportedFiles.length === 0) {
       toast({
-        title: "No CSV files found",
-        description: "Please select CSV files to upload.",
+        title: "No supported files found",
+        description: "Please select CSV or Excel files to upload.",
         variant: "destructive",
       });
       return;
     }
 
-    const newQueue: FileQueueItem[] = csvFiles.map(file => ({
+    const newQueue: FileQueueItem[] = supportedFiles.map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       file,
       status: 'pending'
@@ -113,7 +116,7 @@ const SequentialLeadUploadModal = ({ isOpen, onClose, onSuccess }: SequentialLea
     setFileQueue(newQueue);
     toast({
       title: "Files added to queue",
-      description: `${csvFiles.length} CSV file(s) ready for processing.`,
+      description: `${supportedFiles.length} file(s) ready for processing.`,
     });
   }, []);
 
@@ -161,7 +164,7 @@ const SequentialLeadUploadModal = ({ isOpen, onClose, onSuccess }: SequentialLea
     ));
 
     try {
-      const csvData = await parseCSVFile(currentFile.file);
+      const csvData = await parseEnhancedInventoryFile(currentFile.file);
       
       // Update with parsed data and move to mapping stage
       setFileQueue(prev => prev.map((item, idx) => 
@@ -324,7 +327,7 @@ const SequentialLeadUploadModal = ({ isOpen, onClose, onSuccess }: SequentialLea
               >
                 <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Drop CSV files here or click to browse
+                  Drop CSV or Excel files here or click to browse
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
                   Files will be processed one at a time in the order shown below
@@ -332,14 +335,14 @@ const SequentialLeadUploadModal = ({ isOpen, onClose, onSuccess }: SequentialLea
                 <input
                   type="file"
                   multiple
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls"
                   onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
                   className="hidden"
                   id="sequential-file-input"
                 />
                 <Button asChild>
                   <label htmlFor="sequential-file-input" className="cursor-pointer">
-                    Select CSV Files
+                    Select Files
                   </label>
                 </Button>
               </div>
@@ -422,7 +425,7 @@ const SequentialLeadUploadModal = ({ isOpen, onClose, onSuccess }: SequentialLea
                       Processing: {currentFile.file.name}
                     </h4>
                     <p className="text-sm text-blue-600">
-                      Map the fields for this CSV file before uploading
+                      Map the fields for this file before uploading
                     </p>
                   </div>
                   
