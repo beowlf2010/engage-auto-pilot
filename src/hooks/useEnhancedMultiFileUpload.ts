@@ -14,6 +14,7 @@ import type { QueuedFile } from "@/components/inventory-upload/DragDropFileQueue
 
 interface UseEnhancedMultiFileUploadProps {
   userId: string;
+  duplicateStrategy?: 'skip' | 'update' | 'replace';
 }
 
 export interface EnhancedBatchUploadResult {
@@ -42,7 +43,7 @@ export interface EnhancedBatchUploadResult {
   }>;
 }
 
-export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' }: UseEnhancedMultiFileUploadProps & { duplicateStrategy?: 'skip' | 'update' | 'replace' }) => {
+export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' }: UseEnhancedMultiFileUploadProps) => {
   const [processing, setProcessing] = useState(false);
   const [batchResult, setBatchResult] = useState<EnhancedBatchUploadResult | null>(null);
   const { toast } = useToast();
