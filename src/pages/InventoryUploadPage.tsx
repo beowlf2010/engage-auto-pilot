@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import InventoryUpload from '@/components/InventoryUpload';
+import EnhancedInventoryUpload from '@/components/inventory-upload/EnhancedInventoryUpload';
 import UploadSuccessNotification from '@/components/inventory/UploadSuccessNotification';
 
 const InventoryUploadPage = () => {
@@ -29,7 +29,7 @@ const InventoryUploadPage = () => {
         <UploadSuccessNotification onReUpload={handleStartReUpload} />
       )}
       {!showNotification && (
-        <InventoryUpload user={{ id: profile.id, role: profile.role }} />
+        <EnhancedInventoryUpload userId={profile.id} />
       )}
     </div>
   );
