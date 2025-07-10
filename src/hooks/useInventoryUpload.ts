@@ -62,17 +62,12 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     event.target.value = '';
   };
 
-  const processFile = async (file: File, condition: 'new' | 'used' | 'gm_global', selectedSheet?: string) => {
+  const processFile = async (file: File, condition: 'new' | 'used' | 'gm_global', selectedSheet?: string, transformer?: (row: Record<string, any>) => Record<string, any>) => {
     setUploading(true);
     let uploadRecord: UploadHistoryRecord | null = null;
     
     try {
       console.log(`Processing ${file.name} as ${condition} inventory...`);
-      
-      // Determine if this is preliminary data based on filename or condition
-      const isPreliminaryData = file.name.toLowerCase().includes('preliminary') || 
-                                file.name.toLowerCase().includes('prelim') ||
-                                condition === 'gm_global';
       
       // Store the original file first - map gm_global to inventory type
       const inventoryCondition = condition === 'gm_global' ? 'new' : condition;
@@ -85,6 +80,13 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       console.log('Headers found:', parsed.headers);
       console.log('Sample row keys:', Object.keys(parsed.sample));
       console.log('Sample row data:', parsed.sample);
+      
+      // Apply custom transformer if provided (from field mapping)
+      let processedRows = parsed.rows;
+      if (transformer) {
+        console.log('🔄 [INVENTORY UPLOAD] Applying custom field transformer');
+        processedRows = parsed.rows.map(transformer);
+      }
       
       // Enhanced logging for GM Global files
       if (condition === 'gm_global') {
@@ -101,7 +103,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
       
       // Validate and process all rows with user context
       const validationResult = await validateAndProcessInventoryRows(
-        parsed.rows,
+        processedRows,
         condition,
         uploadRecord.id,
         mapRowToInventoryItem,
@@ -223,6 +225,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     sheetsInfo,
     pendingFile,
     handleFileUpload,
-    handleSheetSelected
+    handleSheetSelected,
+    processFile // Export processFile for field mapping integration
   };
 };
