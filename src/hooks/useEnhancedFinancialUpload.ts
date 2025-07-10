@@ -183,6 +183,12 @@ export const useEnhancedFinancialUpload = (userId: string) => {
     setQueuedFiles([]);
   };
 
+  const resetState = () => {
+    setQueuedFiles([]);
+    setUploading(false);
+    setBatchResult(null);
+  };
+
   return {
     queuedFiles,
     uploading,
@@ -190,6 +196,7 @@ export const useEnhancedFinancialUpload = (userId: string) => {
     addFiles,
     removeFile,
     processBatch,
-    clearResults
+    clearResults,
+    resetState
   };
 };

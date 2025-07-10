@@ -304,6 +304,23 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     }
   };
 
+  const resetState = () => {
+    const {
+      resetUploadState,
+      setSelectedCondition,
+      setShowHistory,
+      setShowSheetSelector,
+      setSheetsInfo,
+      setPendingFile,
+      setShowFieldMapper,
+      setCsvHeaders,
+      setSampleData,
+      setSelectedSheet
+    } = useUploadState();
+    
+    resetUploadState();
+  };
+
   return {
     uploading,
     uploadResult,
@@ -322,6 +339,20 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
     setShowFieldMapper,
     csvHeaders,
     sampleData,
-    handleFieldMappingComplete
+    handleFieldMappingComplete,
+    // Reset functionality
+    resetState: () => {
+      setUploading(false);
+      setUploadResult(null);
+      setSelectedCondition('used');
+      setShowHistory(false);
+      setShowSheetSelector(false);
+      setSheetsInfo([]);
+      setPendingFile(null);
+      setShowFieldMapper(false);
+      setCsvHeaders([]);
+      setSampleData({});
+      setSelectedSheet(undefined);
+    }
   };
 };

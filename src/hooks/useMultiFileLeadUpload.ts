@@ -65,6 +65,13 @@ export const useMultiFileLeadUpload = () => {
     setBatchResult(null);
   }, []);
 
+  const resetState = useCallback(() => {
+    setQueuedFiles([]);
+    setProcessing(false);
+    setBatchResult(null);
+    setUpdateExistingLeads(false);
+  }, []);
+
   const processFile = async (queuedFile: QueuedFile): Promise<{
     success: boolean;
     totalRows: number;
@@ -269,6 +276,7 @@ export const useMultiFileLeadUpload = () => {
     addFiles,
     removeFile,
     clearQueue,
-    processBatch
+    processBatch,
+    resetState
   };
 };

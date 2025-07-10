@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, Upload, ArrowRight, RotateCcw } from 'lucide-react';
+import { CheckCircle, Upload, ArrowRight, RotateCcw, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useInventoryUpload } from '@/hooks/useInventoryUpload';
 import { useEnhancedFinancialUpload } from '@/hooks/useEnhancedFinancialUpload';
 import { useMultiFileLeadUpload } from '@/hooks/useMultiFileLeadUpload';
@@ -56,11 +57,16 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [stepResults, setStepResults] = useState<Record<number, any>>({});
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [showRestartDialog, setShowRestartDialog] = useState(false);
 
-  // Upload hooks
+  // Upload hooks with enhanced functionality
   const inventoryUpload = useInventoryUpload({ userId });
-  const { addFiles: addFinancialFiles, processBatch: processFinancialBatch, batchResult: financialResult, uploading: financialUploading } = useEnhancedFinancialUpload(userId);
-  const { addFiles: addLeadFiles, processBatch: processLeadBatch, batchResult: leadResult } = useMultiFileLeadUpload();
+  const financialUpload = useEnhancedFinancialUpload(userId);
+  const leadUpload = useMultiFileLeadUpload();
+
+  const { addFiles: addFinancialFiles, processBatch: processFinancialBatch, batchResult: financialResult, uploading: financialUploading, resetState: resetFinancialState } = financialUpload;
+  const { addFiles: addLeadFiles, processBatch: processLeadBatch, batchResult: leadResult, resetState: resetLeadState } = leadUpload;
 
   const currentStepData = uploadSteps.find(step => step.id === currentStep);
   const progress = (completedSteps.size / uploadSteps.length) * 100;
@@ -129,28 +135,79 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
   }, [financialResult, financialUploading, currentStepData?.fileType]);
 
   const handleNext = () => {
-    if (currentStep < uploadSteps.length) {
+    if (currentStep < uploadSteps.length && !isNavigating) {
+      setIsNavigating(true);
       setCurrentStep(currentStep + 1);
+      setTimeout(() => setIsNavigating(false), 100);
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+    if (currentStep > 1 && !isNavigating) {
+      setIsNavigating(true);
+      
+      // Clear upload state for the current step being left
+      const currentStepData = uploadSteps.find(step => step.id === currentStep);
+      if (currentStepData) {
+        switch (currentStepData.fileType) {
+          case 'inventory':
+            inventoryUpload.resetState();
+            break;
+          case 'financial':
+            resetFinancialState();
+            break;
+          case 'leads':
+            resetLeadState();
+            break;
+        }
+      }
+
+      // Remove completion status for steps after the one we're going back to
+      const targetStep = currentStep - 1;
+      setCompletedSteps(prev => {
+        const newCompleted = new Set(prev);
+        for (let step = targetStep + 1; step <= uploadSteps.length; step++) {
+          newCompleted.delete(step);
+        }
+        return newCompleted;
+      });
+
+      // Clear results for future steps
+      setStepResults(prev => {
+        const newResults = { ...prev };
+        for (let step = targetStep + 1; step <= uploadSteps.length; step++) {
+          delete newResults[step];
+        }
+        return newResults;
+      });
+
+      setCurrentStep(targetStep);
+      setTimeout(() => setIsNavigating(false), 100);
     }
   };
 
   const handleRestart = () => {
+    setIsNavigating(true);
+    
+    // Reset all upload hook states
+    inventoryUpload.resetState();
+    resetFinancialState();
+    resetLeadState();
+    
+    // Reset component state
     setCurrentStep(1);
     setCompletedSteps(new Set());
     setStepResults({});
+    setShowRestartDialog(false);
+    
+    setTimeout(() => setIsNavigating(false), 100);
   };
 
   const isCurrentStepCompleted = completedSteps.has(currentStep);
   const canProceed = isCurrentStepCompleted || currentStep === 1;
 
   // Check if current upload is in progress
-  const isUploading = inventoryUpload.uploading || financialUploading;
+  const isUploading = inventoryUpload.uploading || financialUploading || leadUpload.processing;
 
   if (isComplete) {
     return (
@@ -186,10 +243,32 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
             </div>
             
             <div className="flex justify-between">
-              <Button variant="outline" onClick={handleRestart}>
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Start Over
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline">
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Start Over
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center space-x-2">
+                      <AlertTriangle className="w-5 h-5 text-amber-500" />
+                      <span>Start Over?</span>
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will clear all completed uploads and return you to the first step. 
+                      Your data will remain in the system, but you'll need to re-upload if you want to make changes.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRestart}>
+                      Start Over
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <Button onClick={() => { onSuccess?.(); onClose(); }}>
                 View Results
               </Button>
@@ -257,20 +336,54 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
           </Card>
 
           {/* Step Navigation */}
-          <div className="flex justify-between">
-            <Button 
-              variant="outline" 
-              onClick={handlePrevious}
-              disabled={currentStep === 1}
-            >
-              Previous
-            </Button>
+          <div className="flex justify-between items-center">
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={handlePrevious}
+                disabled={currentStep === 1 || isUploading || isNavigating}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Previous
+              </Button>
+              
+              <AlertDialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline"
+                    disabled={isUploading || isNavigating}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Restart
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center space-x-2">
+                      <AlertTriangle className="w-5 h-5 text-amber-500" />
+                      <span>Restart Upload Process?</span>
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will clear all progress and uploaded data, returning you to the first step. 
+                      You'll need to re-upload all files. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRestart} className="bg-destructive hover:bg-destructive/90">
+                      Restart Process
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
             
             <div className="flex space-x-2">
               {currentStep < uploadSteps.length && (
                 <Button 
                   onClick={handleNext}
-                  disabled={!isCurrentStepCompleted}
+                  disabled={!isCurrentStepCompleted || isNavigating}
                 >
                   Next Step
                   <ArrowRight className="w-4 h-4 ml-2" />

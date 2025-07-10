@@ -30,6 +30,20 @@ export const useUploadState = () => {
   const [sampleData, setSampleData] = useState<Record<string, string>>({});
   const [selectedSheet, setSelectedSheet] = useState<string | undefined>(undefined);
 
+  const resetUploadState = () => {
+    setUploading(false);
+    setUploadResult(null);
+    setSelectedCondition('used');
+    setShowHistory(false);
+    setShowSheetSelector(false);
+    setSheetsInfo([]);
+    setPendingFile(null);
+    setShowFieldMapper(false);
+    setCsvHeaders([]);
+    setSampleData({});
+    setSelectedSheet(undefined);
+  };
+
   return {
     uploading,
     setUploading,
@@ -53,6 +67,8 @@ export const useUploadState = () => {
     sampleData,
     setSampleData,
     selectedSheet,
-    setSelectedSheet
+    setSelectedSheet,
+    // Reset function
+    resetUploadState
   };
 };
