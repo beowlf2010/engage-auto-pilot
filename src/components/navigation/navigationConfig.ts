@@ -146,6 +146,12 @@ export const navigationItems: NavigationItem[] = [
     access: ['admin', 'manager', 'sales']
   },
   {
+    label: 'Call Analysis',
+    href: '/call-analysis',
+    icon: Phone,
+    access: ['admin', 'manager', 'sales']
+  },
+  {
     label: 'Sales Dashboard',
     href: '/sales-dashboard',
     icon: TrendingUp,

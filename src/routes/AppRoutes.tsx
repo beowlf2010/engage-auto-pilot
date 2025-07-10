@@ -38,6 +38,7 @@ const AINotificationsPage = lazy(() => import('@/pages/AINotificationsPage'));
 const AIAnalyticsDashboardPage = lazy(() => import('@/pages/AIAnalyticsDashboardPage'));
 const AIWorkflowsPage = lazy(() => import('@/pages/AIWorkflowsPage'));
 const AITemperaturePage = lazy(() => import('@/pages/AITemperaturePage'));
+const CallAnalysisPage = lazy(() => import('@/pages/CallAnalysisPage'));
 
 import { RouteWrapper } from '@/components/routes/RouteWrapper';
 
@@ -176,6 +177,12 @@ const AppRoutes = () => {
         <Route path="/ai-temperature" element={
           <RouteWrapper LayoutComponent={LayoutComponent} routeName="Lead Temperature">
             <AITemperaturePage />
+          </RouteWrapper>
+        } />
+
+        <Route path="/call-analysis" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Call Analysis">
+            <CallAnalysisPage />
           </RouteWrapper>
         } />
         

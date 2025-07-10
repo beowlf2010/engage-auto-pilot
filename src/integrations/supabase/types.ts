@@ -1866,6 +1866,90 @@ export type Database = {
         }
         Relationships: []
       }
+      call_conversation_analysis: {
+        Row: {
+          ai_recommendations: string | null
+          buying_signals: Json | null
+          call_log_id: string
+          call_outcome_prediction: string | null
+          confidence_score: number | null
+          conversation_summary: string | null
+          created_at: string
+          emotion_detected: string | null
+          engagement_level: string | null
+          id: string
+          intent_detected: string | null
+          lead_id: string
+          next_actions: Json | null
+          objections_raised: Json | null
+          quality_score: number | null
+          sentiment_score: number | null
+          talk_time_ratio: number | null
+          topics_discussed: Json | null
+          transcript_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_recommendations?: string | null
+          buying_signals?: Json | null
+          call_log_id: string
+          call_outcome_prediction?: string | null
+          confidence_score?: number | null
+          conversation_summary?: string | null
+          created_at?: string
+          emotion_detected?: string | null
+          engagement_level?: string | null
+          id?: string
+          intent_detected?: string | null
+          lead_id: string
+          next_actions?: Json | null
+          objections_raised?: Json | null
+          quality_score?: number | null
+          sentiment_score?: number | null
+          talk_time_ratio?: number | null
+          topics_discussed?: Json | null
+          transcript_id: string
+          updated_at?: string
+        }
+        Update: {
+          ai_recommendations?: string | null
+          buying_signals?: Json | null
+          call_log_id?: string
+          call_outcome_prediction?: string | null
+          confidence_score?: number | null
+          conversation_summary?: string | null
+          created_at?: string
+          emotion_detected?: string | null
+          engagement_level?: string | null
+          id?: string
+          intent_detected?: string | null
+          lead_id?: string
+          next_actions?: Json | null
+          objections_raised?: Json | null
+          quality_score?: number | null
+          sentiment_score?: number | null
+          talk_time_ratio?: number | null
+          topics_discussed?: Json | null
+          transcript_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_call_conversation_analysis_lead_id"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_call_conversation_analysis_transcript_id"
+            columns: ["transcript_id"]
+            isOneToOne: false
+            referencedRelation: "call_transcriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_history: {
         Row: {
           call_cost: number | null
@@ -1921,6 +2005,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "call_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_insights: {
+        Row: {
+          action_taken: boolean | null
+          actionable: boolean | null
+          call_log_id: string
+          confidence_score: number | null
+          created_at: string
+          id: string
+          insight_text: string
+          insight_type: string
+          lead_id: string
+          timestamp_in_call: number | null
+        }
+        Insert: {
+          action_taken?: boolean | null
+          actionable?: boolean | null
+          call_log_id: string
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          insight_text: string
+          insight_type: string
+          lead_id: string
+          timestamp_in_call?: number | null
+        }
+        Update: {
+          action_taken?: boolean | null
+          actionable?: boolean | null
+          call_log_id?: string
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          insight_text?: string
+          insight_type?: string
+          lead_id?: string
+          timestamp_in_call?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_call_insights_lead_id"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
@@ -2135,6 +2266,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "call_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_transcriptions: {
+        Row: {
+          ai_analysis_status: string | null
+          call_log_id: string
+          created_at: string
+          id: string
+          lead_id: string
+          processing_status: string | null
+          recording_url: string | null
+          transcript_confidence: number | null
+          transcript_text: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_analysis_status?: string | null
+          call_log_id: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          processing_status?: string | null
+          recording_url?: string | null
+          transcript_confidence?: number | null
+          transcript_text?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_analysis_status?: string | null
+          call_log_id?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          processing_status?: string | null
+          recording_url?: string | null
+          transcript_confidence?: number | null
+          transcript_text?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_call_transcriptions_lead_id"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
@@ -5221,6 +5399,59 @@ export type Database = {
           wholesale_units?: number | null
         }
         Relationships: []
+      }
+      real_time_call_monitoring: {
+        Row: {
+          call_log_id: string
+          coaching_suggestions: string | null
+          created_at: string
+          escalation_needed: boolean | null
+          escalation_reason: string | null
+          id: string
+          lead_id: string
+          live_insights: Json | null
+          live_sentiment: number | null
+          live_transcript: string | null
+          monitoring_active: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          call_log_id: string
+          coaching_suggestions?: string | null
+          created_at?: string
+          escalation_needed?: boolean | null
+          escalation_reason?: string | null
+          id?: string
+          lead_id: string
+          live_insights?: Json | null
+          live_sentiment?: number | null
+          live_transcript?: string | null
+          monitoring_active?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          call_log_id?: string
+          coaching_suggestions?: string | null
+          created_at?: string
+          escalation_needed?: boolean | null
+          escalation_reason?: string | null
+          id?: string
+          lead_id?: string
+          live_insights?: Json | null
+          live_sentiment?: number | null
+          live_transcript?: string | null
+          monitoring_active?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_real_time_call_monitoring_lead_id"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recon_approvals: {
         Row: {

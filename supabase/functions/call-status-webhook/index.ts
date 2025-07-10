@@ -51,6 +51,27 @@ serve(async (req) => {
           .eq('id', callLogId)
         
         console.log('🎙️ Recording URL saved:', recordingUrl);
+        
+        // Trigger voice AI transcription process
+        if (leadId) {
+          try {
+            const { data, error } = await supabase.functions.invoke('voice-ai-transcription', {
+              body: {
+                callLogId,
+                recordingUrl,
+                leadId
+              }
+            });
+            
+            if (error) {
+              console.error('❌ Failed to start voice AI transcription:', error);
+            } else {
+              console.log('✅ Voice AI transcription started:', data?.transcriptionId);
+            }
+          } catch (transcriptionError) {
+            console.error('❌ Error starting transcription:', transcriptionError);
+          }
+        }
       }
       
       return new Response('OK', { headers: corsHeaders })
