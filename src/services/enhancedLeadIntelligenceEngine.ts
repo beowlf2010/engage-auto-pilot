@@ -264,6 +264,18 @@ class EnhancedLeadIntelligenceEngine {
   }
 
   async analyzeCompetitorMentions(conversations: any[]): Promise<CompetitorIntelligence[]> {
+    // Use the new competitive intelligence service
+    try {
+      const { competitiveIntelligenceService } = await import('@/services/competitiveIntelligenceService');
+      const leadId = conversations[0]?.lead_id;
+      if (leadId) {
+        return await competitiveIntelligenceService.analyzeCompetitorMentions(leadId);
+      }
+    } catch (error) {
+      console.error('Error using competitive intelligence service:', error);
+    }
+
+    // Fallback to original method
     const competitors = [
       'toyota', 'ford', 'chevrolet', 'honda', 'nissan', 'bmw', 'mercedes',
       'audi', 'lexus', 'acura', 'infiniti', 'cadillac', 'lincoln', 'buick',

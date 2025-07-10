@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { enhancedLeadIntelligenceEngine } from '@/services/enhancedLeadIntelligenceEngine';
 import type { LeadIntelligenceProfile, IntelligenceMetrics } from '@/types/leadIntelligence';
+import CompetitiveIntelligencePanel from '@/components/intelligence/CompetitiveIntelligencePanel';
 
 const LeadIntelligenceDashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<IntelligenceMetrics>({
@@ -505,21 +506,7 @@ const LeadIntelligenceDashboard: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="competitors" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Competitive Intelligence</CardTitle>
-              <CardDescription>Monitor competitor mentions and competitive threats</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Competitive Analysis</h3>
-                <p className="text-muted-foreground">
-                  Track competitor mentions and develop counter-strategies
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <CompetitiveIntelligencePanel />
         </TabsContent>
       </Tabs>
     </div>
