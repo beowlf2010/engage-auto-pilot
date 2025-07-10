@@ -10,6 +10,7 @@ import LeadDetailHeader from "./streamlined/LeadDetailHeader";
 import ChatContainer from "./streamlined/ChatContainer";
 import LeadDetailSidebar from "./streamlined/LeadDetailSidebar";
 import EnhancedUnifiedAIPanel from "./streamlined/EnhancedUnifiedAIPanel";
+import SmartFollowUpPanel from "@/components/ai/SmartFollowUpPanel";
 import type { Lead } from "@/types/lead";
 import type { LeadDetailData } from "@/services/leadDetailService";
 
@@ -161,6 +162,23 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
             messages={conversationMessages}
             vehicleInterest={lead.vehicleInterest}
             onSendMessage={handleSendMessageWrapper}
+          />
+        </div>
+
+        {/* Smart Follow-up Recommendations Panel */}
+        <div className="bg-white rounded-lg border border-gray-200">
+          <SmartFollowUpPanel
+            leadId={lead.id}
+            leadName={`${lead.firstName} ${lead.lastName}`}
+            vehicleInterest={lead.vehicleInterest}
+            conversationHistory={conversationMessages.map(m => m.body)}
+            lastInteractionDate={new Date(conversationMessages[conversationMessages.length - 1]?.sentAt || Date.now())}
+            leadTemperature={50} // Calculate dynamically from conversation data
+            journeyStage={'initial_contact'} // Will be calculated dynamically
+            engagementPattern={
+              conversationMessages.length > 5 ? 'responsive' :
+              conversationMessages.length > 2 ? 'slow' : 'inactive'
+            }
           />
         </div>
         

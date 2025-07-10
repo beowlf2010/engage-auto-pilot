@@ -13,10 +13,11 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import type { AIRecommendation } from '@/services/contextualAIAssistant';
+import type { SmartRecommendation } from '@/services/smartFollowUpEngine';
 
 interface SmartActionButtonsProps {
-  recommendations: AIRecommendation[];
-  onExecuteAction: (action: AIRecommendation) => void;
+  recommendations: (AIRecommendation | SmartRecommendation)[];
+  onExecuteAction: (action: AIRecommendation | SmartRecommendation) => void;
   className?: string;
 }
 
@@ -55,13 +56,17 @@ const SmartActionButtons: React.FC<SmartActionButtonsProps> = ({
     }
   };
 
-  const getButtonText = (action: AIRecommendation) => {
+  const getButtonText = (action: AIRecommendation | SmartRecommendation) => {
     // Shorten action text for button display
     const text = action.action;
     if (text.length > 30) {
       return text.substring(0, 27) + '...';
     }
     return text;
+  };
+
+  const isSmartRecommendation = (action: AIRecommendation | SmartRecommendation): action is SmartRecommendation => {
+    return 'successProbability' in action;
   };
 
   // Show only top 3 immediate actions
@@ -106,6 +111,15 @@ const SmartActionButtons: React.FC<SmartActionButtonsProps> = ({
               <div className="absolute -top-1 -right-1">
                 <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
               </div>
+            )}
+
+            {isSmartRecommendation(action) && action.successProbability > 0.8 && (
+              <Badge 
+                variant="outline" 
+                className="absolute -top-2 -left-2 text-xs px-1 py-0 h-4 bg-green-50 text-green-700 border-green-200"
+              >
+                {Math.round(action.successProbability * 100)}%
+              </Badge>
             )}
           </div>
         ))}
