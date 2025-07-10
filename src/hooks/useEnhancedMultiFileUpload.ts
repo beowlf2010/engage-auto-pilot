@@ -251,6 +251,8 @@ export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' 
   };
 
   const processBatch = async (files: QueuedFile[]): Promise<EnhancedBatchUploadResult> => {
+    console.log('processBatch called with files:', files);
+    
     if (processingRef.current) {
       console.warn('Batch processing already in progress');
       return batchResult || {

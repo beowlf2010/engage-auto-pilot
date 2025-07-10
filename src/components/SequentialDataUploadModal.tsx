@@ -77,9 +77,11 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
     if (!files || files.length === 0) return;
 
     const step = currentStepData!;
+    console.log('File selected:', files[0].name, 'for step:', step.title);
     
     try {
       if (step.fileType === 'inventory' && step.condition) {
+        console.log('Processing inventory file with condition:', step.condition);
         // Convert to QueuedFile format for enhanced upload
         const queuedFiles = Array.from(files).map((file, index) => ({
           id: `${Date.now()}-${index}`,
@@ -87,7 +89,9 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
           condition: step.condition as 'new' | 'used' | 'gm_global',
           status: 'pending' as const
         }));
-        await inventoryUpload.processBatch(queuedFiles);
+        console.log('Created queued files:', queuedFiles);
+        const result = await inventoryUpload.processBatch(queuedFiles);
+        console.log('Inventory upload result:', result);
       } else if (step.fileType === 'financial') {
         // Convert FileList to array for financial upload
         const fileArray = Array.from(files);
@@ -109,6 +113,8 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
       }
     } catch (error) {
       console.error(`Error uploading ${step.title}:`, error);
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     }
 
     // Reset input
