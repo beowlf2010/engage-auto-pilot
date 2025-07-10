@@ -98,7 +98,7 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         // Either combined vehicle field or separate fields
         (autoMapping.vehicle) || 
         (autoMapping.year && autoMapping.make && autoMapping.model)
-      ) && autoMapping.stockNumber;
+      ); // Removed stockNumber requirement to be more lenient
 
       if (!hasMinimalMapping) {
         console.log('🔍 [FIELD MAPPING CHECK] Auto-detection insufficient, showing field mapper');
