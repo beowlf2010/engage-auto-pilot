@@ -68,6 +68,8 @@ export const mapRowToInventoryItem = (
       // Use standard extraction methods for regular inventory files
       try {
         console.log('🔧 [INVENTORY MAPPER] Using standard field extraction');
+        console.log('🔧 [INVENTORY MAPPER] Upload condition:', condition);
+        console.log('🔧 [INVENTORY MAPPER] Row sample for format detection:', Object.fromEntries(Object.entries(row).slice(0, 3)));
         
         // Try vAuto-specific extraction first if this looks like a vAuto file
         const vautoData = extractVautoFields(row);
@@ -95,6 +97,8 @@ export const mapRowToInventoryItem = (
           };
         } else {
           console.log('🔧 [INVENTORY MAPPER] vAuto extraction failed, falling back to standard extraction');
+          console.log('🔧 [INVENTORY MAPPER] Available columns for standard extraction:', Object.keys(row));
+          
           mappedData = {
             ...extractVehicleFields(row),
             ...extractVINField(row),
@@ -102,6 +106,13 @@ export const mapRowToInventoryItem = (
             condition: condition === 'new' ? 'new' : 'used',
             status: 'available'
           };
+          
+          console.log('🔧 [INVENTORY MAPPER] Standard extraction result:', {
+            make: mappedData.make,
+            model: mappedData.model,
+            year: mappedData.year,
+            hasData: !!(mappedData.make && mappedData.model)
+          });
           
           // Try to supplement with any vAuto data that was extracted
           if (Object.keys(vautoData).length > 0) {
