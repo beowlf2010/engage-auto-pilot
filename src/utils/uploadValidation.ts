@@ -103,8 +103,8 @@ export const validateAndProcessInventoryRows = async (
             continue;
           }
 
-          // Prepare vehicle data for security definer function - only include existing database columns
-          const processedVehicle = {
+          // Prepare vehicle data for security definer function - only include defined values
+          const vehicleData = {
             make: vehicle.make,
             model: vehicle.model,
             year: vehicle.year || 2024,
@@ -133,6 +133,11 @@ export const validateAndProcessInventoryRows = async (
             created_at: vehicle.created_at || new Date().toISOString(),
             updated_at: vehicle.updated_at || new Date().toISOString()
           };
+
+          // Filter out undefined values to prevent database insertion errors
+          const processedVehicle = Object.fromEntries(
+            Object.entries(vehicleData).filter(([key, value]) => value !== undefined)
+          );
 
           vehiclesToInsert.push(processedVehicle);
           
