@@ -9,6 +9,7 @@ import { LeadDetailData } from '@/services/leadDetailService';
 import VehicleRecommendationsTab from './VehicleRecommendationsTab';
 import LeadScoringCard from '../LeadScoringCard';
 import ChurnPredictionCard from '../ChurnPredictionCard';
+import AIIntelligenceHub from '../../ai/AIIntelligenceHub';
 
 interface LeadTabsSectionProps {
   lead: LeadDetailData;
@@ -48,13 +49,14 @@ const LeadTabsSection = ({ lead }: LeadTabsSectionProps) => {
 
   return (
     <Tabs defaultValue="messaging" className="w-full">
-      <TabsList className="grid w-full grid-cols-6">
+      <TabsList className="grid w-full grid-cols-7">
         <TabsTrigger value="messaging">Messaging</TabsTrigger>
         <TabsTrigger value="ai-recommendations">AI Matches</TabsTrigger>
         <TabsTrigger value="scoring">Lead Score</TabsTrigger>
         <TabsTrigger value="churn">Churn Risk</TabsTrigger>
         <TabsTrigger value="activity">Activity</TabsTrigger>
         <TabsTrigger value="ai-automation">AI Automation</TabsTrigger>
+        <TabsTrigger value="ai-intelligence">🧠 AI Hub</TabsTrigger>
       </TabsList>
 
       <TabsContent value="messaging" className="mt-6">
@@ -83,6 +85,10 @@ const LeadTabsSection = ({ lead }: LeadTabsSectionProps) => {
           aiOptIn={lead.aiOptIn || false}
           onAIOptInChange={handleAIOptInChange}
         />
+      </TabsContent>
+
+      <TabsContent value="ai-intelligence" className="mt-6">
+        <AIIntelligenceHub leadId={lead.id} autoRefresh={true} />
       </TabsContent>
     </Tabs>
   );

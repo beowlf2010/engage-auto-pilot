@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_churn_predictions: {
+        Row: {
+          actual_outcome: string | null
+          churn_probability: number
+          contributing_factors: Json | null
+          created_at: string
+          days_until_predicted_churn: number | null
+          id: string
+          last_engagement_score: number | null
+          lead_id: string
+          predicted_at: string
+          prediction_confidence: number
+          recommended_interventions: Json | null
+          risk_level: string
+          updated_at: string
+          validated_at: string | null
+        }
+        Insert: {
+          actual_outcome?: string | null
+          churn_probability?: number
+          contributing_factors?: Json | null
+          created_at?: string
+          days_until_predicted_churn?: number | null
+          id?: string
+          last_engagement_score?: number | null
+          lead_id: string
+          predicted_at?: string
+          prediction_confidence?: number
+          recommended_interventions?: Json | null
+          risk_level?: string
+          updated_at?: string
+          validated_at?: string | null
+        }
+        Update: {
+          actual_outcome?: string | null
+          churn_probability?: number
+          contributing_factors?: Json | null
+          created_at?: string
+          days_until_predicted_churn?: number | null
+          id?: string
+          last_engagement_score?: number | null
+          lead_id?: string
+          predicted_at?: string
+          prediction_confidence?: number
+          recommended_interventions?: Json | null
+          risk_level?: string
+          updated_at?: string
+          validated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_churn_predictions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_context_learning: {
         Row: {
           confidence_score: number
@@ -283,6 +342,78 @@ export type Database = {
           },
         ]
       }
+      ai_generated_messages: {
+        Row: {
+          ai_confidence: number
+          approved_by: string | null
+          created_at: string
+          effectiveness_score: number | null
+          generated_content: string
+          human_approved: boolean | null
+          id: string
+          lead_id: string
+          message_type: string
+          personalization_factors: Json | null
+          rejected_reason: string | null
+          response_received: boolean | null
+          response_sentiment: string | null
+          sent_at: string | null
+          template_used: string | null
+          tone_style: string
+        }
+        Insert: {
+          ai_confidence?: number
+          approved_by?: string | null
+          created_at?: string
+          effectiveness_score?: number | null
+          generated_content: string
+          human_approved?: boolean | null
+          id?: string
+          lead_id: string
+          message_type: string
+          personalization_factors?: Json | null
+          rejected_reason?: string | null
+          response_received?: boolean | null
+          response_sentiment?: string | null
+          sent_at?: string | null
+          template_used?: string | null
+          tone_style?: string
+        }
+        Update: {
+          ai_confidence?: number
+          approved_by?: string | null
+          created_at?: string
+          effectiveness_score?: number | null
+          generated_content?: string
+          human_approved?: boolean | null
+          id?: string
+          lead_id?: string
+          message_type?: string
+          personalization_factors?: Json | null
+          rejected_reason?: string | null
+          response_received?: boolean | null
+          response_sentiment?: string | null
+          sent_at?: string | null
+          template_used?: string | null
+          tone_style?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generated_messages_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generated_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_insights: {
         Row: {
           action_recommendations: Json | null
@@ -330,6 +461,78 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ai_inventory_matches: {
+        Row: {
+          confidence_level: number
+          created_at: string
+          id: string
+          inventory_id: string
+          lead_id: string
+          lead_interaction: string | null
+          lead_preferences: Json | null
+          match_reasons: Json | null
+          match_score: number
+          match_type: string
+          personalized_pitch: string | null
+          presentation_order: number | null
+          pricing_strategy: Json | null
+          shown_to_lead_at: string | null
+          updated_at: string
+          vehicle_highlights: Json | null
+        }
+        Insert: {
+          confidence_level?: number
+          created_at?: string
+          id?: string
+          inventory_id: string
+          lead_id: string
+          lead_interaction?: string | null
+          lead_preferences?: Json | null
+          match_reasons?: Json | null
+          match_score?: number
+          match_type?: string
+          personalized_pitch?: string | null
+          presentation_order?: number | null
+          pricing_strategy?: Json | null
+          shown_to_lead_at?: string | null
+          updated_at?: string
+          vehicle_highlights?: Json | null
+        }
+        Update: {
+          confidence_level?: number
+          created_at?: string
+          id?: string
+          inventory_id?: string
+          lead_id?: string
+          lead_interaction?: string | null
+          lead_preferences?: Json | null
+          match_reasons?: Json | null
+          match_score?: number
+          match_type?: string
+          personalized_pitch?: string | null
+          presentation_order?: number | null
+          pricing_strategy?: Json | null
+          shown_to_lead_at?: string | null
+          updated_at?: string
+          vehicle_highlights?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_inventory_matches_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_inventory_matches_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_lead_scores: {
         Row: {
@@ -966,6 +1169,72 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ai_notifications: {
+        Row: {
+          action_taken_at: string | null
+          ai_confidence: number
+          assigned_to: string | null
+          created_at: string
+          dismissed_at: string | null
+          expires_at: string | null
+          id: string
+          lead_id: string
+          message: string
+          metadata: Json | null
+          notification_type: string
+          read_at: string | null
+          title: string
+          urgency_level: string
+        }
+        Insert: {
+          action_taken_at?: string | null
+          ai_confidence?: number
+          assigned_to?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          expires_at?: string | null
+          id?: string
+          lead_id: string
+          message: string
+          metadata?: Json | null
+          notification_type: string
+          read_at?: string | null
+          title: string
+          urgency_level?: string
+        }
+        Update: {
+          action_taken_at?: string | null
+          ai_confidence?: number
+          assigned_to?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          expires_at?: string | null
+          id?: string
+          lead_id?: string
+          message?: string
+          metadata?: Json | null
+          notification_type?: string
+          read_at?: string | null
+          title?: string
+          urgency_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_notifications_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_notifications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_personalization_rules: {
         Row: {
