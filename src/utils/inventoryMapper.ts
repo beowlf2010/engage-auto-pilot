@@ -147,10 +147,10 @@ export const mapRowToInventoryItem = (
 
     // Build clean inventory item without wrapped undefined objects
     const inventoryItem: InventoryItem = {
-      id: '', // Database will assign real UUID
+      id: 'auto-generated', // Placeholder - database will generate UUID
       make: cleanedMake!,
       model: cleanedModel!,
-      vin: mappedData.vin || null,
+      vin: mappedData.vin || '',
       condition: mappedData.condition || finalCondition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
