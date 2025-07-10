@@ -78,10 +78,18 @@ export const mapRowToInventoryItem = (
         
         if (hasVautoData) {
           console.log('✅ [INVENTORY MAPPER] vAuto extraction successful, using as primary data:', vautoData);
+          
+          // Extract other fields that might have wrapped undefined objects
+          const vinData = extractVINField(row);
+          const optionsData = extractOptionsFields(row);
+          
+          console.log('🔍 [INVENTORY MAPPER] VIN extraction result:', vinData);
+          console.log('🔍 [INVENTORY MAPPER] Options extraction result:', optionsData);
+          
           mappedData = {
             ...vautoData,
-            ...extractVINField(row),
-            ...extractOptionsFields(row),
+            ...vinData,
+            ...optionsData,
             condition: condition === 'new' ? 'new' : 'used',
             status: 'available'
           };
@@ -176,12 +184,22 @@ export const mapRowToInventoryItem = (
       updated_at: currentTimestamp,
       // Spread other mapped data while filtering out undefined values
       ...Object.fromEntries(
-        Object.entries(mappedData).filter(([key, value]) => 
-          key !== 'id' && // Don't include any id field
-          value !== undefined && 
-          value !== null &&
-          value !== ''
-        )
+        Object.entries(mappedData).filter(([key, value]) => {
+          // Skip id field
+          if (key === 'id') return false;
+          
+          // Skip undefined, null, or empty values
+          if (value === undefined || value === null || value === '') return false;
+          
+          // Skip wrapped undefined objects (these seem to come from some serialization process)
+          if (typeof value === 'object' && value !== null && 
+              (value as any)._type === 'undefined' && (value as any).value === 'undefined') {
+            console.log(`🧹 Filtering out wrapped undefined object for ${key}:`, value);
+            return false;
+          }
+          
+          return true;
+        })
       )
     } as InventoryItem;
 
