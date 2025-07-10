@@ -223,19 +223,19 @@ const DataUploadCenter = ({ user }: DataUploadCenterProps) => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview">
+          <TabsContent value="overview" className="focus:outline-none">
             <OverviewTab />
           </TabsContent>
 
-          <TabsContent value="leads">
+          <TabsContent value="leads" className="focus:outline-none" onDragOver={(e) => e.preventDefault()}>
             <UploadLeads user={user} />
           </TabsContent>
 
-          <TabsContent value="inventory">
+          <TabsContent value="inventory" className="focus:outline-none" onDragOver={(e) => e.preventDefault()}>
             <InventoryUpload user={user} />
           </TabsContent>
 
-          <TabsContent value="financial">
+          <TabsContent value="financial" className="focus:outline-none" onDragOver={(e) => e.preventDefault()}>
             <FlexibleFinancialUpload user={user} />
           </TabsContent>
         </Tabs>

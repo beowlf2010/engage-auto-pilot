@@ -29,18 +29,19 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
     e.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      setLastUploadedFile(file.name);
-      console.log('📁 [UPLOAD AREA] File dropped, calling onFilesSelected:', file.name);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const fileNames = Array.from(e.dataTransfer.files).map(f => f.name);
+      setLastUploadedFile(fileNames.length === 1 ? fileNames[0] : `${fileNames.length} files`);
+      console.log('📁 [UPLOAD AREA] Files dropped, calling onFilesSelected:', fileNames);
       onFilesSelected(e.dataTransfer.files);
     }
   };
 
   const handleFileSelect = (files: FileList) => {
-    if (files && files[0]) {
-      setLastUploadedFile(files[0].name);
-      console.log('📁 [UPLOAD AREA] File selected, calling onFilesSelected:', files[0].name);
+    if (files && files.length > 0) {
+      const fileNames = Array.from(files).map(f => f.name);
+      setLastUploadedFile(fileNames.length === 1 ? fileNames[0] : `${fileNames.length} files`);
+      console.log('📁 [UPLOAD AREA] Files selected, calling onFilesSelected:', fileNames);
       onFilesSelected(files);
     }
   };
@@ -97,21 +98,22 @@ const UploadArea = ({ onFilesSelected, uploading }: UploadAreaProps) => {
               
               <div>
                 <p className="text-lg font-medium text-slate-800 mb-2">
-                  Drop your file here
+                  Drop your files here
                 </p>
                 <p className="text-slate-600 mb-4">
-                  or click to browse and select a file
+                  or click to browse and select multiple files
                 </p>
                 <Button 
                   onClick={() => fileInputRef.current?.click()}
                   className="mx-auto"
                 >
-                  Choose File
+                  Choose Files
                 </Button>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept=".csv,.xlsx,.xls,.txt"
+                  multiple
                   onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
                   className="hidden"
                 />
