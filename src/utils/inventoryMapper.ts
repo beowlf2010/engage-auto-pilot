@@ -212,30 +212,33 @@ export const mapRowToInventoryItem = (
 
 // Helper function to validate if a row contains valid vehicle data
 const isValidVehicleDataRow = (row: Record<string, any>): boolean => {
-  // Check for common header patterns that should be skipped
-  const headerPatterns = [
-    /^photos?$/i,
-    /^vAuto\s*Network$/i,
-    /^(stock\s*#|stock\s*number)$/i,
-    /^(year|make|model|trim)$/i,
-    /^(price|mileage|condition)$/i
-  ];
+  console.log('🔍 [VALIDATION] Checking row validity:', Object.keys(row).slice(0, 3));
   
   const values = Object.values(row);
   const firstValue = values[0]?.toString()?.toLowerCase()?.trim();
   
-  // If the first value matches header patterns, it's likely a header row
-  if (firstValue && headerPatterns.some(pattern => pattern.test(firstValue))) {
-    console.log('❌ [VALIDATION] Row appears to be headers:', firstValue);
+  console.log('🔍 [VALIDATION] First value:', firstValue);
+  console.log('🔍 [VALIDATION] All values sample:', values.slice(0, 5));
+  
+  // Very strict header patterns - only reject obvious headers
+  const strictHeaderPatterns = [
+    /^photos?$/i,
+    /^vAuto\s*Network$/i
+  ];
+  
+  // Only reject if first value is clearly a header
+  if (firstValue && strictHeaderPatterns.some(pattern => pattern.test(firstValue))) {
+    console.log('❌ [VALIDATION] Row rejected - clear header pattern:', firstValue);
     return false;
   }
   
-  // Check for at least some non-empty values
+  // Very lenient validation - just need some data
   const nonEmptyValues = values.filter(v => v && v.toString().trim()).length;
-  if (nonEmptyValues < 2) {
-    console.log('❌ [VALIDATION] Row has too few non-empty values:', nonEmptyValues);
+  if (nonEmptyValues === 0) {
+    console.log('❌ [VALIDATION] Row rejected - completely empty');
     return false;
   }
   
+  console.log('✅ [VALIDATION] Row accepted - appears to be data');
   return true;
 };
