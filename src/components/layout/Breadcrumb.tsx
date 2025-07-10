@@ -16,7 +16,7 @@ const Breadcrumb: React.FC = () => {
     'financial-dashboard': 'Financial',
     'analytics': 'Analytics',
     'settings': 'Settings',
-    'upload-inventory': 'Upload Inventory',
+    'data-upload': 'Data Upload Center',
     'predictive-analytics': 'Predictive Analytics',
     'message-export': 'Message Export',
     'admin-dashboard': 'Admin Dashboard',

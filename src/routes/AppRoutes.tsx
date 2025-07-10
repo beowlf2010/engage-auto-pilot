@@ -13,10 +13,9 @@ import { AppErrorBoundary } from '@/components/error/AppErrorBoundary';
 // Lazy load pages for better performance
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const LeadsPage = lazy(() => import('@/pages/LeadsPage'));
-const UploadLeadsPage = lazy(() => import('@/pages/UploadLeadsPage'));
+const DataUploadCenterPage = lazy(() => import('@/pages/DataUploadCenterPage'));
 const SmartInboxPage = lazy(() => import('@/pages/SmartInboxPage'));
 const InventoryDashboardPage = lazy(() => import('@/pages/InventoryDashboardPage'));
-const InventoryUploadPage = lazy(() => import('@/pages/InventoryUploadPage'));
 const RPOInsightsPage = lazy(() => import('@/pages/RPOInsightsPage'));
 const RPODatabasePage = lazy(() => import('@/pages/RPODatabasePage'));
 const FinancialDashboardPage = lazy(() => import('@/pages/FinancialDashboardPage'));
@@ -71,9 +70,10 @@ const AppRoutes = () => {
           </RouteWrapper>
         } />
         
-        <Route path="/upload-leads" element={
-          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Upload Leads">
-            <UploadLeadsPage />
+        {/* Data Upload Center */}
+        <Route path="/data-upload" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Data Upload Center">
+            <DataUploadCenterPage />
           </RouteWrapper>
         } />
         
@@ -94,12 +94,6 @@ const AppRoutes = () => {
         <Route path="/inventory-dashboard" element={
           <InventoryLayout>
             <InventoryDashboardPage />
-          </InventoryLayout>
-        } />
-        
-        <Route path="/upload-inventory" element={
-          <InventoryLayout>
-            <InventoryUploadPage />
           </InventoryLayout>
         } />
         

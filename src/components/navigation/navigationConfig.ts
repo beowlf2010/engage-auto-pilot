@@ -50,9 +50,9 @@ export const navigationItems: NavigationItem[] = [
     access: ['admin', 'manager', 'sales']
   },
   {
-    label: 'Upload Leads',
-    href: '/upload-leads',
-    icon: FileSpreadsheet,
+    label: 'Upload Data',
+    href: '/data-upload',
+    icon: Upload,
     access: ['admin', 'manager']
   },
   {
@@ -66,12 +66,6 @@ export const navigationItems: NavigationItem[] = [
     href: '/inventory-dashboard',
     icon: Package,
     access: ['admin', 'manager', 'sales']
-  },
-  {
-    label: 'Upload Inventory',
-    href: '/upload-inventory',
-    icon: Upload,
-    access: ['admin', 'manager']
   },
   {
     label: 'RPO Insights',
