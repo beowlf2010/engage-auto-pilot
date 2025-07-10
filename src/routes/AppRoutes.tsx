@@ -34,6 +34,10 @@ const AIPerformanceDashboardPage = lazy(() => import('@/pages/AIPerformanceDashb
 const AITrainingCenterPage = lazy(() => import('@/pages/AITrainingCenterPage'));
 const AIOptInDashboardPage = lazy(() => import('@/pages/AIOptInDashboardPage'));
 const PublicSalesProfile = lazy(() => import('@/components/sales-profiles/PublicSalesProfile'));
+const AINotificationsPage = lazy(() => import('@/pages/AINotificationsPage'));
+const AIAnalyticsDashboardPage = lazy(() => import('@/pages/AIAnalyticsDashboardPage'));
+const AIWorkflowsPage = lazy(() => import('@/pages/AIWorkflowsPage'));
+const AITemperaturePage = lazy(() => import('@/pages/AITemperaturePage'));
 
 import { RouteWrapper } from '@/components/routes/RouteWrapper';
 
@@ -148,6 +152,30 @@ const AppRoutes = () => {
         <Route path="/ai-opt-ins" element={
           <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Opt-In Management">
             <AIOptInDashboardPage />
+          </RouteWrapper>
+        } />
+
+        <Route path="/ai-notifications" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Notifications">
+            <AINotificationsPage />
+          </RouteWrapper>
+        } />
+
+        <Route path="/ai-analytics" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Analytics">
+            <AIAnalyticsDashboardPage />
+          </RouteWrapper>
+        } />
+
+        <Route path="/ai-workflows" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Workflows">
+            <AIWorkflowsPage />
+          </RouteWrapper>
+        } />
+
+        <Route path="/ai-temperature" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Lead Temperature">
+            <AITemperaturePage />
           </RouteWrapper>
         } />
         

@@ -14,7 +14,11 @@ import {
   Shield,
   Palette,
   FileSpreadsheet,
-  Zap
+  Zap,
+  Bell,
+  Activity,
+  Workflow,
+  Thermometer
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -116,6 +120,30 @@ export const navigationItems: NavigationItem[] = [
     href: '/ai-opt-ins',
     icon: Bot,
     access: ['admin', 'manager']
+  },
+  {
+    label: 'AI Notifications',
+    href: '/ai-notifications',
+    icon: Bell,
+    access: ['admin', 'manager', 'sales']
+  },
+  {
+    label: 'AI Analytics',
+    href: '/ai-analytics',
+    icon: Activity,
+    access: ['admin', 'manager']
+  },
+  {
+    label: 'AI Workflows',
+    href: '/ai-workflows',
+    icon: Workflow,
+    access: ['admin', 'manager']
+  },
+  {
+    label: 'Lead Temperature',
+    href: '/ai-temperature',
+    icon: Thermometer,
+    access: ['admin', 'manager', 'sales']
   },
   {
     label: 'Sales Dashboard',
