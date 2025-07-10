@@ -243,11 +243,11 @@ const UploadLeads = ({ user }: UploadLeadsProps = {}) => {
             Import leads from CSV files with intelligent field mapping using ultimate bypass upload
           </p>
         </div>
-        {uploadResult && (
-          <Button onClick={clearResults} variant="outline">
-            Upload New File
+        <div className="flex space-x-4">
+          <Button onClick={() => setShowSequentialModal(true)} variant="outline">
+            Sequential Upload (Multiple Files)
           </Button>
-        )}
+        </div>
       </div>
 
       {/* Ultimate Bypass Upload Notice */}
