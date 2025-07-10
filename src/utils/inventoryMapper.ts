@@ -45,16 +45,16 @@ export const mapRowToInventoryItem = (
   condition: UploadCondition,
   uploadId: string
 ): InventoryItem => {
-  console.log('=== INVENTORY MAPPING DEBUG ===');
-  console.log('Condition:', condition);
-  console.log('Available columns:', Object.keys(row));
-  console.log('Sample row data (first 3 columns):', Object.fromEntries(Object.entries(row).slice(0, 3)));
-  console.log('Raw row data sample:', { 
-    firstKey: Object.keys(row)[0], 
-    firstValue: Object.values(row)[0],
-    secondKey: Object.keys(row)[1], 
-    secondValue: Object.values(row)[1] 
-  });
+  console.log('🔧 [INVENTORY MAPPER] === ENHANCED INVENTORY MAPPING ===');
+  console.log('🔧 [INVENTORY MAPPER] Upload condition:', condition);
+  console.log('🔧 [INVENTORY MAPPER] Available columns:', Object.keys(row));
+  console.log('🔧 [INVENTORY MAPPER] Sample row data:', Object.fromEntries(Object.entries(row).slice(0, 3)));
+
+  // Pre-validation: Check if this row contains valid vehicle data
+  if (!isValidVehicleDataRow(row)) {
+    console.error('❌ [INVENTORY MAPPER] Row validation failed - not vehicle data:', row);
+    throw new Error('Invalid vehicle data row - appears to be headers or metadata');
+  }
 
   let mappedData: any;
   const currentTimestamp = new Date().toISOString();
@@ -62,116 +62,78 @@ export const mapRowToInventoryItem = (
   try {
     // Determine file type and use appropriate extraction
     if (condition === 'gm_global') {
-      console.log('Using GM Global extraction for comprehensive data capture');
+      console.log('🔧 [INVENTORY MAPPER] Using GM Global extraction');
       mappedData = extractGMGlobalFields(row);
     } else {
-      // Use standard extraction methods for regular inventory files
-      try {
-        console.log('🔧 [INVENTORY MAPPER] Using standard field extraction');
-        console.log('🔧 [INVENTORY MAPPER] Upload condition:', condition);
-        console.log('🔧 [INVENTORY MAPPER] Row sample for format detection:', Object.fromEntries(Object.entries(row).slice(0, 3)));
-        
-        // Try vAuto-specific extraction first if this looks like a vAuto file
-        const vautoData = extractVautoFields(row);
-        const hasVautoData = vautoData.make && vautoData.model;
-        
-        console.log('🔧 [INVENTORY MAPPER] vAuto extraction result:', vautoData);
-        console.log('🔧 [INVENTORY MAPPER] Has valid vAuto data:', hasVautoData);
-        
-        if (hasVautoData) {
-          console.log('✅ [INVENTORY MAPPER] vAuto extraction successful, using as primary data:', vautoData);
-          
-          // Extract other fields that might have wrapped undefined objects
-          const vinData = extractVINField(row);
-          const optionsData = extractOptionsFields(row);
-          
-          console.log('🔍 [INVENTORY MAPPER] VIN extraction result:', vinData);
-          console.log('🔍 [INVENTORY MAPPER] Options extraction result:', optionsData);
-          
-          mappedData = {
-            ...vautoData,
-            ...vinData,
-            ...optionsData,
-            condition: condition === 'new' ? 'new' : 'used',
-            status: 'available'
-          };
-        } else {
-          console.log('🔧 [INVENTORY MAPPER] vAuto extraction failed, falling back to standard extraction');
-          console.log('🔧 [INVENTORY MAPPER] Available columns for standard extraction:', Object.keys(row));
-          
-          mappedData = {
-            ...extractVehicleFields(row),
-            ...extractVINField(row),
-            ...extractOptionsFields(row),
-            condition: condition === 'new' ? 'new' : 'used',
-            status: 'available'
-          };
-          
-          console.log('🔧 [INVENTORY MAPPER] Standard extraction result:', {
-            make: mappedData.make,
-            model: mappedData.model,
-            year: mappedData.year,
-            hasData: !!(mappedData.make && mappedData.model)
-          });
-          
-          // Try to supplement with any vAuto data that was extracted
-          if (Object.keys(vautoData).length > 0) {
-            console.log('🔧 [INVENTORY MAPPER] Supplementing with partial vAuto data:', vautoData);
-            mappedData = { ...mappedData, ...vautoData };
-          }
-        }
-
-        console.log('✅ [INVENTORY MAPPER] Final extraction result:', {
-          make: mappedData.make,
-          model: mappedData.model,
-          year: mappedData.year,
-          vin: mappedData.vin,
-          source: hasVautoData ? 'vAuto' : 'standard'
-        });
-      } catch (error) {
-        console.error('💥 [INVENTORY MAPPER] Error in field extraction:', error);
-        // Fallback to basic mapping
+      console.log('🔧 [INVENTORY MAPPER] Using standard field extraction');
+      
+      // Try vAuto-specific extraction first if this looks like a vAuto file
+      const vautoData = extractVautoFields(row);
+      const hasVautoData = vautoData.make && vautoData.model;
+      
+      console.log('🔧 [INVENTORY MAPPER] vAuto extraction result:', {
+        make: vautoData.make,
+        model: vautoData.model,
+        hasValidData: hasVautoData
+      });
+      
+      if (hasVautoData) {
+        console.log('✅ [INVENTORY MAPPER] Using vAuto extraction');
         mappedData = {
-          make: row.make || row.Make || null,
-          model: row.model || row.Model || null,
+          ...vautoData,
+          ...extractVINField(row),
+          ...extractOptionsFields(row),
           condition: condition === 'new' ? 'new' : 'used',
           status: 'available'
         };
+      } else {
+        console.log('🔧 [INVENTORY MAPPER] Using standard field extraction');
+        mappedData = {
+          ...extractVehicleFields(row),
+          ...extractVINField(row),
+          ...extractOptionsFields(row),
+          condition: condition === 'new' ? 'new' : 'used',
+          status: 'available'
+        };
+        
+        // Try to supplement with any vAuto data that was extracted
+        if (Object.keys(vautoData).length > 0) {
+          mappedData = { ...mappedData, ...vautoData };
+        }
       }
     }
+
+    console.log('🔧 [INVENTORY MAPPER] Raw extraction result:', {
+      make: mappedData.make,
+      model: mappedData.model,
+      year: mappedData.year,
+      vin: mappedData.vin
+    });
 
     // Clean and validate make/model data
     const cleanedMake = cleanVehicleData(mappedData.make);
     const cleanedModel = cleanVehicleData(mappedData.model);
 
-    console.log('🔍 Field extraction results:');
-    console.log('- Original make:', mappedData.make);
-    console.log('- Original model:', mappedData.model);
-    console.log('- Cleaned make:', cleanedMake);
-    console.log('- Cleaned model:', cleanedModel);
+    console.log('🔍 [INVENTORY MAPPER] Data cleaning results:', {
+      originalMake: mappedData.make,
+      originalModel: mappedData.model,
+      cleanedMake,
+      cleanedModel
+    });
 
-    // More flexible validation for vehicle data
+    // Validate essential vehicle data
     if (!cleanedMake || !cleanedModel) {
-      console.warn('❌ Missing essential vehicle data after cleaning:', {
-        originalMake: mappedData.make,
-        originalModel: mappedData.model,
+      console.error('❌ [INVENTORY MAPPER] Missing essential vehicle data:', {
         cleanedMake,
         cleanedModel,
         availableColumns: Object.keys(row),
-        firstRowSample: Object.fromEntries(Object.entries(row).slice(0, 5))
+        sampleData: Object.fromEntries(Object.entries(row).slice(0, 5))
       });
       
       throw new Error(`Missing essential vehicle data: make="${cleanedMake}", model="${cleanedModel}"`);
     }
     
-    // Additional validation for reasonable data
     if (!isValidVehicleData(cleanedMake, cleanedModel)) {
-      console.warn('❌ Invalid vehicle data detected:', {
-        cleanedMake,
-        cleanedModel,
-        reason: 'Failed validity check'
-      });
-      
       throw new Error(`Invalid vehicle data: make="${cleanedMake}", model="${cleanedModel}"`);
     }
 
@@ -183,7 +145,7 @@ export const mapRowToInventoryItem = (
       finalCondition = condition;
     }
 
-    // Build clean inventory item without temporary ID - let database assign real UUID
+    // Build clean inventory item without wrapped undefined objects
     const inventoryItem: InventoryItem = {
       make: cleanedMake!,
       model: cleanedModel!,
@@ -193,19 +155,16 @@ export const mapRowToInventoryItem = (
       upload_history_id: uploadId,
       created_at: currentTimestamp,
       updated_at: currentTimestamp,
-      // Spread other mapped data while filtering out undefined values
+      // Filter out problematic values
       ...Object.fromEntries(
         Object.entries(mappedData).filter(([key, value]) => {
-          // Skip id field
           if (key === 'id') return false;
-          
-          // Skip undefined, null, or empty values
           if (value === undefined || value === null || value === '') return false;
           
-          // Skip wrapped undefined objects (these seem to come from some serialization process)
+          // Filter out wrapped undefined objects
           if (typeof value === 'object' && value !== null && 
               (value as any)._type === 'undefined' && (value as any).value === 'undefined') {
-            console.log(`🧹 Filtering out wrapped undefined object for ${key}:`, value);
+            console.log(`🧹 [INVENTORY MAPPER] Filtered wrapped undefined: ${key}`);
             return false;
           }
           
@@ -214,7 +173,7 @@ export const mapRowToInventoryItem = (
       )
     } as InventoryItem;
 
-    // Set source_report based on condition and data type
+    // Set source_report based on condition
     if (condition === 'gm_global' || mappedData.gm_order_number) {
       inventoryItem.source_report = 'orders_all';
     } else if (condition === 'new') {
@@ -223,7 +182,7 @@ export const mapRowToInventoryItem = (
       inventoryItem.source_report = 'merch_inv_view';
     }
 
-    // Calculate delivery variance if we have both dates
+    // Calculate delivery variance if available
     if (inventoryItem.actual_delivery_date && inventoryItem.estimated_delivery_date) {
       try {
         const actualDate = new Date(inventoryItem.actual_delivery_date);
@@ -236,24 +195,47 @@ export const mapRowToInventoryItem = (
       }
     }
 
-    console.log('Final mapped inventory item:', {
+    console.log('✅ [INVENTORY MAPPER] Successfully mapped inventory item:', {
       make: inventoryItem.make,
       model: inventoryItem.model,
       condition: inventoryItem.condition,
       source_report: inventoryItem.source_report,
-      gm_order_number: inventoryItem.gm_order_number,
-      customer_name: inventoryItem.customer_name,
-      estimated_delivery_date: inventoryItem.estimated_delivery_date,
-      hasGMData: !!(inventoryItem.gm_order_number || inventoryItem.customer_name),
-      created_at: inventoryItem.created_at,
-      updated_at: inventoryItem.updated_at
+      hasGmData: !!(inventoryItem.gm_order_number || inventoryItem.customer_name)
     });
 
     return inventoryItem;
   } catch (error) {
-    console.error('Critical error in mapRowToInventoryItem:', error);
-    
-    // Don't create invalid inventory items - let the error bubble up
+    console.error('💥 [INVENTORY MAPPER] Critical mapping error:', error);
     throw new Error(`Failed to map vehicle data: ${error.message}`);
   }
+};
+
+// Helper function to validate if a row contains valid vehicle data
+const isValidVehicleDataRow = (row: Record<string, any>): boolean => {
+  // Check for common header patterns that should be skipped
+  const headerPatterns = [
+    /^photos?$/i,
+    /^vAuto\s*Network$/i,
+    /^(stock\s*#|stock\s*number)$/i,
+    /^(year|make|model|trim)$/i,
+    /^(price|mileage|condition)$/i
+  ];
+  
+  const values = Object.values(row);
+  const firstValue = values[0]?.toString()?.toLowerCase()?.trim();
+  
+  // If the first value matches header patterns, it's likely a header row
+  if (firstValue && headerPatterns.some(pattern => pattern.test(firstValue))) {
+    console.log('❌ [VALIDATION] Row appears to be headers:', firstValue);
+    return false;
+  }
+  
+  // Check for at least some non-empty values
+  const nonEmptyValues = values.filter(v => v && v.toString().trim()).length;
+  if (nonEmptyValues < 2) {
+    console.log('❌ [VALIDATION] Row has too few non-empty values:', nonEmptyValues);
+    return false;
+  }
+  
+  return true;
 };
