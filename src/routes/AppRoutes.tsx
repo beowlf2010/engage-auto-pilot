@@ -6,6 +6,7 @@ import AuthPage from '@/components/auth/AuthPage';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AppLayout from '@/components/layout/AppLayout';
 import MobileLayout from '@/components/layout/MobileLayout';
+import InventoryLayout from '@/components/layout/InventoryLayout';
 import { SimpleLoading } from '@/components/ui/SimpleLoading';
 import { AppErrorBoundary } from '@/components/error/AppErrorBoundary';
 
@@ -91,27 +92,27 @@ const AppRoutes = () => {
         
         {/* Inventory */}
         <Route path="/inventory-dashboard" element={
-          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Inventory Dashboard">
+          <InventoryLayout>
             <InventoryDashboardPage />
-          </RouteWrapper>
+          </InventoryLayout>
         } />
         
         <Route path="/upload-inventory" element={
-          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Upload Inventory">
+          <InventoryLayout>
             <InventoryUploadPage />
-          </RouteWrapper>
+          </InventoryLayout>
         } />
         
         <Route path="/rpo-insights" element={
-          <RouteWrapper LayoutComponent={LayoutComponent} routeName="RPO Insights">
+          <InventoryLayout>
             <RPOInsightsPage />
-          </RouteWrapper>
+          </InventoryLayout>
         } />
         
         <Route path="/rpo-database" element={
-          <RouteWrapper LayoutComponent={LayoutComponent} routeName="RPO Database">
+          <InventoryLayout>
             <RPODatabasePage />
-          </RouteWrapper>
+          </InventoryLayout>
         } />
         
         {/* Analytics */}
