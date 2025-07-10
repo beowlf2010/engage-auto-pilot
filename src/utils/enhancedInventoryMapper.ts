@@ -126,10 +126,10 @@ export const mapRowToInventoryItemEnhanced = async (
       'id', 'make', 'model', 'year', 'vin', 'condition', 'status', 'price', 'msrp',
       'mileage', 'exterior_color', 'interior_color', 'transmission', 'drivetrain',
       'fuel_type', 'engine', 'body_style', 'doors', 'seats', 'trim', 'stock_number',
-      'location', 'uploaded_by', 'upload_history_id', 'created_at', 'updated_at',
+      'lot_location', 'uploaded_by', 'upload_history_id', 'created_at', 'updated_at',
       'rpo_codes', 'rpo_descriptions', 'days_in_inventory', 'source_report',
       'gm_order_number', 'customer_name', 'estimated_delivery_date', 'actual_delivery_date',
-      'delivery_variance_days', 'gm_status_description', 'leads_count'
+      'delivery_variance_days', 'gm_status_description', 'leads_count', 'invoice', 'description', 'notes'
     ]);
 
     // Filter mapped data to only include valid columns
