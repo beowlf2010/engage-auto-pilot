@@ -103,7 +103,7 @@ export const validateAndProcessInventoryRows = async (
             continue;
           }
 
-          // Prepare vehicle data for security definer function
+          // Prepare vehicle data for security definer function - only include existing database columns
           const processedVehicle = {
             make: vehicle.make,
             model: vehicle.model,
@@ -115,27 +115,20 @@ export const validateAndProcessInventoryRows = async (
             price: vehicle.price || 0,
             mileage: vehicle.mileage || 0,
             body_style: vehicle.body_style,
-            exterior_color: (vehicle as any).exterior_color,
-            interior_color: (vehicle as any).interior_color,
             transmission: vehicle.transmission,
             engine: vehicle.engine,
             fuel_type: vehicle.fuel_type,
             drivetrain: vehicle.drivetrain,
             trim: vehicle.trim,
             msrp: vehicle.msrp || 0,
-            invoice_price: (vehicle as any).invoice_price || 0,
             days_in_inventory: vehicle.days_in_inventory || 0,
-            lot_location: (vehicle as any).lot_location || vehicle.location,
-            key_location: (vehicle as any).key_location,
             notes: (vehicle as any).notes,
             rpo_codes: vehicle.rpo_codes,
-            vehicle_description: (vehicle as any).vehicle_description,
             source_report: vehicle.source_report || 'uploaded',
             gm_order_number: vehicle.gm_order_number,
             customer_name: vehicle.customer_name,
             estimated_delivery_date: vehicle.estimated_delivery_date,
             actual_delivery_date: vehicle.actual_delivery_date,
-            gm_status_description: (vehicle as any).gm_status_description,
             delivery_variance_days: vehicle.delivery_variance_days || 0,
             created_at: vehicle.created_at || new Date().toISOString(),
             updated_at: vehicle.updated_at || new Date().toISOString()
