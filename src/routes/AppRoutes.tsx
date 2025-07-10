@@ -39,6 +39,7 @@ const AIAnalyticsDashboardPage = lazy(() => import('@/pages/AIAnalyticsDashboard
 const AIWorkflowsPage = lazy(() => import('@/pages/AIWorkflowsPage'));
 const AITemperaturePage = lazy(() => import('@/pages/AITemperaturePage'));
 const CallAnalysisPage = lazy(() => import('@/pages/CallAnalysisPage'));
+const WorkflowEnginePage = lazy(() => import('@/pages/WorkflowEnginePage'));
 
 import { RouteWrapper } from '@/components/routes/RouteWrapper';
 
@@ -183,6 +184,12 @@ const AppRoutes = () => {
         <Route path="/call-analysis" element={
           <RouteWrapper LayoutComponent={LayoutComponent} routeName="Call Analysis">
             <CallAnalysisPage />
+          </RouteWrapper>
+        } />
+
+        <Route path="/workflow-engine" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Workflow Engine">
+            <WorkflowEnginePage />
           </RouteWrapper>
         } />
         

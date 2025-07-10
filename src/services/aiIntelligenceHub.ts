@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { unifiedAIResponseEngine, MessageContext } from '@/services/unifiedAIResponseEngine';
 import { intelligentAutoApproval } from '@/services/intelligentAutoApproval';
 import { aiAutomationCoordinator } from '@/services/aiAutomationCoordinator';
+import { automatedWorkflowEngine } from '@/services/automatedWorkflowEngine';
 
 interface IntelligenceContext {
   leadId: string;
@@ -29,7 +30,10 @@ export class AIIntelligenceHub {
     // Start the advanced AI automation system
     await aiAutomationCoordinator.startAutomation();
     
-    console.log('✅ [AI HUB] Intelligence services initialized with advanced automation');
+    // Start the automated workflow engine
+    await automatedWorkflowEngine.startEngine();
+    
+    console.log('✅ [AI HUB] Intelligence services initialized with workflow automation');
   }
 
   async getIntelligenceInsights() {
