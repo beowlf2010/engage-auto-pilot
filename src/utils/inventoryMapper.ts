@@ -147,12 +147,14 @@ export const mapRowToInventoryItem = (
 
     // Build clean inventory item without wrapped undefined objects
     const inventoryItem: InventoryItem = {
+      id: '', // Database will assign real UUID
       make: cleanedMake!,
       model: cleanedModel!,
       vin: mappedData.vin || null,
       condition: mappedData.condition || finalCondition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
+      uploaded_by: null, // Set to null to satisfy RLS policy
       created_at: currentTimestamp,
       updated_at: currentTimestamp,
       // Filter out problematic values
