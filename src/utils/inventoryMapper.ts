@@ -145,7 +145,18 @@ export const mapRowToInventoryItem = (
       finalCondition = condition;
     }
 
-    // Build clean inventory item without wrapped undefined objects
+    // Valid inventory table columns based on database schema
+    const validColumns = new Set([
+      'id', 'make', 'model', 'year', 'vin', 'condition', 'status', 'price', 'msrp',
+      'mileage', 'exterior_color', 'interior_color', 'transmission', 'drivetrain',
+      'fuel_type', 'engine', 'body_style', 'doors', 'seats', 'trim', 'stock_number',
+      'location', 'uploaded_by', 'upload_history_id', 'created_at', 'updated_at',
+      'rpo_codes', 'rpo_descriptions', 'days_in_inventory', 'source_report',
+      'gm_order_number', 'customer_name', 'estimated_delivery_date', 'actual_delivery_date',
+      'delivery_variance_days', 'gm_status_description', 'leads_count'
+    ]);
+
+    // Build clean inventory item with only valid database columns
     const inventoryItem: InventoryItem = {
       id: 'auto-generated', // Placeholder - database will generate UUID
       make: cleanedMake!,
@@ -157,11 +168,17 @@ export const mapRowToInventoryItem = (
       uploaded_by: null, // Set to null to satisfy RLS policy
       created_at: currentTimestamp,
       updated_at: currentTimestamp,
-      // Filter out problematic values
+      // Filter out invalid fields and problematic values
       ...Object.fromEntries(
         Object.entries(mappedData).filter(([key, value]) => {
           if (key === 'id') return false;
           if (value === undefined || value === null || value === '') return false;
+          
+          // Only allow valid database columns
+          if (!validColumns.has(key)) {
+            console.log(`🧹 [INVENTORY MAPPER] Filtered invalid column: ${key} = ${value}`);
+            return false;
+          }
           
           // Filter out wrapped undefined objects
           if (typeof value === 'object' && value !== null && 

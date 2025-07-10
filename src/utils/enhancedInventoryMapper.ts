@@ -112,6 +112,26 @@ export const mapRowToInventoryItemEnhanced = (
     // Generate a temporary ID for the database to use
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+    // Valid inventory table columns based on database schema
+    const validColumns = new Set([
+      'id', 'make', 'model', 'year', 'vin', 'condition', 'status', 'price', 'msrp',
+      'mileage', 'exterior_color', 'interior_color', 'transmission', 'drivetrain',
+      'fuel_type', 'engine', 'body_style', 'doors', 'seats', 'trim', 'stock_number',
+      'location', 'uploaded_by', 'upload_history_id', 'created_at', 'updated_at',
+      'rpo_codes', 'rpo_descriptions', 'days_in_inventory', 'source_report',
+      'gm_order_number', 'customer_name', 'estimated_delivery_date', 'actual_delivery_date',
+      'delivery_variance_days', 'gm_status_description', 'leads_count'
+    ]);
+
+    // Filter mapped data to only include valid columns
+    const filteredMappedData = Object.fromEntries(
+      Object.entries(mappedData).filter(([key, value]) => {
+        if (validColumns.has(key)) return true;
+        console.log(`🧹 [ENHANCED MAPPER] Filtered invalid column: ${key} = ${value}`);
+        return false;
+      })
+    );
+
     // Final data preparation
     const inventoryItem: InventoryItem = {
       id: tempId, // Temporary ID, database will assign real UUID
@@ -124,7 +144,7 @@ export const mapRowToInventoryItemEnhanced = (
       source_report: mappedData.source_report,
       created_at: currentTimestamp,
       updated_at: currentTimestamp,
-      ...mappedData
+      ...filteredMappedData
     };
 
     // Calculate delivery variance for GM Global orders
