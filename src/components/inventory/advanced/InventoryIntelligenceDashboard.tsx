@@ -137,145 +137,128 @@ const InventoryIntelligenceDashboard = () => {
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-primary" />
-            AI Inventory Intelligence
+    <div className="space-y-6">
+      {/* Overview Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Velocity Score</p>
+              <p className={`text-2xl font-bold ${getScoreColor(metrics?.velocityScore || 0)}`}>
+                {metrics?.velocityScore || 0}
+              </p>
+            </div>
+            <Activity className="w-8 h-8 text-muted-foreground" />
           </div>
-          <Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-purple-50">
-            <Zap className="w-3 h-3 mr-1" />
-            Live Analysis
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="recommendations">AI Insights</TabsTrigger>
-            <TabsTrigger value="alerts">Alerts</TabsTrigger>
-            <TabsTrigger value="trends">Trends</TabsTrigger>
-          </TabsList>
+        </Card>
 
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 rounded-lg border bg-gradient-to-br from-blue-50 to-blue-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-700">Velocity Score</p>
-                    <p className={`text-2xl font-bold ${getScoreColor(metrics?.velocityScore || 0)}`}>
-                      {metrics?.velocityScore || 0}
-                    </p>
-                  </div>
-                  <Activity className="w-8 h-8 text-blue-600" />
-                </div>
-                <Progress value={metrics?.velocityScore || 0} className="mt-2" />
-              </div>
-
-              <div className="p-4 rounded-lg border bg-gradient-to-br from-green-50 to-green-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-700">Pricing Health</p>
-                    <p className={`text-2xl font-bold ${getScoreColor(metrics?.pricingHealth || 0)}`}>
-                      {metrics?.pricingHealth || 0}%
-                    </p>
-                  </div>
-                  <DollarSign className="w-8 h-8 text-green-600" />
-                </div>
-                <Progress value={metrics?.pricingHealth || 0} className="mt-2" />
-              </div>
-
-              <div className="p-4 rounded-lg border bg-gradient-to-br from-purple-50 to-purple-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-700">Turn Rate</p>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {metrics?.turnRate || 0}x
-                    </p>
-                  </div>
-                  <BarChart3 className="w-8 h-8 text-purple-600" />
-                </div>
-                <p className="text-xs text-purple-600 mt-2">Annual turns</p>
-              </div>
-
-              <div className="p-4 rounded-lg border bg-gradient-to-br from-orange-50 to-orange-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-orange-700">Profit Margin</p>
-                    <p className="text-2xl font-bold text-orange-600">
-                      {metrics?.profitMargin || 0}%
-                    </p>
-                  </div>
-                  <Target className="w-8 h-8 text-orange-600" />
-                </div>
-                <p className="text-xs text-orange-600 mt-2">Average gross</p>
-              </div>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Pricing Health</p>
+              <p className={`text-2xl font-bold ${getScoreColor(metrics?.pricingHealth || 0)}`}>
+                {metrics?.pricingHealth || 0}%
+              </p>
             </div>
+            <DollarSign className="w-8 h-8 text-muted-foreground" />
+          </div>
+        </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {metrics?.alerts.map((alert, index) => (
-                <div key={index} className="p-4 rounded-lg border">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant={getAlertColor(alert.severity)}>
-                      {alert.type.toUpperCase()}
-                    </Badge>
-                    <span className="text-2xl font-bold">{alert.count}</span>
-                  </div>
-                  <p className="text-sm text-gray-600 capitalize">
-                    {alert.type.replace('_', ' ')} vehicles need attention
-                  </p>
-                </div>
-              ))}
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Turn Rate</p>
+              <p className="text-2xl font-bold">
+                {metrics?.turnRate || 0}x
+              </p>
             </div>
-          </TabsContent>
+            <BarChart3 className="w-8 h-8 text-muted-foreground" />
+          </div>
+        </Card>
 
-          <TabsContent value="recommendations" className="space-y-4">
-            <div className="space-y-3">
-              {metrics?.aiRecommendations.map((rec, index) => (
-                <div key={index} className="p-4 rounded-lg border bg-gradient-to-r from-blue-50 to-purple-50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant={rec.priority === 'high' ? 'destructive' : rec.priority === 'medium' ? 'secondary' : 'outline'}>
-                          {rec.priority} priority
-                        </Badge>
-                        <Badge variant="outline">{rec.type}</Badge>
-                      </div>
-                      <p className="font-medium mb-1">{rec.message}</p>
-                      <p className="text-sm text-gray-600 mb-2">Impact: {rec.impact}</p>
-                      <p className="text-sm font-medium text-blue-600">
-                        Recommended Action: {rec.action}
-                      </p>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Profit Margin</p>
+              <p className="text-2xl font-bold">
+                {metrics?.profitMargin || 0}%
+              </p>
+            </div>
+            <Target className="w-8 h-8 text-muted-foreground" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Tabs for detailed views */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="recommendations">AI Insights</TabsTrigger>
+          <TabsTrigger value="alerts">Alerts</TabsTrigger>
+          <TabsTrigger value="trends">Trends</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          {/* Alert Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {metrics?.alerts.map((alert, index) => (
+              <Card key={index} className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <Badge variant={getAlertColor(alert.severity)}>
+                    {alert.type.toUpperCase()}
+                  </Badge>
+                  <span className="text-2xl font-bold">{alert.count}</span>
+                </div>
+                <p className="text-sm text-muted-foreground capitalize">
+                  {alert.type.replace('_', ' ')} vehicles need attention
+                </p>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="recommendations" className="space-y-4">
+          <div className="space-y-3">
+            {metrics?.aiRecommendations.map((rec, index) => (
+              <Card key={index} className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant={rec.priority === 'high' ? 'destructive' : rec.priority === 'medium' ? 'secondary' : 'outline'}>
+                        {rec.priority} priority
+                      </Badge>
+                      <Badge variant="outline">{rec.type}</Badge>
                     </div>
-                    <Button size="sm" variant="outline">
-                      Act Now
-                    </Button>
+                    <p className="font-medium mb-1">{rec.message}</p>
+                    <p className="text-sm text-muted-foreground mb-2">Impact: {rec.impact}</p>
+                    <p className="text-sm font-medium text-primary">
+                      Action: {rec.action}
+                    </p>
                   </div>
+                  <Button size="sm" variant="outline">
+                    Act Now
+                  </Button>
                 </div>
-              ))}
-            </div>
-          </TabsContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
 
-          <TabsContent value="alerts" className="space-y-4">
-            <div className="text-center text-gray-500 py-8">
-              <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <p>Real-time alert monitoring coming soon</p>
-              <p className="text-sm">Get notified about pricing changes, market shifts, and opportunities</p>
-            </div>
-          </TabsContent>
+        <TabsContent value="alerts" className="space-y-4">
+          <div className="text-center text-muted-foreground py-8">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-4" />
+            <p>Real-time alert monitoring coming soon</p>
+          </div>
+        </TabsContent>
 
-          <TabsContent value="trends" className="space-y-4">
-            <div className="text-center text-gray-500 py-8">
-              <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <p>Advanced trend analysis coming soon</p>
-              <p className="text-sm">Track seasonal patterns, market demand, and pricing trends</p>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+        <TabsContent value="trends" className="space-y-4">
+          <div className="text-center text-muted-foreground py-8">
+            <TrendingUp className="w-12 h-12 mx-auto mb-4" />
+            <p>Advanced trend analysis coming soon</p>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
 

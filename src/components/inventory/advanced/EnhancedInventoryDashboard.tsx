@@ -16,125 +16,97 @@ const EnhancedInventoryDashboard = () => {
   const [activeTab, setActiveTab] = useState('intelligence');
 
   return (
-    <div className="w-full space-y-8 animate-fade-in">
-      {/* Stunning Hero Header */}
-      <div className="relative overflow-hidden">
-        <Card className="border-0 bg-gradient-primary shadow-floating animate-scale-in">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-transparent to-accent/20 animate-pulse-glow" />
-          <CardHeader className="relative">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-white/20 rounded-2xl blur-xl animate-pulse-glow" />
-                  <div className="relative p-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 shadow-glow">
-                    <Brain className="w-8 h-8 text-white animate-float" />
-                  </div>
-                </div>
-                <div className="text-white">
-                  <h1 className="text-3xl font-bold mb-1 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80">
-                    Advanced Inventory Intelligence
-                  </h1>
-                  <p className="text-white/80 text-lg">AI-powered inventory management & optimization</p>
-                </div>
+    <div className="w-full max-w-7xl mx-auto space-y-6">
+      {/* Clean Header */}
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary text-primary-foreground">
+                <Brain className="w-5 h-5" />
               </div>
-              <div className="flex items-center gap-3">
-                <Badge className="bg-white/10 text-white border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all duration-300">
-                  <Sparkles className="w-3 h-3 mr-1 animate-pulse" />
-                  Live Analytics
-                </Badge>
-                <Button variant="secondary" size="sm" className="bg-white/10 text-white border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all duration-300">
-                  <Settings2 className="w-4 h-4 mr-2" />
-                  Configure
-                </Button>
+              <div>
+                <h1 className="text-xl font-semibold">Inventory Intelligence</h1>
+                <p className="text-sm text-muted-foreground">AI-powered insights and analytics</p>
               </div>
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">
+                <Zap className="w-3 h-3 mr-1" />
+                Live
+              </Badge>
+              <Button variant="outline" size="sm">
+                <Settings2 className="w-4 h-4 mr-1" />
+                Settings
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
 
-      {/* Enhanced Navigation Tabs */}
-      <Card className="border-0 shadow-elegant bg-gradient-subtle animate-slide-in-right">
+      {/* Clean Tabs */}
+      <Card className="border shadow-sm">
         <CardContent className="p-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="p-8 pb-0">
-              <TabsList className="grid w-full grid-cols-4 h-auto p-2 bg-gradient-surface shadow-card rounded-2xl border-0">
+            <div className="border-b">
+              <TabsList className="h-auto p-1 bg-transparent grid w-full grid-cols-4">
                 <TabsTrigger 
                   value="intelligence" 
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl transition-all duration-300 data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-glow data-[state=active]:scale-105 hover:scale-102 hover:bg-muted/50"
+                  className="flex flex-col items-center gap-2 p-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md"
                 >
-                  <div className="relative">
-                    <Brain className="w-6 h-6 transition-transform duration-300 group-hover:scale-110" />
-                    {activeTab === 'intelligence' && (
-                      <div className="absolute inset-0 bg-white/20 rounded-full blur-lg animate-pulse-glow" />
-                    )}
-                  </div>
+                  <Brain className="w-4 h-4" />
                   <div className="text-center">
-                    <div className="font-semibold text-sm">AI Intelligence</div>
-                    <div className="text-xs opacity-70">Smart insights & recommendations</div>
+                    <div className="text-xs font-medium">AI Intelligence</div>
+                    <div className="text-xs opacity-70">Insights</div>
                   </div>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="pricing" 
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl transition-all duration-300 data-[state=active]:bg-gradient-success data-[state=active]:text-white data-[state=active]:shadow-glow data-[state=active]:scale-105 hover:scale-102 hover:bg-muted/50"
+                  className="flex flex-col items-center gap-2 p-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md"
                 >
-                  <div className="relative">
-                    <Target className="w-6 h-6 transition-transform duration-300 group-hover:scale-110" />
-                    {activeTab === 'pricing' && (
-                      <div className="absolute inset-0 bg-white/20 rounded-full blur-lg animate-pulse-glow" />
-                    )}
-                  </div>
+                  <Target className="w-4 h-4" />
                   <div className="text-center">
-                    <div className="font-semibold text-sm">Pricing Intelligence</div>
-                    <div className="text-xs opacity-70">Market analysis & optimization</div>
+                    <div className="text-xs font-medium">Pricing</div>
+                    <div className="text-xs opacity-70">Analysis</div>
                   </div>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="automation" 
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl transition-all duration-300 data-[state=active]:bg-gradient-warning data-[state=active]:text-white data-[state=active]:shadow-glow data-[state=active]:scale-105 hover:scale-102 hover:bg-muted/50"
+                  className="flex flex-col items-center gap-2 p-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md"
                 >
-                  <div className="relative">
-                    <Bot className="w-6 h-6 transition-transform duration-300 group-hover:scale-110" />
-                    {activeTab === 'automation' && (
-                      <div className="absolute inset-0 bg-white/20 rounded-full blur-lg animate-pulse-glow" />
-                    )}
-                  </div>
+                  <Bot className="w-4 h-4" />
                   <div className="text-center">
-                    <div className="font-semibold text-sm">Automation</div>
-                    <div className="text-xs opacity-70">Smart rules & alerts</div>
+                    <div className="text-xs font-medium">Automation</div>
+                    <div className="text-xs opacity-70">Rules</div>
                   </div>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="performance" 
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl transition-all duration-300 data-[state=active]:bg-gradient-accent data-[state=active]:text-white data-[state=active]:shadow-glow data-[state=active]:scale-105 hover:scale-102 hover:bg-muted/50"
+                  className="flex flex-col items-center gap-2 p-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md"
                 >
-                  <div className="relative">
-                    <BarChart3 className="w-6 h-6 transition-transform duration-300 group-hover:scale-110" />
-                    {activeTab === 'performance' && (
-                      <div className="absolute inset-0 bg-white/20 rounded-full blur-lg animate-pulse-glow" />
-                    )}
-                  </div>
+                  <BarChart3 className="w-4 h-4" />
                   <div className="text-center">
-                    <div className="font-semibold text-sm">Performance</div>
-                    <div className="text-xs opacity-70">Analytics & tracking</div>
+                    <div className="text-xs font-medium">Performance</div>
+                    <div className="text-xs opacity-70">Analytics</div>
                   </div>
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <div className="p-8">
-              <TabsContent value="intelligence" className="mt-0 animate-fade-in">
+            <div className="p-6">
+              <TabsContent value="intelligence" className="mt-0 space-y-0">
                 <InventoryIntelligenceDashboard />
               </TabsContent>
 
-              <TabsContent value="pricing" className="mt-0 animate-fade-in">
+              <TabsContent value="pricing" className="mt-0 space-y-0">
                 <PricingIntelligence />
               </TabsContent>
 
-              <TabsContent value="automation" className="mt-0 animate-fade-in">
+              <TabsContent value="automation" className="mt-0 space-y-0">
                 <InventoryAutomation />
               </TabsContent>
 
-              <TabsContent value="performance" className="mt-0 animate-fade-in">
+              <TabsContent value="performance" className="mt-0 space-y-0">
                 <InventoryPerformanceTracker />
               </TabsContent>
             </div>
@@ -142,34 +114,22 @@ const EnhancedInventoryDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Enhanced Quick Actions */}
-      <Card className="border-0 shadow-card bg-gradient-subtle animate-bounce-in">
-        <CardContent className="p-8">
+      {/* Clean Quick Actions */}
+      <Card className="border shadow-sm">
+        <CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-primary text-white shadow-glow">
-                <Activity className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-bold text-xl text-foreground">Quick Actions</h3>
-                <p className="text-muted-foreground">Common inventory management tasks</p>
-              </div>
+            <div>
+              <h3 className="font-medium text-sm">Quick Actions</h3>
+              <p className="text-xs text-muted-foreground">Common tasks</p>
             </div>
-            <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="hover:shadow-elegant transition-all duration-300 hover:scale-105 border-2"
-              >
-                <RefreshCw className="w-5 h-5 mr-2" />
-                Refresh All Data
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="text-xs">
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Refresh
               </Button>
-              <Button 
-                className="bg-gradient-primary hover:shadow-glow transition-all duration-300 hover:scale-105 text-white border-0"
-                size="lg"
-              >
-                <TrendingUp className="w-5 h-5 mr-2" />
-                Export Report
+              <Button size="sm" className="text-xs">
+                <TrendingUp className="w-3 h-3 mr-1" />
+                Export
               </Button>
             </div>
           </div>
