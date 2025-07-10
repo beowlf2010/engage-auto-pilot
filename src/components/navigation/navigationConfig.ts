@@ -13,7 +13,8 @@ import {
   Upload,
   Shield,
   Palette,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Zap
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -91,6 +92,12 @@ export const navigationItems: NavigationItem[] = [
     href: '/ai-monitor',
     icon: Bot,
     access: ['admin', 'manager']
+  },
+  {
+    label: 'AI Dashboard',
+    href: '/ai-dashboard',
+    icon: Zap,
+    access: ['admin', 'manager', 'sales']
   },
   {
     label: 'AI Performance',
