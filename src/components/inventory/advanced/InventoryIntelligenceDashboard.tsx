@@ -36,11 +36,22 @@ const InventoryIntelligenceDashboard = () => {
   const { data: metrics, isLoading } = useQuery({
     queryKey: ['inventory-intelligence'],
     queryFn: async (): Promise<InventoryMetrics> => {
-      // Get basic inventory stats
+      // Get inventory with demand predictions
       const { data: inventory } = await supabase
         .from('inventory')
         .select('*')
         .eq('status', 'available');
+
+      // Get demand predictions
+      const { data: predictions } = await supabase
+        .from('inventory_demand_predictions')
+        .select(`
+          *,
+          inventory:inventory_id (
+            id, vin, make, model, year, price, days_in_inventory, body_style
+          )
+        `)
+        .gte('last_calculated_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
       if (!inventory) return {
         velocityScore: 0,
@@ -51,49 +62,91 @@ const InventoryIntelligenceDashboard = () => {
         alerts: []
       };
 
-      // Calculate velocity score (simplified)
+      // Calculate real velocity score based on actual data
       const avgDaysInStock = inventory.reduce((sum, item) => 
         sum + (item.days_in_inventory || 0), 0) / inventory.length;
-      const velocityScore = Math.max(0, 100 - (avgDaysInStock / 60) * 100);
+      const velocityScore = Math.max(0, Math.min(100, 100 - (avgDaysInStock / 60) * 100));
 
-      // Generate AI recommendations
-      const aiRecommendations = [
-        {
+      // Calculate pricing health from predictions
+      const pricingPredictions = predictions?.filter(p => p.price_competitiveness) || [];
+      const marketPricedCount = pricingPredictions.filter(p => p.price_competitiveness === 'market').length;
+      const pricingHealth = pricingPredictions.length > 0 
+        ? Math.round((marketPricedCount / pricingPredictions.length) * 100)
+        : 75;
+
+      // Calculate turn rate (vehicles sold per month)
+      const soldVehicles = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('status', 'sold')
+        .gte('sold_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+      
+      const turnRate = Math.round((soldVehicles.data?.length || 0) / 30 * 30); // Monthly turn rate
+
+      // Calculate profit margin from recent sales - using simplified calculation
+      const profitMargin = 15; // Default margin - can be enhanced with real deals data later
+
+      // Generate real AI recommendations based on data
+      const aiRecommendations = [];
+      
+      // High-priority pricing recommendations
+      const overpriced = pricingPredictions.filter(p => p.price_competitiveness === 'above');
+      if (overpriced.length > 0) {
+        aiRecommendations.push({
           type: 'pricing' as const,
           priority: 'high' as const,
-          message: '12 vehicles priced above market average',
-          impact: 'Reduce time on lot by 15-20 days',
+          message: `${overpriced.length} vehicles priced above market average`,
+          impact: `Reduce time on lot by ${Math.round(overpriced.length * 2)}-${Math.round(overpriced.length * 3)} days`,
           action: 'Reduce prices by 3-5%'
-        },
-        {
+        });
+      }
+
+      // High demand opportunities
+      const highDemand = predictions?.filter(p => p.demand_score > 80) || [];
+      if (highDemand.length > 0) {
+        aiRecommendations.push({
           type: 'promotion' as const,
           priority: 'medium' as const,
-          message: '8 SUVs showing high demand signals',
-          impact: 'Potential $15K additional revenue',
+          message: `${highDemand.length} vehicles showing high demand signals`,
+          impact: `Potential $${Math.round(highDemand.length * 2)}K additional revenue`,
           action: 'Feature in marketing campaigns'
-        },
-        {
+        });
+      }
+
+      // Stale inventory
+      const staleVehicles = inventory.filter(item => (item.days_in_inventory || 0) > 90);
+      if (staleVehicles.length > 0) {
+        const staleValue = staleVehicles.reduce((sum, item) => sum + (item.price || 0), 0);
+        aiRecommendations.push({
           type: 'trade' as const,
-          priority: 'low' as const,
-          message: '5 vehicles over 90 days old',
-          impact: 'Free up $45K in capital',
+          priority: staleVehicles.length > 10 ? 'high' as const : 'low' as const,
+          message: `${staleVehicles.length} vehicles over 90 days old`,
+          impact: `Free up $${Math.round(staleValue / 1000)}K in capital`,
           action: 'Consider wholesale/auction'
-        }
-      ];
+        });
+      }
 
-      // Calculate health metrics
-      const pricingHealth = Math.floor(Math.random() * 30) + 70; // 70-100
-      const turnRate = Math.floor(Math.random() * 20) + 15; // 15-35
-      const profitMargin = Math.floor(Math.random() * 10) + 12; // 12-22
-
+      // Generate alerts based on real data
       const alerts = [
-        { type: 'stale' as const, count: 5, severity: 'warning' as const },
-        { type: 'overpriced' as const, count: 12, severity: 'critical' as const },
-        { type: 'opportunity' as const, count: 8, severity: 'info' as const }
-      ];
+        { 
+          type: 'stale' as const, 
+          count: staleVehicles.length, 
+          severity: staleVehicles.length > 10 ? 'critical' as const : 'warning' as const 
+        },
+        { 
+          type: 'overpriced' as const, 
+          count: overpriced.length, 
+          severity: overpriced.length > 15 ? 'critical' as const : 'warning' as const 
+        },
+        { 
+          type: 'opportunity' as const, 
+          count: highDemand.length, 
+          severity: 'info' as const 
+        }
+      ].filter(alert => alert.count > 0);
 
       return {
-        velocityScore,
+        velocityScore: Math.round(velocityScore),
         pricingHealth,
         turnRate,
         profitMargin,
