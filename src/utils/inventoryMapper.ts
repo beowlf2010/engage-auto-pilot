@@ -1,10 +1,9 @@
 
-import { extractVehicleFields } from './field-extraction';
-import { extractVINField } from './field-extraction';
-import { extractOptionsFields } from './field-extraction';
-import { extractGMGlobalFields } from './field-extraction/gmGlobalEnhanced';
-import { extractVautoFields } from './field-extraction';
 import { InventoryItem } from '../services/inventory/types';
+import { extractVehicleFields, extractVINField, extractOptionsFields, extractVautoFields } from './field-extraction';
+import { extractGMGlobalFields } from './field-extraction/gmGlobalEnhanced';
+import { parseDate } from './field-extraction/core';
+import { supabase } from '@/integrations/supabase/client';
 
 // Define the upload condition type
 export type UploadCondition = 'new' | 'used' | 'gm_global';
@@ -40,11 +39,11 @@ const cleanVehicleData = (value: string): string | null => {
   return cleaned;
 };
 
-export const mapRowToInventoryItem = (
+export const mapRowToInventoryItem = async (
   row: any,
   condition: UploadCondition,
   uploadId: string
-): InventoryItem => {
+): Promise<InventoryItem> => {
   console.log('🔧 [INVENTORY MAPPER] === ENHANCED INVENTORY MAPPING ===');
   console.log('🔧 [INVENTORY MAPPER] Upload condition:', condition);
   console.log('🔧 [INVENTORY MAPPER] Available columns:', Object.keys(row));
@@ -145,6 +144,17 @@ export const mapRowToInventoryItem = (
       finalCondition = condition;
     }
 
+    // Generate proper UUID for database insertion
+    const itemId = crypto.randomUUID();
+    
+    // Get current user ID for authentication
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUserId = user?.id;
+    
+    if (!currentUserId) {
+      throw new Error('User must be authenticated to upload inventory');
+    }
+
     // Valid inventory table columns based on database schema
     const validColumns = new Set([
       'id', 'make', 'model', 'year', 'vin', 'condition', 'status', 'price', 'msrp',
@@ -158,14 +168,14 @@ export const mapRowToInventoryItem = (
 
     // Build clean inventory item with only valid database columns
     const inventoryItem: InventoryItem = {
-      id: 'auto-generated', // Placeholder - database will generate UUID
+      id: itemId,
       make: cleanedMake!,
       model: cleanedModel!,
       vin: mappedData.vin || '',
       condition: mappedData.condition || finalCondition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
-      uploaded_by: null, // Set to null to satisfy RLS policy
+      uploaded_by: currentUserId, // Set to current user for RLS policy
       created_at: currentTimestamp,
       updated_at: currentTimestamp,
       // Filter out invalid fields and problematic values

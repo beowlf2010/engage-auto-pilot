@@ -37,7 +37,7 @@ export const validateAndProcessInventoryRows = async (
   rows: any[],
   condition: 'new' | 'used' | 'gm_global',
   uploadHistoryId: string,
-  mapRowToInventoryItem: (row: any, condition: 'new' | 'used' | 'gm_global', uploadHistoryId: string) => InventoryItem,
+  mapRowToInventoryItem: (row: any, condition: 'new' | 'used' | 'gm_global', uploadHistoryId: string) => Promise<InventoryItem>,
   userId?: string
 ): Promise<ValidationResult> => {
   const errors: string[] = [];

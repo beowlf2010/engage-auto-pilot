@@ -8,8 +8,8 @@ export interface InventoryItem {
   model: string;
   trim?: string;
   body_style?: string;
-  color_exterior?: string;
-  color_interior?: string;
+  exterior_color?: string;
+  interior_color?: string;
   engine?: string;
   transmission?: string;
   drivetrain?: string;
@@ -38,6 +38,7 @@ export interface InventoryItem {
   carfax_url?: string;
   location?: string;
   upload_history_id?: string;
+  uploaded_by?: string;
   created_at: string;
   updated_at: string;
   

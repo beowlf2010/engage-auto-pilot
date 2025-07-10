@@ -6,6 +6,7 @@ import { extractGMGlobalFields } from './field-extraction/gmGlobalEnhanced';
 import { extractVautoFields } from './field-extraction';
 import { InventoryItem } from '../services/inventory/types';
 import type { ReportDetection } from './reportDetection';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface EnhancedMappingResult {
   item: InventoryItem;
@@ -13,14 +14,14 @@ export interface EnhancedMappingResult {
   dataQualityScore: number;
 }
 
-export const mapRowToInventoryItemEnhanced = (
+export const mapRowToInventoryItemEnhanced = async (
   row: any,
   condition: 'new' | 'used' | 'gm_global',
   uploadId: string,
   fileName: string,
   headers: string[],
   detection?: ReportDetection
-): EnhancedMappingResult => {
+): Promise<EnhancedMappingResult> => {
   
   const warnings: string[] = [];
   let dataQualityScore = 100;
@@ -109,8 +110,16 @@ export const mapRowToInventoryItemEnhanced = (
       dataQualityScore -= 30;
     }
 
-    // Generate a temporary ID for the database to use
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Generate proper UUID for database insertion
+    const itemId = crypto.randomUUID();
+    
+    // Get current user ID for authentication
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUserId = user?.id;
+    
+    if (!currentUserId) {
+      throw new Error('User must be authenticated to upload inventory');
+    }
 
     // Valid inventory table columns based on database schema
     const validColumns = new Set([
@@ -134,13 +143,14 @@ export const mapRowToInventoryItemEnhanced = (
 
     // Final data preparation
     const inventoryItem: InventoryItem = {
-      id: tempId, // Temporary ID, database will assign real UUID
+      id: itemId,
       make: mappedData.make || 'Unknown',
       model: mappedData.model || 'Unknown',
       vin: mappedData.vin || '',
       condition: mappedData.condition,
       status: mappedData.status || 'available',
       upload_history_id: uploadId,
+      uploaded_by: currentUserId, // Set to current user for RLS policy
       source_report: mappedData.source_report,
       created_at: currentTimestamp,
       updated_at: currentTimestamp,

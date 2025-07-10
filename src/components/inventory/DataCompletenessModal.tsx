@@ -17,7 +17,7 @@ const requiredFields = [
   { key: "model", label: "Model" },
   { key: "year", label: "Year" },
   { key: "price", label: "Price" },
-  { key: "color_exterior", label: "Exterior Color" },
+  { key: "exterior_color", label: "Exterior Color" },
   { key: "mileage", label: "Mileage" },
   { key: "status", label: "Status" },
   // add more fields if needed

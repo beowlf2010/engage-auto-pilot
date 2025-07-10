@@ -231,7 +231,7 @@ const EnhancedInventoryTable = ({
                           {vehicle.body_style}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {vehicle.color_exterior}
+                          {vehicle.exterior_color}
                         </div>
                       </div>
                     </TableCell>
