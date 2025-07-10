@@ -6,6 +6,7 @@ import AdvancedInventoryFilters from './AdvancedInventoryFilters';
 import EnhancedInventoryTable from './EnhancedInventoryTable';
 import QuickActionsToolbar from './QuickActionsToolbar';
 import BulkOperationsDialog from './BulkOperationsDialog';
+import RealTimeAlertsCenter from './RealTimeAlertsCenter';
 import InventoryCleanupButton from './InventoryCleanupButton';
 import UsedInventoryDiagnostics from './UsedInventoryDiagnostics';
 import EnhancedInventoryDashboard from './advanced/EnhancedInventoryDashboard';
@@ -156,6 +157,9 @@ const InventoryDashboardContent = ({
 
   return (
     <>
+      {/* Real-time Alerts Center */}
+      <RealTimeAlertsCenter />
+      
       {/* Enhanced AI-Powered Inventory Intelligence */}
       <EnhancedInventoryDashboard />
       
