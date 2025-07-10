@@ -39,22 +39,50 @@ const getPriorityBadgeColor = (priority: AIInsight['priority']) => {
 };
 
 const handleInsightAction = (insight: AIInsight) => {
+  // Create URL with insight context for better targeting
+  const baseParams = new URLSearchParams({
+    source: 'ai_insight',
+    insight_id: insight.id,
+    insight_type: insight.type
+  });
+
   switch (insight.actionType) {
     case 'view_leads':
-      // Navigate to leads page with filter
-      window.location.hash = '#/leads';
+      // Add specific filters based on insight data
+      if (insight.data?.leadIds) {
+        baseParams.set('filter_ids', insight.data.leadIds.join(','));
+      }
+      if (insight.id === 'unresponsive-leads') {
+        baseParams.set('filter_status', 'new');
+        baseParams.set('filter_last_reply', '7_days_ago');
+      }
+      if (insight.id === 'high-potential-leads') {
+        baseParams.set('filter_ai_opted', 'true');
+        baseParams.set('filter_engagement', 'low');
+      }
+      window.location.hash = `#/leads?${baseParams.toString()}`;
       break;
+      
     case 'update_templates':
-      // Navigate to templates management
-      window.location.hash = '#/templates';
+      if (insight.data?.templates) {
+        baseParams.set('focus_templates', insight.data.templates.map((t: any) => t.id).join(','));
+      }
+      window.location.hash = `#/templates?${baseParams.toString()}`;
       break;
+      
     case 'schedule_calls':
-      // Navigate to calling interface
-      window.location.hash = '#/calls';
+      if (insight.data?.leads) {
+        baseParams.set('priority_leads', insight.data.leads.map((l: any) => l.id).join(','));
+      }
+      window.location.hash = `#/calls?${baseParams.toString()}`;
       break;
+      
     case 'review_messages':
-      // Navigate to message review
-      window.location.hash = '#/conversations';
+      if (insight.data?.responseRate !== undefined) {
+        baseParams.set('focus_metric', 'response_rate');
+        baseParams.set('current_rate', insight.data.responseRate.toString());
+      }
+      window.location.hash = `#/conversations?${baseParams.toString()}`;
       break;
   }
 };
