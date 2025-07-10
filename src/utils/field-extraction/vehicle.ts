@@ -4,6 +4,7 @@ import { getFieldValue } from './core';
 // Parse combined vehicle field like "2019 Honda Accord EX-L"
 export const parseVehicleField = (vehicleText: string): { year?: number; make?: string; model?: string; trim?: string } => {
   if (!vehicleText || typeof vehicleText !== 'string') {
+    console.log('🔍 [VEHICLE PARSING] No valid vehicle text provided');
     return {};
   }
 
@@ -13,50 +14,47 @@ export const parseVehicleField = (vehicleText: string): { year?: number; make?: 
   const parts = trimmed.split(' ').filter(part => part.length > 0);
   
   if (parts.length < 3) {
-    console.warn('⚠️ [VEHICLE PARSING] Vehicle field has less than 3 parts:', parts);
+    console.warn('⚠️ [VEHICLE PARSING] Vehicle field has less than 3 parts, trying alternative parsing:', parts);
+    
+    // Try alternative parsing for cases like "Honda Accord" without year
+    if (parts.length === 2) {
+      return {
+        make: parts[0],
+        model: parts[1]
+      };
+    }
     return {};
   }
 
   // First part should be year (4 digits)
   const yearMatch = parts[0].match(/^\d{4}$/);
-  const year = yearMatch ? parseInt(parts[0], 10) : undefined;
+  let year: number | undefined;
+  let makeIndex = 1;
   
-  if (!year || year < 1900 || year > new Date().getFullYear() + 2) {
-    console.warn('⚠️ [VEHICLE PARSING] Invalid year detected:', parts[0]);
-    return {};
+  if (yearMatch) {
+    year = parseInt(parts[0], 10);
+    if (year < 1900 || year > new Date().getFullYear() + 2) {
+      console.warn('⚠️ [VEHICLE PARSING] Invalid year, treating as make:', parts[0]);
+      year = undefined;
+      makeIndex = 0;
+    }
+  } else {
+    console.log('🔍 [VEHICLE PARSING] No year found, starting with make');
+    makeIndex = 0;
   }
 
-  // Second part should be make
-  const make = parts[1];
+  // Extract make and model
+  const make = parts[makeIndex];
+  const model = parts[makeIndex + 1];
   
-  // Third part and beyond should be model and trim
-  const modelAndTrim = parts.slice(2);
-  
-  // Try to separate model from trim
-  let model = modelAndTrim[0];
-  let trim = '';
-  
-  if (modelAndTrim.length > 1) {
-    // If there's a hyphenated model like "F-150", keep it together
-    if (modelAndTrim[0].includes('-') && modelAndTrim.length > 1) {
-      model = modelAndTrim[0];
-      trim = modelAndTrim.slice(1).join(' ');
-    } else if (modelAndTrim.length === 2) {
-      // Simple case: "Accord EX-L"
-      model = modelAndTrim[0];
-      trim = modelAndTrim[1];
-    } else {
-      // Multiple parts: try to determine where model ends and trim begins
-      model = modelAndTrim[0];
-      trim = modelAndTrim.slice(1).join(' ');
-    }
-  }
+  // Remaining parts are trim
+  const trim = parts.slice(makeIndex + 2).join(' ') || undefined;
 
   const result = {
     year,
     make,
     model,
-    trim: trim || undefined
+    trim
   };
 
   console.log('✅ [VEHICLE PARSING] Parsed result:', result);

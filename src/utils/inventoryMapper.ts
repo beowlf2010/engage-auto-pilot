@@ -59,41 +59,39 @@ export const mapRowToInventoryItem = (
       console.log('Using GM Global extraction for comprehensive data capture');
       mappedData = extractGMGlobalFields(row);
     } else {
-      // Check if this looks like a GM Global file even if not explicitly marked
-      const hasGMGlobalFields = Object.keys(row).some(key => 
-        key.toLowerCase().includes('order') ||
-        key.toLowerCase().includes('delivery') ||
-        key.toLowerCase().includes('customer') ||
-        key.toLowerCase().includes('gm ')
-      );
+      // Use standard extraction methods for regular inventory files
+      try {
+        console.log('🔧 [INVENTORY MAPPER] Using standard field extraction');
+        mappedData = {
+          ...extractVehicleFields(row),
+          ...extractVINField(row),
+          ...extractOptionsFields(row),
+          condition: condition === 'new' ? 'new' : 'used',
+          status: 'available'
+        };
 
-      if (hasGMGlobalFields) {
-        console.log('Detected GM Global fields, using enhanced extraction');
-        mappedData = extractGMGlobalFields(row);
-      } else {
-        // Use existing extraction methods with error handling
-        try {
-          mappedData = {
-            ...extractVehicleFields(row),
-            ...extractVINField(row),
-            ...extractOptionsFields(row),
-            condition: condition === 'new' ? 'new' : 'used',
-            status: 'available'
-          };
+        console.log('✅ [INVENTORY MAPPER] Standard extraction result:', {
+          make: mappedData.make,
+          model: mappedData.model,
+          year: mappedData.year,
+          vin: mappedData.vin
+        });
 
-          // Try Vauto-specific extraction if available
-          const vautoData = extractVautoFields(row);
+        // Try Vauto-specific extraction if available
+        const vautoData = extractVautoFields(row);
+        if (Object.keys(vautoData).length > 0) {
+          console.log('🔧 [INVENTORY MAPPER] Applying Vauto data:', vautoData);
           mappedData = { ...mappedData, ...vautoData };
-        } catch (error) {
-          console.error('Error in field extraction:', error);
-          // Fallback to basic mapping
-          mappedData = {
-            make: row.make || row.Make || null,
-            model: row.model || row.Model || null,
-            condition: condition === 'new' ? 'new' : 'used',
-            status: 'available'
-          };
         }
+      } catch (error) {
+        console.error('💥 [INVENTORY MAPPER] Error in field extraction:', error);
+        // Fallback to basic mapping
+        mappedData = {
+          make: row.make || row.Make || null,
+          model: row.model || row.Model || null,
+          condition: condition === 'new' ? 'new' : 'used',
+          status: 'available'
+        };
       }
     }
 
@@ -107,18 +105,29 @@ export const mapRowToInventoryItem = (
     console.log('- Cleaned make:', cleanedMake);
     console.log('- Cleaned model:', cleanedModel);
 
-    // Reject vehicles with invalid make/model data
-    if (!isValidVehicleData(cleanedMake || '', cleanedModel || '')) {
-      console.warn('❌ Rejecting vehicle with invalid make/model data:', {
+    // More flexible validation for vehicle data
+    if (!cleanedMake || !cleanedModel) {
+      console.warn('❌ Missing essential vehicle data after cleaning:', {
         originalMake: mappedData.make,
         originalModel: mappedData.model,
         cleanedMake,
         cleanedModel,
         availableColumns: Object.keys(row),
-        sampleRow: row
+        firstRowSample: Object.fromEntries(Object.entries(row).slice(0, 5))
       });
       
-      throw new Error(`Invalid vehicle data: make="${mappedData.make}", model="${mappedData.model}"`);
+      throw new Error(`Missing essential vehicle data: make="${cleanedMake}", model="${cleanedModel}"`);
+    }
+    
+    // Additional validation for reasonable data
+    if (!isValidVehicleData(cleanedMake, cleanedModel)) {
+      console.warn('❌ Invalid vehicle data detected:', {
+        cleanedMake,
+        cleanedModel,
+        reason: 'Failed validity check'
+      });
+      
+      throw new Error(`Invalid vehicle data: make="${cleanedMake}", model="${cleanedModel}"`);
     }
 
     // Determine the final condition value
