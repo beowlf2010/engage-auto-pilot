@@ -161,46 +161,50 @@ export const useEnhancedMultiFileUpload = ({ userId }: UseEnhancedMultiFileUploa
       let errorCount = 0;
       const errors: string[] = [];
       
-      const inventoryItems = parsed.rows.map((row, index) => {
-        try {
-          const mappingResult = mapRowToInventoryItemEnhanced(
-            row, 
-            detection.recommendedCondition, 
-            uploadRecord!.id, 
-            queuedFile.file.name, 
-            parsed.headers,
-            detection
-          );
-          
-          // Additional validation for the mapped item
-          const validation = validateInventoryItem(mappingResult.item, detection.reportType);
-          
-          if (!validation.isValid) {
-            errors.push(`Row ${index + 1}: ${validation.errors.join(', ')}`);
+      const inventoryItemsWithNulls = await Promise.all(
+        parsed.rows.map(async (row, index) => {
+          try {
+            const mappingResult = await mapRowToInventoryItemEnhanced(
+              row, 
+              detection.recommendedCondition, 
+              uploadRecord!.id, 
+              queuedFile.file.name, 
+              parsed.headers,
+              detection
+            );
+            
+            // Additional validation for the mapped item
+            const validation = validateInventoryItem(mappingResult.item, detection.reportType);
+            
+            if (!validation.isValid) {
+              errors.push(`Row ${index + 1}: ${validation.errors.join(', ')}`);
+              errorCount++;
+              return null;
+            }
+            
+            if (validation.warnings.length > 0) {
+              console.warn(`Row ${index + 1} warnings:`, validation.warnings);
+              validationWarnings++;
+            }
+            
+            if (mappingResult.warnings.length > 0) {
+              console.warn(`Row ${index + 1} mapping warnings:`, mappingResult.warnings);
+              validationWarnings++;
+            }
+            
+            successCount++;
+            return validation.correctedData || mappingResult.item;
+            
+          } catch (error) {
+            console.error(`Error processing row ${index + 1}:`, error);
+            errors.push(`Row ${index + 1}: Processing failed - ${error instanceof Error ? error.message : 'Unknown error'}`);
             errorCount++;
             return null;
           }
-          
-          if (validation.warnings.length > 0) {
-            console.warn(`Row ${index + 1} warnings:`, validation.warnings);
-            validationWarnings++;
-          }
-          
-          if (mappingResult.warnings.length > 0) {
-            console.warn(`Row ${index + 1} mapping warnings:`, mappingResult.warnings);
-            validationWarnings++;
-          }
-          
-          successCount++;
-          return validation.correctedData || mappingResult.item;
-          
-        } catch (error) {
-          console.error(`Error processing row ${index + 1}:`, error);
-          errors.push(`Row ${index + 1}: Processing failed - ${error instanceof Error ? error.message : 'Unknown error'}`);
-          errorCount++;
-          return null;
-        }
-      }).filter(item => item !== null);
+        })
+      );
+      
+      const inventoryItems = inventoryItemsWithNulls.filter(item => item !== null);
 
       console.log(`Processing complete: ${successCount} successful, ${errorCount} errors, ${validationWarnings} warnings`);
 

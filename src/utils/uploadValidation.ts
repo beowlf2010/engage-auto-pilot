@@ -95,7 +95,7 @@ export const validateAndProcessInventoryRows = async (
       for (const [index, row] of batch.entries()) {
         console.log(`🔄 Processing CSV row ${i + index + 1}:`, Object.keys(row));
         try {
-          const vehicle = mapRowToInventoryItem(row, condition, uploadHistoryId);
+          const vehicle = await mapRowToInventoryItem(row, condition, uploadHistoryId);
           
           // Enhanced validation with detailed logging
           console.log(`🔍 Processing row ${i + index + 1}:`, { make: vehicle.make, model: vehicle.model, vin: vehicle.vin });
