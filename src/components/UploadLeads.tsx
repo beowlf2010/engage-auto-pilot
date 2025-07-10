@@ -58,34 +58,71 @@ const UploadLeads = ({ user }: UploadLeadsProps = {}) => {
   const handleFilesSelected = useCallback(async (files: FileList) => {
     if (!files || files.length === 0) {
       toast({
-        title: "No file selected",
-        description: "Please select a CSV file to upload.",
+        title: "No files selected",
+        description: "Please select CSV files to upload.",
         variant: "destructive",
       });
       return;
     }
 
-    const file = files[0];
-    if (!file.name.toLowerCase().endsWith('.csv')) {
+    // Validate all files are CSV
+    const fileArray = Array.from(files);
+    const invalidFiles = fileArray.filter(file => !file.name.toLowerCase().endsWith('.csv'));
+    
+    if (invalidFiles.length > 0) {
       toast({
         title: "Invalid file format",
-        description: "Please select a valid CSV file.",
+        description: `Invalid files: ${invalidFiles.map(f => f.name).join(', ')}. Please select only CSV files.`,
         variant: "destructive",
       });
       return;
     }
 
-    console.log('🔥 [UPLOAD LEADS] File selected:', file.name);
+    console.log('🔥 [UPLOAD LEADS] Files selected:', fileArray.map(f => f.name));
     setProcessingStage('mapping');
 
     try {
-      const text = await file.text();
-      const parsedCSV = parseCSVText(text);
+      // Process all CSV files and combine them
+      let combinedHeaders: string[] = [];
+      let combinedRows: Record<string, string>[] = [];
+      
+      for (const file of fileArray) {
+        const text = await file.text();
+        const parsedCSV = parseCSVText(text);
+        
+        console.log(`📊 [UPLOAD LEADS] Parsed ${file.name} - headers:`, parsedCSV.headers);
+        console.log(`📊 [UPLOAD LEADS] Parsed ${file.name} - rows:`, parsedCSV.rows.length);
+        
+        // Use headers from first file, validate others match
+        if (combinedHeaders.length === 0) {
+          combinedHeaders = parsedCSV.headers;
+        } else {
+          // Check if headers match (basic validation)
+          const headerMismatch = parsedCSV.headers.some(h => !combinedHeaders.includes(h));
+          if (headerMismatch) {
+            console.warn(`⚠️ [UPLOAD LEADS] Header mismatch in ${file.name}, but continuing...`);
+          }
+        }
+        
+        // Add rows from this file
+        combinedRows.push(...parsedCSV.rows);
+      }
 
-      console.log('📊 [UPLOAD LEADS] Parsed CSV headers:', parsedCSV.headers);
-      console.log('📊 [UPLOAD LEADS] Total rows:', parsedCSV.rows.length);
+      const combinedCSV = {
+        headers: combinedHeaders,
+        rows: combinedRows
+      };
 
-      setCsvData(parsedCSV);
+      console.log('📊 [UPLOAD LEADS] Combined CSV - Total headers:', combinedCSV.headers.length);
+      console.log('📊 [UPLOAD LEADS] Combined CSV - Total rows:', combinedCSV.rows.length);
+
+      setCsvData(combinedCSV);
+      
+      toast({
+        title: "Files processed",
+        description: `Successfully processed ${fileArray.length} file(s) with ${combinedRows.length} total rows.`,
+      });
+      
     } catch (error) {
       console.error('💥 [UPLOAD LEADS] File parsing error:', error);
       toast({
