@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle, Upload, ArrowRight, RotateCcw, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useInventoryUpload } from '@/hooks/useInventoryUpload';
+import { useEnhancedMultiFileUpload } from '@/hooks/useEnhancedMultiFileUpload';
 import { useEnhancedFinancialUpload } from '@/hooks/useEnhancedFinancialUpload';
 import { useMultiFileLeadUpload } from '@/hooks/useMultiFileLeadUpload';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,7 +61,7 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
   const [showRestartDialog, setShowRestartDialog] = useState(false);
 
   // Upload hooks with enhanced functionality
-  const inventoryUpload = useInventoryUpload({ userId });
+  const inventoryUpload = useEnhancedMultiFileUpload({ userId, duplicateStrategy: 'skip' });
   const financialUpload = useEnhancedFinancialUpload(userId);
   const leadUpload = useMultiFileLeadUpload();
 
@@ -80,8 +80,14 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
     
     try {
       if (step.fileType === 'inventory' && step.condition) {
-        // Call the inventory upload handler - completion will be handled by useEffect
-        inventoryUpload.handleFileUpload(event, step.condition);
+        // Convert to QueuedFile format for enhanced upload
+        const queuedFiles = Array.from(files).map((file, index) => ({
+          id: `${Date.now()}-${index}`,
+          file,
+          condition: step.condition as 'new' | 'used' | 'gm_global',
+          status: 'pending' as const
+        }));
+        await inventoryUpload.processBatch(queuedFiles);
       } else if (step.fileType === 'financial') {
         // Convert FileList to array for financial upload
         const fileArray = Array.from(files);
@@ -120,12 +126,12 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
 
   // Watch for inventory upload completion
   useEffect(() => {
-    if (currentStepData?.fileType === 'inventory' && inventoryUpload.uploadResult && !inventoryUpload.uploading) {
-      if (inventoryUpload.uploadResult.status === 'success' || inventoryUpload.uploadResult.status === 'partial') {
-        handleStepComplete(inventoryUpload.uploadResult);
+    if (currentStepData?.fileType === 'inventory' && inventoryUpload.batchResult && !inventoryUpload.processing) {
+      if (inventoryUpload.batchResult.successfulFiles > 0) {
+        handleStepComplete(inventoryUpload.batchResult);
       }
     }
-  }, [inventoryUpload.uploadResult, inventoryUpload.uploading, currentStepData?.fileType]);
+  }, [inventoryUpload.batchResult, inventoryUpload.processing, currentStepData?.fileType]);
 
   // Watch for financial upload completion
   useEffect(() => {
@@ -151,7 +157,7 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
       if (currentStepData) {
         switch (currentStepData.fileType) {
           case 'inventory':
-            inventoryUpload.resetState();
+            inventoryUpload.setBatchResult(null);
             break;
           case 'financial':
             resetFinancialState();
@@ -190,7 +196,7 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
     setIsNavigating(true);
     
     // Reset all upload hook states
-    inventoryUpload.resetState();
+    inventoryUpload.setBatchResult(null);
     resetFinancialState();
     resetLeadState();
     
@@ -207,7 +213,7 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
   const canProceed = isCurrentStepCompleted || currentStep === 1;
 
   // Check if current upload is in progress
-  const isUploading = inventoryUpload.uploading || financialUploading || leadUpload.processing;
+  const isUploading = inventoryUpload.processing || financialUploading || leadUpload.processing;
 
   if (isComplete) {
     return (
