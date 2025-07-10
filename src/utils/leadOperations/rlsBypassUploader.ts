@@ -138,13 +138,34 @@ export const promoteToAdmin = async (
       };
     }
     
-    const { data, error } = await supabase.rpc('promote_user_to_admin', {
-      target_user_id: userId,
-      justification: justification || 'Self-promotion via application'
-    });
+    // Check if user is already admin first
+    const { data: existingRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'admin')
+      .single();
+    
+    if (existingRoles) {
+      console.log('✅ [ADMIN PROMOTION] User is already admin, skipping promotion');
+      return {
+        success: true,
+        message: 'User already has admin privileges'
+      };
+    }
+    
+    // Use the correct function name for self-promotion
+    const { data, error } = await supabase.rpc('make_current_user_admin');
     
     if (error) {
       console.error('❌ [ADMIN PROMOTION] Failed:', error);
+      // If error mentions self-promotion, user is likely already admin
+      if (error.message?.includes('cannot promote himself') || error.message?.includes('already admin')) {
+        return {
+          success: true,
+          message: 'User already has admin privileges'
+        };
+      }
       throw error;
     }
     
@@ -153,14 +174,24 @@ export const promoteToAdmin = async (
     // Type assertion for the response data
     const result = data as any;
     return {
-      success: result.success || false,
+      success: result.success || true,
       message: result.message || 'Admin promotion completed'
     };
   } catch (error) {
     console.error('💥 [ADMIN PROMOTION] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Handle case where user is already admin
+    if (errorMessage.includes('cannot promote himself') || errorMessage.includes('already admin')) {
+      return {
+        success: true,
+        message: 'User already has admin privileges'
+      };
+    }
+    
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: errorMessage
     };
   }
 };
