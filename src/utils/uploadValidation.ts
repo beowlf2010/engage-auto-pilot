@@ -186,14 +186,31 @@ export const validateAndProcessInventoryRows = async (
                 // Add specific errors if available
                 if (result.errors && Array.isArray(result.errors)) {
                   result.errors.forEach((err) => {
-                    errors.push(`Batch ${batchNumber}, Vehicle ${err.vehicle_index}: ${err.error}`);
+                    const errorDetails = typeof err === 'object' && err !== null ? 
+                      `${err.error || 'Database error'} (SQLSTATE: ${err.sqlstate || 'unknown'})` : 
+                      String(err);
+                    errors.push(`Batch ${batchNumber}, Vehicle ${err.vehicle_index || 'unknown'}: ${errorDetails}`);
+                    console.error(`❌ Vehicle insertion error:`, err);
                   });
                 }
               }
             } else {
-              console.error(`❌ Batch ${batchNumber} insertion failed:`, result.error);
-              errors.push(`Batch ${batchNumber}: ${result.error || 'Unknown insertion error'}`);
+              console.error(`❌ Batch ${batchNumber} insertion failed:`, result);
+              // Show detailed error information instead of generic message
+              const detailedError = result.error || 'Unknown insertion error';
+              errors.push(`Batch ${batchNumber}: ${detailedError}`);
               errorCount += vehiclesToInsert.length;
+              
+              // Also log specific errors if available
+              if (result.errors && Array.isArray(result.errors)) {
+                result.errors.forEach((err) => {
+                  const errorDetails = typeof err === 'object' && err !== null ? 
+                    `${err.error || 'Database error'} (SQLSTATE: ${err.sqlstate || 'unknown'})` : 
+                    String(err);
+                  errors.push(`Batch ${batchNumber}, Vehicle ${err.vehicle_index || 'unknown'}: ${errorDetails}`);
+                  console.error(`❌ Individual vehicle error:`, err);
+                });
+              }
             }
           } else {
             console.error(`❌ Batch ${batchNumber}: No result returned from insertion function`);
