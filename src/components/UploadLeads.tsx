@@ -17,6 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import ImportFeaturesCard from './upload-leads/ImportFeaturesCard';
 import PhonePriorityCard from './upload-leads/PhonePriorityCard';
 import CSVTemplateCard from './upload-leads/CSVTemplateCard';
+import SequentialLeadUploadModal from './leads/SequentialLeadUploadModal';
 
 interface CSVData {
   headers: string[];
@@ -54,6 +55,7 @@ const UploadLeads = ({ user }: UploadLeadsProps = {}) => {
   const [updateExistingLeads, setUpdateExistingLeads] = useState(false);
   const [processingStage, setProcessingStage] = useState<ProcessingStage>('upload');
   const [processingMessage, setProcessingMessage] = useState<string>('');
+  const [showSequentialModal, setShowSequentialModal] = useState(false);
 
   const handleFilesSelected = useCallback(async (files: FileList) => {
     if (!files || files.length === 0) {
@@ -393,6 +395,11 @@ const UploadLeads = ({ user }: UploadLeadsProps = {}) => {
           <CSVTemplateCard />
         </div>
       </div>
+
+      <SequentialLeadUploadModal
+        isOpen={showSequentialModal}
+        onClose={() => setShowSequentialModal(false)}
+      />
     </div>
   );
 };
