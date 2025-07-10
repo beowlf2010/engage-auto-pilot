@@ -5,9 +5,9 @@ import { parseVehicleField } from '@/utils/field-extraction/vehicle';
 const inventoryFieldPatterns: Record<keyof InventoryFieldMapping, string[]> = {
   // Vehicle Information
   vehicle: ['vehicle', 'vehicle_description', 'full_vehicle', 'description', 'vehicle desc', 'unit', 'automobile'],
-  year: ['year', 'model_year', 'yr', 'vehicle_year', 'model year', 'year built'],
-  make: ['make', 'manufacturer', 'brand', 'vehicle_make', 'mfr', 'mfg', 'oem'],
-  model: ['model', 'vehicle_model', 'car_model', 'model name', 'vehicle model'],
+  year: ['year', 'model_year', 'yr', 'vehicle_year', 'model year', 'year built', 'my'],
+  make: ['make', 'manufacturer', 'brand', 'vehicle_make', 'mfr', 'mfg', 'oem', 'division'],
+  model: ['model', 'vehicle_model', 'car_model', 'model name', 'vehicle model', 'model description'],
   trim: ['trim', 'trim_level', 'grade', 'trim_description', 'style', 'body style', 'body'],
 
   // Identifiers  
@@ -103,19 +103,42 @@ export const performInventoryAutoDetection = (headers: string[]): InventoryField
   
   // Auto-detect each field with improved pattern matching
   Object.entries(inventoryFieldPatterns).forEach(([fieldKey, patterns]) => {
+    console.log(`🔍 [INVENTORY MAPPING] Checking field: ${fieldKey} with patterns:`, patterns);
+    
     for (const pattern of patterns) {
       const lowerPattern = pattern.toLowerCase();
+      console.log(`  🔍 Testing pattern: "${pattern}" (lowercase: "${lowerPattern}")`);
+      
       const headerIndex = lowerHeaders.findIndex(h => {
+        console.log(`    🔍 Testing against header: "${h}"`);
+        
         // Exact match first (highest priority)
-        if (h === lowerPattern) return true;
+        if (h === lowerPattern) {
+          console.log(`      ✅ Exact match found`);
+          return true;
+        }
+        
         // Direct contains match
-        if (h.includes(lowerPattern)) return true;
+        if (h.includes(lowerPattern)) {
+          console.log(`      ✅ Contains match found (header contains pattern)`);
+          return true;
+        }
+        
         // Reverse contains for cases like "Year" matching "Model Year"
-        if (lowerPattern.includes(h) && h.length > 2) return true;
+        if (lowerPattern.includes(h) && h.length > 2) {
+          console.log(`      ✅ Reverse contains match found (pattern contains header)`);
+          return true;
+        }
+        
         // Handle special characters and spaces
         const normalizedHeader = h.replace(/[^a-z0-9]/g, '');
         const normalizedPattern = lowerPattern.replace(/[^a-z0-9]/g, '');
-        if (normalizedHeader === normalizedPattern) return true;
+        if (normalizedHeader === normalizedPattern) {
+          console.log(`      ✅ Normalized match found (${normalizedHeader} === ${normalizedPattern})`);
+          return true;
+        }
+        
+        console.log(`      ❌ No match`);
         return false;
       });
       
@@ -123,7 +146,13 @@ export const performInventoryAutoDetection = (headers: string[]): InventoryField
         mapping[fieldKey as keyof InventoryFieldMapping] = headers[headerIndex];
         console.log(`✅ [INVENTORY MAPPING] Auto-detected ${fieldKey}: ${headers[headerIndex]} (pattern: ${pattern})`);
         break;
+      } else {
+        console.log(`  ❌ No header matched pattern: ${pattern}`);
       }
+    }
+    
+    if (!mapping[fieldKey as keyof InventoryFieldMapping]) {
+      console.log(`❌ [INVENTORY MAPPING] Field ${fieldKey} could not be auto-detected`);
     }
   });
 
@@ -165,6 +194,11 @@ export const validateInventoryMapping = (mapping: InventoryFieldMapping): { isVa
 // Transform inventory mapping to the format expected by the inventory system
 export const transformInventoryData = (rowData: Record<string, any>, mapping: InventoryFieldMapping): Record<string, any> => {
   const result: Record<string, any> = {};
+  
+  console.log('🔄 [INVENTORY TRANSFORM] Starting transformation');
+  console.log('🔄 [INVENTORY TRANSFORM] Input mapping:', mapping);
+  console.log('🔄 [INVENTORY TRANSFORM] Input row data keys:', Object.keys(rowData));
+  console.log('🔄 [INVENTORY TRANSFORM] Sample row data:', rowData);
   
   // Handle combined vehicle field parsing
   if (mapping.vehicle && rowData[mapping.vehicle]) {

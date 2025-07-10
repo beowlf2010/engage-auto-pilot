@@ -45,7 +45,10 @@ export const mapRowToInventoryItem = (
   condition: UploadCondition,
   uploadId: string
 ): InventoryItem => {
-  console.log('Mapping row to inventory item:', { condition, keys: Object.keys(row) });
+  console.log('=== INVENTORY MAPPING DEBUG ===');
+  console.log('Condition:', condition);
+  console.log('Available columns:', Object.keys(row));
+  console.log('Sample row data:', row);
 
   let mappedData: any;
   const currentTimestamp = new Date().toISOString();
@@ -98,13 +101,21 @@ export const mapRowToInventoryItem = (
     const cleanedMake = cleanVehicleData(mappedData.make);
     const cleanedModel = cleanVehicleData(mappedData.model);
 
+    console.log('🔍 Field extraction results:');
+    console.log('- Original make:', mappedData.make);
+    console.log('- Original model:', mappedData.model);
+    console.log('- Cleaned make:', cleanedMake);
+    console.log('- Cleaned model:', cleanedModel);
+
     // Reject vehicles with invalid make/model data
     if (!isValidVehicleData(cleanedMake || '', cleanedModel || '')) {
-      console.warn('Rejecting vehicle with invalid make/model data:', {
+      console.warn('❌ Rejecting vehicle with invalid make/model data:', {
         originalMake: mappedData.make,
         originalModel: mappedData.model,
         cleanedMake,
-        cleanedModel
+        cleanedModel,
+        availableColumns: Object.keys(row),
+        sampleRow: row
       });
       
       throw new Error(`Invalid vehicle data: make="${mappedData.make}", model="${mappedData.model}"`);
