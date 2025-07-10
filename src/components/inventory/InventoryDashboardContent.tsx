@@ -5,6 +5,7 @@ import InventoryFilters from './InventoryFilters';
 import InventoryTable from './InventoryTable';
 import InventoryCleanupButton from './InventoryCleanupButton';
 import UsedInventoryDiagnostics from './UsedInventoryDiagnostics';
+import EnhancedInventoryDashboard from './advanced/EnhancedInventoryDashboard';
 import { InventoryItem, InventoryFilters as IInventoryFilters } from '@/services/inventory/types';
 
 interface InventoryDashboardContentProps {
@@ -30,6 +31,9 @@ const InventoryDashboardContent = ({
 }: InventoryDashboardContentProps) => {
   return (
     <>
+      {/* Enhanced AI-Powered Inventory Intelligence */}
+      <EnhancedInventoryDashboard />
+      
       <InventoryStats inventory={inventory} loading={isLoading} />
       
       <div className="space-y-4">
