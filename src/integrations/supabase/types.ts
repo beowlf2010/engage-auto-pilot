@@ -3023,6 +3023,7 @@ export type Database = {
           manager_id: string | null
           original_fi_profit: number | null
           original_gross_profit: number | null
+          original_stock_number: string | null
           original_total_profit: number | null
           sale_amount: number | null
           stock_number: string | null
@@ -3047,6 +3048,7 @@ export type Database = {
           manager_id?: string | null
           original_fi_profit?: number | null
           original_gross_profit?: number | null
+          original_stock_number?: string | null
           original_total_profit?: number | null
           sale_amount?: number | null
           stock_number?: string | null
@@ -3071,6 +3073,7 @@ export type Database = {
           manager_id?: string | null
           original_fi_profit?: number | null
           original_gross_profit?: number | null
+          original_stock_number?: string | null
           original_total_profit?: number | null
           sale_amount?: number | null
           stock_number?: string | null
