@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import InventoryDashboard from "@/components/InventoryDashboard";
-import InventoryUpload from "@/components/InventoryUpload";
+import EnhancedInventoryUpload from "@/components/inventory-upload/EnhancedInventoryUpload";
 import VehicleDetail from "@/components/VehicleDetail";
 import RPOInsights from "@/components/RPOInsights";
 import BreadcrumbNav from "@/components/inventory/BreadcrumbNav";
@@ -68,7 +68,7 @@ const InventoryLayout = ({ page }: InventoryLayoutProps) => {
       case 'dashboard':
         return <InventoryDashboard />;
       case 'inventory-upload':
-        return <InventoryUpload user={user} />;
+        return <EnhancedInventoryUpload userId={user.id} />;
       case 'vehicle-detail':
         return <VehicleDetail />;
       case 'rpo-insights':
