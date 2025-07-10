@@ -12,7 +12,7 @@ export interface ParsedInventoryData {
   rows: any[];
   sample: Record<string, string>;
   fileType: 'csv' | 'excel';
-  formatType?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'gm_global' | 'unknown';
+  formatType?: 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'gm_global' | 'vauto' | 'unknown';
 }
 
 export const getSheetInfo = async (file: File): Promise<SheetInfo[]> => {

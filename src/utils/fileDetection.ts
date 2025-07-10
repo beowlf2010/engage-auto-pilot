@@ -7,10 +7,20 @@ export const getFileType = (file: File): 'csv' | 'excel' => {
   return 'csv';
 };
 
-export const detectFormatType = (headers: string[]): 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'gm_global' | 'unknown' => {
+export const detectFormatType = (headers: string[]): 'new_car_main_view' | 'merch_inv_view' | 'orders_all' | 'gm_orders' | 'gm_global' | 'vauto' | 'unknown' => {
   const headerStr = headers.join('|').toLowerCase();
   
-  // Enhanced GM Global format detection with more patterns
+  // vAuto format detection (check first to prevent GM Global misclassification)
+  const vautoPatterns = ['vehicle', 'stock #', 'price', 'mileage', 'cost to market', 'days in inventory'];
+  const vautoMatches = vautoPatterns.filter(pattern => headerStr.includes(pattern));
+  const hasVehicleField = headers.some(h => h.toLowerCase() === 'vehicle' || h.toLowerCase() === 'vehicle:');
+  
+  if (vautoMatches.length >= 4 || (vautoMatches.length >= 3 && hasVehicleField)) {
+    console.log('✓ Detected vAuto format based on headers:', vautoMatches);
+    return 'vauto';
+  }
+  
+  // Enhanced GM Global format detection with more patterns (only after vAuto check)
   if (headerStr.includes('gm config id') || 
       headerStr.includes('gm stored config description') ||
       (headerStr.includes('order #') && headerStr.includes('division')) ||

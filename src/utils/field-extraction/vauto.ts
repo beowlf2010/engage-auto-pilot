@@ -38,25 +38,43 @@ export const parseVautoVehicleField = (vehicleStr: string): any => {
   };
 };
 
+// Detect if this is a vAuto file format
+export const detectVautoFormat = (row: Record<string, any>): boolean => {
+  const keys = Object.keys(row).map(k => k.toLowerCase());
+  const vautoPatterns = ['vehicle', 'stock #', 'price', 'mileage', 'cost to market'];
+  const matches = vautoPatterns.filter(pattern => 
+    keys.some(key => key.includes(pattern.replace(' ', '_')) || key.includes(pattern))
+  );
+  return matches.length >= 3;
+};
+
 // Extract vAuto-specific fields from row data
 export const extractVautoFields = (row: Record<string, any>): any => {
   console.log('=== VAUTO FIELDS EXTRACTION ===');
   
-  // Look for vAuto vehicle field
+  // Enhanced vAuto vehicle field patterns
   const vehicleFields = [
-    'Vehicle', 'vehicle', 'Vehicle:', 'VehicleDescription'
+    'Vehicle', 'vehicle', 'Vehicle:', 'VehicleDescription', 'Vehicle Description',
+    'Full Vehicle', 'Unit', 'Description', 'Vehicle_Description'
   ];
   
   const vehicleStr = getFieldValue(row, vehicleFields);
+  let result: any = {};
+  
   if (vehicleStr) {
-    return parseVautoVehicleField(vehicleStr);
+    const parsedVehicle = parseVautoVehicleField(vehicleStr);
+    if (parsedVehicle.make && parsedVehicle.model) {
+      result = { ...result, ...parsedVehicle };
+      console.log('✅ Successfully parsed vAuto vehicle field:', parsedVehicle);
+    }
   }
   
   // Look for other vAuto-specific fields
-  const result: any = {};
+  
+  // Enhanced vAuto field extraction
   
   // Price fields
-  const priceFields = ['Price', 'AskingPrice', 'ListPrice'];
+  const priceFields = ['Price', 'AskingPrice', 'ListPrice', 'List Price', 'Asking Price'];
   const price = getFieldValue(row, priceFields);
   if (price) {
     const numPrice = parseFloat(price.replace(/[^0-9.-]/g, ''));
@@ -66,12 +84,29 @@ export const extractVautoFields = (row: Record<string, any>): any => {
   }
   
   // Mileage fields
-  const mileageFields = ['Mileage', 'Miles', 'Odometer'];
+  const mileageFields = ['Mileage', 'Miles', 'Odometer', 'Milo'];
   const mileage = getFieldValue(row, mileageFields);
   if (mileage) {
     const numMileage = parseInt(mileage.replace(/[^0-9]/g, ''), 10);
     if (!isNaN(numMileage)) {
       result.mileage = numMileage;
+    }
+  }
+  
+  // Stock number
+  const stockFields = ['Stock #', 'Stock Number', 'Stock_Number', 'StockNumber'];
+  const stockNumber = getFieldValue(row, stockFields);
+  if (stockNumber) {
+    result.stock_number = stockNumber;
+  }
+  
+  // Days in inventory
+  const daysFields = ['Days in Inventory', 'Days_in_Inventory', 'Age', 'Inventory_Age'];
+  const days = getFieldValue(row, daysFields);
+  if (days) {
+    const numDays = parseInt(days.replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(numDays)) {
+      result.days_in_inventory = numDays;
     }
   }
   

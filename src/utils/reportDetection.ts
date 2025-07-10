@@ -1,6 +1,6 @@
 
 export interface ReportDetection {
-  reportType: 'gm_global' | 'new_car_main_view' | 'merch_inv_view' | 'sales_report' | 'unknown';
+  reportType: 'gm_global' | 'new_car_main_view' | 'merch_inv_view' | 'sales_report' | 'vauto' | 'unknown';
   confidence: number;
   recommendedCondition: 'new' | 'used' | 'gm_global';
   sourceReport: string;
@@ -10,6 +10,23 @@ export interface ReportDetection {
 export const detectReportType = (fileName: string, headers: string[]): ReportDetection => {
   const fileNameLower = fileName.toLowerCase();
   const headerSet = new Set(headers.map(h => h.toLowerCase()));
+  
+  // vAuto indicators (check first to prevent misclassification)
+  const vautoIndicators = [
+    'vehicle',
+    'price',
+    'mileage',
+    'stock #',
+    'stock_number',
+    'asking_price',
+    'list_price',
+    'days_in_inventory',
+    'cost to market'
+  ];
+  
+  // vAuto filename patterns
+  const vautoFilePatterns = ['vauto', 'v-auto', 'vanto', 'inventory', 'used', 'preowned'];
+  const hasVautoFilePattern = vautoFilePatterns.some(pattern => fileNameLower.includes(pattern));
   
   // Strong indicators for GM Global orders
   const gmGlobalIndicators = [
@@ -45,6 +62,34 @@ export const detectReportType = (fileName: string, headers: string[]): ReportDet
   
   const foundIndicators: string[] = [];
   let confidence = 0;
+  
+  // Check for vAuto patterns first (to prevent GM Global misclassification)
+  const vautoMatches = vautoIndicators.filter(indicator => {
+    const found = headerSet.has(indicator) || 
+                  headers.some(h => h.toLowerCase().includes(indicator.replace('_', ' ')));
+    if (found) foundIndicators.push(indicator);
+    return found;
+  });
+  
+  // Check for combined vehicle field (strong vAuto indicator)
+  const hasCombinedVehicleField = headers.some(h => 
+    h.toLowerCase() === 'vehicle' || 
+    h.toLowerCase().includes('vehicle description') ||
+    h.toLowerCase() === 'vehicle:'
+  );
+  
+  // Detect vAuto if we have enough indicators
+  if (vautoMatches.length >= 4 || (vautoMatches.length >= 3 && hasCombinedVehicleField) || 
+      (vautoMatches.length >= 2 && hasVautoFilePattern)) {
+    confidence = Math.min(95, 70 + (vautoMatches.length * 8) + (hasCombinedVehicleField ? 10 : 0) + (hasVautoFilePattern ? 15 : 0));
+    return {
+      reportType: 'vauto',
+      confidence,
+      recommendedCondition: 'used',
+      sourceReport: 'merch_inv_view',
+      indicators: foundIndicators
+    };
+  }
   
   // Check for GM Global patterns
   const gmGlobalMatches = gmGlobalIndicators.filter(indicator => {

@@ -3,8 +3,8 @@ import { parseVehicleField } from '@/utils/field-extraction/vehicle';
 
 // Enhanced patterns for inventory field detection
 const inventoryFieldPatterns: Record<keyof InventoryFieldMapping, string[]> = {
-  // Vehicle Information - prioritize combined vehicle fields
-  vehicle: ['vehicle', 'vehicle_description', 'full_vehicle', 'description', 'vehicle desc', 'unit', 'automobile', 'auto'],
+  // Vehicle Information - prioritize combined vehicle fields (enhanced for vAuto)
+  vehicle: ['vehicle', 'vehicle_description', 'full_vehicle', 'description', 'vehicle desc', 'unit', 'automobile', 'auto', 'vehicle:'],
   year: ['year', 'model_year', 'yr', 'vehicle_year', 'model year', 'year built', 'my', 'model yr'],
   make: ['make', 'manufacturer', 'brand', 'vehicle_make', 'mfr', 'mfg', 'oem', 'division', 'make_name'],
   model: ['model', 'vehicle_model', 'car_model', 'model name', 'vehicle model', 'model description', 'model_name'],

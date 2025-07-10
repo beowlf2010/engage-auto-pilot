@@ -11,7 +11,7 @@ export { extractRPOCodes, extractOptionDescriptions } from './options';
 import { findYearInRow, findMakeInRow, findModelInRow, parseVehicleField } from './vehicle';
 import { findVINInRow } from './vin';
 import { extractRPOCodes, extractOptionDescriptions } from './options';
-import { parseVautoVehicleField } from './vauto';
+import { parseVautoVehicleField, detectVautoFormat } from './vauto';
 
 // Add missing extraction functions that are being imported
 export const extractVehicleFields = (row: any) => {
@@ -62,16 +62,7 @@ export const extractOptionsFields = (row: any) => {
 };
 
 export const extractVautoFields = (row: any) => {
-  // Check if this looks like a vAuto file
-  const vehicleField = Object.keys(row).find(key => 
-    key.toLowerCase().includes('vehicle') && 
-    typeof row[key] === 'string' && 
-    row[key].includes(' ')
-  );
-  
-  if (vehicleField) {
-    return parseVautoVehicleField(row[vehicleField]);
-  }
-  
-  return {};
+  // Import the full vAuto extraction logic
+  const { extractVautoFields: fullVautoExtraction } = require('./vauto');
+  return fullVautoExtraction(row);
 };

@@ -62,27 +62,44 @@ export const mapRowToInventoryItem = (
       // Use standard extraction methods for regular inventory files
       try {
         console.log('🔧 [INVENTORY MAPPER] Using standard field extraction');
-        mappedData = {
-          ...extractVehicleFields(row),
-          ...extractVINField(row),
-          ...extractOptionsFields(row),
-          condition: condition === 'new' ? 'new' : 'used',
-          status: 'available'
-        };
+        
+        // Try vAuto-specific extraction first if this looks like a vAuto file
+        const vautoData = extractVautoFields(row);
+        const hasVautoData = vautoData.make && vautoData.model;
+        
+        if (hasVautoData) {
+          console.log('✅ [INVENTORY MAPPER] vAuto extraction successful, using as primary data:', vautoData);
+          mappedData = {
+            ...vautoData,
+            ...extractVINField(row),
+            ...extractOptionsFields(row),
+            condition: condition === 'new' ? 'new' : 'used',
+            status: 'available'
+          };
+        } else {
+          console.log('🔧 [INVENTORY MAPPER] vAuto extraction failed, falling back to standard extraction');
+          mappedData = {
+            ...extractVehicleFields(row),
+            ...extractVINField(row),
+            ...extractOptionsFields(row),
+            condition: condition === 'new' ? 'new' : 'used',
+            status: 'available'
+          };
+          
+          // Try to supplement with any vAuto data that was extracted
+          if (Object.keys(vautoData).length > 0) {
+            console.log('🔧 [INVENTORY MAPPER] Supplementing with partial vAuto data:', vautoData);
+            mappedData = { ...mappedData, ...vautoData };
+          }
+        }
 
-        console.log('✅ [INVENTORY MAPPER] Standard extraction result:', {
+        console.log('✅ [INVENTORY MAPPER] Final extraction result:', {
           make: mappedData.make,
           model: mappedData.model,
           year: mappedData.year,
-          vin: mappedData.vin
+          vin: mappedData.vin,
+          source: hasVautoData ? 'vAuto' : 'standard'
         });
-
-        // Try Vauto-specific extraction if available
-        const vautoData = extractVautoFields(row);
-        if (Object.keys(vautoData).length > 0) {
-          console.log('🔧 [INVENTORY MAPPER] Applying Vauto data:', vautoData);
-          mappedData = { ...mappedData, ...vautoData };
-        }
       } catch (error) {
         console.error('💥 [INVENTORY MAPPER] Error in field extraction:', error);
         // Fallback to basic mapping
