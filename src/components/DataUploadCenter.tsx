@@ -228,7 +228,7 @@ const DataUploadCenter = ({ user }: DataUploadCenterProps) => {
           </TabsContent>
 
           <TabsContent value="leads">
-            <UploadLeads />
+            <UploadLeads user={user} />
           </TabsContent>
 
           <TabsContent value="inventory">

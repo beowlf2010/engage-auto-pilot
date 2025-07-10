@@ -37,7 +37,18 @@ interface UploadResultType {
 
 type ProcessingStage = 'upload' | 'mapping' | 'processing' | 'results';
 
-const UploadLeads = () => {
+interface UploadLeadsProps {
+  user?: {
+    id: string;
+    email?: string;
+    role: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+  };
+}
+
+const UploadLeads = ({ user }: UploadLeadsProps = {}) => {
   const [csvData, setCsvData] = useState<CSVData | null>(null);
   const [uploadResult, setUploadResult] = useState<UploadResultType | null>(null);
   const [updateExistingLeads, setUpdateExistingLeads] = useState(false);
