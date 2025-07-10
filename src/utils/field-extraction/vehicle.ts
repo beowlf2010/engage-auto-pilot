@@ -2,7 +2,7 @@
 import { getFieldValue } from './core';
 
 // Parse combined vehicle field like "2019 Honda Accord EX-L"
-const parseVehicleField = (vehicleText: string): { year?: number; make?: string; model?: string; trim?: string } => {
+export const parseVehicleField = (vehicleText: string): { year?: number; make?: string; model?: string; trim?: string } => {
   if (!vehicleText || typeof vehicleText !== 'string') {
     return {};
   }

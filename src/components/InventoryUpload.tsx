@@ -15,7 +15,7 @@ import DragDropFileQueue from "./inventory-upload/DragDropFileQueue";
 import EnhancedBatchUploadResult from "./inventory-upload/EnhancedBatchUploadResult";
 import VehicleScraper from "./inventory-upload/VehicleScraper";
 import UploadSessionControls from "./inventory-upload/UploadSessionControls";
-import InventoryFieldMappingModal from "./InventoryFieldMappingModal";
+import InventoryFieldMapper from "./inventory-mapper/InventoryFieldMapper";
 import type { QueuedFile } from "./inventory-upload/DragDropFileQueue";
 
 interface InventoryUploadProps {
@@ -130,12 +130,12 @@ const InventoryUpload = ({ user }: InventoryUploadProps) => {
           </Button>
         </div>
         
-        <InventoryFieldMappingModal
-          isOpen={showFieldMapper}
-          onClose={() => setShowFieldMapper(false)}
+        <InventoryFieldMapper
           csvHeaders={csvHeaders}
           sampleData={sampleData}
-          onMappingComplete={handleFieldMappingComplete}
+          onMappingComplete={(mapping, transformer) => {
+            handleFieldMappingComplete(mapping, transformer);
+          }}
         />
       </div>
     );

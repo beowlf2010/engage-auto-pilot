@@ -93,14 +93,32 @@ export const useInventoryUpload = ({ userId }: UseInventoryUploadProps) => {
         mappedFieldsCount: Object.values(autoMapping).filter(v => v).length
       });
 
-      // Check if we have minimal required fields auto-detected
-      const hasMinimalMapping = (
-        // Either combined vehicle field or separate fields
-        (autoMapping.vehicle) || 
-        (autoMapping.year && autoMapping.make && autoMapping.model)
-      ); // Removed stockNumber requirement to be more lenient
+      // Improved auto-detection logic
+      const hasVehicleInfo = !!(autoMapping.vehicle || (autoMapping.year && autoMapping.make && autoMapping.model));
+      const hasIdentifier = !!(autoMapping.stockNumber || autoMapping.vin);
+      const mappedFieldsCount = Object.values(autoMapping).filter(v => v).length;
+      const mappingCoverage = mappedFieldsCount / parsed.headers.length;
+      
+      console.log('🔍 [FIELD MAPPING CHECK] Auto-detection analysis:', {
+        hasVehicleInfo,
+        hasIdentifier,
+        mappedFieldsCount,
+        totalHeaders: parsed.headers.length,
+        mappingCoverage
+      });
 
-      if (!hasMinimalMapping) {
+      // Show field mapper if:
+      // 1. No vehicle information detected, OR
+      // 2. No identifiers detected, OR  
+      // 3. Very low mapping coverage (less than 20% of fields mapped)
+      const shouldShowFieldMapper = (
+        !hasVehicleInfo || 
+        !hasIdentifier || 
+        (mappedFieldsCount < 3) ||
+        (mappingCoverage < 0.2 && parsed.headers.length > 5)
+      );
+
+      if (shouldShowFieldMapper) {
         console.log('🔍 [FIELD MAPPING CHECK] Auto-detection insufficient, showing field mapper');
         // Store the parsed data for the field mapper
         setCsvHeaders(parsed.headers);

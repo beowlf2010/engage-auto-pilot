@@ -1,17 +1,18 @@
 import { InventoryFieldMapping } from './types';
+import { parseVehicleField } from '@/utils/field-extraction/vehicle';
 
 // Enhanced patterns for inventory field detection
 const inventoryFieldPatterns: Record<keyof InventoryFieldMapping, string[]> = {
   // Vehicle Information
-  vehicle: ['vehicle', 'vehicle_description', 'full_vehicle', 'description'],
-  year: ['year', 'model_year', 'yr', 'vehicle_year'],
-  make: ['make', 'manufacturer', 'brand', 'vehicle_make'],
-  model: ['model', 'vehicle_model', 'car_model'],
-  trim: ['trim', 'trim_level', 'grade', 'trim_description'],
+  vehicle: ['vehicle', 'vehicle_description', 'full_vehicle', 'description', 'vehicle desc', 'unit', 'automobile'],
+  year: ['year', 'model_year', 'yr', 'vehicle_year', 'model year', 'year built'],
+  make: ['make', 'manufacturer', 'brand', 'vehicle_make', 'mfr', 'mfg', 'oem'],
+  model: ['model', 'vehicle_model', 'car_model', 'model name', 'vehicle model'],
+  trim: ['trim', 'trim_level', 'grade', 'trim_description', 'style', 'body style', 'body'],
 
   // Identifiers  
-  stockNumber: ['stock #', 'stock_number', 'stock no', 'stock_no', 'inventory_number', 'unit_number', 'stocknumber'],
-  vin: ['vin', 'vin_number', 'vehicle_identification_number'],
+  stockNumber: ['stock #', 'stock_number', 'stock no', 'stock_no', 'inventory_number', 'unit_number', 'stocknumber', 'inventory #', 'inv #', 'stock'],
+  vin: ['vin', 'vin_number', 'vehicle_identification_number', 'vin number', 'vehicle vin'],
 
   // Vehicle Details
   odometer: ['odometer', 'mileage', 'miles', 'milo', 'km'],
@@ -90,69 +91,6 @@ const inventoryFieldPatterns: Record<keyof InventoryFieldMapping, string[]> = {
   deletedDate: ['deleted date', 'deleted_date', 'removal_date']
 };
 
-// Enhanced vehicle parsing function for combined "Vehicle" field
-export const parseVehicleField = (vehicleText: string): { year?: number; make?: string; model?: string; trim?: string } => {
-  if (!vehicleText || typeof vehicleText !== 'string') {
-    return {};
-  }
-
-  console.log('🔍 [INVENTORY PARSING] Parsing vehicle field:', vehicleText);
-
-  const trimmed = vehicleText.trim();
-  const parts = trimmed.split(' ').filter(part => part.length > 0);
-  
-  if (parts.length < 3) {
-    console.warn('⚠️ [INVENTORY PARSING] Vehicle field has less than 3 parts:', parts);
-    return {};
-  }
-
-  // First part should be year (4 digits)
-  const yearMatch = parts[0].match(/^\d{4}$/);
-  const year = yearMatch ? parseInt(parts[0], 10) : undefined;
-  
-  if (!year || year < 1900 || year > new Date().getFullYear() + 2) {
-    console.warn('⚠️ [INVENTORY PARSING] Invalid year detected:', parts[0]);
-    return {};
-  }
-
-  // Second part should be make
-  const make = parts[1];
-  
-  // Third part and beyond should be model and trim
-  const modelAndTrim = parts.slice(2);
-  
-  // Try to separate model from trim
-  // Common model patterns: single word, or hyphenated (F-150, CX-5)
-  let model = modelAndTrim[0];
-  let trim = '';
-  
-  if (modelAndTrim.length > 1) {
-    // If there's a hyphenated model like "F-150", keep it together
-    if (modelAndTrim[0].includes('-') && modelAndTrim.length > 1) {
-      model = modelAndTrim[0];
-      trim = modelAndTrim.slice(1).join(' ');
-    } else if (modelAndTrim.length === 2) {
-      // Simple case: "Accord EX-L"
-      model = modelAndTrim[0];
-      trim = modelAndTrim[1];
-    } else {
-      // Multiple parts: try to determine where model ends and trim begins
-      // For now, take first part as model, rest as trim
-      model = modelAndTrim[0];
-      trim = modelAndTrim.slice(1).join(' ');
-    }
-  }
-
-  const result = {
-    year,
-    make,
-    model,
-    trim: trim || undefined
-  };
-
-  console.log('✅ [INVENTORY PARSING] Parsed result:', result);
-  return result;
-};
 
 export const performInventoryAutoDetection = (headers: string[]): InventoryFieldMapping => {
   const mapping: Partial<InventoryFieldMapping> = {};
@@ -163,14 +101,21 @@ export const performInventoryAutoDetection = (headers: string[]): InventoryField
   console.log('🔍 [INVENTORY MAPPING] Headers found:', headers);
   console.log('🔍 [INVENTORY MAPPING] Lowercase headers:', lowerHeaders);
   
-  // Auto-detect each field
+  // Auto-detect each field with improved pattern matching
   Object.entries(inventoryFieldPatterns).forEach(([fieldKey, patterns]) => {
     for (const pattern of patterns) {
+      const lowerPattern = pattern.toLowerCase();
       const headerIndex = lowerHeaders.findIndex(h => {
         // Exact match first (highest priority)
-        if (h === pattern.toLowerCase()) return true;
-        // Contains match (lower priority)
-        if (h.includes(pattern.toLowerCase()) || pattern.toLowerCase().includes(h)) return true;
+        if (h === lowerPattern) return true;
+        // Direct contains match
+        if (h.includes(lowerPattern)) return true;
+        // Reverse contains for cases like "Year" matching "Model Year"
+        if (lowerPattern.includes(h) && h.length > 2) return true;
+        // Handle special characters and spaces
+        const normalizedHeader = h.replace(/[^a-z0-9]/g, '');
+        const normalizedPattern = lowerPattern.replace(/[^a-z0-9]/g, '');
+        if (normalizedHeader === normalizedPattern) return true;
         return false;
       });
       
@@ -197,18 +142,22 @@ export const validateInventoryMapping = (mapping: InventoryFieldMapping): { isVa
     errors.push('Vehicle information is required (either combined Vehicle field or separate Year/Make/Model fields)');
   }
   
-  // Stock number is highly recommended for inventory tracking
-  if (!mapping.stockNumber) {
-    errors.push('Stock Number is recommended for inventory tracking');
+  // Identifier is critical for inventory tracking
+  const hasIdentifier = !!(mapping.stockNumber || mapping.vin);
+  if (!hasIdentifier) {
+    errors.push('At least one identifier (Stock Number or VIN) is required for inventory tracking');
   }
   
-  // Price is important for inventory
-  if (!mapping.price) {
-    errors.push('Price information is recommended');
+  // Price is recommended but not critical
+  if (!mapping.price && !mapping.listPrice && !mapping.msrp) {
+    errors.push('Price information is recommended (Price, List Price, or MSRP)');
   }
+  
+  // Consider mapping valid if we have vehicle info and at least one identifier
+  const isMinimallyValid = (hasCombinedVehicle || hasSeparateFields) && hasIdentifier;
   
   return {
-    isValid: errors.length === 0,
+    isValid: isMinimallyValid,
     errors
   };
 };

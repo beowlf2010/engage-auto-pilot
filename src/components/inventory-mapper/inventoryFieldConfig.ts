@@ -31,8 +31,8 @@ export const inventoryFieldSections: InventoryFieldSection[] = [
     title: "Identifiers",
     icon: Hash,
     fields: [
-      { key: "stockNumber", label: "Stock Number", required: true, description: "Stock # or inventory number" },
-      { key: "vin", label: "VIN", required: true, description: "Vehicle Identification Number" }
+      { key: "stockNumber", label: "Stock Number", description: "Stock # or inventory number (recommended)" },
+      { key: "vin", label: "VIN", description: "Vehicle Identification Number (recommended)" }
     ]
   },
   {
@@ -53,7 +53,7 @@ export const inventoryFieldSections: InventoryFieldSection[] = [
     title: "Pricing Information",
     icon: DollarSign,
     fields: [
-      { key: "price", label: "Price", required: true },
+      { key: "price", label: "Price", description: "Asking price (recommended)" },
       { key: "listPrice", label: "List Price" },
       { key: "msrp", label: "MSRP" },
       { key: "cost", label: "Cost" },
