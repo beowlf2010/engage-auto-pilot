@@ -6,7 +6,7 @@ import UploadSuccessNotification from '@/components/inventory/UploadSuccessNotif
 
 const InventoryUploadPage = () => {
   const { profile } = useAuth();
-  const [showNotification, setShowNotification] = useState(true);
+  const [showNotification, setShowNotification] = useState(false);
   
   if (!profile || !['manager', 'admin'].includes(profile.role)) {
     return (
