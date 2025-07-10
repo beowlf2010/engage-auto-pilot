@@ -18,6 +18,7 @@ import { navigationItems } from './navigation/navigationConfig';
 import { cn } from '@/lib/utils';
 import { useAuth } from './auth/AuthProvider';
 import NavigationItem from './navigation/NavigationItem';
+import { NotificationPanel } from './notifications/NotificationPanel';
 
 interface StreamlinedNavigationProps {
   isCollapsed: boolean;
@@ -49,9 +50,12 @@ const StreamlinedNavigation: React.FC<StreamlinedNavigationProps> = ({ isCollaps
   return (
     <div className="flex flex-col h-full space-y-1">
       <div className="px-3 py-2">
-        <h2 className={cn("mb-2 px-4 font-bold text-sm uppercase", isCollapsed ? "text-center" : "text-left")}>
-          {isCollapsed ? "Menu" : "Dashboard"}
-        </h2>
+        <div className="flex items-center justify-between mb-2 px-4">
+          <h2 className={cn("font-bold text-sm uppercase", isCollapsed ? "text-center" : "text-left")}>
+            {isCollapsed ? "Menu" : "Dashboard"}
+          </h2>
+          {!isCollapsed && <NotificationPanel />}
+        </div>
         {filteredNavigationItems.map((item) => (
           <NavigationItem key={item.label} item={item} isCollapsed={isCollapsed} />
         ))}
