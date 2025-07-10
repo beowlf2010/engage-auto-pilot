@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Car } from "lucide-react";
+import { Loader2, Brain, Sparkles } from "lucide-react";
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -71,16 +71,21 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Car className="w-8 h-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-slate-800">Loveable CRM</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-xl border-0 bg-card/95 backdrop-blur">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex items-center justify-center space-x-3 mb-2">
+            <div className="relative">
+              <Brain className="w-8 h-8 text-primary" />
+              <Sparkles className="w-4 h-4 text-secondary absolute -top-1 -right-1" />
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              AutoVantage AI
+            </h1>
           </div>
-          <CardTitle>Welcome</CardTitle>
-          <CardDescription>
-            Sign in to your account or create a new one
+          <CardTitle className="text-foreground">Welcome to the Future</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Access your AI-powered automotive intelligence platform
           </CardDescription>
         </CardHeader>
         <CardContent>
