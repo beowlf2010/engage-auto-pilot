@@ -118,23 +118,23 @@ const UploadResult = ({ result }: UploadResultProps) => {
         )}
 
         {isSuccess && result.summary && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-green-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-green-200">
             <div className="text-center">
               <CardDescription className="font-medium text-green-800">Total Sales</CardDescription>
               <p className="text-lg font-semibold text-green-700">
-                ${result.summary.totalSales?.toLocaleString() || '0'}
+                ${(result.summary.totalSales || result.summary.total_sales || 0).toLocaleString()}
               </p>
             </div>
             <div className="text-center">
               <CardDescription className="font-medium text-green-800">Total Gross</CardDescription>
               <p className="text-lg font-semibold text-green-700">
-                ${result.summary.totalGross?.toLocaleString() || '0'}
+                ${(result.summary.totalGross || result.summary.total_gross || 0).toLocaleString()}
               </p>
             </div>
             <div className="text-center">
               <CardDescription className="font-medium text-green-800">Total F&I</CardDescription>
               <p className="text-lg font-semibold text-green-700">
-                ${result.summary.totalFiProfit?.toLocaleString() || '0'}
+                ${(result.summary.totalFiProfit || result.summary.total_fi_profit || 0).toLocaleString()}
               </p>
             </div>
           </div>
