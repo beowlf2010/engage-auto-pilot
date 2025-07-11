@@ -226,11 +226,17 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
   const handleLeadUpload = async (step: UploadStep, files: FileList) => {
     updateProcessingDetails('processing', 30, 'Processing lead files');
     
-    addDebugLog(`👥 Adding ${files.length} lead files`);
-    addLeadFiles(files);
+    addDebugLog(`👥 Processing ${files.length} lead files directly`);
+    
+    // Create queued files directly to avoid race condition
+    const queuedFiles = Array.from(files).map(file => ({
+      id: `${Date.now()}-${Math.random()}`,
+      file,
+      status: 'pending' as const
+    }));
     
     updateProcessingDetails('processing', 70, 'Batch processing leads');
-    const result = await processLeadBatch();
+    const result = await processLeadBatch(queuedFiles);
     
     addDebugLog(`👥 Lead processing result: ${JSON.stringify(result)}`);
     

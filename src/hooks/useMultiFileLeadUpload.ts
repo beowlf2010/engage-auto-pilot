@@ -53,7 +53,12 @@ export const useMultiFileLeadUpload = () => {
       status: 'pending'
     }));
 
-    setQueuedFiles(prev => [...prev, ...newFiles]);
+    console.log(`📁 [LEAD UPLOAD] Adding ${files.length} files:`, Array.from(files).map(f => f.name));
+    setQueuedFiles(prev => {
+      const updated = [...prev, ...newFiles];
+      console.log(`📁 [LEAD UPLOAD] Queue updated, total files: ${updated.length}`);
+      return updated;
+    });
   }, []);
 
   const removeFile = useCallback((fileId: string) => {
@@ -203,8 +208,12 @@ export const useMultiFileLeadUpload = () => {
     }
   };
 
-  const processBatch = async (): Promise<BatchUploadResult> => {
-    if (queuedFiles.length === 0) {
+  const processBatch = async (filesToProcess?: QueuedFile[]): Promise<BatchUploadResult> => {
+    const targetFiles = filesToProcess || queuedFiles;
+    console.log(`🔍 [LEAD UPLOAD] Processing batch - available files: ${targetFiles.length}`);
+    
+    if (targetFiles.length === 0) {
+      console.error('❌ [LEAD UPLOAD] No files to process in batch');
       throw new Error('No files to process');
     }
 
@@ -215,7 +224,7 @@ export const useMultiFileLeadUpload = () => {
     setProcessing(true);
     
     const result: BatchUploadResult = {
-      totalFiles: queuedFiles.length,
+      totalFiles: targetFiles.length,
       totalLeads: 0,
       successfulLeads: 0,
       failedLeads: 0,
@@ -224,10 +233,10 @@ export const useMultiFileLeadUpload = () => {
     };
 
     try {
-      console.log(`🚀 [SUPABASE MULTI UPLOAD] Starting Supabase-compatible batch processing of ${queuedFiles.length} files`);
+      console.log(`🚀 [SUPABASE MULTI UPLOAD] Starting Supabase-compatible batch processing of ${targetFiles.length} files`);
 
       // Process files sequentially to avoid overwhelming the system
-      for (const queuedFile of queuedFiles) {
+      for (const queuedFile of targetFiles) {
         const fileResult = await processFile(queuedFile);
         
         result.totalLeads += fileResult.totalRows;
