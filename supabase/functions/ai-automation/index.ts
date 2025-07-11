@@ -54,6 +54,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let runId: string | null = null;
+  const startTime = Date.now();
+
   try {
     // Parse request body - handle both empty and malformed JSON
     let requestData;
@@ -86,6 +89,24 @@ serve(async (req) => {
     console.log(`🔐 [AI-AUTOMATION] Environment check passed`);
 
     const supabaseClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Create automation run record
+    const { data: runRecord, error: runError } = await supabaseClient
+      .from('ai_automation_runs')
+      .insert({
+        source,
+        status: 'running',
+        metadata: { priority, enhanced, automated }
+      })
+      .select()
+      .single();
+
+    if (runError) {
+      console.error('❌ [AI-AUTOMATION] Error creating run record:', runError);
+    } else {
+      runId = runRecord.id;
+      console.log(`📝 [AI-AUTOMATION] Created run record: ${runId}`);
+    }
 
     // Use default settings instead of accessing non-existent table
     const batchSize = 50;
@@ -342,10 +363,31 @@ serve(async (req) => {
       processingTime: processingTime,
       enhanced: enhanced,
       timestamp: new Date().toISOString(),
-      source: source
+      source: source,
+      runId: runId
     };
 
     console.log(`✅ [AI-AUTOMATION] Automation completed:`, result);
+
+    // Update run record with completion data
+    if (runId) {
+      const { error: updateError } = await supabaseClient
+        .from('ai_automation_runs')
+        .update({
+          completed_at: new Date().toISOString(),
+          status: 'completed',
+          leads_processed: processedCount,
+          leads_successful: successfulCount,
+          leads_failed: failedCount,
+          total_queued: totalQueued,
+          processing_time_ms: processingTime
+        })
+        .eq('id', runId);
+
+      if (updateError) {
+        console.error('❌ [AI-AUTOMATION] Error updating run record:', updateError);
+      }
+    }
 
     // Log any failures for debugging
     if (failedCount > 0) {
@@ -361,11 +403,34 @@ serve(async (req) => {
     console.error('❌ [AI-AUTOMATION] Critical error in AI automation:', error);
     console.error('❌ [AI-AUTOMATION] Error stack:', error.stack);
     
+    // Update run record with error
+    if (runId) {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+        
+        await supabaseClient
+          .from('ai_automation_runs')
+          .update({
+            completed_at: new Date().toISOString(),
+            status: 'failed',
+            error_message: error.message,
+            processing_time_ms: Date.now() - startTime
+          })
+          .eq('id', runId);
+      } catch (updateError) {
+        console.error('❌ [AI-AUTOMATION] Error updating run record with failure:', updateError);
+      }
+    }
+    
     const errorResponse = {
       error: error.message,
       timestamp: new Date().toISOString(),
       source: 'ai-automation',
-      type: 'critical_failure'
+      type: 'critical_failure',
+      runId: runId
     };
     
     return new Response(JSON.stringify(errorResponse), {

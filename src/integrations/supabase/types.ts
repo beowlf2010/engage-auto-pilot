@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_automation_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          leads_failed: number | null
+          leads_processed: number | null
+          leads_successful: number | null
+          metadata: Json | null
+          processing_time_ms: number | null
+          source: string
+          started_at: string
+          status: string
+          total_queued: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          leads_failed?: number | null
+          leads_processed?: number | null
+          leads_successful?: number | null
+          metadata?: Json | null
+          processing_time_ms?: number | null
+          source?: string
+          started_at?: string
+          status?: string
+          total_queued?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          leads_failed?: number | null
+          leads_processed?: number | null
+          leads_successful?: number | null
+          metadata?: Json | null
+          processing_time_ms?: number | null
+          source?: string
+          started_at?: string
+          status?: string
+          total_queued?: number | null
+        }
+        Relationships: []
+      }
       ai_churn_predictions: {
         Row: {
           actual_outcome: string | null
@@ -7096,6 +7144,10 @@ export type Database = {
         }
         Returns: string
       }
+      check_ai_automation_health: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       classify_deal_by_stock: {
         Args: { stock_number: string }
         Returns: string
@@ -7306,6 +7358,10 @@ export type Database = {
           p_role: Database["public"]["Enums"]["app_role"]
         }
         Returns: undefined
+      }
+      trigger_ai_automation_manual: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       update_daily_kpis: {
         Args: { target_date?: string }
