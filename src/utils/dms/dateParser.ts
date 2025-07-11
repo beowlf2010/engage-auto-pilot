@@ -1,9 +1,12 @@
 
 export const extractDealDate = (dateValue: string): string | null => {
-  if (!dateValue) return null;
+  if (!dateValue || String(dateValue).trim() === '') {
+    console.log(`=== DATE PARSING === Empty or null input, returning null`);
+    return null;
+  }
   
-  const dateStr = dateValue.trim();
-  console.log(`=== SIMPLIFIED DATE PARSING === Input: "${dateStr}"`);
+  const dateStr = String(dateValue).trim();
+  console.log(`=== DATE PARSING === Input: "${dateStr}" (type: ${typeof dateValue})`);
   
   // Get current year as default
   const currentYear = new Date().getFullYear();
@@ -29,6 +32,8 @@ export const extractDealDate = (dateValue: string): string | null => {
     /^(\d{1,2})-(\d{1,2})-(\d{4})$/, // MM-DD-YYYY
     /^(\d{1,2})-(\d{1,2})-(\d{2})$/, // MM-DD-YY
     /^(\d{2})(\d{2})$/, // MMDD - assume current year
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+\d{1,2}:\d{2}:\d{2}\s+[AP]M$/, // MM/DD/YYYY HH:MM:SS AM/PM
+    /^(\d{4})-(\d{1,2})-(\d{1,2})\s+\d{1,2}:\d{2}:\d{2}$/, // YYYY-MM-DD HH:MM:SS
   ];
   
   for (let i = 0; i < formats.length; i++) {
@@ -67,6 +72,13 @@ export const extractDealDate = (dateValue: string): string | null => {
         monthStr = match[0].substring(0, 2);
         dayStr = match[0].substring(2, 4);
         console.log(`MMDD format, using current year: ${yearNum}`);
+      } else if (i === 8) { // MM/DD/YYYY HH:MM:SS AM/PM
+        [, monthStr, dayStr] = match;
+        yearNum = parseInt(match[3]);
+        console.log(`DateTime format with time, extracted: ${monthStr}/${dayStr}/${yearNum}`);
+      } else if (i === 9) { // YYYY-MM-DD HH:MM:SS
+        console.log(`ISO DateTime format: ${match[0].split(' ')[0]}`);
+        return match[0].split(' ')[0];
       }
       
       if (monthStr && dayStr) {

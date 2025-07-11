@@ -23,7 +23,10 @@ export const parseDmsFile = async (file: File) => {
     }
     
     console.log('Raw data rows:', data.length);
-    console.log('First few rows:', data.slice(0, 5));
+    console.log('First few rows:');
+    data.slice(0, 10).forEach((row, index) => {
+      console.log(`Row ${index}:`, row);
+    });
     
     // Detect column mapping
     const columnMapping = detectDmsColumns(data);
@@ -38,7 +41,14 @@ export const parseDmsFile = async (file: File) => {
     console.log(`Extracted ${deals.length} deals`);
     
     if (deals.length === 0) {
-      throw new Error('No valid deals found in the file. Please check that the report contains transaction data with the expected columns.');
+      console.error('=== DIAGNOSTIC INFO ===');
+      console.error('Total data rows:', data.length);
+      console.error('Column mapping found:', columnMapping);
+      console.error('Sample of data rows:');
+      data.slice(0, 15).forEach((row, index) => {
+        console.error(`  Row ${index}:`, row);
+      });
+      throw new Error(`No valid deals found in the file. Found ${data.length} total rows but could not extract any deals. Check the console for detailed parsing information.`);
     }
     
     // Log sample deal for debugging

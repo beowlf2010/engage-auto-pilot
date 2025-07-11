@@ -24,8 +24,19 @@ export const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: 
   const grossProfit = getNumberValue(columnMapping.gross);
   const fiProfit = getNumberValue(columnMapping.fi) || 0;
   
-  // Skip rows without essential data
-  if (!stockNumber && grossProfit === undefined) {
+  // Log raw row data for debugging
+  console.log(`=== ROW EXTRACTION === Row data:`, {
+    stockNumber,
+    rawDate: getValue(columnMapping.date),
+    grossProfit,
+    fiProfit,
+    rawGross: getValue(columnMapping.gross),
+    rawFI: getValue(columnMapping.fi)
+  });
+
+  // Skip rows without essential data (more lenient - only require stock OR profit data)
+  if (!stockNumber && grossProfit === undefined && fiProfit === 0) {
+    console.log(`Skipping row - no stock number and no profit data`);
     return null;
   }
   
@@ -42,7 +53,7 @@ export const extractDealFromRow = (row: any[], headerRow: any[], columnMapping: 
   console.log(`Deal extraction - Stock: ${stockNumber}, Raw date: "${dateValue}", Parsed date: ${dealDate}, Deal type: ${dealType}`);
   
   if (!dealDate) {
-    console.warn(`Failed to parse date "${dateValue}" for stock ${stockNumber} - NO FALLBACK APPLIED`);
+    console.warn(`Failed to parse date "${dateValue}" for stock ${stockNumber} - CONTINUING WITHOUT DATE`);
   }
   
   const deal: DealRecord = {
