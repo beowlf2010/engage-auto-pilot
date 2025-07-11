@@ -1,6 +1,9 @@
 
 project_id = "tevtajmaofvnffzcsiuu"
 
+[functions.ai-automation]
+verify_jwt = true
+
 [functions.firecrawl-scraper]
 verify_jwt = false
 
