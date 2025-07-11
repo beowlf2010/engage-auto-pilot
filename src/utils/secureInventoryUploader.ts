@@ -109,12 +109,22 @@ export const uploadInventorySecurely = async (
   console.log(`🔐 [SECURE UPLOADER] Calling secure database function for ${preparedVehicles.length} vehicles`);
   console.log('🔐 [SECURE UPLOADER] Current user:', user.id);
   console.log('🔐 [SECURE UPLOADER] Session exists:', !!supabase.auth.getSession());
+  console.log('🔐 [SECURE UPLOADER] Prepared vehicles sample:', preparedVehicles.slice(0, 2));
+  console.log('🔐 [SECURE UPLOADER] Upload history ID:', uploadHistoryId);
 
   // Use the secure database function with explicit authentication context
   const { data: result, error } = await supabase.rpc('insert_inventory_secure', {
     p_vehicles: preparedVehicles,
     p_upload_history_id: uploadHistoryId
   });
+
+  console.log('🔐 [SECURE UPLOADER] Raw database response:', { result, error });
+  
+  // If RPC call fails completely, try fallback direct insertion
+  if (error || !result) {
+    console.log('💥 [SECURE UPLOADER] RPC failed, attempting direct insertion fallback');
+    return await fallbackDirectInsertion(preparedVehicles, uploadHistoryId, user.id);
+  }
 
   if (error) {
     console.error('💥 [SECURE UPLOADER] Database function error:', error);
@@ -201,3 +211,59 @@ export const uploadInventorySecurely = async (
       : `Upload failed: ${errors.length} errors occurred`
   };
 };
+
+/**
+ * Fallback method for direct insertion when RPC fails
+ */
+async function fallbackDirectInsertion(
+  preparedVehicles: any[],
+  uploadHistoryId: string,
+  userId: string
+): Promise<SecureUploadResult> {
+  console.log('🔄 [FALLBACK] Starting direct insertion for', preparedVehicles.length, 'vehicles');
+  
+  let successfulInserts = 0;
+  const errors: Array<{ rowIndex: number; error: string; details?: any }> = [];
+  
+  for (let i = 0; i < preparedVehicles.length; i++) {
+    const vehicle = preparedVehicles[i];
+    try {
+      const { error: insertError } = await supabase
+        .from('inventory')
+        .insert({
+          ...vehicle,
+          upload_history_id: uploadHistoryId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (insertError) {
+        console.error(`🚫 [FALLBACK] Insert error for vehicle ${i}:`, insertError);
+        errors.push({
+          rowIndex: i,
+          error: insertError.message,
+          details: insertError
+        });
+      } else {
+        successfulInserts++;
+      }
+    } catch (err) {
+      console.error(`💥 [FALLBACK] Exception for vehicle ${i}:`, err);
+      errors.push({
+        rowIndex: i,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        details: err
+      });
+    }
+  }
+  
+  console.log(`✅ [FALLBACK] Completed: ${successfulInserts}/${preparedVehicles.length} successful`);
+  
+  return {
+    success: successfulInserts > 0,
+    totalProcessed: preparedVehicles.length,
+    successfulInserts,
+    errors,
+    message: `Fallback insertion: ${successfulInserts}/${preparedVehicles.length} vehicles uploaded`
+  };
+}
