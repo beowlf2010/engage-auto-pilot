@@ -168,12 +168,12 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
     const allProblematicLeads = [...mediumQuality.leads, ...poorQuality.leads];
     const genericVehicleCount = allProblematicLeads.filter(lead => {
       const assessment = mediumQuality.assessments.get(lead.id) || poorQuality.assessments.get(lead.id);
-      return assessment?.vehicleValidation.detectedIssue.includes('Generic');
+      return assessment?.vehicleValidation?.detectedIssue?.includes('Generic') || false;
     }).length;
 
     const noVehicleCount = allProblematicLeads.filter(lead => {
       const assessment = mediumQuality.assessments.get(lead.id) || poorQuality.assessments.get(lead.id);
-      return assessment?.vehicleValidation.detectedIssue.includes('No vehicle');
+      return assessment?.vehicleValidation?.detectedIssue?.includes('No vehicle') || false;
     }).length;
 
     if (genericVehicleCount > 0) {
