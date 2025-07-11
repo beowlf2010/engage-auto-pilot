@@ -10,6 +10,7 @@ import { createUploadHistory } from '@/utils/leadOperations/uploadHistoryService
 export interface EnhancedUploadResult extends BypassUploadResult {
   duplicateCheckResult?: DuplicateCheckResult;
   skippedDuplicates?: number;
+  duplicateVehicles?: number;
   soldCustomerSummary?: SoldCustomerUploadSummary;
 }
 

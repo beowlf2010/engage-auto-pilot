@@ -18,10 +18,16 @@ export interface SecureUploadResult {
   success: boolean;
   totalProcessed: number;
   successfulInserts: number;
+  duplicateVehicles: number;
   errors: Array<{
     rowIndex: number;
     error: string;
     details?: any;
+  }>;
+  duplicateDetails?: Array<{
+    rowIndex: number;
+    vehicleInfo: string;
+    reason: string;
   }>;
   message: string;
 }
@@ -49,6 +55,7 @@ export const uploadInventorySecurely = async (
         success: false,
         totalProcessed: 0,
         successfulInserts: 0,
+        duplicateVehicles: 0,
         errors: [{ rowIndex: -1, error: 'User authentication required for inventory upload' }],
         message: 'Authentication failed'
       };
@@ -70,6 +77,7 @@ export const uploadInventorySecurely = async (
       success: false,
       totalProcessed: 0,
       successfulInserts: 0,
+      duplicateVehicles: 0,
       errors: [{ rowIndex: -1, error: 'Permission verification failed' }],
       message: 'Permission check failed'
     };
@@ -83,6 +91,7 @@ export const uploadInventorySecurely = async (
       success: false,
       totalProcessed: 0,
       successfulInserts: 0,
+      duplicateVehicles: 0,
       errors: [{ rowIndex: -1, error: 'Manager or admin role required for inventory uploads' }],
       message: 'Insufficient permissions'
     };
@@ -142,7 +151,9 @@ export const uploadInventorySecurely = async (
 
   // Use direct database insertion with proper error handling
   let successfulInserts = 0;
+  let duplicateVehicles = 0;
   const errors: Array<{ rowIndex: number; error: string; details?: any }> = [];
+  const duplicateDetails: Array<{ rowIndex: number; vehicleInfo: string; reason: string }> = [];
 
   // Process vehicles in batches for better performance and error isolation
   const batchSize = 10;
@@ -172,30 +183,39 @@ export const uploadInventorySecurely = async (
         if (insertError) {
           console.error(`🚫 [SECURE UPLOADER] Insert error for vehicle ${globalIndex + 1}:`, insertError);
           
-          let userFriendlyError = insertError.message;
+          // Handle duplicates separately from actual errors
           if (insertError.code === '23505') {
-            userFriendlyError = `Duplicate vehicle detected (VIN or Stock Number already exists)`;
-          } else if (insertError.code === '23502') {
-            userFriendlyError = `Missing required field`;
-          } else if (insertError.message.includes('violates row-level security')) {
-            userFriendlyError = `Permission denied: insufficient privileges to insert inventory`;
-          }
-
-          errors.push({
-            rowIndex: globalIndex + 1,
-            error: userFriendlyError,
-            details: {
-              code: insertError.code,
-              hint: insertError.hint,
-              details: insertError.details,
-              vehicle: {
-                make: vehicle.make,
-                model: vehicle.model,
-                year: vehicle.year,
-                stock_number: vehicle.stock_number
-              }
+            duplicateVehicles++;
+            duplicateDetails.push({
+              rowIndex: globalIndex + 1,
+              vehicleInfo: `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.stock_number ? ` (Stock: ${vehicle.stock_number})` : ''}${vehicle.vin ? ` (VIN: ${vehicle.vin})` : ''}`,
+              reason: 'Vehicle already exists in inventory'
+            });
+          } else {
+            // Handle actual errors
+            let userFriendlyError = insertError.message;
+            if (insertError.code === '23502') {
+              userFriendlyError = `Missing required field`;
+            } else if (insertError.message.includes('violates row-level security')) {
+              userFriendlyError = `Permission denied: insufficient privileges to insert inventory`;
             }
-          });
+
+            errors.push({
+              rowIndex: globalIndex + 1,
+              error: userFriendlyError,
+              details: {
+                code: insertError.code,
+                hint: insertError.hint,
+                details: insertError.details,
+                vehicle: {
+                  make: vehicle.make,
+                  model: vehicle.model,
+                  year: vehicle.year,
+                  stock_number: vehicle.stock_number
+                }
+              }
+            });
+          }
         } else {
           successfulInserts++;
           console.log(`✅ [SECURE UPLOADER] Successfully inserted vehicle ${globalIndex + 1} with ID:`, insertedData?.id);
@@ -225,14 +245,16 @@ export const uploadInventorySecurely = async (
   }
 
   const totalProcessed = inventoryItems.length;
-  const success = successfulInserts > 0;
+  const success = successfulInserts > 0 || duplicateVehicles > 0;
   const errorCount = errors.length;
 
   console.log(`📊 [SECURE UPLOADER] Upload complete:`, {
     totalProcessed,
     successfulInserts,
+    duplicateVehicles,
     errorCount,
-    successRate: `${Math.round((successfulInserts / totalProcessed) * 100)}%`
+    successRate: `${Math.round((successfulInserts / totalProcessed) * 100)}%`,
+    duplicateRate: `${Math.round((duplicateVehicles / totalProcessed) * 100)}%`
   });
 
   // Update upload history with results
@@ -244,7 +266,7 @@ export const uploadInventorySecurely = async (
           successful_imports: successfulInserts,
           failed_imports: errorCount,
           processing_status: success ? 'completed' : 'completed_with_errors',
-          error_details: errorCount > 0 ? `${errorCount} vehicles failed to import` : null
+          error_details: errorCount > 0 ? `${errorCount} vehicles failed to import` : duplicateVehicles > 0 ? `${duplicateVehicles} duplicate vehicles skipped` : null
         })
         .eq('id', uploadHistoryId);
     } catch (updateError) {
@@ -252,14 +274,34 @@ export const uploadInventorySecurely = async (
     }
   }
 
+  // Generate appropriate success message
+  let message = '';
+  if (successfulInserts > 0 && duplicateVehicles > 0 && errorCount > 0) {
+    message = `${successfulInserts} new vehicles imported, ${duplicateVehicles} duplicates skipped, ${errorCount} errors occurred`;
+  } else if (successfulInserts > 0 && duplicateVehicles > 0) {
+    message = `${successfulInserts} new vehicles imported, ${duplicateVehicles} duplicates skipped (already in system)`;
+  } else if (successfulInserts > 0 && errorCount > 0) {
+    message = `${successfulInserts} new vehicles imported, ${errorCount} errors occurred`;
+  } else if (successfulInserts > 0) {
+    message = `Successfully imported ${successfulInserts} new vehicles`;
+  } else if (duplicateVehicles === totalProcessed) {
+    message = `All ${duplicateVehicles} vehicles already exist in system - inventory is up to date`;
+  } else if (duplicateVehicles > 0 && errorCount > 0) {
+    message = `${duplicateVehicles} duplicates skipped, ${errorCount} errors occurred`;
+  } else if (duplicateVehicles > 0) {
+    message = `${duplicateVehicles} vehicles already exist in system`;
+  } else {
+    message = `Upload failed: ${errorCount} errors occurred`;
+  }
+
   return {
     success,
     totalProcessed,
     successfulInserts,
+    duplicateVehicles,
     errors,
-    message: success 
-      ? `Successfully uploaded ${successfulInserts}/${totalProcessed} vehicles${errorCount > 0 ? ` (${errorCount} failed)` : ''}`
-      : `Upload failed: ${errorCount} errors occurred`
+    duplicateDetails: duplicateDetails.length > 0 ? duplicateDetails : undefined,
+    message
   };
 };
 
@@ -314,6 +356,7 @@ async function fallbackDirectInsertion(
     success: successfulInserts > 0,
     totalProcessed: preparedVehicles.length,
     successfulInserts,
+    duplicateVehicles: 0, // Fallback doesn't separate duplicates
     errors,
     message: `Fallback insertion: ${successfulInserts}/${preparedVehicles.length} vehicles uploaded`
   };
