@@ -12,6 +12,8 @@ import { toast } from '@/hooks/use-toast';
 import MessagePreviewInline from './MessagePreviewInline';
 import { sendMessage } from '@/services/messagesService';
 import { useAuth } from '@/components/auth/AuthProvider';
+import AutomationStatusCard from './AutomationStatusCard';
+import LiveActivityFeed from './LiveActivityFeed';
 
 interface QueuedMessage {
   id: string;
@@ -322,6 +324,12 @@ const EnhancedAIQueueTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Real-time Automation Dashboard */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <AutomationStatusCard />
+        <LiveActivityFeed />
+      </div>
+
       {/* Enhanced Header with Automation Status */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">

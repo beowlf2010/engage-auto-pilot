@@ -97,6 +97,13 @@ class OptimizedRealtimeManager {
       }, (payload) => {
         this.handleMessage('leads', payload);
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'ai_message_approval_queue'
+      }, (payload) => {
+        this.handleMessage('ai_message_approval_queue', payload);
+      })
       .subscribe((status) => {
         this.handleSubscriptionStatus(status);
       });
