@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, Upload, ArrowRight, RotateCcw, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Upload, ArrowRight, RotateCcw, AlertTriangle, ArrowLeft, Bug, Zap, Eye, EyeOff } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useEnhancedMultiFileUpload } from '@/hooks/useEnhancedMultiFileUpload';
 import { useEnhancedFinancialUpload } from '@/hooks/useEnhancedFinancialUpload';
@@ -60,12 +60,210 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
   const [stepResults, setStepResults] = useState<Record<number, any>>({});
   const [isNavigating, setIsNavigating] = useState(false);
   const [showRestartDialog, setShowRestartDialog] = useState(false);
+  
+  // Enhanced debugging and fallback state
+  const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [canManuallyAdvance, setCanManuallyAdvance] = useState(false);
+  const [uploadAttempts, setUploadAttempts] = useState<Record<number, number>>({});
+  const [processingDetails, setProcessingDetails] = useState<{
+    stage: string;
+    progress: number;
+    details: string;
+  }>({ stage: 'idle', progress: 0, details: '' });
+  
   const { toast } = useToast();
 
   // Upload hooks with enhanced functionality
   const inventoryUpload = useEnhancedMultiFileUpload({ userId, duplicateStrategy: 'skip' });
   const financialUpload = useEnhancedFinancialUpload(userId);
   const leadUpload = useMultiFileLeadUpload();
+
+  // Enhanced debugging helper functions
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const logMessage = `[${timestamp}] ${message}`;
+    console.log('🔍 DEBUG:', logMessage);
+    setDebugLogs(prev => [...prev.slice(-19), logMessage]); // Keep last 20 logs
+  };
+
+  const updateProcessingDetails = (stage: string, progress: number, details: string) => {
+    setProcessingDetails({ stage, progress, details });
+    addDebugLog(`Stage: ${stage} (${progress}%) - ${details}`);
+  };
+
+  const validateUploadChain = async (step: UploadStep, files: FileList) => {
+    addDebugLog(`🔍 Validating upload chain for ${step.title}`);
+    
+    // Step 1: File validation
+    updateProcessingDetails('validation', 10, 'Validating file format and size');
+    if (!files || files.length === 0) {
+      throw new Error('No files selected');
+    }
+    
+    const file = files[0];
+    if (file.size > 50 * 1024 * 1024) { // 50MB limit
+      throw new Error('File size exceeds 50MB limit');
+    }
+    
+    // Step 2: File type validation
+    updateProcessingDetails('validation', 30, 'Checking file type compatibility');
+    const allowedTypes = step.fileType === 'financial' 
+      ? ['.xlsx', '.xls'] 
+      : ['.csv', '.xlsx', '.xls'];
+    
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    if (!allowedTypes.includes(fileExtension)) {
+      throw new Error(`Invalid file type. Expected: ${allowedTypes.join(', ')}`);
+    }
+    
+    // Step 3: Hook validation
+    updateProcessingDetails('validation', 50, 'Validating upload hooks');
+    switch (step.fileType) {
+      case 'inventory':
+        if (!inventoryUpload) throw new Error('Inventory upload hook not available');
+        break;
+      case 'financial':
+        if (!financialUpload) throw new Error('Financial upload hook not available');
+        break;
+      case 'leads':
+        if (!leadUpload) throw new Error('Lead upload hook not available');
+        break;
+    }
+    
+    updateProcessingDetails('validation', 100, 'Validation complete');
+    addDebugLog(`✅ Upload chain validation passed for ${step.title}`);
+    return true;
+  };
+
+  const attemptUploadWithFallbacks = async (step: UploadStep, files: FileList) => {
+    const stepAttempts = uploadAttempts[step.id] || 0;
+    setUploadAttempts(prev => ({ ...prev, [step.id]: stepAttempts + 1 }));
+    
+    addDebugLog(`🚀 Starting upload attempt #${stepAttempts + 1} for ${step.title}`);
+    
+    try {
+      // Pre-upload validation
+      await validateUploadChain(step, files);
+      
+      // Main upload logic with enhanced error handling
+      if (step.fileType === 'inventory' && step.condition) {
+        return await handleInventoryUpload(step, files);
+      } else if (step.fileType === 'financial') {
+        return await handleFinancialUpload(step, files);
+      } else if (step.fileType === 'leads') {
+        return await handleLeadUpload(step, files);
+      }
+      
+    } catch (error) {
+      addDebugLog(`❌ Upload attempt #${stepAttempts + 1} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Enable manual advance after 2 failed attempts
+      if (stepAttempts >= 1) {
+        setCanManuallyAdvance(true);
+        addDebugLog(`🎯 Manual advance enabled after ${stepAttempts + 1} failed attempts`);
+      }
+      
+      throw error;
+    }
+  };
+
+  const handleInventoryUpload = async (step: UploadStep, files: FileList) => {
+    updateProcessingDetails('processing', 20, 'Converting files to queue format');
+    
+    const queuedFiles = Array.from(files).map((file, index) => ({
+      id: `${Date.now()}-${index}`,
+      file,
+      condition: step.condition as 'new' | 'used' | 'gm_global',
+      status: 'pending' as const
+    }));
+    
+    addDebugLog(`📋 Created ${queuedFiles.length} queued files`);
+    updateProcessingDetails('processing', 40, 'Starting batch processing');
+    
+    const result = await inventoryUpload.processBatch(queuedFiles);
+    addDebugLog(`📊 Batch result: ${result.successfulFiles}/${result.totalFiles} files successful`);
+    
+    updateProcessingDetails('validation', 80, 'Validating results');
+    
+    if (result && result.successfulFiles > 0) {
+      updateProcessingDetails('completion', 100, 'Upload completed successfully');
+      addDebugLog(`✅ Force completing step due to successful upload`);
+      
+      // Multiple completion paths for reliability
+      setTimeout(() => handleStepComplete(result), 100);  // Fallback 1
+      setTimeout(() => handleStepComplete(result), 500);  // Fallback 2
+      
+      return result;
+    } else {
+      throw new Error(`Upload failed: ${result.failedFiles} files failed, ${result.successfulFiles} succeeded`);
+    }
+  };
+
+  const handleFinancialUpload = async (step: UploadStep, files: FileList) => {
+    updateProcessingDetails('processing', 20, 'Preparing financial files');
+    
+    const fileArray = Array.from(files);
+    const queuedFiles = fileArray.map((file, index) => ({
+      id: `${Date.now()}-${index}`,
+      file,
+      status: 'pending' as const
+    }));
+    
+    addDebugLog(`💰 Adding ${queuedFiles.length} financial files to queue`);
+    updateProcessingDetails('processing', 50, 'Processing financial data');
+    
+    addFinancialFiles(queuedFiles);
+    const result = await processFinancialBatch();
+    
+    addDebugLog(`💰 Financial processing result: ${JSON.stringify(result)}`);
+    updateProcessingDetails('completion', 100, 'Financial upload completed');
+    
+    return result;
+  };
+
+  const handleLeadUpload = async (step: UploadStep, files: FileList) => {
+    updateProcessingDetails('processing', 30, 'Processing lead files');
+    
+    addDebugLog(`👥 Adding ${files.length} lead files`);
+    addLeadFiles(files);
+    
+    updateProcessingDetails('processing', 70, 'Batch processing leads');
+    const result = await processLeadBatch();
+    
+    addDebugLog(`👥 Lead processing result: ${JSON.stringify(result)}`);
+    
+    if (result) {
+      updateProcessingDetails('completion', 100, 'Lead upload completed');
+      handleStepComplete(result);
+      return result;
+    } else {
+      throw new Error('Lead processing returned no result');
+    }
+  };
+
+  const forceAdvanceStep = () => {
+    addDebugLog(`⚡ MANUAL ADVANCE: Forcing completion of step ${currentStep}`);
+    
+    const mockResult = {
+      totalFiles: 1,
+      successfulFiles: 1,
+      totalRecords: 1,
+      successfulRecords: 1,
+      message: 'Manually advanced due to upload issues'
+    };
+    
+    handleStepComplete(mockResult);
+    setCanManuallyAdvance(false);
+    setUploadAttempts(prev => ({ ...prev, [currentStep]: 0 }));
+    
+    toast({
+      title: "Step Advanced Manually",
+      description: "Step completed manually after upload issues. You may need to re-upload this data later.",
+      variant: "default"
+    });
+  };
 
   const { addFiles: addFinancialFiles, processBatch: processFinancialBatch, batchResult: financialResult, uploading: financialUploading, resetState: resetFinancialState } = financialUpload;
   const { addFiles: addLeadFiles, processBatch: processLeadBatch, batchResult: leadResult, resetState: resetLeadState } = leadUpload;
@@ -79,57 +277,26 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
     if (!files || files.length === 0) return;
 
     const step = currentStepData!;
-    console.log('🔄 File selected:', files[0].name, 'for step:', step.title);
+    setUploadStatus(`Starting upload for ${step.title}`);
+    addDebugLog(`🔄 File selected: ${files[0].name} for step: ${step.title}`);
     
     try {
-      if (step.fileType === 'inventory' && step.condition) {
-        console.log('🔄 Processing inventory file with condition:', step.condition);
-        // Convert to QueuedFile format for enhanced upload
-        const queuedFiles = Array.from(files).map((file, index) => ({
-          id: `${Date.now()}-${index}`,
-          file,
-          condition: step.condition as 'new' | 'used' | 'gm_global',
-          status: 'pending' as const
-        }));
-        console.log('🔄 Created queued files:', queuedFiles);
-        
-        // DIRECT CALL - handleStepComplete immediately after processBatch
-        const result = await inventoryUpload.processBatch(queuedFiles);
-        console.log('🔄 Inventory upload result:', result);
-        
-        // Force step completion
-        if (result && result.successfulFiles > 0) {
-          console.log('🔄 Force completing step due to successful upload');
-          handleStepComplete(result);
-        }
-        
-      } else if (step.fileType === 'financial') {
-        // Convert FileList to array for financial upload
-        const fileArray = Array.from(files);
-        const queuedFiles = fileArray.map((file, index) => ({
-          id: `${Date.now()}-${index}`,
-          file,
-          status: 'pending' as const
-        }));
-        addFinancialFiles(queuedFiles);
-        await processFinancialBatch();
-        // Financial upload completion will be handled by useEffect watching financialResult
-      } else if (step.fileType === 'leads') {
-        // Lead upload uses FileList directly
-        addLeadFiles(files);
-        const result = await processLeadBatch();
-        if (result) {
-          handleStepComplete(result);
-        }
+      // Use enhanced upload with fallbacks
+      const result = await attemptUploadWithFallbacks(step, files);
+      
+      if (result) {
+        setUploadStatus('Upload completed successfully');
+        addDebugLog(`✅ Upload completed successfully for ${step.title}`);
       }
+      
     } catch (error) {
-      console.error(`❌ Error uploading ${step.title}:`, error);
-      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
-      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setUploadStatus(`Upload failed: ${errorMessage}`);
+      addDebugLog(`❌ Upload failed for ${step.title}: ${errorMessage}`);
       
       toast({
         title: "Upload Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        description: `${errorMessage}${canManuallyAdvance ? '. Manual advance available.' : ''}`,
         variant: "destructive"
       });
     }
@@ -363,6 +530,134 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
               )}
             </CardContent>
           </Card>
+
+          {/* Real-time Status Panel */}
+          {(uploadStatus || processingDetails.stage !== 'idle') && (
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span>Upload Status</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {uploadStatus && (
+                  <p className="text-sm font-medium">{uploadStatus}</p>
+                )}
+                {processingDetails.stage !== 'idle' && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="capitalize">{processingDetails.stage}</span>
+                      <span>{processingDetails.progress}%</span>
+                    </div>
+                    <Progress value={processingDetails.progress} className="h-2" />
+                    <p className="text-xs text-muted-foreground">{processingDetails.details}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Manual Recovery Options */}
+          {canManuallyAdvance && (
+            <Card className="border-amber-200 bg-amber-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center space-x-2">
+                  <Zap className="w-4 h-4 text-amber-600" />
+                  <span>Manual Recovery Available</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-amber-800">
+                  Upload attempts have failed. You can manually advance to the next step and retry this upload later.
+                </p>
+                <div className="flex space-x-2">
+                  <Button 
+                    onClick={forceAdvanceStep}
+                    variant="outline"
+                    size="sm"
+                    className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                  >
+                    <Zap className="w-3 h-3 mr-1" />
+                    Force Advance
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setCanManuallyAdvance(false);
+                      setUploadAttempts(prev => ({ ...prev, [currentStep]: 0 }));
+                    }}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    Retry Upload
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Debug Panel Toggle */}
+          <div className="flex justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDebugPanel(!showDebugPanel)}
+              className="text-muted-foreground"
+            >
+              {showDebugPanel ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+              {showDebugPanel ? 'Hide' : 'Show'} Debug Info
+            </Button>
+          </div>
+
+          {/* Debug Panel */}
+          {showDebugPanel && (
+            <Card className="border-slate-200 bg-slate-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center space-x-2">
+                  <Bug className="w-4 h-4" />
+                  <span>Debug Information</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDebugLogs([])}
+                    className="ml-auto h-6 px-2 text-xs"
+                  >
+                    Clear
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="font-medium">Current Step:</span> {currentStep}/{uploadSteps.length}
+                    </div>
+                    <div>
+                      <span className="font-medium">Attempts:</span> {uploadAttempts[currentStep] || 0}
+                    </div>
+                    <div>
+                      <span className="font-medium">Processing:</span> {isUploading ? 'Yes' : 'No'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Manual Mode:</span> {canManuallyAdvance ? 'Available' : 'Disabled'}
+                    </div>
+                  </div>
+                  <div className="border-t pt-2">
+                    <p className="text-xs font-medium mb-1">Recent Logs:</p>
+                    <div className="max-h-32 overflow-y-auto space-y-1 text-xs font-mono bg-slate-100 p-2 rounded">
+                      {debugLogs.length === 0 ? (
+                        <p className="text-muted-foreground">No debug logs yet...</p>
+                      ) : (
+                        debugLogs.slice(-10).map((log, index) => (
+                          <div key={index} className="break-all">{log}</div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Step Navigation */}
           <div className="flex justify-between items-center">
