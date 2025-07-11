@@ -107,8 +107,10 @@ export const uploadInventorySecurely = async (
   }));
 
   console.log(`🔐 [SECURE UPLOADER] Calling secure database function for ${preparedVehicles.length} vehicles`);
+  console.log('🔐 [SECURE UPLOADER] Current user:', user.id);
+  console.log('🔐 [SECURE UPLOADER] Session exists:', !!supabase.auth.getSession());
 
-  // Use the secure database function
+  // Use the secure database function with explicit authentication context
   const { data: result, error } = await supabase.rpc('insert_inventory_secure', {
     p_vehicles: preparedVehicles,
     p_upload_history_id: uploadHistoryId

@@ -6,6 +6,7 @@ import { validateAndProcessInventoryRows } from "@/utils/uploadValidation";
 import { mapRowToInventoryItem } from "@/utils/enhancedFileParsingUtils";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 import { syncInventoryData } from "@/services/inventoryService";
+import { uploadInventorySecurely } from "@/utils/secureInventoryUploader";
 import type { QueuedFile } from "@/components/inventory-upload/DragDropFileQueue";
 
 interface UseMultiFileUploadProps {
@@ -73,25 +74,27 @@ export const useMultiFileUpload = ({ userId }: UseMultiFileUploadProps) => {
       const parsed = await parseEnhancedInventoryFile(queuedFile.file);
       console.log(`Parsed ${parsed.fileType} file with ${parsed.rows.length} rows`);
       
-      // Validate and process all rows
-      const validationResult = await validateAndProcessInventoryRows(
-        parsed.rows,
-        queuedFile.condition,
-        uploadRecord.id,
-        mapRowToInventoryItem
+      // Map rows to inventory items and use secure uploader
+      const inventoryItems = await Promise.all(
+        parsed.rows.map(row => mapRowToInventoryItem(row, queuedFile.condition, uploadRecord.id))
       );
-
+      
+      console.log(`🔐 [MULTI-FILE] Using secure uploader for ${inventoryItems.length} items`);
+      
+      // Use the secure uploader
+      const uploadResult = await uploadInventorySecurely(inventoryItems, uploadRecord.id);
+      
       // Update upload history with results
       await updateUploadHistory(uploadRecord.id, {
         total_rows: parsed.rows.length,
-        successful_imports: validationResult.successCount,
-        failed_imports: validationResult.errorCount,
-        processing_status: 'completed',
-        error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
+        successful_imports: uploadResult.successfulInserts,
+        failed_imports: uploadResult.errors.length,
+        processing_status: uploadResult.success ? 'completed' : 'failed',
+        error_details: uploadResult.errors.length > 0 ? uploadResult.errors.slice(0, 20).map(e => e.error).join('\n') : undefined
       });
 
       // Only trigger automatic sync for actual inventory (not preliminary data)
-      if (!isPreliminaryData && validationResult.successCount > 0) {
+      if (!isPreliminaryData && uploadResult.successfulInserts > 0) {
         try {
           console.log(`Triggering automatic inventory sync for ${queuedFile.file.name}...`);
           await syncInventoryData(uploadRecord.id);
@@ -102,19 +105,19 @@ export const useMultiFileUpload = ({ userId }: UseMultiFileUploadProps) => {
         console.log(`Skipping automatic sync for preliminary data: ${queuedFile.file.name}`);
       }
 
-      if (validationResult.errorCount === 0) {
+      if (uploadResult.errors.length === 0) {
         toast({
           title: `${queuedFile.file.name} processed successfully`,
-          description: `${validationResult.successCount} ${isPreliminaryData ? 'preliminary orders' : 'records'} imported`,
+          description: `${uploadResult.successfulInserts} ${isPreliminaryData ? 'preliminary orders' : 'records'} imported`,
         });
-      } else if (validationResult.successCount > 0) {
+      } else if (uploadResult.successfulInserts > 0) {
         toast({
           title: `${queuedFile.file.name} processed with warnings`,
-          description: `${validationResult.successCount} imported, ${validationResult.errorCount} failed`,
+          description: `${uploadResult.successfulInserts} imported, ${uploadResult.errors.length} failed`,
           variant: "default"
         });
       } else {
-        throw new Error(`No records could be imported from ${queuedFile.file.name}`);
+        throw new Error(`No records could be imported from ${queuedFile.file.name}: ${uploadResult.message}`);
       }
 
     } catch (error) {
