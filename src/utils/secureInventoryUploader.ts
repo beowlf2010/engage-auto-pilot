@@ -81,125 +81,166 @@ export const uploadInventorySecurely = async (
 
   console.log('✅ [SECURE UPLOADER] Authentication and permissions verified');
 
+  // Prepare inventory data with comprehensive validation and formatting
+  const preparedVehicles = inventoryItems.map((item, index) => {
+    try {
+      // Validate required fields
+      if (!item.make || !item.model || !item.year) {
+        throw new Error(`Missing required fields: make, model, or year at row ${index + 1}`);
+      }
+
+      // Ensure year is a valid number
+      const year = parseInt(String(item.year));
+      if (isNaN(year) || year < 1900 || year > new Date().getFullYear() + 2) {
+        throw new Error(`Invalid year: ${item.year} at row ${index + 1}`);
+      }
+
+      // Clean and format the vehicle data
+      return {
+        id: item.id || crypto.randomUUID(),
+        make: String(item.make).trim(),
+        model: String(item.model).trim(),
+        year: year,
+        vin: item.vin ? String(item.vin).trim().toUpperCase() : null,
+        stock_number: item.stock_number ? String(item.stock_number).trim() : null,
+        price: item.price ? parseFloat(String(item.price)) : null,
+        mileage: item.mileage ? parseInt(String(item.mileage)) : null,
+        condition: item.condition || 'used',
+        color_exterior: item.exterior_color ? String(item.exterior_color).trim() : null,
+        color_interior: item.interior_color ? String(item.interior_color).trim() : null,
+        transmission: item.transmission ? String(item.transmission).trim() : null,
+        drivetrain: item.drivetrain ? String(item.drivetrain).trim() : null,
+        fuel_type: item.fuel_type ? String(item.fuel_type).trim() : null,
+        body_style: item.body_style ? String(item.body_style).trim() : null,
+        engine: item.engine ? String(item.engine).trim() : null,
+        trim: item.trim ? String(item.trim).trim() : null,
+        status: item.status || 'available',
+        upload_history_id: uploadHistoryId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+    } catch (validationError) {
+      console.error(`🚫 [SECURE UPLOADER] Validation error for item ${index}:`, validationError);
+      throw validationError;
+    }
+  });
+
+  console.log(`🔐 [SECURE UPLOADER] Starting direct insertion for ${preparedVehicles.length} vehicles`);
+  console.log('🔐 [SECURE UPLOADER] Current user:', user.id);
+  console.log('🔐 [SECURE UPLOADER] Upload history ID:', uploadHistoryId);
+  console.log('🔐 [SECURE UPLOADER] Sample prepared vehicle:', preparedVehicles[0]);
+
+  // Use direct database insertion with proper error handling
   let successfulInserts = 0;
   const errors: Array<{ rowIndex: number; error: string; details?: any }> = [];
 
-  // Prepare inventory data for the secure database function
-  const preparedVehicles = inventoryItems.map(item => ({
-    id: item.id || crypto.randomUUID(),
-    make: item.make,
-    model: item.model,
-    year: item.year,
-    vin: item.vin,
-    stock_number: item.stock_number,
-    price: item.price,
-    mileage: item.mileage,
-    condition: item.condition || 'used',
-    exterior_color: item.exterior_color,
-    interior_color: item.interior_color,
-    transmission: item.transmission,
-    drivetrain: item.drivetrain,
-    fuel_type: item.fuel_type,
-    body_style: item.body_style,
-    engine: item.engine,
-    trim_level: item.trim,
-    status: item.status || 'available'
-  }));
+  // Process vehicles in batches for better performance and error isolation
+  const batchSize = 10;
+  for (let i = 0; i < preparedVehicles.length; i += batchSize) {
+    const batch = preparedVehicles.slice(i, i + batchSize);
+    console.log(`🔄 [SECURE UPLOADER] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(preparedVehicles.length / batchSize)}`);
 
-  console.log(`🔐 [SECURE UPLOADER] Calling secure database function for ${preparedVehicles.length} vehicles`);
-  console.log('🔐 [SECURE UPLOADER] Current user:', user.id);
-  console.log('🔐 [SECURE UPLOADER] Session exists:', !!supabase.auth.getSession());
-  console.log('🔐 [SECURE UPLOADER] Prepared vehicles sample:', preparedVehicles.slice(0, 2));
-  console.log('🔐 [SECURE UPLOADER] Upload history ID:', uploadHistoryId);
+    for (let j = 0; j < batch.length; j++) {
+      const vehicle = batch[j];
+      const globalIndex = i + j;
+      
+      try {
+        console.log(`⚡ [SECURE UPLOADER] Inserting vehicle ${globalIndex + 1}:`, {
+          make: vehicle.make,
+          model: vehicle.model,
+          year: vehicle.year,
+          stock_number: vehicle.stock_number,
+          vin: vehicle.vin
+        });
 
-  // Use the secure database function with explicit authentication context
-  const { data: result, error } = await supabase.rpc('insert_inventory_secure', {
-    p_vehicles: preparedVehicles,
-    p_upload_history_id: uploadHistoryId
-  });
+        const { error: insertError, data: insertedData } = await supabase
+          .from('inventory')
+          .insert(vehicle)
+          .select('id')
+          .single();
 
-  console.log('🔐 [SECURE UPLOADER] Raw database response:', { result, error });
-  
-  // If RPC call fails completely, try fallback direct insertion
-  if (error || !result) {
-    console.log('💥 [SECURE UPLOADER] RPC failed, attempting direct insertion fallback');
-    return await fallbackDirectInsertion(preparedVehicles, uploadHistoryId, user.id);
-  }
+        if (insertError) {
+          console.error(`🚫 [SECURE UPLOADER] Insert error for vehicle ${globalIndex + 1}:`, insertError);
+          
+          let userFriendlyError = insertError.message;
+          if (insertError.code === '23505') {
+            userFriendlyError = `Duplicate vehicle detected (VIN or Stock Number already exists)`;
+          } else if (insertError.code === '23502') {
+            userFriendlyError = `Missing required field`;
+          } else if (insertError.message.includes('violates row-level security')) {
+            userFriendlyError = `Permission denied: insufficient privileges to insert inventory`;
+          }
 
-  if (error) {
-    console.error('💥 [SECURE UPLOADER] Database function error:', error);
-    
-    // Provide specific error messages for different types of failures
-    let errorMessage = error.message;
-    if (error.message.includes('permission') || error.message.includes('role')) {
-      errorMessage = 'Permission denied: You need manager, admin, or sales role to upload inventory. Please contact your administrator.';
-    }
-    
-    return {
-      success: false,
-      totalProcessed: inventoryItems.length,
-      successfulInserts: 0,
-      errors: [{ rowIndex: -1, error: errorMessage, details: error }],
-      message: 'Database insertion failed'
-    };
-  }
-
-  if (!result) {
-    return {
-      success: false,
-      totalProcessed: inventoryItems.length,
-      successfulInserts: 0,
-      errors: [{ rowIndex: -1, error: 'No result returned from database function' }],
-      message: 'Database insertion failed'
-    };
-  }
-
-  console.log('✅ [SECURE UPLOADER] Database function result:', result);
-
-  // Type cast the result to our expected interface
-  const insertResult = result as unknown as DatabaseInsertResult;
-
-  // Process the result
-  successfulInserts = insertResult.inserted_count || 0;
-  
-  // Convert error details from the database function
-  if (insertResult.error_details && Array.isArray(insertResult.error_details)) {
-    insertResult.error_details.forEach((errorDetail: any) => {
-      errors.push({
-        rowIndex: errorDetail.vehicle_index || -1,
-        error: errorDetail.error || 'Unknown database error',
-        details: {
-          sqlstate: errorDetail.sqlstate,
-          vehicle_data: errorDetail.vehicle_data
+          errors.push({
+            rowIndex: globalIndex + 1,
+            error: userFriendlyError,
+            details: {
+              code: insertError.code,
+              hint: insertError.hint,
+              details: insertError.details,
+              vehicle: {
+                make: vehicle.make,
+                model: vehicle.model,
+                year: vehicle.year,
+                stock_number: vehicle.stock_number
+              }
+            }
+          });
+        } else {
+          successfulInserts++;
+          console.log(`✅ [SECURE UPLOADER] Successfully inserted vehicle ${globalIndex + 1} with ID:`, insertedData?.id);
         }
-      });
-    });
-  }
+      } catch (err) {
+        console.error(`💥 [SECURE UPLOADER] Exception for vehicle ${globalIndex + 1}:`, err);
+        errors.push({
+          rowIndex: globalIndex + 1,
+          error: err instanceof Error ? err.message : 'Unknown error occurred',
+          details: {
+            exception: err,
+            vehicle: {
+              make: vehicle.make,
+              model: vehicle.model,
+              year: vehicle.year,
+              stock_number: vehicle.stock_number
+            }
+          }
+        });
+      }
+    }
 
-  // Handle permission errors specifically
-  if (insertResult.error && (insertResult.error.includes('permission') || insertResult.error.includes('role'))) {
-    return {
-      success: false,
-      totalProcessed: inventoryItems.length,
-      successfulInserts: 0,
-      errors: [{ 
-        rowIndex: -1, 
-        error: 'Permission denied: You need manager, admin, or sales role to upload inventory. Please contact your administrator.',
-        details: insertResult 
-      }],
-      message: 'Permission denied'
-    };
+    // Small delay between batches to avoid overwhelming the database
+    if (i + batchSize < preparedVehicles.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   }
 
   const totalProcessed = inventoryItems.length;
   const success = successfulInserts > 0;
+  const errorCount = errors.length;
 
   console.log(`📊 [SECURE UPLOADER] Upload complete:`, {
     totalProcessed,
     successfulInserts,
-    errorCount: errors.length,
-    success
+    errorCount,
+    successRate: `${Math.round((successfulInserts / totalProcessed) * 100)}%`
   });
+
+  // Update upload history with results
+  if (uploadHistoryId) {
+    try {
+      await supabase
+        .from('upload_history')
+        .update({
+          successful_imports: successfulInserts,
+          failed_imports: errorCount,
+          processing_status: success ? 'completed' : 'completed_with_errors',
+          error_details: errorCount > 0 ? `${errorCount} vehicles failed to import` : null
+        })
+        .eq('id', uploadHistoryId);
+    } catch (updateError) {
+      console.error('🚫 [SECURE UPLOADER] Failed to update upload history:', updateError);
+    }
+  }
 
   return {
     success,
@@ -207,8 +248,8 @@ export const uploadInventorySecurely = async (
     successfulInserts,
     errors,
     message: success 
-      ? `Successfully uploaded ${successfulInserts}/${totalProcessed} inventory items`
-      : `Upload failed: ${errors.length} errors occurred`
+      ? `Successfully uploaded ${successfulInserts}/${totalProcessed} vehicles${errorCount > 0 ? ` (${errorCount} failed)` : ''}`
+      : `Upload failed: ${errorCount} errors occurred`
   };
 };
 
