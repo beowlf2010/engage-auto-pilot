@@ -26,6 +26,7 @@ import {
   Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EmergencyStopHeader } from '@/components/emergency/EmergencyStopHeader';
 
 interface InventoryLayoutProps {
   children: React.ReactNode;
@@ -211,22 +212,25 @@ function InventorySidebar() {
 export default function InventoryLayout({ children }: InventoryLayoutProps) {
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full">
-        <InventorySidebar />
-        
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Mobile header with trigger */}
-          <header className="lg:hidden h-14 flex items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
-            <SidebarTrigger className="mr-4" />
-            <h1 className="font-semibold">Inventory Management</h1>
-          </header>
+      <div className="min-h-screen flex flex-col w-full">
+        <EmergencyStopHeader />
+        <div className="flex flex-1 w-full">
+          <InventorySidebar />
+          
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Mobile header with trigger */}
+            <header className="lg:hidden h-14 flex items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+              <SidebarTrigger className="mr-4" />
+              <h1 className="font-semibold">Inventory Management</h1>
+            </header>
 
-          {/* Main content */}
-          <main className="flex-1 overflow-auto">
-            <div className="container max-w-full p-6">
-              {children}
-            </div>
-          </main>
+            {/* Main content */}
+            <main className="flex-1 overflow-auto">
+              <div className="container max-w-full p-6">
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
       </div>
     </SidebarProvider>

@@ -7,6 +7,7 @@ import { AppSidebar } from './AppSidebar';
 import MobileBottomNav from './MobileBottomNav';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
+import { EmergencyStopHeader } from '@/components/emergency/EmergencyStopHeader';
 
 interface MobileLayoutProps {
   children: React.ReactNode;
@@ -19,6 +20,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <EmergencyStopHeader />
       {/* Mobile Header */}
       <header className="sticky top-0 z-50 bg-background border-b px-4 py-3 flex items-center justify-between">
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
