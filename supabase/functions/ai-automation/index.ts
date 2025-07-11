@@ -55,19 +55,37 @@ serve(async (req) => {
   }
 
   try {
+    // Parse request body - handle both empty and malformed JSON
+    let requestData;
+    try {
+      const bodyText = await req.text();
+      requestData = bodyText ? JSON.parse(bodyText) : {};
+    } catch (parseError) {
+      console.warn('⚠️ [AI-AUTOMATION] Invalid JSON in request, using defaults:', parseError);
+      requestData = {};
+    }
+
     const {
       automated = true,
       source = 'scheduled',
       priority = 'normal',
       enhanced = false
-    } = await req.json();
+    } = requestData;
 
     console.log(`🤖 [AI-AUTOMATION] Starting AI automation, source: ${source}, priority: ${priority}, enhanced: ${enhanced}`);
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Validate environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('❌ [AI-AUTOMATION] Missing required environment variables');
+      throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    }
+
+    console.log(`🔐 [AI-AUTOMATION] Environment check passed`);
+
+    const supabaseClient = createClient(supabaseUrl, serviceRoleKey);
 
     // Use default settings instead of accessing non-existent table
     const batchSize = 50;
@@ -104,11 +122,30 @@ serve(async (req) => {
       }
     }
 
+    // Test database connection first
+    try {
+      const { data: testData, error: testError } = await supabaseClient
+        .from('leads')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ [AI-AUTOMATION] Database connection test failed:', testError);
+        throw new Error(`Database connection failed: ${testError.message}`);
+      }
+      console.log(`✅ [AI-AUTOMATION] Database connection verified`);
+    } catch (dbError) {
+      console.error('❌ [AI-AUTOMATION] Database connection error:', dbError);
+      throw dbError;
+    }
+
     // Get leads ready for AI processing
     const now = new Date();
+    console.log(`🕒 [AI-AUTOMATION] Current time: ${now.toISOString()}`);
+    
     const { data: leads, error: leadsError } = await supabaseClient
       .from('leads')
-      .select('id, first_name, vehicle_interest, ai_messages_sent')
+      .select('id, first_name, vehicle_interest, ai_messages_sent, created_at, next_ai_send_at')
       .eq('ai_opt_in', true)
       .eq('ai_sequence_paused', false)
       .not('next_ai_send_at', 'is', null)
@@ -117,17 +154,37 @@ serve(async (req) => {
 
     if (leadsError) {
       console.error('❌ [AI-AUTOMATION] Error fetching leads:', leadsError);
-      throw new Error('Failed to fetch leads');
+      throw new Error(`Failed to fetch leads: ${leadsError.message}`);
     }
+
+    // Log detailed lead queue status
+    const { data: queueStats } = await supabaseClient
+      .from('leads')
+      .select('id')
+      .eq('ai_opt_in', true)
+      .eq('ai_sequence_paused', false)
+      .not('next_ai_send_at', 'is', null);
+
+    const totalQueued = queueStats?.length || 0;
+    console.log(`📊 [AI-AUTOMATION] Queue status: ${leads?.length || 0} ready to process, ${totalQueued} total queued`);
 
     if (!leads || leads.length === 0) {
       console.log('😴 [AI-AUTOMATION] No leads to process');
-      return new Response(JSON.stringify({ message: 'No leads to process' }), {
+      return new Response(JSON.stringify({ 
+        message: 'No leads to process',
+        totalQueued,
+        timestamp: now.toISOString()
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     console.log(`👉 [AI-AUTOMATION] Processing ${leads.length} leads`);
+    
+    // Log first few leads for debugging
+    leads.slice(0, 3).forEach(lead => {
+      console.log(`📋 [AI-AUTOMATION] Lead ${lead.id}: next_send=${lead.next_ai_send_at}, messages_sent=${lead.ai_messages_sent}`);
+    });
 
     // Process leads in parallel with rate limiting
     let processedCount = 0;
@@ -166,25 +223,41 @@ serve(async (req) => {
         const gentleMessage = generateGentleMessage(lead.first_name, lead.vehicle_interest);
 
         // Send message using conversations table instead of messages
+        console.log(`📤 [AI-AUTOMATION] Attempting to send message to lead ${lead.id}`);
+        
+        const messagePayload = {
+          lead_id: lead.id,
+          body: gentleMessage,
+          direction: 'out',
+          sent_at: new Date().toISOString(),
+          ai_generated: true
+        };
+        
+        console.log(`📝 [AI-AUTOMATION] Message payload:`, messagePayload);
+        
         const { data: messageData, error: messageError } = await supabaseClient
           .from('conversations')
-          .insert({
-            lead_id: lead.id,
-            body: gentleMessage,
-            direction: 'out',
-            sent_at: new Date().toISOString(),
-            ai_generated: true
-          })
+          .insert(messagePayload)
           .select()
           .single();
 
         if (messageError) {
           console.error(`❌ [AI-AUTOMATION] Error sending message to lead ${lead.id}:`, messageError);
+          console.error(`❌ [AI-AUTOMATION] Message payload that failed:`, messagePayload);
           failedCount++;
           return;
         }
 
-        console.log(`💬 [AI-AUTOMATION] Sent message to lead ${lead.id}: ${gentleMessage}`);
+        if (!messageData) {
+          console.error(`❌ [AI-AUTOMATION] No message data returned for lead ${lead.id}`);
+          failedCount++;
+          return;
+        }
+
+        console.log(`💬 [AI-AUTOMATION] Successfully sent message to lead ${lead.id}:`, {
+          messageId: messageData.id,
+          content: gentleMessage.substring(0, 50) + '...'
+        });
         successfulCount++;
 
         // Handle lead status transition after sending AI message
@@ -259,24 +332,43 @@ serve(async (req) => {
     const endTime = Date.now();
     const processingTime = endTime - startTime;
 
-    console.log(`✅ [AI-AUTOMATION] Automation completed: Processed=${processedCount}, Successful=${successfulCount}, Failed=${failedCount}, Time=${processingTime}ms`);
+    const result = {
+      message: 'AI automation completed',
+      processed: processedCount,
+      successful: successfulCount,
+      failed: failedCount,
+      queueSize: leads.length,
+      totalQueued: totalQueued,
+      processingTime: processingTime,
+      enhanced: enhanced,
+      timestamp: new Date().toISOString(),
+      source: source
+    };
+
+    console.log(`✅ [AI-AUTOMATION] Automation completed:`, result);
+
+    // Log any failures for debugging
+    if (failedCount > 0) {
+      console.warn(`⚠️ [AI-AUTOMATION] ${failedCount} leads failed to process - check individual lead errors above`);
+    }
 
     return new Response(
-      JSON.stringify({
-        message: 'AI automation completed',
-        processed: processedCount,
-        successful: successfulCount,
-        failed: failedCount,
-        queueSize: leads.length,
-        processingTime: processingTime,
-        enhanced: enhanced
-      }),
+      JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('❌ [AI-AUTOMATION] Error in AI automation:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('❌ [AI-AUTOMATION] Critical error in AI automation:', error);
+    console.error('❌ [AI-AUTOMATION] Error stack:', error.stack);
+    
+    const errorResponse = {
+      error: error.message,
+      timestamp: new Date().toISOString(),
+      source: 'ai-automation',
+      type: 'critical_failure'
+    };
+    
+    return new Response(JSON.stringify(errorResponse), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
