@@ -12,6 +12,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   initializeUserForCSV: () => Promise<{ success: boolean; error?: string }>;
+  uploadInProgress: boolean;
+  setUploadInProgress: (inProgress: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +31,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [uploadInProgress, setUploadInProgress] = useState(false);
 
   // Initialize user for CSV operations using synchronized approach
   const initializeUserForCSV = async (): Promise<{ success: boolean; error?: string }> => {
@@ -174,39 +177,60 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
+    let authChangeDebounceTimer: NodeJS.Timeout | null = null;
     
-    // Set up auth state listener
+    // Set up auth state listener with debouncing to prevent rapid state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
         
         console.log('🔄 [AUTH] Auth state changed:', event, session?.user?.id);
         
-        // Update session and user state
+        // Clear previous debounce timer
+        if (authChangeDebounceTimer) {
+          clearTimeout(authChangeDebounceTimer);
+        }
+        
+        // Skip intensive auth operations if upload is in progress
+        if (uploadInProgress && event === 'TOKEN_REFRESHED') {
+          console.log('⏭️ [AUTH] Skipping profile refetch during upload - token refresh handled silently');
+          setSession(session);
+          setUser(session?.user ?? null);
+          return;
+        }
+        
+        // Update session and user state immediately
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Handle profile fetching after state update
-        if (session?.user) {
-          setTimeout(async () => {
-            if (!mounted) return;
-            
-            try {
+        // Debounce profile fetching to prevent rapid consecutive calls
+        authChangeDebounceTimer = setTimeout(async () => {
+          if (!mounted) return;
+          
+          try {
+            if (session?.user) {
+              // Validate session before fetching profile
+              if (session.expires_at && session.expires_at < Date.now() / 1000) {
+                console.warn('⚠️ [AUTH] Session appears expired, skipping profile fetch');
+                setLoading(false);
+                return;
+              }
+              
               const profileData = await fetchUserProfile(session.user.id);
               if (!mounted) return;
               
               setProfile(profileData);
               setLoading(false);
-            } catch (error) {
-              console.error('Error in deferred auth setup:', error);
-              if (!mounted) return;
+            } else {
+              setProfile(null);
               setLoading(false);
             }
-          }, 0);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
+          } catch (error) {
+            console.error('Error in deferred auth setup:', error);
+            if (!mounted) return;
+            setLoading(false);
+          }
+        }, 300); // 300ms debounce delay
       }
     );
 
@@ -243,6 +267,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
       clearTimeout(fallbackTimeout);
+      if (authChangeDebounceTimer) {
+        clearTimeout(authChangeDebounceTimer);
+      }
     };
   }, []);
 
@@ -295,19 +322,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await supabase.auth.signOut();
   };
 
+  // Create a context value that includes upload state management
+  const contextValue = {
+    user,
+    session,
+    profile,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    initializeUserForCSV,
+    uploadInProgress,
+    setUploadInProgress,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        profile,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        initializeUserForCSV,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

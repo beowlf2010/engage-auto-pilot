@@ -7,6 +7,7 @@ import { mapRowToInventoryItemEnhanced } from "@/utils/enhancedInventoryMapper";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
 import { detectReportType } from "@/utils/reportDetection";
 import { uploadInventorySecurely } from '@/utils/secureInventoryUploader';
+import { useAuth } from '@/components/auth/AuthProvider';
 import type { QueuedFile } from "@/components/inventory-upload/DragDropFileQueue";
 
 interface UseEnhancedMultiFileUploadProps {
@@ -44,6 +45,7 @@ export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' 
   const [processing, setProcessing] = useState(false);
   const [batchResult, setBatchResult] = useState<EnhancedBatchUploadResult | null>(null);
   const { toast } = useToast();
+  const { user, setUploadInProgress } = useAuth(); // Get user and upload state from auth context
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -53,8 +55,10 @@ export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' 
     if (mountedRef.current) {
       setProcessing(value);
       processingRef.current = value;
+      // Update auth context to prevent auth operations during upload
+      setUploadInProgress(value);
     }
-  }, []);
+  }, [setUploadInProgress]);
 
   const safeSetBatchResult = useCallback((result: EnhancedBatchUploadResult | null) => {
     if (mountedRef.current) {
@@ -187,8 +191,8 @@ export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' 
 
       console.log(`🔄 [UPLOAD HOOK] Mapped ${inventoryItems.length} items, processing with secure uploader...`);
       
-      // Use the secure uploader
-      const uploadResult = await uploadInventorySecurely(inventoryItems, uploadRecord.id);
+      // Use the secure uploader with current user to avoid auth state changes
+      const uploadResult = await uploadInventorySecurely(inventoryItems, uploadRecord.id, user || undefined);
       
       console.log(`✅ [UPLOAD HOOK] Secure upload result:`, {
         success: uploadResult.success,

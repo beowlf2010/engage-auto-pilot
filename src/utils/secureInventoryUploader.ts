@@ -28,32 +28,41 @@ export interface SecureUploadResult {
 
 /**
  * Secure inventory uploader that handles authentication, RLS policies, and proper error handling
+ * @param inventoryItems - Array of inventory items to upload
+ * @param uploadHistoryId - ID of the upload history record
+ * @param user - Authenticated user object (passed to avoid auth state changes during upload)
  */
 export const uploadInventorySecurely = async (
   inventoryItems: InventoryItem[],
-  uploadHistoryId: string
+  uploadHistoryId: string,
+  user?: { id: string; [key: string]: any }
 ): Promise<SecureUploadResult> => {
   console.log('🔐 [SECURE UPLOADER] Starting secure inventory upload');
   
-  // Verify user authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  
-  if (authError || !user) {
-    console.error('❌ [SECURE UPLOADER] Authentication failed:', authError);
-    return {
-      success: false,
-      totalProcessed: 0,
-      successfulInserts: 0,
-      errors: [{ rowIndex: -1, error: 'User authentication required for inventory upload' }],
-      message: 'Authentication failed'
-    };
+  // Use provided user object or verify authentication as fallback
+  let authenticatedUser = user;
+  if (!authenticatedUser) {
+    const { data: { user: fetchedUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !fetchedUser) {
+      console.error('❌ [SECURE UPLOADER] Authentication failed:', authError);
+      return {
+        success: false,
+        totalProcessed: 0,
+        successfulInserts: 0,
+        errors: [{ rowIndex: -1, error: 'User authentication required for inventory upload' }],
+        message: 'Authentication failed'
+      };
+    }
+    authenticatedUser = fetchedUser;
   }
+  
+  console.log('✅ [SECURE UPLOADER] Using authenticated user:', authenticatedUser.id);
 
   // Verify user has proper permissions
   const { data: userRoles, error: roleError } = await supabase
     .from('user_roles')
     .select('role')
-    .eq('user_id', user.id);
+    .eq('user_id', authenticatedUser.id);
 
   if (roleError) {
     console.error('❌ [SECURE UPLOADER] Role check failed:', roleError);
@@ -116,7 +125,7 @@ export const uploadInventorySecurely = async (
         trim: item.trim ? String(item.trim).trim() : null,
         status: item.status || 'available',
         upload_history_id: uploadHistoryId,
-        uploaded_by: user.id, // CRITICAL: Set uploaded_by for RLS policy compliance
+        uploaded_by: authenticatedUser.id, // CRITICAL: Set uploaded_by for RLS policy compliance
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -127,7 +136,7 @@ export const uploadInventorySecurely = async (
   });
 
   console.log(`🔐 [SECURE UPLOADER] Starting direct insertion for ${preparedVehicles.length} vehicles`);
-  console.log('🔐 [SECURE UPLOADER] Current user:', user.id);
+  console.log('🔐 [SECURE UPLOADER] Current user:', authenticatedUser.id);
   console.log('🔐 [SECURE UPLOADER] Upload history ID:', uploadHistoryId);
   console.log('🔐 [SECURE UPLOADER] Sample prepared vehicle:', preparedVehicles[0]);
 
