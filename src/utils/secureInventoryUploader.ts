@@ -116,6 +116,7 @@ export const uploadInventorySecurely = async (
         trim: item.trim ? String(item.trim).trim() : null,
         status: item.status || 'available',
         upload_history_id: uploadHistoryId,
+        uploaded_by: user.id, // CRITICAL: Set uploaded_by for RLS policy compliance
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
