@@ -3,13 +3,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
 import { storeUploadedFile, createUploadHistoryWithoutStorage, updateUploadHistory, type UploadHistoryRecord } from "@/utils/fileStorageUtils";
-import { validateAndProcessInventoryRowsWithDuplicateHandling } from "@/utils/uploadValidation";
 import { mapRowToInventoryItemEnhanced } from "@/utils/enhancedInventoryMapper";
 import { handleFileSelection } from "@/utils/fileUploadHandlers";
-import { syncInventoryData } from "@/services/inventoryService";
-import { vehicleHistoryService } from "@/services/inventory/vehicleHistoryService";
 import { detectReportType } from "@/utils/reportDetection";
-import { validateInventoryItem } from "@/services/inventory/core/gmGlobalValidationService";
+import { uploadInventorySecurely } from '@/utils/secureInventoryUploader';
 import type { QueuedFile } from "@/components/inventory-upload/DragDropFileQueue";
 
 interface UseEnhancedMultiFileUploadProps {
@@ -161,79 +158,66 @@ export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' 
         console.log('Upload history created without storage, ID:', uploadRecord.id);
       }
       
-      // Enhanced validation and processing with duplicate handling
-      const validationResult = await validateAndProcessInventoryRowsWithDuplicateHandling(
-        parsed.rows,
-        detection.recommendedCondition,
-        uploadRecord.id,
-        (row, condition, uploadId) => mapRowToInventoryItemEnhanced(
-          row, 
-          condition, 
-          uploadId, 
-          queuedFile.file.name, 
-          parsed.headers,
-          detection
-        ).then(result => result.item),
-        userId,
-        duplicateStrategy
-      );
+      // Map rows to inventory items
+      const inventoryItems = [];
+      const errors = [];
+      
+      for (let i = 0; i < parsed.rows.length; i++) {
+        try {
+          const mappingResult = await mapRowToInventoryItemEnhanced(
+            parsed.rows[i], 
+            detection.recommendedCondition, 
+            uploadRecord.id, 
+            queuedFile.file.name, 
+            parsed.headers,
+            detection
+          );
+          
+          if (mappingResult.item) {
+            inventoryItems.push(mappingResult.item);
+          }
+          if (mappingResult.warnings && mappingResult.warnings.length > 0) {
+            console.warn(`Row ${i + 1} warnings:`, mappingResult.warnings);
+          }
+        } catch (error) {
+          console.error(`Error mapping row ${i + 1}:`, error);
+          errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
 
-      console.log(`Processing complete: ${validationResult.successCount} new, ${validationResult.updatedCount || 0} updated, ${validationResult.skippedCount || 0} skipped, ${validationResult.errorCount} errors`);
+      console.log(`🔄 [UPLOAD HOOK] Mapped ${inventoryItems.length} items, processing with secure uploader...`);
+      
+      // Use the secure uploader
+      const uploadResult = await uploadInventorySecurely(inventoryItems, uploadRecord.id);
+      
+      console.log(`✅ [UPLOAD HOOK] Secure upload result:`, {
+        success: uploadResult.success,
+        totalProcessed: uploadResult.totalProcessed,
+        successfulInserts: uploadResult.successfulInserts,
+        errorCount: uploadResult.errors?.length || 0
+      });
 
-      // Vehicle history tracking for successfully processed vehicles
-      let historyResult = {
-        historyRecorded: 0,
-        masterRecordsUpserted: 0,
-        duplicatesDetected: validationResult.duplicateCount || 0
-      };
-
-      // Note: Vehicle history is now handled by the database function
-
-      // Update upload history with enhanced results
+      // Update upload history with results
       if (mountedRef.current) {
         await updateUploadHistory(uploadRecord.id, {
           total_rows: parsed.rows.length,
-          successful_imports: validationResult.successCount,
-          failed_imports: validationResult.errorCount,
-          processing_status: 'completed',
-          error_details: validationResult.errors.length > 0 ? validationResult.errors.slice(0, 20).join('\n') : undefined
+          successful_imports: uploadResult.successfulInserts,
+          failed_imports: uploadResult.errors?.length || 0,
+          processing_status: uploadResult.success ? 'completed' : 'failed',
+          error_details: uploadResult.errors?.length > 0 
+            ? uploadResult.errors.slice(0, 20).map(e => e.error).join('\n') 
+            : undefined
         });
       }
 
-      // Enhanced sync trigger - now includes automatic cleanup
-      const isPreliminaryData = detection.reportType === 'gm_global' || 
-                                queuedFile.file.name.toLowerCase().includes('preliminary');
-      
-      if (!isPreliminaryData && validationResult.successCount > 0 && mountedRef.current) {
-        try {
-          console.log(`Triggering enhanced automatic inventory sync with cleanup for ${queuedFile.file.name}...`);
-          await syncInventoryData(uploadRecord.id);
-          console.log('Enhanced sync with cleanup completed successfully');
-        } catch (syncError) {
-          console.error('Enhanced automatic sync failed:', syncError);
-        }
-      } else if (isPreliminaryData) {
-        console.log(`Skipping sync/cleanup for preliminary data: ${queuedFile.file.name}`);
-      }
-
-      // Success notification with enhanced information
-      if (mountedRef.current) {
-        const duplicateMsg = historyResult.duplicatesDetected > 0 
-          ? `, ${historyResult.duplicatesDetected} duplicates ${duplicateStrategy}ped`
-          : '';
-        
-        const updateMsg = validationResult.updatedCount && validationResult.updatedCount > 0
-          ? `, ${validationResult.updatedCount} updated`
-          : '';
-        
-        const cleanupMsg = !isPreliminaryData 
-          ? ' (inventory cleaned up automatically)'
-          : '';
-        
+      // Success notification
+      if (mountedRef.current && uploadResult.success) {
         toast({
           title: `${queuedFile.file.name} processed successfully`,
-          description: `${validationResult.successCount} new records${updateMsg}${duplicateMsg} (${detection.reportType})${cleanupMsg}`,
+          description: `${uploadResult.successfulInserts} vehicles uploaded successfully (${detection.reportType})`,
         });
+      } else if (uploadResult.successfulInserts === 0) {
+        throw new Error(uploadResult.message || 'No vehicles were uploaded successfully');
       }
 
     } catch (error) {

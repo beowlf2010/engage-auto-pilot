@@ -1,6 +1,19 @@
 import { supabase } from '@/integrations/supabase/client';
 import { InventoryItem } from '@/services/inventory/types';
 
+interface DatabaseInsertResult {
+  success: boolean;
+  inserted_count: number;
+  total_count: number;
+  error?: string;
+  error_details?: Array<{
+    vehicle_index: number;
+    error: string;
+    sqlstate: string;
+    vehicle_data: any;
+  }>;
+}
+
 export interface SecureUploadResult {
   success: boolean;
   totalProcessed: number;
@@ -71,113 +84,99 @@ export const uploadInventorySecurely = async (
   let successfulInserts = 0;
   const errors: Array<{ rowIndex: number; error: string; details?: any }> = [];
 
-  // Process items in batches to avoid overwhelming the database
-  const batchSize = 50;
-  const batches = [];
-  
-  for (let i = 0; i < inventoryItems.length; i += batchSize) {
-    batches.push(inventoryItems.slice(i, i + batchSize));
+  // Prepare inventory data for the secure database function
+  const preparedVehicles = inventoryItems.map(item => ({
+    id: item.id || crypto.randomUUID(),
+    make: item.make,
+    model: item.model,
+    year: item.year,
+    vin: item.vin,
+    stock_number: item.stock_number,
+    price: item.price,
+    mileage: item.mileage,
+    condition: item.condition || 'used',
+    exterior_color: item.exterior_color,
+    interior_color: item.interior_color,
+    transmission: item.transmission,
+    drivetrain: item.drivetrain,
+    fuel_type: item.fuel_type,
+    body_style: item.body_style,
+    engine: item.engine,
+    trim_level: item.trim,
+    status: item.status || 'available'
+  }));
+
+  console.log(`🔐 [SECURE UPLOADER] Calling secure database function for ${preparedVehicles.length} vehicles`);
+
+  // Use the secure database function
+  const { data: result, error } = await supabase.rpc('insert_inventory_secure', {
+    p_vehicles: preparedVehicles,
+    p_upload_history_id: uploadHistoryId
+  });
+
+  if (error) {
+    console.error('💥 [SECURE UPLOADER] Database function error:', error);
+    
+    // Provide specific error messages for different types of failures
+    let errorMessage = error.message;
+    if (error.message.includes('permission') || error.message.includes('role')) {
+      errorMessage = 'Permission denied: You need manager, admin, or sales role to upload inventory. Please contact your administrator.';
+    }
+    
+    return {
+      success: false,
+      totalProcessed: inventoryItems.length,
+      successfulInserts: 0,
+      errors: [{ rowIndex: -1, error: errorMessage, details: error }],
+      message: 'Database insertion failed'
+    };
   }
 
-  console.log(`📦 [SECURE UPLOADER] Processing ${inventoryItems.length} items in ${batches.length} batches`);
+  if (!result) {
+    return {
+      success: false,
+      totalProcessed: inventoryItems.length,
+      successfulInserts: 0,
+      errors: [{ rowIndex: -1, error: 'No result returned from database function' }],
+      message: 'Database insertion failed'
+    };
+  }
 
-  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-    const batch = batches[batchIndex];
-    const batchOffset = batchIndex * batchSize;
-    
-    console.log(`🔄 [SECURE UPLOADER] Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} items)`);
+  console.log('✅ [SECURE UPLOADER] Database function result:', result);
 
-    try {
-      // Prepare batch data with proper authentication fields
-      const batchData = batch.map((item, index) => {
-        // Ensure all required fields are present and properly formatted
-        const preparedItem = {
-          ...item,
-          id: item.id || crypto.randomUUID(),
-          uploaded_by: user.id,
-          upload_history_id: uploadHistoryId,
-          created_at: item.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
+  // Type cast the result to our expected interface
+  const insertResult = result as unknown as DatabaseInsertResult;
 
-        // Remove any undefined or null values that might cause issues
-        Object.keys(preparedItem).forEach(key => {
-          if (preparedItem[key as keyof typeof preparedItem] === undefined) {
-            delete preparedItem[key as keyof typeof preparedItem];
-          }
-        });
-
-        return preparedItem;
-      });
-
-      // Insert batch
-      const { data, error } = await supabase
-        .from('inventory')
-        .insert(batchData)
-        .select('id');
-
-      if (error) {
-        console.error(`❌ [SECURE UPLOADER] Batch ${batchIndex + 1} failed:`, error);
-        
-        // Try inserting items individually to identify specific failures
-        for (let i = 0; i < batch.length; i++) {
-          const item = batchData[i];
-          const originalIndex = batchOffset + i;
-          
-          try {
-            const { error: individualError } = await supabase
-              .from('inventory')
-              .insert([item])
-              .select('id')
-              .single();
-
-            if (individualError) {
-              errors.push({
-                rowIndex: originalIndex,
-                error: `Database insertion failed: ${individualError.message}`,
-                details: {
-                  code: individualError.code,
-                  hint: individualError.hint,
-                  make: item.make,
-                  model: item.model,
-                  vin: item.vin
-                }
-              });
-            } else {
-              successfulInserts++;
-            }
-          } catch (individualException) {
-            errors.push({
-              rowIndex: originalIndex,
-              error: `Insertion exception: ${individualException instanceof Error ? individualException.message : 'Unknown error'}`,
-              details: {
-                make: item.make,
-                model: item.model,
-                vin: item.vin
-              }
-            });
-          }
+  // Process the result
+  successfulInserts = insertResult.inserted_count || 0;
+  
+  // Convert error details from the database function
+  if (insertResult.error_details && Array.isArray(insertResult.error_details)) {
+    insertResult.error_details.forEach((errorDetail: any) => {
+      errors.push({
+        rowIndex: errorDetail.vehicle_index || -1,
+        error: errorDetail.error || 'Unknown database error',
+        details: {
+          sqlstate: errorDetail.sqlstate,
+          vehicle_data: errorDetail.vehicle_data
         }
-      } else {
-        successfulInserts += data?.length || batch.length;
-        console.log(`✅ [SECURE UPLOADER] Batch ${batchIndex + 1} successful: ${data?.length || batch.length} items inserted`);
-      }
-    } catch (batchException) {
-      console.error(`💥 [SECURE UPLOADER] Batch ${batchIndex + 1} exception:`, batchException);
-      
-      // Mark all items in this batch as failed
-      for (let i = 0; i < batch.length; i++) {
-        errors.push({
-          rowIndex: batchOffset + i,
-          error: `Batch processing failed: ${batchException instanceof Error ? batchException.message : 'Unknown error'}`,
-          details: {
-            batchIndex: batchIndex + 1,
-            make: batch[i].make,
-            model: batch[i].model
-          }
-        });
-      }
-    }
+      });
+    });
+  }
+
+  // Handle permission errors specifically
+  if (insertResult.error && (insertResult.error.includes('permission') || insertResult.error.includes('role'))) {
+    return {
+      success: false,
+      totalProcessed: inventoryItems.length,
+      successfulInserts: 0,
+      errors: [{ 
+        rowIndex: -1, 
+        error: 'Permission denied: You need manager, admin, or sales role to upload inventory. Please contact your administrator.',
+        details: insertResult 
+      }],
+      message: 'Permission denied'
+    };
   }
 
   const totalProcessed = inventoryItems.length;

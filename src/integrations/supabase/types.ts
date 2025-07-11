@@ -7230,6 +7230,10 @@ export type Database = {
         }
         Returns: Json
       }
+      insert_inventory_secure: {
+        Args: { p_vehicles: Json; p_upload_history_id: string }
+        Returns: Json
+      }
       insert_inventory_with_context: {
         Args: {
           p_vehicles: Json
