@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, Upload, ArrowRight, RotateCcw, AlertTriangle, ArrowLeft, Bug, Zap, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle, Upload, ArrowRight, RotateCcw, AlertTriangle, ArrowLeft, Bug, Zap, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useEnhancedMultiFileUpload } from '@/hooks/useEnhancedMultiFileUpload';
 import { useEnhancedFinancialUpload } from '@/hooks/useEnhancedFinancialUpload';
 import { useMultiFileLeadUpload } from '@/hooks/useMultiFileLeadUpload';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import LeadBatchUploadResult from '@/components/leads/LeadBatchUploadResult';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface SequentialDataUploadModalProps {
   isOpen: boolean;
@@ -60,6 +62,7 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
   const [stepResults, setStepResults] = useState<Record<number, any>>({});
   const [isNavigating, setIsNavigating] = useState(false);
   const [showRestartDialog, setShowRestartDialog] = useState(false);
+  const [expandedResults, setExpandedResults] = useState<Set<number>>(new Set());
   
   // Enhanced debugging and fallback state
   const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -315,9 +318,118 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
     setCompletedSteps(prev => new Set([...prev, currentStep]));
     setStepResults(prev => ({ ...prev, [currentStep]: result }));
     
+    // Auto-expand results for the just completed step
+    setExpandedResults(prev => new Set([...prev, currentStep]));
+    
     if (currentStep < uploadSteps.length) {
       setCurrentStep(currentStep + 1);
     }
+  };
+
+  const toggleResultExpansion = (stepId: number) => {
+    setExpandedResults(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(stepId)) {
+        newSet.delete(stepId);
+      } else {
+        newSet.add(stepId);
+      }
+      return newSet;
+    });
+  };
+
+  const renderStepResult = (step: UploadStep, result: any) => {
+    if (!result) return null;
+
+    const isExpanded = expandedResults.has(step.id);
+    
+    // Format result summary based on step type
+    let summary = '';
+    let hasIssues = false;
+    
+    if (step.fileType === 'leads') {
+      summary = `${result.successfulLeads || 0} imported, ${result.failedLeads || 0} failed, ${result.duplicateLeads || 0} duplicates`;
+      hasIssues = result.failedLeads > 0 || result.duplicateLeads > 0;
+    } else if (step.fileType === 'inventory') {
+      summary = `${result.successfulFiles || 0}/${result.totalFiles || 0} files processed successfully`;
+      hasIssues = (result.failedFiles || 0) > 0;
+    } else if (step.fileType === 'financial') {
+      summary = `${result.successfulRecords || 0} records processed`;
+      hasIssues = (result.failedRecords || 0) > 0;
+    }
+
+    return (
+      <Card key={`result-${step.id}`} className={`mt-2 ${hasIssues ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
+        <Collapsible open={isExpanded} onOpenChange={() => toggleResultExpansion(step.id)}>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-opacity-80 pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium">Results: {summary}</span>
+                </div>
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              {step.fileType === 'leads' && (
+                <LeadBatchUploadResult 
+                  result={result} 
+                  onClose={() => toggleResultExpansion(step.id)}
+                  onViewLeads={() => {
+                    onClose();
+                    // Navigate to leads view if needed
+                  }}
+                />
+              )}
+              {step.fileType === 'inventory' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Total Files:</span> {result.totalFiles || 0}
+                    </div>
+                    <div>
+                      <span className="font-medium">Successful:</span> {result.successfulFiles || 0}
+                    </div>
+                    <div>
+                      <span className="font-medium">Failed:</span> {result.failedFiles || 0}
+                    </div>
+                  </div>
+                  {result.details && (
+                    <div className="text-xs text-gray-600 mt-2">
+                      {result.details}
+                    </div>
+                  )}
+                </div>
+              )}
+              {step.fileType === 'financial' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Records Processed:</span> {result.successfulRecords || 0}
+                    </div>
+                    <div>
+                      <span className="font-medium">Failed:</span> {result.failedRecords || 0}
+                    </div>
+                  </div>
+                  {result.message && (
+                    <div className="text-xs text-gray-600 mt-2">
+                      {result.message}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+    );
   };
 
   // Watch for inventory upload completion
@@ -422,23 +534,46 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
               {uploadSteps.map((step) => {
                 const result = stepResults[step.id];
+                const isExpanded = expandedResults.has(step.id);
+                
                 return (
                   <Card key={step.id} className="border-green-200">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span>{step.title}</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <p className="text-sm text-muted-foreground">
-                        {result?.success || result?.successfulLeads || 'Completed'} items processed
-                      </p>
-                    </CardContent>
+                    <Collapsible open={isExpanded} onOpenChange={() => toggleResultExpansion(step.id)}>
+                      <CollapsibleTrigger asChild>
+                        <CardHeader className="cursor-pointer hover:bg-green-100/50 pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm flex items-center space-x-2">
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                              <span>{step.title}</span>
+                            </CardTitle>
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground text-left">
+                            {step.fileType === 'leads' && result ? 
+                              `${result.successfulLeads || 0} leads imported, ${result.failedLeads || 0} failed` :
+                              step.fileType === 'inventory' && result ?
+                              `${result.successfulFiles || 0}/${result.totalFiles || 0} files processed` :
+                              step.fileType === 'financial' && result ?
+                              `${result.successfulRecords || 0} records processed` :
+                              'Completed'
+                            }
+                          </p>
+                        </CardHeader>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <CardContent className="pt-0">
+                          {renderStepResult(step, result)}
+                        </CardContent>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </Card>
                 );
               })}
@@ -721,6 +856,36 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
               )}
             </div>
           </div>
+
+          {/* Show results for completed steps */}
+          {completedSteps.size > 0 && (
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium mb-3">Completed Steps:</h4>
+              <div className="space-y-2">
+                {uploadSteps
+                  .filter(step => completedSteps.has(step.id))
+                  .map(step => (
+                    <div key={step.id}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center space-x-2">
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <span>{step.title}</span>
+                        </span>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => toggleResultExpansion(step.id)}
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          View Results
+                        </Button>
+                      </div>
+                      {renderStepResult(step, stepResults[step.id])}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
 
           {/* Progress Overview */}
           <div className="grid grid-cols-4 gap-2">
