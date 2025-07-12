@@ -8,6 +8,8 @@ interface ConnectionState {
   lastConnected: Date | null;
   reconnectAttempts: number;
   maxReconnectAttempts: number;
+  connectionQuality: 'excellent' | 'good' | 'poor' | 'critical';
+  lastError: string | null;
 }
 
 interface UseEnhancedConnectionManagerProps {
@@ -23,7 +25,9 @@ export const useEnhancedConnectionManager = (props: UseEnhancedConnectionManager
     status: 'connecting',
     lastConnected: null,
     reconnectAttempts: 0,
-    maxReconnectAttempts: 5
+    maxReconnectAttempts: 10, // Increased from 5 to 10
+    connectionQuality: 'excellent',
+    lastError: null
   });
 
   const channelRef = useRef<any>(null);
@@ -49,14 +53,18 @@ export const useEnhancedConnectionManager = (props: UseEnhancedConnectionManager
       setConnectionState(prev => ({
         ...prev,
         status: 'offline',
-        isConnected: false
+        isConnected: false,
+        connectionQuality: 'critical',
+        lastError: 'Maximum reconnection attempts exceeded'
       }));
       startFallbackPolling();
       return;
     }
 
-    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, then 30s
-    const delay = Math.min(1000 * Math.pow(2, connectionState.reconnectAttempts), 30000);
+    // Enhanced exponential backoff with jitter: 1s, 2s, 4s, 8s, 16s, 32s, then 60s
+    const baseDelay = 1000 * Math.pow(2, connectionState.reconnectAttempts);
+    const jitter = Math.random() * 1000;
+    const delay = Math.min(baseDelay + jitter, 60000);
     
     console.log(`🔄 [CONNECTION] Scheduling reconnect in ${delay}ms (attempt ${connectionState.reconnectAttempts + 1})`);
 
@@ -97,9 +105,14 @@ export const useEnhancedConnectionManager = (props: UseEnhancedConnectionManager
       const now = new Date();
       const timeSinceLastSync = now.getTime() - lastSyncRef.current.getTime();
       
-      // If no sync for more than 2 minutes, consider connection stale
-      if (timeSinceLastSync > 120000 && connectionState.isConnected) {
+      // Increased tolerance - if no sync for more than 3 minutes, consider connection stale
+      if (timeSinceLastSync > 180000 && connectionState.isConnected) {
         console.warn('⚠️ [CONNECTION] Connection appears stale, forcing reconnect');
+        setConnectionState(prev => ({
+          ...prev,
+          connectionQuality: 'poor',
+          lastError: 'Connection stale - no data received'
+        }));
         forceReconnect();
       }
     }, 60000); // Check every minute
@@ -158,7 +171,9 @@ export const useEnhancedConnectionManager = (props: UseEnhancedConnectionManager
               isConnected: true,
               status: 'connected',
               lastConnected: new Date(),
-              reconnectAttempts: 0
+              reconnectAttempts: 0,
+              connectionQuality: 'excellent',
+              lastError: null
             }));
             stopFallbackPolling();
             startHealthCheck();
@@ -166,12 +181,31 @@ export const useEnhancedConnectionManager = (props: UseEnhancedConnectionManager
             break;
 
           case 'CHANNEL_ERROR':
+            setConnectionState(prev => ({
+              ...prev,
+              isConnected: false,
+              status: 'failed',
+              lastError: 'Channel error occurred'
+            }));
+            scheduleReconnect();
+            break;
+            
           case 'TIMED_OUT':
+            setConnectionState(prev => ({
+              ...prev,
+              isConnected: false,
+              status: 'failed',
+              lastError: 'Connection timed out'
+            }));
+            scheduleReconnect();
+            break;
+            
           case 'CLOSED':
             setConnectionState(prev => ({
               ...prev,
               isConnected: false,
-              status: 'failed'
+              status: 'failed',
+              lastError: 'Connection closed unexpectedly'
             }));
             scheduleReconnect();
             break;

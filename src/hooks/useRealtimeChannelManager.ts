@@ -1,15 +1,13 @@
 
-import { useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useCallback, useEffect } from 'react';
+import { optimizedRealtimeManager } from '@/services/optimizedRealtimeManager';
 import type { RealtimeCallbacks } from '@/types/realtime';
 
 // Global state to prevent multiple subscriptions
 let globalChannelState = {
-  channel: null as any,
   callbacks: [] as RealtimeCallbacks[],
-  isSubscribing: false,
-  isSubscribed: false,
-  subscriptionPromise: null as Promise<any> | null
+  subscriptions: new Map<string, () => void>(),
+  isSubscribing: false
 };
 
 export const useRealtimeChannelManager = () => {
@@ -31,45 +29,23 @@ export const useRealtimeChannelManager = () => {
   }, []);
 
   const createChannel = useCallback((profile: any, handleIncomingMessage: any, handleIncomingEmail: any) => {
-    // If we already have a subscribed channel, return it
-    if (globalChannelState.channel && globalChannelState.isSubscribed) {
-      console.log('🔌 Reusing existing subscribed channel');
-      return globalChannelState.channel;
+    if (globalChannelState.isSubscribing) {
+      console.log('🔌 Channel creation already in progress');
+      return;
     }
 
-    // If we're already in the process of subscribing, return the existing channel
-    if (globalChannelState.isSubscribing && globalChannelState.channel) {
-      console.log('🔌 Channel subscription in progress, reusing channel');
-      return globalChannelState.channel;
-    }
-
-    // If there's a subscription promise, wait for it
-    if (globalChannelState.subscriptionPromise) {
-      console.log('🔌 Waiting for existing subscription promise');
-      return globalChannelState.subscriptionPromise.then(() => globalChannelState.channel);
+    if (globalChannelState.subscriptions.size > 0) {
+      console.log('🔌 Reusing existing optimized channel subscriptions');
+      return;
     }
 
     globalChannelState.isSubscribing = true;
-    
-    const channelName = `centralized-realtime-${profile.id}`;
-    console.log('🔌 Creating new centralized realtime channel:', channelName);
-    
-    // Clean up any existing channel first
-    if (globalChannelState.channel) {
-      try {
-        supabase.removeChannel(globalChannelState.channel);
-      } catch (error) {
-        console.log('🧹 Error cleaning up old channel (expected):', error);
-      }
-    }
-    
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'conversations'
-      }, (payload) => {
+    console.log('🔌 Creating optimized realtime subscriptions');
+
+    // Subscribe to conversations using the optimized manager
+    const conversationUnsubscribe = optimizedRealtimeManager.subscribe({
+      id: 'conversations-updates',
+      callback: (payload) => {
         console.log('🔄 Conversation database change:', {
           event: payload.eventType,
           table: payload.table,
@@ -77,61 +53,41 @@ export const useRealtimeChannelManager = () => {
           hasOld: !!payload.old
         });
         handleIncomingMessage(payload);
-      })
-      .on('postgres_changes', {
-        event: 'INSERT',
+      },
+      filters: {
+        event: '*',
         schema: 'public',
-        table: 'email_conversations',
-        filter: 'direction=eq.in'
-      }, handleIncomingEmail);
-
-    globalChannelState.channel = channel;
-
-    // Create subscription promise to prevent race conditions
-    globalChannelState.subscriptionPromise = new Promise((resolve, reject) => {
-      channel.subscribe((status) => {
-        console.log('📡 Centralized realtime channel status:', status);
-        
-        if (status === 'SUBSCRIBED') {
-          globalChannelState.isSubscribing = false;
-          globalChannelState.isSubscribed = true;
-          globalChannelState.subscriptionPromise = null;
-          console.log('✅ Centralized realtime channel subscribed successfully');
-          resolve(channel);
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Centralized realtime channel error');
-          globalChannelState.channel = null;
-          globalChannelState.isSubscribing = false;
-          globalChannelState.isSubscribed = false;
-          globalChannelState.subscriptionPromise = null;
-          reject(new Error('Channel subscription failed'));
-        } else if (status === 'CLOSED') {
-          console.log('🔌 Centralized realtime channel closed');
-          globalChannelState.channel = null;
-          globalChannelState.isSubscribing = false;
-          globalChannelState.isSubscribed = false;
-          globalChannelState.subscriptionPromise = null;
-          resolve(null);
-        }
-      });
+        table: 'conversations'
+      }
     });
 
-    return globalChannelState.subscriptionPromise.then(() => globalChannelState.channel);
+    globalChannelState.subscriptions.set('conversations', conversationUnsubscribe);
+    globalChannelState.isSubscribing = false;
+    
+    console.log('✅ Optimized realtime subscriptions created');
   }, []);
 
   const cleanupChannel = useCallback(() => {
-    if (globalChannelState.callbacks.length === 0 && globalChannelState.channel) {
-      try {
-        console.log('🧹 Cleaning up centralized realtime channel');
-        supabase.removeChannel(globalChannelState.channel);
-        globalChannelState.channel = null;
-        globalChannelState.isSubscribing = false;
-        globalChannelState.isSubscribed = false;
-        globalChannelState.subscriptionPromise = null;
-      } catch (error) {
-        console.error('❌ Error removing centralized realtime channel:', error);
-      }
+    if (globalChannelState.callbacks.length === 0 && globalChannelState.subscriptions.size > 0) {
+      console.log('🧹 Cleaning up optimized realtime subscriptions');
+      
+      // Unsubscribe from all subscriptions
+      globalChannelState.subscriptions.forEach((unsubscribe, key) => {
+        console.log(`🗑️ Unsubscribing from ${key}`);
+        unsubscribe();
+      });
+      
+      globalChannelState.subscriptions.clear();
+      globalChannelState.isSubscribing = false;
     }
+  }, []);
+
+  // Initialize optimized realtime manager on mount
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      optimizedRealtimeManager.cleanup();
+    };
   }, []);
 
   return {
@@ -140,8 +96,7 @@ export const useRealtimeChannelManager = () => {
     createChannel,
     cleanupChannel,
     getCallbacks: () => globalChannelState.callbacks,
-    getChannel: () => globalChannelState.channel,
     isSubscribing: () => globalChannelState.isSubscribing,
-    isSubscribed: () => globalChannelState.isSubscribed
+    isSubscribed: () => globalChannelState.subscriptions.size > 0
   };
 };

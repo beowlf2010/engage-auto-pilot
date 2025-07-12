@@ -11,6 +11,9 @@ interface ConnectionState {
   lastConnected: Date | null;
   reconnectAttempts: number;
   maxReconnectAttempts: number;
+  connectionQuality?: 'excellent' | 'good' | 'poor' | 'critical';
+  lastError?: string | null;
+  disconnectReason?: string | null;
 }
 
 interface ConnectionStatusIndicatorProps {
@@ -26,17 +29,20 @@ const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
   onForceSync,
   className = ""
 }) => {
-  const { isConnected, status, lastConnected, reconnectAttempts, maxReconnectAttempts } = connectionState;
+  const { isConnected, status, lastConnected, reconnectAttempts, maxReconnectAttempts, connectionQuality, lastError, disconnectReason } = connectionState;
 
   const getStatusInfo = () => {
     switch (status) {
       case 'connected':
+        const qualityText = connectionQuality === 'excellent' ? 'Excellent' :
+                           connectionQuality === 'good' ? 'Good' :
+                           connectionQuality === 'poor' ? 'Unstable' : 'Connected';
         return {
           icon: <Wifi className="w-3 h-3" />,
-          text: "Connected",
+          text: qualityText,
           variant: "default" as const,
-          color: "text-green-600 bg-green-50 border-green-200",
-          description: "Real-time updates active"
+          color: connectionQuality === 'poor' ? "text-yellow-600 bg-yellow-50 border-yellow-200" : "text-green-600 bg-green-50 border-green-200",
+          description: connectionQuality === 'poor' ? "Connection unstable but active" : "Real-time updates active"
         };
       
       case 'connecting':
@@ -68,12 +74,13 @@ const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
       
       case 'failed':
       default:
+        const errorMsg = lastError || disconnectReason || "Connection failed";
         return {
           icon: <AlertTriangle className="w-3 h-3" />,
           text: "Disconnected",
           variant: "destructive" as const,
           color: "text-red-600 bg-red-50 border-red-200",
-          description: "Connection failed. Click to retry."
+          description: `${errorMsg}. Click to retry.`
         };
     }
   };
@@ -113,6 +120,12 @@ const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
           <div className="text-xs space-y-1">
             <p>{statusInfo.description}</p>
             <p className="text-gray-500">Last connected: {formatLastConnected()}</p>
+            {connectionQuality && status === 'connected' && (
+              <p className="text-blue-600">Quality: {connectionQuality}</p>
+            )}
+            {lastError && status !== 'connected' && (
+              <p className="text-red-600">Error: {lastError}</p>
+            )}
             {status === 'offline' && (
               <p className="text-orange-600">Auto-refreshing every 30s</p>
             )}

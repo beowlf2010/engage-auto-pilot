@@ -7,10 +7,13 @@ import { Wifi, WifiOff, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-rea
 
 interface ConnectionState {
   isConnected: boolean;
-  status: 'connecting' | 'connected' | 'reconnecting' | 'offline';
+  status: 'connecting' | 'connected' | 'reconnecting' | 'offline' | 'failed';
   lastConnected: Date | null;
   reconnectAttempts: number;
   maxReconnectAttempts: number;
+  connectionQuality?: 'excellent' | 'good' | 'poor' | 'critical';
+  lastError?: string | null;
+  disconnectReason?: string | null;
 }
 
 interface SimpleConnectionStatusProps {
