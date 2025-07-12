@@ -310,6 +310,42 @@ export const testFunctionCommunication = async () => {
   }
 };
 
+// Debug AI automation step by step
+export const debugAIAutomation = async () => {
+  try {
+    console.log('🔍 [debugAIAutomation] Starting step-by-step debugging');
+    
+    const startTime = Date.now();
+    const { data, error } = await supabase.functions.invoke('debug-ai-automation', {
+      body: {}
+    });
+    const duration = Date.now() - startTime;
+    
+    console.log('🔍 [debugAIAutomation] Function invoke completed in:', duration, 'ms');
+    console.log('🔍 [debugAIAutomation] Raw response data:', data);
+    console.log('🔍 [debugAIAutomation] Raw response error:', error);
+
+    if (error) {
+      console.error('❌ [debugAIAutomation] Supabase function error:', error);
+      return {
+        success: false,
+        error: error.message,
+        details: error
+      };
+    }
+
+    console.log('✅ [debugAIAutomation] Debug completed:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ [debugAIAutomation] Caught error:', error);
+    return {
+      success: false,
+      error: error.message,
+      details: error
+    };
+  }
+};
+
 export const validatePhoneNumber = (phone: string): boolean => {
   // More flexible validation
   const digits = phone.replace(/\D/g, '');

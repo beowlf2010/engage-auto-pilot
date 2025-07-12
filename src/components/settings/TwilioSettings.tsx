@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Phone, Save, TestTube, AlertCircle, Activity, Shield, Bell, Trash2, Network } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { testFunctionCommunication } from '@/services/settingsService';
+import { testFunctionCommunication, debugAIAutomation } from '@/services/settingsService';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface TwilioSettingsProps {
@@ -34,6 +34,7 @@ const TwilioSettings: React.FC<TwilioSettingsProps> = ({ userRole }) => {
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testingCommunication, setTestingCommunication] = useState(false);
+  const [debugging, setDebugging] = useState(false);
   const [newAlertPhone, setNewAlertPhone] = useState('');
   const { toast } = useToast();
 
@@ -242,6 +243,32 @@ const TwilioSettings: React.FC<TwilioSettingsProps> = ({ userRole }) => {
     }
   };
 
+  const debugAIAutomationFlow = async () => {
+    setDebugging(true);
+    try {
+      const result = await debugAIAutomation();
+      
+      if (result?.success) {
+        toast({
+          title: "AI Automation Debug Successful",
+          description: "Debug completed successfully. Check console for detailed information.",
+        });
+        console.log('🔍 [DEBUG] Full result:', result);
+      } else {
+        throw new Error(result?.error || 'Unknown error in AI automation debug');
+      }
+    } catch (error) {
+      console.error('AI automation debug failed:', error);
+      toast({
+        title: "AI Automation Debug Failed",
+        description: `Debug failed: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setDebugging(false);
+    }
+  };
+
   const addAlertPhone = () => {
     if (newAlertPhone && !monitoringSettings.alert_phone_numbers.includes(newAlertPhone)) {
       setMonitoringSettings(prev => ({
@@ -372,6 +399,15 @@ const TwilioSettings: React.FC<TwilioSettingsProps> = ({ userRole }) => {
                   >
                     <Network className="w-4 h-4 mr-2" />
                     {testingCommunication ? 'Testing...' : 'Test Function Communication'}
+                  </Button>
+
+                  <Button 
+                    onClick={debugAIAutomationFlow} 
+                    disabled={debugging} 
+                    variant="outline"
+                  >
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    {debugging ? 'Debugging...' : 'Debug AI Automation'}
                   </Button>
                 </div>
               )}
