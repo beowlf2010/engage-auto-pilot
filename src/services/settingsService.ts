@@ -112,36 +112,75 @@ export const sendTestSMS = async (testPhoneNumber: string) => {
 // Direct SMS test function to isolate the issue
 export const testDirectSMS = async () => {
   try {
-    console.log('📱 [testDirectSMS] Testing direct SMS sending');
+    console.log('📱 [testDirectSMS] Testing direct SMS sending with enhanced debugging...');
     
+    // Test with a more realistic phone number format
     const testPayload = {
-      to: '+15551234567', // Use a standard test number
-      body: 'Test SMS from CRM system',
+      to: '+12345678900', // Changed to a more standard test format
+      body: 'Test SMS from CRM system - Enhanced debugging',
       conversationId: null
     };
     
-    console.log('📱 [testDirectSMS] Payload:', testPayload);
+    console.log('📱 [testDirectSMS] Enhanced payload:', testPayload);
     
     const startTime = Date.now();
-    const { data, error } = await supabase.functions.invoke('send-sms', {
+    const response = await supabase.functions.invoke('send-sms', {
       body: testPayload
     });
     const duration = Date.now() - startTime;
     
     console.log('📱 [testDirectSMS] Function invoke completed in:', duration, 'ms');
-    console.log('📱 [testDirectSMS] Raw response data:', data);
-    console.log('📱 [testDirectSMS] Raw response error:', error);
-
-    if (error) {
-      console.error('❌ [testDirectSMS] Supabase function error:', error);
-      throw error;
+    console.log('📱 [testDirectSMS] Full response object:', response);
+    
+    // Check if we got data or error
+    if (response.error) {
+      console.error('❌ [testDirectSMS] Supabase invoke error:', {
+        message: response.error.message,
+        details: response.error.details,
+        hint: response.error.hint,
+        code: response.error.code,
+        status: response.error.status,
+        context: response.error.context
+      });
+      
+      // Log the actual response body if available
+      if (response.error.context?.res?.body) {
+        console.error('❌ [testDirectSMS] Response body:', response.error.context.res.body);
+      }
+      
+      return {
+        success: false,
+        error: response.error.message || 'Edge Function invocation failed',
+        details: response.error
+      };
     }
-
-    console.log('✅ [testDirectSMS] Success! Response data:', data);
-    return data;
+    
+    if (response.data) {
+      console.log('✅ [testDirectSMS] Success! Response data:', response.data);
+      return response.data;
+    }
+    
+    // Handle case where no error but also no data
+    console.warn('⚠️ [testDirectSMS] No error but also no data received');
+    return {
+      success: false,
+      error: 'No data received from Edge Function',
+      rawResponse: response
+    };
+    
   } catch (error) {
-    console.error('❌ [testDirectSMS] Caught error:', error);
-    throw error;
+    console.error('❌ [testDirectSMS] Caught error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      fullError: error
+    });
+    
+    return {
+      success: false,
+      error: error.message || 'Unknown error occurred',
+      details: error
+    };
   }
 };
 
