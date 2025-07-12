@@ -488,6 +488,9 @@ serve(async (req) => {
             messageSid: smsResult.data.messageSid,
             conversationId: smsResult.data.conversationId
           });
+
+          // Mark as successful
+          successfulCount++;
           
         } catch (aiCallError) {
           console.error(`❌ [AI-AUTOMATION] Critical error calling intelligent-conversation-ai for lead ${lead.id}:`, {
