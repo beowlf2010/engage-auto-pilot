@@ -54,17 +54,53 @@ export const testTwilioConnection = async (accountSid: string, authToken: string
 
 export const sendTestSMS = async (testPhoneNumber: string) => {
   try {
+    console.log('🔍 [sendTestSMS] Starting test SMS with phone:', testPhoneNumber);
+    
+    // Format the phone number first
+    const formattedPhone = formatPhoneNumber(testPhoneNumber);
+    console.log('🔍 [sendTestSMS] Formatted phone:', formattedPhone);
+    
+    // Validate the phone number
+    const isValid = validatePhoneNumber(formattedPhone);
+    console.log('🔍 [sendTestSMS] Phone validation result:', isValid);
+    
+    if (!isValid) {
+      throw new Error(`Invalid phone number format: ${formattedPhone}`);
+    }
+
+    const payload = { testPhoneNumber: formattedPhone };
+    console.log('🔍 [sendTestSMS] Calling supabase.functions.invoke with payload:', payload);
+    
+    const startTime = Date.now();
     const { data, error } = await supabase.functions.invoke('test-sms', {
-      body: { testPhoneNumber }
+      body: payload
     });
+    const duration = Date.now() - startTime;
+    
+    console.log('🔍 [sendTestSMS] Function invoke completed in:', duration, 'ms');
+    console.log('🔍 [sendTestSMS] Raw response data:', data);
+    console.log('🔍 [sendTestSMS] Raw response error:', error);
 
     if (error) {
+      console.error('❌ [sendTestSMS] Supabase function error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        status: error.status
+      });
       throw error;
     }
 
+    console.log('✅ [sendTestSMS] Success! Response data:', data);
     return data;
   } catch (error) {
-    console.error('Error sending test SMS:', error);
+    console.error('❌ [sendTestSMS] Caught error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      fullError: error
+    });
     throw error;
   }
 };
