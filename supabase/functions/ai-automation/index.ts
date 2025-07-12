@@ -479,11 +479,38 @@ serve(async (req) => {
           
           console.log(`✅ [AI-AUTOMATION] Message ready for lead ${lead.id}: "${generatedMessage}"`);
 
-          // Now send the generated message via SMS
+          // Create conversation record and send SMS
+          console.log(`📤 [AI-AUTOMATION] Creating conversation record for lead ${lead.id}`);
+          
+          const conversationData = {
+            lead_id: lead.id,
+            profile_id: null, // Will be set by AI automation
+            body: generatedMessage,
+            direction: 'out',
+            sent_at: new Date().toISOString(),
+            ai_generated: true,
+            sms_status: 'pending'
+          };
+
+          const { data: conversation, error: conversationError } = await supabaseClient
+            .from('conversations')
+            .insert(conversationData)
+            .select()
+            .single();
+
+          if (conversationError) {
+            console.error(`❌ [AI-AUTOMATION] Failed to create conversation for lead ${lead.id}:`, conversationError);
+            failedCount++;
+            return;
+          }
+
+          console.log(`✅ [AI-AUTOMATION] Created conversation ${conversation.id} for lead ${lead.id}`);
+
+          // Now send the SMS
           const smsPayload = {
             to: primaryPhone,
             body: generatedMessage,
-            conversationId: null // Will be created by SMS function
+            conversationId: conversation.id
           };
 
           console.log(`📱 [AI-AUTOMATION] Sending SMS to ${primaryPhone} for lead ${lead.id} with payload:`, smsPayload);
@@ -500,19 +527,44 @@ serve(async (req) => {
 
           if (smsResult.error) {
             console.error(`❌ [AI-AUTOMATION] SMS send error for lead ${lead.id}:`, smsResult.error);
+            // Update conversation status to failed
+            await supabaseClient
+              .from('conversations')
+              .update({ 
+                sms_status: 'failed',
+                sms_error: smsResult.error?.message || 'SMS sending failed'
+              })
+              .eq('id', conversation.id);
             failedCount++;
             return;
           }
 
           if (!smsResult.data?.success) {
             console.error(`❌ [AI-AUTOMATION] SMS send returned failure for lead ${lead.id}:`, smsResult.data);
+            // Update conversation status to failed
+            await supabaseClient
+              .from('conversations')
+              .update({ 
+                sms_status: 'failed',
+                sms_error: smsResult.data?.error || 'SMS sending failed'
+              })
+              .eq('id', conversation.id);
             failedCount++;
             return;
           }
 
+          // Update conversation status to sent
+          await supabaseClient
+            .from('conversations')
+            .update({
+              sms_status: 'sent',
+              twilio_message_id: smsResult.data.messageSid
+            })
+            .eq('id', conversation.id);
+
           console.log(`✅ [AI-AUTOMATION] SMS sent successfully for lead ${lead.id}:`, {
             messageSid: smsResult.data.messageSid,
-            conversationId: smsResult.data.conversationId
+            conversationId: conversation.id
           });
 
           // Mark as successful
