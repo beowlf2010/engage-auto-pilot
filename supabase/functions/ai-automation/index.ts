@@ -440,25 +440,53 @@ serve(async (req) => {
 
           console.log(`🧠 [AI-AUTOMATION] Calling intelligent-conversation-ai for lead ${lead.id}`);
           
-          const result = await supabaseClient.functions.invoke('intelligent-conversation-ai', {
+          const aiResult = await supabaseClient.functions.invoke('intelligent-conversation-ai', {
             body: aiPayload
           });
 
-          if (result.error) {
-            console.error(`❌ [AI-AUTOMATION] AI function error for lead ${lead.id}:`, result.error);
+          if (aiResult.error) {
+            console.error(`❌ [AI-AUTOMATION] AI function error for lead ${lead.id}:`, aiResult.error);
             failedCount++;
             return;
           }
 
-          if (!result.data?.success) {
-            console.error(`❌ [AI-AUTOMATION] AI function returned failure for lead ${lead.id}:`, result.data);
+          if (!aiResult.data?.success) {
+            console.error(`❌ [AI-AUTOMATION] AI function returned failure for lead ${lead.id}:`, aiResult.data);
             failedCount++;
             return;
           }
 
-          console.log(`✅ [AI-AUTOMATION] AI message generated and sent successfully for lead ${lead.id}:`, {
-            messageSid: result.data.messageSid,
-            conversationId: result.data.conversationId
+          const generatedMessage = aiResult.data.message;
+          console.log(`✅ [AI-AUTOMATION] AI message generated for lead ${lead.id}: "${generatedMessage}"`);
+
+          // Now send the generated message via SMS
+          const smsPayload = {
+            to: primaryPhone,
+            body: generatedMessage,
+            conversationId: null // Will be created by SMS function
+          };
+
+          console.log(`📱 [AI-AUTOMATION] Sending SMS to ${primaryPhone} for lead ${lead.id}`);
+          
+          const smsResult = await supabaseClient.functions.invoke('send-sms', {
+            body: smsPayload
+          });
+
+          if (smsResult.error) {
+            console.error(`❌ [AI-AUTOMATION] SMS send error for lead ${lead.id}:`, smsResult.error);
+            failedCount++;
+            return;
+          }
+
+          if (!smsResult.data?.success) {
+            console.error(`❌ [AI-AUTOMATION] SMS send returned failure for lead ${lead.id}:`, smsResult.data);
+            failedCount++;
+            return;
+          }
+
+          console.log(`✅ [AI-AUTOMATION] SMS sent successfully for lead ${lead.id}:`, {
+            messageSid: smsResult.data.messageSid,
+            conversationId: smsResult.data.conversationId
           });
           
         } catch (aiCallError) {
