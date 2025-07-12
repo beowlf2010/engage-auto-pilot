@@ -4,14 +4,77 @@ project_id = "tevtajmaofvnffzcsiuu"
 [functions.ai-automation]
 verify_jwt = true
 
+[functions.call-status-webhook]
+verify_jwt = false
+
+[functions.conversation-analysis]
+verify_jwt = true
+
 [functions.firecrawl-scraper]
 verify_jwt = false
+
+[functions.generate-ai-response]
+verify_jwt = true
 
 [functions.inbound-email-webhook]
 verify_jwt = false
 
+[functions.intelligent-conversation-ai]
+verify_jwt = true
+
+[functions.inventory-alerts]
+verify_jwt = true
+
 [functions.inventory-cleanup-edge]
 verify_jwt = true
 
+[functions.lead-ai-pause]
+verify_jwt = true
+
+[functions.lead-ai-start]
+verify_jwt = true
+
+[functions.make-call]
+verify_jwt = true
+
+[functions.name-validation-helpers]
+verify_jwt = true
+
+[functions.postmark-inbound-webhook]
+verify_jwt = false
+
+[functions.process-scraped-inventory]
+verify_jwt = true
+
+[functions.send-email]
+verify_jwt = true
+
+[functions.send-sms]
+verify_jwt = true
+
+[functions.send-user-notification]
+verify_jwt = true
+
+[functions.test-simple]
+verify_jwt = false
+
+[functions.test-sms]
+verify_jwt = true
+
+[functions.twilio-health-monitor]
+verify_jwt = true
+
 [functions.twilio-webhook]
+verify_jwt = false
+
+[functions.update-settings]
+verify_jwt = true
+
+[functions.vehicle-history-processor]
+verify_jwt = true
+
+[functions.voice-ai-transcription]
+verify_jwt = true
+
+[functions.voicemail-twiml]
 verify_jwt = false
