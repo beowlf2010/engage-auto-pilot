@@ -429,10 +429,13 @@ serve(async (req) => {
           const aiPayload = {
             leadId: lead.id,
             leadName: `${leadWithPhone.first_name || ''} ${leadWithPhone.last_name || ''}`.trim() || 'there',
-            latestMessage: 'AI automation follow-up',
+            messageBody: 'AI automation follow-up',
+            latestCustomerMessage: 'AI automation follow-up',
             conversationHistory,
-            vehicleInterest: leadWithPhone.vehicle_interest || '',
-            phoneNumber: primaryPhone
+            hasConversationalSignals: true,
+            leadSource: 'ai_automation',
+            leadSourceData: { automated: true },
+            vehicleInterest: leadWithPhone.vehicle_interest || 'finding the right vehicle'
           };
 
           console.log(`🧠 [AI-AUTOMATION] Calling intelligent-conversation-ai for lead ${lead.id}`);
