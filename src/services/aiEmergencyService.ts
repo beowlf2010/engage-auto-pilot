@@ -50,7 +50,7 @@ class AIEmergencyService {
         const { data, error } = await supabase
           .from('ai_emergency_settings')
           .select('*')
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           this.settings = {

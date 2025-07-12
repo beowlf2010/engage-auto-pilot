@@ -484,7 +484,7 @@ const TwilioSettings: React.FC<TwilioSettingsProps> = ({ userRole }) => {
                 </div>
 
                 <div className="space-y-2">
-                  {monitoringSettings.alert_phone_numbers.map((phone, index) => (
+                  {(monitoringSettings.alert_phone_numbers || []).map((phone, index) => (
                     <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
                       <span>{phone}</span>
                       <Button
