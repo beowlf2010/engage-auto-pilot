@@ -7192,6 +7192,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      create_system_conversation: {
+        Args: { conversation_data: Json }
+        Returns: string
+      }
       detect_suspicious_activity: {
         Args: { p_user_id: string; p_time_window_minutes?: number }
         Returns: boolean

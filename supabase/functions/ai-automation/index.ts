@@ -493,24 +493,36 @@ serve(async (req) => {
           };
 
           // Use service_role client to bypass RLS for system-generated conversations
-          const { data: conversation, error: conversationError } = await supabaseClient
+          const { data: conversationId, error: conversationError } = await supabaseClient
             .rpc('create_system_conversation', {
               conversation_data: conversationData
             });
 
           if (conversationError) {
-            console.error(`❌ [AI-AUTOMATION] Failed to create conversation for lead ${lead.id}:`, conversationError);
+            console.error(`❌ [AI-AUTOMATION] Failed to create conversation for lead ${lead.id}:`, {
+              error: conversationError,
+              code: conversationError.code,
+              message: conversationError.message,
+              details: conversationError.details,
+              hint: conversationError.hint
+            });
             failedCount++;
             return;
           }
 
-          console.log(`✅ [AI-AUTOMATION] Created conversation ${conversation.id} for lead ${lead.id}`);
+          if (!conversationId) {
+            console.error(`❌ [AI-AUTOMATION] No conversation ID returned for lead ${lead.id}`);
+            failedCount++;
+            return;
+          }
 
-          // Now send the SMS
+          console.log(`✅ [AI-AUTOMATION] Created conversation ${conversationId} for lead ${lead.id}`);
+
+           // Now send the SMS
           const smsPayload = {
             to: primaryPhone,
             body: generatedMessage,
-            conversationId: conversation.id
+            conversationId: conversationId
           };
 
           console.log(`📱 [AI-AUTOMATION] Sending SMS to ${primaryPhone} for lead ${lead.id} with payload:`, smsPayload);
@@ -534,7 +546,7 @@ serve(async (req) => {
                 sms_status: 'failed',
                 sms_error: smsResult.error?.message || 'SMS sending failed'
               })
-              .eq('id', conversation.id);
+              .eq('id', conversationId);
             failedCount++;
             return;
           }
@@ -548,7 +560,7 @@ serve(async (req) => {
                 sms_status: 'failed',
                 sms_error: smsResult.data?.error || 'SMS sending failed'
               })
-              .eq('id', conversation.id);
+              .eq('id', conversationId);
             failedCount++;
             return;
           }
@@ -560,11 +572,11 @@ serve(async (req) => {
               sms_status: 'sent',
               twilio_message_id: smsResult.data.messageSid
             })
-            .eq('id', conversation.id);
+            .eq('id', conversationId);
 
           console.log(`✅ [AI-AUTOMATION] SMS sent successfully for lead ${lead.id}:`, {
             messageSid: smsResult.data.messageSid,
-            conversationId: conversation.id
+            conversationId: conversationId
           });
 
           // Mark as successful
