@@ -492,11 +492,11 @@ serve(async (req) => {
             sms_status: 'pending'
           };
 
+          // Use service_role client to bypass RLS for system-generated conversations
           const { data: conversation, error: conversationError } = await supabaseClient
-            .from('conversations')
-            .insert(conversationData)
-            .select()
-            .single();
+            .rpc('create_system_conversation', {
+              conversation_data: conversationData
+            });
 
           if (conversationError) {
             console.error(`❌ [AI-AUTOMATION] Failed to create conversation for lead ${lead.id}:`, conversationError);
