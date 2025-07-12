@@ -243,42 +243,136 @@ serve(async (req) => {
         // Generate message
         const gentleMessage = generateGentleMessage(lead.first_name, lead.vehicle_interest);
 
-        // Send message using conversations table instead of messages
-        console.log(`📤 [AI-AUTOMATION] Attempting to send message to lead ${lead.id}`);
+        // Get lead phone number first
+        console.log(`📤 [AI-AUTOMATION] Preparing to send message to lead ${lead.id}`);
         
-        const messagePayload = {
+        const { data: leadWithPhone, error: phoneError } = await supabaseClient
+          .from('leads')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            phone_numbers (
+              number,
+              is_primary
+            )
+          `)
+          .eq('id', lead.id)
+          .single();
+
+        if (phoneError || !leadWithPhone) {
+          console.error(`❌ [AI-AUTOMATION] Error fetching lead phone for ${lead.id}:`, phoneError);
+          failedCount++;
+          return;
+        }
+
+        // Get primary phone number with fallback
+        const phoneNumbers = Array.isArray(leadWithPhone.phone_numbers) ? leadWithPhone.phone_numbers : [];
+        const primaryPhone = phoneNumbers.find((p: any) => p.is_primary)?.number || 
+                            phoneNumbers[0]?.number;
+
+        if (!primaryPhone) {
+          console.error(`❌ [AI-AUTOMATION] No phone number found for lead ${lead.id}`);
+          failedCount++;
+          return;
+        }
+
+        // Create conversation record first
+        const conversationData = {
           lead_id: lead.id,
           body: gentleMessage,
           direction: 'out',
           sent_at: new Date().toISOString(),
-          ai_generated: true
+          ai_generated: true,
+          sms_status: 'pending'
         };
-        
-        console.log(`📝 [AI-AUTOMATION] Message payload:`, messagePayload);
-        
-        const { data: messageData, error: messageError } = await supabaseClient
+
+        const { data: conversation, error: conversationError } = await supabaseClient
           .from('conversations')
-          .insert(messagePayload)
+          .insert(conversationData)
           .select()
           .single();
 
-        if (messageError) {
-          console.error(`❌ [AI-AUTOMATION] Error sending message to lead ${lead.id}:`, messageError);
-          console.error(`❌ [AI-AUTOMATION] Message payload that failed:`, messagePayload);
+        if (conversationError || !conversation) {
+          console.error(`❌ [AI-AUTOMATION] Error creating conversation for lead ${lead.id}:`, conversationError);
           failedCount++;
           return;
         }
 
-        if (!messageData) {
-          console.error(`❌ [AI-AUTOMATION] No message data returned for lead ${lead.id}`);
+        console.log(`💾 [AI-AUTOMATION] Created conversation record ${conversation.id} for lead ${lead.id}`);
+        
+        try {
+          // Call the send-sms edge function with correct payload format
+          const { data: smsResponse, error: smsError } = await supabaseClient.functions.invoke('send-sms', {
+            body: {
+              to: primaryPhone,
+              body: gentleMessage,
+              conversationId: conversation.id
+            }
+          });
+
+          if (smsError) {
+            console.error(`❌ [AI-AUTOMATION] SMS error for lead ${lead.id}:`, smsError);
+            // Update conversation with error status
+            await supabaseClient
+              .from('conversations')
+              .update({ 
+                sms_status: 'failed',
+                sms_error: smsError.message 
+              })
+              .eq('id', conversation.id);
+            failedCount++;
+            return;
+          }
+
+          if (!smsResponse?.success) {
+            console.error(`❌ [AI-AUTOMATION] SMS failed for lead ${lead.id}:`, smsResponse?.error || 'Unknown error');
+            // Update conversation with error status
+            await supabaseClient
+              .from('conversations')
+              .update({ 
+                sms_status: 'failed',
+                sms_error: smsResponse?.error || 'Unknown SMS error'
+              })
+              .eq('id', conversation.id);
+            failedCount++;
+            return;
+          }
+
+          // Update conversation with success
+          const updateData: any = {
+            sms_status: 'sent'
+          };
+          
+          if (smsResponse?.messageSid) {
+            updateData.twilio_message_id = smsResponse.messageSid;
+          }
+
+          await supabaseClient
+            .from('conversations')
+            .update(updateData)
+            .eq('id', conversation.id);
+
+          console.log(`📱 [AI-AUTOMATION] SMS sent successfully to lead ${lead.id}:`, {
+            conversationId: conversation.id,
+            messageSid: smsResponse.messageSid,
+            content: gentleMessage.substring(0, 50) + '...'
+          });
+          
+        } catch (smsCallError) {
+          console.error(`❌ [AI-AUTOMATION] Error calling send-sms for lead ${lead.id}:`, smsCallError);
+          // Update conversation with error status
+          await supabaseClient
+            .from('conversations')
+            .update({ 
+              sms_status: 'failed',
+              sms_error: smsCallError.message 
+            })
+            .eq('id', conversation.id);
           failedCount++;
           return;
         }
 
-        console.log(`💬 [AI-AUTOMATION] Successfully sent message to lead ${lead.id}:`, {
-          messageId: messageData.id,
-          content: gentleMessage.substring(0, 50) + '...'
-        });
         successfulCount++;
 
         // Handle lead status transition after sending AI message
