@@ -69,11 +69,19 @@ serve(async (req) => {
       });
     }
 
+    // Check if the AI function returned success
+    const isSuccess = result.data?.success === true;
+    
     return new Response(JSON.stringify({
-      success: true,
-      message: 'AI conversation test completed successfully',
+      success: isSuccess,
+      message: isSuccess ? 'AI conversation test completed successfully' : 'AI conversation test completed with issues',
       result: result.data,
-      testPayload
+      testPayload,
+      debugInfo: {
+        hasData: !!result.data,
+        dataSuccess: result.data?.success,
+        hasMessage: !!result.data?.message
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

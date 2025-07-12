@@ -603,6 +603,7 @@ serve(async (req) => {
     const processingTime = endTime - startTime;
 
     const result = {
+      success: successfulCount > 0,
       message: 'AI automation completed',
       processed: processedCount,
       successful: successfulCount,

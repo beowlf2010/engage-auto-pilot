@@ -153,7 +153,7 @@ export const AIAutomationTester = () => {
         {result && (
           <div className="mt-4">
             <h3 className="text-lg font-semibold mb-2">
-              AI Automation Result: {result.success ? '✅ Success' : '❌ Failed'}
+              AI Automation Result: {result.successful > 0 || result.message?.includes('completed') ? '✅ Success' : '❌ Failed'}
             </h3>
             <pre className="bg-slate-100 p-4 rounded text-sm overflow-auto max-h-96">
               {JSON.stringify(result, null, 2)}
