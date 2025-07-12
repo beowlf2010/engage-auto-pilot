@@ -109,6 +109,42 @@ export const sendTestSMS = async (testPhoneNumber: string) => {
 };
 
 // Add manual AI automation test function
+// Direct SMS test function to isolate the issue
+export const testDirectSMS = async () => {
+  try {
+    console.log('📱 [testDirectSMS] Testing direct SMS sending');
+    
+    const testPayload = {
+      to: '+1234567890', // Test number
+      body: 'Direct SMS test from troubleshooting',
+      conversationId: null
+    };
+    
+    console.log('📱 [testDirectSMS] Payload:', testPayload);
+    
+    const startTime = Date.now();
+    const { data, error } = await supabase.functions.invoke('send-sms', {
+      body: testPayload
+    });
+    const duration = Date.now() - startTime;
+    
+    console.log('📱 [testDirectSMS] Function invoke completed in:', duration, 'ms');
+    console.log('📱 [testDirectSMS] Raw response data:', data);
+    console.log('📱 [testDirectSMS] Raw response error:', error);
+
+    if (error) {
+      console.error('❌ [testDirectSMS] Supabase function error:', error);
+      throw error;
+    }
+
+    console.log('✅ [testDirectSMS] Success! Response data:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ [testDirectSMS] Caught error:', error);
+    throw error;
+  }
+};
+
 export const testAIAutomation = async () => {
   try {
     console.log('🤖 [testAIAutomation] Starting manual AI automation test');
@@ -118,7 +154,7 @@ export const testAIAutomation = async () => {
       body: { 
         source: 'manual_test',
         priority: 'normal',
-        enhanced: false 
+        enhanced: true 
       }
     });
     const duration = Date.now() - startTime;
