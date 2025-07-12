@@ -30,6 +30,124 @@ const INVALID_PATTERNS = [
 
 const FALLBACK_MESSAGE = "I see you're still exploring options—happy to help you find the right fit!";
 
+// STEP 5: Direct Twilio fallback function
+const attemptDirectTwilioFallback = async (smsPayload: any, supabaseClient: any) => {
+  try {
+    console.log('🔄 [FALLBACK] Attempting direct Twilio API call as fallback...');
+    
+    // Get Twilio credentials from database using the same method as send-sms function
+    const { data: settings, error } = await supabaseClient
+      .from('settings')
+      .select('key, value')
+      .in('key', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER']);
+
+    if (error) {
+      console.error('❌ [FALLBACK] Database error fetching Twilio settings:', error);
+      return { success: false, error: 'Failed to fetch Twilio settings from database' };
+    }
+
+    const settingsMap: Record<string, string> = {};
+    settings?.forEach(setting => {
+      settingsMap[setting.key] = setting.value;
+    });
+
+    const accountSid = settingsMap['TWILIO_ACCOUNT_SID'];
+    const authToken = settingsMap['TWILIO_AUTH_TOKEN'];
+    const phoneNumber = settingsMap['TWILIO_PHONE_NUMBER'];
+
+    if (!accountSid || !authToken || !phoneNumber) {
+      console.error('❌ [FALLBACK] Missing Twilio credentials in database');
+      return { success: false, error: 'Missing Twilio credentials in database' };
+    }
+
+    console.log('✅ [FALLBACK] Got Twilio credentials from database');
+
+    // Make direct Twilio API call
+    const payload = new URLSearchParams({
+      To: smsPayload.to,
+      From: phoneNumber,
+      Body: smsPayload.body
+    });
+
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const response = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: payload
+    });
+
+    const result = await response.json();
+    console.log('📡 [FALLBACK] Twilio API response:', { status: response.status, result });
+
+    if (!response.ok) {
+      console.error('❌ [FALLBACK] Twilio API error:', result);
+      return { 
+        success: false, 
+        error: result.message || 'Twilio API error',
+        twilioError: result 
+      };
+    }
+
+    console.log('✅ [FALLBACK] Direct Twilio call successful:', result.sid);
+    return {
+      success: true,
+      messageSid: result.sid,
+      status: result.status || 'queued',
+      conversationId: smsPayload.conversationId,
+      credentialsSource: 'database_fallback',
+      message: 'SMS sent successfully using direct Twilio fallback!'
+    };
+
+  } catch (error) {
+    console.error('❌ [FALLBACK] Critical error in direct Twilio fallback:', error);
+    return { 
+      success: false, 
+      error: `Fallback error: ${error.message}`,
+      details: error 
+    };
+  }
+};
+
+// STEP 4: Test function-to-function communication
+const testSMSFunctionCommunication = async (supabaseClient: any) => {
+  try {
+    console.log('🧪 [TEST] Testing function-to-function SMS communication...');
+    
+    const testPayload = {
+      to: '+12345678900',
+      body: 'Test message from AI automation function',
+      conversationId: null
+    };
+
+    const { data: response, error } = await supabaseClient.functions.invoke('send-sms', {
+      body: testPayload
+    });
+
+    console.log('🧪 [TEST] Function-to-function test result:', {
+      hasError: !!error,
+      responseSuccess: response?.success,
+      error: error?.message || response?.error,
+      messageSid: response?.messageSid
+    });
+
+    return {
+      success: !error && response?.success,
+      error: error?.message || response?.error,
+      response
+    };
+  } catch (testError) {
+    console.error('❌ [TEST] Error testing function-to-function communication:', testError);
+    return {
+      success: false,
+      error: testError.message,
+      details: testError
+    };
+  }
+};
+
 const validateVehicleInterest = (vehicleInterest: string | null | undefined) => {
   if (!vehicleInterest || typeof vehicleInterest !== 'string') {
     return { isValid: false, message: FALLBACK_MESSAGE };
@@ -54,20 +172,39 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Parse request body early to check for test endpoints
+  let requestData;
+  try {
+    const bodyText = await req.text();
+    requestData = bodyText ? JSON.parse(bodyText) : {};
+  } catch (parseError) {
+    console.warn('⚠️ [AI-AUTOMATION] Invalid JSON in request, using defaults:', parseError);
+    requestData = {};
+  }
+
+  // STEP 4: Special route for testing function-to-function communication
+  if (requestData.test_endpoint === 'test-sms-communication') {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+    
+    const testResult = await testSMSFunctionCommunication(supabaseClient);
+    
+    return new Response(JSON.stringify({
+      message: 'Function-to-function SMS communication test',
+      result: testResult,
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   let runId: string | null = null;
   const startTime = Date.now();
 
   try {
-    // Parse request body - handle both empty and malformed JSON
-    let requestData;
-    try {
-      const bodyText = await req.text();
-      requestData = bodyText ? JSON.parse(bodyText) : {};
-    } catch (parseError) {
-      console.warn('⚠️ [AI-AUTOMATION] Invalid JSON in request, using defaults:', parseError);
-      requestData = {};
-    }
-
+    // requestData already parsed above for test endpoint check
     const {
       automated = true,
       source = 'scheduled',
@@ -323,10 +460,59 @@ serve(async (req) => {
           // TROUBLESHOOTING: Test direct function-to-function communication first
           console.log(`🧪 [AI-AUTOMATION] Testing send-sms function connectivity...`);
           
-          // Call the send-sms edge function with correct payload format
-          const { data: smsResponse, error: smsError } = await supabaseClient.functions.invoke('send-sms', {
-            body: smsPayload
-          });
+          // STEP 1: Use service role key for function-to-function authentication
+          const functionClient = createClient(
+            Deno.env.get('SUPABASE_URL')!, 
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+          );
+
+          // STEP 2: Standardized payload format validation
+          if (!smsPayload.to || !smsPayload.body) {
+            throw new Error(`Invalid SMS payload: missing required fields - to: ${!!smsPayload.to}, body: ${!!smsPayload.body}`);
+          }
+
+          // STEP 3: Enhanced retry logic with exponential backoff
+          let smsResponse = null;
+          let smsError = null;
+          let retryCount = 0;
+          const maxRetries = 3;
+
+          while (retryCount < maxRetries) {
+            try {
+              console.log(`🔄 [AI-AUTOMATION] SMS attempt ${retryCount + 1}/${maxRetries} for lead ${lead.id}`);
+              
+              const result = await functionClient.functions.invoke('send-sms', {
+                body: smsPayload
+              });
+              
+              smsResponse = result.data;
+              smsError = result.error;
+              
+              // Break on success
+              if (!smsError && smsResponse?.success) {
+                break;
+              }
+              
+              // Log the specific error for this attempt
+              console.warn(`⚠️ [AI-AUTOMATION] SMS attempt ${retryCount + 1} failed for lead ${lead.id}:`, {
+                error: smsError?.message || smsResponse?.error,
+                willRetry: retryCount < maxRetries - 1
+              });
+              
+            } catch (invokeError) {
+              console.error(`❌ [AI-AUTOMATION] SMS invoke error attempt ${retryCount + 1} for lead ${lead.id}:`, invokeError);
+              smsError = invokeError;
+            }
+            
+            retryCount++;
+            
+            // Exponential backoff: wait 1s, 2s, 4s
+            if (retryCount < maxRetries) {
+              const delay = Math.pow(2, retryCount - 1) * 1000;
+              console.log(`⏳ [AI-AUTOMATION] Waiting ${delay}ms before retry ${retryCount + 1}`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
 
           // TROUBLESHOOTING: Enhanced response logging
           console.log(`📡 [AI-AUTOMATION] RAW SMS RESPONSE for lead ${lead.id}:`, {
@@ -346,41 +532,53 @@ serve(async (req) => {
             messageSid: smsResponse?.messageSid
           });
 
-          if (smsError) {
-            console.error(`❌ [AI-AUTOMATION] SMS invoke error for lead ${lead.id}:`, {
-              error: smsError,
-              errorMessage: smsError.message,
-              errorDetails: smsError.details || 'No details'
-            });
-            // Update conversation with error status
-            await supabaseClient
-              .from('conversations')
-              .update({ 
-                sms_status: 'failed',
-                sms_error: `Function invoke error: ${smsError.message}` 
-              })
-              .eq('id', conversation.id);
-            failedCount++;
-            return;
-          }
-
-          if (!smsResponse?.success) {
-            console.error(`❌ [AI-AUTOMATION] SMS function returned failure for lead ${lead.id}:`, {
-              response: smsResponse,
-              error: smsResponse?.error,
+          // STEP 5: Enhanced error handling with fallback mechanism
+          if (smsError || !smsResponse?.success) {
+            console.error(`❌ [AI-AUTOMATION] All SMS attempts failed for lead ${lead.id} after ${retryCount} retries:`, {
+              finalError: smsError?.message || smsResponse?.error,
+              errorDetails: smsError?.details,
               twilioError: smsResponse?.twilioError,
-              credentialsSource: smsResponse?.credentialsSource
+              credentialsSource: smsResponse?.credentialsSource,
+              retryCount
             });
-            // Update conversation with error status
-            await supabaseClient
-              .from('conversations')
-              .update({ 
-                sms_status: 'failed',
-                sms_error: smsResponse?.error || 'SMS function returned failure'
-              })
-              .eq('id', conversation.id);
-            failedCount++;
-            return;
+
+            // STEP 5: Fallback mechanism - try direct Twilio API call
+            console.log(`🔄 [AI-AUTOMATION] Attempting direct Twilio fallback for lead ${lead.id}`);
+            
+            try {
+              const fallbackResult = await attemptDirectTwilioFallback(smsPayload, supabaseClient);
+              
+              if (fallbackResult.success) {
+                console.log(`✅ [AI-AUTOMATION] Fallback successful for lead ${lead.id}:`, fallbackResult);
+                smsResponse = fallbackResult;
+              } else {
+                console.error(`❌ [AI-AUTOMATION] Fallback also failed for lead ${lead.id}:`, fallbackResult);
+                
+                // Update conversation with comprehensive error status
+                await supabaseClient
+                  .from('conversations')
+                  .update({ 
+                    sms_status: 'failed',
+                    sms_error: `All attempts failed - Function: ${smsError?.message || smsResponse?.error}, Fallback: ${fallbackResult.error}` 
+                  })
+                  .eq('id', conversation.id);
+                failedCount++;
+                return;
+              }
+            } catch (fallbackError) {
+              console.error(`❌ [AI-AUTOMATION] Critical fallback error for lead ${lead.id}:`, fallbackError);
+              
+              // Update conversation with error status
+              await supabaseClient
+                .from('conversations')
+                .update({ 
+                  sms_status: 'failed',
+                  sms_error: `Critical failure - Function error: ${smsError?.message || smsResponse?.error}, Fallback error: ${fallbackError.message}` 
+                })
+                .eq('id', conversation.id);
+              failedCount++;
+              return;
+            }
           }
 
           // Update conversation with success

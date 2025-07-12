@@ -261,6 +261,55 @@ export const testAIAutomation = async () => {
   }
 };
 
+// Test function-to-function SMS communication
+export const testFunctionCommunication = async () => {
+  try {
+    console.log('🧪 [testFunctionCommunication] Testing function-to-function SMS communication');
+    
+    const startTime = Date.now();
+    const { data, error } = await supabase.functions.invoke('ai-automation', {
+      body: { 
+        test_endpoint: 'test-sms-communication'
+      }
+    });
+    const duration = Date.now() - startTime;
+    
+    console.log('🧪 [testFunctionCommunication] Function invoke completed in:', duration, 'ms');
+    console.log('🧪 [testFunctionCommunication] Raw response data:', data);
+    console.log('🧪 [testFunctionCommunication] Raw response error:', error);
+
+    if (error) {
+      console.error('❌ [testFunctionCommunication] Supabase function error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        status: error.status
+      });
+      return {
+        success: false,
+        error: error.message,
+        details: error
+      };
+    }
+
+    console.log('✅ [testFunctionCommunication] Success! Response data:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ [testFunctionCommunication] Caught error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      fullError: error
+    });
+    return {
+      success: false,
+      error: error.message,
+      details: error
+    };
+  }
+};
+
 export const validatePhoneNumber = (phone: string): boolean => {
   // More flexible validation
   const digits = phone.replace(/\D/g, '');

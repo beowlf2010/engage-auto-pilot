@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Phone, Save, TestTube, AlertCircle, Activity, Shield, Bell, Trash2 } from 'lucide-react';
+import { Phone, Save, TestTube, AlertCircle, Activity, Shield, Bell, Trash2, Network } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { testFunctionCommunication } from '@/services/settingsService';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface TwilioSettingsProps {
@@ -32,6 +33,7 @@ const TwilioSettings: React.FC<TwilioSettingsProps> = ({ userRole }) => {
   const [currentStatus, setCurrentStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [testingCommunication, setTestingCommunication] = useState(false);
   const [newAlertPhone, setNewAlertPhone] = useState('');
   const { toast } = useToast();
 
@@ -215,6 +217,31 @@ const TwilioSettings: React.FC<TwilioSettingsProps> = ({ userRole }) => {
     }
   };
 
+  const testFunctionToFunctionCommunication = async () => {
+    setTestingCommunication(true);
+    try {
+      const result = await testFunctionCommunication();
+      
+      if (result?.result?.success) {
+        toast({
+          title: "Function Communication Test Successful",
+          description: "Function-to-function SMS communication is working correctly.",
+        });
+      } else {
+        throw new Error(result?.result?.error || 'Unknown error in function communication');
+      }
+    } catch (error) {
+      console.error('Function communication test failed:', error);
+      toast({
+        title: "Function Communication Test Failed",
+        description: `Function-to-function communication failed: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setTestingCommunication(false);
+    }
+  };
+
   const addAlertPhone = () => {
     if (newAlertPhone && !monitoringSettings.alert_phone_numbers.includes(newAlertPhone)) {
       setMonitoringSettings(prev => ({
@@ -327,7 +354,7 @@ const TwilioSettings: React.FC<TwilioSettingsProps> = ({ userRole }) => {
               </div>
 
               {canEdit && (
-                <div className="flex space-x-2 pt-4">
+                <div className="flex flex-wrap gap-2 pt-4">
                   <Button onClick={saveSettings} disabled={loading}>
                     <Save className="w-4 h-4 mr-2" />
                     {loading ? 'Saving...' : 'Save Settings'}
@@ -336,6 +363,15 @@ const TwilioSettings: React.FC<TwilioSettingsProps> = ({ userRole }) => {
                   <Button onClick={testTwilio} disabled={testing} variant="outline">
                     <TestTube className="w-4 h-4 mr-2" />
                     {testing ? 'Testing...' : 'Test Configuration'}
+                  </Button>
+
+                  <Button 
+                    onClick={testFunctionToFunctionCommunication} 
+                    disabled={testingCommunication} 
+                    variant="outline"
+                  >
+                    <Network className="w-4 h-4 mr-2" />
+                    {testingCommunication ? 'Testing...' : 'Test Function Communication'}
                   </Button>
                 </div>
               )}
