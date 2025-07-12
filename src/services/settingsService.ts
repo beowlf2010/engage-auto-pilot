@@ -115,7 +115,7 @@ export const testDirectSMS = async () => {
     console.log('📱 [testDirectSMS] Testing direct SMS sending');
     
     const testPayload = {
-      to: '+1234567890', // Test number
+      to: '+12513252469', // Use the actual Twilio number from settings for testing
       body: 'Direct SMS test from troubleshooting',
       conversationId: null
     };
