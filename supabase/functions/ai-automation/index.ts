@@ -462,14 +462,15 @@ serve(async (req) => {
             return;
           }
 
-          const generatedMessage = aiResult.data.message;
+          let generatedMessage = aiResult.data?.message;
+          
+          // Implement fallback messaging if AI fails
           if (!generatedMessage) {
-            console.error(`❌ [AI-AUTOMATION] No message generated for lead ${lead.id}:`, aiResult.data);
-            failedCount++;
-            return;
+            console.warn(`⚠️ [AI-AUTOMATION] No AI message generated for lead ${lead.id}, using fallback message`);
+            generatedMessage = `Hi ${leadWithPhone.first_name || 'there'}! Thanks for your interest in ${leadWithPhone.vehicle_interest || 'our vehicles'}. I wanted to follow up and see if you have any questions about our inventory. Feel free to reply or give us a call!`;
           }
           
-          console.log(`✅ [AI-AUTOMATION] AI message generated for lead ${lead.id}: "${generatedMessage}"`);
+          console.log(`✅ [AI-AUTOMATION] Message ready for lead ${lead.id}: "${generatedMessage}"`);
 
           // Now send the generated message via SMS
           const smsPayload = {

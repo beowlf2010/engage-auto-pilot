@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { testAIAutomation, testDirectSMS, testSimpleFunction } from '@/services/settingsService';
+import { testAIAutomation, testDirectSMS, testSimpleFunction, testAIConversation } from '@/services/settingsService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -10,6 +10,8 @@ export const AIAutomationTester = () => {
   const [smsLoading, setSmsLoading] = useState(false);
   const [simpleResult, setSimpleResult] = useState<any>(null);
   const [simpleLoading, setSimpleLoading] = useState(false);
+  const [aiConversationResult, setAiConversationResult] = useState<any>(null);
+  const [aiConversationLoading, setAiConversationLoading] = useState(false);
 
   const runTest = async () => {
     setLoading(true);
@@ -53,6 +55,20 @@ export const AIAutomationTester = () => {
     }
   };
 
+  const runAIConversationTest = async () => {
+    setAiConversationLoading(true);
+    setAiConversationResult(null);
+    
+    try {
+      const testResult = await testAIConversation();
+      setAiConversationResult(testResult);
+    } catch (error) {
+      setAiConversationResult({ success: false, error: error.message });
+    } finally {
+      setAiConversationLoading(false);
+    }
+  };
+
   // Auto-run tests in sequence when component mounts
   React.useEffect(() => {
     const runAutomaticTests = async () => {
@@ -65,15 +81,22 @@ export const AIAutomationTester = () => {
       // Wait a moment
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // Then test AI conversation directly
+      console.log('🔧 [DEBUG] Step 2: Testing AI conversation...');
+      await runAIConversationTest();
+      
+      // Wait a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       // Then test direct SMS
-      console.log('🔧 [DEBUG] Step 2: Testing direct SMS...');
+      console.log('🔧 [DEBUG] Step 3: Testing direct SMS...');
       await runDirectSMSTest();
       
       // Wait a moment
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Finally test AI automation
-      console.log('🔧 [DEBUG] Step 3: Testing AI automation...');
+      console.log('🔧 [DEBUG] Step 4: Testing AI automation...');
       await runTest();
     };
     
@@ -90,13 +113,22 @@ export const AIAutomationTester = () => {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Button 
             onClick={runTest} 
             disabled={loading}
             className="w-full"
           >
             {loading ? 'Testing...' : 'Test AI Automation'}
+          </Button>
+          
+          <Button 
+            onClick={runAIConversationTest} 
+            disabled={aiConversationLoading}
+            variant="outline"
+            className="w-full"
+          >
+            {aiConversationLoading ? 'Testing...' : 'Test AI Conversation'}
           </Button>
           
           <Button 
@@ -125,6 +157,17 @@ export const AIAutomationTester = () => {
             </h3>
             <pre className="bg-slate-100 p-4 rounded text-sm overflow-auto max-h-96">
               {JSON.stringify(result, null, 2)}
+            </pre>
+          </div>
+        )}
+        
+        {aiConversationResult && (
+          <div className="mt-4">
+            <h3 className="text-lg font-semibold mb-2">
+              AI Conversation Result: {aiConversationResult.success ? '✅ Success' : '❌ Failed'}
+            </h3>
+            <pre className="bg-slate-100 p-4 rounded text-sm overflow-auto max-h-96">
+              {JSON.stringify(aiConversationResult, null, 2)}
             </pre>
           </div>
         )}

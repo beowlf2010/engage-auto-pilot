@@ -346,6 +346,29 @@ export const debugAIAutomation = async () => {
   }
 };
 
+// Test the AI conversation function directly
+export const testAIConversation = async () => {
+  console.log('🔧 [DEBUG] Starting direct AI conversation test...');
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('test-ai-conversation', {
+      body: { test: true }
+    });
+
+    console.log('🔧 [DEBUG] AI conversation test response:', { data, error });
+    
+    if (error) {
+      console.error('🔧 [DEBUG] AI conversation test failed:', error);
+      return { success: false, error: error.message, details: error };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('🔧 [DEBUG] Critical error in AI conversation test:', error);
+    return { success: false, error: error.message, stack: error.stack };
+  }
+};
+
 export const validatePhoneNumber = (phone: string): boolean => {
   // More flexible validation
   const digits = phone.replace(/\D/g, '');
