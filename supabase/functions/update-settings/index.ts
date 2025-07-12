@@ -115,6 +115,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Validate Twilio Account SID format
+    if (settingType === 'TWILIO_ACCOUNT_SID') {
+      if (!value.startsWith('AC') || value.length !== 34) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid Twilio Account SID format (must start with AC and be 34 characters)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // Validate Twilio Auth Token format
+    if (settingType === 'TWILIO_AUTH_TOKEN') {
+      if (value.length !== 32) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid Twilio Auth Token format (must be 32 characters)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // Validate Twilio Phone Number format
+    if (settingType === 'TWILIO_PHONE_NUMBER') {
+      const phoneRegex = /^\+1[0-9]{10}$/
+      if (!phoneRegex.test(value)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid Twilio Phone Number format (must be in E.164 format: +1XXXXXXXXXX)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     console.log('🔄 Attempting to update/insert setting...');
     
     // First try to update existing record
@@ -164,7 +195,10 @@ Deno.serve(async (req) => {
     const settingNames = {
       'OPENAI_API_KEY': 'OpenAI API Key',
       'TELNYX_API_KEY': 'Telnyx API Key',
-      'TELNYX_MESSAGING_PROFILE_ID': 'Telnyx Messaging Profile ID'
+      'TELNYX_MESSAGING_PROFILE_ID': 'Telnyx Messaging Profile ID',
+      'TWILIO_ACCOUNT_SID': 'Twilio Account SID',
+      'TWILIO_AUTH_TOKEN': 'Twilio Auth Token',
+      'TWILIO_PHONE_NUMBER': 'Twilio Phone Number'
     }
 
     const friendlyName = settingNames[settingType] || settingType
