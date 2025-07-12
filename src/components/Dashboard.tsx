@@ -10,6 +10,7 @@ import { SafeErrorBoundary } from '@/components/error/SafeErrorBoundary';
 import { StatsGridSkeleton, QuickActionsSkeleton, RecentActivitySkeleton, AIInsightsSkeleton } from '@/components/ui/dashboard-skeletons';
 import { RefreshCw, Wifi, WifiOff, Database, Zap, BarChart3 } from 'lucide-react';
 import { SMSMonitoringCard } from '@/components/dashboard/SMSMonitoringCard';
+import { SMSTestPanel } from '@/components/dashboard/SMSTestPanel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -189,10 +190,15 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
           </div>
         </div>
 
-        {/* SMS Monitoring Card */}
-        <SafeErrorBoundary>
-          <SMSMonitoringCard />
-        </SafeErrorBoundary>
+        {/* SMS System Cards */}
+        <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+          <SafeErrorBoundary>
+            <SMSMonitoringCard />
+          </SafeErrorBoundary>
+          <SafeErrorBoundary>
+            <SMSTestPanel />
+          </SafeErrorBoundary>
+        </div>
 
         {/* Recent Activity - Full width */}
         <SafeErrorBoundary>
