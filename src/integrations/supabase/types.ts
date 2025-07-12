@@ -1436,6 +1436,33 @@ export type Database = {
           },
         ]
       }
+      ai_queue_health: {
+        Row: {
+          created_at: string
+          id: string
+          queue_health_score: number
+          total_failed: number
+          total_overdue: number
+          total_processing: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          queue_health_score?: number
+          total_failed?: number
+          total_overdue?: number
+          total_processing?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          queue_health_score?: number
+          total_failed?: number
+          total_overdue?: number
+          total_processing?: number
+        }
+        Relationships: []
+      }
       ai_schedule_config: {
         Row: {
           created_at: string
@@ -2911,6 +2938,7 @@ export type Database = {
           ai_generated: boolean
           body: string
           created_at: string
+          delivery_status_updated_at: string | null
           direction: string
           id: string
           lead_id: string
@@ -2918,6 +2946,8 @@ export type Database = {
           read_at: string | null
           sent_at: string
           sms_error: string | null
+          sms_error_code: string | null
+          sms_error_message: string | null
           sms_status: string | null
           twilio_message_id: string | null
         }
@@ -2925,6 +2955,7 @@ export type Database = {
           ai_generated?: boolean
           body: string
           created_at?: string
+          delivery_status_updated_at?: string | null
           direction: string
           id?: string
           lead_id: string
@@ -2932,6 +2963,8 @@ export type Database = {
           read_at?: string | null
           sent_at?: string
           sms_error?: string | null
+          sms_error_code?: string | null
+          sms_error_message?: string | null
           sms_status?: string | null
           twilio_message_id?: string | null
         }
@@ -2939,6 +2972,7 @@ export type Database = {
           ai_generated?: boolean
           body?: string
           created_at?: string
+          delivery_status_updated_at?: string | null
           direction?: string
           id?: string
           lead_id?: string
@@ -2946,6 +2980,8 @@ export type Database = {
           read_at?: string | null
           sent_at?: string
           sms_error?: string | null
+          sms_error_code?: string | null
+          sms_error_message?: string | null
           sms_status?: string | null
           twilio_message_id?: string | null
         }
