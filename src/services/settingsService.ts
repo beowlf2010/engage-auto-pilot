@@ -68,7 +68,10 @@ export const sendTestSMS = async (testPhoneNumber: string) => {
       throw new Error(`Invalid phone number format: ${formattedPhone}`);
     }
 
-    const payload = { testPhoneNumber: formattedPhone };
+    const payload = { 
+      to: formattedPhone, 
+      message: 'Test SMS from your CRM system. If you received this, your Twilio configuration is working correctly!' 
+    };
     console.log('🔍 [sendTestSMS] Calling supabase.functions.invoke with payload:', payload);
     
     const startTime = Date.now();
