@@ -108,6 +108,49 @@ export const sendTestSMS = async (testPhoneNumber: string) => {
   }
 };
 
+// Add manual AI automation test function
+export const testAIAutomation = async () => {
+  try {
+    console.log('🤖 [testAIAutomation] Starting manual AI automation test');
+    
+    const startTime = Date.now();
+    const { data, error } = await supabase.functions.invoke('ai-automation', {
+      body: { 
+        source: 'manual_test',
+        priority: 'normal',
+        enhanced: false 
+      }
+    });
+    const duration = Date.now() - startTime;
+    
+    console.log('🤖 [testAIAutomation] Function invoke completed in:', duration, 'ms');
+    console.log('🤖 [testAIAutomation] Raw response data:', data);
+    console.log('🤖 [testAIAutomation] Raw response error:', error);
+
+    if (error) {
+      console.error('❌ [testAIAutomation] Supabase function error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        status: error.status
+      });
+      throw error;
+    }
+
+    console.log('✅ [testAIAutomation] Success! Response data:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ [testAIAutomation] Caught error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      fullError: error
+    });
+    throw error;
+  }
+};
+
 export const validatePhoneNumber = (phone: string): boolean => {
   // More flexible validation
   const digits = phone.replace(/\D/g, '');
