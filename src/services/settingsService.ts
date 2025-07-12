@@ -145,6 +145,41 @@ export const testDirectSMS = async () => {
   }
 };
 
+// Test simple edge function to isolate issues
+export const testSimpleFunction = async () => {
+  try {
+    console.log('🧪 [testSimpleFunction] Testing simple edge function');
+    
+    const testPayload = {
+      test: 'data',
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('🧪 [testSimpleFunction] Payload:', testPayload);
+    
+    const startTime = Date.now();
+    const { data, error } = await supabase.functions.invoke('test-simple', {
+      body: testPayload
+    });
+    const duration = Date.now() - startTime;
+    
+    console.log('🧪 [testSimpleFunction] Function invoke completed in:', duration, 'ms');
+    console.log('🧪 [testSimpleFunction] Raw response data:', data);
+    console.log('🧪 [testSimpleFunction] Raw response error:', error);
+
+    if (error) {
+      console.error('❌ [testSimpleFunction] Supabase function error:', error);
+      throw error;
+    }
+
+    console.log('✅ [testSimpleFunction] Success! Response data:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ [testSimpleFunction] Caught error:', error);
+    throw error;
+  }
+};
+
 export const testAIAutomation = async () => {
   try {
     console.log('🤖 [testAIAutomation] Starting manual AI automation test');
