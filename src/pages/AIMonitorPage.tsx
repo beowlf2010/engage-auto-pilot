@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import AIMessageMonitor from '@/components/AIMessageMonitor';
+import AIMonitor from './AIMonitor';
 
 const AIMonitorPage = () => {
   const { profile } = useAuth();
@@ -17,15 +17,7 @@ const AIMonitorPage = () => {
     );
   }
 
-  return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">AI Message Monitor</h1>
-        <p className="text-slate-600">Monitor and control your AI messaging system</p>
-      </div>
-      <AIMessageMonitor />
-    </div>
-  );
+  return <AIMonitor />;
 };
 
 export default AIMonitorPage;
