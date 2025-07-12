@@ -9,6 +9,7 @@ import AIInsightsWidget from './dashboard/AIInsightsWidget';
 import { SafeErrorBoundary } from '@/components/error/SafeErrorBoundary';
 import { StatsGridSkeleton, QuickActionsSkeleton, RecentActivitySkeleton, AIInsightsSkeleton } from '@/components/ui/dashboard-skeletons';
 import { RefreshCw, Wifi, WifiOff, Database, Zap, BarChart3 } from 'lucide-react';
+import { SMSMonitoringCard } from '@/components/dashboard/SMSMonitoringCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -187,6 +188,11 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
             </SafeErrorBoundary>
           </div>
         </div>
+
+        {/* SMS Monitoring Card */}
+        <SafeErrorBoundary>
+          <SMSMonitoringCard />
+        </SafeErrorBoundary>
 
         {/* Recent Activity - Full width */}
         <SafeErrorBoundary>

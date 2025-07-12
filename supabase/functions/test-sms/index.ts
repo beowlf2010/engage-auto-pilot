@@ -1,9 +1,5 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2'
-import { getTwilioSecrets } from './utils/twilioCredentials.ts'
-import { authenticateAndAuthorize } from './utils/authUtils.ts'
-import { sendTestSMS } from './utils/smsService.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,93 +13,115 @@ serve(async (req) => {
 
   try {
     console.log('=== TEST SMS FUNCTION START ===');
+    const { to, message } = await req.json()
+    
+    if (!to || !message) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Phone number and message are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`📱 Testing SMS to ${to}`);
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Authenticate and authorize the user
-    const authResult = await authenticateAndAuthorize(req, supabase)
-    if (!authResult.success) {
+    // Get Twilio credentials from database
+    const { data: settings, error } = await supabase
+      .from('settings')
+      .select('key, value')
+      .in('key', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER'])
+
+    if (error) {
+      console.error('❌ Database error:', error);
       return new Response(
-        JSON.stringify({ error: authResult.error }),
-        { 
-          status: authResult.statusCode || 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ success: false, error: 'Failed to fetch Twilio credentials' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Parse request body
-    const { testPhoneNumber } = await req.json()
-    console.log('📱 Test phone number received:', testPhoneNumber);
-    
-    if (!testPhoneNumber) {
-      return new Response(
-        JSON.stringify({ error: 'Test phone number is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const settingsMap: Record<string, string> = {}
+    settings?.forEach(setting => {
+      settingsMap[setting.key] = setting.value
+    })
 
-    // Get Twilio credentials
-    console.log('🔑 Fetching Twilio credentials...');
-    const { accountSid, authToken, phoneNumber, source } = await getTwilioSecrets(supabase)
-    
+    const accountSid = settingsMap['TWILIO_ACCOUNT_SID']
+    const authToken = settingsMap['TWILIO_AUTH_TOKEN']
+    const phoneNumber = settingsMap['TWILIO_PHONE_NUMBER']
+
     if (!accountSid || !authToken || !phoneNumber) {
-      console.error('❌ Missing Twilio credentials:', { 
-        hasAccountSid: !!accountSid, 
-        hasAuthToken: !!authToken,
-        hasPhoneNumber: !!phoneNumber,
-        source: source,
-        accountSidStart: accountSid ? accountSid.substring(0, 6) + '...' : 'none',
-        phoneNumber: phoneNumber || 'none'
-      });
       return new Response(
         JSON.stringify({ 
-          success: false,
-          error: 'Missing Twilio credentials. Please configure your Account SID, Auth Token, and Phone Number in the Settings first.',
-          details: {
-            hasAccountSid: !!accountSid,
-            hasAuthToken: !!authToken,
-            hasPhoneNumber: !!phoneNumber,
-            credentialsSource: source,
-            debugInfo: `Account SID: ${accountSid ? 'present' : 'missing'}, Auth Token: ${authToken ? 'present' : 'missing'}, Phone: ${phoneNumber ? 'present' : 'missing'}, Source: ${source}`
-          }
+          success: false, 
+          error: 'Missing Twilio credentials in database',
+          hasAccountSid: !!accountSid,
+          hasAuthToken: !!authToken,
+          hasPhoneNumber: !!phoneNumber
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log('✅ Twilio credentials found from', source.toUpperCase(), '- Account SID:', accountSid.substring(0, 6) + '...', 'Phone:', phoneNumber);
 
-    // Send the SMS
-    const smsResult = await sendTestSMS(testPhoneNumber, accountSid, authToken, phoneNumber, source)
-    
-    const statusCode = smsResult.success ? 200 : 400
+    console.log('✅ Twilio credentials found:', {
+      accountSidStart: accountSid.substring(0, 6) + '...',
+      phoneNumber: phoneNumber
+    });
+
+    // Send test SMS via Twilio
+    const payload = new URLSearchParams({
+      To: to,
+      From: phoneNumber,
+      Body: message
+    })
+
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+    const response = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: payload
+    })
+
+    const result = await response.json()
+    console.log('📡 Twilio API response:', JSON.stringify(result, null, 2));
+
+    if (!response.ok) {
+      console.error('❌ Twilio API error:', result);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: result.message || 'Failed to send SMS',
+          twilioError: result
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('✅ Test SMS sent successfully:', result.sid);
+
     return new Response(
-      JSON.stringify(smsResult),
-      { 
-        status: statusCode, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ 
+        success: true, 
+        messageSid: result.sid,
+        status: result.status,
+        message: 'Test SMS sent successfully!'
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('💥 CRITICAL ERROR in test-sms function:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-    
+    console.error('💥 Error in test-sms function:', error);
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: `Server error: ${error.message}`,
-        type: 'server_error'
+        error: `Server error: ${error.message}`
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
