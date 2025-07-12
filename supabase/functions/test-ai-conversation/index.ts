@@ -34,17 +34,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Test payload for AI conversation
+    // Test payload for AI conversation - matches intelligent-conversation-ai expected parameters
     const testPayload = {
       leadId: "test-lead-id",
-      leadInfo: {
-        firstName: "Test",
-        lastName: "User",
-        vehicleInterest: "2024 Honda Civic"
-      },
-      conversationHistory: [],
-      lastMessage: "Hello, I'm interested in learning more about your inventory",
-      vehicleInterest: "2024 Honda Civic"
+      leadName: "Test User",
+      messageBody: "Hello, I'm interested in learning more about your inventory",
+      latestCustomerMessage: "Hello, I'm interested in learning more about your inventory", 
+      conversationHistory: "",
+      vehicleInterest: "2024 Honda Civic",
+      leadSource: "test"
     };
 
     console.log('🔧 [TEST-AI-CONVERSATION] Calling intelligent-conversation-ai with test payload:', testPayload);
