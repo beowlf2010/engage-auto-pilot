@@ -36,7 +36,25 @@ export const fetchLeadsData = async (showHidden: boolean) => {
 
   if (leadsError) throw leadsError;
 
-  return leadsData as LeadDataFromDB[];
+  // Filter out leads without valid phone numbers after fetching
+  const validLeads = leadsData?.filter(lead => {
+    const validPhones = lead.phone_numbers?.filter(phone => {
+      const cleanNumber = phone.number?.replace(/[^0-9]/g, '') || '';
+      return (
+        phone.status === 'active' &&
+        cleanNumber.length >= 10 &&
+        cleanNumber.length <= 15 &&
+        !/[a-zA-Z]/.test(phone.number || '') &&
+        !phone.number?.toLowerCase().includes('commission') &&
+        !phone.number?.toLowerCase().includes('tribal') &&
+        !phone.number?.toLowerCase().includes('gaming') &&
+        !phone.number?.toLowerCase().includes('casino')
+      );
+    });
+    return validPhones && validPhones.length > 0;
+  }) || [];
+
+  return validLeads as LeadDataFromDB[];
 };
 
 export const fetchConversationsData = async (): Promise<ConversationFromDB[]> => {
