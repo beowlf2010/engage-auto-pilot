@@ -109,8 +109,9 @@ serve(async (req) => {
     }
 
     // Use default settings instead of accessing non-existent table
-    const batchSize = 50;
-    const maxConcurrentSends = 5;
+    // TROUBLESHOOTING: Reduced batch size to 1 for easier debugging
+    const batchSize = source === 'manual_test' ? 1 : 50;
+    const maxConcurrentSends = source === 'manual_test' ? 1 : 5;
     const dailyMessageLimit = 8;
     const autoUnpauseStaleLeads = true;
     const stalePauseThresholdDays = 7;
@@ -302,19 +303,40 @@ serve(async (req) => {
         console.log(`💾 [AI-AUTOMATION] Created conversation record ${conversation.id} for lead ${lead.id}`);
         
         try {
-          console.log(`🔧 [AI-AUTOMATION] Calling send-sms function for lead ${lead.id} with:`, {
+          // TROUBLESHOOTING: Enhanced logging before SMS function call
+          const smsPayload = {
             to: primaryPhone,
+            body: gentleMessage,
+            conversationId: conversation.id
+          };
+          
+          console.log(`🔧 [AI-AUTOMATION] DETAILED SMS PAYLOAD for lead ${lead.id}:`, {
+            payload: smsPayload,
+            phoneNumberLength: primaryPhone?.length,
+            phoneNumberFormat: primaryPhone,
+            messageLength: gentleMessage.length,
             conversationId: conversation.id,
-            messageLength: gentleMessage.length
+            leadId: lead.id,
+            timestamp: new Date().toISOString()
           });
 
+          // TROUBLESHOOTING: Test direct function-to-function communication first
+          console.log(`🧪 [AI-AUTOMATION] Testing send-sms function connectivity...`);
+          
           // Call the send-sms edge function with correct payload format
           const { data: smsResponse, error: smsError } = await supabaseClient.functions.invoke('send-sms', {
-            body: {
-              to: primaryPhone,
-              body: gentleMessage,
-              conversationId: conversation.id
-            }
+            body: smsPayload
+          });
+
+          // TROUBLESHOOTING: Enhanced response logging
+          console.log(`📡 [AI-AUTOMATION] RAW SMS RESPONSE for lead ${lead.id}:`, {
+            rawData: smsResponse,
+            rawError: smsError,
+            hasData: !!smsResponse,
+            hasError: !!smsError,
+            dataType: typeof smsResponse,
+            errorType: typeof smsError,
+            timestamp: new Date().toISOString()
           });
 
           console.log(`📡 [AI-AUTOMATION] SMS function response for lead ${lead.id}:`, {
