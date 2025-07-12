@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test AI Automation</title>
+</head>
+<body>
+    <h1>Test AI Automation Function</h1>
+    <button onclick="testAutomation()">Test AI Automation</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAutomation() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('https://tevtajmaofvnffzcsiuu.supabase.co/functions/v1/ai-automation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRldnRham1hb2Z2bmZmemNzaXV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1ODgyNDcsImV4cCI6MjA2NTE2NDI0N30.xFuVYGXv9MGio82M8e3vqqDv7mlaaxY7U01o8zEVumg'
+                    },
+                    body: JSON.stringify({
+                        automated: false,
+                        source: 'debug_test',
+                        priority: 'debug',
+                        enhanced: true
+                    })
+                });
+                
+                const result = await response.json();
+                resultDiv.innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                console.log('AI Automation Result:', result);
+            } catch (error) {
+                resultDiv.innerHTML = 'Error: ' + error.message;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

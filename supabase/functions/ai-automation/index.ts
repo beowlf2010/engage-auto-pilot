@@ -302,6 +302,12 @@ serve(async (req) => {
         console.log(`💾 [AI-AUTOMATION] Created conversation record ${conversation.id} for lead ${lead.id}`);
         
         try {
+          console.log(`🔧 [AI-AUTOMATION] Calling send-sms function for lead ${lead.id} with:`, {
+            to: primaryPhone,
+            conversationId: conversation.id,
+            messageLength: gentleMessage.length
+          });
+
           // Call the send-sms edge function with correct payload format
           const { data: smsResponse, error: smsError } = await supabaseClient.functions.invoke('send-sms', {
             body: {
@@ -311,14 +317,25 @@ serve(async (req) => {
             }
           });
 
+          console.log(`📡 [AI-AUTOMATION] SMS function response for lead ${lead.id}:`, {
+            hasError: !!smsError,
+            responseSuccess: smsResponse?.success,
+            error: smsError?.message || smsResponse?.error,
+            messageSid: smsResponse?.messageSid
+          });
+
           if (smsError) {
-            console.error(`❌ [AI-AUTOMATION] SMS error for lead ${lead.id}:`, smsError);
+            console.error(`❌ [AI-AUTOMATION] SMS invoke error for lead ${lead.id}:`, {
+              error: smsError,
+              errorMessage: smsError.message,
+              errorDetails: smsError.details || 'No details'
+            });
             // Update conversation with error status
             await supabaseClient
               .from('conversations')
               .update({ 
                 sms_status: 'failed',
-                sms_error: smsError.message 
+                sms_error: `Function invoke error: ${smsError.message}` 
               })
               .eq('id', conversation.id);
             failedCount++;
@@ -326,13 +343,18 @@ serve(async (req) => {
           }
 
           if (!smsResponse?.success) {
-            console.error(`❌ [AI-AUTOMATION] SMS failed for lead ${lead.id}:`, smsResponse?.error || 'Unknown error');
+            console.error(`❌ [AI-AUTOMATION] SMS function returned failure for lead ${lead.id}:`, {
+              response: smsResponse,
+              error: smsResponse?.error,
+              twilioError: smsResponse?.twilioError,
+              credentialsSource: smsResponse?.credentialsSource
+            });
             // Update conversation with error status
             await supabaseClient
               .from('conversations')
               .update({ 
                 sms_status: 'failed',
-                sms_error: smsResponse?.error || 'Unknown SMS error'
+                sms_error: smsResponse?.error || 'SMS function returned failure'
               })
               .eq('id', conversation.id);
             failedCount++;
@@ -353,20 +375,25 @@ serve(async (req) => {
             .update(updateData)
             .eq('id', conversation.id);
 
-          console.log(`📱 [AI-AUTOMATION] SMS sent successfully to lead ${lead.id}:`, {
+          console.log(`✅ [AI-AUTOMATION] SMS sent successfully to lead ${lead.id}:`, {
             conversationId: conversation.id,
             messageSid: smsResponse.messageSid,
+            credentialsSource: smsResponse.credentialsSource,
             content: gentleMessage.substring(0, 50) + '...'
           });
           
         } catch (smsCallError) {
-          console.error(`❌ [AI-AUTOMATION] Error calling send-sms for lead ${lead.id}:`, smsCallError);
+          console.error(`❌ [AI-AUTOMATION] Critical error calling send-sms for lead ${lead.id}:`, {
+            error: smsCallError,
+            errorMessage: smsCallError.message,
+            errorStack: smsCallError.stack
+          });
           // Update conversation with error status
           await supabaseClient
             .from('conversations')
             .update({ 
               sms_status: 'failed',
-              sms_error: smsCallError.message 
+              sms_error: `Critical SMS call error: ${smsCallError.message}` 
             })
             .eq('id', conversation.id);
           failedCount++;
