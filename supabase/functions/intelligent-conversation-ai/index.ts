@@ -18,9 +18,18 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🔧 [FINN AI] Checking OpenAI API key...');
     if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+      console.error('❌ [FINN AI] OpenAI API key not configured');
+      return new Response(JSON.stringify({
+        error: 'OpenAI API key not configured',
+        success: false
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+    console.log('✅ [FINN AI] OpenAI API key found');
 
     const supabase = createClient(supabaseUrl!, supabaseKey!);
 
@@ -30,10 +39,8 @@ serve(async (req) => {
       messageBody,
       latestCustomerMessage,
       conversationHistory,
-      hasConversationalSignals,
-      leadSource,
-      leadSourceData,
-      vehicleInterest
+      vehicleInterest,
+      leadSource
     } = await req.json();
 
     // Fetch lead geographical data for location-aware responses
@@ -41,7 +48,7 @@ serve(async (req) => {
       .from('leads')
       .select('address, city, state, postal_code')
       .eq('id', leadId)
-      .single();
+      .maybeSingle();
 
     console.log('📍 [FINN AI] Lead location:', {
       city: leadGeoData?.city,
