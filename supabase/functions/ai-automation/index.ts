@@ -147,7 +147,7 @@ serve(async (req) => {
     try {
       const { data: testData, error: testError } = await supabaseClient
         .from('leads')
-        .select('count')
+        .select('id')
         .limit(1);
       
       if (testError) {
