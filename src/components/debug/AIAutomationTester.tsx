@@ -53,10 +53,41 @@ export const AIAutomationTester = () => {
     }
   };
 
+  // Auto-run tests in sequence when component mounts
+  React.useEffect(() => {
+    const runAutomaticTests = async () => {
+      console.log('🔧 [DEBUG] Starting automatic test sequence...');
+      
+      // First test simple function
+      console.log('🔧 [DEBUG] Step 1: Testing simple function...');
+      await runSimpleTest();
+      
+      // Wait a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Then test direct SMS
+      console.log('🔧 [DEBUG] Step 2: Testing direct SMS...');
+      await runDirectSMSTest();
+      
+      // Wait a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Finally test AI automation
+      console.log('🔧 [DEBUG] Step 3: Testing AI automation...');
+      await runTest();
+    };
+    
+    // Run tests only once when component mounts
+    runAutomaticTests();
+  }, []);
+
   return (
     <Card className="w-full max-w-2xl">
       <CardHeader>
         <CardTitle>AI Automation Debug Tests</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Running automatic debugging sequence...
+        </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
