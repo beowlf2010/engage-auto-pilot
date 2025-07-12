@@ -58,6 +58,9 @@ verify_jwt = true
 [functions.test-simple]
 verify_jwt = false
 
+[functions.test-ai-conversation]
+verify_jwt = true
+
 [functions.test-sms]
 verify_jwt = true
 

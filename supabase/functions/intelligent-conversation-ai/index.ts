@@ -1,10 +1,7 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
-import { buildContextualPrompt } from './contextualPrompts.ts';
-import { analyzeIntentEnhanced } from './enhancedIntentAnalysis.ts';
-import { analyzeConversationPattern } from './conversationAnalysis.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -55,13 +52,18 @@ serve(async (req) => {
     console.log('🤖 [FINN AI] Processing request for lead:', leadId);
     console.log('🤖 [FINN AI] Customer message:', messageBody?.substring(0, 100));
 
-    // Enhanced intent analysis
-    const intentAnalysis = analyzeIntentEnhanced(
-      messageBody || latestCustomerMessage,
-      conversationHistory,
-      vehicleInterest,
-      leadSource
-    );
+    // Simple intent analysis
+    const customerMessage = messageBody || latestCustomerMessage || '';
+    const intentAnalysis = {
+      primaryIntent: customerMessage.toLowerCase().includes('price') ? 'pricing_inquiry' : 
+                    customerMessage.toLowerCase().includes('appointment') ? 'appointment_request' :
+                    customerMessage.toLowerCase().includes('test drive') ? 'test_drive_request' : 'general_inquiry',
+      confidence: 0.8,
+      responseStrategy: 'helpful',
+      customerContext: {
+        mentionedTopics: []
+      }
+    };
 
     console.log('🎯 [FINN AI] Intent analysis:', {
       primary: intentAnalysis.primaryIntent,
@@ -69,26 +71,39 @@ serve(async (req) => {
       strategy: intentAnalysis.responseStrategy
     });
 
-    // Analyze conversation patterns
-    const conversationPattern = analyzeConversationPattern(conversationHistory);
+    // Simple conversation pattern analysis
+    const conversationPattern = {
+      hasRepetitiveGreeting: false,
+      isEstablishedConversation: (conversationHistory || '').length > 100,
+      customerMessageCount: (conversationHistory || '').split('Customer:').length - 1,
+      salesMessageCount: (conversationHistory || '').split('Sales:').length - 1
+    };
 
     // Get conversation memory
     const { data: conversationMemory } = await supabase
       .from('ai_conversation_context')
       .select('*')
       .eq('lead_id', leadId)
-      .single();
+      .maybeSingle();
 
-    // Build contextual prompts with geographic awareness
-    const { systemPrompt, userPrompt } = buildContextualPrompt(
-      leadName,
-      vehicleInterest || 'finding the right vehicle',
-      messageBody || latestCustomerMessage,
-      conversationHistory,
-      intentAnalysis,
-      conversationMemory,
-      leadGeoData
-    );
+    // Build simple contextual prompts
+    const systemPrompt = `You are Finn, a friendly and helpful car sales assistant. You work for a car dealership.
+
+Key guidelines:
+- Be conversational and helpful
+- Keep responses under 160 characters for SMS
+- Focus on ${vehicleInterest || 'helping the customer find the right vehicle'}
+- Be professional but friendly
+- Ask one question to move the conversation forward
+
+Customer location: ${leadGeoData?.city || 'Unknown'}, ${leadGeoData?.state || 'Unknown'}
+Customer interest: ${vehicleInterest || 'General inquiry'}`;
+
+    const userPrompt = `Customer message: "${customerMessage}"
+
+Previous conversation context: ${conversationHistory ? conversationHistory.slice(-500) : 'No previous conversation'}
+
+Please respond as Finn with a helpful, brief message (under 160 characters).`;
 
     console.log('📝 [FINN AI] Generated system prompt length:', systemPrompt.length);
     console.log('📝 [FINN AI] Generated user prompt length:', userPrompt.length);
