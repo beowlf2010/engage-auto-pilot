@@ -438,10 +438,16 @@ serve(async (req) => {
             vehicleInterest: leadWithPhone.vehicle_interest || 'finding the right vehicle'
           };
 
-          console.log(`🧠 [AI-AUTOMATION] Calling intelligent-conversation-ai for lead ${lead.id}`);
+          console.log(`🧠 [AI-AUTOMATION] Calling intelligent-conversation-ai for lead ${lead.id} with payload:`, aiPayload);
           
           const aiResult = await supabaseClient.functions.invoke('intelligent-conversation-ai', {
             body: aiPayload
+          });
+
+          console.log(`🧠 [AI-AUTOMATION] AI function response for lead ${lead.id}:`, {
+            error: aiResult.error,
+            data: aiResult.data,
+            status: aiResult.status
           });
 
           if (aiResult.error) {
@@ -457,6 +463,12 @@ serve(async (req) => {
           }
 
           const generatedMessage = aiResult.data.message;
+          if (!generatedMessage) {
+            console.error(`❌ [AI-AUTOMATION] No message generated for lead ${lead.id}:`, aiResult.data);
+            failedCount++;
+            return;
+          }
+          
           console.log(`✅ [AI-AUTOMATION] AI message generated for lead ${lead.id}: "${generatedMessage}"`);
 
           // Now send the generated message via SMS
@@ -466,10 +478,16 @@ serve(async (req) => {
             conversationId: null // Will be created by SMS function
           };
 
-          console.log(`📱 [AI-AUTOMATION] Sending SMS to ${primaryPhone} for lead ${lead.id}`);
+          console.log(`📱 [AI-AUTOMATION] Sending SMS to ${primaryPhone} for lead ${lead.id} with payload:`, smsPayload);
           
           const smsResult = await supabaseClient.functions.invoke('send-sms', {
             body: smsPayload
+          });
+
+          console.log(`📱 [AI-AUTOMATION] SMS function response for lead ${lead.id}:`, {
+            error: smsResult.error,
+            data: smsResult.data,
+            status: smsResult.status
           });
 
           if (smsResult.error) {
@@ -491,12 +509,14 @@ serve(async (req) => {
 
           // Mark as successful
           successfulCount++;
+          console.log(`🎉 [AI-AUTOMATION] Lead ${lead.id} processed successfully! Current counts - successful: ${successfulCount}, failed: ${failedCount}`);
           
         } catch (aiCallError) {
-          console.error(`❌ [AI-AUTOMATION] Critical error calling intelligent-conversation-ai for lead ${lead.id}:`, {
+          console.error(`❌ [AI-AUTOMATION] Critical error processing lead ${lead.id}:`, {
             error: aiCallError,
             errorMessage: aiCallError.message,
-            errorStack: aiCallError.stack
+            errorStack: aiCallError.stack,
+            name: aiCallError.name
           });
           failedCount++;
           return;
