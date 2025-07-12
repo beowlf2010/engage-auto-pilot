@@ -502,8 +502,6 @@ serve(async (req) => {
           return;
         }
 
-        successfulCount++;
-
         // Handle lead status transition after sending AI message
         try {
           const { data: leadStatus, error: statusError } = await supabaseClient
