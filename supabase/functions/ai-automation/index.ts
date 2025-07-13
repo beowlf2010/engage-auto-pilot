@@ -185,8 +185,7 @@ serve(async (req) => {
   /* ORIGINAL CODE DISABLED FOR COMPLIANCE
   // This function was sending messages directly bypassing compliance checks
   // DO NOT RE-ENABLE without implementing proper compliance checks via consolidatedSendMessage
-
-  // Parse request body early to check for test endpoints
+  */
   let requestData;
   try {
     const bodyText = await req.text();
