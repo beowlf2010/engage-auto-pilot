@@ -24,21 +24,21 @@ export const useConversationsList = () => {
             direction,
             sent_at,
             read_at,
-            leads!inner(
-              id,
-              first_name,
-              last_name,
-              email,
-              vehicle_interest,
-              salesperson_id,
-              status,
-              ai_opt_in,
-              source,
-              lead_type_name,
-              phone_numbers!inner(
-                number,
-                is_primary
-              ),
+              leads!inner(
+                id,
+                first_name,
+                last_name,
+                email,
+                vehicle_interest,
+                salesperson_id,
+                status,
+                ai_opt_in,
+                source,
+                lead_type_name,
+                phone_numbers(
+                  number,
+                  is_primary
+                ),
               profiles(
                 first_name,
                 last_name
