@@ -97,6 +97,11 @@ export class ComprehensiveAIContentGenerator {
       .select('*')
       .limit(500);
 
+    // DISABLED: This code was creating fake conversations and causing SMS spam
+    console.warn('🚫 Conversation generation disabled to prevent SMS spam to suppressed numbers');
+    return;
+    
+    /* ORIGINAL CODE DISABLED
     if (!conversations || !leads) return;
 
     // Generate customer responses to AI messages
@@ -129,6 +134,7 @@ export class ComprehensiveAIContentGenerator {
         }
       }
     }
+    */
 
     // Generate multi-turn conversation threads for leads with minimal activity
     for (const lead of leads.slice(0, 200)) {

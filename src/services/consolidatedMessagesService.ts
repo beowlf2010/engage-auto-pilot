@@ -215,9 +215,11 @@ export const validateProfile = (profile: any): { isValid: boolean; profileId?: s
     return { isValid: false, error: 'Invalid profile structure - missing ID' };
   }
 
-  // Validate UUID format
+  // Validate UUID format (allow special AI system UUID)
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(profileId)) {
+  const specialAISystemUUID = '00000000-0000-0000-0000-000000000001';
+  
+  if (!uuidRegex.test(profileId) && profileId !== specialAISystemUUID) {
     return { isValid: false, error: 'Invalid profile ID format' };
   }
 

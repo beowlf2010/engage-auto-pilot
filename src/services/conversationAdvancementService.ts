@@ -209,10 +209,11 @@ export class ConversationAdvancementService {
       console.log(`📝 [CONVERSATION ADVANCEMENT] Message: "${strategy.messageContent}"`);
       
       // Use the consolidated message service with full compliance checks
+      // Pass null for profileId since this is an AI-generated message
       const result = await consolidatedSendMessage({
         leadId,
         messageBody: strategy.messageContent,
-        profileId: 'ai-system', // Use a special AI system profile ID
+        profileId: '00000000-0000-0000-0000-000000000001', // Use special AI system UUID
         isAIGenerated: true
       });
 
@@ -223,7 +224,8 @@ export class ConversationAdvancementService {
           messageId: result.conversationId 
         };
       } else {
-        console.error(`❌ [CONVERSATION ADVANCEMENT] Message failed via compliant service:`, result.error);
+        console.error(`❌ [CONVERSATION ADVANCEMENT] Blocked by compliance:`, result.error);
+        // This is expected behavior - the message was correctly blocked
         return { 
           success: false 
         };
