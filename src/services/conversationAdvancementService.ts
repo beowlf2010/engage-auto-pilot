@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { consolidatedSendMessage } from './consolidatedMessagesService';
 
 interface ConversationAdvancementConfig {
   leadId: string;
@@ -201,74 +202,34 @@ export class ConversationAdvancementService {
     };
   }
 
-  // Send advancement message
+  // Send advancement message using compliant service
   async sendAdvancementMessage(leadId: string, strategy: AdvancementStrategy): Promise<{ success: boolean; messageId?: string }> {
     try {
-      // Get the phone number for this lead
-      const { data: phoneData, error: phoneError } = await supabase
-        .from('phone_numbers')
-        .select('number')
-        .eq('lead_id', leadId)
-        .eq('is_primary', true)
-        .maybeSingle();
-
-      if (phoneError || !phoneData) {
-        throw new Error('No primary phone number found for this lead');
-      }
-
-      // Store the conversation record
-      const { data: conversation, error: conversationError } = await supabase
-        .from('conversations')
-        .insert({
-          lead_id: leadId,
-          body: strategy.messageContent,
-          direction: 'out',
-          ai_generated: true,
-          sent_at: new Date().toISOString(),
-          sms_status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (conversationError) {
-        throw new Error('Failed to create conversation record');
-      }
-
-      // Send SMS
-      const { data, error } = await supabase.functions.invoke('send-sms', {
-        body: {
-          to: phoneData.number,
-          body: strategy.messageContent,
-          conversationId: conversation.id
-        }
+      console.log(`🚀 [CONVERSATION ADVANCEMENT] Sending AI advancement message to lead: ${leadId}`);
+      console.log(`📝 [CONVERSATION ADVANCEMENT] Message: "${strategy.messageContent}"`);
+      
+      // Use the consolidated message service with full compliance checks
+      const result = await consolidatedSendMessage({
+        leadId,
+        messageBody: strategy.messageContent,
+        profileId: 'ai-system', // Use a special AI system profile ID
+        isAIGenerated: true
       });
 
-      if (error || !data?.success) {
-        // Update conversation with failure status
-        await supabase
-          .from('conversations')
-          .update({ 
-            sms_status: 'failed', 
-            sms_error: data?.error || error?.message || 'Failed to send' 
-          })
-          .eq('id', conversation.id);
-        
-        throw new Error(data?.error || error?.message || 'Failed to send message');
+      if (result.success) {
+        console.log(`✅ [CONVERSATION ADVANCEMENT] Message sent successfully via compliant service`);
+        return { 
+          success: true, 
+          messageId: result.conversationId 
+        };
+      } else {
+        console.error(`❌ [CONVERSATION ADVANCEMENT] Message failed via compliant service:`, result.error);
+        return { 
+          success: false 
+        };
       }
-
-      // Update conversation with success
-      await supabase
-        .from('conversations')
-        .update({ 
-          sms_status: 'sent', 
-          twilio_message_id: data?.telnyxMessageId || data?.messageSid 
-        })
-        .eq('id', conversation.id);
-
-      return { success: true, messageId: conversation.id };
-
     } catch (error) {
-      console.error('❌ [SEND ADVANCEMENT] Error:', error);
+      console.error('❌ [CONVERSATION ADVANCEMENT] Error sending advancement message:', error);
       return { success: false };
     }
   }
