@@ -26,9 +26,11 @@ const SmartInboxPage = () => {
 
   useEffect(() => {
     if (profile?.id) {
-      console.log('🤖 Starting unified AI processor for profile:', profile.id);
+      console.log('🚫 AI automation DISABLED - preventing SMS spam to suppressed numbers');
       
-      // Start processing with unified AI service
+      // EMERGENCY SHUTDOWN: AI automation disabled to prevent SMS spam
+      // DO NOT RE-ENABLE without implementing proper compliance checks
+      /* DISABLED FOR COMPLIANCE REASONS
       const processInterval = setInterval(async () => {
         try {
           await unifiedAI.processAllPendingResponses(profile);
@@ -42,6 +44,7 @@ const SmartInboxPage = () => {
         console.log('🤖 Stopping unified AI processor');
         clearInterval(processInterval);
       };
+      */
     }
   }, [profile?.id]);
 

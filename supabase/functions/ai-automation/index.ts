@@ -172,6 +172,20 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // EMERGENCY SHUTDOWN: Function disabled to prevent SMS spam
+  console.log('🚫 [AI-AUTOMATION] EMERGENCY SHUTDOWN - Function disabled to prevent SMS spam to suppressed numbers');
+  return new Response(JSON.stringify({
+    success: false,
+    message: 'AI automation temporarily disabled for compliance - preventing SMS spam',
+    timestamp: new Date().toISOString()
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+
+  /* ORIGINAL CODE DISABLED FOR COMPLIANCE
+  // This function was sending messages directly bypassing compliance checks
+  // DO NOT RE-ENABLE without implementing proper compliance checks via consolidatedSendMessage
+
   // Parse request body early to check for test endpoints
   let requestData;
   try {
