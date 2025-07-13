@@ -7143,6 +7143,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_phone_number_constraints: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       auto_suppress_failed_numbers: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -7393,6 +7397,15 @@ export type Database = {
       mark_missing_vehicles_sold: {
         Args: { p_upload_id: string }
         Returns: undefined
+      }
+      merge_duplicate_leads_by_phone: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          phone_number: string
+          kept_lead_id: string
+          merged_lead_ids: string[]
+          conversations_moved: number
+        }[]
       }
       normalize_phone: {
         Args: { phone_input: string }
