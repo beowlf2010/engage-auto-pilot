@@ -165,25 +165,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (userRoles) {
         const roles = userRoles.map(r => r.role);
         const highestRole = determineHighestRole(roles, profileData.role);
-        const enhancedProfile = { ...profileData, role: highestRole, userRoles: roles };
-        
-        // STEP 3: Debug timing of profile loading
-        console.log('🔍 [DEBUG STEP 3] Enhanced profile created:', {
-          userId: enhancedProfile.id,
-          finalRole: enhancedProfile.role,
-          userRoles: enhancedProfile.userRoles,
-          profileRole: profileData.role,
-          timestamp: new Date().toISOString()
-        });
-        
-        return enhancedProfile;
+        return { ...profileData, role: highestRole, userRoles: roles };
       }
-      
-      console.log('🔍 [DEBUG STEP 3] Basic profile returned (no user_roles):', {
-        userId: profileData.id,
-        profileRole: profileData.role,
-        timestamp: new Date().toISOString()
-      });
       
       return profileData;
     } catch (error) {
