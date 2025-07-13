@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useInboxFilters, InboxFilters } from '@/hooks/useInboxFilters';
 import { useConversationsList } from '@/hooks/conversation/useConversationsList';
@@ -62,16 +62,33 @@ const SmartInboxWithEnhancedAI = () => {
     updateInterval: 30000
   });
 
-  // Apply local filters to conversations
-  const filteredConversations = applyFilters(prioritizedConversations.length > 0 ? prioritizedConversations : conversations);
+  // Apply local filters to conversations and ensure inbound messages are prioritized
+  const filteredConversations = useMemo(() => {
+    let filtered = applyFilters(prioritizedConversations.length > 0 ? prioritizedConversations : conversations);
+    
+    // Sort to prioritize inbound messages and unread conversations
+    filtered.sort((a, b) => {
+      // First: Unread messages come first
+      if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+      if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+      
+      // Second: Inbound messages come before outbound
+      if (a.lastMessageDirection === 'in' && b.lastMessageDirection === 'out') return -1;
+      if (a.lastMessageDirection === 'out' && b.lastMessageDirection === 'in') return 1;
+      
+      // Third: Sort by most recent message
+      return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+    });
+    
+    return filtered;
+  }, [prioritizedConversations, conversations, applyFilters]);
 
   const handleFiltersChange = useCallback((newFilters: Partial<InboxFilters>) => {
     Object.entries(newFilters).forEach(([key, value]) => {
       updateFilter(key as keyof InboxFilters, value);
     });
-    
     // Note: setInboxFilters not needed with useConversationsList
-  }, [updateFilter, setInboxFilters]);
+  }, [updateFilter]);
 
   const handleConversationSelect = useCallback(async (leadId: string) => {
     try {

@@ -260,10 +260,24 @@ export const EnhancedConversationCard: React.FC<EnhancedConversationCardProps> =
                 </Badge>
               )}
               
+              {/* Enhanced inbound message indicators */}
+              {conversation.lastMessageDirection === 'in' && (
+                <Badge variant="default" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                  <MessageSquare className="h-3 w-3 mr-1" />
+                  Inbound Message
+                </Badge>
+              )}
+              
               {conversation.lastMessageDirection === 'in' && conversation.unreadCount > 0 && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="destructive" className="text-xs animate-pulse">
                   <MessageSquare className="h-3 w-3 mr-1" />
                   Needs Response
+                </Badge>
+              )}
+              
+              {conversation.lastMessageDirection === 'out' && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  Awaiting Reply
                 </Badge>
               )}
             </div>
