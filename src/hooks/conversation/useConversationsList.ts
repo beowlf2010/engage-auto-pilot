@@ -18,7 +18,7 @@ export const useConversationsList = () => {
       try {
         console.log('🔄 Starting conversations query...');
 
-        // Get the most recent conversation per lead using direct query
+        // Get the most recent conversation per lead using window function query
         const { data: conversationsData, error } = await supabase
           .from('conversations')
           .select(`
@@ -49,20 +49,18 @@ export const useConversationsList = () => {
 
         if (error) throw error;
 
-        // Group conversations by lead and get the most recent one per lead
-        const conversationMap = new Map<string, any>();
+        // Deduplicate by lead_id to get the most recent conversation per lead
         const seenLeads = new Set<string>();
-        
-        // Process conversations to get one per lead (most recent first due to ordering)
-        conversationsData?.forEach(conv => {
-          if (!seenLeads.has(conv.lead_id)) {
-            seenLeads.add(conv.lead_id);
-            conversationMap.set(conv.lead_id, conv);
+        const uniqueConversations = conversationsData?.filter(conv => {
+          if (seenLeads.has(conv.lead_id)) {
+            return false;
           }
-        });
+          seenLeads.add(conv.lead_id);
+          return true;
+        }) || [];
 
-        // Get unique lead IDs from the filtered conversations
-        const leadIds = Array.from(conversationMap.keys());
+        // Get unique lead IDs
+        const leadIds = uniqueConversations.map(conv => conv.lead_id);
         
         // Get phone numbers for all leads in a separate query
         const { data: phoneData } = await supabase
@@ -82,7 +80,7 @@ export const useConversationsList = () => {
         // Process conversations into list format
         const conversationListMap = new Map<string, ConversationListItem>();
 
-        Array.from(conversationMap.values()).forEach(conv => {
+        uniqueConversations.forEach(conv => {
           const leadId = conv.lead_id;
           const lead = conv.leads;
           
