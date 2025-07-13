@@ -15,6 +15,7 @@ export const useConversationsList = () => {
       try {
         console.log('🔄 [STABLE CONV] Loading conversations...');
 
+        // Get distinct conversations with lead data and aggregated phone numbers
         const { data: conversationsData, error } = await supabase
           .from('conversations')
           .select(`
@@ -24,21 +25,17 @@ export const useConversationsList = () => {
             direction,
             sent_at,
             read_at,
-              leads!inner(
-                id,
-                first_name,
-                last_name,
-                email,
-                vehicle_interest,
-                salesperson_id,
-                status,
-                ai_opt_in,
-                source,
-                lead_type_name,
-                phone_numbers(
-                  number,
-                  is_primary
-                ),
+            leads!inner(
+              id,
+              first_name,
+              last_name,
+              email,
+              vehicle_interest,
+              salesperson_id,
+              status,
+              ai_opt_in,
+              source,
+              lead_type_name,
               profiles(
                 first_name,
                 last_name
@@ -49,6 +46,24 @@ export const useConversationsList = () => {
 
         if (error) throw error;
 
+        // Get unique lead IDs from conversations
+        const leadIds = [...new Set(conversationsData?.map(conv => conv.lead_id) || [])];
+        
+        // Get phone numbers for all leads in a separate query
+        const { data: phoneData } = await supabase
+          .from('phone_numbers')
+          .select('lead_id, number, is_primary')
+          .in('lead_id', leadIds);
+
+        // Create a map of lead_id to phone numbers
+        const phoneMap = new Map<string, { number: string; is_primary: boolean }[]>();
+        phoneData?.forEach(phone => {
+          if (!phoneMap.has(phone.lead_id)) {
+            phoneMap.set(phone.lead_id, []);
+          }
+          phoneMap.get(phone.lead_id)!.push(phone);
+        });
+
         // Process conversations into list format
         const conversationMap = new Map<string, ConversationListItem>();
 
@@ -57,8 +72,10 @@ export const useConversationsList = () => {
           const lead = conv.leads;
           
           if (!conversationMap.has(leadId)) {
-            const primaryPhone = lead.phone_numbers?.find(p => p.is_primary)?.number || 
-                               lead.phone_numbers?.[0]?.number || '';
+            // Get phone numbers for this lead from the phone map
+            const leadPhones = phoneMap.get(leadId) || [];
+            const primaryPhone = leadPhones.find(p => p.is_primary)?.number || 
+                               leadPhones[0]?.number || '';
 
             conversationMap.set(leadId, {
               leadId,
