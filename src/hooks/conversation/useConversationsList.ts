@@ -18,8 +18,8 @@ export const useConversationsList = () => {
       try {
         console.log('🔄 Starting conversations query...');
 
-        // Get the latest conversation per lead using database function
-        const { data: conversationsData, error } = await supabase.rpc('get_latest_conversations_per_lead');
+        // Get conversations using prioritized function that shows inbound messages first
+        const { data: conversationsData, error } = await supabase.rpc('get_inbox_conversations_prioritized');
 
         if (error) throw error;
 
@@ -62,7 +62,7 @@ export const useConversationsList = () => {
             lastMessageTime: new Date(conv.sent_at).toLocaleString(),
             lastMessageDirection: conv.direction as 'in' | 'out',
             lastMessageDate: new Date(conv.sent_at),
-            unreadCount: conv.direction === 'in' && !conv.read_at ? 1 : 0,
+            unreadCount: Number(conv.unread_count) || 0,
             messageCount: 1,
             salespersonId: conv.salesperson_id,
             vehicleInterest: conv.vehicle_interest || '',

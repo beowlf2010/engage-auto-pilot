@@ -7294,6 +7294,30 @@ export type Database = {
           is_overdue: boolean
         }[]
       }
+      get_inbox_conversations_prioritized: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          lead_id: string
+          body: string
+          direction: string
+          sent_at: string
+          read_at: string
+          first_name: string
+          last_name: string
+          email: string
+          status: string
+          vehicle_interest: string
+          source: string
+          lead_type_name: string
+          salesperson_id: string
+          profiles_first_name: string
+          profiles_last_name: string
+          ai_opt_in: boolean
+          has_unread_inbound: boolean
+          unread_count: number
+          latest_inbound_at: string
+        }[]
+      }
       get_inventory_status_summary: {
         Args: Record<PropertyKey, never>
         Returns: {
