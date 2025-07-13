@@ -5,15 +5,43 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import type { ConversationListItem } from './conversationTypes';
 
 export const useConversationsList = () => {
-  const { profile } = useAuth();
+  const { profile, user, session } = useAuth();
 
   const { data: conversations = [], isLoading: conversationsLoading, refetch: refetchConversations } = useQuery({
     queryKey: ['stable-conversations', profile?.id],
     queryFn: async () => {
-      if (!profile) return [];
+      // STEP 1: Debug current auth state
+      console.log('🔍 [DEBUG STEP 1] Auth State Check:', {
+        userId: user?.id,
+        profileId: profile?.id,
+        profileRole: profile?.role,
+        userRoles: profile?.userRoles,
+        sessionExists: !!session,
+        sessionExpiresAt: session?.expires_at,
+        isSessionValid: session ? (session.expires_at > Date.now() / 1000) : false
+      });
+
+      if (!profile) {
+        console.log('❌ [DEBUG STEP 1] No profile found, returning empty array');
+        return [];
+      }
 
       try {
         console.log('🔄 [STABLE CONV] Loading conversations...');
+        
+        // STEP 4: Test the RLS function directly
+        try {
+          const { data: managerCheck, error: managerError } = await supabase.rpc('user_has_manager_access');
+          console.log('🔍 [DEBUG STEP 4] Manager access check:', {
+            hasManagerAccess: managerCheck,
+            error: managerError
+          });
+        } catch (rlsError) {
+          console.error('❌ [DEBUG STEP 4] Error checking manager access:', rlsError);
+        }
+        
+        // STEP 2: Test the exact query to see what's happening
+        console.log('🔍 [DEBUG STEP 2] About to execute conversations query...');
 
         // Get distinct conversations with lead data and aggregated phone numbers
         const { data: conversationsData, error } = await supabase
@@ -44,10 +72,27 @@ export const useConversationsList = () => {
           `)
           .order('sent_at', { ascending: false });
 
+        // STEP 2: Debug query results
+        console.log('🔍 [DEBUG STEP 2] Raw query results:', {
+          error: error,
+          conversationCount: conversationsData?.length || 0,
+          firstFewConversations: conversationsData?.slice(0, 3).map(c => ({
+            id: c.id,
+            lead_id: c.lead_id,
+            salesperson_id: c.leads?.salesperson_id,
+            direction: c.direction
+          }))
+        });
+
         if (error) throw error;
 
         // Get unique lead IDs from conversations
         const leadIds = [...new Set(conversationsData?.map(conv => conv.lead_id) || [])];
+        
+        console.log('🔍 [DEBUG STEP 2] Processing results:', {
+          uniqueLeadIds: leadIds.length,
+          totalConversationRecords: conversationsData?.length || 0
+        });
         
         // Get phone numbers for all leads in a separate query
         const { data: phoneData } = await supabase
