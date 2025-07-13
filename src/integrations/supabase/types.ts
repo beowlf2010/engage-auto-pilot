@@ -7283,6 +7283,28 @@ export type Database = {
           oldest_upload_date: string
         }[]
       }
+      get_latest_conversations_per_lead: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          lead_id: string
+          body: string
+          direction: string
+          sent_at: string
+          read_at: string
+          first_name: string
+          last_name: string
+          email: string
+          vehicle_interest: string
+          salesperson_id: string
+          status: string
+          ai_opt_in: boolean
+          source: string
+          lead_type_name: string
+          profiles_first_name: string
+          profiles_last_name: string
+        }[]
+      }
       get_rpo_analytics: {
         Args: Record<PropertyKey, never>
         Returns: {

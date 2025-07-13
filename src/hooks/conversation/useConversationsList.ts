@@ -18,49 +18,13 @@ export const useConversationsList = () => {
       try {
         console.log('🔄 Starting conversations query...');
 
-        // Get the most recent conversation per lead using window function query
-        const { data: conversationsData, error } = await supabase
-          .from('conversations')
-          .select(`
-            id,
-            lead_id,
-            body,
-            direction,
-            sent_at,
-            read_at,
-            leads!inner(
-              id,
-              first_name,
-              last_name,
-              email,
-              vehicle_interest,
-              salesperson_id,
-              status,
-              ai_opt_in,
-              source,
-              lead_type_name,
-              profiles(
-                first_name,
-                last_name
-              )
-            )
-          `)
-          .order('sent_at', { ascending: false });
+        // Get the latest conversation per lead using database function
+        const { data: conversationsData, error } = await supabase.rpc('get_latest_conversations_per_lead');
 
         if (error) throw error;
 
-        // Deduplicate by lead_id to get the most recent conversation per lead
-        const seenLeads = new Set<string>();
-        const uniqueConversations = conversationsData?.filter(conv => {
-          if (seenLeads.has(conv.lead_id)) {
-            return false;
-          }
-          seenLeads.add(conv.lead_id);
-          return true;
-        }) || [];
-
         // Get unique lead IDs
-        const leadIds = uniqueConversations.map(conv => conv.lead_id);
+        const leadIds = conversationsData?.map(conv => conv.lead_id) || [];
         
         // Get phone numbers for all leads in a separate query
         const { data: phoneData } = await supabase
@@ -80,9 +44,8 @@ export const useConversationsList = () => {
         // Process conversations into list format
         const conversationListMap = new Map<string, ConversationListItem>();
 
-        uniqueConversations.forEach(conv => {
+        conversationsData?.forEach(conv => {
           const leadId = conv.lead_id;
-          const lead = conv.leads;
           
           // Get phone numbers for this lead from the phone map
           const leadPhones = phoneMap.get(leadId) || [];
@@ -91,23 +54,23 @@ export const useConversationsList = () => {
 
           conversationListMap.set(leadId, {
             leadId,
-            leadName: `${lead.first_name} ${lead.last_name}`,
+            leadName: `${conv.first_name} ${conv.last_name}`,
             primaryPhone,
             leadPhone: primaryPhone,
-            leadEmail: lead.email || '',
+            leadEmail: conv.email || '',
             lastMessage: conv.body,
             lastMessageTime: new Date(conv.sent_at).toLocaleString(),
             lastMessageDirection: conv.direction as 'in' | 'out',
             lastMessageDate: new Date(conv.sent_at),
             unreadCount: conv.direction === 'in' && !conv.read_at ? 1 : 0,
             messageCount: 1,
-            salespersonId: lead.salesperson_id,
-            vehicleInterest: lead.vehicle_interest || '',
-            leadSource: lead.source || '',
-            leadType: lead.lead_type_name || 'unknown',
-            status: lead.status || 'new',
-            salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : undefined,
-            aiOptIn: lead.ai_opt_in || false
+            salespersonId: conv.salesperson_id,
+            vehicleInterest: conv.vehicle_interest || '',
+            leadSource: conv.source || '',
+            leadType: conv.lead_type_name || 'unknown',
+            status: conv.status || 'new',
+            salespersonName: conv.profiles_first_name && conv.profiles_last_name ? `${conv.profiles_first_name} ${conv.profiles_last_name}` : undefined,
+            aiOptIn: conv.ai_opt_in || false
           });
         });
 
