@@ -44,6 +44,7 @@ export const useConversationsList = () => {
         console.log('🔍 [DEBUG STEP 2] About to execute conversations query...');
 
         // Get distinct conversations with lead data and aggregated phone numbers
+        // Removed .limit() to fetch ALL conversations and show all conversation threads
         const { data: conversationsData, error } = await supabase
           .from('conversations')
           .select(`
