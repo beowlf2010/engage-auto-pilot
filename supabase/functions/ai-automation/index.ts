@@ -172,19 +172,22 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // EMERGENCY SHUTDOWN: Function disabled to prevent SMS spam
-  console.log('🚫 [AI-AUTOMATION] EMERGENCY SHUTDOWN - Function disabled to prevent SMS spam to suppressed numbers');
+  // EMERGENCY SHUTDOWN: Function completely disabled, cron job disabled
+  console.log('🚨 [EMERGENCY SHUTDOWN] AI automation completely disabled - cron job removed, all SMS stopped');
   return new Response(JSON.stringify({
     success: false,
-    message: 'AI automation temporarily disabled for compliance - preventing SMS spam',
-    timestamp: new Date().toISOString()
+    message: 'EMERGENCY SHUTDOWN: AI automation completely disabled, cron job removed to stop SMS spam',
+    timestamp: new Date().toISOString(),
+    cron_job_status: 'REMOVED',
+    shutdown_reason: 'SMS spam prevention - compliance emergency'
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 
-  /* ORIGINAL CODE DISABLED FOR COMPLIANCE
-  // This function was sending messages directly bypassing compliance checks
-  // DO NOT RE-ENABLE without implementing proper compliance checks via consolidatedSendMessage
+  /* 
+  COMPLETE SHUTDOWN - ALL CODE BELOW DISABLED FOR EMERGENCY COMPLIANCE
+  THE CRON JOB HAS BEEN REMOVED AND THIS FUNCTION NOW RETURNS IMMEDIATELY
+  DO NOT RE-ENABLE ANY CODE BELOW WITHOUT FIXING COMPLIANCE ISSUES
   */
   let requestData;
   try {
