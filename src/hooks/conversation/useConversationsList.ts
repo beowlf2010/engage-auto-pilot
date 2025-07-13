@@ -18,61 +18,8 @@ export const useConversationsList = () => {
       try {
         console.log('🔄 Starting conversations query...');
 
-        // STEP 1: Test raw conversations query without any joins
-        console.log('🔍 STEP 1: Testing raw conversations count...');
-        const { data: rawConversations, error: rawError } = await supabase
-          .from('conversations')
-          .select('id, lead_id')
-          .limit(50000);
-        
-        console.log('🔍 STEP 1 Results:', {
-          rawError,
-          rawConversationsCount: rawConversations?.length || 0,
-          uniqueLeadIdsFromRaw: [...new Set(rawConversations?.map(c => c.lead_id) || [])].length
-        });
-
-        // STEP 2: Test with leads join
-        console.log('🔍 STEP 2: Testing with leads join...');
-        const { data: conversationsData, error } = await supabase
-          .from('conversations')
-          .select(`
-            id,
-            lead_id,
-            body,
-            direction,
-            sent_at,
-            read_at,
-            leads!inner(
-              id,
-              first_name,
-              last_name,
-              email,
-              vehicle_interest,
-              salesperson_id,
-              status,
-              ai_opt_in,
-              source,
-              lead_type_name,
-              profiles(
-                first_name,
-                last_name
-              )
-            )
-          `)
-          .order('sent_at', { ascending: false })
-          .limit(50000);
-
-        console.log('🔍 STEP 2 Results:', {
-          error,
-          conversationCount: conversationsData?.length || 0,
-          uniqueLeadIds: [...new Set(conversationsData?.map(conv => conv.lead_id) || [])].length,
-          sampleData: conversationsData?.slice(0, 3).map(c => ({
-            id: c.id,
-            lead_id: c.lead_id,
-            hasLeadData: !!c.leads,
-            leadFirstName: c.leads?.first_name
-          }))
-        });
+        // Get the most recent conversation per lead using window function approach
+        const { data: conversationsData, error } = await supabase.rpc('get_latest_conversations_per_lead');
 
         if (error) throw error;
 
