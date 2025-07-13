@@ -7143,6 +7143,10 @@ export type Database = {
       }
     }
     Functions: {
+      auto_suppress_failed_numbers: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       book_appointment_slot: {
         Args: { p_date: string; p_time: string }
         Returns: boolean
@@ -7183,6 +7187,10 @@ export type Database = {
       check_ai_automation_health: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      check_message_rate_limit: {
+        Args: { p_phone_number: string; p_limit_minutes?: number }
+        Returns: boolean
       }
       classify_deal_by_stock: {
         Args: { stock_number: string }

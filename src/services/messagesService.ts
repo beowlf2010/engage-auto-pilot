@@ -1,16 +1,30 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { sendMessage as fixedSendMessage } from './fixedMessagesService';
+import { consolidatedSendMessage, validateProfile } from './consolidatedMessagesService';
 
-// Redirect all message sending through the working fixed service
+// Redirect all message sending through the consolidated service with compliance checks
 export const sendMessage = async (
   leadId: string,
   messageContent: string,
   profile: any,
   isAIGenerated: boolean = false
 ) => {
-  console.log(`📤 [MESSAGES] Redirecting to fixed message service for lead ${leadId}`);
-  return await fixedSendMessage(leadId, messageContent, profile, isAIGenerated);
+  console.log(`📤 [MESSAGES] Using consolidated service with compliance checks for lead ${leadId}`);
+  
+  // Validate profile data
+  const { isValid, profileId, error } = validateProfile(profile);
+  if (!isValid) {
+    console.error(`❌ [MESSAGES] Profile validation failed: ${error}`);
+    throw new Error(`Profile validation failed: ${error}`);
+  }
+
+  // Use the consolidated service with all compliance checks
+  return await consolidatedSendMessage({
+    leadId,
+    messageBody: messageContent,
+    profileId: profileId!,
+    isAIGenerated
+  });
 };
 
 export const getMessages = async (leadId: string) => {

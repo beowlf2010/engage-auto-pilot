@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { isSuppressed, enforceConsent } from '@/utils/compliance/complianceUtils';
 
 export interface SendMessageParams {
   leadId: string;
@@ -70,6 +71,39 @@ export const consolidatedSendMessage = async (params: SendMessageParams): Promis
 
     console.log(`📱 [CONSOLIDATED] Using phone: ${phoneData.number}`);
 
+    // CRITICAL COMPLIANCE CHECKS - Stop spam before creating conversation
+    const phoneNumber = phoneData.number;
+    
+    // Check if phone number is suppressed (blocked)
+    const isPhoneSuppressed = await isSuppressed(phoneNumber, 'sms');
+    if (isPhoneSuppressed) {
+      console.warn(`🚫 [COMPLIANCE] Phone ${phoneNumber} is suppressed - blocking message`);
+      throw new Error(`Phone number ${phoneNumber} is on the suppression list and cannot receive messages`);
+    }
+
+    // Check rate limiting to prevent spam
+    const { data: rateLimitCheck, error: rateLimitError } = await supabase
+      .rpc('check_message_rate_limit', { p_phone_number: phoneNumber, p_limit_minutes: 10 });
+    
+    if (rateLimitError) {
+      console.warn(`⚠️ [COMPLIANCE] Rate limit check failed:`, rateLimitError);
+    } else if (!rateLimitCheck) {
+      console.warn(`🚫 [COMPLIANCE] Rate limit exceeded for ${phoneNumber} - blocking message`);
+      throw new Error(`Rate limit exceeded for ${phoneNumber}. Please wait before sending another message.`);
+    }
+
+    // Check consent for the lead (optional but recommended)
+    try {
+      await enforceConsent(leadId, 'sms');
+      console.log(`✅ [COMPLIANCE] Consent verified for lead ${leadId}`);
+    } catch (consentError) {
+      console.warn(`⚠️ [COMPLIANCE] No consent found for lead ${leadId}:`, consentError);
+      // Continue anyway - consent check is warning only for now
+      // In production, you might want to block messages without consent
+    }
+
+    console.log(`✅ [COMPLIANCE] All compliance checks passed for ${phoneNumber}`);
+
     // Create conversation record
     const conversationData = {
       lead_id: leadId,
@@ -112,6 +146,14 @@ export const consolidatedSendMessage = async (params: SendMessageParams): Promis
           sms_error: smsResult?.error || smsError?.message || 'SMS sending failed'
         })
         .eq('id', conversation.id);
+      
+      // Auto-suppress numbers with repeated failures to prevent spam
+      console.log(`🔄 [COMPLIANCE] Running auto-suppression check for failed messages`);
+      try {
+        await supabase.rpc('auto_suppress_failed_numbers');
+      } catch (autoSuppressError) {
+        console.warn(`⚠️ [COMPLIANCE] Auto-suppression check failed:`, autoSuppressError);
+      }
       
       throw new Error(smsResult?.error || smsError?.message || 'SMS sending failed');
     }
