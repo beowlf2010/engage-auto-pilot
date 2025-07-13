@@ -7151,6 +7151,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      auto_suppress_high_failure_numbers: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       book_appointment_slot: {
         Args: { p_date: string; p_time: string }
         Returns: boolean
@@ -7207,6 +7211,10 @@ export type Database = {
       create_system_conversation: {
         Args: { conversation_data: Json }
         Returns: string
+      }
+      detect_mass_message_failures: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       detect_suspicious_activity: {
         Args: { p_user_id: string; p_time_window_minutes?: number }
