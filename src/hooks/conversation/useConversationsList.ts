@@ -10,12 +10,29 @@ export const useConversationsList = () => {
   const { data: conversations = [], isLoading: conversationsLoading, refetch: refetchConversations } = useQuery({
     queryKey: ['stable-conversations', profile?.id],
     queryFn: async () => {
-      if (!profile) return [];
+      if (!profile) {
+        console.log('❌ No profile found, returning empty array');
+        return [];
+      }
 
       try {
-        console.log('🔄 [STABLE CONV] Loading conversations...');
+        console.log('🔄 Starting conversations query...');
 
-        // Get ALL conversations with lead data - explicitly set high limit to override PostgREST default
+        // STEP 1: Test raw conversations query without any joins
+        console.log('🔍 STEP 1: Testing raw conversations count...');
+        const { data: rawConversations, error: rawError } = await supabase
+          .from('conversations')
+          .select('id, lead_id')
+          .limit(50000);
+        
+        console.log('🔍 STEP 1 Results:', {
+          rawError,
+          rawConversationsCount: rawConversations?.length || 0,
+          uniqueLeadIdsFromRaw: [...new Set(rawConversations?.map(c => c.lead_id) || [])].length
+        });
+
+        // STEP 2: Test with leads join
+        console.log('🔍 STEP 2: Testing with leads join...');
         const { data: conversationsData, error } = await supabase
           .from('conversations')
           .select(`
@@ -43,7 +60,19 @@ export const useConversationsList = () => {
             )
           `)
           .order('sent_at', { ascending: false })
-          .limit(50000); // Set explicit high limit to get all conversations
+          .limit(50000);
+
+        console.log('🔍 STEP 2 Results:', {
+          error,
+          conversationCount: conversationsData?.length || 0,
+          uniqueLeadIds: [...new Set(conversationsData?.map(conv => conv.lead_id) || [])].length,
+          sampleData: conversationsData?.slice(0, 3).map(c => ({
+            id: c.id,
+            lead_id: c.lead_id,
+            hasLeadData: !!c.leads,
+            leadFirstName: c.leads?.first_name
+          }))
+        });
 
         if (error) throw error;
 
