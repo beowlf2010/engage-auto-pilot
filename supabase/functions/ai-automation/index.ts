@@ -167,6 +167,22 @@ const validateVehicleInterest = (vehicleInterest: string | null | undefined) => 
   return { isValid: true, message: `your interest in ${trimmed}` };
 };
 
+// Timeout wrapper for function calls and database operations
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> => {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`${operationName} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } catch (error) {
+    console.error(`❌ [TIMEOUT] ${operationName} failed:`, error.message);
+    throw error;
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -478,9 +494,13 @@ serve(async (req) => {
           
           let generatedMessage;
           try {
-            const aiResult = await supabaseClient.functions.invoke('intelligent-conversation-ai', {
-              body: aiPayload
-            });
+            const aiResult = await withTimeout(
+              supabaseClient.functions.invoke('intelligent-conversation-ai', {
+                body: aiPayload
+              }),
+              30000, // 30 second timeout
+              `AI function call for lead ${lead.id}`
+            );
 
             console.log(`🧠 [AI-AUTOMATION] AI function response for lead ${lead.id}:`, {
               error: aiResult.error,
@@ -563,9 +583,13 @@ serve(async (req) => {
 
           console.log(`📱 [AI-AUTOMATION] Sending SMS to ${primaryPhone} for lead ${lead.id} with payload:`, smsPayload);
           
-          const smsResult = await supabaseClient.functions.invoke('send-sms', {
-            body: smsPayload
-          });
+          const smsResult = await withTimeout(
+            supabaseClient.functions.invoke('send-sms', {
+              body: smsPayload
+            }),
+            25000, // 25 second timeout
+            `SMS send for lead ${lead.id}`
+          );
 
           console.log(`📱 [AI-AUTOMATION] SMS function response for lead ${lead.id}:`, {
             error: smsResult.error,
@@ -679,18 +703,59 @@ serve(async (req) => {
       }
     };
 
-    // Execute lead processing with concurrency control
+    // Execute lead processing with improved concurrency control and timeout handling
     const executeWithConcurrency = async (tasks: (() => Promise<void>)[], maxConcurrent: number) => {
+      console.log(`🔧 [AI-AUTOMATION] Starting concurrency-controlled execution: ${tasks.length} tasks, max ${maxConcurrent} concurrent`);
+      
       const executing: Promise<void>[] = [];
-      for (const task of tasks) {
-        if (executing.length >= maxConcurrent) {
-          await Promise.race(executing);
+      const completed: boolean[] = [];
+      let taskIndex = 0;
+      
+      const processTask = async (taskFn: () => Promise<void>, index: number) => {
+        try {
+          console.log(`🔄 [AI-AUTOMATION] Starting task ${index + 1}/${tasks.length}`);
+          
+          // Wrap each task with its own timeout to prevent hanging
+          await withTimeout(taskFn(), 120000, `Lead processing task ${index + 1}`);
+          
+          completed[index] = true;
+          console.log(`✅ [AI-AUTOMATION] Completed task ${index + 1}/${tasks.length}`);
+        } catch (error) {
+          console.error(`❌ [AI-AUTOMATION] Task ${index + 1} failed:`, error.message);
+          completed[index] = false;
         }
-        const p = task();
-        executing.push(p);
-        p.finally(() => executing.splice(executing.indexOf(p), 1));
+      };
+
+      // Process tasks with concurrency control
+      for (const task of tasks) {
+        // Wait if we've reached max concurrency
+        if (executing.length >= maxConcurrent) {
+          await Promise.race(executing.map(p => p.catch(() => {}))); // Ignore individual errors here
+        }
+        
+        // Clean up completed promises
+        for (let i = executing.length - 1; i >= 0; i--) {
+          if (completed[i] !== undefined) {
+            executing.splice(i, 1);
+          }
+        }
+        
+        const promise = processTask(task, taskIndex++);
+        executing.push(promise);
       }
-      await Promise.all(executing);
+      
+      // Wait for all remaining tasks to complete, with overall timeout
+      try {
+        await withTimeout(
+          Promise.allSettled(executing),
+          180000, // 3 minute overall timeout
+          'All lead processing tasks'
+        );
+      } catch (overallTimeout) {
+        console.error('❌ [AI-AUTOMATION] Overall processing timeout reached, some tasks may still be running');
+      }
+      
+      console.log(`🏁 [AI-AUTOMATION] Concurrency-controlled execution completed`);
     };
 
     const leadTasks = leads.map(lead => async () => {
