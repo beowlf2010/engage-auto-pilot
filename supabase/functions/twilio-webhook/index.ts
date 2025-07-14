@@ -141,15 +141,14 @@ serve(async (req) => {
             sent_at: new Date().toISOString(),
             twilio_message_id: messageSid,
             sms_status: 'received',
-            ai_generated: false,
-            from_number: fromNumber,
-            to_number: toNumber
+            ai_generated: false
           })
           .select('id')
           .single();
 
         if (conversationError) {
           console.error('❌ Error creating inbound conversation:', conversationError);
+          console.error('❌ Conversation error details:', JSON.stringify(conversationError, null, 2));
           return new Response('OK', { status: 200, headers: corsHeaders })
         }
 
