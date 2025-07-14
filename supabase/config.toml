@@ -4,6 +4,9 @@ project_id = "tevtajmaofvnffzcsiuu"
 [functions.ai-automation]
 verify_jwt = true
 
+[functions.trigger-ai-test]
+verify_jwt = true
+
 [functions.call-status-webhook]
 verify_jwt = false
 
