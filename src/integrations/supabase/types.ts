@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_automation_locks: {
+        Row: {
+          acquired_at: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          lock_id: string
+          lock_name: string
+        }
+        Insert: {
+          acquired_at?: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          lock_id: string
+          lock_name: string
+        }
+        Update: {
+          acquired_at?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          lock_id?: string
+          lock_name?: string
+        }
+        Relationships: []
+      }
       ai_automation_runs: {
         Row: {
           completed_at: string | null
