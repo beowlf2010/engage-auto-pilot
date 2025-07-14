@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_automation_control: {
+        Row: {
+          automation_enabled: boolean | null
+          created_at: string | null
+          emergency_stop: boolean | null
+          global_timeout_minutes: number | null
+          id: string
+          max_concurrent_runs: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          automation_enabled?: boolean | null
+          created_at?: string | null
+          emergency_stop?: boolean | null
+          global_timeout_minutes?: number | null
+          id?: string
+          max_concurrent_runs?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          automation_enabled?: boolean | null
+          created_at?: string | null
+          emergency_stop?: boolean | null
+          global_timeout_minutes?: number | null
+          id?: string
+          max_concurrent_runs?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ai_automation_runs: {
         Row: {
           completed_at: string | null
