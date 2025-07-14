@@ -172,23 +172,43 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // EMERGENCY SHUTDOWN: Function completely disabled, cron job disabled
-  console.log('🚨 [EMERGENCY SHUTDOWN] AI automation completely disabled - cron job removed, all SMS stopped');
-  return new Response(JSON.stringify({
-    success: false,
-    message: 'EMERGENCY SHUTDOWN: AI automation completely disabled, cron job removed to stop SMS spam',
-    timestamp: new Date().toISOString(),
-    cron_job_status: 'REMOVED',
-    shutdown_reason: 'SMS spam prevention - compliance emergency'
-  }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
+  // Check AI emergency settings before proceeding
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('❌ [AI-AUTOMATION] Missing required environment variables');
+    return new Response(JSON.stringify({
+      success: false,
+      message: 'Missing required environment variables',
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
 
-  /* 
-  COMPLETE SHUTDOWN - ALL CODE BELOW DISABLED FOR EMERGENCY COMPLIANCE
-  THE CRON JOB HAS BEEN REMOVED AND THIS FUNCTION NOW RETURNS IMMEDIATELY
-  DO NOT RE-ENABLE ANY CODE BELOW WITHOUT FIXING COMPLIANCE ISSUES
-  */
+  const supabaseClient = createClient(supabaseUrl, serviceRoleKey);
+  
+  // Check if AI is disabled via emergency settings
+  const { data: emergencySettings } = await supabaseClient
+    .from('ai_emergency_settings')
+    .select('ai_disabled, disable_reason')
+    .limit(1)
+    .single();
+
+  if (emergencySettings?.ai_disabled) {
+    console.log('🚫 [AI-AUTOMATION] AI is disabled via emergency settings:', emergencySettings.disable_reason);
+    return new Response(JSON.stringify({
+      success: false,
+      message: `AI automation disabled: ${emergencySettings.disable_reason || 'Emergency shutdown active'}`,
+      timestamp: new Date().toISOString(),
+      shutdown_reason: emergencySettings.disable_reason
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  console.log('✅ [AI-AUTOMATION] Emergency settings check passed, proceeding with automation');
   let requestData;
   try {
     const bodyText = await req.text();
