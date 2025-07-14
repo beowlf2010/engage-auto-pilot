@@ -88,18 +88,60 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
 
   // Enhanced filtering with search
   const filteredConversations = useMemo(() => {
+    const startTime = performance.now();
+    
+    console.log('🔍 [ENHANCED-INBOX] Starting UI filtering:', {
+      timestamp: new Date().toISOString(),
+      inputConversations: conversations.length,
+      searchQuery: searchQuery.trim(),
+      inboundInInput: conversations.filter(c => c.lastMessageDirection === 'in').length,
+      unreadInInput: conversations.filter(c => c.unreadCount > 0).length
+    });
+
     let filtered = applyFilters(conversations);
+
+    console.log('🎯 [ENHANCED-INBOX] After filters:', {
+      afterFilters: filtered.length,
+      removedByFilters: conversations.length - filtered.length
+    });
 
     // Apply search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
+      const beforeSearch = filtered.length;
+      
       filtered = filtered.filter(conv => 
         conv.leadName?.toLowerCase().includes(query) ||
         conv.leadPhone?.toLowerCase().includes(query) ||
         conv.vehicleInterest?.toLowerCase().includes(query) ||
         conv.lastMessage?.toLowerCase().includes(query)
       );
+
+      console.log('🔍 [ENHANCED-INBOX] After search filter:', {
+        searchQuery: query,
+        beforeSearch,
+        afterSearch: filtered.length,
+        removedBySearch: beforeSearch - filtered.length
+      });
     }
+
+    const endTime = performance.now();
+    const inboundFiltered = filtered.filter(c => c.lastMessageDirection === 'in');
+    const unreadFiltered = filtered.filter(c => c.unreadCount > 0);
+
+    console.log('✅ [ENHANCED-INBOX] UI filtering complete:', {
+      finalCount: filtered.length,
+      inboundCount: inboundFiltered.length,
+      unreadCount: unreadFiltered.length,
+      processingTime: Math.round(endTime - startTime) + 'ms',
+      topConversations: filtered.slice(0, 3).map(c => ({
+        leadId: c.leadId,
+        name: c.leadName,
+        phone: c.primaryPhone,
+        direction: c.lastMessageDirection,
+        unreadCount: c.unreadCount
+      }))
+    });
 
     return filtered;
   }, [conversations, applyFilters, searchQuery]);
@@ -340,24 +382,44 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
               </div>
             ) : (
               <div className={`space-y-3 ${viewMode === 'grid' ? 'grid grid-cols-1 gap-3' : ''}`}>
-                {filteredConversations.map((conversation) => (
-                  <EnhancedConversationCard
-                    key={conversation.leadId}
-                    conversation={conversation}
-                    isSelected={selectedConversation === conversation.leadId}
-                    isSelectable={true}
-                    isChecked={selectedItems.has(conversation.leadId)}
-                    onSelect={onSelectConversation || (() => {})}
-                    onCheck={handleSelectItem}
-                    showAIInsights={true}
-                    aiInsights={aiInsights[conversation.leadId] || {
-                      confidence: Math.random() * 0.4 + 0.6,
-                      urgencyLevel: conversation.unreadCount > 2 ? 'high' : 'medium',
-                      buyingSignals: conversation.vehicleInterest ? ['vehicle interest'] : [],
-                      nextBestAction: 'Send follow-up message'
-                    }}
-                  />
-                ))}
+                {filteredConversations.map((conversation, index) => {
+                  // Log rendering of inbound messages and target number
+                  if (conversation.lastMessageDirection === 'in' || 
+                      conversation.primaryPhone === '+12513252469' || 
+                      conversation.primaryPhone.replace(/\D/g, '') === '12513252469') {
+                    console.log('🎨 [ENHANCED-INBOX] Rendering conversation card:', {
+                      position: index + 1,
+                      leadId: conversation.leadId,
+                      name: conversation.leadName,
+                      phone: conversation.primaryPhone,
+                      direction: conversation.lastMessageDirection,
+                      unreadCount: conversation.unreadCount,
+                      lastMessage: conversation.lastMessage?.substring(0, 50),
+                      isSelected: selectedConversation === conversation.leadId,
+                      isTargetNumber: conversation.primaryPhone === '+12513252469' || 
+                                     conversation.primaryPhone.replace(/\D/g, '') === '12513252469'
+                    });
+                  }
+
+                  return (
+                    <EnhancedConversationCard
+                      key={conversation.leadId}
+                      conversation={conversation}
+                      isSelected={selectedConversation === conversation.leadId}
+                      isSelectable={true}
+                      isChecked={selectedItems.has(conversation.leadId)}
+                      onSelect={onSelectConversation || (() => {})}
+                      onCheck={handleSelectItem}
+                      showAIInsights={true}
+                      aiInsights={aiInsights[conversation.leadId] || {
+                        confidence: Math.random() * 0.4 + 0.6,
+                        urgencyLevel: conversation.unreadCount > 2 ? 'high' : 'medium',
+                        buyingSignals: conversation.vehicleInterest ? ['vehicle interest'] : [],
+                        nextBestAction: 'Send follow-up message'
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
