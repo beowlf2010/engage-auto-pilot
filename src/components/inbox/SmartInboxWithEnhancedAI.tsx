@@ -196,7 +196,7 @@ const SmartInboxWithEnhancedAI = () => {
 
   if (authLoading || inboxLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-lg font-medium text-gray-700">
@@ -209,7 +209,7 @@ const SmartInboxWithEnhancedAI = () => {
 
   if (inboxError) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <p className="text-lg font-medium text-red-600">Error loading conversations</p>
           <p className="text-sm text-gray-600 mt-2">{inboxError}</p>
@@ -223,34 +223,36 @@ const SmartInboxWithEnhancedAI = () => {
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <p className="text-lg font-medium text-gray-700">Please log in to view your inbox.</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-background">
+    <div className="h-full flex flex-col overflow-hidden bg-background">
       <FilterRestorationBanner
         isRestored={isRestored}
         onClearFilters={handleClearRestoredFilters}
         onDismiss={handleDismissRestorationBanner}
       />
       
-      <EnhancedSmartInbox
-        conversations={filteredConversations}
-        onSelectConversation={handleConversationSelect}
-        selectedConversation={null}
-        isLoading={inboxLoading || isAnalyzing}
-        hasMore={hasMore}
-        onLoadMore={loadMore}
-        onRefresh={handleRefresh}
-        totalConversations={totalConversations}
-        unreadCount={unreadCount}
-        aiInsights={aiInsights}
-        onSearch={setInboxSearch}
-        searchQuery={searchQuery}
-      />
+      <div className="flex-1 overflow-hidden">
+        <EnhancedSmartInbox
+          conversations={filteredConversations}
+          onSelectConversation={handleConversationSelect}
+          selectedConversation={null}
+          isLoading={inboxLoading || isAnalyzing}
+          hasMore={hasMore}
+          onLoadMore={loadMore}
+          onRefresh={handleRefresh}
+          totalConversations={totalConversations}
+          unreadCount={unreadCount}
+          aiInsights={aiInsights}
+          onSearch={setInboxSearch}
+          searchQuery={searchQuery}
+        />
+      </div>
     </div>
   );
 };

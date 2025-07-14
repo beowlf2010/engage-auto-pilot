@@ -214,9 +214,9 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Header */}
-      <div className="border-b bg-card">
+      <div className="flex-shrink-0 border-b bg-card">
         <div className="p-3 md:p-4">
           <div className="flex items-center justify-between mb-3 md:mb-4">
             <div className="flex items-center gap-2 md:gap-3">
@@ -347,7 +347,7 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Conversations List - Responsive */}
         <div className={`${
           sidebarCollapsed 
@@ -357,8 +357,8 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
           selectedConversation && !sidebarCollapsed 
             ? 'hidden md:block' 
             : 'block'
-        } border-r bg-card transition-all duration-200`}>
-          <div className="h-full overflow-auto p-4">
+        } border-r bg-card transition-all duration-200 flex flex-col overflow-hidden`}>
+          <div className="flex-1 overflow-y-auto p-4">
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -443,9 +443,9 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
           selectedConversation 
             ? 'flex-1' 
             : 'hidden md:flex md:flex-1'
-        } flex transition-all duration-200`}>
+        } flex transition-all duration-200 overflow-hidden min-h-0`}>
           {/* Chat Interface */}
-          <div className="flex-1 bg-background relative">
+          <div className="flex-1 bg-background relative overflow-hidden">
             <ChatInterface
               conversation={getCurrentConversation()}
               onMessageSent={onRefresh}
@@ -454,8 +454,8 @@ export const EnhancedSmartInbox: React.FC<EnhancedSmartInboxProps> = ({
 
           {/* AI Assistant Panel - Hidden on mobile */}
           {!aiPanelCollapsed && (
-            <div className="hidden lg:block w-80 border-l bg-card">
-              <div className="h-full overflow-auto p-4">
+            <div className="hidden lg:block w-80 border-l bg-card flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4">
                 <InlineAIAssistant
                   conversation={getCurrentConversation()}
                   isVisible={true}

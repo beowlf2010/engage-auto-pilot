@@ -332,9 +332,9 @@ const OptimizedConsolidatedSmartInbox: React.FC<OptimizedConsolidatedSmartInboxP
   }
 
   return (
-    <div className="w-full h-full">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Optimized header with connection status */}
-      <div className="mb-4 flex-shrink-0 flex justify-between items-center">
+      <div className="flex-shrink-0 mb-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
           {/* Enhanced connection status */}
           <SimpleConnectionStatus
@@ -379,9 +379,9 @@ const OptimizedConsolidatedSmartInbox: React.FC<OptimizedConsolidatedSmartInboxP
       </div>
 
       {/* Optimized tabs with smart badges */}
-      <div className="mb-4 flex-shrink-0">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100 h-12">
+      <div className="flex-shrink-0 mb-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100 h-12 flex-shrink-0">
             <TabsTrigger value="unread" className="flex items-center gap-2 text-base">
               <AlertCircle className="w-4 h-4" />
               <span>Unread</span>
@@ -414,10 +414,10 @@ const OptimizedConsolidatedSmartInbox: React.FC<OptimizedConsolidatedSmartInboxP
           </TabsList>
 
           {/* Optimized tab content with virtualization ready structure */}
-          <TabsContent value={activeTab} className="flex-1 h-full mt-0 pt-4">
-            <div className="grid h-full gap-4" style={{ gridTemplateColumns: selectedLead ? 'minmax(350px, 25%) 1fr minmax(300px, 20%)' : '1fr' }}>
+          <TabsContent value={activeTab} className="flex-1 overflow-hidden mt-0 pt-4">
+            <div className="grid h-full gap-4 overflow-hidden" style={{ gridTemplateColumns: selectedLead ? 'minmax(350px, 25%) 1fr minmax(300px, 20%)' : '1fr' }}>
               {/* Conversations List */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col">
                 {conversationsLoading && isInitialLoad ? (
                   <ConversationListSkeleton />
                 ) : (
@@ -434,7 +434,7 @@ const OptimizedConsolidatedSmartInbox: React.FC<OptimizedConsolidatedSmartInboxP
 
               {/* Chat View */}
               {selectedLead && selectedConversation && (
-                <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <div className="border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col">
                   <EnhancedChatView
                     selectedConversation={selectedConversation}
                     messages={robustMessages}
@@ -452,8 +452,8 @@ const OptimizedConsolidatedSmartInbox: React.FC<OptimizedConsolidatedSmartInboxP
 
               {/* Lead Context Panel */}
               {selectedLead && (
-                <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                  <LeadContextPanel 
+                <div className="border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col">
+                  <LeadContextPanel
                     conversation={selectedConversation}
                     messages={robustMessages}
                     onSendMessage={handleSendMessage}

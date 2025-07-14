@@ -50,7 +50,7 @@ const SmartInboxPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-lg font-medium text-gray-700">Loading Smart Inbox...</p>
@@ -70,7 +70,7 @@ const SmartInboxPage = () => {
 
   if (isMobile) {
     return (
-      <div className="h-full bg-background">
+      <div className="h-screen bg-background overflow-hidden">
         <MobileSmartInbox 
           onLeadsRefresh={handleLeadsRefresh} 
           preselectedLeadId={leadId}
@@ -80,15 +80,15 @@ const SmartInboxPage = () => {
   }
 
   return (
-    <div className="h-full p-6">
-      <div className="mb-6 mobile-hidden">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
+      <div className="flex-shrink-0 p-6 pb-0 mobile-hidden">
         <h1 className="text-3xl font-bold text-slate-800 mb-2">Smart Inbox</h1>
         <p className="text-slate-600">
           AI-powered conversation management with intelligent insights and automated actions
         </p>
       </div>
 
-      <div className="h-[calc(100vh-12rem)]">
+      <div className="flex-1 p-6 pt-4 overflow-hidden">
         <OptimizedConsolidatedSmartInbox 
           onLeadsRefresh={handleLeadsRefresh} 
           preselectedLeadId={leadId}
