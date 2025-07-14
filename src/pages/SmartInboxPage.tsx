@@ -4,10 +4,7 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { unifiedAI } from "@/services/unifiedAIService";
 import { useIsMobile } from "@/hooks/use-mobile";
-import SimpleSmartInboxPage from "./SimpleSmartInboxPage";
-// Temporarily commented out to fix module import error
-// import OptimizedConsolidatedSmartInbox from "@/components/inbox/OptimizedConsolidatedSmartInbox";
-// import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
+import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
@@ -70,8 +67,14 @@ const SmartInboxPage = () => {
     window.location.reload();
   };
 
-  // Temporarily use simple inbox to fix module import error
-  return <SimpleSmartInboxPage />;
+  return (
+    <div className="h-screen bg-background overflow-hidden">
+      <MobileSmartInbox 
+        onLeadsRefresh={handleLeadsRefresh} 
+        preselectedLeadId={leadId}
+      />
+    </div>
+  );
 };
 
 export default SmartInboxPage;

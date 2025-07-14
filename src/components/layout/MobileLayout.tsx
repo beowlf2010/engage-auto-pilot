@@ -43,7 +43,17 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
               </Button>
             </div>
             {profile && (
-              <AppSidebar unreadCount={unreadCount} />
+              <div className="px-4">
+                <h2 className="text-lg font-semibold mb-4">Navigation</h2>
+                {/* Simplified navigation for mobile - avoiding sidebar provider issues */}
+                <div className="space-y-2">
+                  <a href="/dashboard" className="block p-2 rounded hover:bg-accent">Dashboard</a>
+                  <a href="/smart-inbox" className="block p-2 rounded hover:bg-accent">
+                    Smart Inbox {unreadCount > 0 && <span className="ml-2 bg-destructive text-destructive-foreground px-2 py-1 rounded text-xs">{unreadCount}</span>}
+                  </a>
+                  <a href="/leads" className="block p-2 rounded hover:bg-accent">Leads</a>
+                </div>
+              </div>
             )}
           </SheetContent>
         </Sheet>
