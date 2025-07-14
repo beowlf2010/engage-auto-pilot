@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { Menu, X } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
 import MobileBottomNav from './MobileBottomNav';
@@ -19,10 +20,11 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
   const unreadCount = useUnreadCount();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <EmergencyStopHeader />
-      {/* Mobile Header */}
-      <header className="sticky top-0 z-50 bg-background border-b px-4 py-3 flex items-center justify-between">
+    <TooltipProvider>
+      <div className="min-h-screen bg-background flex flex-col">
+        <EmergencyStopHeader />
+        {/* Mobile Header */}
+        <header className="sticky top-0 z-50 bg-background border-b px-4 py-3 flex items-center justify-between">
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="sm" className="p-2">
@@ -56,9 +58,10 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
         {children}
       </main>
 
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav unreadCount={unreadCount} />
-    </div>
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav unreadCount={unreadCount} />
+      </div>
+    </TooltipProvider>
   );
 };
 
