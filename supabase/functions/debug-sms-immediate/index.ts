@@ -43,13 +43,30 @@ serve(async (req) => {
     // Try to call send-sms function with a test message
     console.log('📤 [DEBUG-SMS] Attempting direct SMS send...');
     
-    const { data: smsResult, error: smsError } = await supabaseClient.functions.invoke('send-sms', {
-      body: {
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-sms`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
         to: '+13345640639', // Test lead phone number from query above
         body: 'DEBUG TEST: SMS pipeline diagnostic - please ignore',
         conversationId: null
-      }
+      })
     });
+
+    let smsResult = null;
+    let smsError = null;
+    
+    try {
+      smsResult = await response.json();
+    } catch (parseError) {
+      smsError = { message: `Response parse error: ${parseError.message}`, status: response.status };
+    }
+    
+    console.log('📬 [DEBUG-SMS] Raw response status:', response.status);
+    console.log('📬 [DEBUG-SMS] Raw response headers:', Object.fromEntries(response.headers.entries()));
 
     console.log('📬 [DEBUG-SMS] SMS function response:', {
       data: smsResult,

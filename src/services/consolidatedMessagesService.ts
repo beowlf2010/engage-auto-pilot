@@ -129,6 +129,7 @@ export const consolidatedSendMessage = async (params: SendMessageParams): Promis
     console.log(`✅ [CONSOLIDATED] Created conversation: ${conversation.id}`);
 
     // Send SMS via edge function
+    console.log(`📤 [CONSOLIDATED] Calling send-sms function for conversation: ${conversation.id}`);
     const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
       body: {
         to: phoneData.number,
@@ -137,13 +138,33 @@ export const consolidatedSendMessage = async (params: SendMessageParams): Promis
       }
     });
 
+    // Enhanced error logging for debugging
+    console.log(`📬 [CONSOLIDATED] SMS function response:`, {
+      success: smsResult?.success,
+      error: smsResult?.error,
+      smsError: smsError,
+      phone: phoneData.number,
+      conversationId: conversation.id
+    });
+
     if (smsError || !smsResult?.success) {
-      // Update conversation with error
+      // Enhanced error details for troubleshooting
+      const errorDetails = {
+        smsResult: smsResult,
+        smsError: smsError,
+        phone: phoneData.number,
+        messageLength: messageBody.length,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.error(`❌ [CONSOLIDATED] SMS sending failed with details:`, errorDetails);
+      
+      // Update conversation with detailed error
       await supabase
         .from('conversations')
         .update({ 
           sms_status: 'failed',
-          sms_error: smsResult?.error || smsError?.message || 'SMS sending failed'
+          sms_error: JSON.stringify(errorDetails)
         })
         .eq('id', conversation.id);
       
@@ -155,7 +176,7 @@ export const consolidatedSendMessage = async (params: SendMessageParams): Promis
         console.warn(`⚠️ [COMPLIANCE] Auto-suppression check failed:`, autoSuppressError);
       }
       
-      throw new Error(smsResult?.error || smsError?.message || 'SMS sending failed');
+      throw new Error(`SMS sending failed: ${JSON.stringify(errorDetails)}`);
     }
 
     // Update conversation with success
