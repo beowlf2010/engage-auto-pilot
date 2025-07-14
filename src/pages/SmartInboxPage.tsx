@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { unifiedAI } from "@/services/unifiedAIService";
 import { useIsMobile } from "@/hooks/use-mobile";
 import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
+import { SMSDebugPanel } from "@/components/debug/SMSDebugPanel";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
@@ -69,6 +70,12 @@ const SmartInboxPage = () => {
 
   return (
     <div className="h-screen bg-background overflow-hidden">
+      {/* Temporary debug panel - only show if user is admin */}
+      {profile?.role === 'admin' && (
+        <div className="absolute top-4 right-4 z-50 w-96">
+          <SMSDebugPanel />
+        </div>
+      )}
       <MobileSmartInbox 
         onLeadsRefresh={handleLeadsRefresh} 
         preselectedLeadId={leadId}
