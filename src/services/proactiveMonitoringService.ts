@@ -188,14 +188,18 @@ export class ProactiveMonitoringService {
 
   private async storeMetric(metric: SystemMetric): Promise<void> {
     try {
-      // Store in a new table for system metrics history
-      await supabase.from('system_health_history').insert({
-        timestamp: metric.timestamp.toISOString(),
-        health_score: metric.healthScore,
-        critical_issues: metric.criticalIssues,
-        warnings: metric.warnings,
-        response_time_ms: metric.responseTime,
-        queue_health_score: metric.automationQueueHealth
+      // Store in automation runs table for now (until types are updated)
+      await supabase.from('ai_automation_runs').insert({
+        source: 'health_monitor',
+        status: 'completed',
+        metadata: {
+          timestamp: metric.timestamp.toISOString(),
+          health_score: metric.healthScore,
+          critical_issues: metric.criticalIssues,
+          warnings: metric.warnings,
+          response_time_ms: metric.responseTime,
+          queue_health_score: metric.automationQueueHealth
+        }
       });
     } catch (error) {
       // Don't fail monitoring if storage fails
@@ -218,14 +222,18 @@ export class ProactiveMonitoringService {
   private async triggerAlert(rule: AlertRule): Promise<void> {
     console.log(`🚨 ALERT [${rule.severity.toUpperCase()}]: ${rule.name} - ${rule.message}`);
     
-    // Store alert in database
+    // Store alert as automation run for now (until types are updated)
     try {
-      await supabase.from('system_alerts').insert({
-        alert_type: rule.name,
-        severity: rule.severity,
-        message: rule.message,
-        triggered_at: new Date().toISOString(),
-        auto_remediation_attempted: !!rule.autoRemediation
+      await supabase.from('ai_automation_runs').insert({
+        source: 'system_alert',
+        status: rule.severity === 'critical' ? 'failed' : 'completed',
+        error_message: `${rule.name}: ${rule.message}`,
+        metadata: {
+          alert_type: rule.name,
+          severity: rule.severity,
+          auto_remediation_attempted: !!rule.autoRemediation,
+          triggered_at: new Date().toISOString()
+        }
       });
     } catch (error) {
       console.error('Failed to store alert:', error);
@@ -275,7 +283,7 @@ export class ProactiveMonitoringService {
   private async checkEmergencySettings(): Promise<void> {
     const { data, error } = await supabase
       .from('ai_emergency_settings')
-      .select('ai_disabled, emergency_stop')
+      .select('ai_disabled')
       .order('created_at', { ascending: false })
       .limit(1);
 

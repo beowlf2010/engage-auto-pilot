@@ -2766,6 +2766,36 @@ export type Database = {
           },
         ]
       }
+      configuration_validations: {
+        Row: {
+          created_at: string | null
+          id: string
+          issues: Json | null
+          recommendations: Json | null
+          status: string
+          validated_at: string
+          validation_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          issues?: Json | null
+          recommendations?: Json | null
+          status: string
+          validated_at?: string
+          validation_type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          issues?: Json | null
+          recommendations?: Json | null
+          status?: string
+          validated_at?: string
+          validation_type?: string
+        }
+        Relationships: []
+      }
       conversation_analysis: {
         Row: {
           analyzed_at: string
@@ -6349,6 +6379,72 @@ export type Database = {
           successful_outcomes?: number
           timing_patterns?: Json | null
           total_attempts?: number
+        }
+        Relationships: []
+      }
+      system_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          id: string
+          message: string
+          metadata: Json | null
+          resolved: boolean | null
+          resolved_at: string | null
+          severity: string
+          triggered_at: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          id?: string
+          message: string
+          metadata?: Json | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          severity?: string
+          triggered_at?: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          id?: string
+          message?: string
+          metadata?: Json | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          severity?: string
+          triggered_at?: string
+        }
+        Relationships: []
+      }
+      system_health_history: {
+        Row: {
+          alerts_triggered: number | null
+          created_at: string | null
+          health_score: number
+          id: string
+          metrics: Json
+          timestamp: string
+          trends: Json | null
+        }
+        Insert: {
+          alerts_triggered?: number | null
+          created_at?: string | null
+          health_score: number
+          id?: string
+          metrics?: Json
+          timestamp?: string
+          trends?: Json | null
+        }
+        Update: {
+          alerts_triggered?: number | null
+          created_at?: string | null
+          health_score?: number
+          id?: string
+          metrics?: Json
+          timestamp?: string
+          trends?: Json | null
         }
         Relationships: []
       }
