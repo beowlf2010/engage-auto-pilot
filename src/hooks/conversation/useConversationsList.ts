@@ -26,19 +26,20 @@ export const useConversationsList = () => {
       }
 
       try {
-        // Get conversations using prioritized function that shows inbound messages first
-        const { data: conversationsData, error } = await supabase.rpc('get_inbox_conversations_prioritized');
+        // Get conversations using NEW optimized function that includes phone data and limits results
+        const { data: conversationsData, error } = await supabase.rpc('get_inbox_conversations_prioritized_limited');
 
         if (error) throw error;
 
-        console.log('📊 [INBOX-TRACE] Raw conversations data received:', {
+        console.log('📊 [INBOX-TRACE] Raw conversations data received (LIMITED):', {
           count: conversationsData?.length || 0,
           firstFew: conversationsData?.slice(0, 3).map(conv => ({
             leadId: conv.lead_id,
             direction: conv.direction,
             sentAt: conv.sent_at,
             unreadCount: conv.unread_count,
-            phone: `${conv.first_name} ${conv.last_name}`,
+            phone: conv.primary_phone,
+            name: `${conv.first_name} ${conv.last_name}`,
             lastMessage: conv.body?.substring(0, 50) + '...'
           })) || [],
           inboundCount: conversationsData?.filter(conv => conv.direction === 'in').length || 0,
@@ -46,66 +47,30 @@ export const useConversationsList = () => {
           totalUnread: conversationsData?.reduce((sum, conv) => sum + (Number(conv.unread_count) || 0), 0) || 0
         });
 
-        // Get unique lead IDs
-        const leadIds = conversationsData?.map(conv => conv.lead_id) || [];
-        console.log('📋 [INBOX-TRACE] Processing leads:', { 
-          uniqueLeadIds: leadIds.length,
-          leadIds: leadIds.slice(0, 5) 
-        });
-        
-        // Get phone numbers for all leads in a separate query
-        const { data: phoneData } = await supabase
-          .from('phone_numbers')
-          .select('lead_id, number, is_primary')
-          .in('lead_id', leadIds);
-
-        // Create a map of lead_id to phone numbers
-        const phoneMap = new Map<string, { number: string; is_primary: boolean }[]>();
-        phoneData?.forEach(phone => {
-          if (!phoneMap.has(phone.lead_id)) {
-            phoneMap.set(phone.lead_id, []);
-          }
-          phoneMap.get(phone.lead_id)!.push(phone);
-        });
-
-        console.log('📞 [INBOX-TRACE] Phone mapping complete:', {
-          phoneRecords: phoneData?.length || 0,
-          leadsWithPhones: phoneMap.size,
-          phoneMapSample: Array.from(phoneMap.entries()).slice(0, 3).map(([leadId, phones]) => ({
-            leadId,
-            phones: phones.map(p => ({ number: p.number, isPrimary: p.is_primary }))
-          }))
-        });
-
         // Check for specific number
         const targetNumber = '+12513252469';
-        const targetPhoneRecord = phoneData?.find(p => 
-          p.number === targetNumber || 
-          p.number.replace(/\D/g, '') === targetNumber.replace(/\D/g, '')
+        const targetConversationData = conversationsData?.find(conv => 
+          conv.primary_phone === targetNumber || 
+          conv.primary_phone.replace(/\D/g, '') === targetNumber.replace(/\D/g, '')
         );
-        if (targetPhoneRecord) {
-          console.log('🎯 [INBOUND-MSG] Found target number record:', {
-            leadId: targetPhoneRecord.lead_id,
-            number: targetPhoneRecord.number,
-            isPrimary: targetPhoneRecord.is_primary,
-            conversationsForLead: conversationsData?.filter(c => c.lead_id === targetPhoneRecord.lead_id).map(c => ({
-              direction: c.direction,
-              sentAt: c.sent_at,
-              body: c.body?.substring(0, 100)
-            }))
+        if (targetConversationData) {
+          console.log('🎯 [INBOUND-MSG] Found target number in conversations:', {
+            leadId: targetConversationData.lead_id,
+            phone: targetConversationData.primary_phone,
+            name: `${targetConversationData.first_name} ${targetConversationData.last_name}`,
+            direction: targetConversationData.direction,
+            sentAt: targetConversationData.sent_at,
+            unreadCount: targetConversationData.unread_count,
+            body: targetConversationData.body?.substring(0, 100)
           });
         }
 
-        // Process conversations into list format
+        // Process conversations into list format - phone data already included!
         const conversationListMap = new Map<string, ConversationListItem>();
 
         conversationsData?.forEach(conv => {
           const leadId = conv.lead_id;
-          
-          // Get phone numbers for this lead from the phone map
-          const leadPhones = phoneMap.get(leadId) || [];
-          const primaryPhone = leadPhones.find(p => p.is_primary)?.number || 
-                             leadPhones[0]?.number || '';
+          const primaryPhone = conv.primary_phone || ''; // Phone data now included in query
 
           // Special logging for inbound messages
           if (conv.direction === 'in') {
@@ -150,7 +115,7 @@ export const useConversationsList = () => {
         // Comprehensive final logging
         const inboundConversations = result.filter(c => c.lastMessageDirection === 'in');
         const unreadConversations = result.filter(c => c.unreadCount > 0);
-        const targetConversation = result.find(c => 
+        const targetConversationItem = result.find(c => 
           c.primaryPhone === targetNumber || 
           c.primaryPhone.replace(/\D/g, '') === targetNumber.replace(/\D/g, '')
         );
@@ -160,14 +125,14 @@ export const useConversationsList = () => {
           inboundCount: inboundConversations.length,
           unreadCount: unreadConversations.length,
           processingTime: Math.round(endTime - startTime) + 'ms',
-          targetNumberFound: !!targetConversation,
-          targetConversationDetails: targetConversation ? {
-            leadId: targetConversation.leadId,
-            name: targetConversation.leadName,
-            phone: targetConversation.primaryPhone,
-            lastMessage: targetConversation.lastMessage?.substring(0, 50),
-            direction: targetConversation.lastMessageDirection,
-            unreadCount: targetConversation.unreadCount
+          targetNumberFound: !!targetConversationItem,
+          targetConversationDetails: targetConversationItem ? {
+            leadId: targetConversationItem.leadId,
+            name: targetConversationItem.leadName,
+            phone: targetConversationItem.primaryPhone,
+            lastMessage: targetConversationItem.lastMessage?.substring(0, 50),
+            direction: targetConversationItem.lastMessageDirection,
+            unreadCount: targetConversationItem.unreadCount
           } : null,
           inboundSample: inboundConversations.slice(0, 3).map(c => ({
             leadId: c.leadId,

@@ -36,94 +36,50 @@ export const useSimplifiedRealtimeInbox = ({ onLeadsRefresh }: UseSimplifiedReal
     try {
       console.log('🔄 [SIMPLIFIED INBOX] Loading conversations');
       
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`
-          lead_id,
-          body,
-          direction,
-          sent_at,
-          leads!inner(
-            id,
-            first_name,
-            last_name,
-            phone_numbers!inner(number, is_primary),
-            vehicle_interest,
-            status,
-            salesperson_id
-          )
-        `)
-        .order('sent_at', { ascending: false });
+      // Use the new optimized function with phone data already included and limited results
+      const { data, error } = await supabase.rpc('get_inbox_conversations_prioritized_limited');
 
       if (error) throw error;
 
-      // Group conversations by lead_id and process
-      const conversationsByLead = new Map();
-      
-      data?.forEach((conv: any) => {
-        const leadId = conv.lead_id;
-        if (!conversationsByLead.has(leadId)) {
-          conversationsByLead.set(leadId, {
-            lead: conv.leads,
-            messages: []
-          });
-        }
-        conversationsByLead.get(leadId).messages.push({
-          body: conv.body,
-          direction: conv.direction,
-          sent_at: conv.sent_at
-        });
-      });
+      // Process conversations directly from the optimized function
+      const processedConversations: ConversationListItem[] = (data || []).map(conv => ({
+        leadId: conv.lead_id,
+        leadName: `${conv.first_name} ${conv.last_name}`.trim(),
+        primaryPhone: conv.primary_phone || '',
+        leadPhone: conv.primary_phone || '',
+        leadEmail: conv.email || '',
+        lastMessage: conv.body || 'No messages',
+        lastMessageTime: new Date(conv.sent_at).toLocaleString(),
+        lastMessageDirection: conv.direction as 'in' | 'out' | null,
+        unreadCount: Number(conv.unread_count) || 0,
+        messageCount: 1,
+        salespersonId: conv.salesperson_id,
+        vehicleInterest: conv.vehicle_interest || 'No vehicle specified',
+        leadSource: conv.source || 'unknown',
+        leadType: conv.lead_type_name || 'unknown',
+        status: conv.status || 'new',
+        lastMessageDate: new Date(conv.sent_at),
+        aiOptIn: conv.ai_opt_in || false,
+        salespersonName: conv.profiles_first_name && conv.profiles_last_name ? 
+          `${conv.profiles_first_name} ${conv.profiles_last_name}` : undefined
+      }));
 
-      // Process conversations with unread counts
-      const processedConversations = await Promise.all(
-        Array.from(conversationsByLead.entries()).map(async ([leadId, convData]: [string, any]) => {
-          const lead = convData.lead;
-          const messages = convData.messages;
-          const primaryPhone = lead.phone_numbers.find((p: any) => p.is_primary)?.number || 
-                              lead.phone_numbers[0]?.number || '';
-
-          // Get unread count
-          const { count: unreadCount } = await supabase
-            .from('conversations')
-            .select('*', { count: 'exact', head: true })
-            .eq('lead_id', leadId)
-            .eq('direction', 'in')
-            .is('read_at', null);
-
-          // Get last message details
-          const lastMessage = messages[0] || { body: 'No messages', direction: null, sent_at: new Date().toISOString() };
-          const lastMessageDate = new Date(lastMessage.sent_at);
-
-          return {
-            leadId,
-            leadName: `${lead.first_name} ${lead.last_name}`.trim(),
-            primaryPhone,
-            leadPhone: primaryPhone,
-            lastMessage: lastMessage.body,
-            lastMessageTime: lastMessageDate.toLocaleString(),
-            lastMessageDirection: lastMessage.direction as 'in' | 'out' | null,
-            unreadCount: unreadCount || 0,
-            messageCount: messages.length,
-            salespersonId: lead.salesperson_id,
-            vehicleInterest: lead.vehicle_interest || 'No vehicle specified',
-            status: lead.status || 'new',
-            lastMessageDate,
-            aiOptIn: false,
-            leadSource: 'unknown'
-          } as ConversationListItem;
-        })
-      );
-
-      // Remove duplicates and sort
+      // Remove duplicates and sort by unread count then by last message date
       const uniqueConversations = processedConversations
         .filter((conv, index, self) => 
           index === self.findIndex(c => c.leadId === conv.leadId)
         )
-        .sort((a, b) => b.unreadCount - a.unreadCount);
+        .sort((a, b) => {
+          // First sort by unread count
+          if (b.unreadCount !== a.unreadCount) {
+            return b.unreadCount - a.unreadCount;
+          }
+          // Then by last message date
+          return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
+        });
 
       setConversations(uniqueConversations);
-      console.log('✅ [SIMPLIFIED INBOX] Loaded conversations:', uniqueConversations.length);
+      console.log('✅ [SIMPLIFIED INBOX] Loaded conversations (OPTIMIZED):', uniqueConversations.length);
 
     } catch (error) {
       console.error('❌ [SIMPLIFIED INBOX] Error loading conversations:', error);

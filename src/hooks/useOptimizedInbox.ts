@@ -110,39 +110,8 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
     try {
       setError(null);
       
-      // Build query based on user role - including read_at field
-      let query = supabase
-        .from('leads')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          phone,
-          email,
-          vehicle_interest,
-          source,
-          status,
-          salesperson_id,
-          ai_opt_in,
-          message_intensity,
-          created_at,
-          conversations!inner(
-            id,
-            body,
-            direction,
-            sent_at,
-            read_at,
-            ai_generated
-          )
-        `);
-
-      // Apply role-based filtering
-      if (profile.role === 'sales') {
-        query = query.or(`salesperson_id.eq.${profile.id},salesperson_id.is.null`);
-      }
-
-      // Remove the limit and order to get all conversations, then we'll sort by activity
-      const { data: leadsData, error: leadsError } = await query;
+      // Use the new optimized database function instead of complex joins
+      const { data: leadsData, error: leadsError } = await supabase.rpc('get_inbox_conversations_prioritized_limited');
 
       if (leadsError) throw leadsError;
 
@@ -152,50 +121,30 @@ export const useOptimizedInbox = ({ onLeadsRefresh }: UseOptimizedInboxProps = {
         return;
       }
 
-      // Process conversations and sort by last message activity
-      const conversationMap = new Map<string, ConversationListItem>();
-
-      leadsData.forEach(lead => {
-        if (!lead.conversations || lead.conversations.length === 0) return;
-
-        const lastMessage = lead.conversations
-          .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0];
-
-        // Count ALL unread messages (where read_at IS NULL) regardless of age
-        const unreadCount = lead.conversations.filter(
-          msg => msg.direction === 'in' && !msg.read_at
-        ).length;
-
-        conversationMap.set(lead.id, {
-          leadId: lead.id,
-          leadName: `${lead.first_name} ${lead.last_name}`,
-          leadPhone: lead.phone || '',
-          primaryPhone: lead.phone || '',
-          leadEmail: lead.email || '',
-          vehicleInterest: lead.vehicle_interest || '',
-          leadSource: lead.source || '',
-          leadType: '',
-          status: lead.status || 'new',
-          salespersonId: lead.salesperson_id,
-          aiOptIn: lead.ai_opt_in || false,
-          messageIntensity: lead.message_intensity || 'standard',
-          lastMessage: lastMessage?.body || '',
-          lastMessageTime: lastMessage ? new Date(lastMessage.sent_at).toLocaleString() : '',
-          lastMessageDate: new Date(lastMessage?.sent_at || lead.created_at),
-          lastMessageDirection: lastMessage?.direction as 'in' | 'out' | null,
-          unreadCount,
-          messageCount: lead.conversations.length,
-          isAiGenerated: lastMessage?.ai_generated || false
-        });
-      });
-
-      // Convert to array and sort by last message activity (most recent first)
-      const conversationsArray = Array.from(conversationMap.values())
-        .sort((a, b) => {
-          // Sort by last message date, most recent first
-          return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
-        })
-        .slice(0, 150); // Increase limit slightly to ensure we catch active conversations
+      // Process conversations from optimized function - already sorted and limited
+      const conversationsArray: ConversationListItem[] = (leadsData || []).map(conv => ({
+        leadId: conv.lead_id,
+        leadName: `${conv.first_name} ${conv.last_name}`,
+        leadPhone: conv.primary_phone || '',
+        primaryPhone: conv.primary_phone || '',
+        leadEmail: conv.email || '',
+        vehicleInterest: conv.vehicle_interest || '',
+        leadSource: conv.source || '',
+        leadType: conv.lead_type_name || 'unknown',
+        status: conv.status || 'new',
+        salespersonId: conv.salesperson_id,
+        aiOptIn: conv.ai_opt_in || false,
+        messageIntensity: 'standard',
+        lastMessage: conv.body || '',
+        lastMessageTime: new Date(conv.sent_at).toLocaleString(),
+        lastMessageDate: new Date(conv.sent_at),
+        lastMessageDirection: conv.direction as 'in' | 'out' | null,
+        unreadCount: Number(conv.unread_count) || 0,
+        messageCount: 1,
+        isAiGenerated: false,
+        salespersonName: conv.profiles_first_name && conv.profiles_last_name ? 
+          `${conv.profiles_first_name} ${conv.profiles_last_name}` : undefined
+      }));
 
       setConversations(conversationsArray);
       setTotalConversations(conversationsArray.length);
