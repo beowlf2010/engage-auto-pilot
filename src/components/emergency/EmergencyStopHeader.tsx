@@ -93,26 +93,31 @@ export const EmergencyStopHeader = () => {
   };
 
   return (
-    <div className="relative bg-destructive/90 backdrop-blur border-b border-destructive/20 px-4 py-3">
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-b border-border/50 px-4 py-3 shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Status Indicator */}
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive-foreground" />
-          <span className="text-sm font-medium text-destructive-foreground">
-            AI Emergency Control
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span className="text-sm font-medium text-foreground">
+              AI System Control
+            </span>
+          </div>
           <Badge 
             variant={isDisabled ? "destructive" : "secondary"}
-            className={isDisabled ? "bg-destructive text-destructive-foreground" : "bg-emerald-500 text-white animate-pulse"}
+            className={isDisabled ? 
+              "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400" : 
+              "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
+            }
           >
-            {isDisabled ? "AI STOPPED" : "AI ACTIVE"}
+            {isDisabled ? "STOPPED" : "ACTIVE"}
           </Badge>
         </div>
 
         {/* Control Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {disableInfo && (
-            <span className="text-xs text-destructive-foreground/80 hidden sm:block">
+            <span className="text-xs text-muted-foreground hidden sm:block">
               Stopped: {new Date(disableInfo.disabledAt).toLocaleTimeString()}
             </span>
           )}
@@ -120,14 +125,14 @@ export const EmergencyStopHeader = () => {
           {/* System Check Button */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-500">
+              <Button variant="outline" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600">
                 <Settings className="h-4 w-4 mr-1" />
-                System Check
+                System Check & Start
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>System Health Check & Start</DialogTitle>
+                <DialogTitle>Comprehensive System Health Check</DialogTitle>
               </DialogHeader>
               <SystemHealthPanel onSystemStart={handleSystemStart} />
             </DialogContent>
@@ -140,7 +145,7 @@ export const EmergencyStopHeader = () => {
                   variant="outline" 
                   size="sm"
                   disabled={isLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
                 >
                   <Power className="h-4 w-4 mr-1" />
                   Re-enable AI
@@ -180,7 +185,7 @@ export const EmergencyStopHeader = () => {
                   variant="destructive" 
                   size="sm"
                   disabled={isLoading}
-                  className="bg-red-600 hover:bg-red-700 text-white shadow-lg animate-pulse"
+                  className="bg-red-600 hover:bg-red-700 text-white shadow-lg"
                 >
                   <PowerOff className="h-4 w-4 mr-1" />
                   EMERGENCY STOP

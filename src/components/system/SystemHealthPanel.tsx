@@ -75,8 +75,11 @@ export const SystemHealthPanel: React.FC<SystemHealthPanelProps> = ({ onSystemSt
   };
 
   const completedChecks = report?.checks.filter(c => c.status === 'success' || c.status === 'error').length || 0;
-  const totalChecks = report?.checks.length || 5;
+  const totalChecks = report?.checks.length || 8;
   const progress = totalChecks > 0 ? (completedChecks / totalChecks) * 100 : 0;
+  
+  const criticalErrors = report?.checks.filter(c => c.status === 'error' && c.critical).length || 0;
+  const warnings = report?.checks.filter(c => c.status === 'error' && !c.critical).length || 0;
 
   return (
     <Card className="w-full">
@@ -138,7 +141,19 @@ export const SystemHealthPanel: React.FC<SystemHealthPanelProps> = ({ onSystemSt
             )}
 
             {/* Summary */}
-            <p className="text-sm text-muted-foreground">{report.summary}</p>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">{report.summary}</p>
+              {criticalErrors > 0 && (
+                <div className="text-sm text-destructive font-medium">
+                  ⚠️ {criticalErrors} critical error(s) must be fixed before starting
+                </div>
+              )}
+              {warnings > 0 && (
+                <div className="text-sm text-amber-600 dark:text-amber-400">
+                  ⚠️ {warnings} warning(s) - system can start but may have limited functionality
+                </div>
+              )}
+            </div>
 
             {/* Individual Checks */}
             <div className="space-y-2">
@@ -149,14 +164,24 @@ export const SystemHealthPanel: React.FC<SystemHealthPanelProps> = ({ onSystemSt
                 >
                   <div className="flex items-center gap-3">
                     {getStatusIcon(check.status)}
-                    <div>
-                      <div className="font-medium text-sm">{check.name}</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-sm">{check.name}</div>
+                        {check.critical && (
+                          <Badge variant="destructive" className="text-xs">CRITICAL</Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {check.message}
                       </div>
                       {check.error && (
-                        <div className="text-xs text-destructive mt-1">
-                          Error: {check.error}
+                        <div className="text-xs text-destructive mt-1 p-2 bg-destructive/10 rounded">
+                          <strong>Error:</strong> {check.error}
+                        </div>
+                      )}
+                      {check.details && check.status === 'success' && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          ✓ Additional details available
                         </div>
                       )}
                     </div>
