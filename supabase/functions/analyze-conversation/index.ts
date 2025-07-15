@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -22,27 +21,40 @@ serve(async (req) => {
     console.log('Analyze conversation request:', { action });
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get OpenAI API key from settings table
+    const { data: openAIKeySetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'OPENAI_API_KEY')
+      .maybeSingle();
+
+    if (!openAIKeySetting?.value) {
+      throw new Error('OpenAI API key not configured in settings');
+    }
+
+    const openAIApiKey = openAIKeySetting.value;
 
     let result = {};
 
     switch (action) {
       case 'summarize':
-        result = await summarizeConversation(payload.messages);
+        result = await summarizeConversation(payload.messages, openAIApiKey);
         break;
       case 'sentiment':
-        result = await analyzeSentiment(payload.message);
+        result = await analyzeSentiment(payload.message, openAIApiKey);
         break;
       case 'suggestions':
-        result = await generateSuggestions(payload.messages, payload.leadContext);
+        result = await generateSuggestions(payload.messages, payload.leadContext, openAIApiKey);
         break;
       case 'compliance_check':
-        result = await checkCompliance(payload.message, payload.ruleType);
+        result = await checkCompliance(payload.message, payload.ruleType, openAIApiKey);
         break;
       case 'quality_score':
-        result = await analyzeQuality(payload.messages, payload.sentiments);
+        result = await analyzeQuality(payload.messages, payload.sentiments, openAIApiKey);
         break;
       case 'training_recommendations':
-        result = await generateTrainingRecommendations(payload.qualityScores, payload.violations, payload.salespersonId);
+        result = await generateTrainingRecommendations(payload.qualityScores, payload.violations, payload.salespersonId, openAIApiKey);
         break;
       case 'sales_forecast':
         result = await generateSalesForecast(payload, openAIApiKey);
@@ -89,7 +101,7 @@ serve(async (req) => {
   }
 });
 
-async function summarizeConversation(messages: any[]) {
+async function summarizeConversation(messages: any[], openAIApiKey: string) {
   if (!openAIApiKey) {
     return { summary: 'OpenAI API key not configured', keyPoints: [] };
   }
@@ -129,7 +141,7 @@ async function summarizeConversation(messages: any[]) {
   };
 }
 
-async function analyzeSentiment(message: string) {
+async function analyzeSentiment(message: string, openAIApiKey: string) {
   if (!openAIApiKey) {
     return { sentimentScore: 0, sentimentLabel: 'neutral', confidenceScore: 0.5, emotions: [] };
   }
@@ -160,7 +172,7 @@ async function analyzeSentiment(message: string) {
   return JSON.parse(data.choices[0].message.content);
 }
 
-async function generateSuggestions(messages: any[], leadContext: any) {
+async function generateSuggestions(messages: any[], leadContext: any, openAIApiKey: string) {
   if (!openAIApiKey) {
     return { suggestions: [] };
   }
@@ -195,7 +207,7 @@ async function generateSuggestions(messages: any[], leadContext: any) {
   return JSON.parse(data.choices[0].message.content);
 }
 
-async function checkCompliance(message: string, ruleType: string) {
+async function checkCompliance(message: string, ruleType: string, openAIApiKey: string) {
   if (!openAIApiKey) {
     return { violation: false, detectedContent: '' };
   }
@@ -236,7 +248,7 @@ async function checkCompliance(message: string, ruleType: string) {
   return JSON.parse(data.choices[0].message.content);
 }
 
-async function analyzeQuality(messages: any[], sentiments: any[]) {
+async function analyzeQuality(messages: any[], sentiments: any[], openAIApiKey: string) {
   if (!openAIApiKey) {
     return { 
       professionalismScore: 5.0, 
@@ -277,7 +289,7 @@ async function analyzeQuality(messages: any[], sentiments: any[]) {
   return JSON.parse(data.choices[0].message.content);
 }
 
-async function generateTrainingRecommendations(qualityScores: any[], violations: any[], salespersonId: string) {
+async function generateTrainingRecommendations(qualityScores: any[], violations: any[], salespersonId: string, openAIApiKey: string) {
   if (!openAIApiKey) {
     return { recommendations: [] };
   }

@@ -146,10 +146,18 @@ serve(async (req) => {
     console.log(`📝 [AI MESSAGE] Context prepared:`, aiContext);
 
     // Generate message using OpenAI
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
+    // Get OpenAI API key from settings table
+    const { data: openAIKeySetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'OPENAI_API_KEY')
+      .maybeSingle();
+
+    if (!openAIKeySetting?.value) {
+      throw new Error('OpenAI API key not configured in settings');
     }
+
+    const openaiApiKey = openAIKeySetting.value;
 
     // Create decision-based prompts
     let prompt = '';

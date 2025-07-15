@@ -1,7 +1,9 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,9 +31,20 @@ serve(async (req) => {
   }
 
   try {
-    if (!openAIApiKey) {
-      throw new Error('OPENAI_API_KEY is not configured');
+    const supabase = createClient(supabaseUrl!, supabaseKey!);
+    
+    // Get OpenAI API key from settings table
+    const { data: openAIKeySetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'OPENAI_API_KEY')
+      .maybeSingle();
+
+    if (!openAIKeySetting?.value) {
+      throw new Error('OpenAI API key not configured in settings');
     }
+
+    const openAIApiKey = openAIKeySetting.value;
 
     const { conversation, type = 'response' }: { 
       conversation: ConversationData;

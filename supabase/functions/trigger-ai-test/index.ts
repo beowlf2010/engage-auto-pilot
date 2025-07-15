@@ -4,7 +4,6 @@ import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,7 +38,22 @@ serve(async (req) => {
       console.error('❌ Database test failed:', error);
     }
 
-    // Test 2: OpenAI Connection
+    // Test 2: OpenAI Connection - Get API key from settings
+    let openAIApiKey = null;
+    try {
+      const { data: openAIKeySetting } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'OPENAI_API_KEY')
+        .maybeSingle();
+      
+      if (openAIKeySetting?.value) {
+        openAIApiKey = openAIKeySetting.value;
+      }
+    } catch (error) {
+      console.error('❌ Failed to get OpenAI API key from settings:', error);
+    }
+
     if (openAIApiKey) {
       try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
