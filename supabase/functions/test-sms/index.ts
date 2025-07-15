@@ -13,16 +13,22 @@ serve(async (req) => {
 
   try {
     console.log('=== TEST SMS FUNCTION START ===');
-    const { to, message } = await req.json()
+    const body = await req.json()
+    const { to, message, systemCheck, testMode } = body
     
-    if (!to || !message) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Phone number and message are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Handle system check mode
+    if (systemCheck || testMode) {
+      console.log('🔍 Running SMS system check...');
+    } else {
+      // Regular SMS sending requires to and message
+      if (!to || !message) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Phone number and message are required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      console.log(`📱 Testing SMS to ${to}`);
     }
-
-    console.log(`📱 Testing SMS to ${to}`);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -70,7 +76,49 @@ serve(async (req) => {
       phoneNumber: phoneNumber
     });
 
-    // Send test SMS via Twilio
+    // Handle system check mode
+    if (systemCheck || testMode) {
+      console.log('🔍 System check mode - testing Twilio API connectivity...');
+      
+      // Test Twilio API connectivity without sending SMS
+      const twilioValidationUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`
+      const validationResponse = await fetch(twilioValidationUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        }
+      })
+
+      const validationResult = await validationResponse.json()
+      console.log('📡 Twilio validation response:', JSON.stringify(validationResult, null, 2));
+
+      if (!validationResponse.ok) {
+        console.error('❌ Twilio credentials validation failed:', validationResult);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Twilio credentials validation failed',
+            twilioError: validationResult,
+            details: 'Check your Twilio Account SID and Auth Token'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log('✅ SMS system check passed - Twilio credentials are valid');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'SMS system check passed',
+          twilioAccountName: validationResult.friendly_name,
+          twilioPhoneNumber: phoneNumber,
+          status: 'credentials_valid'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Send test SMS via Twilio (regular mode)
     const payload = new URLSearchParams({
       To: to,
       From: phoneNumber,
