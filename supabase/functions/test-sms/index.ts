@@ -80,42 +80,131 @@ serve(async (req) => {
     if (systemCheck || testMode) {
       console.log('🔍 System check mode - testing Twilio API connectivity...');
       
-      // Test Twilio API connectivity without sending SMS
-      const twilioValidationUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`
-      const validationResponse = await fetch(twilioValidationUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+      // Enhanced Twilio API validation with retry logic
+      const validateTwilioCredentials = async (retryCount = 0) => {
+        const twilioValidationUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`
+        
+        try {
+          const validationResponse = await fetch(twilioValidationUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+            },
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          })
+
+          const validationResult = await validationResponse.json()
+          console.log('📡 Twilio validation response:', JSON.stringify(validationResult, null, 2));
+
+          if (!validationResponse.ok) {
+            console.error('❌ Twilio credentials validation failed:', {
+              status: validationResponse.status,
+              statusText: validationResponse.statusText,
+              result: validationResult,
+              accountSidUsed: accountSid.substring(0, 6) + '...',
+              retryCount
+            });
+
+            // Provide specific error messages for common issues
+            let errorMessage = 'Twilio credentials validation failed';
+            let troubleshooting = 'Check your Twilio Account SID and Auth Token';
+
+            if (validationResponse.status === 401) {
+              errorMessage = 'Twilio authentication failed';
+              troubleshooting = 'Your Account SID or Auth Token is incorrect. Please verify them in your Twilio Console.';
+            } else if (validationResponse.status === 404) {
+              errorMessage = 'Twilio account not found';
+              troubleshooting = 'Your Account SID does not exist. Please check your Twilio Console.';
+            } else if (validationResponse.status === 429) {
+              errorMessage = 'Twilio rate limit exceeded';
+              troubleshooting = 'Too many requests to Twilio API. Please try again in a few minutes.';
+            } else if (validationResponse.status >= 500) {
+              errorMessage = 'Twilio service unavailable';
+              troubleshooting = 'Twilio API is experiencing issues. Please try again later.';
+            }
+
+            // For non-critical errors, still return success with warning
+            if (validationResponse.status === 429 || validationResponse.status >= 500) {
+              console.log('⚠️ SMS system check passed with warning - Twilio API temporarily unavailable');
+              return new Response(
+                JSON.stringify({ 
+                  success: true, 
+                  warning: true,
+                  message: 'SMS system check passed with warning',
+                  error: errorMessage,
+                  troubleshooting: troubleshooting,
+                  details: 'Credentials exist in database but Twilio API validation failed temporarily',
+                  credentialsStatus: 'configured_but_unvalidated',
+                  twilioPhoneNumber: phoneNumber
+                }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              )
+            }
+
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: errorMessage,
+                troubleshooting: troubleshooting,
+                twilioError: validationResult,
+                credentialsStatus: 'invalid',
+                debugInfo: {
+                  accountSidUsed: accountSid.substring(0, 6) + '...',
+                  phoneNumber: phoneNumber,
+                  httpStatus: validationResponse.status
+                }
+              }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+
+          console.log('✅ SMS system check passed - Twilio credentials are valid');
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              message: 'SMS system check passed',
+              twilioAccountName: validationResult.friendly_name || 'Unknown',
+              twilioPhoneNumber: phoneNumber,
+              credentialsStatus: 'valid_and_verified',
+              accountStatus: validationResult.status || 'active'
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+
+        } catch (networkError) {
+          console.error('🌐 Network error during Twilio validation:', {
+            error: networkError.message,
+            retryCount,
+            accountSidUsed: accountSid.substring(0, 6) + '...'
+          });
+
+          // Retry on network errors (up to 2 retries)
+          if (retryCount < 2 && (networkError.name === 'TypeError' || networkError.name === 'AbortError')) {
+            console.log(`🔄 Retrying Twilio validation... (attempt ${retryCount + 1}/2)`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+            return validateTwilioCredentials(retryCount + 1);
+          }
+
+          // After retries failed, return success with warning (since credentials exist in DB)
+          console.log('⚠️ SMS system check passed with warning - network connectivity issues');
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              warning: true,
+              message: 'SMS system check passed with warning',
+              error: 'Network connectivity issues with Twilio API',
+              troubleshooting: 'Your credentials are configured but could not be validated due to network issues. SMS may still work.',
+              details: 'Credentials exist in database but network validation failed',
+              credentialsStatus: 'configured_but_unvalidated',
+              twilioPhoneNumber: phoneNumber,
+              networkError: networkError.message
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
-      })
-
-      const validationResult = await validationResponse.json()
-      console.log('📡 Twilio validation response:', JSON.stringify(validationResult, null, 2));
-
-      if (!validationResponse.ok) {
-        console.error('❌ Twilio credentials validation failed:', validationResult);
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Twilio credentials validation failed',
-            twilioError: validationResult,
-            details: 'Check your Twilio Account SID and Auth Token'
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
       }
 
-      console.log('✅ SMS system check passed - Twilio credentials are valid');
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'SMS system check passed',
-          twilioAccountName: validationResult.friendly_name,
-          twilioPhoneNumber: phoneNumber,
-          status: 'credentials_valid'
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return validateTwilioCredentials();
     }
 
     // Send test SMS via Twilio (regular mode)

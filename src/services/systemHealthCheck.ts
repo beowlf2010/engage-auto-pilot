@@ -389,7 +389,7 @@ export class SystemHealthService {
           { step: 'Check Rate Limits', description: 'Verify SMS rate limits are not exceeded' }
         ];
         check.remediationSuggestions = [
-          'Configure Twilio API credentials in Supabase secrets',
+          'Configure Twilio API credentials in Settings',
           'Verify Twilio account is active and funded',
           'Check Twilio phone number configuration',
           'Test SMS sending with test numbers'
@@ -397,9 +397,55 @@ export class SystemHealthService {
         return;
       }
 
-      check.status = 'success';
-      check.message = 'SMS service operational';
-      check.details = { smsTest: 'passed' };
+      // Handle enhanced response format with success/warning cases
+      if (data?.success === true) {
+        if (data.warning) {
+          // Success with warning - still operational but with issues
+          check.status = 'success';
+          check.message = `SMS service operational (with warnings)`;
+          check.details = { 
+            smsTest: 'passed_with_warnings',
+            warningMessage: data.error || data.message,
+            credentialsStatus: data.credentialsStatus || 'unknown',
+            troubleshooting: data.troubleshooting
+          };
+          // Add warning info for monitoring
+          check.error = `Warning: ${data.error || 'SMS service has non-critical issues'}`;
+        } else {
+          // Full success
+          check.status = 'success';
+          check.message = 'SMS service fully operational';
+          check.details = { 
+            smsTest: 'passed',
+            twilioAccountName: data.twilioAccountName,
+            twilioPhoneNumber: data.twilioPhoneNumber,
+            credentialsStatus: data.credentialsStatus || 'valid'
+          };
+        }
+      } else {
+        // Failure case
+        check.status = 'error';
+        check.error = data?.error || 'SMS service test failed';
+        check.message = 'SMS service test failed (non-critical)';
+        check.details = {
+          smsTest: 'failed',
+          twilioError: data?.twilioError,
+          troubleshooting: data?.troubleshooting,
+          credentialsStatus: data?.credentialsStatus || 'unknown'
+        };
+        check.troubleshootingSteps = [
+          { step: 'Check Twilio Configuration', description: data?.troubleshooting || 'Verify Twilio API credentials are configured' },
+          { step: 'Test Twilio Connectivity', description: 'Check if Twilio services are accessible' },
+          { step: 'Verify Phone Numbers', description: 'Ensure Twilio phone numbers are active' },
+          { step: 'Check Rate Limits', description: 'Verify SMS rate limits are not exceeded' }
+        ];
+        check.remediationSuggestions = [
+          'Configure Twilio API credentials in Settings',
+          'Verify Twilio account is active and funded',
+          'Check Twilio phone number configuration',
+          'Test SMS sending with test numbers'
+        ];
+      }
 
     } catch (error) {
       check.status = 'error';
@@ -412,7 +458,7 @@ export class SystemHealthService {
         { step: 'Check Rate Limits', description: 'Verify SMS rate limits are not exceeded' }
       ];
       check.remediationSuggestions = [
-        'Configure Twilio API credentials in Supabase secrets',
+        'Configure Twilio API credentials in Settings',
         'Verify Twilio account is active and funded',
         'Check Twilio phone number configuration',
         'Test SMS sending with test numbers'

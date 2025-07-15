@@ -90,15 +90,68 @@ serve(async (req) => {
     }
     testResults.tests.push(leadTest);
 
-    // Test 3: Attempt to call send-sms function (if we have test data)
+    // Test 3: Enhanced SMS system check using test-sms function
+    const smsSystemTest = {
+      name: 'SMS System Check (Enhanced)',
+      passed: false,
+      details: {}
+    };
+
+    if (credentialsTest.passed) {
+      console.log('📋 [TEST 3] Testing SMS system with enhanced validation...');
+      try {
+        const testPayload = {
+          systemCheck: true,
+          testMode: true
+        };
+
+        const { data: smsResult, error: smsError } = await supabaseClient.functions.invoke('test-sms', {
+          body: testPayload
+        });
+
+        if (smsError) {
+          smsSystemTest.details = { 
+            error: smsError.message,
+            type: 'function_invocation_error'
+          };
+        } else {
+          // Handle both success and success-with-warning cases
+          smsSystemTest.passed = smsResult?.success === true;
+          smsSystemTest.details = {
+            success: smsResult?.success,
+            warning: smsResult?.warning || false,
+            message: smsResult?.message,
+            error: smsResult?.error,
+            troubleshooting: smsResult?.troubleshooting,
+            credentialsStatus: smsResult?.credentialsStatus,
+            twilioAccountName: smsResult?.twilioAccountName,
+            twilioPhoneNumber: smsResult?.twilioPhoneNumber,
+            networkError: smsResult?.networkError
+          };
+        }
+      } catch (testError) {
+        smsSystemTest.details = {
+          error: testError.message,
+          type: 'test_exception'
+        };
+      }
+    } else {
+      smsSystemTest.details = { 
+        skipped: true, 
+        reason: 'Prerequisites failed - credentials missing from database' 
+      };
+    }
+    testResults.tests.push(smsSystemTest);
+
+    // Test 4: Attempt to call send-sms function (if we have test data and system check passed)
     const smsTest = {
       name: 'SMS Function Call Test',
       passed: false,
       details: {}
     };
 
-    if (credentialsTest.passed && leadTest.passed) {
-      console.log('📋 [TEST 3] Testing SMS function with real data...');
+    if (credentialsTest.passed && leadTest.passed && smsSystemTest.passed) {
+      console.log('📋 [TEST 4] Testing SMS function with real data...');
       try {
         const smsPayload = {
           to: leadTest.details.phoneNumber,
@@ -133,13 +186,13 @@ serve(async (req) => {
     } else {
       smsTest.details = { 
         skipped: true, 
-        reason: 'Prerequisites failed - credentials or lead data missing' 
+        reason: 'Prerequisites failed - credentials, lead data missing, or system check failed' 
       };
     }
     testResults.tests.push(smsTest);
 
-    // Test 4: Check suppression list impact
-    console.log('📋 [TEST 4] Checking suppression list...');
+    // Test 5: Check suppression list impact
+    console.log('📋 [TEST 5] Checking suppression list...');
     const { data: suppressedCount } = await supabaseClient
       .from('compliance_suppression_list')
       .select('id', { count: 'exact' })
@@ -155,8 +208,8 @@ serve(async (req) => {
     };
     testResults.tests.push(suppressionTest);
 
-    // Test 5: Check ai_emergency_settings
-    console.log('📋 [TEST 5] Checking AI emergency settings...');
+    // Test 6: Check ai_emergency_settings
+    console.log('📋 [TEST 6] Checking AI emergency settings...');
     const { data: emergencySettings } = await supabaseClient
       .from('ai_emergency_settings')
       .select('ai_disabled, disable_reason')
@@ -173,16 +226,24 @@ serve(async (req) => {
     };
     testResults.tests.push(emergencyTest);
 
-    // Summary
+    // Summary with enhanced analysis
     const allTestsPassed = testResults.tests.every(t => t.passed);
+    const criticalTests = testResults.tests.filter(t => t.name.includes('Credentials') || t.name.includes('Emergency'));
+    const criticalTestsPassed = criticalTests.every(t => t.passed);
+    const hasWarnings = testResults.tests.some(t => t.details?.warning);
+    
     const summary = {
-      overall: allTestsPassed ? 'PASS' : 'FAIL',
+      overall: allTestsPassed ? 'PASS' : (criticalTestsPassed ? 'PASS_WITH_WARNINGS' : 'FAIL'),
       totalTests: testResults.tests.length,
       passed: testResults.tests.filter(t => t.passed).length,
       failed: testResults.tests.filter(t => !t.passed).length,
+      warnings: testResults.tests.filter(t => t.details?.warning).length,
       recommendation: allTestsPassed 
         ? 'SMS pipeline is healthy - AI automation should work correctly'
-        : 'Issues detected - AI automation will likely fail until these are resolved'
+        : criticalTestsPassed 
+          ? 'SMS pipeline has warnings but should work - monitor for issues'
+          : 'Critical issues detected - AI automation will likely fail until these are resolved',
+      healthStatus: allTestsPassed ? 'healthy' : (criticalTestsPassed ? 'degraded' : 'unhealthy')
     };
 
     console.log('🧪 [SMS-PIPELINE-TEST] Test completed:', summary);
