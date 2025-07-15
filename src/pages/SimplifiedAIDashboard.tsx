@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Bot, 
   Users, 
@@ -16,11 +17,14 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { EmergencyControlCard } from '@/components/emergency/EmergencyControlCard';
+import BulkAIOptInAction from '@/components/leads/BulkAIOptInAction';
+import EnhancedBulkAIOptIn from '@/components/leads/EnhancedBulkAIOptIn';
 import { toast } from '@/hooks/use-toast';
 
 interface Lead {
@@ -55,6 +59,7 @@ const SimplifiedAIDashboard: React.FC = () => {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [aiStats, setAIStats] = useState<AIStats>({
@@ -175,6 +180,33 @@ const SimplifiedAIDashboard: React.FC = () => {
     }
   };
 
+  // Bulk selection handlers
+  const handleSelectLead = (leadId: string) => {
+    setSelectedLeads(prev => 
+      prev.includes(leadId) 
+        ? prev.filter(id => id !== leadId)
+        : [...prev, leadId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    const visibleLeadIds = filteredLeads.slice(0, 20).map(lead => lead.id);
+    if (selectedLeads.length === visibleLeadIds.length) {
+      setSelectedLeads([]);
+    } else {
+      setSelectedLeads(visibleLeadIds);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedLeads([]);
+  };
+
+  const handleBulkComplete = () => {
+    fetchData();
+    clearSelection();
+  };
+
   // Filter leads based on search
   const filteredLeads = leads.filter(lead => {
     if (!searchTerm) return true;
@@ -274,7 +306,7 @@ const SimplifiedAIDashboard: React.FC = () => {
 
         {/* Leads Tab */}
         <TabsContent value="leads" className="space-y-4">
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-4 items-center justify-between">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -284,7 +316,60 @@ const SimplifiedAIDashboard: React.FC = () => {
                 className="pl-10"
               />
             </div>
+            
+            {/* Bulk Selection Controls */}
+            <div className="flex items-center gap-2">
+              {selectedLeads.length > 0 && (
+                <>
+                  <Badge variant="outline" className="px-3 py-1">
+                    {selectedLeads.length} selected
+                  </Badge>
+                  <Button
+                    variant="outline" 
+                    size="sm"
+                    onClick={clearSelection}
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Clear
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSelectAll}
+              >
+                Select All
+              </Button>
+            </div>
           </div>
+
+          {/* Bulk Actions Panel */}
+          {selectedLeads.length > 0 && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="font-medium text-primary">
+                      {selectedLeads.length} leads selected
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <EnhancedBulkAIOptIn
+                      selectedLeads={filteredLeads.filter(lead => selectedLeads.includes(lead.id))}
+                      onComplete={handleBulkComplete}
+                    />
+                    <BulkAIOptInAction
+                      selectedLeads={filteredLeads.filter(lead => selectedLeads.includes(lead.id))}
+                      onComplete={handleBulkComplete}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -294,6 +379,13 @@ const SimplifiedAIDashboard: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedLeads.length === filteredLeads.slice(0, 20).length && filteredLeads.length > 0}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Vehicle Interest</TableHead>
@@ -304,6 +396,13 @@ const SimplifiedAIDashboard: React.FC = () => {
                 <TableBody>
                   {filteredLeads.slice(0, 20).map((lead) => (
                     <TableRow key={lead.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedLeads.includes(lead.id)}
+                          onCheckedChange={() => handleSelectLead(lead.id)}
+                          aria-label={`Select ${lead.first_name} ${lead.last_name}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="font-medium">{lead.first_name} {lead.last_name}</div>
                       </TableCell>
