@@ -34,6 +34,63 @@ export async function testAIResponse(
   }
 }
 
+// Run immediate comprehensive test
+export async function runComprehensiveAITest() {
+  console.log('🔧 [COMPREHENSIVE TEST] Starting full AI system diagnostic...');
+  
+  try {
+    // Import the test runner
+    const { runAISystemTest, testAIGenerationDirect } = await import('./aiTestRunner');
+    
+    // Step 1: Test the complete system
+    console.log('🧪 [STEP 1] Testing complete AI automation system...');
+    const systemTest = await runAISystemTest();
+    
+    // Step 2: Test direct AI generation
+    console.log('🧪 [STEP 2] Testing direct AI message generation...');
+    const directTest = await testAIGenerationDirect();
+    
+    const results = {
+      systemTest,
+      directTest,
+      overall: {
+        success: systemTest.success && directTest.success,
+        issues: []
+      }
+    };
+    
+    if (!systemTest.success) {
+      results.overall.issues.push('AI automation system failing');
+    }
+    
+    if (!directTest.success) {
+      results.overall.issues.push('AI message generation failing');
+    }
+    
+    console.log('🔧 [COMPREHENSIVE TEST] Final Results:', results);
+    
+    return results;
+    
+  } catch (error) {
+    console.error('❌ [COMPREHENSIVE TEST] Failed:', error);
+    return {
+      systemTest: { success: false, error: 'Test runner failed' },
+      directTest: { success: false, error: 'Test runner failed' },
+      overall: { success: false, issues: ['Test execution failed'] }
+    };
+  }
+}
+
+// Global function for manual testing in console
+if (typeof window !== 'undefined') {
+  (window as any).testAI = async () => {
+    console.log('🔧 Manual AI Test Started...');
+    const results = await runComprehensiveAITest();
+    console.log('🔧 Manual AI Test Complete:', results);
+    return results;
+  };
+}
+
 export async function testMultipleScenarios() {
   console.log('🧪 Testing Multiple AI Scenarios...');
   
