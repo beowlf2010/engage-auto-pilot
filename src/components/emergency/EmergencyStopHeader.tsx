@@ -1,51 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Power, PowerOff, Settings } from 'lucide-react';
+
+import React, { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { aiEmergencyService } from '@/services/aiEmergencyService';
-import { SystemHealthPanel } from '@/components/system/SystemHealthPanel';
-import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/AuthProvider';
 
-export const EmergencyStopHeader = () => {
+export const EmergencyStopHeader: React.FC = () => {
   const [isDisabled, setIsDisabled] = useState(false);
   const [disableInfo, setDisableInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { profile } = useAuth();
 
   useEffect(() => {
-    // Initialize the service and get current state
     const initializeService = async () => {
-      try {
-        await aiEmergencyService.initialize();
-        setIsDisabled(aiEmergencyService.isAIDisabled());
-        setDisableInfo(aiEmergencyService.getDisableInfo());
-      } catch (error) {
-        console.error('Failed to initialize AI emergency service:', error);
-      }
+      await aiEmergencyService.initialize();
+      setIsDisabled(aiEmergencyService.isAIDisabled());
+      setDisableInfo(aiEmergencyService.getDisableInfo());
     };
 
     initializeService();
 
-    // Subscribe to status changes
     const unsubscribe = aiEmergencyService.onStatusChange((disabled) => {
       setIsDisabled(disabled);
       setDisableInfo(aiEmergencyService.getDisableInfo());
@@ -54,175 +28,62 @@ export const EmergencyStopHeader = () => {
     return unsubscribe;
   }, []);
 
-  const handleEmergencyStop = async () => {
+  const handleToggle = async () => {
+    if (isLoading) return;
+
     setIsLoading(true);
     try {
-      await aiEmergencyService.disableAI('Emergency shutdown activated from header', profile?.id);
-      toast.error('🚨 AI Emergency Stop Activated', {
-        description: 'All AI operations have been halted immediately.',
-        duration: 5000,
-      });
+      if (isDisabled) {
+        await aiEmergencyService.enableAI(profile?.id);
+      } else {
+        await aiEmergencyService.disableAI('Manual emergency stop', profile?.id);
+      }
     } catch (error) {
-      console.error('Failed to activate emergency stop:', error);
-      toast.error('Failed to activate emergency stop');
+      console.error('❌ Error toggling AI emergency state:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleReEnable = async () => {
-    setIsLoading(true);
-    try {
-      await aiEmergencyService.enableAI(profile?.id);
-      toast.success('✅ AI Re-enabled', {
-        description: 'AI operations have been restored.',
-        duration: 3000,
-      });
-    } catch (error) {
-      console.error('Failed to re-enable AI:', error);
-      toast.error('Failed to re-enable AI');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSystemStart = () => {
-    toast.success('🚀 System Starting', {
-      description: 'AI operations are being initialized...',
-    });
-  };
+  // Only show if AI is disabled - when enabled, don't show anything
+  if (!isDisabled) {
+    return null;
+  }
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-b border-border/50 px-4 py-3 shadow-sm">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-red-500/90 backdrop-blur-sm border-b border-red-600/50 px-4 py-2 shadow-lg">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Status Indicator */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Settings className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-sm font-medium text-foreground">
-              AI System Control
-            </span>
+          <AlertTriangle className="h-5 w-5 text-white animate-pulse" />
+          <div className="text-white">
+            <span className="font-semibold text-sm">AI EMERGENCY STOP ACTIVE</span>
+            {disableInfo?.reason && (
+              <span className="ml-2 text-xs opacity-90">- {disableInfo.reason}</span>
+            )}
           </div>
-          <Badge 
-            variant={isDisabled ? "destructive" : "secondary"}
-            className={isDisabled ? 
-              "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400" : 
-              "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
-            }
+        </div>
+
+        {(profile?.role === 'admin' || profile?.role === 'manager') && (
+          <Button
+            onClick={handleToggle}
+            disabled={isLoading}
+            variant="secondary"
+            size="sm"
+            className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-xs px-3 py-1 h-auto"
           >
-            {isDisabled ? "STOPPED" : "ACTIVE"}
-          </Badge>
-        </div>
-
-        {/* Control Buttons */}
-        <div className="flex items-center gap-3">
-          {disableInfo && (
-            <span className="text-xs text-muted-foreground hidden sm:block">
-              Stopped: {new Date(disableInfo.disabledAt).toLocaleTimeString()}
-            </span>
-          )}
-
-          {/* System Check Button */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600">
-                <Settings className="h-4 w-4 mr-1" />
-                System Check & Start
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Comprehensive System Health Check</DialogTitle>
-              </DialogHeader>
-              <SystemHealthPanel onSystemStart={handleSystemStart} />
-            </DialogContent>
-          </Dialog>
-          
-          {isDisabled ? (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  disabled={isLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
-                >
-                  <Power className="h-4 w-4 mr-1" />
-                  Re-enable AI
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="flex items-center gap-2">
-                    <Power className="h-5 w-5 text-emerald-600" />
-                    Re-enable AI Operations?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will restore all AI functionality including message generation, lead scoring, 
-                    and automated responses. Make sure any issues have been resolved.
-                    {disableInfo?.reason && (
-                      <div className="mt-2 p-2 bg-muted rounded text-sm">
-                        <strong>Disabled reason:</strong> {disableInfo.reason}
-                      </div>
-                    )}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleReEnable}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    Re-enable AI
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  disabled={isLoading}
-                  className="bg-red-600 hover:bg-red-700 text-white shadow-lg"
-                >
-                  <PowerOff className="h-4 w-4 mr-1" />
-                  EMERGENCY STOP
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                    <AlertTriangle className="h-5 w-5" />
-                    Emergency AI Shutdown
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will immediately halt ALL AI operations including:
-                    <ul className="list-disc list-inside mt-2 space-y-1">
-                      <li>Message generation and sending</li>
-                      <li>Lead scoring and analysis</li>
-                      <li>Automated responses</li>
-                      <li>AI-powered insights</li>
-                    </ul>
-                    <div className="mt-3 p-3 bg-destructive/10 rounded border-l-4 border-destructive">
-                      <strong>⚠️ Only use in emergency situations!</strong>
-                    </div>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleEmergencyStop}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    EMERGENCY STOP
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-        </div>
+            {isLoading ? (
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 border border-white/50 border-t-white rounded-full animate-spin" />
+                <span>Enabling...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <CheckCircle className="h-3 w-3" />
+                <span>Re-enable AI</span>
+              </div>
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );
