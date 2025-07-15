@@ -1,5 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export interface TroubleshootingStep {
+  step: string;
+  description: string;
+  action?: () => Promise<void>;
+  autoFix?: boolean;
+  actionLabel?: string;
+}
+
 export interface SystemCheck {
   name: string;
   status: 'pending' | 'running' | 'success' | 'error';
@@ -7,6 +15,9 @@ export interface SystemCheck {
   details?: any;
   error?: string;
   critical?: boolean;
+  troubleshootingSteps?: TroubleshootingStep[];
+  remediationSuggestions?: string[];
+  canAutoFix?: boolean;
 }
 
 export interface SystemHealthReport {
@@ -14,6 +25,10 @@ export interface SystemHealthReport {
   checks: SystemCheck[];
   canStart: boolean;
   summary: string;
+  healthScore: number;
+  recommendations: string[];
+  criticalIssues: string[];
+  warnings: string[];
 }
 
 export class SystemHealthService {
@@ -42,7 +57,11 @@ export class SystemHealthService {
       overallStatus: 'running',
       checks,
       canStart: false,
-      summary: 'Running system health checks...'
+      summary: 'Running system health checks...',
+      healthScore: 0,
+      recommendations: [],
+      criticalIssues: [],
+      warnings: []
     };
 
     try {
@@ -89,13 +108,58 @@ export class SystemHealthService {
         report.summary = 'All systems operational. Ready to start AI operations.';
       }
 
+      // Calculate health score and generate recommendations
+      const successCount = checks.filter(c => c.status === 'success').length;
+      report.healthScore = Math.round((successCount / checks.length) * 100);
+      report.criticalIssues = checks.filter(c => c.status === 'error' && c.critical).map(c => c.name);
+      report.warnings = checks.filter(c => c.status === 'error' && !c.critical).map(c => c.name);
+      report.recommendations = this.generateRecommendations(checks);
+
     } catch (error) {
       report.overallStatus = 'error';
       report.canStart = false;
       report.summary = `System check failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      report.healthScore = 0;
+      report.criticalIssues = ['System Check Failed'];
+      report.recommendations = ['Contact technical support for assistance'];
     }
 
     return report;
+  }
+
+  private generateRecommendations(checks: SystemCheck[]): string[] {
+    const recommendations: string[] = [];
+    
+    const failedChecks = checks.filter(c => c.status === 'error');
+    if (failedChecks.length === 0) {
+      recommendations.push('All systems are functioning optimally');
+      return recommendations;
+    }
+
+    // Critical issues first
+    const criticalFailures = failedChecks.filter(c => c.critical);
+    if (criticalFailures.length > 0) {
+      recommendations.push('🚨 Critical Issues Found:');
+      criticalFailures.forEach(check => {
+        recommendations.push(`• Fix ${check.name}: ${check.error}`);
+        if (check.remediationSuggestions) {
+          check.remediationSuggestions.forEach(suggestion => {
+            recommendations.push(`  - ${suggestion}`);
+          });
+        }
+      });
+    }
+
+    // Non-critical warnings
+    const warnings = failedChecks.filter(c => !c.critical);
+    if (warnings.length > 0) {
+      recommendations.push('⚠️ Non-Critical Warnings:');
+      warnings.forEach(check => {
+        recommendations.push(`• ${check.name}: ${check.error}`);
+      });
+    }
+
+    return recommendations;
   }
 
   private async testDatabaseConnection(check: SystemCheck): Promise<void> {
@@ -121,6 +185,18 @@ export class SystemHealthService {
       check.status = 'error';
       check.error = error instanceof Error ? error.message : 'Unknown database error';
       check.message = 'Database connection failed';
+      check.troubleshootingSteps = [
+        { step: 'Verify Network Connection', description: 'Check if you can access the internet and Supabase dashboard' },
+        { step: 'Check Supabase Status', description: 'Visit status.supabase.com to verify service availability' },
+        { step: 'Verify Project Settings', description: 'Ensure project URL and API keys are correct' },
+        { step: 'Check RLS Policies', description: 'Verify Row Level Security policies allow access to leads table' }
+      ];
+      check.remediationSuggestions = [
+        'Check your internet connection',
+        'Verify Supabase project is active',
+        'Ensure API keys are valid and not expired',
+        'Check if RLS policies are properly configured'
+      ];
     }
   }
 
@@ -157,6 +233,18 @@ export class SystemHealthService {
       check.status = 'error';
       check.error = error instanceof Error ? error.message : 'Unknown database integrity error';
       check.message = 'Database integrity check failed';
+      check.troubleshootingSteps = [
+        { step: 'Check Table Existence', description: 'Verify all required tables exist in the database' },
+        { step: 'Verify RLS Policies', description: 'Check that Row Level Security policies are properly configured' },
+        { step: 'Test User Permissions', description: 'Ensure current user has proper access to critical tables' },
+        { step: 'Run Database Migration', description: 'Check if database schema is up to date' }
+      ];
+      check.remediationSuggestions = [
+        'Run database migrations to ensure schema is current',
+        'Check RLS policies for critical tables',
+        'Verify user authentication and permissions',
+        'Contact administrator if tables are missing'
+      ];
     }
   }
 
@@ -186,6 +274,18 @@ export class SystemHealthService {
       check.status = 'error';
       check.error = error instanceof Error ? error.message : 'Unknown OpenAI API error';
       check.message = 'OpenAI API test failed';
+      check.troubleshootingSteps = [
+        { step: 'Verify API Key', description: 'Check if OpenAI API key is properly configured in Supabase secrets' },
+        { step: 'Test API Connectivity', description: 'Verify OpenAI API is accessible from your location' },
+        { step: 'Check API Limits', description: 'Ensure you have sufficient API credits and rate limits' },
+        { step: 'Verify Edge Function', description: 'Check if trigger-ai-test edge function is deployed and working' }
+      ];
+      check.remediationSuggestions = [
+        'Configure OpenAI API key in Supabase dashboard under Settings > Edge Functions',
+        'Verify API key has proper permissions and billing is active',
+        'Check OpenAI API status at status.openai.com',
+        'Test edge function deployment'
+      ];
     }
   }
 
@@ -211,6 +311,18 @@ export class SystemHealthService {
       check.status = 'error';
       check.error = error instanceof Error ? error.message : 'Unknown edge function error';
       check.message = 'Edge functions failed';
+      check.troubleshootingSteps = [
+        { step: 'Check Function Deployment', description: 'Verify edge functions are properly deployed' },
+        { step: 'Test Function Logs', description: 'Check edge function logs for errors' },
+        { step: 'Verify Permissions', description: 'Ensure functions have proper permissions' },
+        { step: 'Test Network Connectivity', description: 'Verify functions can connect to external services' }
+      ];
+      check.remediationSuggestions = [
+        'Redeploy edge functions',
+        'Check function logs in Supabase dashboard',
+        'Verify function permissions and secrets',
+        'Test network connectivity from edge functions'
+      ];
     }
   }
 
@@ -240,6 +352,18 @@ export class SystemHealthService {
       check.status = 'error';
       check.error = error instanceof Error ? error.message : 'Unknown AI generation error';
       check.message = 'AI generation test failed';
+      check.troubleshootingSteps = [
+        { step: 'Verify OpenAI Integration', description: 'Check if OpenAI API is properly configured' },
+        { step: 'Test AI Functions', description: 'Verify AI edge functions are working' },
+        { step: 'Check Templates', description: 'Ensure AI message templates are available' },
+        { step: 'Test Lead Context', description: 'Verify AI can access lead data for generation' }
+      ];
+      check.remediationSuggestions = [
+        'Fix OpenAI API configuration',
+        'Verify AI edge functions are deployed',
+        'Check AI message templates in database',
+        'Test lead data access permissions'
+      ];
     }
   }
 
@@ -258,6 +382,18 @@ export class SystemHealthService {
         check.status = 'error';
         check.error = `SMS service unavailable: ${error.message}`;
         check.message = 'SMS service test failed (non-critical)';
+        check.troubleshootingSteps = [
+          { step: 'Check Twilio Configuration', description: 'Verify Twilio API credentials are configured' },
+          { step: 'Test Twilio Connectivity', description: 'Check if Twilio services are accessible' },
+          { step: 'Verify Phone Numbers', description: 'Ensure Twilio phone numbers are active' },
+          { step: 'Check Rate Limits', description: 'Verify SMS rate limits are not exceeded' }
+        ];
+        check.remediationSuggestions = [
+          'Configure Twilio API credentials in Supabase secrets',
+          'Verify Twilio account is active and funded',
+          'Check Twilio phone number configuration',
+          'Test SMS sending with test numbers'
+        ];
         return;
       }
 
@@ -269,6 +405,18 @@ export class SystemHealthService {
       check.status = 'error';
       check.error = error instanceof Error ? error.message : 'Unknown SMS service error';
       check.message = 'SMS service test failed (non-critical)';
+      check.troubleshootingSteps = [
+        { step: 'Check Twilio Configuration', description: 'Verify Twilio API credentials are configured' },
+        { step: 'Test Twilio Connectivity', description: 'Check if Twilio services are accessible' },
+        { step: 'Verify Phone Numbers', description: 'Ensure Twilio phone numbers are active' },
+        { step: 'Check Rate Limits', description: 'Verify SMS rate limits are not exceeded' }
+      ];
+      check.remediationSuggestions = [
+        'Configure Twilio API credentials in Supabase secrets',
+        'Verify Twilio account is active and funded',
+        'Check Twilio phone number configuration',
+        'Test SMS sending with test numbers'
+      ];
     }
   }
 
@@ -305,6 +453,18 @@ export class SystemHealthService {
       check.status = 'error';
       check.error = error instanceof Error ? error.message : 'Unknown emergency system error';
       check.message = 'Emergency systems failed';
+      check.troubleshootingSteps = [
+        { step: 'Check Emergency Tables', description: 'Verify emergency system tables exist and are accessible' },
+        { step: 'Test RLS Policies', description: 'Check Row Level Security policies for emergency tables' },
+        { step: 'Verify User Permissions', description: 'Ensure current user can access emergency controls' },
+        { step: 'Test Emergency Functions', description: 'Verify emergency stop/start functions work' }
+      ];
+      check.remediationSuggestions = [
+        'Verify emergency system tables exist',
+        'Check RLS policies for emergency tables',
+        'Ensure user has proper emergency permissions',
+        'Test emergency stop/start functionality'
+      ];
     }
   }
 
@@ -335,6 +495,41 @@ export class SystemHealthService {
       check.status = 'error';
       check.error = error instanceof Error ? error.message : 'Unknown configuration error';
       check.message = 'Configuration failed';
+      check.troubleshootingSteps = [
+        { step: 'Check Environment Variables', description: 'Verify all required environment variables are set' },
+        { step: 'Test Authentication', description: 'Verify user authentication is working' },
+        { step: 'Check API Keys', description: 'Ensure all API keys are valid and not expired' },
+        { step: 'Verify Project Settings', description: 'Check Supabase project configuration' }
+      ];
+      check.remediationSuggestions = [
+        'Verify environment variables are properly set',
+        'Check authentication configuration',
+        'Ensure API keys are valid',
+        'Review project settings in Supabase dashboard'
+      ];
+    }
+  }
+
+  // Auto-fix methods
+  async autoFixDatabaseConnection(): Promise<boolean> {
+    try {
+      // Attempt to reconnect to database
+      await supabase.from('leads').select('count').limit(1);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async autoFixEmergencySettings(): Promise<boolean> {
+    try {
+      // Ensure emergency settings exist
+      const { error } = await supabase
+        .from('ai_emergency_settings')
+        .upsert({ ai_disabled: false });
+      return !error;
+    } catch {
+      return false;
     }
   }
 }

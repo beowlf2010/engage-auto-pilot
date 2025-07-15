@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { systemHealthService, SystemHealthReport, SystemCheck } from '@/services/systemHealthCheck';
+import { TroubleshootingPanel } from '@/components/troubleshooting/TroubleshootingPanel';
 import { toast } from 'sonner';
 
 interface SystemHealthPanelProps {
@@ -85,7 +87,7 @@ export const SystemHealthPanel: React.FC<SystemHealthPanelProps> = ({ onSystemSt
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>System Health Check</span>
+          <span>System Health & Troubleshooting</span>
           <div className="flex items-center gap-2">
             <Button
               onClick={runSystemCheck}
@@ -115,95 +117,113 @@ export const SystemHealthPanel: React.FC<SystemHealthPanelProps> = ({ onSystemSt
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="space-y-4">
-        {report && (
-          <>
-            {/* Overall Status */}
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(report.overallStatus)}
-                <span className="font-medium">Overall Status</span>
-              </div>
-              <Badge className={getStatusColor(report.overallStatus)}>
-                {report.overallStatus.toUpperCase()}
-              </Badge>
-            </div>
-
-            {/* Progress Bar */}
-            {isRunning && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span>{completedChecks}/{totalChecks}</span>
-                </div>
-                <Progress value={progress} className="h-2" />
-              </div>
-            )}
-
-            {/* Summary */}
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">{report.summary}</p>
-              {criticalErrors > 0 && (
-                <div className="text-sm text-destructive font-medium">
-                  ⚠️ {criticalErrors} critical error(s) must be fixed before starting
-                </div>
-              )}
-              {warnings > 0 && (
-                <div className="text-sm text-amber-600 dark:text-amber-400">
-                  ⚠️ {warnings} warning(s) - system can start but may have limited functionality
-                </div>
-              )}
-            </div>
-
-            {/* Individual Checks */}
-            <div className="space-y-2">
-              {report.checks.map((check, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                >
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(check.status)}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="font-medium text-sm">{check.name}</div>
-                        {check.critical && (
-                          <Badge variant="destructive" className="text-xs">CRITICAL</Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {check.message}
-                      </div>
-                      {check.error && (
-                        <div className="text-xs text-destructive mt-1 p-2 bg-destructive/10 rounded">
-                          <strong>Error:</strong> {check.error}
-                        </div>
-                      )}
-                      {check.details && check.status === 'success' && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          ✓ Additional details available
-                        </div>
-                      )}
-                    </div>
+      <CardContent>
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="overview">System Overview</TabsTrigger>
+            <TabsTrigger value="troubleshooting">Troubleshooting</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="overview" className="space-y-4 mt-4">
+            {report && (
+              <>
+                {/* Overall Status */}
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(report.overallStatus)}
+                    <span className="font-medium">Overall Status</span>
                   </div>
-                  <Badge 
-                    variant="outline" 
-                    className={getStatusColor(check.status)}
-                  >
-                    {check.status}
+                  <Badge className={getStatusColor(report.overallStatus)}>
+                    {report.overallStatus.toUpperCase()}
                   </Badge>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
 
-        {!report && !isRunning && (
-          <div className="text-center py-8 text-muted-foreground">
-            <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-            <p>Run a system health check to verify all components are operational</p>
-          </div>
-        )}
+                {/* Progress Bar */}
+                {isRunning && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress</span>
+                      <span>{completedChecks}/{totalChecks}</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
+                )}
+
+                {/* Summary */}
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">{report.summary}</p>
+                  {criticalErrors > 0 && (
+                    <div className="text-sm text-destructive font-medium">
+                      ⚠️ {criticalErrors} critical error(s) must be fixed before starting
+                    </div>
+                  )}
+                  {warnings > 0 && (
+                    <div className="text-sm text-amber-600 dark:text-amber-400">
+                      ⚠️ {warnings} warning(s) - system can start but may have limited functionality
+                    </div>
+                  )}
+                </div>
+
+                {/* Individual Checks */}
+                <div className="space-y-2">
+                  {report.checks.map((check, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                    >
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(check.status)}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className="font-medium text-sm">{check.name}</div>
+                            {check.critical && (
+                              <Badge variant="destructive" className="text-xs">CRITICAL</Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {check.message}
+                          </div>
+                          {check.error && (
+                            <div className="text-xs text-destructive mt-1 p-2 bg-destructive/10 rounded">
+                              <strong>Error:</strong> {check.error}
+                            </div>
+                          )}
+                          {check.details && check.status === 'success' && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              ✓ Additional details available
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className={getStatusColor(check.status)}
+                      >
+                        {check.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {!report && !isRunning && (
+              <div className="text-center py-8 text-muted-foreground">
+                <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                <p>Run a system health check to verify all components are operational</p>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="troubleshooting" className="mt-4">
+            <TroubleshootingPanel
+              report={report}
+              onRunCheck={runSystemCheck}
+              onSystemStart={handleSystemStart}
+              isRunning={isRunning}
+            />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
