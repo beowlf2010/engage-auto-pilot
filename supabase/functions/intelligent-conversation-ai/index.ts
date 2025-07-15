@@ -47,10 +47,13 @@ serve(async (req) => {
       leadName,
       messageBody,
       latestCustomerMessage,
-      conversationHistory,
+      conversationHistory: rawConversationHistory,
       vehicleInterest,
       leadSource
     } = await req.json();
+
+    // Ensure conversationHistory is a string
+    const conversationHistory = typeof rawConversationHistory === 'string' ? rawConversationHistory : String(rawConversationHistory || '');
 
     // Fetch lead geographical data for location-aware responses
     const { data: leadGeoData } = await supabase
