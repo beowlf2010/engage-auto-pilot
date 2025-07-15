@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Power, PowerOff } from 'lucide-react';
+import { AlertTriangle, Power, PowerOff, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,7 +13,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { aiEmergencyService } from '@/services/aiEmergencyService';
+import { SystemHealthPanel } from '@/components/system/SystemHealthPanel';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/AuthProvider';
 
@@ -78,8 +86,14 @@ export const EmergencyStopHeader = () => {
     }
   };
 
+  const handleSystemStart = () => {
+    toast.success('🚀 System Starting', {
+      description: 'AI operations are being initialized...',
+    });
+  };
+
   return (
-    <div className="sticky top-0 z-[100] bg-destructive/90 backdrop-blur border-b border-destructive/20 px-4 py-2">
+    <div className="relative bg-destructive/90 backdrop-blur border-b border-destructive/20 px-4 py-3">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Status Indicator */}
         <div className="flex items-center gap-2">
@@ -95,13 +109,29 @@ export const EmergencyStopHeader = () => {
           </Badge>
         </div>
 
-        {/* Emergency Button */}
+        {/* Control Buttons */}
         <div className="flex items-center gap-2">
           {disableInfo && (
             <span className="text-xs text-destructive-foreground/80 hidden sm:block">
               Stopped: {new Date(disableInfo.disabledAt).toLocaleTimeString()}
             </span>
           )}
+
+          {/* System Check Button */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-500">
+                <Settings className="h-4 w-4 mr-1" />
+                System Check
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>System Health Check & Start</DialogTitle>
+              </DialogHeader>
+              <SystemHealthPanel onSystemStart={handleSystemStart} />
+            </DialogContent>
+          </Dialog>
           
           {isDisabled ? (
             <AlertDialog>
