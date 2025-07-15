@@ -97,48 +97,7 @@ export const navigationItems: NavigationItem[] = [
     icon: Zap,
     access: ['admin', 'manager', 'sales']
   },
-  {
-    label: 'AI Performance',
-    href: '/ai-performance',
-    icon: Brain,
-    access: ['admin', 'manager']
-  },
-  {
-    label: 'AI Training',
-    href: '/ai-training',
-    icon: TrendingUp,
-    access: ['admin', 'manager']
-  },
-  {
-    label: 'AI Opt-In Management',
-    href: '/ai-opt-ins',
-    icon: Bot,
-    access: ['admin', 'manager']
-  },
-  {
-    label: 'AI Notifications',
-    href: '/ai-notifications',
-    icon: Bell,
-    access: ['admin', 'manager', 'sales']
-  },
-  {
-    label: 'AI Analytics',
-    href: '/ai-analytics',
-    icon: Activity,
-    access: ['admin', 'manager']
-  },
-  {
-    label: 'AI Workflows',
-    href: '/ai-workflows',
-    icon: Workflow,
-    access: ['admin', 'manager']
-  },
-  {
-    label: 'Lead Temperature',
-    href: '/ai-temperature',
-    icon: Thermometer,
-    access: ['admin', 'manager', 'sales']
-  },
+  // Simplified AI section - all functionality moved to AI Dashboard
   {
     label: 'Call Analysis',
     href: '/call-analysis',

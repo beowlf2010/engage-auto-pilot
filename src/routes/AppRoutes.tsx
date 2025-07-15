@@ -38,6 +38,7 @@ const AINotificationsPage = lazy(() => import('@/pages/AINotificationsPage'));
 const AIAnalyticsDashboardPage = lazy(() => import('@/pages/AIAnalyticsDashboardPage'));
 const AIWorkflowsPage = lazy(() => import('@/pages/AIWorkflowsPage'));
 const AITemperaturePage = lazy(() => import('@/pages/AITemperaturePage'));
+const SimplifiedAIDashboard = lazy(() => import('@/pages/SimplifiedAIDashboard'));
 const CallAnalysisPage = lazy(() => import('@/pages/CallAnalysisPage'));
 const WorkflowEnginePage = lazy(() => import('@/pages/WorkflowEnginePage'));
 const LeadIntelligencePage = lazy(() => import('@/pages/LeadIntelligencePage'));
@@ -119,6 +120,12 @@ const AppRoutes = () => {
         <Route path="/ai-monitor" element={
           <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Monitor">
             <AIMonitorPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/ai-dashboard" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="AI Dashboard">
+            <SimplifiedAIDashboard />
           </RouteWrapper>
         } />
         
