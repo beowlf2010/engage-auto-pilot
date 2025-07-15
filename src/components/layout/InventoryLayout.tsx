@@ -26,7 +26,7 @@ import {
   Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { EmergencyStopHeader } from '@/components/emergency/EmergencyStopHeader';
+
 
 interface InventoryLayoutProps {
   children: React.ReactNode;
@@ -213,7 +213,6 @@ export default function InventoryLayout({ children }: InventoryLayoutProps) {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex flex-col w-full">
-        <EmergencyStopHeader />
         <div className="flex flex-1 w-full">
           <InventorySidebar />
           

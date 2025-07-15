@@ -30,6 +30,7 @@ import HideLeadButton from '@/components/leads/HideLeadButton';
 import ShowHiddenLeadsToggle from '@/components/leads/ShowHiddenLeadsToggle';
 import { toast } from '@/hooks/use-toast';
 import { getBatchValidationStatuses, type OptimizedValidationStatus, getCachedValidationStatus } from '@/services/optimizedValidationService';
+import { EmergencyControlCard } from '@/components/emergency/EmergencyControlCard';
 
 interface Lead {
   id: string;
@@ -406,8 +407,10 @@ const AIOptInDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Emergency Control and Overview Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <EmergencyControlCard />
+        
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
