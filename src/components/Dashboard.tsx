@@ -11,6 +11,7 @@ import { StatsGridSkeleton, QuickActionsSkeleton, RecentActivitySkeleton, AIInsi
 import { RefreshCw, Wifi, WifiOff, Database, Zap, BarChart3 } from 'lucide-react';
 import { SMSMonitoringCard } from '@/components/dashboard/SMSMonitoringCard';
 import { SMSTestPanel } from '@/components/dashboard/SMSTestPanel';
+import { AIStatusDashboard } from '@/components/ai/AIStatusDashboard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -200,7 +201,10 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
           </SafeErrorBoundary>
         </div>
 
-        {/* Recent Activity - Full width */}
+        {/* AI Automation Status Dashboard */}
+        <SafeErrorBoundary>
+          <AIStatusDashboard />
+        </SafeErrorBoundary>
         <SafeErrorBoundary>
           {loading.leadCounts || loading.unreadMessages ? (
             <RecentActivitySkeleton />
