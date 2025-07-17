@@ -275,63 +275,41 @@ const processLead = async (lead: any, supabaseClient: any): Promise<{ success: b
 
     console.log(`✅ [LEAD] AI generated message for ${leadId}: "${generatedMessage.substring(0, 100)}..."`);
 
-    // Create conversation record
-    const conversationData = {
-      lead_id: leadId,
-      profile_id: null,
-      body: generatedMessage,
-      direction: 'out',
-      sent_at: new Date().toISOString(),
-      ai_generated: true,
-      sms_status: 'pending'
-    };
+    // Get any available profile for system messages (use first admin/manager profile)
+    const { data: systemProfile } = await supabaseClient
+      .from('profiles')
+      .select('id')
+      .eq('role', 'admin')
+      .limit(1)
+      .single();
 
-    const conversationId = await withTimeout(
-      supabaseClient.rpc('create_system_conversation', { conversation_data: conversationData }),
-      10000,
-      `Conversation creation for ${leadId}`
+    const profileId = systemProfile?.id || null;
+    console.log(`👤 [LEAD] Using system profile: ${profileId}`);
+
+    // Use consolidated message service for proper SMS handling
+    const { data: consolidatedResult, error: consolidatedError } = await withTimeout(
+      supabaseClient.functions.invoke('send-sms', { 
+        body: {
+          leadId: leadId,
+          messageBody: generatedMessage,
+          profileId: profileId,
+          isAIGenerated: true,
+          to: primaryPhone,
+          conversationId: null // Let the service create the conversation
+        }
+      }),
+      30000,
+      `Consolidated message send for ${leadId}`
     );
 
-    if (!conversationId) {
-      throw new Error('Failed to create conversation record');
+    if (consolidatedError || !consolidatedResult?.success) {
+      const errorMsg = consolidatedError?.message || consolidatedResult?.error || 'Message sending failed';
+      console.error(`❌ [LEAD] Consolidated message failed for ${leadId}:`, errorMsg);
+      throw new Error(`Message sending failed: ${errorMsg}`);
     }
 
-    console.log(`📝 [LEAD] Created conversation ${conversationId} for ${leadId}`);
-
-    // Send SMS
-    const smsPayload = {
-      to: primaryPhone,
-      body: generatedMessage,
-      conversationId: conversationId
-    };
-
-    const { data: smsResult, error: smsError } = await withTimeout(
-      supabaseClient.functions.invoke('send-sms', { body: smsPayload }),
-      20000,
-      `SMS send for ${leadId}`
-    );
-
-    if (smsError || !smsResult?.success) {
-      // Update conversation status to failed
-      await supabaseClient
-        .from('conversations')
-        .update({ 
-          sms_status: 'failed',
-          sms_error: smsError?.message || smsResult?.error || 'SMS failed'
-        })
-        .eq('id', conversationId);
-
-      throw new Error(`SMS failed: ${smsError?.message || smsResult?.error}`);
-    }
-
-    // Update conversation status to sent
-    await supabaseClient
-      .from('conversations')
-      .update({
-        sms_status: 'sent',
-        twilio_message_id: smsResult.messageSid
-      })
-      .eq('id', conversationId);
+    console.log(`✅ [LEAD] Message sent successfully via consolidated service for ${leadId}`);
+    const conversationId = consolidatedResult.conversationId;
 
     // Update lead status and schedule next message
     const nextSendTime = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours later

@@ -92,8 +92,32 @@ serve(async (req) => {
 
   try {
     console.log('=== SEND SMS FUNCTION START ===');
-    const { to, body, conversationId } = await req.json()
-    console.log(`📱 Received request to send to ${to} for conversation ${conversationId}`);
+    const requestData = await req.json();
+    
+    // Support both legacy format and new consolidated format
+    const { 
+      to, 
+      body, 
+      conversationId, 
+      leadId, 
+      messageBody, 
+      profileId, 
+      isAIGenerated 
+    } = requestData;
+
+    // Determine which format we're using
+    const recipientPhone = to;
+    const messageText = body || messageBody;
+    const isConsolidatedCall = leadId && messageBody && profileId !== undefined;
+    
+    console.log(`📱 Received ${isConsolidatedCall ? 'CONSOLIDATED' : 'LEGACY'} request:`, {
+      to: recipientPhone,
+      messageLength: messageText?.length,
+      conversationId,
+      leadId,
+      profileId,
+      isAIGenerated
+    });
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -133,19 +157,61 @@ serve(async (req) => {
     }
     console.log('✅ Twilio credentials found from', source.toUpperCase(), '- Account SID:', accountSid.substring(0, 6) + '...', 'Phone:', phoneNumber);
 
+    let currentConversationId = conversationId;
+    
+    // If this is a consolidated call and no conversation exists, create one
+    if (isConsolidatedCall && !conversationId) {
+      console.log('📝 Creating conversation record for consolidated call...');
+      
+      const conversationData = {
+        lead_id: leadId,
+        profile_id: profileId,
+        body: messageText,
+        direction: 'out',
+        sent_at: new Date().toISOString(),
+        ai_generated: isAIGenerated || false,
+        sms_status: 'pending'
+      };
+
+      const { data: conversation, error: conversationError } = await supabase
+        .from('conversations')
+        .insert(conversationData)
+        .select()
+        .single();
+
+      if (conversationError) {
+        console.error('❌ Failed to create conversation:', conversationError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Failed to create conversation: ${conversationError.message}`,
+            leadId
+          }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      currentConversationId = conversation.id;
+      console.log(`✅ Created conversation: ${currentConversationId}`);
+    }
+
     // Compose the Twilio API request
     const payload = new URLSearchParams({
-      To: to,
+      To: recipientPhone,
       From: phoneNumber,
-      Body: body
+      Body: messageText
     })
 
     console.log('📤 Sending SMS with payload:', { 
-      to, 
+      to: recipientPhone, 
       from: phoneNumber, 
-      bodyLength: body.length,
-      conversationId,
-      credentialsSource: source
+      bodyLength: messageText.length,
+      conversationId: currentConversationId,
+      credentialsSource: source,
+      isConsolidated: isConsolidatedCall
     })
 
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
@@ -201,12 +267,24 @@ serve(async (req) => {
     const messageId = result.sid || 'unknown'
     console.log('✅ SUCCESS! Twilio SMS sent using', source.toUpperCase(), 'credentials:', messageId)
 
+    // Update conversation status if we have one
+    if (currentConversationId) {
+      console.log('📝 Updating conversation status to sent...');
+      await supabase
+        .from('conversations')
+        .update({
+          sms_status: 'sent',
+          twilio_message_id: messageId
+        })
+        .eq('id', currentConversationId);
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         messageSid: messageId,
         status: result.status || 'queued',
-        conversationId,
+        conversationId: currentConversationId,
         credentialsSource: source,
         message: `SMS sent successfully using ${source} credentials!`
       }),

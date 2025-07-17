@@ -41,7 +41,23 @@ export class EnhancedMessageProcessor {
       
       if (response?.message) {
         console.log('✅ [PROCESSOR] Generated response successfully');
-        return response.message;
+        
+        // Send the message using the consolidated service
+        const { sendMessage } = await import('./messagesService');
+        
+        try {
+          const result = await sendMessage(leadId, response.message, null, true);
+          if (result.success) {
+            console.log('✅ [PROCESSOR] Message sent successfully via consolidated service');
+            return response.message;
+          } else {
+            console.error('❌ [PROCESSOR] Failed to send message:', result.error);
+            return null;
+          }
+        } catch (sendError) {
+          console.error('❌ [PROCESSOR] Error sending message:', sendError);
+          return null;
+        }
       }
 
       return null;
