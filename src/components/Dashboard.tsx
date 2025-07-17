@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEnhancedDashboard } from '@/hooks/useEnhancedDashboard';
-import { DashboardStats } from './dashboard/DashboardStats';
+import { EnhancedDashboardStats } from './dashboard/EnhancedDashboardStats';
 import { QuickActions } from './dashboard/QuickActions';
 import { RecentActivity } from './dashboard/RecentActivity';
 import { TrendsWidget } from './dashboard/TrendsWidget';
@@ -105,10 +105,11 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
           {loading.messageStats || loading.leadCounts || loading.unreadMessages ? (
             <StatsGridSkeleton />
           ) : (
-            <DashboardStats 
+            <EnhancedDashboardStats 
               messageStats={data.messageStats}
               leadCounts={data.leadCounts}
               unreadMessages={data.unreadMessages}
+              weeklyLeads={data.trends.weeklyLeads}
               statsLoading={false}
             />
           )}

@@ -96,7 +96,7 @@ export const TrendsWidget: React.FC<TrendsWidgetProps> = ({ trends, loading }) =
 
         {/* Weekly Leads Chart */}
         <div className="space-y-2">
-          <h4 className="text-sm font-medium">Weekly Lead Generation</h4>
+          <h4 className="text-sm font-medium">Daily New Leads (Last 7 Days)</h4>
           <ResponsiveContainer width="100%" height={120}>
             <AreaChart data={chartData}>
               <defs>
@@ -146,7 +146,7 @@ export const TrendsWidget: React.FC<TrendsWidgetProps> = ({ trends, loading }) =
 
         {/* Message Activity Chart */}
         <div className="space-y-2">
-          <h4 className="text-sm font-medium">Message Activity</h4>
+          <h4 className="text-sm font-medium">Daily Messages (Last 7 Days)</h4>
           <ResponsiveContainer width="100%" height={120}>
             <LineChart data={chartData}>
               <XAxis 
@@ -184,7 +184,7 @@ export const TrendsWidget: React.FC<TrendsWidgetProps> = ({ trends, loading }) =
             </LineChart>
           </ResponsiveContainer>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{totalMessagesThisWeek} messages sent</span>
+            <span>{totalMessagesThisWeek} messages sent this week</span>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-primary" />
