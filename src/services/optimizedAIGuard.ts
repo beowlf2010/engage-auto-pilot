@@ -211,9 +211,18 @@ class OptimizedAIGuard {
   private async checkAIOptInStatus(leadId: string): Promise<{ shouldRespond: boolean; confidence: number; reason: string }> {
     const { data: lead } = await supabase
       .from('leads')
-      .select('ai_opt_in')
+      .select('ai_opt_in, status')
       .eq('id', leadId)
       .single();
+
+    // Don't send AI messages to leads marked as lost, closed, or sold
+    if (lead?.status && ['lost', 'closed', 'sold'].includes(lead.status.toLowerCase())) {
+      return {
+        shouldRespond: false,
+        confidence: 1.0,
+        reason: `Lead is marked as ${lead.status} - no further AI messaging needed`
+      };
+    }
 
     if (lead?.ai_opt_in === false) {
       return {
