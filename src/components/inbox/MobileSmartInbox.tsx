@@ -11,18 +11,17 @@ import { ArrowLeft, MessageSquare, AlertCircle, Inbox } from "lucide-react";
 import ConversationsList from './ConversationsList';
 import EnhancedChatView from './EnhancedChatView';
 import LeadContextPanel from './LeadContextPanel';
+import AITopBar from './AITopBar';
 import type { ConversationListItem } from '@/hooks/conversation/conversationTypes';
 
 interface MobileSmartInboxProps {
   onLeadsRefresh: () => void;
   preselectedLeadId?: string | null;
-  onOpenAIModal?: (data: any) => void;
 }
 
 const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
   onLeadsRefresh,
-  preselectedLeadId,
-  onOpenAIModal
+  preselectedLeadId
 }) => {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState("unread");
@@ -145,6 +144,14 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
   if (mobileView === 'chat') {
     return (
       <div className="h-full flex flex-col bg-background">
+        {/* AI Top Bar */}
+        <AITopBar
+          selectedConversation={selectedConversation}
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          canReply={selectedConversation?.lastMessageDirection !== 'out'}
+        />
+
         {/* Chat Header */}
         <div className="flex items-center px-4 py-3 border-b bg-card">
           <Button 
@@ -163,29 +170,14 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
               {selectedConversation?.lastMessage}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => onOpenAIModal?.({
-                selectedConversation,
-                messages,
-                canReply: selectedConversation?.lastMessageDirection !== 'out',
-                onSendMessage: handleSendMessage
-              })}
-              className="text-xs"
-            >
-              AI
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleShowContext}
-              className="text-xs"
-            >
-              More
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleShowContext}
+            className="text-xs"
+          >
+            More
+          </Button>
         </div>
 
         {/* Chat Messages */}

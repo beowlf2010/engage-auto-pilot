@@ -1,14 +1,10 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { unifiedAI } from "@/services/unifiedAIService";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Bot, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
-import AIAssistantModal from "@/components/inbox/AIAssistantModal";
 import { SMSDebugPanel } from "@/components/debug/SMSDebugPanel";
 
 const SmartInboxPage = () => {
@@ -17,14 +13,6 @@ const SmartInboxPage = () => {
   const leadId = searchParams.get('leadId');
   const isMobile = useIsMobile();
   
-  // AI Assistant Modal state
-  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-  const [aiModalData, setAIModalData] = useState({
-    selectedConversation: null,
-    messages: [],
-    canReply: false,
-    onSendMessage: async () => {}
-  });
 
   useEffect(() => {
     const requestNotificationPermission = async () => {
@@ -81,16 +69,6 @@ const SmartInboxPage = () => {
     window.location.reload();
   };
 
-  const handleOpenAIModal = (data?: any) => {
-    if (data) {
-      setAIModalData(data);
-    }
-    setIsAIModalOpen(true);
-  };
-
-  const handleCloseAIModal = () => {
-    setIsAIModalOpen(false);
-  };
 
   return (
     <div className="h-screen bg-background overflow-hidden">
@@ -103,29 +81,6 @@ const SmartInboxPage = () => {
       <MobileSmartInbox 
         onLeadsRefresh={handleLeadsRefresh} 
         preselectedLeadId={leadId}
-        onOpenAIModal={handleOpenAIModal}
-      />
-      
-      {/* Floating AI Assistant Button */}
-      <Button
-        onClick={() => handleOpenAIModal()}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 z-50"
-        size="icon"
-      >
-        <div className="relative">
-          <Bot className="h-6 w-6" />
-          <Sparkles className="h-3 w-3 absolute -top-1 -right-1 text-yellow-400" />
-        </div>
-      </Button>
-      
-      {/* AI Assistant Modal */}
-      <AIAssistantModal
-        isOpen={isAIModalOpen}
-        onClose={handleCloseAIModal}
-        selectedConversation={aiModalData.selectedConversation}
-        messages={aiModalData.messages}
-        onSendMessage={aiModalData.onSendMessage}
-        canReply={aiModalData.canReply}
       />
     </div>
   );
