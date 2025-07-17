@@ -14,6 +14,7 @@ import { sendMessage } from '@/services/messagesService';
 import { useAuth } from '@/components/auth/AuthProvider';
 import AutomationStatusCard from './AutomationStatusCard';
 import LiveActivityFeed from './LiveActivityFeed';
+import LeadProcessingModal from './LeadProcessingModal';
 
 interface QueuedMessage {
   id: string;
@@ -500,6 +501,16 @@ const EnhancedAIQueueTab = () => {
                           <Badge variant="outline" className="text-xs">
                             {formatTimeUntilDue(message.nextSendAt)}
                           </Badge>
+                          <LeadProcessingModal
+                            leadId={message.id}
+                            onLeadUpdated={fetchQueuedMessages}
+                            trigger={
+                              <Button variant="outline" size="sm">
+                                <User className="w-3 h-3 mr-1" />
+                                Process
+                              </Button>
+                            }
+                          />
                           <Button
                             variant="ghost"
                             size="sm"
