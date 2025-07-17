@@ -5,6 +5,7 @@ import AutomationControls from './automation/AutomationControls';
 import AutomationStatsCards from './automation/AutomationStatsCards';
 import RecentRunsList from './automation/RecentRunsList';
 import SystemInfoCard from './automation/SystemInfoCard';
+import HealthMonitorCard from './HealthMonitorCard';
 
 const AutomationControlPanel = () => {
   const {
@@ -13,7 +14,8 @@ const AutomationControlPanel = () => {
     loading,
     triggering,
     toggleAutomation,
-    triggerManualRun
+    triggerManualRun,
+    systemHealth
   } = useAutomationData();
 
   if (loading) {
@@ -35,6 +37,8 @@ const AutomationControlPanel = () => {
         successRate={stats.successRate}
         automationEnabled={stats.automationEnabled}
       />
+
+      {systemHealth && <HealthMonitorCard health={systemHealth} />}
 
       <RecentRunsList runs={recentRuns} />
 

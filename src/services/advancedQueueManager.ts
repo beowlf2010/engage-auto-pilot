@@ -461,7 +461,8 @@ export class AdvancedQueueManager {
 
   // Configuration methods
   setBatchSize(size: number): void {
-    this.batchSize = Math.max(1, Math.min(50, size));
+    // Reduce batch size for better reliability
+    this.batchSize = Math.max(1, Math.min(6, size));
   }
 
   setMaxConcurrentProcessing(max: number): void {

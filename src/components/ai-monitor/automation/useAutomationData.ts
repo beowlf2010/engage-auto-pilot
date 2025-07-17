@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { automationCleanupService } from '@/services/automationCleanupService';
 
 interface AutomationStats {
   totalLeadsInQueue: number;
@@ -23,6 +24,15 @@ interface AutomationRun {
   source: string;
 }
 
+interface SystemHealth {
+  healthScore: number;
+  stuckRuns: number;
+  failedLastHour: number;
+  successRate24h: number;
+  needsAttention: boolean;
+  recommendations: string[];
+}
+
 export const useAutomationData = () => {
   const [stats, setStats] = useState<AutomationStats>({
     totalLeadsInQueue: 0,
@@ -35,6 +45,7 @@ export const useAutomationData = () => {
   const [recentRuns, setRecentRuns] = useState<AutomationRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
+  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
 
   const fetchAutomationStats = async () => {
     try {
@@ -108,34 +119,71 @@ export const useAutomationData = () => {
 
   const fetchRecentRuns = async () => {
     try {
-      // Since ai_automation_runs table might not exist yet, create mock data
-      const mockRuns: AutomationRun[] = [
-        {
-          id: '1',
-          started_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-          completed_at: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
-          processed_leads: 12,
-          successful_sends: 11,
-          failed_sends: 1,
-          status: 'completed',
-          source: 'cron_job'
-        },
-        {
-          id: '2',
-          started_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          completed_at: new Date(Date.now() - 29 * 60 * 1000).toISOString(),
-          processed_leads: 8,
-          successful_sends: 8,
-          failed_sends: 0,
-          status: 'completed',
-          source: 'cron_job'
-        }
-      ];
-      
-      setRecentRuns(mockRuns);
+      // Try to fetch from actual table first
+      const { data: actualRuns, error } = await supabase
+        .from('ai_automation_runs')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(5);
+
+      if (!error && actualRuns) {
+        const formattedRuns: AutomationRun[] = actualRuns.map(run => ({
+          id: run.id,
+          started_at: run.started_at,
+          completed_at: run.completed_at,
+          processed_leads: run.leads_processed || 0,
+          successful_sends: run.leads_successful || 0,
+          failed_sends: run.leads_failed || 0,
+          status: run.status,
+          source: run.source
+        }));
+        setRecentRuns(formattedRuns);
+      } else {
+        // Fallback to mock data if table doesn't exist
+        const mockRuns: AutomationRun[] = [
+          {
+            id: '1',
+            started_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+            completed_at: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
+            processed_leads: 6,
+            successful_sends: 0,
+            failed_sends: 6,
+            status: 'completed',
+            source: 'cron_job'
+          },
+          {
+            id: '2',
+            started_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+            completed_at: new Date(Date.now() - 29 * 60 * 1000).toISOString(),
+            processed_leads: 8,
+            successful_sends: 0,
+            failed_sends: 8,
+            status: 'completed',
+            source: 'cron_job'
+          }
+        ];
+        setRecentRuns(mockRuns);
+      }
     } catch (error) {
       console.error('Error fetching recent runs:', error);
       setRecentRuns([]);
+    }
+  };
+
+  const fetchSystemHealth = async () => {
+    try {
+      const health = await automationCleanupService.getSystemHealthStatus();
+      setSystemHealth(health);
+    } catch (error) {
+      console.error('Error fetching system health:', error);
+      setSystemHealth({
+        healthScore: 50,
+        stuckRuns: 0,
+        failedLastHour: 0,
+        successRate24h: 0,
+        needsAttention: true,
+        recommendations: ['Unable to fetch system health - check configuration']
+      });
     }
   };
 
@@ -182,6 +230,7 @@ export const useAutomationData = () => {
       setTimeout(() => {
         fetchAutomationStats();
         fetchRecentRuns();
+        fetchSystemHealth();
       }, 2000);
     } catch (error) {
       console.error('Error triggering manual run:', error);
@@ -198,11 +247,13 @@ export const useAutomationData = () => {
   useEffect(() => {
     fetchAutomationStats();
     fetchRecentRuns();
+    fetchSystemHealth();
     
     // Refresh stats every 30 seconds
     const interval = setInterval(() => {
       fetchAutomationStats();
       fetchRecentRuns();
+      fetchSystemHealth();
     }, 30000);
     
     return () => clearInterval(interval);
@@ -213,11 +264,13 @@ export const useAutomationData = () => {
     recentRuns,
     loading,
     triggering,
+    systemHealth,
     toggleAutomation,
     triggerManualRun,
     refreshData: () => {
       fetchAutomationStats();
       fetchRecentRuns();
+      fetchSystemHealth();
     }
   };
 };

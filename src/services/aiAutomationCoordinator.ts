@@ -1,6 +1,7 @@
 import { intelligentAutoApproval } from './intelligentAutoApproval';
 import { advancedQueueManager } from './advancedQueueManager';
 import { predictivePerformanceEngine } from './predictivePerformanceEngine';
+import { automationCleanupService } from './automationCleanupService';
 import { supabase } from '@/integrations/supabase/client';
 
 export class AIAutomationCoordinator {
@@ -21,6 +22,9 @@ export class AIAutomationCoordinator {
     console.log('🚀 [AI COORDINATOR] Starting AI automation system...');
     this.isRunning = true;
 
+    // Start cleanup and monitoring services
+    await automationCleanupService.startCleanupMonitoring();
+
     // Process queue every 2 minutes
     this.processingInterval = setInterval(async () => {
       try {
@@ -39,6 +43,10 @@ export class AIAutomationCoordinator {
       clearInterval(this.processingInterval);
       this.processingInterval = null;
     }
+    
+    // Stop cleanup and monitoring services
+    automationCleanupService.stopCleanupMonitoring();
+    
     this.isRunning = false;
     console.log('⏹️ [AI COORDINATOR] AI automation stopped');
   }
@@ -77,6 +85,7 @@ export class AIAutomationCoordinator {
     queueStats: any;
     cacheStats: any;
     performance: any;
+    health: any;
   }> {
     const queueStats = await advancedQueueManager.getQueueStats();
     const cacheStats = {
@@ -99,11 +108,15 @@ export class AIAutomationCoordinator {
       average_confidence_score: 0
     };
 
+    // Get system health status
+    const health = await automationCleanupService.getSystemHealthStatus();
+
     return {
       isRunning: this.isRunning,
       queueStats,
       cacheStats,
-      performance
+      performance,
+      health
     };
   }
 
