@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Key, Phone, MessageSquare, Shield } from "lucide-react";
+import { Loader2, Key, Phone, MessageSquare, Shield, Settings as SettingsIcon } from "lucide-react";
+import SMSComplianceMonitor from '@/components/compliance/SMSComplianceMonitor';
 
 interface Setting {
   key: string;
@@ -169,86 +171,105 @@ const Settings = () => {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Settings</h1>
+        <h1 className="text-3xl font-bold">Settings & Configuration</h1>
         <p className="text-muted-foreground">
-          Configure your API keys and credentials for SMS and AI functionality.
+          Configure your API keys, credentials, and monitor SMS compliance.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
+      <Tabs defaultValue="api-keys" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="api-keys" className="flex items-center gap-2">
+            <SettingsIcon className="h-4 w-4" />
             API Configuration
-          </CardTitle>
-          <CardDescription>
-            Enter your API keys and credentials to enable SMS and AI features.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {settingsConfig.map((config, index) => {
-            const setting = settings.find(s => s.key === config.key);
-            const Icon = config.icon;
+          </TabsTrigger>
+          <TabsTrigger value="compliance" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            SMS Compliance
+          </TabsTrigger>
+        </TabsList>
 
-            return (
-              <div key={config.key}>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label htmlFor={config.key} className="flex items-center gap-2">
-                        <Icon className="h-4 w-4" />
-                        {config.label}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        {config.description}
-                      </p>
-                      <a 
-                        href={config.link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline"
-                      >
-                        Get your {config.label} →
-                      </a>
+        <TabsContent value="api-keys">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                API Configuration
+              </CardTitle>
+              <CardDescription>
+                Enter your API keys and credentials to enable SMS and AI features.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {settingsConfig.map((config, index) => {
+                const setting = settings.find(s => s.key === config.key);
+                const Icon = config.icon;
+
+                return (
+                  <div key={config.key}>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <Label htmlFor={config.key} className="flex items-center gap-2">
+                            <Icon className="h-4 w-4" />
+                            {config.label}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            {config.description}
+                          </p>
+                          <a 
+                            href={config.link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline"
+                          >
+                            Get your {config.label} →
+                          </a>
+                        </div>
+                        <Button 
+                          size="sm"
+                          onClick={() => setting && saveSetting(setting)}
+                          disabled={saving || !setting?.value}
+                        >
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                        </Button>
+                      </div>
+                      
+                      <Input
+                        id={config.key}
+                        type={config.type}
+                        value={setting?.value || ''}
+                        onChange={(e) => updateSetting(config.key, e.target.value)}
+                        placeholder={`Enter your ${config.label}`}
+                        className="font-mono"
+                      />
                     </div>
-                    <Button 
-                      size="sm"
-                      onClick={() => setting && saveSetting(setting)}
-                      disabled={saving || !setting?.value}
-                    >
-                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
-                    </Button>
+                    
+                    {index < settingsConfig.length - 1 && <Separator className="mt-6" />}
                   </div>
-                  
-                  <Input
-                    id={config.key}
-                    type={config.type}
-                    value={setting?.value || ''}
-                    onChange={(e) => updateSetting(config.key, e.target.value)}
-                    placeholder={`Enter your ${config.label}`}
-                    className="font-mono"
-                  />
-                </div>
-                
-                {index < settingsConfig.length - 1 && <Separator className="mt-6" />}
-              </div>
-            );
-          })}
+                );
+              })}
 
-          <Separator />
-          
-          <div className="flex justify-end">
-            <Button 
-              onClick={saveAllSettings}
-              disabled={saving}
-              size="lg"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Save All Settings
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <Separator />
+              
+              <div className="flex justify-end">
+                <Button 
+                  onClick={saveAllSettings}
+                  disabled={saving}
+                  size="lg"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Save All Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="compliance">
+          <SMSComplianceMonitor />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
