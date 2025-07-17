@@ -9,6 +9,7 @@ import LeadsStatusTabs from '@/components/leads/LeadsStatusTabs';
 import LeadQuickView from '@/components/leads/LeadQuickView';
 import BulkActionsPanel from '@/components/leads/BulkActionsPanel';
 import FilterRestorationBanner from '@/components/leads/FilterRestorationBanner';
+import AIInsightBanner from '@/components/leads/AIInsightBanner';
 import { Lead } from '@/types/lead';
 
 const LeadsList = () => {
@@ -23,6 +24,7 @@ const LeadsList = () => {
     statusFilter,
     searchFilters,
     filtersLoaded,
+    aiInsightFilters,
     setStatusFilter,
     setSearchFilters,
     clearFilters,
@@ -153,8 +155,17 @@ const LeadsList = () => {
 
   return (
     <div className="space-y-6" key={refreshKey}>
+      {/* AI Insight Banner */}
+      {aiInsightFilters.source === 'ai_insight' && aiInsightFilters.leadIds && (
+        <AIInsightBanner
+          insightType={aiInsightFilters.insightType}
+          leadCount={aiInsightFilters.leadIds.length}
+          onClearFilters={clearFilters}
+        />
+      )}
+      
       {/* Filter Restoration Banner */}
-      {hasActiveFilters && (
+      {hasActiveFilters && aiInsightFilters.source !== 'ai_insight' && (
         <FilterRestorationBanner
           onClearFilters={clearFilters}
           filtersCount={filtersCount}

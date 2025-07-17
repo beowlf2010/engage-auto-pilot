@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { processLeadData } from './leads/useLeadsDataProcessor';
 import { Lead } from '@/types/lead';
@@ -20,17 +21,58 @@ export interface SearchFilters {
 }
 
 export const useAdvancedLeads = () => {
+  const location = useLocation();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [quickViewLead, setQuickViewLead] = useState<Lead | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [filtersLoaded, setFiltersLoaded] = useState(false);
+  const [aiInsightFilters, setAiInsightFilters] = useState<{
+    leadIds?: string[];
+    status?: string;
+    lastReply?: string;
+    source?: string;
+    insightType?: string;
+  }>({});
   
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     searchTerm: '',
     dateFilter: 'all'
   });
+
+  // Parse URL parameters for AI insight filters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const hashParams = new URLSearchParams(location.hash.split('?')[1] || '');
+    
+    // Check both regular URL params and hash params (for hash routing compatibility)
+    const getParam = (key: string) => urlParams.get(key) || hashParams.get(key);
+    
+    const source = getParam('source');
+    const filterIds = getParam('filter_ids');
+    const filterStatus = getParam('filter_status');
+    const filterLastReply = getParam('filter_last_reply');
+    const insightType = getParam('insight_type');
+    
+    if (source === 'ai_insight' && filterIds) {
+      const leadIds = filterIds.split(',').map(id => id.trim());
+      setAiInsightFilters({
+        leadIds,
+        status: filterStatus || undefined,
+        lastReply: filterLastReply || undefined,
+        source,
+        insightType: insightType || undefined
+      });
+      
+      // Set appropriate status filter based on AI insight
+      if (filterStatus) {
+        setStatusFilter(filterStatus);
+      }
+    } else {
+      setAiInsightFilters({});
+    }
+  }, [location.search, location.hash]);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -84,7 +126,36 @@ export const useAdvancedLeads = () => {
   const finalFilteredLeads = useMemo(() => {
     let filtered = [...leads];
 
-    // Apply search filters first
+    // Apply AI insight filters first if present
+    if (aiInsightFilters.leadIds && aiInsightFilters.leadIds.length > 0) {
+      filtered = filtered.filter(lead => 
+        aiInsightFilters.leadIds!.includes(lead.id.toString())
+      );
+      
+      // Apply additional AI insight filters
+      if (aiInsightFilters.lastReply) {
+        const dayMap: { [key: string]: number } = {
+          '1_day_ago': 1,
+          '3_days_ago': 3,
+          '7_days_ago': 7,
+          '14_days_ago': 14,
+          '30_days_ago': 30
+        };
+        
+        const daysAgo = dayMap[aiInsightFilters.lastReply];
+        if (daysAgo) {
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+          
+          filtered = filtered.filter(lead => {
+            // Filter leads that haven't replied within the specified timeframe
+            return !lead.lastMessageTime || new Date(lead.lastMessageTime) < cutoffDate;
+          });
+        }
+      }
+    }
+
+    // Apply search filters
     if (searchFilters.searchTerm) {
       const searchTerm = searchFilters.searchTerm.toLowerCase();
       filtered = filtered.filter(lead => 
@@ -211,7 +282,7 @@ export const useAdvancedLeads = () => {
     }
 
     return filtered;
-  }, [leads, statusFilter, searchFilters]);
+  }, [leads, statusFilter, searchFilters, aiInsightFilters]);
 
   // Lead selection functions
   const selectAllFiltered = useCallback(() => {
@@ -247,7 +318,13 @@ export const useAdvancedLeads = () => {
       dateFilter: 'all'
     });
     setStatusFilter('all');
-  }, []);
+    setAiInsightFilters({});
+    
+    // Clear URL parameters by navigating to the current route without search params
+    if (aiInsightFilters.source === 'ai_insight') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [aiInsightFilters.source]);
 
   // Engagement score calculation
   const getEngagementScore = useCallback((lead: Lead) => {
@@ -283,6 +360,7 @@ export const useAdvancedLeads = () => {
     searchFilters,
     savedPresets: [], // Empty array since we removed preset functionality
     filtersLoaded,
+    aiInsightFilters,
     setStatusFilter,
     setSearchFilters,
     clearFilters,
