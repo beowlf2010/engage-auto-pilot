@@ -16,11 +16,13 @@ import type { ConversationListItem } from '@/hooks/conversation/conversationType
 interface MobileSmartInboxProps {
   onLeadsRefresh: () => void;
   preselectedLeadId?: string | null;
+  onOpenAIModal?: (data: any) => void;
 }
 
 const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
   onLeadsRefresh,
-  preselectedLeadId
+  preselectedLeadId,
+  onOpenAIModal
 }) => {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState("unread");
@@ -161,14 +163,29 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
               {selectedConversation?.lastMessage}
             </p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleShowContext}
-            className="text-xs"
-          >
-            AI
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onOpenAIModal?.({
+                selectedConversation,
+                messages,
+                canReply: selectedConversation?.lastMessageDirection !== 'out',
+                onSendMessage: handleSendMessage
+              })}
+              className="text-xs"
+            >
+              AI
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleShowContext}
+              className="text-xs"
+            >
+              More
+            </Button>
+          </div>
         </div>
 
         {/* Chat Messages */}
