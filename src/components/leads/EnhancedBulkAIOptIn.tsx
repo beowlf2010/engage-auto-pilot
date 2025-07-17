@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Bot, 
   CheckCircle, 
   AlertTriangle, 
   XCircle,
   BarChart3,
-  Users
+  Users,
+  Shield
 } from 'lucide-react';
 import { 
   Dialog,
@@ -20,6 +22,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { assessLeadDataQuality, type DataQualityAssessment } from '@/services/unifiedDataQualityService';
+import BatchControlDialog from './BatchControlDialog';
 
 interface Lead {
   id: string;
@@ -50,9 +53,11 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
   onComplete
 }) => {
   const [showDialog, setShowDialog] = useState(false);
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
   const [qualityBreakdown, setQualityBreakdown] = useState<QualityBreakdown | null>(null);
+  const [selectedTierLeads, setSelectedTierLeads] = useState<Lead[]>([]);
 
   // Count how many leads don't have AI enabled
   const leadsWithoutAI = selectedLeads.filter(lead => !lead.ai_opt_in);
@@ -110,22 +115,36 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
   const enableAIForTier = async (tiers: ('high' | 'medium' | 'poor')[]) => {
     if (!qualityBreakdown) return;
 
+    const leadsToEnable: Lead[] = [];
+    
+    if (tiers.includes('high')) {
+      leadsToEnable.push(...qualityBreakdown.highQuality.leads);
+    }
+    if (tiers.includes('medium')) {
+      leadsToEnable.push(...qualityBreakdown.mediumQuality.leads);
+    }
+    if (tiers.includes('poor')) {
+      leadsToEnable.push(...qualityBreakdown.poorQuality.leads);
+    }
+
+    if (leadsToEnable.length === 0) return;
+
+    // Check if we should show batch control dialog
+    const SAFE_BATCH_SIZE = 50;
+    if (leadsToEnable.length > SAFE_BATCH_SIZE) {
+      setSelectedTierLeads(leadsToEnable);
+      setShowDialog(false);
+      setShowBatchDialog(true);
+      return;
+    }
+
+    // Process directly if small enough
+    await processBatch(leadsToEnable.map(l => l.id));
+  };
+
+  const processBatch = async (leadIds: string[]) => {
     setIsEnabling(true);
     try {
-      const leadsToEnable: string[] = [];
-      
-      if (tiers.includes('high')) {
-        leadsToEnable.push(...qualityBreakdown.highQuality.leads.map(l => l.id));
-      }
-      if (tiers.includes('medium')) {
-        leadsToEnable.push(...qualityBreakdown.mediumQuality.leads.map(l => l.id));
-      }
-      if (tiers.includes('poor')) {
-        leadsToEnable.push(...qualityBreakdown.poorQuality.leads.map(l => l.id));
-      }
-
-      if (leadsToEnable.length === 0) return;
-
       const { error } = await supabase
         .from('leads')
         .update({ 
@@ -135,16 +154,17 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
           ai_sequence_paused: false,
           ai_pause_reason: null
         })
-        .in('id', leadsToEnable);
+        .in('id', leadIds);
 
       if (error) throw error;
 
       toast({
         title: "AI messaging enabled",
-        description: `Successfully enabled AI messaging for ${leadsToEnable.length} leads.`,
+        description: `Successfully enabled AI messaging for ${leadIds.length} leads.`,
       });
 
       setShowDialog(false);
+      setShowBatchDialog(false);
       onComplete();
       
     } catch (error) {
@@ -190,18 +210,31 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
     return null;
   }
 
+  // Show warning for large selections
+  const shouldShowWarning = leadsWithoutAI.length > 50;
+
   return (
     <>
-      <Button 
-        variant="outline" 
-        size="sm"
-        onClick={analyzeLeadQuality}
-        disabled={isAnalyzing}
-        className="border-blue-200 text-blue-700 hover:bg-blue-50"
-      >
-        <Bot className="w-4 h-4 mr-2" />
-        {isAnalyzing ? 'Analyzing Quality...' : `Smart Enable AI (${leadsWithoutAI.length})`}
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={analyzeLeadQuality}
+          disabled={isAnalyzing}
+          className="border-blue-200 text-blue-700 hover:bg-blue-50"
+        >
+          <Bot className="w-4 h-4 mr-2" />
+          {isAnalyzing ? 'Analyzing Quality...' : `Smart Enable AI (${leadsWithoutAI.length})`}
+        </Button>
+        {shouldShowWarning && (
+          <div className="relative group">
+            <Shield className="w-4 h-4 text-orange-500" />
+            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              Large batch - will use batch controls
+            </div>
+          </div>
+        )}
+      </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-2xl">
@@ -217,6 +250,18 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
 
           {qualityBreakdown && (
             <div className="space-y-4">
+              {/* Batch size warning for large selections */}
+              {leadsWithoutAI.length > 50 && (
+                <Alert className="border-orange-200 bg-orange-50">
+                  <Shield className="w-4 h-4 text-orange-600" />
+                  <AlertDescription className="text-orange-800">
+                    <strong>Large selection detected:</strong> You have {leadsWithoutAI.length} leads selected. 
+                    For safety, batches over 50 leads will be processed using our batch control system 
+                    to prevent overwhelming recipients.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* High Quality Tier */}
               <div className="border rounded-lg p-4 bg-green-50 border-green-200">
                 <div className="flex items-center justify-between mb-2">
@@ -299,6 +344,9 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
                   className="w-full"
                 >
                   Enable AI for High + Medium Quality ({qualityBreakdown.highQuality.leads.length + qualityBreakdown.mediumQuality.leads.length})
+                  {(qualityBreakdown.highQuality.leads.length + qualityBreakdown.mediumQuality.leads.length) > 50 && (
+                    <span className="ml-2 text-xs text-orange-600">(Will use batch controls)</span>
+                  )}
                 </Button>
 
                 <Button
@@ -307,7 +355,12 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
                   disabled={isEnabling}
                   className="w-full border-red-200 text-red-700 hover:bg-red-50"
                 >
-                  Enable AI for All Leads ({leadsWithoutAI.length}) - Not Recommended
+                  Enable AI for All Leads ({leadsWithoutAI.length})
+                  {leadsWithoutAI.length > 50 ? (
+                    <span className="ml-2 text-xs">(Will use batch controls)</span>
+                  ) : (
+                    <span className="ml-2 text-xs">- Not Recommended</span>
+                  )}
                 </Button>
               </div>
             </div>
@@ -320,6 +373,15 @@ const EnhancedBulkAIOptIn: React.FC<EnhancedBulkAIOptInProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Batch Control Dialog */}
+      <BatchControlDialog
+        open={showBatchDialog}
+        onOpenChange={setShowBatchDialog}
+        leadsToProcess={selectedTierLeads}
+        onProcessBatch={processBatch}
+        isProcessing={isEnabling}
+      />
     </>
   );
 };
