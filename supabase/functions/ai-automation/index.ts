@@ -198,6 +198,46 @@ const processLead = async (lead: any, supabaseClient: any): Promise<{ success: b
       throw new Error('No phone number found');
     }
 
+    // Check if phone number is on suppression list (COMPLIANCE CHECK)
+    const { data: suppressionCheck, error: suppressionError } = await withTimeout(
+      supabaseClient
+        .from('compliance_suppression_list')
+        .select('id, reason, created_at')
+        .eq('contact', primaryPhone)
+        .eq('type', 'sms')
+        .limit(1),
+      5000,
+      `Suppression check for ${leadId}`
+    );
+
+    if (suppressionError) {
+      console.error(`❌ [COMPLIANCE] Error checking suppression list for ${leadId}:`, suppressionError);
+      return { success: false, error: 'Suppression check failed' };
+    }
+
+    if (suppressionCheck && suppressionCheck.length > 0) {
+      const suppression = suppressionCheck[0];
+      console.log(`🚫 [COMPLIANCE] Phone ${primaryPhone} is on suppression list - BLOCKING message for ${leadId}`);
+      console.log(`🚫 [COMPLIANCE] Suppression reason: ${suppression.reason} (added: ${suppression.created_at})`);
+      
+      // Pause the lead's AI sequence
+      await withTimeout(
+        supabaseClient
+          .from('leads')
+          .update({
+            ai_sequence_paused: true,
+            ai_pause_reason: `Phone number on suppression list: ${suppression.reason}`,
+            next_ai_send_at: null,
+            ai_opt_in: false
+          })
+          .eq('id', leadId),
+        10000,
+        `Lead suppression pause for ${leadId}`
+      );
+
+      return { success: false, error: 'Phone number on suppression list' };
+    }
+
     // Check daily message limit
     const dailyLimit = 8;
     if (leadData.ai_messages_sent >= dailyLimit) {

@@ -124,6 +124,48 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // CRITICAL: Check suppression list before sending (COMPLIANCE)
+    console.log('🚫 [COMPLIANCE] Checking suppression list for:', recipientPhone);
+    const { data: suppressionCheck, error: suppressionError } = await supabase
+      .from('compliance_suppression_list')
+      .select('id, reason, created_at, details')
+      .eq('contact', recipientPhone)
+      .eq('type', 'sms')
+      .limit(1);
+
+    if (suppressionError) {
+      console.error('❌ [COMPLIANCE] Error checking suppression list:', suppressionError);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Suppression check failed',
+        conversationId: conversationId
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (suppressionCheck && suppressionCheck.length > 0) {
+      const suppression = suppressionCheck[0];
+      console.log(`🚫 [COMPLIANCE] BLOCKING SMS - Phone ${recipientPhone} is on suppression list`);
+      console.log(`🚫 [COMPLIANCE] Reason: ${suppression.reason} (${suppression.details || 'No details'})`);
+      console.log(`🚫 [COMPLIANCE] Added: ${suppression.created_at}`);
+      
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Phone number on suppression list',
+        reason: suppression.reason,
+        blocked: true,
+        compliance: true,
+        conversationId: conversationId
+      }), {
+        status: 200, // Return 200 to prevent retries
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('✅ [COMPLIANCE] Phone number not on suppression list - proceeding with send');
+
     // Get Twilio credentials using updated logic
     console.log('🔑 Fetching Twilio credentials...');
     const { accountSid, authToken, phoneNumber, source } = await getTwilioSecrets(supabase)

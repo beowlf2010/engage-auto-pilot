@@ -92,3 +92,91 @@ export async function enforceConsent(leadId: string, channel: "sms" | "email") {
   }
   return true;
 }
+
+// Detect opt-out keywords in message content
+export function detectOptOutKeywords(messageBody: string): { isOptOut: boolean; keyword: string | null } {
+  const stopKeywords = [
+    'STOP', 'UNSUBSCRIBE', 'QUIT', 'CANCEL', 'END', 
+    'OPTOUT', 'OPT-OUT', 'OPT OUT', 'REMOVE', 'DELETE'
+  ];
+  
+  const normalizedMessage = messageBody.toUpperCase().trim();
+  
+  for (const keyword of stopKeywords) {
+    if (normalizedMessage === keyword || normalizedMessage.includes(keyword)) {
+      return { isOptOut: true, keyword };
+    }
+  }
+  
+  return { isOptOut: false, keyword: null };
+}
+
+// Process opt-out request and add to suppression list
+export async function processOptOutRequest({
+  phoneNumber,
+  leadId,
+  messageBody,
+  keyword,
+}: {
+  phoneNumber: string;
+  leadId?: string;
+  messageBody: string;
+  keyword: string;
+}) {
+  try {
+    // Add to suppression list
+    const { error: suppressionError } = await supabase
+      .from("compliance_suppression_list")
+      .insert({
+        contact: phoneNumber,
+        type: "sms",
+        reason: "Customer opt-out via SMS",
+        details: `Customer sent: "${messageBody}" (keyword: ${keyword})`,
+        lead_id: leadId || null,
+      });
+
+    if (suppressionError) {
+      console.error("Failed to add to suppression list:", suppressionError);
+      throw new Error("Failed to process opt-out request");
+    }
+
+    // If we have a lead ID, update the lead status
+    if (leadId) {
+      const { error: leadUpdateError } = await supabase
+        .from("leads")
+        .update({
+          ai_opt_in: false,
+          ai_sequence_paused: true,
+          ai_pause_reason: "Customer opted out via STOP message",
+          next_ai_send_at: null,
+          status: "opted_out",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", leadId);
+
+      if (leadUpdateError) {
+        console.error("Failed to update lead status:", leadUpdateError);
+      }
+
+      // Log the opt-out audit
+      await logConsentAudit({
+        leadId,
+        eventType: "opt-out",
+        channel: "sms",
+        eventMetadata: {
+          reason: "STOP message received",
+          message_body: messageBody,
+          phone_number: phoneNumber,
+          keyword: keyword,
+        },
+        performedBy: null,
+      });
+    }
+
+    console.log(`✅ [COMPLIANCE] Successfully processed opt-out for ${phoneNumber}`);
+    return true;
+  } catch (error) {
+    console.error("Error processing opt-out request:", error);
+    throw error;
+  }
+}

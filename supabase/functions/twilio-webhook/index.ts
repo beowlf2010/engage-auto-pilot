@@ -127,6 +127,88 @@ serve(async (req) => {
       console.log(`📱 Processing INBOUND message from ${fromNumber} to ${toNumber}`);
       console.log(`📝 Message body: "${messageBody}"`);
 
+      // Check for STOP/opt-out keywords before processing
+      const stopKeywords = ['STOP', 'UNSUBSCRIBE', 'QUIT', 'CANCEL', 'END', 'OPTOUT', 'OPT-OUT'];
+      const isOptOutMessage = stopKeywords.some(keyword => 
+        messageBody.toUpperCase().trim() === keyword
+      );
+
+      if (isOptOutMessage) {
+        const detectedKeyword = stopKeywords.find(keyword => 
+          messageBody.toUpperCase().trim() === keyword
+        ) || 'STOP';
+        
+        console.log(`🚫 [COMPLIANCE] STOP message detected from ${fromNumber}: "${messageBody}"`);
+        
+        try {
+          // Find or create lead first to get lead ID
+          const leadId = await findOrCreateLead(supabase, fromNumber);
+
+          // Add to suppression list with lead ID
+          await supabase
+            .from('compliance_suppression_list')
+            .insert({
+              contact: normalizePhoneNumber(fromNumber),
+              type: 'sms',
+              reason: 'Customer opt-out via SMS',
+              details: `Customer sent: "${messageBody}" (keyword: ${detectedKeyword})`,
+              lead_id: leadId
+            });
+
+          console.log(`✅ [COMPLIANCE] Added ${fromNumber} to suppression list`);
+
+          // Pause AI automation for this lead
+          await supabase
+            .from('leads')
+            .update({
+              ai_opt_in: false,
+              ai_sequence_paused: true,
+              ai_pause_reason: 'Customer opted out via STOP message',
+              next_ai_send_at: null,
+              status: 'opted_out',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', leadId);
+
+          // Log the opt-out audit trail
+          await supabase
+            .from('lead_consent_audit')
+            .insert({
+              lead_id: leadId,
+              event_type: 'opt-out',
+              channel: 'sms',
+              event_metadata: { 
+                reason: 'STOP message received', 
+                message_body: messageBody,
+                phone_number: fromNumber,
+                keyword: detectedKeyword
+              },
+              performed_by: null
+            });
+
+          // Create conversation record for the STOP message
+          await supabase
+            .from('conversations')
+            .insert({
+              lead_id: leadId,
+              body: messageBody,
+              direction: 'in',
+              sent_at: new Date().toISOString(),
+              twilio_message_id: messageSid,
+              sms_status: 'received',
+              ai_generated: false
+            });
+
+          console.log('✅ [COMPLIANCE] STOP message processed successfully - NO AUTO-REPLY SENT');
+          return new Response('OK', { status: 200, headers: corsHeaders });
+
+        } catch (error) {
+          console.error('❌ [COMPLIANCE] Error processing STOP message:', error);
+          // Still return OK to Twilio to prevent retries
+          return new Response('OK', { status: 200, headers: corsHeaders });
+        }
+      }
+
       try {
         // Find or create lead for the sender
         const leadId = await findOrCreateLead(supabase, fromNumber);
