@@ -441,12 +441,15 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
     }
   }, [inventoryUpload.batchResult, inventoryUpload.processing, currentStepData?.fileType]);
 
-  // Watch for financial upload completion
+  // Watch for financial upload completion with proper dependencies
   useEffect(() => {
+    addDebugLog(`🔍 Financial upload watcher triggered - Step: ${currentStepData?.fileType}, Result: ${!!financialResult}, Uploading: ${financialUploading}, Current Step: ${currentStep}`);
+    
     if (currentStepData?.fileType === 'financial' && financialResult && !financialUploading) {
+      addDebugLog(`✅ Financial upload complete - handling step completion`);
       handleStepComplete(financialResult);
     }
-  }, [financialResult, financialUploading, currentStepData?.fileType]);
+  }, [financialResult, financialUploading, currentStepData?.fileType, currentStep, completedSteps]);
 
   const handleNext = () => {
     if (currentStep < uploadSteps.length && !isNavigating) {
