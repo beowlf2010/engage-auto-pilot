@@ -97,6 +97,12 @@ export const navigationItems: NavigationItem[] = [
     icon: Zap,
     access: ['admin', 'manager', 'sales']
   },
+  {
+    label: 'AI Opt-In Manager',
+    href: '/ai-opt-ins',
+    icon: Brain,
+    access: ['admin', 'manager']
+  },
   // Simplified AI section - all functionality moved to AI Dashboard
   {
     label: 'Call Analysis',
