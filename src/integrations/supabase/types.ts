@@ -7364,6 +7364,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_stuck_automation_runs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       create_system_conversation: {
         Args: { conversation_data: Json }
         Returns: string
