@@ -56,84 +56,46 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
 
   return (
     <SafeErrorBoundary>
-      <div className="space-y-6">
-        {/* Enhanced Welcome Section */}
-        <div className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 rounded-lg p-6 text-primary-foreground relative overflow-hidden">
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -translate-y-16 translate-x-16" />
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full translate-y-12 -translate-x-12" />
-          </div>
-          
-          <div className="relative flex items-center justify-between">
-            <div className="space-y-3">
-              <h1 className="text-3xl font-bold">
-                Welcome back, {user.firstName}! 👋
-              </h1>
-              <p className="text-primary-foreground/90 text-lg">
-                Here's your automotive sales performance at a glance
-              </p>
-              
-              {/* Quick stats preview */}
-              <div className="flex items-center gap-4 mt-4">
-                <div className="bg-white/10 rounded-lg px-3 py-2">
-                  <div className="text-2xl font-bold">{data.leadCounts.totalLeads}</div>
-                  <div className="text-sm text-primary-foreground/80">Total Leads</div>
-                </div>
-                <div className="bg-white/10 rounded-lg px-3 py-2">
-                  <div className="text-2xl font-bold">{data.trends.responseRate}%</div>
-                  <div className="text-sm text-primary-foreground/80">Response Rate</div>
-                </div>
-                <div className="bg-white/10 rounded-lg px-3 py-2">
-                  <div className="text-2xl font-bold">{data.unreadMessages}</div>
-                  <div className="text-sm text-primary-foreground/80">Unread</div>
-                </div>
-              </div>
+      <div className="space-y-4">
+        {/* Compact Welcome Header */}
+        <div className="bg-gradient-to-r from-primary to-primary/80 rounded-lg p-4 text-primary-foreground">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold">Welcome back, {user.firstName}! 👋</h1>
+              <p className="text-primary-foreground/90 text-sm">Sales performance overview</p>
             </div>
             
-            <div className="flex items-center gap-3">
-              {/* Enhanced status indicators */}
-              <div className="flex items-center gap-2">
-                {hasAnyData ? (
-                  <>
-                    <div className="flex items-center gap-1">
-                      {isRefetching ? (
-                        <Database className="h-4 w-4 text-yellow-300 animate-pulse" />
-                      ) : (
-                        <Wifi className="h-4 w-4 text-green-300" />
-                      )}
-                      {isStale && <Zap className="h-3 w-3 text-orange-300" />}
-                    </div>
-                    <Badge variant="secondary" className="bg-white/20 text-white">
-                      {isRefetching ? 'Updating...' : isStale ? 'Stale Data' : 'Live'} • {formatLastUpdated(lastUpdated)}
-                    </Badge>
-                  </>
-                ) : (
-                  <>
-                    <WifiOff className="h-4 w-4 text-yellow-300" />
-                    <Badge variant="secondary" className="bg-white/20 text-white">
-                      Loading...
-                    </Badge>
-                  </>
-                )}
-              </div>
+            <div className="flex items-center gap-2">
+              {hasAnyData ? (
+                <div className="flex items-center gap-1">
+                  {isRefetching ? (
+                    <Database className="h-4 w-4 text-yellow-300 animate-pulse" />
+                  ) : (
+                    <Wifi className="h-4 w-4 text-green-300" />
+                  )}
+                  <Badge variant="secondary" className="bg-white/20 text-white text-xs">
+                    {isRefetching ? 'Syncing...' : 'Live'}
+                  </Badge>
+                </div>
+              ) : (
+                <WifiOff className="h-4 w-4 text-yellow-300" />
+              )}
               
-              {/* Enhanced refresh button */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={refetch}
                 disabled={isLoading}
-                className="text-white hover:bg-white/20"
+                className="text-white hover:bg-white/20 h-8 px-2"
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading || isRefetching ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${isLoading || isRefetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </div>
           
           {error && (
-            <div className="mt-4 text-sm text-primary-foreground/90 bg-white/10 rounded-lg p-3 border border-white/20">
-              ⚠️ {error} - Some data may be outdated
+            <div className="mt-2 text-xs text-primary-foreground/90 bg-white/10 rounded p-2">
+              ⚠️ {error}
             </div>
           )}
         </div>
@@ -152,9 +114,9 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
           )}
         </SafeErrorBoundary>
 
-        {/* Main Content Grid with Trends */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-          {/* Quick Actions - 2 columns */}
+        {/* Compact Grid Layout */}
+        <div className="grid grid-cols-1 xl:grid-cols-6 gap-4">
+          {/* Quick Actions */}
           <div className="xl:col-span-2">
             <SafeErrorBoundary>
               {loading.leadCounts || loading.unreadMessages ? (
@@ -169,8 +131,8 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
             </SafeErrorBoundary>
           </div>
 
-          {/* Trends Widget - 1 column */}
-          <div className="xl:col-span-1">
+          {/* Trends & AI Insights Side by Side */}
+          <div className="xl:col-span-2">
             <SafeErrorBoundary>
               <TrendsWidget 
                 trends={data.trends}
@@ -178,9 +140,8 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
               />
             </SafeErrorBoundary>
           </div>
-
-          {/* AI Insights Widget - 1 column */}
-          <div className="xl:col-span-1">
+          
+          <div className="xl:col-span-2">
             <SafeErrorBoundary>
               {isLoading ? (
                 <AIInsightsSkeleton />
@@ -191,50 +152,46 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
           </div>
         </div>
 
-        {/* SMS System Cards */}
-        <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+        {/* Combined Systems & Activity Row */}
+        <div className="grid gap-4 lg:grid-cols-3">
           <SafeErrorBoundary>
             <SMSMonitoringCard />
           </SafeErrorBoundary>
           <SafeErrorBoundary>
             <SMSTestPanel />
           </SafeErrorBoundary>
+          <SafeErrorBoundary>
+            {loading.leadCounts || loading.unreadMessages ? (
+              <RecentActivitySkeleton />
+            ) : (
+              <RecentActivity 
+                leadCounts={data.leadCounts}
+                unreadMessages={data.unreadMessages}
+                onNavigate={handleNavigate}
+              />
+            )}
+          </SafeErrorBoundary>
         </div>
 
-        {/* AI Automation Status Dashboard */}
+        {/* AI Status Dashboard - More Compact */}
         <SafeErrorBoundary>
           <AIStatusDashboard />
         </SafeErrorBoundary>
-        <SafeErrorBoundary>
-          {loading.leadCounts || loading.unreadMessages ? (
-            <RecentActivitySkeleton />
-          ) : (
-            <RecentActivity 
-              leadCounts={data.leadCounts}
-              unreadMessages={data.unreadMessages}
-              onNavigate={handleNavigate}
-            />
-          )}
-        </SafeErrorBoundary>
 
-        {/* Performance Indicators */}
+        {/* Compact Performance Footer */}
         {hasAnyData && !isLoading && (
-          <Card className="border-dashed border-muted">
-            <CardContent className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <BarChart3 className="h-4 w-4" />
-                <span>React Query Cache Active</span>
-                {isStale && <Badge variant="outline" className="text-xs">Stale Data</Badge>}
+          <div className="text-center py-2">
+            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <BarChart3 className="h-3 w-3" />
+                <span>Cache Active</span>
               </div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span>Background sync: 30s</span>
-                <span>Cache: 5m</span>
-                <Badge variant="outline" className="text-xs">
-                  {isRefetching ? 'Syncing...' : 'Ready'}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+              <Badge variant="outline" className="text-xs">
+                {isRefetching ? 'Syncing...' : 'Ready'}
+              </Badge>
+              {isStale && <Badge variant="outline" className="text-xs">Stale</Badge>}
+            </div>
+          </div>
         )}
       </div>
     </SafeErrorBoundary>
