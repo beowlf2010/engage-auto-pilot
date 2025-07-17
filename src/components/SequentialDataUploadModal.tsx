@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { CheckCircle, Upload, ArrowRight, RotateCcw, AlertTriangle, ArrowLeft, Bug, Zap, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useEnhancedMultiFileUpload } from '@/hooks/useEnhancedMultiFileUpload';
@@ -621,8 +622,9 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Fixed Header */}
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Sequential Data Upload</DialogTitle>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -633,8 +635,10 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
           </div>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Current Step */}
+        {/* Scrollable Content */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="space-y-6 p-1">
+            {/* Current Step */}
           <Card className={`border-2 ${isCurrentStepCompleted ? 'border-green-500' : 'border-primary'}`}>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -803,7 +807,60 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
             </Card>
           )}
 
-          {/* Step Navigation */}
+
+          {/* Show results for completed steps */}
+          {completedSteps.size > 0 && (
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium mb-3">Completed Steps:</h4>
+              <div className="space-y-2">
+                {uploadSteps
+                  .filter(step => completedSteps.has(step.id))
+                  .map(step => (
+                    <div key={step.id}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center space-x-2">
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <span>{step.title}</span>
+                        </span>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => toggleResultExpansion(step.id)}
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          View Results
+                        </Button>
+                      </div>
+                      {renderStepResult(step, stepResults[step.id])}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Progress Overview */}
+          <div className="grid grid-cols-4 gap-2">
+            {uploadSteps.map((step) => (
+              <div 
+                key={step.id}
+                className={`p-2 rounded text-center text-xs ${
+                  completedSteps.has(step.id) 
+                    ? 'bg-green-100 text-green-800 border border-green-300' 
+                    : step.id === currentStep
+                    ? 'bg-primary/10 text-primary border border-primary/30'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {completedSteps.has(step.id) && <CheckCircle className="w-3 h-3 mx-auto mb-1" />}
+                <div className="font-medium">{step.title.split(' ')[1]}</div>
+              </div>
+             ))}
+           </div>
+          </div>
+        </ScrollArea>
+
+        {/* Fixed Footer - Navigation */}
+        <div className="flex-shrink-0 border-t pt-4">
           <div className="flex justify-between items-center">
             <div className="flex space-x-2">
               <Button 
@@ -858,55 +915,6 @@ const SequentialDataUploadModal = ({ isOpen, onClose, userId, onSuccess }: Seque
                 </Button>
               )}
             </div>
-          </div>
-
-          {/* Show results for completed steps */}
-          {completedSteps.size > 0 && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium mb-3">Completed Steps:</h4>
-              <div className="space-y-2">
-                {uploadSteps
-                  .filter(step => completedSteps.has(step.id))
-                  .map(step => (
-                    <div key={step.id}>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="flex items-center space-x-2">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          <span>{step.title}</span>
-                        </span>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => toggleResultExpansion(step.id)}
-                        >
-                          <Eye className="w-3 h-3 mr-1" />
-                          View Results
-                        </Button>
-                      </div>
-                      {renderStepResult(step, stepResults[step.id])}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* Progress Overview */}
-          <div className="grid grid-cols-4 gap-2">
-            {uploadSteps.map((step) => (
-              <div 
-                key={step.id}
-                className={`p-2 rounded text-center text-xs ${
-                  completedSteps.has(step.id) 
-                    ? 'bg-green-100 text-green-800 border border-green-300' 
-                    : step.id === currentStep
-                    ? 'bg-primary/10 text-primary border border-primary/30'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {completedSteps.has(step.id) && <CheckCircle className="w-3 h-3 mx-auto mb-1" />}
-                <div className="font-medium">{step.title.split(' ')[1]}</div>
-              </div>
-            ))}
           </div>
         </div>
       </DialogContent>
