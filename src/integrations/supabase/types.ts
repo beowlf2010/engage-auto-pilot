@@ -7550,6 +7550,19 @@ export type Database = {
           total_sales_value: number
         }[]
       }
+      get_stuck_leads_report: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          lead_id: string
+          first_name: string
+          last_name: string
+          phone_number: string
+          ai_stage: string
+          next_ai_send_at: string
+          minutes_overdue: number
+          has_valid_phone: boolean
+        }[]
+      }
       has_role: {
         Args: {
           _user_id: string

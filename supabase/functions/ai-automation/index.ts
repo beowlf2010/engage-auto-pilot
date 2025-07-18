@@ -298,6 +298,7 @@ async function processLeadSafely(supabase: any, lead: any) {
 
     if (!aiResponse?.success || !aiResponse?.message) {
       console.warn(`⚠️ [LEAD] No AI message generated for ${lead.id}`);
+      await handleLeadWithoutMessage(supabase, lead.id, 'No AI message generated');
       return { success: false, error: 'No AI message generated', leadId: lead.id };
     }
 
@@ -311,7 +312,17 @@ async function processLeadSafely(supabase: any, lead: any) {
 
     if (phoneError || !phoneData) {
       console.warn(`⚠️ [LEAD] No phone number for ${lead.id}`);
+      await handleLeadWithoutPhone(supabase, lead.id);
       return { success: false, error: 'No phone number found', leadId: lead.id };
+    }
+
+    // Check for placeholder phone number
+    if (phoneData.number === '+15551234567' || 
+        phoneData.number.includes('555-1234') ||
+        phoneData.number.length < 10) {
+      console.warn(`⚠️ [LEAD] Placeholder phone detected for ${lead.id}: ${phoneData.number}`);
+      await handleLeadWithoutPhone(supabase, lead.id, 'Placeholder phone number detected');
+      return { success: false, error: 'Placeholder phone number', leadId: lead.id };
     }
 
     // Create conversation record
@@ -417,6 +428,46 @@ async function releaseLock(supabase: any, lockName: string) {
       .eq('lock_name', lockName);
   } catch (error) {
     console.error('❌ [LOCK] Error releasing lock:', error);
+  }
+}
+
+async function handleLeadWithoutPhone(supabase: any, leadId: string, reason = 'No valid phone number found') {
+  try {
+    console.log(`📞 [PHONE FIX] Disabling AI for lead ${leadId}: ${reason}`);
+    
+    await supabase
+      .from('leads')
+      .update({
+        ai_opt_in: false,
+        ai_sequence_paused: true,
+        ai_pause_reason: reason,
+        next_ai_send_at: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', leadId);
+      
+  } catch (error) {
+    console.error(`❌ [PHONE FIX] Error handling lead without phone ${leadId}:`, error);
+  }
+}
+
+async function handleLeadWithoutMessage(supabase: any, leadId: string, reason = 'AI message generation failed') {
+  try {
+    console.log(`💬 [MESSAGE FIX] Updating lead ${leadId}: ${reason}`);
+    
+    // Push next attempt 4 hours into the future
+    const nextAttempt = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
+    
+    await supabase
+      .from('leads')
+      .update({
+        next_ai_send_at: nextAttempt,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', leadId);
+      
+  } catch (error) {
+    console.error(`❌ [MESSAGE FIX] Error handling lead without message ${leadId}:`, error);
   }
 }
 
