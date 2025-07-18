@@ -2669,30 +2669,36 @@ export type Database = {
       compliance_suppression_list: {
         Row: {
           contact: string
+          created_at: string
           details: string | null
           id: string
           lead_id: string | null
           reason: string | null
           suppressed_at: string
           type: string
+          updated_at: string
         }
         Insert: {
           contact: string
+          created_at?: string
           details?: string | null
           id?: string
           lead_id?: string | null
           reason?: string | null
           suppressed_at?: string
           type: string
+          updated_at?: string
         }
         Update: {
           contact?: string
+          created_at?: string
           details?: string | null
           id?: string
           lead_id?: string | null
           reason?: string | null
           suppressed_at?: string
           type?: string
+          updated_at?: string
         }
         Relationships: []
       }
