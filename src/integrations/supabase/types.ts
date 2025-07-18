@@ -3034,6 +3034,7 @@ export type Database = {
           delivery_status_updated_at: string | null
           direction: string
           id: string
+          is_initial_contact: boolean | null
           lead_id: string
           profile_id: string | null
           read_at: string | null
@@ -3051,6 +3052,7 @@ export type Database = {
           delivery_status_updated_at?: string | null
           direction: string
           id?: string
+          is_initial_contact?: boolean | null
           lead_id: string
           profile_id?: string | null
           read_at?: string | null
@@ -3068,6 +3070,7 @@ export type Database = {
           delivery_status_updated_at?: string | null
           direction?: string
           id?: string
+          is_initial_contact?: boolean | null
           lead_id?: string
           profile_id?: string | null
           read_at?: string | null
@@ -7434,6 +7437,10 @@ export type Database = {
           slot_time: string
           available_spots: number
         }[]
+      }
+      get_dealership_context: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_gm_global_status_summary: {
         Args: Record<PropertyKey, never>

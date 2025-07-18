@@ -21,12 +21,16 @@ serve(async (req) => {
 
     console.log('🔧 [FINN AI] Checking OpenAI API key...');
     
-    // Get OpenAI API key from settings table
+    // Get OpenAI API key and dealership context from settings table
     const { data: openAIKeySetting } = await supabase
       .from('settings')
       .select('value')
       .eq('key', 'OPENAI_API_KEY')
       .maybeSingle();
+
+    // Get dealership context for proper identification
+    const { data: dealershipContext } = await supabase
+      .rpc('get_dealership_context');
 
     if (!openAIKeySetting?.value) {
       console.error('❌ [FINN AI] OpenAI API key not configured in settings');
@@ -55,12 +59,22 @@ serve(async (req) => {
     // Ensure conversationHistory is a string
     const conversationHistory = typeof rawConversationHistory === 'string' ? rawConversationHistory : String(rawConversationHistory || '');
 
-    // Fetch lead geographical data for location-aware responses
+    // Fetch lead data including geographical info and check if this is initial contact
     const { data: leadGeoData } = await supabase
       .from('leads')
       .select('address, city, state, postal_code')
       .eq('id', leadId)
       .maybeSingle();
+
+    // Check if this is an initial contact by looking at conversation history
+    const { data: existingConversations } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('direction', 'out')
+      .limit(1);
+
+    const isInitialContact = !existingConversations || existingConversations.length === 0;
 
     console.log('📍 [FINN AI] Lead location:', {
       city: leadGeoData?.city,
@@ -105,25 +119,65 @@ serve(async (req) => {
       .eq('lead_id', leadId)
       .maybeSingle();
 
-    // Build simple contextual prompts
-    const systemPrompt = `You are Finn, a friendly and helpful car sales assistant. You work for a car dealership.
+    // Build contextual prompts with proper dealership identification
+    const dealershipName = dealershipContext?.DEALERSHIP_NAME || 'our dealership';
+    const salespersonName = dealershipContext?.DEFAULT_SALESPERSON_NAME || 'a sales representative';
+    const dealershipLocation = dealershipContext?.DEALERSHIP_LOCATION || 'our location';
+    const dealershipPhone = dealershipContext?.DEALERSHIP_PHONE || 'our dealership';
 
-Key guidelines:
+    let systemPrompt = '';
+
+    if (isInitialContact) {
+      // For initial contact, use warm introduction style
+      systemPrompt = `You are ${salespersonName}, a friendly car sales professional at ${dealershipName} in ${dealershipLocation}.
+
+This is your FIRST contact with this customer, so introduce yourself professionally:
+- Start with a brief, warm introduction
+- Mention you're from ${dealershipName}
+- Reference their interest in ${vehicleInterest || 'finding the right vehicle'}
+- Keep it under 160 characters for SMS
+- Be helpful and inviting
+- Ask one relevant question to start the conversation
+
+Customer location: ${leadGeoData?.city || 'Unknown'}, ${leadGeoData?.state || 'Unknown'}
+Customer interest: ${vehicleInterest || 'General inquiry'}`;
+    } else {
+      // For follow-up messages, maintain professional identity
+      systemPrompt = `You are ${salespersonName} from ${dealershipName} in ${dealershipLocation}.
+
+You're continuing an existing conversation with this customer:
 - Be conversational and helpful
 - Keep responses under 160 characters for SMS
-- Focus on ${vehicleInterest || 'helping the customer find the right vehicle'}
+- Focus on ${vehicleInterest || 'helping them find the right vehicle'}
 - Be professional but friendly
 - Ask one question to move the conversation forward
 
 Customer location: ${leadGeoData?.city || 'Unknown'}, ${leadGeoData?.state || 'Unknown'}
 Customer interest: ${vehicleInterest || 'General inquiry'}`;
+    }
 
-    const userPrompt = `Customer message: "${customerMessage}"
+    let userPrompt = '';
+
+    if (isInitialContact) {
+      userPrompt = `Customer message: "${customerMessage}"
+
+This is your first outreach to this customer. ${vehicleInterest ? `They've shown interest in: ${vehicleInterest}` : 'They are a new lead.'}
+
+Respond with a warm, professional introduction that:
+- Identifies you as ${salespersonName} from ${dealershipName}
+- Acknowledges their interest
+- Invites them to connect
+- Stays under 160 characters`;
+    } else {
+      userPrompt = `Customer message: "${customerMessage}"
 
 Previous conversation context: ${conversationHistory ? conversationHistory.slice(-500) : 'No previous conversation'}
 
-Please respond as Finn with a helpful, brief message (under 160 characters).`;
+Please respond as ${salespersonName} with a helpful, brief message (under 160 characters).`;
+    }
 
+    console.log('📝 [FINN AI] Contact type:', isInitialContact ? 'Initial' : 'Follow-up');
+    console.log('📝 [FINN AI] Dealership context:', { dealershipName, salespersonName, dealershipLocation });
     console.log('📝 [FINN AI] Generated system prompt length:', systemPrompt.length);
     console.log('📝 [FINN AI] Generated user prompt length:', userPrompt.length);
 
