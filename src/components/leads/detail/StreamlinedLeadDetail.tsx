@@ -52,17 +52,24 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
 
   // Simplified send message - let fixedMessagesService handle phone number lookup
   const sendMessage = async (leadId: string, messageBody: string): Promise<void> => {
+    console.log('📤 [STREAMLINED LEAD DETAIL] === STARTING MESSAGE SEND ===');
+    console.log('📤 [STREAMLINED LEAD DETAIL] Lead ID:', leadId);
+    console.log('📤 [STREAMLINED LEAD DETAIL] Message body:', messageBody.substring(0, 50) + '...');
+    console.log('📤 [STREAMLINED LEAD DETAIL] Profile:', profile ? { id: profile.id, firstName: profile.first_name } : 'No profile');
+
     if (!profile || !messageBody.trim()) {
-      throw new Error('Missing profile or message body');
+      const error = new Error('Missing profile or message body');
+      console.error('❌ [STREAMLINED LEAD DETAIL] Error:', error.message);
+      throw error;
     }
 
-    console.log('📤 [LEAD DETAIL] Sending message - letting service handle phone lookup');
+    console.log('📤 [STREAMLINED LEAD DETAIL] Calling fixedSendMessage...');
     
     // Let fixedMessagesService handle all the phone number lookup and validation
     // This service already works correctly in the Smart Inbox
     await fixedSendMessage(leadId, messageBody.trim(), profile, false);
     
-    console.log('✅ [LEAD DETAIL] Message sent successfully via fixed service');
+    console.log('✅ [STREAMLINED LEAD DETAIL] Message sent successfully via fixed service');
   };
 
   // Wrapper function to match the expected signature (message: string) => Promise<void>
@@ -71,27 +78,51 @@ const StreamlinedLeadDetail: React.FC<StreamlinedLeadDetailProps> = ({
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || isSending) return;
+    console.log('📤 [STREAMLINED LEAD DETAIL] === handleSendMessage called ===');
+    console.log('📤 [STREAMLINED LEAD DETAIL] New message:', newMessage);
+    console.log('📤 [STREAMLINED LEAD DETAIL] isSending:', isSending);
+    console.log('📤 [STREAMLINED LEAD DETAIL] Lead ID:', lead.id);
+    
+    if (!newMessage.trim()) {
+      console.log('❌ [STREAMLINED LEAD DETAIL] Empty message, aborting');
+      return;
+    }
+    
+    if (isSending) {
+      console.log('❌ [STREAMLINED LEAD DETAIL] Already sending, aborting');
+      return;
+    }
     
     setIsSending(true);
+    console.log('📤 [STREAMLINED LEAD DETAIL] Set isSending to true');
+    
     try {
-      console.log('📤 Sending message:', newMessage);
+      console.log('📤 [STREAMLINED LEAD DETAIL] About to call sendMessage...');
       await sendMessage(lead.id, newMessage);
+      
+      console.log('✅ [STREAMLINED LEAD DETAIL] Message sent successfully, clearing input');
       setNewMessage("");
+      
+      console.log('🔄 [STREAMLINED LEAD DETAIL] Reloading messages...');
       await loadMessages(lead.id);
       
       toast({
         title: "Message Sent",
         description: "Your message has been sent successfully",
       });
+      
+      console.log('✅ [STREAMLINED LEAD DETAIL] === MESSAGE SEND COMPLETE ===');
     } catch (error) {
-      console.error("Failed to send message:", error);
+      console.error("❌ [STREAMLINED LEAD DETAIL] === MESSAGE SEND FAILED ===");
+      console.error("❌ [STREAMLINED LEAD DETAIL] Error details:", error);
+      
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to send message",
         variant: "destructive"
       });
     } finally {
+      console.log('📤 [STREAMLINED LEAD DETAIL] Setting isSending to false');
       setIsSending(false);
     }
   };

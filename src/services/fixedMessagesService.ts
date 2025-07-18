@@ -1,269 +1,187 @@
 
 import { supabase } from '@/integrations/supabase/client';
-
-// Enhanced message service with better error handling and debugging
-import { processOutboundMessage } from './outboundMessageMonitor';
+import { toast } from '@/hooks/use-toast';
 
 export const sendMessage = async (
   leadId: string,
-  messageBody: string,
+  messageContent: string,
   profile: any,
   isAIGenerated: boolean = false
 ) => {
+  console.log(`📤 [FIXED MESSAGES SERVICE] === ENHANCED SERVICE START ===`);
+  console.log(`📤 [FIXED MESSAGES SERVICE] Lead ID: ${leadId}`);
+  console.log(`📤 [FIXED MESSAGES SERVICE] Message: ${messageContent.substring(0, 50)}...`);
+  console.log(`📤 [FIXED MESSAGES SERVICE] Profile:`, {
+    id: profile?.id,
+    firstName: profile?.first_name,
+    role: profile?.role
+  });
+  console.log(`📤 [FIXED MESSAGES SERVICE] AI Generated: ${isAIGenerated}`);
+
+  if (!profile || !profile.id) {
+    const error = new Error('Profile is required for sending messages');
+    console.error(`❌ [FIXED MESSAGES SERVICE] ${error.message}`);
+    throw error;
+  }
+
+  if (!messageContent?.trim()) {
+    const error = new Error('Message content is required');
+    console.error(`❌ [FIXED MESSAGES SERVICE] ${error.message}`);
+    throw error;
+  }
+
+  if (!leadId) {
+    const error = new Error('Lead ID is required');
+    console.error(`❌ [FIXED MESSAGES SERVICE] ${error.message}`);
+    throw error;
+  }
+
   try {
-    console.log(`📤 [FIXED MESSAGES] === DEBUGGING MESSAGE SEND ===`);
-    console.log(`📤 [FIXED MESSAGES] Lead ID: ${leadId}`);
-    console.log(`📤 [FIXED MESSAGES] Message: "${messageBody.substring(0, 50)}..."`);
-    console.log(`📤 [FIXED MESSAGES] AI Generated: ${isAIGenerated}`);
-    console.log(`📤 [FIXED MESSAGES] Profile received:`, {
-      hasProfile: !!profile,
-      profileId: profile?.id,
-      profileFirstName: profile?.first_name || profile?.firstName,
-      profileType: typeof profile
-    });
-
-    // Enhanced profile validation and cleaning
-    if (!profile) {
-      throw new Error('Profile is required but was not provided');
-    }
-
-    // Handle different profile data structures
-    let cleanProfileId: string;
-    let cleanFirstName: string;
-
-    if (typeof profile === 'string') {
-      cleanProfileId = profile;
-      cleanFirstName = 'User';
-    } else if (profile.id) {
-      cleanProfileId = typeof profile.id === 'string' ? profile.id : profile.id?.value || profile.id?.toString();
-      cleanFirstName = profile.first_name || profile.firstName || 'User';
-    } else {
-      console.error('❌ [FIXED MESSAGES] Invalid profile structure:', profile);
-      throw new Error('Invalid profile data - missing ID');
-    }
-
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(cleanProfileId)) {
-      console.error('❌ [FIXED MESSAGES] Invalid UUID format for profile ID:', cleanProfileId);
-      throw new Error('Invalid profile ID format');
-    }
-
-    console.log(`✅ [FIXED MESSAGES] Using cleaned profile:`, {
-      id: cleanProfileId,
-      firstName: cleanFirstName
-    });
-
-    // Get lead data including phone number and current status with better error handling
-    console.log(`📱 [FIXED MESSAGES] Fetching lead data for: ${leadId}`);
+    // Step 1: Get the lead's primary phone number
+    console.log(`📱 [FIXED MESSAGES SERVICE] Looking up phone for lead: ${leadId}`);
     
-    const { data: lead, error: leadError } = await supabase
-      .from('leads')
-      .select(`
-        id,
-        first_name,
-        last_name,
-        status,
-        vehicle_interest,
-        phone_numbers (
-          number,
-          is_primary
-        )
-      `)
-      .eq('id', leadId)
+    const { data: phoneData, error: phoneError } = await supabase
+      .from('phone_numbers')
+      .select('number')
+      .eq('lead_id', leadId)
+      .eq('is_primary', true)
       .single();
 
-    if (leadError) {
-      console.error('❌ [FIXED MESSAGES] Lead fetch error:', leadError);
-      throw new Error(`Lead not found: ${leadError.message}`);
+    if (phoneError) {
+      console.error(`❌ [FIXED MESSAGES SERVICE] Phone lookup error:`, phoneError);
+      
+      // Fallback: try to get any phone number for this lead
+      console.log(`🔄 [FIXED MESSAGES SERVICE] Fallback: trying to get any phone number`);
+      const { data: fallbackPhone, error: fallbackError } = await supabase
+        .from('phone_numbers')
+        .select('number')
+        .eq('lead_id', leadId)
+        .limit(1)
+        .single();
+
+      if (fallbackError || !fallbackPhone) {
+        const error = new Error('No phone number found for this lead');
+        console.error(`❌ [FIXED MESSAGES SERVICE] ${error.message}`);
+        throw error;
+      }
+      
+      console.log(`✅ [FIXED MESSAGES SERVICE] Using fallback phone: ${fallbackPhone.number}`);
     }
 
-    if (!lead) {
-      console.error('❌ [FIXED MESSAGES] Lead not found for ID:', leadId);
-      throw new Error('Lead not found');
-    }
-
-    console.log(`📋 [FIXED MESSAGES] Lead found:`, {
-      leadName: `${lead.first_name} ${lead.last_name}`,
-      currentStatus: lead.status,
-      phoneCount: lead.phone_numbers?.length || 0
-    });
-
-    // Get primary phone number with fallback
-    const phoneNumbers = Array.isArray(lead.phone_numbers) ? lead.phone_numbers : [];
-    const primaryPhone = phoneNumbers.find((p: any) => p.is_primary)?.number || 
-                        phoneNumbers[0]?.number;
-
-    if (!primaryPhone) {
-      console.error('❌ [FIXED MESSAGES] No phone number found for lead:', leadId);
-      console.error('❌ [FIXED MESSAGES] Available phone numbers:', phoneNumbers);
-      throw new Error('No phone number found for lead - cannot send message');
-    }
-
-    console.log(`📱 [FIXED MESSAGES] Using phone number: ${primaryPhone}`);
-
-    // ===== PRE-SEND MESSAGE VALIDATION AND MONITORING =====
-    console.log(`🔍 [FIXED MESSAGES] Validating message content for generic names...`);
+    const phoneNumber = phoneData?.number || null;
     
-    // Process message through monitoring system
-    const { processedMessage, modifications } = await processOutboundMessage(messageBody, {
-      id: leadId,
-      first_name: lead.first_name,
-      last_name: lead.last_name,
-      vehicle_interest: lead.vehicle_interest
-    });
-
-    // Use the processed (potentially fixed) message
-    const finalMessageBody = processedMessage;
-
-    if (modifications.length > 0) {
-      console.log(`🔧 [FIXED MESSAGES] Message modified by monitoring system:`, modifications);
-      console.log(`📝 [FIXED MESSAGES] Original: "${messageBody}"`);
-      console.log(`📝 [FIXED MESSAGES] Final: "${finalMessageBody}"`);
-    } else {
-      console.log(`✅ [FIXED MESSAGES] Message passed validation without modifications`);
+    if (!phoneNumber) {
+      const error = new Error('No phone number found for this lead');
+      console.error(`❌ [FIXED MESSAGES SERVICE] ${error.message}`);
+      throw error;
     }
 
-    // Create conversation record with enhanced error handling (using processed message)
-    const conversationData = {
-      lead_id: leadId,
-      profile_id: cleanProfileId,
-      body: finalMessageBody.trim(),
-      direction: 'out',
-      sent_at: new Date().toISOString(),
-      ai_generated: isAIGenerated,
-      sms_status: 'pending'
-    };
+    console.log(`📱 [FIXED MESSAGES SERVICE] Found phone: ${phoneNumber}`);
 
-    console.log(`💾 [FIXED MESSAGES] Creating conversation record:`, {
-      leadId: conversationData.lead_id,
-      profileId: conversationData.profile_id,
-      direction: conversationData.direction,
-      aiGenerated: conversationData.ai_generated,
-      messageLength: conversationData.body.length
-    });
-
+    // Step 2: Create conversation record first
+    console.log(`💾 [FIXED MESSAGES SERVICE] Creating conversation record...`);
+    
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
-      .insert(conversationData)
+      .insert({
+        lead_id: leadId,
+        profile_id: profile.id,
+        body: messageContent.trim(),
+        direction: 'out',
+        ai_generated: isAIGenerated,
+        sent_at: new Date().toISOString(),
+        sms_status: 'pending'
+      })
       .select()
       .single();
 
     if (conversationError) {
-      console.error('❌ [FIXED MESSAGES] Conversation creation error:', conversationError);
-      console.error('❌ [FIXED MESSAGES] Failed conversation data:', conversationData);
-      throw new Error(`Failed to create conversation record: ${conversationError.message}`);
+      console.error(`❌ [FIXED MESSAGES SERVICE] Failed to create conversation:`, conversationError);
+      throw new Error(`Failed to save message: ${conversationError.message}`);
     }
 
-    console.log(`✅ [FIXED MESSAGES] Created conversation record: ${conversation.id}`);
+    console.log(`✅ [FIXED MESSAGES SERVICE] Created conversation: ${conversation.id}`);
 
-    // Send SMS via edge function with enhanced error handling
-    console.log(`📤 [FIXED MESSAGES] Sending SMS via edge function...`);
+    // Step 3: Send SMS via edge function
+    console.log(`📤 [FIXED MESSAGES SERVICE] Sending SMS via edge function...`);
     
     const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
       body: {
-        to: primaryPhone,
-        body: finalMessageBody.trim(),
-        conversationId: conversation.id
+        to: phoneNumber,
+        body: messageContent.trim(),
+        conversationId: conversation.id,
+        leadId: leadId,
+        profileId: profile.id,
+        isAIGenerated: isAIGenerated
       }
     });
 
     if (smsError) {
-      console.error('❌ [FIXED MESSAGES] SMS sending failed:', smsError);
+      console.error(`❌ [FIXED MESSAGES SERVICE] SMS send error:`, smsError);
       
-      // Update conversation with error status
+      // Update conversation with error
       await supabase
         .from('conversations')
-        .update({ 
+        .update({
           sms_status: 'failed',
-          sms_error: smsError.message 
+          sms_error: smsError.message
         })
         .eq('id', conversation.id);
       
-      throw new Error(`SMS sending failed: ${smsError.message}`);
+      throw new Error(`Failed to send SMS: ${smsError.message}`);
     }
 
-    console.log(`✅ [FIXED MESSAGES] SMS sent successfully:`, {
-      messageId: smsResult?.sid || smsResult?.messageSid,
-      status: smsResult?.status
-    });
+    if (!smsResult?.success) {
+      console.error(`❌ [FIXED MESSAGES SERVICE] SMS send failed:`, smsResult);
+      
+      // Update conversation with error
+      await supabase
+        .from('conversations')
+        .update({
+          sms_status: 'failed',
+          sms_error: smsResult?.error || 'Unknown error'
+        })
+        .eq('id', conversation.id);
+      
+      throw new Error(`Failed to send SMS: ${smsResult?.error || 'Unknown error'}`);
+    }
 
-    // Update conversation with SMS details
-    const updateData: any = {
-      sms_status: 'sent'
+    console.log(`✅ [FIXED MESSAGES SERVICE] SMS sent successfully:`, smsResult);
+
+    // Step 4: Update conversation with success
+    if (smsResult.messageSid || smsResult.telnyxMessageId) {
+      console.log(`📝 [FIXED MESSAGES SERVICE] Updating conversation with message ID...`);
+      
+      await supabase
+        .from('conversations')
+        .update({
+          sms_status: 'sent',
+          twilio_message_id: smsResult.messageSid || smsResult.telnyxMessageId
+        })
+        .eq('id', conversation.id);
+    }
+
+    console.log(`✅ [FIXED MESSAGES SERVICE] === SERVICE COMPLETE ===`);
+    
+    return {
+      success: true,
+      conversationId: conversation.id,
+      messageSid: smsResult.messageSid || smsResult.telnyxMessageId
     };
 
-    if (smsResult?.sid || smsResult?.messageSid) {
-      updateData.twilio_message_id = smsResult.sid || smsResult.messageSid;
-    }
-
-    await supabase
-      .from('conversations')
-      .update(updateData)
-      .eq('id', conversation.id);
-
-    // Update lead status to "engaged" if currently "new"
-    if (lead.status === 'new') {
-      console.log(`🔄 [FIXED MESSAGES] Updating lead status from "new" to "engaged"`);
-      const { error: statusUpdateError } = await supabase
-        .from('leads')
-        .update({ status: 'engaged' })
-        .eq('id', leadId);
-
-      if (statusUpdateError) {
-        console.warn('⚠️ [FIXED MESSAGES] Failed to update lead status:', statusUpdateError);
-        // Don't throw error for status update failure - message was sent successfully
-      } else {
-        console.log(`✅ [FIXED MESSAGES] Lead status updated to "engaged"`);
-      }
-    }
-
-    console.log(`✅ [FIXED MESSAGES] === MESSAGE SENT SUCCESSFULLY ===`);
-    console.log(`✅ [FIXED MESSAGES] To: ${lead.first_name} ${lead.last_name} (${primaryPhone})`);
-    console.log(`✅ [FIXED MESSAGES] Message: "${messageBody}"`);
-
-    return conversation;
   } catch (error) {
-    console.error('❌ [FIXED MESSAGES] === CRITICAL ERROR IN sendMessage ===');
-    console.error('❌ [FIXED MESSAGES] Error details:', error);
-    console.error('❌ [FIXED MESSAGES] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error(`❌ [FIXED MESSAGES SERVICE] === SERVICE FAILED ===`);
+    console.error(`❌ [FIXED MESSAGES SERVICE] Error:`, error);
+    
+    // Show user-friendly error message
+    const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+    
+    toast({
+      title: "Message Send Failed",
+      description: errorMessage,
+      variant: "destructive"
+    });
+    
     throw error;
-  }
-};
-
-export const getMessages = async (leadId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('sent_at', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching messages:', error);
-      return [];
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Error getting messages:', error);
-    return [];
-  }
-};
-
-export const markMessageAsRead = async (conversationId: string) => {
-  try {
-    const { error } = await supabase
-      .from('conversations')
-      .update({
-        read_at: new Date().toISOString(),
-      })
-      .eq('id', conversationId);
-
-    if (error) {
-      console.error('Error marking message as read:', error);
-    }
-  } catch (error) {
-    console.error('Error marking message as read:', error);
   }
 };

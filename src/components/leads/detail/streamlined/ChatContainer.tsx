@@ -37,10 +37,30 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const [showAIPanel, setShowAIPanel] = React.useState(false);
   const [aiGenerating, setAiGenerating] = React.useState(false);
 
+  const handleSendMessage = () => {
+    console.log('🔍 [CHAT CONTAINER] handleSendMessage called');
+    console.log('🔍 [CHAT CONTAINER] Message:', newMessage);
+    console.log('🔍 [CHAT CONTAINER] isSending:', isSending);
+    console.log('🔍 [CHAT CONTAINER] onSendMessage type:', typeof onSendMessage);
+    
+    try {
+      onSendMessage();
+    } catch (error) {
+      console.error('❌ [CHAT CONTAINER] Error in handleSendMessage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    console.log('🔍 [CHAT CONTAINER] Key pressed:', e.key);
+    
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSendMessage();
+      handleSendMessage();
     }
   };
 
@@ -111,7 +131,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     
     // Use requestAnimationFrame to ensure state is updated before calling onSendMessage
     requestAnimationFrame(() => {
-      onSendMessage();
+      handleSendMessage();
     });
   };
 
@@ -189,7 +209,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         <MessageInput
           newMessage={newMessage}
           setNewMessage={setNewMessage}
-          onSendMessage={onSendMessage}
+          onSendMessage={handleSendMessage}
           onKeyPress={handleKeyPress}
           isSending={isSending}
         />
