@@ -48,9 +48,8 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
 
   // Centralized realtime subscriptions
   useCentralizedRealtime({
-    enabled: !!profile?.id,
-    onConversationUpdate: refetchConversations,
-    onMessageUpdate: refetchConversations,
+    onConversationUpdate: () => refetchConversations(),
+    onMessageUpdate: () => refetchConversations(),
     currentLeadId: selectedLead
   });
 
@@ -114,7 +113,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Conversations</h3>
           <p className="text-sm text-gray-600 mb-4">{error.message}</p>
-          <Button onClick={refetchConversations} variant="outline">
+          <Button onClick={() => refetchConversations()} variant="outline">
             Try Again
           </Button>
         </div>
