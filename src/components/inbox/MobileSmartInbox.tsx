@@ -130,7 +130,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
         <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold mb-2">No Conversations</h3>
         <p className="text-muted-foreground mb-4">You don't have any conversations yet.</p>
-        <Button onClick={refetchConversations} variant="outline">
+        <Button onClick={() => refetchConversations()} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -156,7 +156,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={refetchConversations}
+              onClick={() => refetchConversations()}
               disabled={conversationsLoading}
             >
               <RefreshCw className={`h-4 w-4 ${conversationsLoading ? 'animate-spin' : ''}`} />
