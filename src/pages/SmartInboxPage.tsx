@@ -2,10 +2,10 @@
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
-import { unifiedAI } from "@/services/unifiedAIService";
 import { useIsMobile } from "@/hooks/use-mobile";
 import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
 import ErrorBoundary from "@/components/inbox/ErrorBoundary";
+import { realtimeMessageProcessor } from "@/services/realtimeMessageProcessor";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
@@ -27,25 +27,15 @@ const SmartInboxPage = () => {
 
   useEffect(() => {
     if (profile?.id) {
-      console.log('🚫 AI automation DISABLED - preventing SMS spam to suppressed numbers');
+      console.log('🤖 [SMART INBOX] Initializing intelligent AI message processing');
       
-      // EMERGENCY SHUTDOWN: AI automation disabled to prevent SMS spam
-      // DO NOT RE-ENABLE without implementing proper compliance checks
-      /* DISABLED FOR COMPLIANCE REASONS
-      const processInterval = setInterval(async () => {
-        try {
-          await unifiedAI.processAllPendingResponses(profile);
-          unifiedAI.cleanupProcessedMessages();
-        } catch (error) {
-          console.error('❌ Unified AI processing error:', error);
-        }
-      }, 30000); // Process every 30 seconds
-
+      // Setup the realtime message processor
+      const cleanup = realtimeMessageProcessor.setupRealtimeListener();
+      
       return () => {
-        console.log('🤖 Stopping unified AI processor');
-        clearInterval(processInterval);
+        console.log('🧹 [SMART INBOX] Cleaning up intelligent AI processor');
+        cleanup();
       };
-      */
     }
   }, [profile?.id]);
 
