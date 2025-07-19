@@ -11,7 +11,15 @@ import StableConnectionStatus from './StableConnectionStatus';
 import OptimizedConversationItem from './OptimizedConversationItem';
 import MessageBubble from './MessageBubble';
 
-const MobileSmartInbox = () => {
+interface MobileSmartInboxProps {
+  onLeadsRefresh?: () => void;
+  preselectedLeadId?: string | null;
+}
+
+const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ 
+  onLeadsRefresh, 
+  preselectedLeadId 
+}) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
