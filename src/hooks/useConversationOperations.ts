@@ -58,12 +58,19 @@ export const useConversationOperations = () => {
             leadId,
             leadName: lead.name || 'Unknown',
             primaryPhone: lead.phone_numbers?.[0]?.number || '',
-            vehicleInterest: lead.vehicle_interest || 'Not specified',
-            status: lead.status || 'active',
+            leadPhone: lead.phone_numbers?.[0]?.number || '',
+            leadEmail: '',
             lastMessage: conv.body || '',
             lastMessageTime: conv.sent_at,
-            unreadCount: 0, // Will be calculated separately if needed
-            salespersonId: profile.id
+            lastMessageDirection: conv.direction as 'in' | 'out' | null,
+            unreadCount: 0,
+            messageCount: 1,
+            salespersonId: profile.id,
+            vehicleInterest: lead.vehicle_interest || 'Not specified',
+            leadSource: '',
+            leadType: '',
+            status: lead.status || 'active',
+            lastMessageDate: new Date(conv.sent_at)
           });
         }
       });
