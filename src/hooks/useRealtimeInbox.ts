@@ -1,7 +1,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { useConversationOperations } from './useConversationOperations';
-import { useCentralizedRealtime } from './useCentralizedRealtime';
+import { useResilientRealtime } from './useResilientRealtime';
 
 export const useRealtimeInbox = () => {
   const currentLeadIdRef = useRef<string | null>(null);
@@ -70,8 +70,8 @@ export const useRealtimeInbox = () => {
     loadConversations();
   }, [loadConversations]);
 
-  // Use enhanced centralized realtime subscriptions
-  const { forceRefresh, isConnected, reconnect } = useCentralizedRealtime({
+  // Use enhanced resilient realtime subscriptions
+  const { connectionState, isConnected, forceReconnect, getHealthStatus } = useResilientRealtime({
     onConversationUpdate: handleConversationUpdate,
     onMessageUpdate: handleMessageUpdate,
     onUnreadCountUpdate: handleUnreadCountUpdate
@@ -136,12 +136,11 @@ export const useRealtimeInbox = () => {
     
     if (!isConnected) {
       console.log('🔌 Reconnecting realtime before refresh');
-      reconnect();
+      forceReconnect();
     }
     
     manualRefresh();
-    forceRefresh();
-  }, [manualRefresh, forceRefresh, isConnected, reconnect]);
+  }, [manualRefresh, isConnected, forceReconnect]);
 
   // Cleanup pending timeouts
   useEffect(() => {
@@ -161,6 +160,9 @@ export const useRealtimeInbox = () => {
     sendMessage: enhancedSendMessage,
     refetch: enhancedRefresh,
     isRealtimeConnected: isConnected,
-    forceRefresh: enhancedRefresh
+    connectionState,
+    forceRefresh: enhancedRefresh,
+    forceReconnect,
+    getHealthStatus
   };
 };
