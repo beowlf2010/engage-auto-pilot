@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { useStableRealtimeInbox } from '@/hooks/useStableRealtimeInbox';
-import { StableConnectionStatus } from '@/components/ui/StableConnectionStatus';
+import StableConnectionStatus from '@/components/inbox/StableConnectionStatus';
 import { useIntelligentMessageFlow } from '@/hooks/useIntelligentMessageFlow';
 
 interface MobileSmartInboxProps {
@@ -303,7 +303,16 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <StableConnectionStatus isConnected={isRealtimeConnected} />
+                  <StableConnectionStatus 
+                    connectionState={{
+                      isConnected: isRealtimeConnected,
+                      status: isRealtimeConnected ? 'connected' : 'offline',
+                      reconnectAttempts: 0,
+                      maxReconnectAttempts: 5
+                    }}
+                    onReconnect={() => forceRefresh()}
+                    onRefresh={reloadMessages}
+                  />
                   <Button
                     variant="ghost"
                     size="sm"
