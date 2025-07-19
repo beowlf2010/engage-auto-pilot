@@ -31,7 +31,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
 
   // Use the existing hooks for data management
   const { conversations, conversationsLoading, refetchConversations } = useConversationsList();
-  const { messages, fetchMessages, sendMessage, loading: messagesLoading } = useRealtimeInbox();
+  const { messages, fetchMessages, sendMessage, loading: messagesLoading, isRealtimeConnected } = useRealtimeInbox();
 
   // Set up real-time subscriptions
   useCentralizedRealtime({
@@ -113,6 +113,9 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
 
   const totalUnreadCount = conversations?.reduce((sum, conv) => sum + conv.unreadCount, 0) || 0;
   const selectedConversation = conversations?.find(conv => conv.leadId === selectedLead);
+  
+  // Show connection status if there are issues
+  const showConnectionIssue = !isRealtimeConnected;
 
   // Loading states
   if (conversationsLoading) {
@@ -130,6 +133,14 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
         <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold mb-2">No Conversations</h3>
         <p className="text-muted-foreground mb-4">You don't have any conversations yet.</p>
+        {showConnectionIssue && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <p className="text-sm text-destructive font-medium">Connection Issue Detected</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Real-time updates may be delayed. Try refreshing the page.
+            </p>
+          </div>
+        )}
         <Button onClick={() => refetchConversations()} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
@@ -153,14 +164,22 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
                 </Badge>
               )}
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => refetchConversations()}
-              disabled={conversationsLoading}
-            >
-              <RefreshCw className={`h-4 w-4 ${conversationsLoading ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center space-x-2">
+              {showConnectionIssue && (
+                <div className="flex items-center text-destructive text-xs">
+                  <div className="w-2 h-2 bg-destructive rounded-full mr-1"></div>
+                  Connection Issue
+                </div>
+              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => refetchConversations()}
+                disabled={conversationsLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${conversationsLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
         </div>
 
