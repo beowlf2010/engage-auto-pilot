@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useConversationsList } from '@/hooks/useConversationsList';
+import { useConversationsList } from '@/hooks/conversation/useConversationsList';
+import { useRealtimeInbox } from '@/hooks/useRealtimeInbox';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, RefreshCw, MessageSquare } from "lucide-react";
