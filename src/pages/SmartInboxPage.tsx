@@ -70,7 +70,7 @@ const SmartInboxPage = () => {
 
 
   return (
-    <div className="h-screen bg-background overflow-hidden">
+    <div className="h-screen w-full bg-background flex flex-col">
       <MobileSmartInbox 
         onLeadsRefresh={handleLeadsRefresh} 
         preselectedLeadId={leadId}
