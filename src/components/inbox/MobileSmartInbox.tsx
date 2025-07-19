@@ -26,7 +26,9 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({
   onLeadsRefresh,
   preselectedLeadId
 }) => {
+  console.log('🚀 [MOBILE INBOX] Component is rendering!');
   const { profile, loading: authLoading } = useAuth();
+  console.log('🔍 [MOBILE INBOX] Auth state:', { authLoading, hasProfile: !!profile });
   const [activeTab, setActiveTab] = useState("unread");
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'chat' | 'context'>('list');
