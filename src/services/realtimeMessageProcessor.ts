@@ -5,7 +5,7 @@
 export class RealtimeMessageProcessor {
   private isDisabled = true;
 
-  async processNewCustomerMessage(): Promise<boolean> {
+  async processNewCustomerMessage(leadId: string, messageBody: string): Promise<boolean> {
     console.log('🚫 [REALTIME MESSAGE PROCESSOR] This service is disabled - using consolidatedRealtimeManager instead');
     return false;
   }
