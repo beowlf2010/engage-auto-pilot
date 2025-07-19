@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -11,167 +10,168 @@ export const useConversationsList = () => {
     queryKey: ['stable-conversations', profile?.id],
     queryFn: async () => {
       const startTime = performance.now();
-      console.log('🔄 [INBOX-TRACE] Starting conversations query...', {
+      console.log('🔄 [CONVERSATIONS LIST] Starting conversations query...', {
         timestamp: new Date().toISOString(),
         profileId: profile?.id,
         userEmail: user?.email,
-        sessionExists: !!session,
-        memory: (performance as any).memory ? {
-          used: Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024) + 'MB',
-          total: Math.round((performance as any).memory.totalJSHeapSize / 1024 / 1024) + 'MB'
-        } : 'unavailable'
+        sessionExists: !!session
       });
 
       if (!profile) {
-        console.log('❌ [INBOX-TRACE] No profile found, returning empty array');
+        console.log('❌ [CONVERSATIONS LIST] No profile found, returning empty array');
         return [];
       }
 
       try {
-        // First, let's test basic database connectivity
-        const { data: testQuery, error: testError } = await supabase
-          .from('leads')
-          .select('id')  
-          .limit(1);
+        // Step 1: Get all conversations
+        const { data: allConversations, error: convError } = await supabase
+          .from('conversations')
+          .select('*')
+          .order('sent_at', { ascending: false });
 
-        if (testError) {
-          console.error('❌ [INBOX-TRACE] Database connectivity test failed:', testError);
-          throw new Error(`Database connection failed: ${testError.message}`);
+        if (convError) {
+          console.error('❌ [CONVERSATIONS LIST] Error fetching conversations:', convError);
+          throw convError;
         }
 
-        console.log('✅ [INBOX-TRACE] Database connectivity verified');
+        console.log('📊 [CONVERSATIONS LIST] Total conversations found:', allConversations?.length || 0);
 
-        // Try to call the RPC function
-        const { data: conversationsData, error } = await supabase.rpc('get_inbox_conversations_prioritized_limited');
+        // Step 2: Get all leads separately
+        const { data: allLeads, error: leadsError } = await supabase
+          .from('leads')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            email,
+            vehicle_interest,
+            status,
+            source,
+            lead_type_name,
+            salesperson_id,
+            ai_opt_in,
+            phone_numbers (
+              number,
+              is_primary
+            ),
+            profiles (
+              first_name,
+              last_name
+            )
+          `);
 
-        if (error) {
-          console.error('❌ [INBOX-TRACE] RPC function failed:', error);
-          
-          // Fallback to basic query if RPC fails
-          console.log('🔄 [INBOX-TRACE] Attempting fallback query...');
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('conversations')
-            .select(`
-              id,
-              lead_id,
-              body,
-              direction,
-              sent_at,
-              read_at,
-              leads!inner (
-                id,
-                first_name,
-                last_name,
-                phone_numbers (
-                  number,
-                  is_primary
-                )
-              )
-            `)
-            .order('sent_at', { ascending: false })
-            .limit(50);
+        if (leadsError) {
+          console.error('❌ [CONVERSATIONS LIST] Error fetching leads:', leadsError);
+          throw leadsError;
+        }
 
-          if (fallbackError) {
-            console.error('❌ [INBOX-TRACE] Fallback query also failed:', fallbackError);
-            throw fallbackError;
+        console.log('📊 [CONVERSATIONS LIST] Total leads found:', allLeads?.length || 0);
+
+        // Step 3: Process conversations and group by lead
+        const conversationMap = new Map<string, {
+          leadData: any;
+          latestConversation: any;
+          unreadCount: number;
+          totalMessages: number;
+        }>();
+
+        // Process each conversation
+        allConversations?.forEach((conv: any) => {
+          const leadId = conv.lead_id;
+          if (!leadId) return;
+
+          // Find matching lead data
+          const leadData = allLeads?.find(lead => lead.id === leadId);
+          if (!leadData) {
+            console.warn('⚠️ [CONVERSATIONS LIST] No lead data found for conversation:', leadId);
+            return;
           }
 
-          console.log('✅ [INBOX-TRACE] Fallback query successful, processing data...');
+          // Get or create conversation group for this lead
+          const existing = conversationMap.get(leadId);
+          const isUnread = conv.direction === 'in' && !conv.read_at;
           
-          // Process fallback data into conversations format
-          const conversationMap = new Map<string, ConversationListItem>();
-          
-          fallbackData?.forEach(conv => {
-            const leadId = conv.lead_id;
-            const lead = conv.leads;
-            const primaryPhone = lead.phone_numbers?.find(p => p.is_primary)?.number || 
-                               lead.phone_numbers?.[0]?.number || '';
-
-            if (!conversationMap.has(leadId)) {
-              conversationMap.set(leadId, {
-                leadId,
-                leadName: `${lead.first_name} ${lead.last_name}`,
-                primaryPhone,
-                leadPhone: primaryPhone,
-                leadEmail: '',
-                lastMessage: conv.body,
-                lastMessageTime: new Date(conv.sent_at).toLocaleString(),
-                lastMessageDirection: conv.direction as 'in' | 'out',
-                lastMessageDate: new Date(conv.sent_at),
-                unreadCount: conv.direction === 'in' && !conv.read_at ? 1 : 0,
-                messageCount: 1,
-                salespersonId: null,
-                vehicleInterest: '',
-                leadSource: '',
-                leadType: 'unknown',
-                status: 'new',
-                aiOptIn: false
-              });
+          if (!existing) {
+            // First conversation for this lead
+            conversationMap.set(leadId, {
+              leadData,
+              latestConversation: conv,
+              unreadCount: isUnread ? 1 : 0,
+              totalMessages: 1
+            });
+          } else {
+            // Update existing group
+            // Keep the latest conversation (conversations are ordered by sent_at desc)
+            if (new Date(conv.sent_at) > new Date(existing.latestConversation.sent_at)) {
+              existing.latestConversation = conv;
             }
-          });
-
-          return Array.from(conversationMap.values());
-        }
-
-        console.log('📊 [INBOX-TRACE] Raw conversations data received (LIMITED):', {
-          count: conversationsData?.length || 0,
-          firstFew: conversationsData?.slice(0, 3).map(conv => ({
-            leadId: conv.lead_id,
-            direction: conv.direction,
-            sentAt: conv.sent_at,
-            unreadCount: conv.unread_count,
-            phone: conv.primary_phone,
-            name: `${conv.first_name} ${conv.last_name}`,
-            lastMessage: conv.body?.substring(0, 50) + '...'
-          })) || [],
-          inboundCount: conversationsData?.filter(conv => conv.direction === 'in').length || 0,
-          outboundCount: conversationsData?.filter(conv => conv.direction === 'out').length || 0,
-          totalUnread: conversationsData?.reduce((sum, conv) => sum + (Number(conv.unread_count) || 0), 0) || 0
+            // Count unread messages
+            if (isUnread) {
+              existing.unreadCount++;
+            }
+            existing.totalMessages++;
+          }
         });
 
-        // Process conversations into list format
-        const conversationListMap = new Map<string, ConversationListItem>();
+        console.log('📊 [CONVERSATIONS LIST] Processed conversation groups:', conversationMap.size);
 
-        conversationsData?.forEach(conv => {
-          const leadId = conv.lead_id;
-          const primaryPhone = conv.primary_phone || '';
+        // Step 4: Convert to ConversationListItem format
+        const result: ConversationListItem[] = Array.from(conversationMap.entries()).map(([leadId, group]) => {
+          const { leadData, latestConversation, unreadCount, totalMessages } = group;
+          
+          // Get primary phone or fallback
+          const primaryPhone = leadData.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+                              leadData.phone_numbers?.[0]?.number || 
+                              'No phone';
 
           const conversationItem: ConversationListItem = {
             leadId,
-            leadName: `${conv.first_name} ${conv.last_name}`,
+            leadName: `${leadData.first_name || 'Unknown'} ${leadData.last_name || 'Lead'}`.trim(),
             primaryPhone,
             leadPhone: primaryPhone,
-            leadEmail: conv.email || '',
-            lastMessage: conv.body,
-            lastMessageTime: new Date(conv.sent_at).toLocaleString(),
-            lastMessageDirection: conv.direction as 'in' | 'out',
-            lastMessageDate: new Date(conv.sent_at),
-            unreadCount: Number(conv.unread_count) || 0,
-            messageCount: 1,
-            salespersonId: conv.salesperson_id,
-            vehicleInterest: conv.vehicle_interest || '',
-            leadSource: conv.source || '',
-            leadType: conv.lead_type_name || 'unknown',
-            status: conv.status || 'new',
-            salespersonName: conv.profiles_first_name && conv.profiles_last_name ? `${conv.profiles_first_name} ${conv.profiles_last_name}` : undefined,
-            aiOptIn: conv.ai_opt_in || false
+            leadEmail: leadData.email || '',
+            lastMessage: latestConversation.body || 'No message content',
+            lastMessageTime: new Date(latestConversation.sent_at).toLocaleString(),
+            lastMessageDirection: latestConversation.direction as 'in' | 'out',
+            lastMessageDate: new Date(latestConversation.sent_at),
+            unreadCount,
+            messageCount: totalMessages,
+            salespersonId: leadData.salesperson_id,
+            vehicleInterest: leadData.vehicle_interest || 'Not specified',
+            leadSource: leadData.source || '',
+            leadType: leadData.lead_type_name || 'unknown',
+            status: leadData.status || 'new',
+            salespersonName: leadData.profiles ? 
+              `${leadData.profiles.first_name} ${leadData.profiles.last_name}`.trim() : undefined,
+            aiOptIn: leadData.ai_opt_in || false
           };
 
-          conversationListMap.set(leadId, conversationItem);
+          return conversationItem;
         });
 
-        const result = Array.from(conversationListMap.values());
+        // Step 5: Sort by unread first, then by last message time
+        result.sort((a, b) => {
+          // Prioritize unread conversations
+          if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+          if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+          
+          // Then sort by last message time (newest first)
+          return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
+        });
+
         const endTime = performance.now();
         
-        console.log(`✅ [INBOX-TRACE] Conversations processing complete:`, {
+        console.log(`✅ [CONVERSATIONS LIST] Processing complete:`, {
           totalConversations: result.length,
+          withUnread: result.filter(c => c.unreadCount > 0).length,
+          totalUnreadMessages: result.reduce((sum, c) => sum + c.unreadCount, 0),
           processingTime: Math.round(endTime - startTime) + 'ms'
         });
         
         return result;
 
       } catch (err) {
-        console.error('❌ [STABLE CONV] Error loading conversations:', err);
+        console.error('❌ [CONVERSATIONS LIST] Error loading conversations:', err);
         throw err;
       }
     },

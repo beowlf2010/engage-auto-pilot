@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,7 +11,7 @@ export const useConversationOperations = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load conversations with React Query
+  // Load conversations with React Query - FIXED VERSION
   const { 
     data: conversations = [], 
     isLoading: loading, 
@@ -22,60 +21,153 @@ export const useConversationOperations = () => {
     queryFn: async (): Promise<ConversationListItem[]> => {
       if (!profile?.id) return [];
 
-      console.log('🔄 [CONVERSATION OPS] Loading conversations');
+      console.log('🔄 [CONVERSATION OPS] Loading conversations - FIXED VERSION');
       
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`
-          id,
-          lead_id,
-          body,
-          direction,
-          sent_at,
-          ai_generated,
-          sms_status,
-          leads!inner (
+      try {
+        // Step 1: Get all conversations first (most permissive query)
+        const { data: allConversations, error: convError } = await supabase
+          .from('conversations')
+          .select('*')
+          .order('sent_at', { ascending: false });
+
+        if (convError) {
+          console.error('❌ [CONVERSATION OPS] Error fetching conversations:', convError);
+          throw convError;
+        }
+
+        console.log('📊 [CONVERSATION OPS] Total conversations found:', allConversations?.length || 0);
+
+        // Step 2: Get all leads separately to avoid filtering issues
+        const { data: allLeads, error: leadsError } = await supabase
+          .from('leads')
+          .select(`
             id,
-            name,
+            first_name,
+            last_name,
             vehicle_interest,
             status,
-            phone_numbers (number)
-          )
-        `)
-        .order('sent_at', { ascending: false });
+            salesperson_id,
+            phone_numbers (
+              number,
+              is_primary
+            ),
+            profiles (
+              first_name,
+              last_name
+            )
+          `);
 
-      if (error) throw error;
-
-      // Group by lead and get the latest message for each
-      const leadMap = new Map<string, ConversationListItem>();
-      
-      data?.forEach((conv: any) => {
-        const leadId = conv.lead_id;
-        const lead = conv.leads;
-        
-        if (!leadMap.has(leadId) || new Date(conv.sent_at) > new Date(leadMap.get(leadId)!.lastMessageTime)) {
-          leadMap.set(leadId, {
-            leadId,
-            leadName: lead.name || 'Unknown',
-            primaryPhone: lead.phone_numbers?.[0]?.number || '',
-            leadPhone: lead.phone_numbers?.[0]?.number || '',
-            leadEmail: '',
-            lastMessage: conv.body || '',
-            lastMessageTime: conv.sent_at,
-            lastMessageDirection: conv.direction as 'in' | 'out' | null,
-            unreadCount: 0,
-            messageCount: 1,
-            salespersonId: profile.id,
-            vehicleInterest: lead.vehicle_interest || 'Not specified',
-            leadSource: '',
-            leadType: '',
-            status: lead.status || 'active',
-            lastMessageDate: new Date(conv.sent_at)
-          });
+        if (leadsError) {
+          console.error('❌ [CONVERSATION OPS] Error fetching leads:', leadsError);
+          throw leadsError;
         }
-      });
 
-      return Array.from(leadMap.values());
+        console.log('📊 [CONVERSATION OPS] Total leads found:', allLeads?.length || 0);
+
+        // Step 3: Process conversations and group by lead
+        const conversationMap = new Map<string, {
+          leadData: any;
+          latestConversation: any;
+          unreadCount: number;
+          totalMessages: number;
+        }>();
+
+        // Process each conversation
+        allConversations?.forEach((conv: any) => {
+          const leadId = conv.lead_id;
+          if (!leadId) return;
+
+          // Find matching lead data
+          const leadData = allLeads?.find(lead => lead.id === leadId);
+          if (!leadData) {
+            console.warn('⚠️ [CONVERSATION OPS] No lead data found for conversation:', leadId);
+            return;
+          }
+
+          // Get or create conversation group for this lead
+          const existing = conversationMap.get(leadId);
+          const isUnread = conv.direction === 'in' && !conv.read_at;
+          
+          if (!existing) {
+            // First conversation for this lead
+            conversationMap.set(leadId, {
+              leadData,
+              latestConversation: conv,
+              unreadCount: isUnread ? 1 : 0,
+              totalMessages: 1
+            });
+          } else {
+            // Update existing group
+            // Keep the latest conversation (conversations are ordered by sent_at desc)
+            if (new Date(conv.sent_at) > new Date(existing.latestConversation.sent_at)) {
+              existing.latestConversation = conv;
+            }
+            // Count unread messages
+            if (isUnread) {
+              existing.unreadCount++;
+            }
+            existing.totalMessages++;
+          }
+        });
+
+        console.log('📊 [CONVERSATION OPS] Processed conversation groups:', conversationMap.size);
+
+        // Step 4: Convert to ConversationListItem format
+        const result: ConversationListItem[] = Array.from(conversationMap.entries()).map(([leadId, group]) => {
+          const { leadData, latestConversation, unreadCount, totalMessages } = group;
+          
+          // Get primary phone or fallback
+          const primaryPhone = leadData.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+                              leadData.phone_numbers?.[0]?.number || 
+                              'No phone';
+
+          const conversationItem: ConversationListItem = {
+            leadId,
+            leadName: `${leadData.first_name || 'Unknown'} ${leadData.last_name || 'Lead'}`.trim(),
+            primaryPhone,
+            leadPhone: primaryPhone,
+            leadEmail: leadData.email || '',
+            lastMessage: latestConversation.body || 'No message content',
+            lastMessageTime: new Date(latestConversation.sent_at).toLocaleString(),
+            lastMessageDirection: latestConversation.direction as 'in' | 'out',
+            lastMessageDate: new Date(latestConversation.sent_at),
+            unreadCount,
+            messageCount: totalMessages,
+            salespersonId: leadData.salesperson_id,
+            vehicleInterest: leadData.vehicle_interest || 'Not specified',
+            leadSource: leadData.source || '',
+            leadType: leadData.lead_type_name || 'unknown',
+            status: leadData.status || 'new',
+            salespersonName: leadData.profiles ? 
+              `${leadData.profiles.first_name} ${leadData.profiles.last_name}`.trim() : undefined,
+            aiOptIn: leadData.ai_opt_in || false
+          };
+
+          return conversationItem;
+        });
+
+        // Step 5: Sort by unread first, then by last message time
+        result.sort((a, b) => {
+          // Prioritize unread conversations
+          if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+          if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+          
+          // Then sort by last message time (newest first)
+          return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
+        });
+
+        console.log('✅ [CONVERSATION OPS] Final conversation list:', {
+          totalConversations: result.length,
+          withUnread: result.filter(c => c.unreadCount > 0).length,
+          totalUnreadMessages: result.reduce((sum, c) => sum + c.unreadCount, 0)
+        });
+
+        return result;
+
+      } catch (error) {
+        console.error('❌ [CONVERSATION OPS] Error in conversation loading:', error);
+        throw error;
+      }
     },
     enabled: !!profile?.id,
     staleTime: 30000, // 30 seconds

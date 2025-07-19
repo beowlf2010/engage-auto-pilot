@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Phone, Clock, CheckCheck } from 'lucide-react';
+import { MessageSquare, Phone, Clock, CheckCheck, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface InboxConversationsListProps {
@@ -50,15 +50,26 @@ const InboxConversationsList = ({
     );
   }
 
+  // Show debug info at the top
+  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+
   return (
     <div className="h-full overflow-y-auto">
+      {/* Debug info */}
+      <div className="p-3 bg-blue-50 border-b text-xs text-blue-700">
+        <div className="flex justify-between items-center">
+          <span>📊 {conversations.length} conversations loaded</span>
+          <span>🔴 {totalUnread} total unread messages</span>
+        </div>
+      </div>
+      
       <div className="p-4 space-y-2">
         {conversations.map((conversation) => (
           <Card 
             key={conversation.leadId}
             className={`cursor-pointer transition-all hover:shadow-md ${
               selectedConversationId === conversation.leadId ? 'ring-2 ring-blue-500 bg-blue-50' : ''
-            }`}
+            } ${conversation.unreadCount > 0 ? 'border-l-4 border-l-red-500' : ''}`}
             onClick={() => onConversationSelect(conversation)}
           >
             <CardContent className="p-4">
@@ -69,9 +80,12 @@ const InboxConversationsList = ({
                       {conversation.leadName}
                     </h3>
                     {conversation.unreadCount > 0 && (
-                      <Badge variant="destructive" className="text-xs">
-                        {conversation.unreadCount}
-                      </Badge>
+                      <>
+                        <Badge variant="destructive" className="text-xs">
+                          {conversation.unreadCount}
+                        </Badge>
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                      </>
                     )}
                   </div>
                   
@@ -92,6 +106,9 @@ const InboxConversationsList = ({
                     <div className="flex items-center space-x-1 text-xs text-gray-500">
                       <Clock className="h-3 w-3" />
                       <span>{conversation.lastMessageTime}</span>
+                      <span className="text-blue-500">
+                        • {conversation.messageCount || 0} messages
+                      </span>
                     </div>
                     
                     {conversation.unreadCount > 0 && (
