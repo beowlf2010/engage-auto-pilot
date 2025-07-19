@@ -1,7 +1,7 @@
 
 import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useConversationOperations } from './useConversationOperations';
-import { stableRealtimeManager } from '@/services/stableRealtimeManager';
+import { consolidatedRealtimeManager } from '@/services/consolidatedRealtimeManager';
 
 export const useStableRealtimeInbox = () => {
   const currentLeadIdRef = useRef<string | null>(null);
@@ -10,7 +10,6 @@ export const useStableRealtimeInbox = () => {
   const subscriptionIdRef = useRef<string>(`inbox-${Date.now()}-${Math.random()}`);
   const isSubscribedRef = useRef<boolean>(false);
   
-  // Use conversation operations hook
   const {
     conversations,
     messages,
@@ -22,12 +21,10 @@ export const useStableRealtimeInbox = () => {
     manualRefresh
   } = useConversationOperations();
 
-  // Memoized connection state
   const [connectionState, setConnectionState] = useState(() => 
-    stableRealtimeManager.getConnectionState()
+    consolidatedRealtimeManager.getConnectionState()
   );
 
-  // Stable message fetching function
   const fetchMessages = useCallback(async (leadId: string) => {
     console.log('🔄 [STABLE INBOX] Fetching messages for lead:', leadId);
     currentLeadIdRef.current = leadId;
@@ -41,7 +38,6 @@ export const useStableRealtimeInbox = () => {
     }
   }, [loadMessages]);
 
-  // Stable debounced update handlers
   const handleConversationUpdate = useCallback(() => {
     const now = Date.now();
     if (now - lastRefreshRef.current < 1000) {
@@ -57,16 +53,13 @@ export const useStableRealtimeInbox = () => {
   const handleMessageUpdate = useCallback((leadId: string) => {
     console.log('🔄 [STABLE INBOX] Message update for lead:', leadId);
     
-    // Clear any pending refresh
     if (pendingRefreshRef.current) {
       clearTimeout(pendingRefreshRef.current);
     }
     
-    // Debounced refresh to prevent rapid updates
     pendingRefreshRef.current = setTimeout(() => {
       loadConversations();
       
-      // Only refresh messages for current lead
       if (currentLeadIdRef.current === leadId) {
         console.log('🔄 [STABLE INBOX] Refreshing messages for current lead');
         loadMessages(leadId);
@@ -74,7 +67,6 @@ export const useStableRealtimeInbox = () => {
     }, 500);
   }, [loadConversations, loadMessages]);
 
-  // Stable realtime subscription - using useRef to prevent dependency changes
   const setupRealtimeSubscription = useCallback(() => {
     if (isSubscribedRef.current) {
       console.log('⚠️ [STABLE INBOX] Already subscribed, skipping');
@@ -84,7 +76,7 @@ export const useStableRealtimeInbox = () => {
     console.log('🔗 [STABLE INBOX] Setting up realtime subscription');
     isSubscribedRef.current = true;
     
-    const unsubscribe = stableRealtimeManager.subscribe({
+    const unsubscribe = consolidatedRealtimeManager.subscribe({
       id: subscriptionIdRef.current,
       callback: (payload) => {
         console.log('🔄 [STABLE INBOX] Received update:', payload.eventType);
@@ -111,34 +103,29 @@ export const useStableRealtimeInbox = () => {
       isSubscribedRef.current = false;
       unsubscribe();
     };
-  }, []); // Empty dependency array to prevent re-creation
+  }, [handleConversationUpdate, handleMessageUpdate]);
 
-  // Set up subscription only once
   useEffect(() => {
     const cleanup = setupRealtimeSubscription();
     return cleanup;
-  }, []); // Empty dependency array
+  }, [setupRealtimeSubscription]);
 
-  // Connection state listener
   useEffect(() => {
-    const removeListener = stableRealtimeManager.addConnectionListener(setConnectionState);
+    const removeListener = consolidatedRealtimeManager.addConnectionListener(setConnectionState);
     return removeListener;
   }, []);
 
-  // Load initial conversations
   useEffect(() => {
     console.log('🔄 [STABLE INBOX] Loading initial conversations');
     loadConversations();
   }, [loadConversations]);
 
-  // Enhanced send message with optimistic updates
   const enhancedSendMessage = useCallback(async (leadId: string, message: string) => {
     try {
       console.log('📤 [STABLE INBOX] Sending message');
       
       await sendMessage(leadId, message);
       
-      // Immediate refresh for better UX
       const refreshPromises = [
         loadConversations(),
         currentLeadIdRef.current === leadId ? loadMessages(leadId) : Promise.resolve()
@@ -152,19 +139,17 @@ export const useStableRealtimeInbox = () => {
     }
   }, [sendMessage, loadConversations, loadMessages]);
 
-  // Enhanced manual refresh
   const enhancedRefresh = useCallback(() => {
     console.log('🔄 [STABLE INBOX] Manual refresh triggered');
     
     if (!connectionState.isConnected) {
       console.log('🔌 [STABLE INBOX] Reconnecting before refresh');
-      stableRealtimeManager.forceReconnect();
+      consolidatedRealtimeManager.forceReconnect();
     }
     
     manualRefresh();
   }, [manualRefresh, connectionState.isConnected]);
 
-  // Cleanup pending timeouts
   useEffect(() => {
     return () => {
       if (pendingRefreshRef.current) {
@@ -173,7 +158,6 @@ export const useStableRealtimeInbox = () => {
     };
   }, []);
 
-  // Memoized return value to prevent unnecessary re-renders
   return useMemo(() => ({
     conversations,
     messages,
@@ -185,8 +169,8 @@ export const useStableRealtimeInbox = () => {
     isRealtimeConnected: connectionState.isConnected,
     connectionState,
     forceRefresh: enhancedRefresh,
-    forceReconnect: () => stableRealtimeManager.forceReconnect(),
-    getHealthStatus: () => stableRealtimeManager.getHealthStatus()
+    forceReconnect: () => consolidatedRealtimeManager.forceReconnect(),
+    getHealthStatus: () => consolidatedRealtimeManager.getHealthStatus()
   }), [
     conversations,
     messages,

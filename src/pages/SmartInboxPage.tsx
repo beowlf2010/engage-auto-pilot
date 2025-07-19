@@ -1,43 +1,15 @@
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
 import ErrorBoundary from "@/components/inbox/ErrorBoundary";
-import { realtimeMessageProcessor } from "@/services/realtimeMessageProcessor";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
   const [searchParams] = useSearchParams();
   const leadId = searchParams.get('leadId');
   const isMobile = useIsMobile();
-  
-
-  useEffect(() => {
-    const requestNotificationPermission = async () => {
-      if ('Notification' in window && Notification.permission === 'default') {
-        const permission = await Notification.requestPermission();
-        console.log('Notification permission:', permission);
-      }
-    };
-
-    requestNotificationPermission();
-  }, []);
-
-  useEffect(() => {
-    if (profile?.id) {
-      console.log('🤖 [SMART INBOX] Initializing intelligent AI message processing');
-      
-      // Setup the realtime message processor
-      const cleanup = realtimeMessageProcessor.setupRealtimeListener();
-      
-      return () => {
-        console.log('🧹 [SMART INBOX] Cleaning up intelligent AI processor');
-        cleanup();
-      };
-    }
-  }, [profile?.id]);
 
   if (loading) {
     return (
