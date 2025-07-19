@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { unifiedAI } from "@/services/unifiedAIService";
 import { useIsMobile } from "@/hooks/use-mobile";
 import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
+import ErrorBoundary from "@/components/inbox/ErrorBoundary";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
@@ -68,14 +69,15 @@ const SmartInboxPage = () => {
     window.location.reload();
   };
 
-
   return (
-    <div className="h-screen w-full bg-background flex flex-col">
-      <MobileSmartInbox 
-        onLeadsRefresh={handleLeadsRefresh} 
-        preselectedLeadId={leadId}
-      />
-    </div>
+    <ErrorBoundary>
+      <div className="h-screen w-full bg-background flex flex-col">
+        <MobileSmartInbox 
+          onLeadsRefresh={handleLeadsRefresh} 
+          preselectedLeadId={leadId}
+        />
+      </div>
+    </ErrorBoundary>
   );
 };
 
