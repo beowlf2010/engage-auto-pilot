@@ -7,6 +7,8 @@ export const useStableRealtimeInbox = () => {
   const currentLeadIdRef = useRef<string | null>(null);
   const lastRefreshRef = useRef<number>(0);
   const pendingRefreshRef = useRef<NodeJS.Timeout | null>(null);
+  const subscriptionIdRef = useRef<string>(`inbox-${Date.now()}-${Math.random()}`);
+  const isSubscribedRef = useRef<boolean>(false);
   
   // Use conversation operations hook
   const {
@@ -39,10 +41,10 @@ export const useStableRealtimeInbox = () => {
     }
   }, [loadMessages]);
 
-  // Debounced update handlers
+  // Stable debounced update handlers
   const handleConversationUpdate = useCallback(() => {
     const now = Date.now();
-    if (now - lastRefreshRef.current < 1000) { // Increased debounce to 1s
+    if (now - lastRefreshRef.current < 1000) {
       console.log('⏱️ [STABLE INBOX] Debouncing conversation update');
       return;
     }
@@ -72,12 +74,18 @@ export const useStableRealtimeInbox = () => {
     }, 500);
   }, [loadConversations, loadMessages]);
 
-  // Stable realtime subscription
-  useEffect(() => {
+  // Stable realtime subscription - using useRef to prevent dependency changes
+  const setupRealtimeSubscription = useCallback(() => {
+    if (isSubscribedRef.current) {
+      console.log('⚠️ [STABLE INBOX] Already subscribed, skipping');
+      return () => {};
+    }
+
     console.log('🔗 [STABLE INBOX] Setting up realtime subscription');
+    isSubscribedRef.current = true;
     
     const unsubscribe = stableRealtimeManager.subscribe({
-      id: 'stable-conversations-updates',
+      id: subscriptionIdRef.current,
       callback: (payload) => {
         console.log('🔄 [STABLE INBOX] Received update:', payload.eventType);
 
@@ -100,9 +108,16 @@ export const useStableRealtimeInbox = () => {
 
     return () => {
       console.log('🔌 [STABLE INBOX] Cleaning up realtime subscription');
+      isSubscribedRef.current = false;
       unsubscribe();
     };
-  }, [handleConversationUpdate, handleMessageUpdate]);
+  }, []); // Empty dependency array to prevent re-creation
+
+  // Set up subscription only once
+  useEffect(() => {
+    const cleanup = setupRealtimeSubscription();
+    return cleanup;
+  }, []); // Empty dependency array
 
   // Connection state listener
   useEffect(() => {
