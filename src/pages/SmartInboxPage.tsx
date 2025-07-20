@@ -27,16 +27,16 @@ const SmartInboxPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  const handleLeadsRefresh = () => {
-    window.location.reload();
+  const handleBack = () => {
+    window.history.back();
   };
 
   return (
     <ErrorBoundary>
       <div className="h-screen w-full bg-background flex flex-col">
         <MobileSmartInbox 
-          onLeadsRefresh={handleLeadsRefresh} 
-          preselectedLeadId={leadId}
+          onBack={handleBack} 
+          leadId={leadId || undefined}
         />
       </div>
     </ErrorBoundary>

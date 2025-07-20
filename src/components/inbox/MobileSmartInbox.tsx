@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import ConversationItem from './ConversationItem';
 import MessageThread from './MessageThread';
 import { useStableRealtimeInbox } from '@/hooks/useStableRealtimeInbox';
-import { useMessages } from '@/hooks/useMessages';
 import { toast } from '@/hooks/use-toast';
 import type { ConversationListItem } from '@/types/conversation';
 
@@ -23,18 +22,15 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
   
   const {
     conversations,
+    messages,
     loading: conversationsLoading,
     error,
-    totalUnread,
-    refreshData
+    sendMessage,
+    refetch: refreshData
   } = useStableRealtimeInbox();
 
-  const {
-    messages,
-    loading: messagesLoading,
-    sendMessage,
-    refreshMessages
-  } = useMessages(selectedConversation?.leadId || '');
+  const totalUnread = conversations.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0);
+  const messagesLoading = conversationsLoading;
 
   // Auto-select conversation if leadId is provided in URL
   useEffect(() => {
@@ -71,9 +67,8 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
     if (!selectedConversation) return;
     
     try {
-      await sendMessage(messageContent);
+      await sendMessage(selectedConversation.leadId, messageContent);
       // Refresh both messages and conversations to update unread counts
-      refreshMessages();
       refreshData();
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -87,9 +82,6 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
 
   const handleRefresh = () => {
     refreshData();
-    if (selectedConversation) {
-      refreshMessages();
-    }
   };
 
   if (conversationsLoading) {
@@ -196,7 +188,11 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
                   <ConversationItem
                     key={conversation.leadId}
                     conversation={conversation}
-                    onClick={() => handleConversationSelect(conversation)}
+                    isSelected={selectedConversation?.leadId === conversation.leadId}
+                    onSelect={() => handleConversationSelect(conversation)}
+                    canReply={!!conversation.primaryPhone}
+                    markAsRead={async () => {}}
+                    isMarkingAsRead={false}
                   />
                 ))}
               </div>
