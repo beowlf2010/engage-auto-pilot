@@ -31,9 +31,9 @@ const VoicemailTemplateManager = () => {
 
   const defaultVariables = {
     first_name: 'John',
-    salesperson_name: 'Mike Johnson', 
-    dealership_name: 'AutoVantage Motors',
-    phone_number: '(555) 123-4567',
+    salesperson_name: 'Finn', 
+    dealership_name: 'Jason Pilger Chevrolet',
+    phone_number: '(251) 368-8600',
     vehicle_interest: '2024 Toyota Camry'
   };
 
