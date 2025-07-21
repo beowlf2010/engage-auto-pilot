@@ -4,14 +4,14 @@
 
 import React from 'react';
 
-const OptimizedSmartInbox = () => {
-  console.log('🚫 [OPTIMIZED SMART INBOX] This component is disabled - use MobileSmartInbox instead');
+const EnhancedSmartInbox = () => {
+  console.log('🚫 [ENHANCED SMART INBOX] This component is disabled - use MobileSmartInbox instead');
   
   return (
     <div className="flex items-center justify-center h-full p-8">
       <div className="text-center">
         <div className="text-lg font-medium text-gray-700 mb-2">
-          Optimized Smart Inbox Disabled
+          Enhanced Smart Inbox Disabled
         </div>
         <div className="text-sm text-gray-500">
           This component has been disabled to prevent conflicts. Please use the main Smart Inbox.
@@ -21,4 +21,4 @@ const OptimizedSmartInbox = () => {
   );
 };
 
-export default OptimizedSmartInbox;
+export default EnhancedSmartInbox;
