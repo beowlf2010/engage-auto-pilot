@@ -73,5 +73,5 @@ export const useGlobalUnreadCount = () => {
     };
   }, [profile?.id, fetchUnreadCount]);
 
-  return { unreadCount };
+  return { unreadCount, refreshUnreadCount: fetchUnreadCount };
 };
