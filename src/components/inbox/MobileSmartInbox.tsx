@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Search, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
-import { useConversationsList } from '@/hooks/conversation/useConversationsList';
+// Remove unused import
 import { useMessageFiltering } from '@/components/inbox/useMessageFiltering';
 import { useStableRealtimeInbox } from '@/hooks/useStableRealtimeInbox';
 import ConversationItem from '@/components/inbox/ConversationItem';
-import ConversationView from '@/components/inbox/ConversationView';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { markMessagesAsRead } from '@/services/conversationsService';
 
 interface MobileSmartInboxProps {
@@ -131,20 +131,35 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
     }
   }, [selectedConversation, onBack]);
 
-  // Show conversation view if one is selected
+  // Simple conversation view for mobile
   if (selectedConversation) {
     return (
-      <ConversationView
-        conversation={selectedConversation}
-        messages={messages}
-        onBack={handleBack}
-        onSendMessage={handleSendMessage}
-        sending={isMarkingAsRead}
-        onMarkAsRead={() => handleMarkAsRead(selectedConversation.leadId)}
-        canReply={true}
-        loading={loading}
-        error={error}
-      />
+      <div className="h-screen flex flex-col bg-background">
+        <div className="flex items-center p-4 border-b bg-card">
+          <Button variant="ghost" size="sm" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="ml-3">
+            <h2 className="font-semibold">{selectedConversation.leadName}</h2>
+            <p className="text-sm text-muted-foreground">{selectedConversation.leadPhone}</p>
+          </div>
+        </div>
+        <div className="flex-1 p-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversation Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Vehicle Interest: {selectedConversation.vehicleInterest}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Messages: {messages.length}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     );
   }
 
