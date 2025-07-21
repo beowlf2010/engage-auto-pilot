@@ -3,6 +3,7 @@ export interface ConversationData {
   leadId: string;
   leadName: string;
   leadPhone: string;
+  leadEmail?: string;
   vehicleInterest: string;
   unreadCount: number;
   lastMessage: string;
@@ -14,6 +15,8 @@ export interface ConversationData {
   aiOptIn?: boolean;
   lastMessageDate?: Date;
   leadSource?: string;
+  messageCount?: number;
+  leadType?: string;
 }
 
 export interface ConversationListItem {

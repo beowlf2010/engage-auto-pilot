@@ -26,8 +26,7 @@ const DashboardPage = () => {
     role: profile.role,
     firstName: profile.first_name,
     lastName: profile.last_name,
-    email: profile.email,
-    phone: profile.phone
+    email: profile.email
   };
 
   return <Dashboard user={user} />;

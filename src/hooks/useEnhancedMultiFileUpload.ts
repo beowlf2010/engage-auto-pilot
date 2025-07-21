@@ -45,7 +45,7 @@ export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' 
   const [processing, setProcessing] = useState(false);
   const [batchResult, setBatchResult] = useState<EnhancedBatchUploadResult | null>(null);
   const { toast } = useToast();
-  const { user, setUploadInProgress } = useAuth(); // Get user and upload state from auth context
+  const { user } = useAuth(); // Get user from auth context
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -55,10 +55,9 @@ export const useEnhancedMultiFileUpload = ({ userId, duplicateStrategy = 'skip' 
     if (mountedRef.current) {
       setProcessing(value);
       processingRef.current = value;
-      // Update auth context to prevent auth operations during upload
-      setUploadInProgress(value);
+      // Note: Upload progress tracking can be added here if needed
     }
-  }, [setUploadInProgress]);
+  }, []);
 
   const safeSetBatchResult = useCallback((result: EnhancedBatchUploadResult | null) => {
     if (mountedRef.current) {

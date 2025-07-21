@@ -40,7 +40,12 @@ export const useEnhancedUserProfile = () => {
       
       // Use the profile from auth context if available
       if (authProfile) {
-        setUserProfile(authProfile);
+        const userProfileData: UserProfile = {
+          ...authProfile,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setUserProfile(userProfileData);
       } else {
         // Fallback to direct query
         const { data: existingProfile, error: profileError } = await supabase

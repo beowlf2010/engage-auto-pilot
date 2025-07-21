@@ -36,7 +36,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
     conversationsCount: conversations.length,
     totalUnread,
     loading: conversationsLoading,
-    error: error?.message,
+    error: error,
     selectedConversation: selectedConversation?.leadId
   });
 
@@ -46,7 +46,19 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
       const conversation = conversations.find(c => c.leadId === leadId);
       if (conversation) {
         console.log('🎯 [MOBILE INBOX] Auto-selecting conversation from URL:', leadId);
-        setSelectedConversation(conversation);
+        // Convert ConversationData to ConversationListItem format
+        const conversationItem: ConversationListItem = {
+          ...conversation,
+          primaryPhone: conversation.leadPhone,
+          leadEmail: conversation.leadEmail || '',
+          messageCount: conversation.messageCount || 0,
+          leadType: conversation.leadType || 'unknown',
+          lastMessageDirection: conversation.lastMessageDirection || null,
+          salespersonId: conversation.salespersonId || null,
+          leadSource: conversation.leadSource || '',
+          lastMessageDate: conversation.lastMessageDate || new Date()
+        };
+        setSelectedConversation(conversationItem);
       }
     }
   }, [leadId, conversations, selectedConversation]);
@@ -113,7 +125,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <p className="text-red-600 mb-4">Error loading conversations</p>
-          <p className="text-sm text-gray-500 mb-4">{error.message}</p>
+          <p className="text-sm text-gray-500 mb-4">{error}</p>
           <Button onClick={refreshData} variant="outline">
             <RefreshCw className="w-4 h-4 mr-2" />
             Try Again
@@ -204,17 +216,32 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
               </div>
             ) : (
               <div className="divide-y">
-                {filteredConversations.map((conversation) => (
-                  <ConversationItem
-                    key={conversation.leadId}
-                    conversation={conversation}
-                    isSelected={selectedConversation?.leadId === conversation.leadId}
-                    onSelect={() => handleConversationSelect(conversation)}
-                    canReply={!!conversation.primaryPhone}
-                    markAsRead={async () => {}}
-                    isMarkingAsRead={false}
-                  />
-                ))}
+                {filteredConversations.map((conversation) => {
+                  // Convert ConversationData to ConversationListItem
+                  const conversationItem: ConversationListItem = {
+                    ...conversation,
+                    primaryPhone: conversation.leadPhone,
+                    leadEmail: conversation.leadEmail || '',
+                    messageCount: conversation.messageCount || 0,
+                    leadType: conversation.leadType || 'unknown',
+                    lastMessageDirection: conversation.lastMessageDirection || null,
+                    salespersonId: conversation.salespersonId || null,
+                    leadSource: conversation.leadSource || '',
+                    lastMessageDate: conversation.lastMessageDate || new Date()
+                  };
+                  
+                  return (
+                    <ConversationItem
+                      key={conversation.leadId}
+                      conversation={conversationItem}
+                      isSelected={selectedConversation?.leadId === conversation.leadId}
+                      onSelect={() => handleConversationSelect(conversationItem)}
+                      canReply={!!conversation.leadPhone}
+                      markAsRead={async () => {}}
+                      isMarkingAsRead={false}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

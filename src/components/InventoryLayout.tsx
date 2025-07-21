@@ -37,8 +37,7 @@ const InventoryLayout = ({ page }: InventoryLayoutProps) => {
     email: profile.email,
     role: profile.role,
     firstName: profile.first_name,
-    lastName: profile.last_name,
-    phone: profile.phone
+    lastName: profile.last_name
   };
 
   const getActiveTab = () => {

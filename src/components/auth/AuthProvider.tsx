@@ -17,6 +17,8 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -115,6 +117,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const signIn = async (email: string, password: string) => {
+    console.log('🔑 [AUTH PROVIDER] Signing in user...');
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
+    } catch (err) {
+      console.error('❌ [AUTH PROVIDER] Sign in exception:', err);
+      return { error: err };
+    }
+  };
+
+  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
+    console.log('📝 [AUTH PROVIDER] Signing up user...');
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          },
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+      return { error };
+    } catch (err) {
+      console.error('❌ [AUTH PROVIDER] Sign up exception:', err);
+      return { error: err };
+    }
+  };
+
   const signOut = async () => {
     console.log('🚪 [AUTH PROVIDER] Signing out...');
     setLoading(true);
@@ -133,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signOut, signIn, signUp }}>
       {children}
     </AuthContext.Provider>
   );
