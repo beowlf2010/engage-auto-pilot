@@ -1,206 +1,219 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Search, Filter, RefreshCw } from 'lucide-react';
+import { ConversationListItem } from '@/types/conversation';
+import { ConversationsService } from '@/services/conversationsService';
+import { useInboxFilters } from '@/hooks/useInboxFilters';
 import { useToast } from '@/hooks/use-toast';
-import { fetchConversations, markMessagesAsRead } from '@/services/conversationsService';
-import { stableRealtimeManager } from '@/services/stableRealtimeManager';
-import InboxHeader from './InboxHeader';
-import InboxSidebar from './InboxSidebar';
 import InboxConversationsList from './InboxConversationsList';
 import ConversationView from './ConversationView';
+import SmartFilters from './SmartFilters';
 import InboxDebugPanel from './InboxDebugPanel';
-import type { ConversationListItem } from '@/types/conversation';
 
 interface SmartInboxProps {
   onBack: () => void;
   leadId?: string;
 }
 
-const SmartInbox = ({ onBack, leadId }: SmartInboxProps) => {
+const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
   const { profile } = useAuth();
   const { toast } = useToast();
   
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
-  const [filteredConversations, setFilteredConversations] = useState<ConversationListItem[]>([]);
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(leadId || null);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   const [isMarkingAsRead, setIsMarkingAsRead] = useState(false);
+  
+  const {
+    filters,
+    setFilters,
+    searchQuery,
+    setSearchQuery,
+    filteredConversations,
+    hasActiveFilters,
+    filterSummary,
+    clearFilters
+  } = useInboxFilters(conversations);
 
-  const loadConversations = useCallback(async () => {
-    if (!profile) {
-      console.log('⏳ [SMART INBOX] No profile available, skipping load');
+  console.log('🏠 [SMART INBOX] Component mounted with:', {
+    profileId: profile?.id,
+    leadId,
+    conversationsCount: conversations.length,
+    selectedConversation: selectedConversation?.leadId
+  });
+
+  const fetchConversations = useCallback(async () => {
+    if (!profile?.id) {
+      console.warn('🏠 [SMART INBOX] No profile ID available');
       return;
     }
-    
-    console.log('🔄 [SMART INBOX] Loading conversations...');
+
+    console.log('🔄 [SMART INBOX] Starting to fetch conversations...');
     setLoading(true);
     
     try {
-      const data = await fetchConversations(profile);
-      console.log('✅ [SMART INBOX] Conversations loaded:', {
-        total: data.length,
-        withUnread: data.filter(c => c.unreadCount > 0).length,
-        totalUnreadMessages: data.reduce((sum, c) => sum + c.unreadCount, 0)
+      const conversationData = await ConversationsService.fetchConversations(profile.id);
+      
+      console.log('📊 [SMART INBOX] Conversations fetched:', {
+        total: conversationData.length,
+        withUnread: conversationData.filter(c => c.unreadCount > 0).length,
+        unassigned: conversationData.filter(c => !c.salespersonId).length,
+        assigned: conversationData.filter(c => c.salespersonId).length
       });
       
-      setConversations(data);
+      setConversations(conversationData);
       
-      // If leadId was provided and we don't have a selected conversation, try to find and select it
-      if (leadId && !selectedConversationId) {
-        const targetConversation = data.find(c => c.leadId === leadId);
+      // Auto-select conversation if leadId is provided
+      if (leadId && conversationData.length > 0) {
+        const targetConversation = conversationData.find(conv => conv.leadId === leadId);
         if (targetConversation) {
-          console.log('🎯 [SMART INBOX] Auto-selecting conversation for leadId:', leadId);
-          setSelectedConversationId(leadId);
-        } else {
-          console.warn('⚠️ [SMART INBOX] Could not find conversation for leadId:', leadId);
+          console.log('🎯 [SMART INBOX] Auto-selecting conversation:', targetConversation.leadId);
+          setSelectedConversation(targetConversation);
         }
       }
     } catch (error) {
-      console.error('❌ [SMART INBOX] Error loading conversations:', error);
+      console.error('❌ [SMART INBOX] Error fetching conversations:', error);
       toast({
         title: "Error",
         description: "Failed to load conversations. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  }, [profile, leadId, selectedConversationId, toast]);
+  }, [profile?.id, leadId, toast]);
 
-  // Apply filters whenever conversations, search, or filter settings change
   useEffect(() => {
-    console.log('🔍 [SMART INBOX] Applying filters:', {
-      totalConversations: conversations.length,
-      searchQuery,
-      filterUnreadOnly,
-      conversationsWithUnread: conversations.filter(c => c.unreadCount > 0).length
-    });
-
-    let filtered = [...conversations];
-    
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(conv =>
-        conv.leadName.toLowerCase().includes(query) ||
-        conv.leadPhone.toLowerCase().includes(query) ||
-        conv.lastMessage.toLowerCase().includes(query) ||
-        conv.vehicleInterest.toLowerCase().includes(query)
-      );
-    }
-    
-    // Apply unread filter
-    if (filterUnreadOnly) {
-      filtered = filtered.filter(conv => conv.unreadCount > 0);
-    }
-    
-    console.log('✅ [SMART INBOX] Filters applied:', {
-      filteredCount: filtered.length,
-      withUnread: filtered.filter(c => c.unreadCount > 0).length,
-      totalUnreadInFiltered: filtered.reduce((sum, c) => sum + c.unreadCount, 0)
-    });
-    
-    setFilteredConversations(filtered);
-  }, [conversations, searchQuery, filterUnreadOnly]);
-
-  // Load conversations on mount and when profile changes
-  useEffect(() => {
-    if (profile) {
-      loadConversations();
-    }
-  }, [profile, loadConversations]);
-
-  // Set up realtime subscription
-  useEffect(() => {
-    if (!profile?.id) return;
-
-    console.log('🔗 [SMART INBOX] Setting up realtime subscription');
-
-    const unsubscribe = stableRealtimeManager.subscribe({
-      id: `smart-inbox-${profile.id}`,
-      callback: (payload) => {
-        console.log('🔄 [SMART INBOX] Realtime update received:', payload.eventType);
-        
-        if (payload.table === 'conversations') {
-          if (payload.eventType === 'INSERT' && payload.new?.direction === 'in') {
-            console.log('📬 [SMART INBOX] New incoming message - refreshing conversations');
-            loadConversations();
-          } else if (payload.eventType === 'UPDATE' && 
-                     payload.new?.read_at && !payload.old?.read_at) {
-            console.log('📖 [SMART INBOX] Message marked as read - refreshing conversations');
-            loadConversations();
-          }
-        }
-      },
-      filters: {
-        event: '*',
-        schema: 'public',
-        table: 'conversations'
-      }
-    });
-
-    return () => {
-      console.log('🔌 [SMART INBOX] Cleaning up realtime subscription');
-      unsubscribe();
-    };
-  }, [profile?.id, loadConversations]);
+    fetchConversations();
+  }, [fetchConversations]);
 
   const handleConversationSelect = (conversation: ConversationListItem) => {
-    console.log('👆 [SMART INBOX] Conversation selected:', {
-      leadId: conversation.leadId,
-      leadName: conversation.leadName,
-      unreadCount: conversation.unreadCount
-    });
-    setSelectedConversationId(conversation.leadId);
+    console.log('👆 [SMART INBOX] Conversation selected:', conversation.leadId);
+    setSelectedConversation(conversation);
   };
 
   const handleMarkAsRead = async (leadId: string) => {
-    console.log('📖 [SMART INBOX] Marking messages as read for:', leadId);
-    setIsMarkingAsRead(true);
+    if (isMarkingAsRead) return;
     
+    setIsMarkingAsRead(true);
     try {
-      await markMessagesAsRead(leadId);
+      console.log('📖 [SMART INBOX] Marking conversation as read:', leadId);
       
-      // Refresh conversations to update unread counts
-      await loadConversations();
+      // Update the conversation in state immediately for better UX
+      setConversations(prev => prev.map(conv => 
+        conv.leadId === leadId 
+          ? { ...conv, unreadCount: 0 }
+          : conv
+      ));
+      
+      // Also update selected conversation if it's the one being marked as read
+      if (selectedConversation?.leadId === leadId) {
+        setSelectedConversation(prev => prev ? { ...prev, unreadCount: 0 } : null);
+      }
       
       toast({
-        title: "Messages marked as read",
-        description: "All messages for this conversation have been marked as read.",
+        title: "Success",
+        description: "Conversation marked as read",
       });
+      
+      // Refresh conversations to ensure consistency
+      await fetchConversations();
     } catch (error) {
-      console.error('❌ [SMART INBOX] Error marking messages as read:', error);
+      console.error('❌ [SMART INBOX] Error marking as read:', error);
       toast({
         title: "Error",
-        description: "Failed to mark messages as read. Please try again.",
-        variant: "destructive"
+        description: "Failed to mark conversation as read",
+        variant: "destructive",
       });
     } finally {
       setIsMarkingAsRead(false);
     }
   };
 
-  const selectedConversation = conversations.find(c => c.leadId === selectedConversationId);
+  const handleBackToList = () => {
+    console.log('⬅️ [SMART INBOX] Back to conversation list');
+    setSelectedConversation(null);
+  };
+
+  const handleRefreshConversations = async () => {
+    console.log('🔄 [SMART INBOX] Manual refresh triggered');
+    await fetchConversations();
+  };
 
   return (
-    <div className="h-full w-full bg-background flex flex-col relative">
-      <InboxHeader 
-        onBack={onBack}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        filterUnreadOnly={filterUnreadOnly}
-        onFilterChange={setFilterUnreadOnly}
-        conversationCount={filteredConversations.length}
-        unreadCount={filteredConversations.reduce((sum, c) => sum + c.unreadCount, 0)}
-      />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-80 border-r bg-muted/30 flex flex-col">
+    <div className="h-full flex">
+      {/* Sidebar - Conversation List */}
+      <div className={`${selectedConversation ? 'hidden lg:flex' : 'flex'} flex-col w-full lg:w-1/3 border-r bg-background`}>
+        {/* Header */}
+        <div className="flex-shrink-0 p-4 border-b bg-background">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBack}
+                className="p-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <h1 className="text-lg font-semibold">Smart Inbox</h1>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefreshConversations}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="flex-shrink-0 p-4 border-b bg-muted/30">
+            <SmartFilters
+              filters={filters}
+              onFiltersChange={setFilters}
+              conversations={conversations}
+              filteredConversations={filteredConversations}
+              hasActiveFilters={hasActiveFilters}
+              filterSummary={filterSummary}
+              onClearFilters={clearFilters}
+              userRole={profile?.role}
+            />
+          </div>
+        )}
+
+        {/* Conversation List */}
+        <div className="flex-1 overflow-hidden">
           <InboxConversationsList
             conversations={filteredConversations}
-            selectedConversationId={selectedConversationId}
+            selectedConversationId={selectedConversation?.leadId || null}
             onConversationSelect={handleConversationSelect}
             loading={loading}
             searchQuery={searchQuery}
@@ -208,37 +221,37 @@ const SmartInbox = ({ onBack, leadId }: SmartInboxProps) => {
             isMarkingAsRead={isMarkingAsRead}
           />
         </div>
-        
-        <div className="flex-1">
-          {selectedConversation ? (
-            <ConversationView
-              conversation={selectedConversation}
-              onClose={() => setSelectedConversationId(null)}
-              onRefresh={loadConversations}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Select a conversation
-                </h3>
-                <p className="text-gray-500">
-                  Choose a conversation from the list to view messages
-                </p>
+      </div>
+
+      {/* Main Content - Conversation View */}
+      <div className={`${selectedConversation ? 'flex' : 'hidden lg:flex'} flex-col flex-1 bg-background`}>
+        {selectedConversation ? (
+          <ConversationView
+            conversation={selectedConversation}
+            onRefresh={handleRefreshConversations}
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-6xl mb-4">💬</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Select a conversation</h3>
+              <p className="text-gray-500">Choose a conversation from the list to view messages</p>
+              <div className="mt-4 text-sm text-gray-400">
+                Total conversations: {conversations.length} | 
+                Filtered: {filteredConversations.length} | 
+                With unread: {filteredConversations.filter(c => c.unreadCount > 0).length}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Debug Panel */}
-      {process.env.NODE_ENV === 'development' && (
-        <InboxDebugPanel
-          conversations={conversations}
-          filteredConversations={filteredConversations}
-          onRefresh={loadConversations}
-        />
-      )}
+      <InboxDebugPanel
+        conversations={conversations}
+        filteredConversations={filteredConversations}
+        onRefresh={handleRefreshConversations}
+      />
     </div>
   );
 };
