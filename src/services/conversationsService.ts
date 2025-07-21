@@ -1,11 +1,13 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import type { ConversationData, MessageData } from '@/types/conversation';
+import type { ConversationListItem, MessageData } from '@/types/conversation';
 
-export const fetchConversations = async (profile: any): Promise<ConversationData[]> => {
+export const fetchConversations = async (profile: any): Promise<ConversationListItem[]> => {
   if (!profile) return [];
 
   try {
+    console.log('🔄 [CONVERSATIONS SERVICE] Starting conversation fetch...');
+
     // Get all leads with their basic info, phone numbers, and AI opt-in status
     const { data: leadsData, error: leadsError } = await supabase
       .from('leads')
@@ -13,8 +15,11 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
         id,
         first_name,
         last_name,
+        email,
         vehicle_interest,
         status,
+        source,
+        lead_type_name,
         salesperson_id,
         ai_opt_in,
         phone_numbers (
@@ -30,7 +35,7 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
 
     if (leadsError) throw leadsError;
 
-    // Get latest conversation for each lead
+    // Get all conversations grouped by lead
     const { data: conversationsData, error: conversationsError } = await supabase
       .from('conversations')
       .select('*')
@@ -38,26 +43,45 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
 
     if (conversationsError) throw conversationsError;
 
-    // Group conversations by lead and calculate unread counts
+    console.log('📊 [CONVERSATIONS SERVICE] Found', conversationsData?.length || 0, 'total conversations');
+
+    // Group conversations by lead and calculate metrics
     const conversationMap = new Map();
-    const unreadCountMap = new Map();
     const leadIdsWithMessages = new Set();
 
     conversationsData?.forEach(conv => {
       const leadId = conv.lead_id;
       leadIdsWithMessages.add(leadId);
       
-      // Track latest conversation
-      if (!conversationMap.has(leadId) || 
-          new Date(conv.sent_at) > new Date(conversationMap.get(leadId).sent_at)) {
-        conversationMap.set(leadId, conv);
+      if (!conversationMap.has(leadId)) {
+        conversationMap.set(leadId, {
+          latestConversation: conv,
+          unreadCount: 0,
+          totalMessages: 0,
+          incomingCount: 0,
+          outgoingCount: 0
+        });
       }
-
-      // Count unread incoming messages
-      if (conv.direction === 'in' && !conv.read_at) {
-        const currentCount = unreadCountMap.get(leadId) || 0;
-        unreadCountMap.set(leadId, currentCount + 1);
+      
+      const group = conversationMap.get(leadId);
+      
+      // Update latest conversation
+      if (new Date(conv.sent_at) > new Date(group.latestConversation.sent_at)) {
+        group.latestConversation = conv;
       }
+      
+      // Count messages by direction
+      if (conv.direction === 'in') {
+        group.incomingCount++;
+        // Count unread incoming messages
+        if (!conv.read_at) {
+          group.unreadCount++;
+        }
+      } else {
+        group.outgoingCount++;
+      }
+      
+      group.totalMessages++;
     });
 
     // Filter leads to only include those with actual conversations
@@ -65,41 +89,73 @@ export const fetchConversations = async (profile: any): Promise<ConversationData
       leadIdsWithMessages.has(lead.id)
     ) || [];
 
-    // Transform leads data to include conversation info
-    const transformedConversations = leadsWithConversations.map(lead => {
-      const latestConv = conversationMap.get(lead.id);
-      const unreadCount = unreadCountMap.get(lead.id) || 0;
+    console.log('📊 [CONVERSATIONS SERVICE] Processing', leadsWithConversations.length, 'leads with conversations');
+
+    // Transform leads data to ConversationListItem format
+    const transformedConversations: ConversationListItem[] = leadsWithConversations.map(lead => {
+      const group = conversationMap.get(lead.id);
+      const latestConv = group.latestConversation;
       
-      return {
+      // Get primary phone or fallback
+      const primaryPhone = lead.phone_numbers?.find(p => p.is_primary)?.number || 
+                          lead.phone_numbers?.[0]?.number || 
+                          'No phone';
+
+      const conversationItem: ConversationListItem = {
         leadId: lead.id,
-        leadName: `${lead.first_name} ${lead.last_name}`,
-        leadPhone: lead.phone_numbers.find(p => p.is_primary)?.number || 
-                  lead.phone_numbers[0]?.number || '',
-        vehicleInterest: lead.vehicle_interest,
-        unreadCount,
-        lastMessage: latestConv?.body || 'No messages yet',
-        lastMessageTime: latestConv ? new Date(latestConv.sent_at).toLocaleTimeString() : '',
-        status: lead.status,
+        leadName: `${lead.first_name || 'Unknown'} ${lead.last_name || 'Lead'}`.trim(),
+        primaryPhone,
+        leadPhone: primaryPhone, // Keep both for compatibility
+        leadEmail: lead.email || '',
+        lastMessage: latestConv.body || 'No message content',
+        lastMessageTime: new Date(latestConv.sent_at).toLocaleString(),
+        lastMessageDirection: latestConv.direction as 'in' | 'out',
+        lastMessageDate: new Date(latestConv.sent_at),
+        unreadCount: group.unreadCount,
+        messageCount: group.totalMessages,
         salespersonId: lead.salesperson_id,
-        salespersonName: lead.profiles ? `${lead.profiles.first_name} ${lead.profiles.last_name}` : null,
+        vehicleInterest: lead.vehicle_interest || 'Not specified',
+        leadSource: lead.source || 'Unknown',
+        leadType: lead.lead_type_name || 'Unknown',
+        status: lead.status || 'new',
+        salespersonName: lead.profiles ? 
+          `${lead.profiles.first_name} ${lead.profiles.last_name}`.trim() : undefined,
         aiOptIn: lead.ai_opt_in || false,
-        lastMessageDate: latestConv ? new Date(latestConv.sent_at) : new Date(0)
+        incomingCount: group.incomingCount,
+        outgoingCount: group.outgoingCount
       };
+
+      return conversationItem;
     });
 
-    // Sort conversations: unread first, then by last message time
+    // Sort by unread first, then by last message time
     transformedConversations.sort((a, b) => {
-      // Prioritize unread messages
+      // Prioritize unread conversations
       if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
       if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+      
+      // If both have unread messages, sort by unread count (most unread first)
+      if (a.unreadCount > 0 && b.unreadCount > 0) {
+        if (a.unreadCount !== b.unreadCount) {
+          return b.unreadCount - a.unreadCount;
+        }
+      }
       
       // Then sort by last message time (newest first)
       return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
     });
 
+    const totalUnread = transformedConversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+    
+    console.log('✅ [CONVERSATIONS SERVICE] Processed conversations:', {
+      totalConversations: transformedConversations.length,
+      withUnread: transformedConversations.filter(c => c.unreadCount > 0).length,
+      totalUnreadMessages: totalUnread
+    });
+
     return transformedConversations;
   } catch (error) {
-    console.error('Error fetching conversations:', error);
+    console.error('❌ [CONVERSATIONS SERVICE] Error fetching conversations:', error);
     return [];
   }
 };

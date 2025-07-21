@@ -24,7 +24,7 @@ export interface ConversationListItem {
   leadName: string;
   primaryPhone: string;
   leadPhone: string;
-  leadEmail: string; // Added this missing property
+  leadEmail: string;
   lastMessage: string;
   lastMessageTime: string;
   lastMessageDirection: 'in' | 'out' | null;
@@ -32,8 +32,8 @@ export interface ConversationListItem {
   messageCount: number;
   salespersonId: string | null;
   vehicleInterest: string;
-  leadSource: string; // Updated to use leadSource instead of leadSource?
-  leadType: string; // Added this property
+  leadSource: string;
+  leadType: string;
   status: string;
   lastMessageDate: Date;
   salespersonName?: string;
@@ -45,7 +45,7 @@ export interface ConversationListItem {
   incomingCount?: number;
   outgoingCount?: number;
   hasUnrepliedInbound?: boolean;
-  isAiGenerated?: boolean; // Added this property
+  isAiGenerated?: boolean;
 }
 
 export interface MessageData {

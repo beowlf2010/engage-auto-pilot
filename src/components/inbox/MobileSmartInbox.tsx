@@ -1,15 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Search, MessageCircle, Filter, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import ConversationItem from './ConversationItem';
-import MessageThread from './MessageThread';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Search, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
+import { useConversationsList } from '@/hooks/conversation/useConversationsList';
+import { useMessageFiltering } from '@/components/inbox/useMessageFiltering';
 import { useStableRealtimeInbox } from '@/hooks/useStableRealtimeInbox';
-import { toast } from '@/hooks/use-toast';
-import type { ConversationListItem } from '@/types/conversation';
+import ConversationItem from '@/components/inbox/ConversationItem';
+import ConversationView from '@/components/inbox/ConversationView';
+import { markAllMessagesAsRead } from '@/services/conversationsService';
 
 interface MobileSmartInboxProps {
   onBack: () => void;
@@ -17,236 +17,232 @@ interface MobileSmartInboxProps {
 }
 
 const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) => {
-  const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedConversation, setSelectedConversation] = useState<any>(null);
+  const [isMarkingAsRead, setIsMarkingAsRead] = useState(false);
+
+  // Use stable realtime inbox for real-time updates
   const {
     conversations,
     messages,
-    loading: conversationsLoading,
+    loading,
     error,
+    fetchMessages,
     sendMessage,
-    refetch: refreshData
+    refetch,
+    isRealtimeConnected
   } = useStableRealtimeInbox();
 
-  const totalUnread = conversations.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0);
-  const messagesLoading = conversationsLoading;
+  // Use conversation filtering
+  const {
+    conversationFilter,
+    setConversationFilter,
+    getFilteredConversations,
+    getConversationCounts
+  } = useMessageFiltering();
 
   console.log('📱 [MOBILE INBOX] Render state:', {
     conversationsCount: conversations.length,
-    totalUnread,
-    loading: conversationsLoading,
-    error: error,
-    selectedConversation: selectedConversation?.leadId
+    loading,
+    error,
+    selectedConversation: selectedConversation?.leadId,
+    realtimeConnected: isRealtimeConnected
   });
 
-  // Auto-select conversation if leadId is provided in URL
+  // Filter and search conversations
+  const filteredConversations = getFilteredConversations(conversations).filter(conv =>
+    conv.leadName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.leadPhone.includes(searchQuery) ||
+    conv.vehicleInterest.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const counts = getConversationCounts(conversations);
+
+  console.log('📊 [MOBILE INBOX] Conversation counts:', counts);
+  console.log('📊 [MOBILE INBOX] Filtered conversations:', filteredConversations.length);
+  console.log('🔴 [MOBILE INBOX] Conversations with unread:', 
+    filteredConversations.filter(c => c.unreadCount > 0).map(c => ({
+      leadName: c.leadName,
+      unreadCount: c.unreadCount
+    }))
+  );
+
+  // Auto-select conversation if leadId provided
   useEffect(() => {
     if (leadId && conversations.length > 0 && !selectedConversation) {
       const conversation = conversations.find(c => c.leadId === leadId);
       if (conversation) {
-        console.log('🎯 [MOBILE INBOX] Auto-selecting conversation from URL:', leadId);
-        // Convert ConversationData to ConversationListItem format
-        const conversationItem: ConversationListItem = {
-          ...conversation,
-          primaryPhone: conversation.leadPhone,
-          leadEmail: conversation.leadEmail || '',
-          messageCount: conversation.messageCount || 0,
-          leadType: conversation.leadType || 'unknown',
-          lastMessageDirection: conversation.lastMessageDirection || null,
-          salespersonId: conversation.salespersonId || null,
-          leadSource: conversation.leadSource || '',
-          lastMessageDate: conversation.lastMessageDate || new Date()
-        };
-        setSelectedConversation(conversationItem);
+        console.log('🎯 [MOBILE INBOX] Auto-selecting conversation for leadId:', leadId);
+        handleConversationSelect(conversation);
       }
     }
   }, [leadId, conversations, selectedConversation]);
 
-  const filteredConversations = conversations.filter(conversation =>
-    conversation.leadName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    conversation.vehicleInterest.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleConversationSelect = (conversation: ConversationListItem) => {
-    console.log('📞 [MOBILE INBOX] Selecting conversation:', conversation.leadId);
+  const handleConversationSelect = useCallback(async (conversation: any) => {
+    console.log('📱 [MOBILE INBOX] Selecting conversation:', conversation.leadName);
     setSelectedConversation(conversation);
-    // Update URL to reflect selected conversation
-    const url = new URL(window.location.href);
-    url.searchParams.set('leadId', conversation.leadId);
-    window.history.replaceState({}, '', url.toString());
-  };
+    
+    try {
+      await fetchMessages(conversation.leadId);
+    } catch (error) {
+      console.error('❌ [MOBILE INBOX] Error fetching messages:', error);
+    }
+  }, [fetchMessages]);
 
-  const handleBackToList = () => {
-    console.log('⬅️ [MOBILE INBOX] Going back to conversations list');
-    setSelectedConversation(null);
-    // Remove leadId from URL
-    const url = new URL(window.location.href);
-    url.searchParams.delete('leadId');
-    window.history.replaceState({}, '', url.toString());
-  };
-
-  const handleSendMessage = async (messageContent: string) => {
+  const handleSendMessage = useCallback(async (messageText: string) => {
     if (!selectedConversation) return;
     
     try {
-      await sendMessage(selectedConversation.leadId, messageContent);
-      // Refresh both messages and conversations to update unread counts
-      refreshData();
+      console.log('📤 [MOBILE INBOX] Sending message...');
+      await sendMessage(selectedConversation.leadId, messageText);
+      console.log('✅ [MOBILE INBOX] Message sent successfully');
     } catch (error) {
-      console.error('Failed to send message:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive"
-      });
+      console.error('❌ [MOBILE INBOX] Error sending message:', error);
     }
-  };
+  }, [selectedConversation, sendMessage]);
 
-  const handleRefresh = () => {
+  const handleMarkAsRead = useCallback(async (leadId: string) => {
+    setIsMarkingAsRead(true);
+    try {
+      console.log('📖 [MOBILE INBOX] Marking messages as read for lead:', leadId);
+      await markAllMessagesAsRead(leadId);
+      
+      // Refresh conversations to update unread counts
+      await refetch();
+      
+      console.log('✅ [MOBILE INBOX] Messages marked as read');
+    } catch (error) {
+      console.error('❌ [MOBILE INBOX] Error marking messages as read:', error);
+    } finally {
+      setIsMarkingAsRead(false);
+    }
+  }, [refetch]);
+
+  const handleRefresh = useCallback(async () => {
     console.log('🔄 [MOBILE INBOX] Manual refresh triggered');
-    refreshData();
-  };
+    await refetch();
+  }, [refetch]);
 
-  if (conversationsLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400 animate-pulse" />
-          <p className="text-gray-600">Loading conversations...</p>
-          <p className="text-sm text-gray-500 mt-2">Found {totalUnread} unread messages</p>
-        </div>
-      </div>
-    );
-  }
+  const handleBack = useCallback(() => {
+    if (selectedConversation) {
+      setSelectedConversation(null);
+    } else {
+      onBack();
+    }
+  }, [selectedConversation, onBack]);
 
-  if (error) {
+  // Show conversation view if one is selected
+  if (selectedConversation) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">Error loading conversations</p>
-          <p className="text-sm text-gray-500 mb-4">{error}</p>
-          <Button onClick={refreshData} variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Try Again
-          </Button>
-        </div>
-      </div>
+      <ConversationView
+        conversation={selectedConversation}
+        messages={messages}
+        onBack={handleBack}
+        onSendMessage={handleSendMessage}
+        loading={loading}
+        error={error}
+      />
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {selectedConversation ? (
-        // Message Thread View
-        <div className="flex flex-col h-full">
-          <div className="flex items-center p-4 bg-white border-b">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBackToList}
-              className="mr-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div className="flex-1">
-              <h2 className="font-semibold">Back to Conversations</h2>
-            </div>
+    <div className="h-screen flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b bg-card">
+        <div className="flex items-center space-x-3">
+          <Button variant="ghost" size="sm" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center space-x-2">
+            <MessageSquare className="h-5 w-5 text-primary" />
+            <h1 className="text-lg font-semibold">Smart Inbox</h1>
+            <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500' : 'bg-red-500'}`} />
           </div>
-          
-          <MessageThread
-            leadId={selectedConversation.leadId}
-            messages={messages}
-            conversation={selectedConversation}
-            onSendMessage={handleSendMessage}
-            canReply={!!selectedConversation.primaryPhone}
-            loading={messagesLoading}
-            onRefresh={handleRefresh}
+        </div>
+        <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="p-4 space-y-3 border-b bg-card">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
           />
         </div>
-      ) : (
-        // Conversation List View
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 bg-white border-b">
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" onClick={onBack}>
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <h2 className="font-semibold">Smart Inbox</h2>
-              {totalUnread > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {totalUnread}
-                </Badge>
-              )}
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleRefresh}>
-              <RefreshCw className="w-4 h-4" />
+
+        {/* Filter Tabs */}
+        <div className="flex space-x-2 overflow-x-auto">
+          {[
+            { key: 'all', label: 'All', count: counts.totalCount },
+            { key: 'unread', label: 'Unread', count: counts.unreadCount },
+            { key: 'inbound', label: 'Inbound', count: counts.inboundCount },
+            { key: 'sent', label: 'Sent', count: counts.sentCount }
+          ].map(({ key, label, count }) => (
+            <Button
+              key={key}
+              variant={conversationFilter === key ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setConversationFilter(key as any)}
+              className="flex items-center space-x-1 whitespace-nowrap"
+            >
+              <span>{label}</span>
+              <Badge variant="secondary" className="ml-1">
+                {count}
+              </Badge>
             </Button>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          {/* Search */}
-          <div className="p-4 bg-white border-b">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search conversations..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+      {/* Conversations List */}
+      <div className="flex-1 overflow-y-auto">
+        {loading && conversations.length === 0 ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="text-center">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Loading conversations...</p>
             </div>
           </div>
-
-          {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto">
-            {filteredConversations.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-gray-600">
-                    {searchTerm ? 'No conversations match your search' : 'No conversations yet'}
-                  </p>
-                  {totalUnread > 0 && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      {totalUnread} unread messages found in database
-                    </p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="divide-y">
-                {filteredConversations.map((conversation) => {
-                  // Convert ConversationData to ConversationListItem
-                  const conversationItem: ConversationListItem = {
-                    ...conversation,
-                    primaryPhone: conversation.leadPhone,
-                    leadEmail: conversation.leadEmail || '',
-                    messageCount: conversation.messageCount || 0,
-                    leadType: conversation.leadType || 'unknown',
-                    lastMessageDirection: conversation.lastMessageDirection || null,
-                    salespersonId: conversation.salespersonId || null,
-                    leadSource: conversation.leadSource || '',
-                    lastMessageDate: conversation.lastMessageDate || new Date()
-                  };
-                  
-                  return (
-                    <ConversationItem
-                      key={conversation.leadId}
-                      conversation={conversationItem}
-                      isSelected={selectedConversation?.leadId === conversation.leadId}
-                      onSelect={() => handleConversationSelect(conversationItem)}
-                      canReply={!!conversation.leadPhone}
-                      markAsRead={async () => {}}
-                      isMarkingAsRead={false}
-                    />
-                  );
-                })}
-              </div>
-            )}
+        ) : error ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="text-center">
+              <p className="text-sm text-destructive">Error loading conversations</p>
+              <Button variant="outline" size="sm" onClick={handleRefresh} className="mt-2">
+                Try Again
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        ) : filteredConversations.length === 0 ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="text-center">
+              <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                {searchQuery ? 'No conversations match your search' : 'No conversations found'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 space-y-3">
+            {filteredConversations.map((conversation) => (
+              <ConversationItem
+                key={conversation.leadId}
+                conversation={conversation}
+                isSelected={selectedConversation?.leadId === conversation.leadId}
+                onSelect={() => handleConversationSelect(conversation)}
+                canReply={true}
+                markAsRead={handleMarkAsRead}
+                isMarkingAsRead={isMarkingAsRead}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

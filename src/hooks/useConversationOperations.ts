@@ -5,14 +5,14 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { fetchConversations, fetchMessages, markMessagesAsRead } from '@/services/conversationsService';
 import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
-import type { ConversationData, MessageData } from '@/types/conversation';
+import type { ConversationListItem, MessageData } from '@/types/conversation';
 
 interface UseConversationOperationsProps {
   onLeadsRefresh?: () => void;
 }
 
 export const useConversationOperations = (props?: UseConversationOperationsProps) => {
-  const [conversations, setConversations] = useState<ConversationData[]>([]);
+  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +45,7 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
       console.log('📞 [CONV OPS] Fetching conversations for profile:', profile.id);
       const data = await fetchConversations(profile);
       console.log('✅ [CONV OPS] Conversations loaded:', data.length);
+      console.log('🔴 [CONV OPS] Unread conversations:', data.filter(c => c.unreadCount > 0).length);
       setConversations(data);
     } catch (err) {
       console.error('❌ [CONV OPS] Error loading conversations:', err);
