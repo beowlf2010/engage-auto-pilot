@@ -15,6 +15,9 @@ interface ConversationViewProps {
   sending: boolean;
   onMarkAsRead: () => Promise<void>;
   canReply: boolean;
+  onBack?: () => void;
+  loading?: boolean;
+  error?: string;
 }
 
 const ConversationView = ({

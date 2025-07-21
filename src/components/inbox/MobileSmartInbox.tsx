@@ -139,6 +139,9 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
         messages={messages}
         onBack={handleBack}
         onSendMessage={handleSendMessage}
+        sending={isMarkingAsRead}
+        onMarkAsRead={() => handleMarkAsRead(selectedConversation.leadId)}
+        canReply={true}
         loading={loading}
         error={error}
       />
