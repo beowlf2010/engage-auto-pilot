@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { markAllMessagesAsRead } from '@/services/conversationsService';
+import { markMessagesAsRead } from '@/services/conversationsService';
 import { toast } from '@/hooks/use-toast';
 
 export const useMarkAsRead = (onRefresh: () => void) => {
@@ -12,7 +12,7 @@ export const useMarkAsRead = (onRefresh: () => void) => {
     try {
       setMarkingAsRead(leadId);
       
-      await markAllMessagesAsRead(leadId);
+      await markMessagesAsRead(leadId);
       
       // Refresh conversations to update unread counts
       onRefresh();
