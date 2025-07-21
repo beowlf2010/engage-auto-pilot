@@ -12,16 +12,20 @@ export const useGlobalUnreadCount = () => {
     if (!profile?.id) return;
     
     try {
-      // Debug the actual query to see what's happening
+      // Enhanced: Better query with more debug info
       console.log('🔍 [GLOBAL UNREAD] Querying conversations for unread count...');
       
       const { data, error } = await supabase
         .from('conversations')
-        .select('id, direction, read_at')
+        .select('id, direction, read_at, lead_id')
         .eq('direction', 'in')
         .is('read_at', null);
         
-      console.log('🔍 [GLOBAL UNREAD] Query result:', { data, error });
+      console.log('🔍 [GLOBAL UNREAD] Query result:', { 
+        data: data?.slice(0, 3), // Show first 3 for debugging
+        total: data?.length,
+        error 
+      });
 
       if (error) {
         console.warn('Error fetching unread count:', error);
@@ -42,18 +46,25 @@ export const useGlobalUnreadCount = () => {
       return;
     }
 
-    console.log('🔗 [GLOBAL UNREAD] Setting up stable realtime subscription');
+    console.log('🔗 [GLOBAL UNREAD] Setting up enhanced realtime subscription');
     fetchUnreadCount();
 
-    // Subscribe to conversation changes using stable manager
+    // Enhanced: Subscribe to conversation changes using stable manager
     const unsubscribe = stableRealtimeManager.subscribe({
       id: `global-unread-count-${profile.id}`,
       callback: (payload) => {
-        console.log('🔄 [GLOBAL UNREAD] Realtime update received');
+        console.log('🔄 [GLOBAL UNREAD] Realtime update received:', payload.eventType);
         
-        // Refresh count for any conversation changes
+        // Enhanced: Refresh count for any conversation changes that affect unread status
         if (payload.table === 'conversations') {
-          fetchUnreadCount();
+          if (payload.eventType === 'INSERT' && payload.new?.direction === 'in') {
+            console.log('📬 [GLOBAL UNREAD] New incoming message - refreshing count');
+            fetchUnreadCount();
+          } else if (payload.eventType === 'UPDATE' && 
+                     payload.new?.read_at && !payload.old?.read_at) {
+            console.log('📖 [GLOBAL UNREAD] Message marked as read - refreshing count');
+            fetchUnreadCount();
+          }
         }
       },
       filters: {
@@ -63,18 +74,25 @@ export const useGlobalUnreadCount = () => {
       }
     });
 
-    // Also listen to custom events from other parts of the app
+    // Enhanced: More responsive custom event listener
     const handleUnreadCountChanged = () => {
-      console.log('🔄 [GLOBAL UNREAD] Custom event received, refreshing count');
+      console.log('🔄 [GLOBAL UNREAD] Custom event received, refreshing count immediately');
       fetchUnreadCount();
     };
 
     window.addEventListener('unread-count-changed', handleUnreadCountChanged);
 
+    // Enhanced: Periodic refresh every 30 seconds to ensure accuracy
+    const intervalId = setInterval(() => {
+      console.log('⏰ [GLOBAL UNREAD] Periodic refresh triggered');
+      fetchUnreadCount();
+    }, 30000);
+
     return () => {
-      console.log('🔌 [GLOBAL UNREAD] Cleaning up subscription');
+      console.log('🔌 [GLOBAL UNREAD] Cleaning up enhanced subscription');
       unsubscribe();
       window.removeEventListener('unread-count-changed', handleUnreadCountChanged);
+      clearInterval(intervalId);
     };
   }, [profile?.id, fetchUnreadCount]);
 

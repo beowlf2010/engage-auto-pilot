@@ -54,7 +54,7 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
     setError: () => {} // Error handling is done in the hook
   });
 
-  // Handle conversation selection
+  // Enhanced conversation selection with immediate feedback
   const onSelectConversation = async (leadId: string) => {
     console.log('🔄 [SMART INBOX] Selecting conversation:', leadId);
     setSelectedLead(leadId);
@@ -70,7 +70,10 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
       setSelectedConversation(conversation);
     }
     
-    // Load messages using stable operations
+    // Enhanced: Show immediate loading state for better UX
+    console.log('📖 [SMART INBOX] Auto-marking as read for selected conversation');
+    
+    // Load messages using stable operations (includes auto-mark-as-read)
     await handleSelectConversation(leadId);
   };
 
@@ -81,12 +84,22 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
     }
   };
 
-  // Mark messages as read
+  // Enhanced mark as read with immediate feedback
   const markAsRead = async (leadId: string) => {
     setMarkingAsRead(leadId);
+    
     try {
+      console.log('📖 [SMART INBOX] Manually marking as read for lead:', leadId);
+      
       // Messages are automatically marked as read when loaded
       await fetchMessages(leadId);
+      
+      // Enhanced: Immediate global unread count refresh
+      console.log('🔄 [SMART INBOX] Triggering global unread count refresh after manual mark');
+      window.dispatchEvent(new CustomEvent('unread-count-changed'));
+      
+    } catch (error) {
+      console.error('❌ [SMART INBOX] Failed to mark as read:', error);
     } finally {
       setMarkingAsRead(null);
     }
@@ -102,7 +115,7 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
     }
   }, [urlLeadId, conversations]);
 
-  // Connection status indicator
+  // Enhanced connection status indicator
   const connectionStatus = isRealtimeConnected ? 'Connected' : 'Reconnecting...';
 
   if (!profile) {
@@ -118,12 +131,17 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Header with connection status */}
+      {/* Enhanced header with connection status and auto-mark indicator */}
       <div className="border-b border-border px-4 py-2 flex items-center justify-between bg-card">
         <h1 className="text-lg font-semibold text-foreground">Smart Inbox</h1>
-        <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500' : 'bg-orange-500'}`} />
-          <span className="text-xs text-muted-foreground">{connectionStatus}</span>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500' : 'bg-orange-500'}`} />
+            <span className="text-xs text-muted-foreground">{connectionStatus}</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Auto-mark enabled ✓
+          </div>
         </div>
       </div>
 
@@ -174,6 +192,7 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
         )}
       </div>
 
+      {/* Enhanced error display */}
       {error && (
         <div className="border-t border-border bg-destructive/10 px-4 py-2">
           <div className="text-sm text-destructive">{error}</div>

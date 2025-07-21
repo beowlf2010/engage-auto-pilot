@@ -32,6 +32,11 @@ export const useStableRealtimeInbox = () => {
     try {
       await loadMessages(leadId);
       console.log('✅ [STABLE INBOX] Messages loaded successfully');
+      
+      // Enhanced: Immediate visual feedback and global unread count update
+      console.log('📖 [STABLE INBOX] Triggering immediate unread count refresh');
+      window.dispatchEvent(new CustomEvent('unread-count-changed'));
+      
     } catch (error) {
       console.error('❌ [STABLE INBOX] Error loading messages:', error);
       throw error;
@@ -40,7 +45,7 @@ export const useStableRealtimeInbox = () => {
 
   const handleConversationUpdate = useCallback(() => {
     const now = Date.now();
-    if (now - lastRefreshRef.current < 2000) { // Increased debounce to 2 seconds
+    if (now - lastRefreshRef.current < 1000) { // Reduced debounce to 1 second
       console.log('⏱️ [STABLE INBOX] Debouncing conversation update');
       return;
     }
@@ -65,7 +70,7 @@ export const useStableRealtimeInbox = () => {
         console.log('🔄 [STABLE INBOX] Refreshing messages for current lead');
         loadMessages(leadId);
       }
-    }, 1000); // Increased delay to 1 second
+    }, 500); // Reduced delay to 500ms
   }, [loadConversations, loadMessages]);
 
   const setupRealtimeSubscription = useCallback(() => {
@@ -89,6 +94,10 @@ export const useStableRealtimeInbox = () => {
             if (payload.new?.lead_id) {
               handleMessageUpdate(payload.new.lead_id);
             }
+            
+            // Enhanced: Immediate unread count refresh for any conversation changes
+            console.log('🔄 [STABLE INBOX] Triggering global unread count refresh from realtime');
+            window.dispatchEvent(new CustomEvent('unread-count-changed'));
           }
         }
       },
@@ -129,13 +138,17 @@ export const useStableRealtimeInbox = () => {
       
       await sendMessage(leadId, message);
       
-      // Immediate refresh for instant UI updates
+      // Enhanced: Immediate refresh for instant UI updates
       const refreshPromises = [
         loadConversations(),
         currentLeadIdRef.current === leadId ? loadMessages(leadId) : Promise.resolve()
       ];
       
       await Promise.all(refreshPromises);
+      
+      // Enhanced: Immediate global unread count update
+      console.log('🔄 [STABLE INBOX] Triggering global unread count refresh after send');
+      window.dispatchEvent(new CustomEvent('unread-count-changed'));
       
     } catch (error) {
       console.error('❌ [STABLE INBOX] Send message failed:', error);
@@ -152,6 +165,10 @@ export const useStableRealtimeInbox = () => {
     }
     
     manualRefresh();
+    
+    // Enhanced: Also refresh global unread count
+    console.log('🔄 [STABLE INBOX] Triggering global unread count refresh from manual refresh');
+    window.dispatchEvent(new CustomEvent('unread-count-changed'));
   }, [manualRefresh, connectionState.isConnected]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   markAsRead,
   isMarkingAsRead
 }) => {
+  // Enhanced: Local state for immediate visual feedback
+  const [localUnreadCount, setLocalUnreadCount] = useState(conversation.unreadCount);
+  const [isLocallyMarking, setIsLocallyMarking] = useState(false);
+
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
@@ -48,19 +52,46 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const handleMarkAsRead = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await markAsRead(conversation.leadId);
+    
+    // Enhanced: Immediate visual feedback
+    setIsLocallyMarking(true);
+    setLocalUnreadCount(0);
+    
+    try {
+      await markAsRead(conversation.leadId);
+      console.log('✅ [CONVERSATION ITEM] Successfully marked as read');
+    } catch (error) {
+      console.error('❌ [CONVERSATION ITEM] Failed to mark as read:', error);
+      // Revert local state on error
+      setLocalUnreadCount(conversation.unreadCount);
+    } finally {
+      setIsLocallyMarking(false);
+    }
   };
+
+  const handleSelect = () => {
+    // Enhanced: Immediate visual feedback when selecting
+    if (localUnreadCount > 0) {
+      console.log('📖 [CONVERSATION ITEM] Auto-marking as read on selection');
+      setLocalUnreadCount(0);
+    }
+    onSelect();
+  };
+
+  // Use local unread count for immediate visual feedback
+  const displayUnreadCount = localUnreadCount;
+  const isMarking = isMarkingAsRead || isLocallyMarking;
 
   return (
     <Card 
       className={`p-3 cursor-pointer transition-all hover:shadow-md ${
         isSelected 
           ? 'ring-2 ring-blue-500 border-blue-200' 
-          : conversation.unreadCount > 0 
+          : displayUnreadCount > 0 
             ? 'border-l-4 border-l-red-400 bg-red-50' 
             : 'border-gray-200'
       }`}
-      onClick={onSelect}
+      onClick={handleSelect}
     >
       <div className="flex items-start space-x-3">
         {/* Avatar */}
@@ -78,25 +109,35 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {conversation.leadName}
             </h4>
             <div className="flex items-center space-x-1 flex-shrink-0">
-              {conversation.unreadCount > 0 && (
+              {displayUnreadCount > 0 && (
                 <>
-                  <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
-                    {conversation.unreadCount}
+                  <Badge 
+                    variant="destructive" 
+                    className={`text-xs px-1.5 py-0.5 transition-opacity ${
+                      isMarking ? 'opacity-50' : 'opacity-100'
+                    }`}
+                  >
+                    {displayUnreadCount}
                   </Badge>
                   <Button
                     onClick={handleMarkAsRead}
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0"
-                    disabled={isMarkingAsRead}
+                    disabled={isMarking}
                   >
-                    {isMarkingAsRead ? (
+                    {isMarking ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
                       <CheckCircle className="w-3 h-3" />
                     )}
                   </Button>
                 </>
+              )}
+              {displayUnreadCount === 0 && conversation.unreadCount > 0 && (
+                <div className="text-xs text-green-600 font-medium">
+                  ✓ Read
+                </div>
               )}
             </div>
           </div>
