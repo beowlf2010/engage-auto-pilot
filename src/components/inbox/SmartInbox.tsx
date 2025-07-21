@@ -7,6 +7,8 @@ import EnhancedChatView from './EnhancedChatView';
 import LeadContextPanel from './LeadContextPanel';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useSearchParams } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Filter, MessageSquare } from 'lucide-react';
 import type { ConversationListItem } from '@/types/conversation';
 
 interface SmartInboxProps {
@@ -23,6 +25,7 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [markingAsRead, setMarkingAsRead] = useState<string | null>(null);
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
   // Use the stable realtime inbox system
   const {
@@ -53,6 +56,16 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
     sendingMessage: loading,
     setError: () => {} // Error handling is done in the hook
   });
+
+  // Filter conversations based on unread only setting
+  const filteredConversations = React.useMemo(() => {
+    if (!showUnreadOnly) return conversations;
+    return conversations.filter(conversation => conversation.unreadCount > 0);
+  }, [conversations, showUnreadOnly]);
+
+  // Calculate unread counts for display
+  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+  const filteredUnread = filteredConversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
 
   // Enhanced conversation selection with immediate feedback
   const onSelectConversation = async (leadId: string) => {
@@ -131,9 +144,23 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Enhanced header with connection status and auto-mark indicator */}
+      {/* Enhanced header with connection status, filter, and auto-mark indicator */}
       <div className="border-b border-border px-4 py-2 flex items-center justify-between bg-card">
-        <h1 className="text-lg font-semibold text-foreground">Smart Inbox</h1>
+        <div className="flex items-center space-x-4">
+          <h1 className="text-lg font-semibold text-foreground">Smart Inbox</h1>
+          
+          {/* Unread Filter Button */}
+          <Button
+            variant={showUnreadOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+            className="h-8"
+          >
+            <Filter className="h-3 w-3 mr-1" />
+            {showUnreadOnly ? `Unread (${filteredUnread})` : 'Show All'}
+          </Button>
+        </div>
+        
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500' : 'bg-orange-500'}`} />
@@ -142,15 +169,40 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) =
           <div className="text-xs text-muted-foreground">
             Auto-mark enabled ✓
           </div>
+          {totalUnread > 0 && (
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+              <MessageSquare className="h-3 w-3" />
+              <span>{totalUnread} total unread</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Filter Status Indicator */}
+      {showUnreadOnly && (
+        <div className="px-4 py-2 bg-blue-50 border-b border-border">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-blue-700">
+              📊 Showing {filteredConversations.length} conversations with unread messages
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowUnreadOnly(false)}
+              className="h-6 text-xs text-blue-600 hover:text-blue-800"
+            >
+              Show All ({conversations.length})
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Conversations List */}
         <div className="w-1/3 border-r border-border flex flex-col">
           <ConversationsList
-            conversations={conversations}
+            conversations={filteredConversations}
             selectedLead={selectedLead}
             onSelectConversation={onSelectConversation}
             markAsRead={markAsRead}
