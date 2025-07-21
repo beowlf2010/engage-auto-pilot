@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect } from 'react';
-import { optimizedRealtimeManager } from '@/services/optimizedRealtimeManager';
+import { stableRealtimeManager } from '@/services/stableRealtimeManager';
 import type { RealtimeCallbacks } from '@/types/realtime';
 
 // Global state to prevent multiple subscriptions
@@ -35,15 +35,15 @@ export const useRealtimeChannelManager = () => {
     }
 
     if (globalChannelState.subscriptions.size > 0) {
-      console.log('🔌 Reusing existing optimized channel subscriptions');
+      console.log('🔌 Reusing existing stable channel subscriptions');
       return;
     }
 
     globalChannelState.isSubscribing = true;
-    console.log('🔌 Creating optimized realtime subscriptions');
+    console.log('🔌 Creating stable realtime subscriptions');
 
-    // Subscribe to conversations using the optimized manager
-    const conversationUnsubscribe = optimizedRealtimeManager.subscribe({
+    // Subscribe to conversations using the stable manager
+    const conversationUnsubscribe = stableRealtimeManager.subscribe({
       id: 'conversations-updates',
       callback: (payload) => {
         console.log('🔄 Conversation database change:', {
@@ -64,12 +64,12 @@ export const useRealtimeChannelManager = () => {
     globalChannelState.subscriptions.set('conversations', conversationUnsubscribe);
     globalChannelState.isSubscribing = false;
     
-    console.log('✅ Optimized realtime subscriptions created');
+    console.log('✅ Stable realtime subscriptions created');
   }, []);
 
   const cleanupChannel = useCallback(() => {
     if (globalChannelState.callbacks.length === 0 && globalChannelState.subscriptions.size > 0) {
-      console.log('🧹 Cleaning up optimized realtime subscriptions');
+      console.log('🧹 Cleaning up stable realtime subscriptions');
       
       // Unsubscribe from all subscriptions
       globalChannelState.subscriptions.forEach((unsubscribe, key) => {
@@ -82,11 +82,11 @@ export const useRealtimeChannelManager = () => {
     }
   }, []);
 
-  // Initialize optimized realtime manager on mount
+  // Initialize stable realtime manager on mount
   useEffect(() => {
     return () => {
       // Cleanup on unmount
-      optimizedRealtimeManager.cleanup();
+      stableRealtimeManager.cleanup();
     };
   }, []);
 

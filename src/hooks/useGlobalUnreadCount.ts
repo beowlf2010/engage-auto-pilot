@@ -1,7 +1,8 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useCentralizedRealtime } from './useCentralizedRealtime';
+import { stableRealtimeManager } from '@/services/stableRealtimeManager';
 
 export const useGlobalUnreadCount = () => {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -13,7 +14,7 @@ export const useGlobalUnreadCount = () => {
     try {
       console.log('🔍 [GLOBAL UNREAD COUNT] Fetching actionable unread count for profile:', profile.id);
 
-      // Get unread SMS conversations with lead information - using left join to include unassigned leads
+      // Get unread SMS conversations with lead information
       const { data: smsConversations, error: smsError } = await supabase
         .from('conversations')
         .select('id, body, lead_id, leads(salesperson_id, status)')
@@ -22,7 +23,7 @@ export const useGlobalUnreadCount = () => {
 
       if (smsError) throw smsError;
 
-      // Get unread email conversations with lead information - using left join to include unassigned leads
+      // Get unread email conversations with lead information
       const { data: emailConversations, error: emailError } = await supabase
         .from('email_conversations')
         .select('id, body, lead_id, leads(salesperson_id, status)')
@@ -34,92 +35,44 @@ export const useGlobalUnreadCount = () => {
       // Define comprehensive rejection patterns to filter out
       const rejectionPatterns = [
         // Basic rejections
-        /stop/i,
-        /unsubscribe/i,
-        /not interested/i,
-        /no thanks/i,
-        /no thank you/i,
-        /remove me/i,
-        /delete my number/i,
-        /do not contact/i,
-        /don't contact/i,
-        /dont contact/i,
-        /leave me alone/i,
-        /wrong number/i,
+        /stop/i, /unsubscribe/i, /not interested/i, /no thanks/i, /no thank you/i,
+        /remove me/i, /delete my number/i, /do not contact/i, /don't contact/i,
+        /dont contact/i, /leave me alone/i, /wrong number/i,
         
         // Already purchased variations
-        /found already/i,
-        /bought already/i,
-        /already bought/i,
-        /already purchased/i,
-        /purchased already/i,
-        /just bought/i,
-        /we bought/i,
-        /we purchased/i,
-        /got a/i,
-        /picked up a/i,
-        /found one/i,
-        /found a vehicle/i,
-        /purchased from/i,
-        /bought from/i,
-        /decided on another/i,
-        /chose another/i,
+        /found already/i, /bought already/i, /already bought/i, /already purchased/i,
+        /purchased already/i, /just bought/i, /we bought/i, /we purchased/i,
+        /got a/i, /picked up a/i, /found one/i, /found a vehicle/i,
+        /purchased from/i, /bought from/i, /decided on another/i, /chose another/i,
         /went with another/i,
         
         // Not in market
-        /not in the market/i,
-        /not buying/i,
-        /not looking/i,
-        /not ready/i,
-        /maybe later/i,
-        /in the future/i,
-        /next year/i,
-        /couple months/i,
-        /few months/i,
-        /check back/i,
-        /will check back/i,
-        /not ready yet/i,
+        /not in the market/i, /not buying/i, /not looking/i, /not ready/i,
+        /maybe later/i, /in the future/i, /next year/i, /couple months/i,
+        /few months/i, /check back/i, /will check back/i, /not ready yet/i,
         /maybe in a/i,
         
         // Confused/Wrong contact
-        /who is this/i,
-        /what is this/i,
-        /what car lot/i,
-        /dont text me/i,
-        /don't text me/i,
-        /bad experience/i,
-        /can't use y'all/i,
+        /who is this/i, /what is this/i, /what car lot/i, /dont text me/i,
+        /don't text me/i, /bad experience/i, /can't use y'all/i,
         
-        // Single word rejections (when they're standalone)
-        /^stop$/i,
-        /^no$/i,
-        /^nope$/i,
+        // Single word rejections
+        /^stop$/i, /^no$/i, /^nope$/i,
         
         // Working on getting ready (timing objections)
-        /working on getting/i,
-        /getting ready/i,
-        /house ready/i,
-        /getting my house/i,
-        /working on my house/i,
-        /house situation/i,
-        /personal situation/i,
-        /family situation/i,
-        /moving/i,
-        /relocating/i,
+        /working on getting/i, /getting ready/i, /house ready/i, /getting my house/i,
+        /working on my house/i, /house situation/i, /personal situation/i,
+        /family situation/i, /moving/i, /relocating/i,
         
         // Decision made
-        /decided not to/i,
-        /not purchasing/i,
-        /changed my mind/i,
-        /not interested anymore/i,
-        /at this time/i
+        /decided not to/i, /not purchasing/i, /changed my mind/i,
+        /not interested anymore/i, /at this time/i
       ];
 
-      // Filter SMS conversations to only actionable ones - NEW LOGIC ORDER
+      // Filter SMS conversations to only actionable ones
       const actionableSmsConversations = smsConversations?.filter(conv => {
         // FIRST: Exclude messages from leads marked as lost or closed
         if (conv.leads?.status === 'lost' || conv.leads?.status === 'closed') {
-          console.log('📋 [FILTER] Excluding SMS from closed/lost lead:', conv.lead_id);
           return false;
         }
 
@@ -128,24 +81,21 @@ export const useGlobalUnreadCount = () => {
         const isUnassigned = !conv.leads || !conv.leads.salesperson_id;
         
         if (!isAssignedToUser && !isUnassigned) {
-          console.log('📋 [FILTER] Excluding SMS assigned to other user:', conv.lead_id);
           return false;
         }
 
-        // THIRD: Apply rejection pattern filtering (this now happens AFTER assignment check)
+        // THIRD: Apply rejection pattern filtering
         if (conv.body && rejectionPatterns.some(pattern => pattern.test(conv.body))) {
-          console.log('📋 [FILTER] Excluding rejection SMS:', conv.body.substring(0, 50) + '...');
           return false;
         }
 
         return true;
       }) || [];
 
-      // Filter email conversations to only actionable ones - NEW LOGIC ORDER
+      // Filter email conversations to only actionable ones
       const actionableEmailConversations = emailConversations?.filter(conv => {
         // FIRST: Exclude messages from leads marked as lost or closed
         if (conv.leads?.status === 'lost' || conv.leads?.status === 'closed') {
-          console.log('📋 [FILTER] Excluding email from closed/lost lead:', conv.lead_id);
           return false;
         }
 
@@ -154,13 +104,11 @@ export const useGlobalUnreadCount = () => {
         const isUnassigned = !conv.leads || !conv.leads.salesperson_id;
         
         if (!isAssignedToUser && !isUnassigned) {
-          console.log('📋 [FILTER] Excluding email assigned to other user:', conv.lead_id);
           return false;
         }
 
-        // THIRD: Apply rejection pattern filtering (this now happens AFTER assignment check)
+        // THIRD: Apply rejection pattern filtering
         if (conv.body && rejectionPatterns.some(pattern => pattern.test(conv.body))) {
-          console.log('📋 [FILTER] Excluding rejection email:', conv.body.substring(0, 50) + '...');
           return false;
         }
 
@@ -179,14 +127,6 @@ export const useGlobalUnreadCount = () => {
         filteredOutEmail: (emailConversations?.length || 0) - emailUnread
       });
       
-      // Log some examples of what we're keeping vs filtering out
-      if (smsConversations && smsConversations.length > 0) {
-        console.log('📋 [FILTER EXAMPLES] First few actionable SMS messages:');
-        actionableSmsConversations.slice(0, 3).forEach(conv => {
-          console.log('  ✅ KEEPING:', conv.body?.substring(0, 50) + '...');
-        });
-      }
-      
       setUnreadCount(totalUnread);
     } catch (error) {
       console.error('❌ [GLOBAL UNREAD COUNT] Error fetching unread count:', error);
@@ -194,11 +134,27 @@ export const useGlobalUnreadCount = () => {
     }
   }, [profile]);
 
-  // Use centralized realtime for updates
-  useCentralizedRealtime({
-    onUnreadCountUpdate: fetchUnreadCount,
-    onConversationUpdate: fetchUnreadCount
-  });
+  // Use stable realtime manager for updates
+  useEffect(() => {
+    if (!profile) return;
+
+    console.log('🔗 [GLOBAL UNREAD COUNT] Setting up stable realtime subscription');
+
+    const unsubscribe = stableRealtimeManager.subscribe({
+      id: `unread-count-${profile.id}`,
+      callback: () => {
+        console.log('🔄 [GLOBAL UNREAD COUNT] Realtime update received, refreshing count');
+        fetchUnreadCount();
+      },
+      filters: {
+        event: '*',
+        schema: 'public',
+        table: 'conversations'
+      }
+    });
+
+    return unsubscribe;
+  }, [profile, fetchUnreadCount]);
 
   // Listen for manual unread count change events
   useEffect(() => {

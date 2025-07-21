@@ -4,14 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
-import { useRealtimeChannelManager } from './useRealtimeChannelManager';
+import { stableRealtimeManager } from '@/services/stableRealtimeManager';
 import type { RealtimeCallbacks } from '@/types/realtime';
 
 export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const callbacksRef = useRef<RealtimeCallbacks>(callbacks);
-  const { addCallbacks, removeCallbacks, createChannel, cleanupChannel, isSubscribed } = useRealtimeChannelManager();
+  const subscriptionRef = useRef<(() => void) | null>(null);
 
   // Update callbacks ref when callbacks change
   useEffect(() => {
@@ -76,14 +76,6 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
     }
   }, [profile]);
 
-  const handleEmailNotification = useCallback((payload: any) => {
-    console.log('📧 [CENTRALIZED REALTIME] Email notification:', payload);
-    
-    const currentCallbacks = callbacksRef.current;
-    if (currentCallbacks.onEmailNotification) currentCallbacks.onEmailNotification(payload);
-    if (currentCallbacks.onUnreadCountUpdate) currentCallbacks.onUnreadCountUpdate();
-  }, []);
-
   const forceRefresh = useCallback(() => {
     console.log('🔄 [CENTRALIZED REALTIME] Force refresh triggered');
     const currentCallbacks = callbacksRef.current;
@@ -93,34 +85,39 @@ export const useCentralizedRealtime = (callbacks: RealtimeCallbacks = {}) => {
 
   const reconnect = useCallback(() => {
     console.log('🔌 [CENTRALIZED REALTIME] Reconnection requested');
-    // Remove and recreate the channel
-    if (profile) {
-      createChannel(profile, handleIncomingMessage, handleEmailNotification);
-    }
-  }, [profile, handleIncomingMessage, handleEmailNotification, createChannel]);
+    // Force reconnect through stable manager
+    stableRealtimeManager.forceReconnect();
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
 
-    console.log('🔗 [CENTRALIZED REALTIME] Setting up realtime subscriptions for profile:', profile.id);
+    console.log('🔗 [CENTRALIZED REALTIME] Setting up stable realtime subscriptions for profile:', profile.id);
 
-    // Add our callbacks to the global manager
-    addCallbacks(callbacks);
+    // Subscribe through stable realtime manager
+    const unsubscribe = stableRealtimeManager.subscribe({
+      id: `centralized-conversations-${profile.id}`,
+      callback: handleIncomingMessage,
+      filters: {
+        event: '*',
+        schema: 'public',
+        table: 'conversations'
+      }
+    });
 
-    // Create the channel if it doesn't exist
-    createChannel(profile, handleIncomingMessage, handleEmailNotification);
+    subscriptionRef.current = unsubscribe;
 
     return () => {
-      console.log('🔌 [CENTRALIZED REALTIME] Cleaning up subscriptions');
-      // Remove our callbacks
-      removeCallbacks(callbacks);
-      // Clean up the channel if no more callbacks
-      cleanupChannel();
+      console.log('🔌 [CENTRALIZED REALTIME] Cleaning up stable subscription');
+      if (subscriptionRef.current) {
+        subscriptionRef.current();
+        subscriptionRef.current = null;
+      }
     };
-  }, [profile, callbacks, addCallbacks, removeCallbacks, createChannel, cleanupChannel, handleIncomingMessage, handleEmailNotification]);
+  }, [profile, handleIncomingMessage]);
 
   return {
-    isConnected: isSubscribed(),
+    isConnected: stableRealtimeManager.isConnected(),
     forceRefresh,
     reconnect
   };
