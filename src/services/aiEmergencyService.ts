@@ -26,6 +26,9 @@ class AIEmergencyService {
     await this.checkTableExists();
     await this.loadSettings();
     this.startPeriodicCheck();
+    
+    // Check if we need to auto-restore AI
+    await this.checkAutoRestore();
   }
 
   private async checkTableExists(): Promise<void> {
@@ -113,6 +116,20 @@ class AIEmergencyService {
     }
   }
 
+  private async checkAutoRestore(): Promise<void> {
+    // Auto-restore AI if it was disabled more than 24 hours ago
+    if (this.settings?.aiDisabled && this.settings.disabledAt) {
+      const disabledTime = new Date(this.settings.disabledAt).getTime();
+      const now = Date.now();
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      
+      if (now - disabledTime > twentyFourHours) {
+        console.log('🔄 Auto-restoring AI after 24 hours of emergency shutdown');
+        await this.enableAI('auto-restore');
+      }
+    }
+  }
+
   async disableAI(reason: string = 'Emergency shutdown', userId?: string): Promise<void> {
     if (!this.settings) await this.initialize();
 
@@ -147,6 +164,43 @@ class AIEmergencyService {
     this.notifyListeners(false);
 
     console.log('✅ AI Re-enabled by user:', userId);
+    
+    // Ensure AI system profile exists when AI is enabled
+    await this.ensureAISystemProfile();
+  }
+
+  private async ensureAISystemProfile(): Promise<void> {
+    try {
+      // Check if AI system profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', 'ai-system@autovantage.com')
+        .maybeSingle();
+
+      if (!existingProfile) {
+        console.log('🤖 Creating AI system profile...');
+        
+        // Create AI system profile
+        const { error } = await supabase
+          .from('profiles')
+          .insert({
+            id: '00000000-0000-0000-0000-000000000000',
+            email: 'ai-system@autovantage.com',
+            first_name: 'AI',
+            last_name: 'System',
+            role: 'system'
+          });
+
+        if (error && !error.message.includes('duplicate')) {
+          console.error('❌ Failed to create AI system profile:', error);
+        } else {
+          console.log('✅ AI system profile created successfully');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error ensuring AI system profile:', error);
+    }
   }
 
   isAIDisabled(): boolean {
@@ -210,6 +264,17 @@ class AIEmergencyService {
     }
     
     return true;
+  }
+
+  // Force enable AI for immediate restoration
+  async forceEnableAI(): Promise<void> {
+    console.log('🔧 Force enabling AI system...');
+    await this.enableAI('force-enable');
+  }
+
+  // Get current AI status for debugging
+  getStatus(): AIEmergencySettings | null {
+    return this.settings;
   }
 }
 

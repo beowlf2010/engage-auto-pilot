@@ -1,238 +1,221 @@
-import { supabase } from '@/integrations/supabase/client';
-import { consolidatedSendMessage } from './consolidatedMessagesService';
 
-interface ConversationAdvancementConfig {
-  leadId: string;
-  conversationStage: 'finance_inquiry' | 'pricing_discussion' | 'feature_interest' | 'stalled';
-  lastMessageDirection: 'in' | 'out';
-  timeSinceLastMessage: number; // hours
-  context?: {
-    vehicleInterest?: string;
-    rateQuoted?: string;
-    zipCode?: string;
-    trimLevel?: string;
-  };
-}
+import { supabase } from '@/integrations/supabase/client';
+import { aiEmergencyService } from './aiEmergencyService';
 
 interface AdvancementStrategy {
-  messageContent: string;
-  urgencyLevel: 'low' | 'medium' | 'high';
-  scheduledDelay?: number; // hours
-  followUpSequence?: string[];
+  messageType: string;
+  urgency: 'low' | 'medium' | 'high';
+  template: string;
+  reasoning: string;
 }
 
-export class ConversationAdvancementService {
-  
-  // Hot finance lead templates - for leads already engaged with financing
-  private getFinanceAdvancementStrategy(config: ConversationAdvancementConfig): AdvancementStrategy {
-    const { context, timeSinceLastMessage } = config;
-    
-    if (timeSinceLastMessage < 2) {
-      // Immediate follow-up - create urgency around rate
-      return {
-        messageContent: `${context?.rateQuoted ? `That ${context.rateQuoted} rate` : 'This rate'} is only available through this month - it's actually one of our best rates right now! I'd love to get this locked in for you. Are you available for a quick call today to discuss the ${context?.trimLevel || 'trim'} details and get the paperwork started? This rate could save you hundreds compared to waiting.`,
-        urgencyLevel: 'high',
-        followUpSequence: [
-          'Just wanted to follow up on that great rate we discussed. Still interested in moving forward?',
-          'I wanted to make sure you didn\'t miss out on that special financing. The month is almost over - should we schedule a time to meet?'
-        ]
-      };
-    } else if (timeSinceLastMessage < 24) {
-      // Same day follow-up - add value with features
-      return {
-        messageContent: `Hi! I was thinking about your interest in the ${context?.vehicleInterest || 'Silverado 3500HD'}. The ${context?.trimLevel || 'LTZ'} comes with some incredible features that make it worth every penny at that ${context?.rateQuoted || '5.9%'} rate. Would you like me to send over the full spec sheet, or would you prefer to see it in person?`,
-        urgencyLevel: 'medium',
-        scheduledDelay: 4
-      };
-    } else {
-      // Final urgency push
-      return {
-        messageContent: `Marcus, I don't want you to miss out on this opportunity. That ${context?.rateQuoted || 'special rate'} expires soon, and inventory on the ${context?.vehicleInterest || 'vehicle you\'re interested in'} is moving fast. Can we at least schedule a quick 15-minute call to discuss your options?`,
-        urgencyLevel: 'high'
-      };
-    }
-  }
+interface AdvancementResult {
+  success: boolean;
+  strategy?: AdvancementStrategy;
+  error?: string;
+  aiDisabled?: boolean;
+}
 
-  // Main advancement logic
-  async advanceConversation(leadId: string): Promise<{ success: boolean; message?: string; strategy?: AdvancementStrategy }> {
+class ConversationAdvancementService {
+  private async getLeadConversationContext(leadId: string) {
     try {
-      // Get lead and conversation context
-      const { data: leadData, error: leadError } = await supabase
+      // Get lead info and recent conversations
+      const { data: lead } = await supabase
         .from('leads')
         .select('*')
         .eq('id', leadId)
         .single();
 
-      if (leadError || !leadData) {
-        throw new Error('Lead not found');
-      }
-
-      // Get recent conversations
-      const { data: conversations, error: convError } = await supabase
+      const { data: conversations } = await supabase
         .from('conversations')
         .select('*')
         .eq('lead_id', leadId)
         .order('sent_at', { ascending: false })
-        .limit(5);
+        .limit(10);
 
-      if (convError) {
-        throw new Error('Failed to fetch conversations');
+      return { lead, conversations };
+    } catch (error) {
+      console.error('❌ Error getting lead context:', error);
+      return { lead: null, conversations: [] };
+    }
+  }
+
+  async advanceConversation(leadId: string): Promise<AdvancementResult> {
+    try {
+      // Check if AI is disabled first
+      const canProceed = await aiEmergencyService.checkBeforeAIAction('conversation_advancement');
+      if (!canProceed) {
+        return {
+          success: false,
+          error: 'AI system is currently disabled',
+          aiDisabled: true
+        };
       }
 
+      console.log(`🚀 [CONVERSATION ADVANCEMENT] Starting advancement for lead: ${leadId}`);
+
+      const { lead, conversations } = await this.getLeadConversationContext(leadId);
+
+      if (!lead) {
+        return {
+          success: false,
+          error: 'Lead not found'
+        };
+      }
+
+      // Analyze conversation to determine next strategy
+      const strategy = this.analyzeConversationForStrategy(lead, conversations || []);
+
+      console.log(`📊 [CONVERSATION ADVANCEMENT] Strategy determined:`, strategy);
+
+      return {
+        success: true,
+        strategy
+      };
+    } catch (error) {
+      console.error('❌ [CONVERSATION ADVANCEMENT] Error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  private analyzeConversationForStrategy(lead: any, conversations: any[]): AdvancementStrategy {
+    const lastConversation = conversations[0];
+    const timeSinceLastMessage = lastConversation 
+      ? Math.floor((Date.now() - new Date(lastConversation.sent_at).getTime()) / (1000 * 60 * 60))
+      : 999;
+
+    // Simple strategy based on time and lead status
+    if (timeSinceLastMessage < 6) {
+      return {
+        messageType: 'quick_followup',
+        urgency: 'low',
+        template: `Hi ${lead.first_name}! Just wanted to follow up on your interest in the ${lead.vehicle_interest}. Any questions I can help with?`,
+        reasoning: 'Recent conversation, gentle follow-up'
+      };
+    } else if (timeSinceLastMessage < 24) {
+      return {
+        messageType: 'value_add',
+        urgency: 'medium',
+        template: `Hi ${lead.first_name}! I wanted to share some great features of the ${lead.vehicle_interest} that might interest you. Would you like to know more about financing options?`,
+        reasoning: 'Day-old conversation, add value'
+      };
+    } else if (timeSinceLastMessage < 72) {
+      return {
+        messageType: 'urgency_creator',
+        urgency: 'medium',
+        template: `Hi ${lead.first_name}! I noticed you were interested in the ${lead.vehicle_interest}. These are popular right now - would you like to schedule a time to see it?`,
+        reasoning: 'Multi-day gap, create urgency'
+      };
+    } else {
+      return {
+        messageType: 'reengagement',
+        urgency: 'high',
+        template: `Hi ${lead.first_name}! I wanted to check in about your ${lead.vehicle_interest} search. Are you still looking, or has your situation changed?`,
+        reasoning: 'Long gap, re-engagement needed'
+      };
+    }
+  }
+
+  async sendAdvancementMessage(leadId: string, strategy: AdvancementStrategy): Promise<boolean> {
+    try {
+      // Double-check AI is still enabled
+      const canProceed = await aiEmergencyService.checkBeforeAIAction('send_advancement_message');
+      if (!canProceed) {
+        console.log('🚫 [CONVERSATION ADVANCEMENT] AI disabled, cannot send message');
+        return false;
+      }
+
+      console.log(`📤 [CONVERSATION ADVANCEMENT] Sending message for lead: ${leadId}`);
+
+      // Get AI system profile ID
+      let aiProfileId = '00000000-0000-0000-0000-000000000000';
+
+      // Check if AI profile exists, create if needed
+      const { data: aiProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', aiProfileId)
+        .maybeSingle();
+
+      if (!aiProfile) {
+        console.log('🤖 [CONVERSATION ADVANCEMENT] Creating AI system profile...');
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: aiProfileId,
+            email: 'ai-system@autovantage.com',
+            first_name: 'AI',
+            last_name: 'System',
+            role: 'system'
+          });
+
+        if (profileError && !profileError.message.includes('duplicate')) {
+          console.error('❌ Failed to create AI profile:', profileError);
+          aiProfileId = '00000000-0000-0000-0000-000000000001'; // Fallback ID
+        }
+      }
+
+      // Get lead's phone number for SMS
+      const { data: phoneNumbers } = await supabase
+        .from('phone_numbers')
+        .select('number')
+        .eq('lead_id', leadId)
+        .eq('is_primary', true)
+        .limit(1);
+
+      if (!phoneNumbers || phoneNumbers.length === 0) {
+        console.error('❌ [CONVERSATION ADVANCEMENT] No phone number found for lead');
+        return false;
+      }
+
+      const phoneNumber = phoneNumbers[0].number;
+
+      // Send SMS using the edge function
+      const { error: smsError } = await supabase.functions.invoke('send-sms', {
+        body: {
+          to: phoneNumber,
+          message: strategy.template,
+          leadId: leadId,
+          profileId: aiProfileId,
+          isAIGenerated: true
+        }
+      });
+
+      if (smsError) {
+        console.error('❌ [CONVERSATION ADVANCEMENT] SMS send failed:', smsError);
+        return false;
+      }
+
+      console.log('✅ [CONVERSATION ADVANCEMENT] Message sent successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ [CONVERSATION ADVANCEMENT] Error sending message:', error);
+      return false;
+    }
+  }
+
+  // Helper method to check if a lead needs advancement
+  async checkIfLeadNeedsAdvancement(leadId: string): Promise<boolean> {
+    try {
+      const { conversations } = await this.getLeadConversationContext(leadId);
+      
       if (!conversations || conversations.length === 0) {
-        return { success: false, message: 'No conversation history found' };
+        return false; // No conversations to advance
       }
 
       const lastMessage = conversations[0];
-      const timeSinceLastMessage = Math.floor((Date.now() - new Date(lastMessage.sent_at).getTime()) / (1000 * 60 * 60));
+      const timeSinceLastMessage = Math.floor(
+        (Date.now() - new Date(lastMessage.sent_at).getTime()) / (1000 * 60 * 60)
+      );
 
-      // Analyze conversation for advancement strategy
-      const config: ConversationAdvancementConfig = {
-        leadId,
-        conversationStage: this.detectConversationStage(conversations),
-        lastMessageDirection: lastMessage.direction as 'in' | 'out',
-        timeSinceLastMessage,
-        context: {
-          vehicleInterest: leadData.vehicle_interest,
-          // Extract context from conversation if available
-          rateQuoted: this.extractRateFromConversations(conversations),
-          zipCode: this.extractZipFromConversations(conversations),
-          trimLevel: this.extractTrimFromConversations(conversations)
-        }
-      };
-
-      let strategy: AdvancementStrategy;
-
-      // Determine strategy based on conversation stage
-      switch (config.conversationStage) {
-        case 'finance_inquiry':
-          strategy = this.getFinanceAdvancementStrategy(config);
-          break;
-        case 'pricing_discussion':
-          strategy = this.getPricingAdvancementStrategy(config);
-          break;
-        case 'feature_interest':
-          strategy = this.getFeatureAdvancementStrategy(config);
-          break;
-        default:
-          strategy = this.getGenericAdvancementStrategy(config);
-      }
-
-      return { success: true, strategy };
-
+      // Need advancement if last message was incoming and it's been more than 2 hours
+      return lastMessage.direction === 'in' && timeSinceLastMessage >= 2;
     } catch (error) {
-      console.error('❌ [CONVERSATION ADVANCEMENT] Error:', error);
-      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  }
-
-  // Detect what stage the conversation is in
-  private detectConversationStage(conversations: any[]): ConversationAdvancementConfig['conversationStage'] {
-    const recentMessages = conversations.slice(0, 3);
-    const messageText = recentMessages.map(m => m.body.toLowerCase()).join(' ');
-
-    // Enhanced detection for finance inquiries including basic responses
-    if (messageText.includes('rate') || messageText.includes('interest') || messageText.includes('financing') || 
-        messageText.includes('months') || messageText.includes('payment') || messageText.includes('finance') ||
-        messageText.includes('thx') || messageText.includes('thanks') || messageText.includes('thank')) {
-      return 'finance_inquiry';
-    } else if (messageText.includes('price') || messageText.includes('cost')) {
-      return 'pricing_discussion';
-    } else if (messageText.includes('feature') || messageText.includes('trim') || messageText.includes('ltz') || messageText.includes('silverado')) {
-      return 'feature_interest';
-    }
-
-    return 'stalled';
-  }
-
-  // Extract rate information from conversations
-  private extractRateFromConversations(conversations: any[]): string | undefined {
-    for (const conv of conversations) {
-      const match = conv.body.match(/(\d+\.?\d*)\s*%?\s*for\s*\d+\s*months?/i);
-      if (match) {
-        return `${match[1]}%`;
-      }
-    }
-    return undefined;
-  }
-
-  // Extract zip code from conversations
-  private extractZipFromConversations(conversations: any[]): string | undefined {
-    for (const conv of conversations) {
-      const match = conv.body.match(/\b\d{5}\b/);
-      if (match) {
-        return match[0];
-      }
-    }
-    return undefined;
-  }
-
-  // Extract trim level from conversations
-  private extractTrimFromConversations(conversations: any[]): string | undefined {
-    const trimLevels = ['ltz', 'lt', 'work truck', 'high country', 'rst'];
-    for (const conv of conversations) {
-      for (const trim of trimLevels) {
-        if (conv.body.toLowerCase().includes(trim)) {
-          return trim.toUpperCase();
-        }
-      }
-    }
-    return undefined;
-  }
-
-  // Other advancement strategies
-  private getPricingAdvancementStrategy(config: ConversationAdvancementConfig): AdvancementStrategy {
-    return {
-      messageContent: `I understand pricing is important. Let me get you our best numbers on the ${config.context?.vehicleInterest || 'vehicle you\'re interested in'}. When would be a good time for a quick call to go over everything?`,
-      urgencyLevel: 'medium'
-    };
-  }
-
-  private getFeatureAdvancementStrategy(config: ConversationAdvancementConfig): AdvancementStrategy {
-    return {
-      messageContent: `The ${config.context?.trimLevel || 'trim level'} has some amazing features that are really hard to appreciate until you see them in person. Would you like to schedule a time to take a look?`,
-      urgencyLevel: 'low'
-    };
-  }
-
-  private getGenericAdvancementStrategy(config: ConversationAdvancementConfig): AdvancementStrategy {
-    return {
-      messageContent: `Just wanted to check in and see if you had any other questions about the ${config.context?.vehicleInterest || 'vehicle'}. I'm here to help!`,
-      urgencyLevel: 'low'
-    };
-  }
-
-  // Send advancement message using compliant service
-  async sendAdvancementMessage(leadId: string, strategy: AdvancementStrategy): Promise<{ success: boolean; messageId?: string }> {
-    try {
-      console.log(`🚀 [CONVERSATION ADVANCEMENT] Sending AI advancement message to lead: ${leadId}`);
-      console.log(`📝 [CONVERSATION ADVANCEMENT] Message: "${strategy.messageContent}"`);
-      
-      // Use the consolidated message service with full compliance checks
-      // Pass null for profileId since this is an AI-generated message
-      const result = await consolidatedSendMessage({
-        leadId,
-        messageBody: strategy.messageContent,
-        profileId: '00000000-0000-0000-0000-000000000001', // Use special AI system UUID
-        isAIGenerated: true
-      });
-
-      if (result.success) {
-        console.log(`✅ [CONVERSATION ADVANCEMENT] Message sent successfully via compliant service`);
-        return { 
-          success: true, 
-          messageId: result.conversationId 
-        };
-      } else {
-        console.error(`❌ [CONVERSATION ADVANCEMENT] Blocked by compliance:`, result.error);
-        // This is expected behavior - the message was correctly blocked
-        return { 
-          success: false 
-        };
-      }
-    } catch (error) {
-      console.error('❌ [CONVERSATION ADVANCEMENT] Error sending advancement message:', error);
-      return { success: false };
+      console.error('❌ Error checking advancement need:', error);
+      return false;
     }
   }
 }

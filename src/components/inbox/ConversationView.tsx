@@ -7,6 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Send, MessageSquare, Phone, Clock, CheckCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ConversationAdvancementButton } from './ConversationAdvancementButton';
+import LeadActionsSection from './LeadActionsSection';
+import { markLeadAsLost, markLeadAsSold } from '@/services/leadStatusService';
+import { updateAIFollowupLevel } from '@/services/vehicleUpdateService';
+import { toast } from '@/hooks/use-toast';
 
 interface ConversationViewProps {
   conversation: any;
@@ -29,6 +33,9 @@ const ConversationView = ({
   canReply
 }: ConversationViewProps) => {
   const [messageText, setMessageText] = useState('');
+  const [isMarkingLost, setIsMarkingLost] = useState(false);
+  const [isMarkingSold, setIsMarkingSold] = useState(false);
+  const [isSettingSlowerFollowup, setIsSettingSlowerFollowup] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -54,6 +61,93 @@ const ConversationView = ({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleMarkAsLost = async () => {
+    if (!conversation?.leadId) return;
+    
+    setIsMarkingLost(true);
+    try {
+      const result = await markLeadAsLost(conversation.leadId);
+      if (result.success) {
+        toast({
+          title: "Lead marked as lost",
+          description: "The lead has been marked as lost and AI automation has been disabled.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to mark lead as lost",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingLost(false);
+    }
+  };
+
+  const handleMarkAsSold = async () => {
+    if (!conversation?.leadId) return;
+    
+    setIsMarkingSold(true);
+    try {
+      const result = await markLeadAsSold(conversation.leadId);
+      if (result.success) {
+        toast({
+          title: "Lead marked as sold",
+          description: "The lead has been marked as sold and AI automation has been disabled.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to mark lead as sold",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingSold(false);
+    }
+  };
+
+  const handleSlowerFollowup = async () => {
+    if (!conversation?.leadId) return;
+    
+    setIsSettingSlowerFollowup(true);
+    try {
+      const result = await updateAIFollowupLevel(conversation.leadId, 'gentle');
+      if (result.success) {
+        toast({
+          title: "Follow-up updated",
+          description: "Lead has been set to weekly follow-up schedule.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update follow-up schedule",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSettingSlowerFollowup(false);
     }
   };
 
@@ -146,6 +240,21 @@ const ConversationView = ({
         )}
         <div ref={messagesEndRef} />
       </CardContent>
+
+      {/* Lead Actions Section */}
+      {conversation && (
+        <div className="border-t bg-gray-50 p-4">
+          <LeadActionsSection
+            conversation={conversation}
+            onMarkAsLost={handleMarkAsLost}
+            onMarkAsSold={handleMarkAsSold}
+            onSlowerFollowup={handleSlowerFollowup}
+            isMarkingLost={isMarkingLost}
+            isMarkingSold={isMarkingSold}
+            isSettingSlowerFollowup={isSettingSlowerFollowup}
+          />
+        </div>
+      )}
 
       {/* Conversation Advancement */}
       {messages.length > 0 && (

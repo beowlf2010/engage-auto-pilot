@@ -4,12 +4,19 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import MobileSmartInbox from "@/components/inbox/MobileSmartInbox";
 import ErrorBoundary from "@/components/inbox/ErrorBoundary";
+import { useEffect } from "react";
+import { aiEmergencyService } from "@/services/aiEmergencyService";
 
 const SmartInboxPage = () => {
   const { profile, loading } = useAuth();
   const [searchParams] = useSearchParams();
   const leadId = searchParams.get('leadId');
   const isMobile = useIsMobile();
+
+  // Initialize AI emergency service
+  useEffect(() => {
+    aiEmergencyService.initialize().catch(console.error);
+  }, []);
 
   if (loading) {
     return (
