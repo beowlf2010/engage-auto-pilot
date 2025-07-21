@@ -115,40 +115,56 @@ export const useGlobalUnreadCount = () => {
         /at this time/i
       ];
 
-      // Filter SMS conversations to only actionable ones
+      // Filter SMS conversations to only actionable ones - NEW LOGIC ORDER
       const actionableSmsConversations = smsConversations?.filter(conv => {
-        // Exclude messages from leads marked as lost or closed
+        // FIRST: Exclude messages from leads marked as lost or closed
         if (conv.leads?.status === 'lost' || conv.leads?.status === 'closed') {
           console.log('📋 [FILTER] Excluding SMS from closed/lost lead:', conv.lead_id);
           return false;
         }
 
-        // Exclude messages that match rejection patterns
+        // SECOND: Apply assignment filtering - only include assigned to user OR unassigned
+        const isAssignedToUser = conv.leads?.salesperson_id === profile.id;
+        const isUnassigned = !conv.leads || !conv.leads.salesperson_id;
+        
+        if (!isAssignedToUser && !isUnassigned) {
+          console.log('📋 [FILTER] Excluding SMS assigned to other user:', conv.lead_id);
+          return false;
+        }
+
+        // THIRD: Apply rejection pattern filtering (this now happens AFTER assignment check)
         if (conv.body && rejectionPatterns.some(pattern => pattern.test(conv.body))) {
           console.log('📋 [FILTER] Excluding rejection SMS:', conv.body.substring(0, 50) + '...');
           return false;
         }
 
-        // Only include messages for assigned leads or unassigned leads (for managers/admins)
-        return !conv.leads || !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id;
+        return true;
       }) || [];
 
-      // Filter email conversations to only actionable ones
+      // Filter email conversations to only actionable ones - NEW LOGIC ORDER
       const actionableEmailConversations = emailConversations?.filter(conv => {
-        // Exclude messages from leads marked as lost or closed
+        // FIRST: Exclude messages from leads marked as lost or closed
         if (conv.leads?.status === 'lost' || conv.leads?.status === 'closed') {
           console.log('📋 [FILTER] Excluding email from closed/lost lead:', conv.lead_id);
           return false;
         }
 
-        // Exclude messages that match rejection patterns
+        // SECOND: Apply assignment filtering - only include assigned to user OR unassigned
+        const isAssignedToUser = conv.leads?.salesperson_id === profile.id;
+        const isUnassigned = !conv.leads || !conv.leads.salesperson_id;
+        
+        if (!isAssignedToUser && !isUnassigned) {
+          console.log('📋 [FILTER] Excluding email assigned to other user:', conv.lead_id);
+          return false;
+        }
+
+        // THIRD: Apply rejection pattern filtering (this now happens AFTER assignment check)
         if (conv.body && rejectionPatterns.some(pattern => pattern.test(conv.body))) {
           console.log('📋 [FILTER] Excluding rejection email:', conv.body.substring(0, 50) + '...');
           return false;
         }
 
-        // Only include messages for assigned leads or unassigned leads (for managers/admins)
-        return !conv.leads || !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id;
+        return true;
       }) || [];
 
       const smsUnread = actionableSmsConversations.length;
