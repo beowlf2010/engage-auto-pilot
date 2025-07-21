@@ -14,11 +14,12 @@ interface StableRealtimeSubscription {
 
 class StableRealtimeManager {
   private subscriptions = new Map<string, any>();
-  private isConnected = false;
+  private connected = false;
   private connectionAttempts = 0;
   private maxReconnectAttempts = 3;
   private reconnectDelay = 5000;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private connectionListeners = new Set<(connected: boolean) => void>();
 
   constructor() {
     console.log('🟢 [STABLE REALTIME] Manager initialized');
@@ -35,16 +36,20 @@ class StableRealtimeManager {
     const channel = supabase
       .channel(`stable-${subscription.id}`)
       .on(
-        'postgres_changes',
-        subscription.filters,
+        'postgres_changes' as any,
+        {
+          event: subscription.filters.event,
+          schema: subscription.filters.schema,
+          table: subscription.filters.table
+        },
         (payload) => {
-          this.isConnected = true;
+          this.setConnected(true);
           connectionHealthService.recordConnectionSuccess();
           
           console.log('📨 [STABLE REALTIME] Database change received:', {
             id: subscription.id,
-            event: payload.eventType,
-            table: payload.table
+            event: (payload as any).eventType || 'unknown',
+            table: subscription.filters.table
           });
           
           subscription.callback(payload);
@@ -54,12 +59,12 @@ class StableRealtimeManager {
         console.log('🔄 [STABLE REALTIME] Subscription status:', status, 'for', subscription.id);
         
         if (status === 'SUBSCRIBED') {
-          this.isConnected = true;
+          this.setConnected(true);
           this.connectionAttempts = 0;
           connectionHealthService.recordConnectionSuccess();
           console.log('✅ [STABLE REALTIME] Successfully subscribed:', subscription.id);
         } else if (status === 'TIMED_OUT' || status === 'CLOSED') {
-          this.isConnected = false;
+          this.setConnected(false);
           connectionHealthService.recordConnectionFailure();
           this.handleConnectionFailure(subscription);
         }
@@ -118,17 +123,40 @@ class StableRealtimeManager {
     });
   }
 
+  private setConnected(connected: boolean) {
+    if (this.connected !== connected) {
+      this.connected = connected;
+      this.connectionListeners.forEach(listener => listener(connected));
+    }
+  }
+
   isConnected(): boolean {
-    return this.isConnected;
+    return this.connected;
+  }
+
+  addConnectionListener(callback: (connected: boolean) => void): () => void {
+    this.connectionListeners.add(callback);
+    return () => this.connectionListeners.delete(callback);
   }
 
   getConnectionStatus() {
     return {
-      isConnected: this.isConnected,
+      isConnected: this.connected,
       subscriptionCount: this.subscriptions.size,
       connectionAttempts: this.connectionAttempts,
       healthStatus: connectionHealthService.getHealthStatus()
     };
+  }
+
+  getConnectionState() {
+    return {
+      isConnected: this.connected,
+      reconnectAttempts: this.connectionAttempts
+    };
+  }
+
+  getHealthStatus() {
+    return connectionHealthService.getHealthStatus();
   }
 
   cleanup(): void {
@@ -145,7 +173,7 @@ class StableRealtimeManager {
     });
     
     this.subscriptions.clear();
-    this.isConnected = false;
+    this.setConnected(false);
   }
 }
 

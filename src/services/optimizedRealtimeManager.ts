@@ -24,6 +24,18 @@ class OptimizedRealtimeManager {
     return () => {};
   }
 
+  getConnectionState() {
+    return {
+      isConnected: false,
+      reconnectAttempts: 0
+    };
+  }
+
+  onStatusChange(callback: (state: any) => void): () => void {
+    console.log('📡 [OPTIMIZED REALTIME] Status change listener disabled');
+    return () => {};
+  }
+
   cleanup(): void {
     console.log('📡 [OPTIMIZED REALTIME] Cleanup disabled - no active subscriptions');
   }

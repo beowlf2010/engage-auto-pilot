@@ -22,7 +22,7 @@ export const useStableRealtimeInbox = () => {
   } = useConversationOperations();
 
   const [connectionState, setConnectionState] = useState(() => 
-    stableRealtimeManager.getConnectionState()
+    stableRealtimeManager.getConnectionStatus()
   );
 
   const fetchMessages = useCallback(async (leadId: string) => {
@@ -112,7 +112,9 @@ export const useStableRealtimeInbox = () => {
   }, [setupRealtimeSubscription]);
 
   useEffect(() => {
-    const removeListener = stableRealtimeManager.addConnectionListener(setConnectionState);
+    const removeListener = stableRealtimeManager.addConnectionListener((connected) => {
+      setConnectionState(stableRealtimeManager.getConnectionStatus());
+    });
     return removeListener;
   }, []);
 
