@@ -12,40 +12,92 @@ export const useGlobalUnreadCount = () => {
     if (!profile) return;
 
     try {
-      console.log('🔍 [GLOBAL UNREAD COUNT] Fetching unread count for profile:', profile.id);
+      console.log('🔍 [GLOBAL UNREAD COUNT] Fetching actionable unread count for profile:', profile.id);
 
-      // Get unread SMS conversations - using left join to include unassigned leads
+      // Get unread SMS conversations with lead information - using left join to include unassigned leads
       const { data: smsConversations, error: smsError } = await supabase
         .from('conversations')
-        .select('lead_id, leads(salesperson_id)')
+        .select('id, body, lead_id, leads(salesperson_id, status)')
         .eq('direction', 'in')
         .is('read_at', null);
 
       if (smsError) throw smsError;
 
-      // Get unread email conversations - using left join to include unassigned leads
+      // Get unread email conversations with lead information - using left join to include unassigned leads
       const { data: emailConversations, error: emailError } = await supabase
         .from('email_conversations')
-        .select('lead_id, leads(salesperson_id)')
+        .select('id, body, lead_id, leads(salesperson_id, status)')
         .eq('direction', 'in')
         .is('read_at', null);
 
       if (emailError) throw emailError;
 
-      // Filter by assigned leads or unassigned leads - handle null leads gracefully
-      const smsUnread = smsConversations?.filter(conv => 
-        !conv.leads || !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id
-      ).length || 0;
+      // Define rejection patterns to filter out
+      const rejectionPatterns = [
+        /\bstop\b/i,
+        /\bunsubscribe\b/i,
+        /\bnot interested\b/i,
+        /\bfound already\b/i,
+        /\bbought already\b/i,
+        /\balready bought\b/i,
+        /\bno thanks\b/i,
+        /\bno thank you\b/i,
+        /\bremove me\b/i,
+        /\bdelete my number\b/i,
+        /\bdo not contact\b/i,
+        /\bdon't contact\b/i,
+        /\bleave me alone\b/i,
+        /\bnot looking\b/i,
+        /\bwrong number\b/i,
+        /\bwho is this\b/i,
+        /\bwhat is this\b/i,
+        /\bdont text me\b/i,
+        /\bdon't text me\b/i
+      ];
 
-      const emailUnread = emailConversations?.filter(conv => 
-        !conv.leads || !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id
-      ).length || 0;
+      // Filter SMS conversations to only actionable ones
+      const actionableSmsConversations = smsConversations?.filter(conv => {
+        // Exclude messages from leads marked as lost or closed
+        if (conv.leads?.status === 'lost' || conv.leads?.status === 'closed') {
+          return false;
+        }
 
+        // Exclude messages that match rejection patterns
+        if (conv.body && rejectionPatterns.some(pattern => pattern.test(conv.body))) {
+          return false;
+        }
+
+        // Only include messages for assigned leads or unassigned leads (for managers/admins)
+        return !conv.leads || !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id;
+      }) || [];
+
+      // Filter email conversations to only actionable ones
+      const actionableEmailConversations = emailConversations?.filter(conv => {
+        // Exclude messages from leads marked as lost or closed
+        if (conv.leads?.status === 'lost' || conv.leads?.status === 'closed') {
+          return false;
+        }
+
+        // Exclude messages that match rejection patterns
+        if (conv.body && rejectionPatterns.some(pattern => pattern.test(conv.body))) {
+          return false;
+        }
+
+        // Only include messages for assigned leads or unassigned leads (for managers/admins)
+        return !conv.leads || !conv.leads.salesperson_id || conv.leads.salesperson_id === profile.id;
+      }) || [];
+
+      const smsUnread = actionableSmsConversations.length;
+      const emailUnread = actionableEmailConversations.length;
       const totalUnread = smsUnread + emailUnread;
       
-      console.log('📊 [GLOBAL UNREAD COUNT] SMS unread:', smsUnread, 'Email unread:', emailUnread, 'Total:', totalUnread);
-      console.log('🔍 [GLOBAL UNREAD COUNT] SMS conversations found:', smsConversations?.length);
-      console.log('🔍 [GLOBAL UNREAD COUNT] Email conversations found:', emailConversations?.length);
+      console.log('📊 [GLOBAL UNREAD COUNT] Actionable counts:', {
+        smsUnread,
+        emailUnread,
+        totalUnread,
+        filteredOutSms: (smsConversations?.length || 0) - smsUnread,
+        filteredOutEmail: (emailConversations?.length || 0) - emailUnread
+      });
       
       setUnreadCount(totalUnread);
     } catch (error) {
