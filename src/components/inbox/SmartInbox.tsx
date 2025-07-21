@@ -39,10 +39,11 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
   // Filtering functionality
   const {
     filters,
-    filteredConversations,
-    updateFilters,
+    updateFilter,
     clearFilters,
-    applyFilters
+    applyFilters,
+    hasActiveFilters,
+    getFilterSummary
   } = useInboxFilters();
 
   // Mark as read functionality
@@ -67,7 +68,12 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
   }, [leadId, conversations, selectedConversation, loadMessages]);
 
   // Apply filters to conversations
-  const displayConversations = applyFilters(conversations, filters, searchQuery);
+  const displayConversations = applyFilters(conversations).filter(conv => {
+    if (!searchQuery) return true;
+    return conv.leadName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           conv.leadSource?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           conv.vehicleInterest?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const handleConversationSelect = useCallback(async (conversation: ConversationListItem) => {
     console.log('📱 [SMART INBOX] Selecting conversation:', conversation.leadId);
@@ -202,11 +208,15 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
       <div className="border-b bg-card">
         <SmartFilters
           filters={filters}
-          onFiltersChange={updateFilters}
+          onFiltersChange={(updates) => {
+            Object.entries(updates).forEach(([key, value]) => {
+              updateFilter(key as keyof typeof filters, value);
+            });
+          }}
           conversations={conversations}
           filteredConversations={displayConversations}
-          hasActiveFilters={Object.values(filters).some(v => v !== null && v !== false && v !== '' && (!Array.isArray(v) || v.length > 0))}
-          filterSummary={[]}
+          hasActiveFilters={hasActiveFilters}
+          filterSummary={getFilterSummary()}
           onClearFilters={clearFilters}
           userRole={profile?.role}
         />
