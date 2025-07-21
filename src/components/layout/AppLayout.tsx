@@ -3,7 +3,7 @@ import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
-import { useUnreadCount } from '@/hooks/useUnreadCount';
+import { useGlobalUnreadCount } from '@/hooks/useGlobalUnreadCount';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,7 +11,7 @@ interface AppLayoutProps {
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { profile } = useAuth();
-  const unreadCount = useUnreadCount();
+  const { unreadCount } = useGlobalUnreadCount();
 
   // Desktop layout with modern sidebar
   return (

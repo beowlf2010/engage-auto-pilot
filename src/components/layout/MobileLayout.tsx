@@ -8,7 +8,7 @@ import { Menu, X } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
 import MobileBottomNav from './MobileBottomNav';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useUnreadCount } from '@/hooks/useUnreadCount';
+import { useGlobalUnreadCount } from '@/hooks/useGlobalUnreadCount';
 
 interface MobileLayoutProps {
   children: React.ReactNode;
@@ -17,7 +17,7 @@ interface MobileLayoutProps {
 const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
   const { profile } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const unreadCount = useUnreadCount();
+  const { unreadCount } = useGlobalUnreadCount();
 
   return (
     <TooltipProvider>
