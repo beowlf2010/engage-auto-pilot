@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { UnreadCountService } from '@/services/unreadCountService';
 import { stableRealtimeManager } from '@/services/stableRealtimeManager';
 
 export const useGlobalUnreadCount = () => {
@@ -12,27 +12,17 @@ export const useGlobalUnreadCount = () => {
     if (!profile?.id) return;
     
     try {
-      // Enhanced: Better query with more debug info
       console.log('🔍 [GLOBAL UNREAD] Querying conversations for unread count...');
       
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('id, direction, read_at, lead_id')
-        .eq('direction', 'in')
-        .is('read_at', null);
-        
-      console.log('🔍 [GLOBAL UNREAD] Query result:', { 
-        data: data?.slice(0, 3), // Show first 3 for debugging
-        total: data?.length,
-        error 
+      // Use the unified service with proper role filtering
+      const userRoles = ['manager']; // TODO: Get actual user roles from auth context
+      
+      const count = await UnreadCountService.getUnreadCount({
+        respectUserRole: true,
+        userId: profile.id,
+        userRoles
       });
 
-      if (error) {
-        console.warn('Error fetching unread count:', error);
-        return;
-      }
-
-      const count = data?.length || 0;
       console.log('📊 [GLOBAL UNREAD] Updated count:', count);
       setUnreadCount(count);
     } catch (error) {
@@ -49,7 +39,7 @@ export const useGlobalUnreadCount = () => {
     console.log('🔗 [GLOBAL UNREAD] Setting up enhanced realtime subscription');
     fetchUnreadCount();
 
-    // Enhanced: Subscribe to conversation changes using stable manager
+    // Subscribe to conversation changes using stable manager
     const unsubscribe = stableRealtimeManager.subscribe({
       id: `global-unread-count-${profile.id}`,
       callback: (payload) => {

@@ -1,173 +1,166 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { ConversationListItem, MessageData } from '@/types/conversation';
 
-// Enhanced conversation fetching with proper unread count calculation
 export const fetchConversations = async (profile: any): Promise<ConversationListItem[]> => {
   console.log('🔄 [CONVERSATIONS SERVICE] Fetching conversations for profile:', profile.id);
   
   try {
-    const { data: conversations, error } = await supabase
-      .from('conversations')
-      .select(`
-        *,
-        leads!inner(
-          id,
-          first_name,
-          last_name,
-          vehicle_interest,
-          salesperson_id,
-          lead_source_name,
-          lead_type_name,
-          status,
-          phone_numbers(number)
-        )
-      `)
-      .order('sent_at', { ascending: false });
+    // Get user roles to determine filtering
+    const { data: userRoles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', profile.id);
 
-    if (error) {
-      console.error('❌ [CONVERSATIONS SERVICE] Error fetching conversations:', error);
-      throw error;
+    if (rolesError) {
+      console.warn('⚠️ [CONVERSATIONS SERVICE] Could not fetch user roles, defaulting to assigned leads only:', rolesError);
     }
 
-    if (!conversations || conversations.length === 0) {
-      console.log('📝 [CONVERSATIONS SERVICE] No conversations found');
+    const roles = userRoles?.map(r => r.role) || [];
+    const isAdminOrManager = roles.some(role => ['admin', 'manager'].includes(role));
+    
+    console.log('🔍 [CONVERSATIONS SERVICE] User roles:', roles, 'isAdminOrManager:', isAdminOrManager);
+
+    // Build the leads query based on user role
+    let leadsQuery = supabase
+      .from('leads')
+      .select(`
+        id,
+        first_name,
+        last_name,
+        email,
+        created_at,
+        lead_status_type_name,
+        lead_source_name,
+        vehicle_interest,
+        salesperson_id,
+        phone_numbers:phone_numbers(number)
+      `)
+      .order('created_at', { ascending: false });
+
+    // If not admin/manager, only show assigned leads
+    if (!isAdminOrManager) {
+      console.log('🔍 [CONVERSATIONS SERVICE] Filtering to assigned leads only');
+      leadsQuery = leadsQuery.eq('salesperson_id', profile.id);
+    }
+
+    const { data: leads, error: leadsError } = await leadsQuery;
+
+    if (leadsError) {
+      console.error('❌ [CONVERSATIONS SERVICE] Error fetching leads:', leadsError);
+      throw leadsError;
+    }
+
+    if (!leads || leads.length === 0) {
+      console.log('📭 [CONVERSATIONS SERVICE] No leads found for user');
       return [];
     }
 
-    console.log('📊 [CONVERSATIONS SERVICE] Raw conversations loaded:', conversations.length);
+    console.log('📋 [CONVERSATIONS SERVICE] Found leads:', leads.length);
 
-    // Group conversations by lead_id
-    const conversationsByLead = new Map<string, any[]>();
+    // Get conversations for these leads
+    const leadIds = leads.map(lead => lead.id);
     
-    conversations.forEach(conv => {
-      const leadId = conv.lead_id;
-      if (!conversationsByLead.has(leadId)) {
-        conversationsByLead.set(leadId, []);
-      }
-      conversationsByLead.get(leadId)!.push(conv);
-    });
+    const { data: conversations, error: conversationsError } = await supabase
+      .from('conversations')
+      .select(`
+        id,
+        lead_id,
+        body,
+        direction,
+        sent_at,
+        read_at,
+        ai_generated
+      `)
+      .in('lead_id', leadIds)
+      .order('sent_at', { ascending: false });
 
-    console.log('👥 [CONVERSATIONS SERVICE] Grouped by leads:', conversationsByLead.size);
+    if (conversationsError) {
+      console.error('❌ [CONVERSATIONS SERVICE] Error fetching conversations:', conversationsError);
+      throw conversationsError;
+    }
 
-    const result: ConversationListItem[] = [];
+    console.log('💬 [CONVERSATIONS SERVICE] Found conversations:', conversations?.length || 0);
 
-    conversationsByLead.forEach((leadConversations, leadId) => {
-      const latestConversation = leadConversations[0]; // Already sorted by sent_at desc
-      const lead = latestConversation.leads;
-      const primaryPhone = lead.phone_numbers?.[0]?.number || '';
+    // Process conversations into the format expected by the UI
+    const conversationMap = new Map<string, ConversationListItem>();
 
-      if (!lead) {
-        console.warn('⚠️ [CONVERSATIONS SERVICE] No lead data for conversation:', leadId);
-        return;
-      }
+    leads.forEach(lead => {
+      const leadConversations = conversations?.filter(conv => conv.lead_id === lead.id) || [];
+      const lastMessage = leadConversations[0]; // Most recent due to ordering
+      
+      // Calculate unread count more carefully
+      const incomingMessages = leadConversations.filter(conv => conv.direction === 'in');
+      const unreadMessages = incomingMessages.filter(conv => !conv.read_at);
+      const unreadCount = unreadMessages.length;
 
-      // FIXED: Use explicit null checking for unread count calculation
-      const unreadCount = leadConversations.filter(conv => 
-        conv.direction === 'in' && conv.read_at === null
-      ).length;
-
-      console.log(`🔍 [CONVERSATIONS SERVICE] Lead ${leadId} unread calculation:`, {
+      console.log(`🔍 [CONVERSATIONS SERVICE] Lead ${lead.id} unread calculation:`, {
         totalMessages: leadConversations.length,
-        incomingMessages: leadConversations.filter(c => c.direction === 'in').length,
-        unreadMessages: unreadCount,
-        readAtValues: leadConversations.map(c => ({ id: c.id, direction: c.direction, read_at: c.read_at }))
+        incomingMessages: incomingMessages.length,
+        unreadMessages: unreadMessages.length,
+        readAtValues: leadConversations.slice(0, 5).map(c => ({ 
+          id: c.id, 
+          direction: c.direction, 
+          read_at: c.read_at 
+        }))
       });
 
+      const phoneNumber = lead.phone_numbers?.[0]?.number || '';
+      
       const conversationItem: ConversationListItem = {
+        id: lead.id,
         leadId: lead.id,
-        leadName: `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unknown',
-        primaryPhone: primaryPhone,
-        leadPhone: primaryPhone,
-        leadEmail: '', // Not included in this query
-        lastMessage: latestConversation.body || '',
-        lastMessageTime: latestConversation.sent_at,
-        lastMessageDirection: latestConversation.direction as 'in' | 'out',
-        unreadCount: unreadCount,
-        messageCount: leadConversations.length,
-        salespersonId: lead.salesperson_id,
-        vehicleInterest: lead.vehicle_interest || 'Not specified',
-        leadSource: lead.lead_source_name || 'Unknown',
-        leadType: lead.lead_type_name || 'Unknown',
-        status: lead.status || 'active',
-        lastMessageDate: new Date(latestConversation.sent_at),
-        incomingCount: leadConversations.filter(c => c.direction === 'in').length,
-        outgoingCount: leadConversations.filter(c => c.direction === 'out').length,
-        hasUnrepliedInbound: unreadCount > 0
+        customerName: `${lead.first_name} ${lead.last_name}`.trim(),
+        phoneNumber,
+        lastMessage: lastMessage?.body || '',
+        lastMessageTime: lastMessage?.sent_at || lead.created_at,
+        unreadCount,
+        direction: lastMessage?.direction || 'out',
+        leadStatus: lead.lead_status_type_name || 'New',
+        source: lead.lead_source_name || 'Unknown',
+        vehicleInterest: lead.vehicle_interest || '',
+        isAiGenerated: lastMessage?.ai_generated || false,
+        salespersonId: lead.salesperson_id
       };
 
-      result.push(conversationItem);
+      conversationMap.set(lead.id, conversationItem);
     });
 
-    // Sort by latest message time
-    result.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
-
-    const totalUnread = result.reduce((sum, conv) => sum + conv.unreadCount, 0);
-    console.log('✅ [CONVERSATIONS SERVICE] Final results:', {
-      totalConversations: result.length,
-      totalUnreadMessages: totalUnread,
-      conversationsWithUnread: result.filter(c => c.unreadCount > 0).length
-    });
+    const result = Array.from(conversationMap.values());
+    
+    console.log('✅ [CONVERSATIONS SERVICE] Processed conversations:', result.length);
+    console.log('🔴 [CONVERSATIONS SERVICE] Total unread across all conversations:', 
+      result.reduce((sum, conv) => sum + conv.unreadCount, 0)
+    );
 
     return result;
-
+    
   } catch (error) {
-    console.error('❌ [CONVERSATIONS SERVICE] Error in fetchConversations:', error);
+    console.error('❌ [CONVERSATIONS SERVICE] Unexpected error:', error);
     throw error;
   }
 };
 
-// FIXED: Transform raw Supabase data to MessageData interface
 export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
-  console.log('📬 [CONVERSATIONS SERVICE] Fetching messages for lead:', leadId);
-
   try {
-    const { data: conversations, error } = await supabase
+    const { data, error } = await supabase
       .from('conversations')
       .select('*')
       .eq('lead_id', leadId)
       .order('sent_at', { ascending: true });
 
     if (error) {
-      console.error('❌ [CONVERSATIONS SERVICE] Error fetching messages:', error);
+      console.error('Error fetching messages:', error);
       throw error;
     }
 
-    if (!conversations) {
-      console.log('📝 [CONVERSATIONS SERVICE] No messages found for lead:', leadId);
-      return [];
-    }
-
-    // Transform raw Supabase data to MessageData interface
-    const transformedMessages: MessageData[] = conversations.map(conv => ({
-      id: conv.id,
-      leadId: conv.lead_id,
-      direction: conv.direction as 'in' | 'out',
-      body: conv.body,
-      sentAt: conv.sent_at,
-      readAt: conv.read_at,
-      aiGenerated: conv.ai_generated || false,
-      smsStatus: conv.sms_status || 'unknown',
-      smsError: conv.sms_error
-    }));
-
-    console.log('✅ [CONVERSATIONS SERVICE] Messages transformed:', {
-      count: transformedMessages.length,
-      latestMessage: transformedMessages[transformedMessages.length - 1]?.body?.substring(0, 50) + '...'
-    });
-
-    return transformedMessages;
-
+    return data || [];
   } catch (error) {
-    console.error('❌ [CONVERSATIONS SERVICE] Error in fetchMessages:', error);
-    throw error;
+    console.error('Error in fetchMessages:', error);
+    return [];
   }
 };
 
-// ADDED: Missing markMessagesAsRead function (renamed from markAllMessagesAsRead)
-export const markMessagesAsRead = async (leadId: string): Promise<void> => {
-  console.log('👁️ [CONVERSATIONS SERVICE] Marking messages as read for lead:', leadId);
-
+export const markMessagesAsRead = async (leadId: string) => {
   try {
     const { error } = await supabase
       .from('conversations')
@@ -177,39 +170,14 @@ export const markMessagesAsRead = async (leadId: string): Promise<void> => {
       .is('read_at', null);
 
     if (error) {
-      console.error('❌ [CONVERSATIONS SERVICE] Error marking messages as read:', error);
+      console.error('Error marking messages as read:', error);
       throw error;
     }
+    
+    // Trigger global unread count refresh
+    window.dispatchEvent(new CustomEvent('unread-count-changed'));
 
-    console.log('✅ [CONVERSATIONS SERVICE] Messages marked as read successfully');
   } catch (error) {
-    console.error('❌ [CONVERSATIONS SERVICE] Error in markMessagesAsRead:', error);
-    throw error;
-  }
-};
-
-// ADDED: Alias for backward compatibility
-export const markAllMessagesAsRead = markMessagesAsRead;
-
-// ADDED: Missing assignCurrentUserToLead function
-export const assignCurrentUserToLead = async (leadId: string, userId: string): Promise<boolean> => {
-  console.log('🎯 [CONVERSATIONS SERVICE] Assigning lead to user:', { leadId, userId });
-
-  try {
-    const { error } = await supabase
-      .from('leads')
-      .update({ salesperson_id: userId })
-      .eq('id', leadId);
-
-    if (error) {
-      console.error('❌ [CONVERSATIONS SERVICE] Error assigning lead:', error);
-      return false;
-    }
-
-    console.log('✅ [CONVERSATIONS SERVICE] Lead assigned successfully');
-    return true;
-  } catch (error) {
-    console.error('❌ [CONVERSATIONS SERVICE] Error in assignCurrentUserToLead:', error);
-    return false;
+    console.error('Error in markMessagesAsRead:', error);
   }
 };

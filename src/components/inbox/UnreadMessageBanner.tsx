@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Bell, X, MessageCircle, RefreshCw } from 'lucide-react';
-import { useGlobalUnreadCount } from '@/hooks/useGlobalUnreadCount';
+import { Bell, X, MessageCircle, RefreshCw, Bug } from 'lucide-react';
+import { useUnifiedUnreadCount } from '@/hooks/useUnifiedUnreadCount';
 
 const UnreadMessageBanner = () => {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { unreadCount, refreshUnreadCount } = useGlobalUnreadCount();
+  const [showDebug, setShowDebug] = useState(false);
+  const { unreadCount, refreshUnreadCount, debugInfo } = useUnifiedUnreadCount();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -73,6 +74,17 @@ const UnreadMessageBanner = () => {
           </div>
           
           <div className="flex items-center gap-2 flex-shrink-0">
+            {process.env.NODE_ENV === 'development' && debugInfo && (
+              <Button
+                onClick={() => setShowDebug(!showDebug)}
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/10"
+                title="Debug info"
+              >
+                <Bug className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               onClick={handleManualRefresh}
               variant="ghost"
@@ -103,6 +115,20 @@ const UnreadMessageBanner = () => {
             </Button>
           </div>
         </div>
+        
+        {/* Debug Info Panel */}
+        {showDebug && debugInfo && process.env.NODE_ENV === 'development' && (
+          <div className="mt-3 p-3 bg-white/10 rounded text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <div>Total unread: {debugInfo.totalUnreadMessages}</div>
+              <div>User unread: {debugInfo.userUnreadMessages}</div>
+              <div>Assigned leads: {debugInfo.userAssignedLeads}</div>
+              <div>Is admin/manager: {debugInfo.isAdminOrManager ? 'Yes' : 'No'}</div>
+              <div>Unread lead IDs: {debugInfo.unreadLeadIds?.length || 0}</div>
+              <div>User lead IDs: {debugInfo.userLeadIds?.length || 0}</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
