@@ -18,8 +18,8 @@ export class SmartInboxDataLoader {
           updated_at,
           salesperson_id,
           vehicle_interest,
-          lead_source,
-          lead_type,
+          lead_source_name,
+          lead_type_name,
           phone_numbers (
             number,
             is_primary
@@ -98,8 +98,8 @@ export class SmartInboxDataLoader {
             messageCount: totalMessageCount || 0,
             salespersonId: lead.salesperson_id || null,
             vehicleInterest: lead.vehicle_interest || 'Unknown',
-            leadSource: lead.lead_source || 'Unknown',
-            leadType: lead.lead_type || 'Unknown',
+            leadSource: lead.lead_source_name || 'Unknown',
+            leadType: lead.lead_type_name || 'Unknown',
             status: lead.status,
             lastMessageDate: lastMessage?.sentAt ? new Date(lastMessage.sentAt) : new Date(lead.updated_at),
             salespersonName: undefined, // Could be fetched with a join if needed

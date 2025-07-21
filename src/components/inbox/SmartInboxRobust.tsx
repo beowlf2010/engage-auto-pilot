@@ -7,7 +7,7 @@ import { useMarkAsRead } from '@/hooks/useMarkAsRead';
 import { smartInboxDataLoader } from '@/services/smartInboxDataLoader';
 import ConversationsList from './ConversationsList';
 import ConversationView from './ConversationView';
-import InboxFilters from './InboxFilters';
+import SmartFilters from './SmartFilters';
 import InboxDebugPanel from './InboxDebugPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,8 +39,15 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
     }
   });
 
-  const { applyFilters } = useInboxFilters();
-  const { markAsRead, markingAsRead } = useMarkAsRead();
+  const { 
+    applyFilters, 
+    filters, 
+    updateFilter, 
+    hasActiveFilters, 
+    getFilterSummary, 
+    clearFilters 
+  } = useInboxFilters();
+  const { markAsRead, isMarkingAsRead } = useMarkAsRead();
 
   // Apply filters to conversations
   const filteredConversations = applyFilters(conversations);
@@ -171,7 +178,15 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
 
       {/* Filters */}
       <div className="flex-shrink-0 border-b bg-card p-4">
-        <InboxFilters statusTabs={statusTabs} />
+        <SmartFilters 
+          filters={filters} 
+          onFiltersChange={(updates) => Object.entries(updates).forEach(([key, value]) => updateFilter(key as any, value))}
+          conversations={conversations}
+          filteredConversations={filteredConversations}
+          hasActiveFilters={hasActiveFilters}
+          filterSummary={getFilterSummary()}
+          onClearFilters={clearFilters}
+        />
       </div>
 
       {/* Main Content */}
@@ -198,7 +213,7 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
               showUrgencyIndicator={true}
               showTimestamps={true}
               markAsRead={markAsRead}
-              markingAsRead={markingAsRead}
+              markingAsRead={isMarkingAsRead.toString()}
             />
           </div>
         </div>
@@ -208,7 +223,7 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
           {selectedConversation ? (
             <ConversationView
               conversation={selectedConversation}
-              messages={messages}
+              messages={messages.map(msg => ({ ...msg, sent_at: msg.sentAt }))}
               onBack={() => setSelectedConversation(null)}
               onSendMessage={handleSendMessage}
               onMarkAsRead={handleMarkAsRead}
