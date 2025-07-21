@@ -12,11 +12,16 @@ export const useGlobalUnreadCount = () => {
     if (!profile?.id) return;
     
     try {
+      // Debug the actual query to see what's happening
+      console.log('🔍 [GLOBAL UNREAD] Querying conversations for unread count...');
+      
       const { data, error } = await supabase
         .from('conversations')
-        .select('id')
+        .select('id, direction, read_at')
         .eq('direction', 'in')
         .is('read_at', null);
+        
+      console.log('🔍 [GLOBAL UNREAD] Query result:', { data, error });
 
       if (error) {
         console.warn('Error fetching unread count:', error);
