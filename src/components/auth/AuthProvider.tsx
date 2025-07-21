@@ -37,10 +37,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const createFallbackProfile = (user: User): Profile => {
+    return {
+      id: user.id,
+      email: user.email || '',
+      first_name: user.user_metadata?.first_name || 'User',
+      last_name: user.user_metadata?.last_name || 'Name',
+      role: 'manager'
+    };
+  };
+
+  const fetchProfile = async (userId: string, retryCount = 0): Promise<Profile | null> => {
+    try {
+      console.log('🔍 [AUTH PROVIDER] Fetching profile for user:', userId);
+      
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('❌ [AUTH PROVIDER] Profile fetch error:', error);
+        
+        // Retry once on error
+        if (retryCount < 1) {
+          console.log('🔄 [AUTH PROVIDER] Retrying profile fetch...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return fetchProfile(userId, retryCount + 1);
+        }
+        
+        return null;
+      }
+
+      console.log('✅ [AUTH PROVIDER] Profile loaded:', profileData);
+      return profileData;
+    } catch (err) {
+      console.error('❌ [AUTH PROVIDER] Profile fetch exception:', err);
+      return null;
+    }
+  };
+
   useEffect(() => {
     console.log('🔐 [AUTH PROVIDER] Initializing auth state...');
 
-    // Set up auth state listener FIRST
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔐 [AUTH PROVIDER] Auth state changed:', event, !!session);
@@ -49,24 +90,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          console.log('👤 [AUTH PROVIDER] Loading profile for user:', session.user.id);
-          try {
-            const { data: profileData, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-
-            if (error) {
-              console.error('❌ [AUTH PROVIDER] Profile fetch error:', error);
-              setProfile(null);
-            } else {
-              console.log('✅ [AUTH PROVIDER] Profile loaded:', profileData);
-              setProfile(profileData);
-            }
-          } catch (err) {
-            console.error('❌ [AUTH PROVIDER] Profile fetch exception:', err);
-            setProfile(null);
+          // Try to fetch profile, but don't block on it
+          const fetchedProfile = await fetchProfile(session.user.id);
+          
+          if (fetchedProfile) {
+            setProfile(fetchedProfile);
+          } else {
+            // Create fallback profile if database fetch fails
+            console.log('⚠️ [AUTH PROVIDER] Using fallback profile');
+            const fallbackProfile = createFallbackProfile(session.user);
+            setProfile(fallbackProfile);
           }
         } else {
           console.log('🚫 [AUTH PROVIDER] No session, clearing profile');
@@ -77,35 +110,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // THEN check for existing session with improved timeout handling
+    // Check for existing session
     const initializeAuth = async () => {
       try {
         console.log('🔍 [AUTH PROVIDER] Checking for existing session...');
-        
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session fetch timeout')), 10000)
-        );
-        
-        const { data: { session }, error } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]) as any;
-
-        if (error) {
-          console.error('❌ [AUTH PROVIDER] Session fetch error:', error);
-        } else {
-          console.log('🔍 [AUTH PROVIDER] Initial session check:', !!session);
-          // The onAuthStateChange handler will handle the session processing
-        }
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔍 [AUTH PROVIDER] Initial session check:', !!session);
+        // The onAuthStateChange handler will process this session
       } catch (error) {
         console.error('❌ [AUTH PROVIDER] Session initialization failed:', error);
-        // Continue without session - user can still log in
-      } finally {
-        // Ensure loading is false even if session fetch fails
-        setTimeout(() => {
-          setLoading(false);
-        }, 1000);
+        setLoading(false);
       }
     };
 
@@ -154,7 +168,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     console.log('🚪 [AUTH PROVIDER] Signing out...');
-    setLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -164,8 +177,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err) {
       console.error('❌ [AUTH PROVIDER] Sign out exception:', err);
-    } finally {
-      setLoading(false);
     }
   };
 

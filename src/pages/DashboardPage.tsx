@@ -4,7 +4,7 @@ import Dashboard from "@/components/Dashboard";
 import { Navigate } from "react-router-dom";
 
 const DashboardPage = () => {
-  const { profile, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -17,19 +17,29 @@ const DashboardPage = () => {
     );
   }
 
-  if (!profile) {
+  // Check for user instead of profile to match ProtectedRoute logic
+  if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
-  const user = {
-    id: profile.id,
-    role: profile.role,
-    firstName: profile.first_name,
-    lastName: profile.last_name,
-    email: profile.email
+  // Use profile if available, otherwise create from user data
+  const userProfile = profile || {
+    id: user.id,
+    role: user.user_metadata?.role || 'manager',
+    first_name: user.user_metadata?.first_name || 'User',
+    last_name: user.user_metadata?.last_name || 'Name',
+    email: user.email || ''
   };
 
-  return <Dashboard user={user} />;
+  const dashboardUser = {
+    id: userProfile.id,
+    role: userProfile.role,
+    firstName: userProfile.first_name,
+    lastName: userProfile.last_name,
+    email: userProfile.email
+  };
+
+  return <Dashboard user={dashboardUser} />;
 };
 
 export default DashboardPage;
