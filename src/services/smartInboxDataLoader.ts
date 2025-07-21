@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { ConversationListItem } from '@/types/conversation';
 
@@ -17,6 +18,8 @@ export class SmartInboxDataLoader {
           updated_at,
           salesperson_id,
           vehicle_interest,
+          lead_source,
+          lead_type,
           phone_numbers (
             number,
             is_primary
@@ -36,7 +39,8 @@ export class SmartInboxDataLoader {
 
       const conversations: ConversationListItem[] = await Promise.all(
         data.map(async (lead) => {
-          const primaryPhone = lead.phone_numbers?.find((phone: any) => phone.is_primary)?.number || 'N/A';
+          const primaryPhone = lead.phone_numbers?.find((phone: any) => phone.is_primary)?.number || '';
+          const allPhones = lead.phone_numbers?.map((phone: any) => phone.number) || [];
 
           // Fetch the last message
           const { data: lastMessageData, error: lastMessageError } = await supabase
@@ -47,16 +51,19 @@ export class SmartInboxDataLoader {
             .limit(1)
             .single();
 
-          if (lastMessageError) {
+          if (lastMessageError && lastMessageError.code !== 'PGRST116') {
             console.error(`❌ [SMART INBOX DATA] Error fetching last message for lead ${lead.id}:`, lastMessageError);
           }
 
-          const lastMessage = lastMessageData ? {
-            body: lastMessageData.body || 'No message',
-            sentAt: lastMessageData.sent_at ? new Date(lastMessageData.sent_at).toISOString() : null,
-            direction: lastMessageData.direction,
-            readAt: lastMessageData.read_at
-          } : null;
+          // Fetch message counts
+          const { count: totalMessageCount, error: totalCountError } = await supabase
+            .from('conversations')
+            .select('*', { count: 'exact' })
+            .eq('lead_id', lead.id);
+
+          if (totalCountError) {
+            console.error(`❌ [SMART INBOX DATA] Error fetching total message count for lead ${lead.id}:`, totalCountError);
+          }
 
           // Fetch unread message count
           const { count: unreadCount, error: unreadCountError } = await supabase
@@ -70,17 +77,41 @@ export class SmartInboxDataLoader {
             console.error(`❌ [SMART INBOX DATA] Error fetching unread count for lead ${lead.id}:`, unreadCountError);
           }
 
+          const lastMessage = lastMessageData ? {
+            body: lastMessageData.body || 'No message',
+            sentAt: lastMessageData.sent_at ? new Date(lastMessageData.sent_at).toISOString() : null,
+            direction: lastMessageData.direction as 'in' | 'out',
+            readAt: lastMessageData.read_at
+          } : null;
+
+          // Return complete ConversationListItem object
           return {
             leadId: lead.id,
-            leadName: `${lead.first_name} ${lead.last_name}`,
+            leadName: `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unknown Lead',
             primaryPhone: primaryPhone,
-            vehicleInterest: lead.vehicle_interest || 'Unknown',
-            status: lead.status,
+            leadPhone: primaryPhone, // Required by interface
+            leadEmail: '', // Default empty, would need to fetch from separate table if needed
+            lastMessage: lastMessage?.body || 'No messages yet',
             lastMessageTime: lastMessage?.sentAt || lead.updated_at,
-            lastMessageText: lastMessage?.body || 'No messages yet',
+            lastMessageDirection: lastMessage?.direction || null,
             unreadCount: unreadCount || 0,
+            messageCount: totalMessageCount || 0,
             salespersonId: lead.salesperson_id || null,
-            isAssigned: !!lead.salesperson_id
+            vehicleInterest: lead.vehicle_interest || 'Unknown',
+            leadSource: lead.lead_source || 'Unknown',
+            leadType: lead.lead_type || 'Unknown',
+            status: lead.status,
+            lastMessageDate: lastMessage?.sentAt ? new Date(lastMessage.sentAt) : new Date(lead.updated_at),
+            salespersonName: undefined, // Could be fetched with a join if needed
+            aiOptIn: undefined, // Would need to be added to leads table or fetched separately
+            aiStage: undefined,
+            aiMessagesSent: undefined,
+            aiSequencePaused: undefined,
+            messageIntensity: undefined,
+            incomingCount: undefined,
+            outgoingCount: undefined,
+            hasUnrepliedInbound: (unreadCount || 0) > 0,
+            isAiGenerated: undefined
           };
         })
       );
