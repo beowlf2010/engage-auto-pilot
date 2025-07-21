@@ -61,7 +61,7 @@ export const useDebugMessageLoader = () => {
       isLoading: true,
       error: null,
       loadingMethod: method,
-      cacheStatus: bypassCache ? 'bypassed' : 'unknown'
+      cacheStatus: bypassCache ? 'bypassed' : 'miss'
     }));
 
     try {

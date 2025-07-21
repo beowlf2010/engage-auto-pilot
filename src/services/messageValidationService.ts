@@ -128,24 +128,37 @@ export class MessageValidationService {
       try {
         console.log(`🔧 [MESSAGE VALIDATION] Testing approach: ${approach}`);
         
-        let query = supabase.from('conversations');
+        let result;
         
         switch (approach) {
           case 'basic_fetch':
-            query = query.select('*').eq('lead_id', leadId);
+            result = await supabase
+              .from('conversations')
+              .select('*')
+              .eq('lead_id', leadId);
             break;
           case 'with_joins':
-            query = query.select('*, leads(first_name, last_name)').eq('lead_id', leadId);
+            result = await supabase
+              .from('conversations')
+              .select('*, leads(first_name, last_name)')
+              .eq('lead_id', leadId);
             break;
           case 'count_only':
-            query = query.select('id', { count: 'exact' }).eq('lead_id', leadId);
+            result = await supabase
+              .from('conversations')
+              .select('id', { count: 'exact' })
+              .eq('lead_id', leadId);
             break;
           case 'recent_only':
-            query = query.select('*').eq('lead_id', leadId).limit(10);
+            result = await supabase
+              .from('conversations')
+              .select('*')
+              .eq('lead_id', leadId)
+              .limit(10);
             break;
         }
 
-        const { data, error, count } = await query;
+        const { data, error, count } = result;
         
         if (error) {
           console.error(`❌ [MESSAGE VALIDATION] ${approach} failed:`, error);
