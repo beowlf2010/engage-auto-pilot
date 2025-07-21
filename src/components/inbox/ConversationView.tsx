@@ -1,293 +1,223 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Send, MessageSquare, Phone, Clock, CheckCheck } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Send, Phone, User, CheckCheck, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ConversationAdvancementButton } from './ConversationAdvancementButton';
-import LeadActionsSection from './LeadActionsSection';
-import { markLeadAsLost, markLeadAsSold } from '@/services/leadStatusService';
-import { updateAIFollowupLevel } from '@/services/vehicleUpdateService';
-import { toast } from '@/hooks/use-toast';
+import type { ConversationListItem } from '@/types/conversation';
+
+interface Message {
+  id: string;
+  body: string;
+  direction: 'in' | 'out';
+  sent_at: string;
+  read_at?: string;
+  ai_generated?: boolean;
+}
 
 interface ConversationViewProps {
-  conversation: any;
-  messages: any[];
+  conversation: ConversationListItem;
+  messages: Message[];
+  onBack: () => void;
   onSendMessage: (message: string) => Promise<void>;
   sending: boolean;
   onMarkAsRead: () => Promise<void>;
   canReply: boolean;
-  onBack?: () => void;
-  loading?: boolean;
-  error?: string;
+  loading: boolean;
+  error?: string | null;
 }
 
-const ConversationView = ({
+const ConversationView: React.FC<ConversationViewProps> = ({
   conversation,
   messages,
+  onBack,
   onSendMessage,
   sending,
   onMarkAsRead,
-  canReply
-}: ConversationViewProps) => {
+  canReply,
+  loading,
+  error
+}) => {
   const [messageText, setMessageText] = useState('');
-  const [isMarkingLost, setIsMarkingLost] = useState(false);
-  const [isMarkingSold, setIsMarkingSold] = useState(false);
-  const [isSettingSlowerFollowup, setIsSettingSlowerFollowup] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [sendingLocal, setSendingLocal] = useState(false);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSendMessage = async () => {
-    if (!messageText.trim() || sending) return;
+  const handleSendMessage = useCallback(async () => {
+    if (!messageText.trim() || sendingLocal || sending) return;
     
     try {
+      setSendingLocal(true);
       await onSendMessage(messageText.trim());
       setMessageText('');
-    } catch (error) {
-      console.error('Failed to send message:', error);
+    } catch (err) {
+      console.error('Error sending message:', err);
+    } finally {
+      setSendingLocal(false);
     }
-  };
+  }, [messageText, sendingLocal, sending, onSendMessage]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
-  };
-
-  const handleMarkAsLost = async () => {
-    if (!conversation?.leadId) return;
-    
-    setIsMarkingLost(true);
-    try {
-      const result = await markLeadAsLost(conversation.leadId);
-      if (result.success) {
-        toast({
-          title: "Lead marked as lost",
-          description: "The lead has been marked as lost and AI automation has been disabled.",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to mark lead as lost",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsMarkingLost(false);
-    }
-  };
-
-  const handleMarkAsSold = async () => {
-    if (!conversation?.leadId) return;
-    
-    setIsMarkingSold(true);
-    try {
-      const result = await markLeadAsSold(conversation.leadId);
-      if (result.success) {
-        toast({
-          title: "Lead marked as sold",
-          description: "The lead has been marked as sold and AI automation has been disabled.",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to mark lead as sold",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsMarkingSold(false);
-    }
-  };
-
-  const handleSlowerFollowup = async () => {
-    if (!conversation?.leadId) return;
-    
-    setIsSettingSlowerFollowup(true);
-    try {
-      const result = await updateAIFollowupLevel(conversation.leadId, 'gentle');
-      if (result.success) {
-        toast({
-          title: "Follow-up updated",
-          description: "Lead has been set to weekly follow-up schedule.",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to update follow-up schedule",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSettingSlowerFollowup(false);
-    }
-  };
-
-  if (!conversation) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Select a conversation
-          </h3>
-          <p className="text-gray-500">
-            Choose a conversation from the list to start messaging
-          </p>
-        </div>
-      </div>
-    );
-  }
+  }, [handleSendMessage]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <CardHeader className="border-b bg-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center space-x-2">
-              <span>{conversation.leadName}</span>
-              {conversation.unreadCount > 0 && (
-                <Badge variant="destructive">{conversation.unreadCount} unread</Badge>
-              )}
-            </CardTitle>
-            <div className="flex items-center space-x-4 text-sm text-gray-600 mt-2">
-              <div className="flex items-center space-x-1">
-                <Phone className="h-4 w-4" />
+      <div className="flex items-center justify-between p-4 border-b bg-card">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 className="font-semibold text-foreground">{conversation.leadName}</h2>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Phone className="h-3 w-3" />
                 <span>{conversation.leadPhone}</span>
               </div>
-              <span>•</span>
-              <span>{conversation.vehicleInterest}</span>
             </div>
+            {conversation.unreadCount > 0 && (
+              <Badge variant="destructive">
+                {conversation.unreadCount} unread
+              </Badge>
+            )}
           </div>
-          
+        </div>
+        
+        <div className="flex items-center gap-2">
           {conversation.unreadCount > 0 && (
             <Button
               variant="outline"
               size="sm"
               onClick={onMarkAsRead}
-              className="flex items-center space-x-2"
+              disabled={loading}
             >
-              <CheckCheck className="h-4 w-4" />
-              <span>Mark as Read</span>
+              <CheckCheck className="h-4 w-4 mr-1" />
+              Mark Read
             </Button>
           )}
+          {!conversation.salespersonId && (
+            <Badge variant="outline" className="text-orange-600 border-orange-300">
+              <User className="h-3 w-3 mr-1" />
+              Unassigned
+            </Badge>
+          )}
         </div>
-      </CardHeader>
+      </div>
+
+      {/* Lead Info */}
+      <div className="p-4 bg-muted/30 border-b">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div>
+            <span className="font-medium text-muted-foreground">Vehicle Interest:</span>
+            <p className="text-foreground mt-1">{conversation.vehicleInterest}</p>
+          </div>
+          <div>
+            <span className="font-medium text-muted-foreground">Lead Source:</span>
+            <p className="text-foreground mt-1">{conversation.leadSource || 'Unknown'}</p>
+          </div>
+          <div>
+            <span className="font-medium text-muted-foreground">Status:</span>
+            <p className="text-foreground mt-1 capitalize">{conversation.status}</p>
+          </div>
+        </div>
+      </div>
 
       {/* Messages */}
-      <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="text-center py-8">
-            <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No messages yet</p>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Loading messages...</p>
+            </div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="text-center">
+              <p className="text-muted-foreground">No messages yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Start the conversation!</p>
+            </div>
           </div>
         ) : (
-          messages.map((message, index) => (
+          messages.map((message) => (
             <div
-              key={message.id || index}
+              key={message.id}
               className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
             >
-              <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                  message.direction === 'out'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-900'
-                }`}
-              >
-                <p className="text-sm">{message.body}</p>
-                <div className="flex items-center justify-between mt-1">
-                  <span className={`text-xs ${
-                    message.direction === 'out' ? 'text-blue-100' : 'text-gray-500'
+              <Card className={`max-w-md ${
+                message.direction === 'out' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-card'
+              }`}>
+                <CardContent className="p-3">
+                  <p className="text-sm whitespace-pre-wrap">{message.body}</p>
+                  <div className={`flex items-center justify-between mt-2 text-xs ${
+                    message.direction === 'out' 
+                      ? 'text-primary-foreground/70' 
+                      : 'text-muted-foreground'
                   }`}>
-                    {formatDistanceToNow(new Date(message.sentAt), { addSuffix: true })}
-                  </span>
-                  {message.direction === 'out' && message.aiGenerated && (
-                    <Badge variant="secondary" className="text-xs ml-2">AI</Badge>
-                  )}
-                </div>
-              </div>
+                    <span>
+                      {formatDistanceToNow(new Date(message.sent_at), { addSuffix: true })}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {message.ai_generated && (
+                        <Badge variant="outline" className="text-xs px-1 py-0">
+                          AI
+                        </Badge>
+                      )}
+                      {message.direction === 'out' && (
+                        <span>{message.read_at ? '✓✓' : '✓'}</span>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           ))
         )}
-        <div ref={messagesEndRef} />
-      </CardContent>
-
-      {/* Lead Actions Section */}
-      {conversation && (
-        <div className="border-t bg-gray-50 p-4">
-          <LeadActionsSection
-            conversation={conversation}
-            onMarkAsLost={handleMarkAsLost}
-            onMarkAsSold={handleMarkAsSold}
-            onSlowerFollowup={handleSlowerFollowup}
-            isMarkingLost={isMarkingLost}
-            isMarkingSold={isMarkingSold}
-            isSettingSlowerFollowup={isSettingSlowerFollowup}
-          />
-        </div>
-      )}
-
-      {/* Conversation Advancement */}
-      {messages.length > 0 && (
-        <div className="border-t border-b bg-muted/30 p-3">
-          <ConversationAdvancementButton
-            leadId={conversation.leadId}
-            lastMessageDirection={messages[messages.length - 1]?.direction || 'in'}
-            timeSinceLastMessage={Math.floor((Date.now() - new Date(messages[messages.length - 1]?.sentAt || Date.now()).getTime()) / (1000 * 60 * 60))}
-          />
-        </div>
-      )}
+      </div>
 
       {/* Message Input */}
       {canReply && (
-        <div className="border-t bg-white p-4">
-          <div className="flex space-x-2">
-            <Textarea
+        <div className="p-4 border-t bg-card">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Type your message..."
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              className="flex-1 min-h-[40px] max-h-32 resize-none"
-              disabled={sending}
+              disabled={sendingLocal || sending}
+              className="flex-1"
             />
             <Button
               onClick={handleSendMessage}
-              disabled={!messageText.trim() || sending}
+              disabled={!messageText.trim() || sendingLocal || sending}
               size="sm"
-              className="self-end"
             >
-              <Send className="h-4 w-4" />
+              {sendingLocal || sending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </div>
+          {!canReply && (
+            <p className="text-xs text-muted-foreground mt-2">
+              You don't have permission to reply to this conversation
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Error display */}
+      {error && (
+        <div className="p-3 bg-destructive/10 border-t">
+          <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
     </div>

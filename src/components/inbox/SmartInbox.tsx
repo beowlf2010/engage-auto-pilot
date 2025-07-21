@@ -1,276 +1,284 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Search, Filter } from 'lucide-react';
-import { fetchConversations, markMessagesAsRead } from '@/services/conversationsService';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Search, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
 import { useInboxFilters } from '@/hooks/useInboxFilters';
-import type { ConversationListItem } from '@/types/conversation';
-import type { InboxFilters } from '@/hooks/useInboxFilters';
-import SmartFilters from './SmartFilters';
-import InboxConversationsList from './InboxConversationsList';
-import InboxDebugPanel from './InboxDebugPanel';
-import MessageDebugPanel from '../debug/MessageDebugPanel';
+import { useStableRealtimeInbox } from '@/hooks/useStableRealtimeInbox';
+import { useInboxOperations } from '@/hooks/inbox/useInboxOperations';
+import InboxConversationsList from '@/components/inbox/InboxConversationsList';
+import ConversationView from '@/components/inbox/ConversationView';
+import SmartFilters from '@/components/inbox/SmartFilters';
+import QuickFilters from '@/components/inbox/QuickFilters';
+import ErrorBoundary from '@/components/inbox/ErrorBoundary';
 
 interface SmartInboxProps {
   onBack: () => void;
   leadId?: string;
 }
 
-// Simple conversation view component
-const SimpleConversationView = ({ conversation }: { conversation: ConversationListItem }) => (
-  <Card className="h-full">
-    <CardHeader>
-      <CardTitle className="flex items-center justify-between">
-        <span>{conversation.leadName}</span>
-        <span className="text-sm text-gray-500">{conversation.leadPhone}</span>
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="space-y-4">
-        <div>
-          <h4 className="font-medium">Vehicle Interest</h4>
-          <p className="text-gray-600">{conversation.vehicleInterest}</p>
-        </div>
-        <div>
-          <h4 className="font-medium">Last Message</h4>
-          <p className="text-gray-600">{conversation.lastMessage}</p>
-          <p className="text-xs text-gray-400 mt-1">{conversation.lastMessageTime}</p>
-        </div>
-        <div>
-          <h4 className="font-medium">Status</h4>
-          <p className="text-gray-600">{conversation.status}</p>
-        </div>
-        {conversation.salespersonName && (
-          <div>
-            <h4 className="font-medium">Assigned To</h4>
-            <p className="text-gray-600">{conversation.salespersonName}</p>
-          </div>
-        )}
-      </div>
-    </CardContent>
-  </Card>
-);
-
 const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
   const { profile } = useAuth();
-  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [isMarkingAsRead, setIsMarkingAsRead] = useState(false);
-  const [debugPanelOpen, setDebugPanelOpen] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState<any>(null);
+  const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
-  // Use inbox filters hook
+  // Use the inbox filters hook
   const {
     filters,
     updateFilter,
-    clearFilters,
+    clearAllFilters,
+    filteredConversations,
     hasActiveFilters,
-    applyFilters,
-    getFilterSummary
+    filterSummary
   } = useInboxFilters();
 
-  // Apply filters and search to conversations
-  const filteredConversations = React.useMemo(() => {
-    let filtered = applyFilters(conversations);
-    
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(conv =>
-        conv.leadName.toLowerCase().includes(query) ||
-        conv.leadPhone.includes(query) ||
-        conv.vehicleInterest.toLowerCase().includes(query) ||
-        conv.lastMessage.toLowerCase().includes(query)
-      );
-    }
-    
-    return filtered;
-  }, [conversations, applyFilters, searchQuery]);
+  // Use stable realtime inbox for conversations and messaging
+  const {
+    conversations,
+    messages,
+    loading,
+    loadMessages,
+    sendMessage,
+    sendingMessage,
+    markAsRead,
+    isMarkingAsRead,
+    refetchConversations
+  } = useStableRealtimeInbox();
 
-  // Load conversations
-  const loadConversations = async () => {
-    if (!profile) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('🔄 [SMART INBOX] Loading conversations...');
-      
-      const data = await fetchConversations(profile);
-      setConversations(data);
-      
-      console.log('✅ [SMART INBOX] Loaded conversations:', data.length);
-      
-      // Auto-select conversation if leadId is provided
-      if (leadId && data.length > 0) {
-        const targetConversation = data.find(conv => conv.leadId === leadId);
-        if (targetConversation) {
-          setSelectedConversation(targetConversation);
-          console.log('🎯 [SMART INBOX] Auto-selected conversation for lead:', leadId);
-        }
-      }
-    } catch (err) {
-      console.error('❌ [SMART INBOX] Error loading conversations:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load conversations');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use inbox operations for conversation handling
+  const {
+    canReply,
+    handleSelectConversation,
+    handleSendMessage
+  } = useInboxOperations({
+    user: { role: profile?.role || 'user', id: profile?.id || '' },
+    loadMessages,
+    sendMessage,
+    sendingMessage,
+    setError
+  });
+
+  // Handle filters change - convert from partial update to individual updates
+  const handleFiltersChange = useCallback((partialFilters: any) => {
+    Object.entries(partialFilters).forEach(([key, value]) => {
+      updateFilter(key as any, value);
+    });
+  }, [updateFilter]);
 
   // Handle conversation selection
-  const handleConversationSelect = (conversation: ConversationListItem) => {
-    setSelectedConversation(conversation);
-    console.log('📱 [SMART INBOX] Selected conversation:', conversation.leadId);
-  };
-
-  // Handle mark as read
-  const handleMarkAsRead = async (leadId: string) => {
+  const handleConversationSelect = useCallback(async (conversation: any) => {
     try {
-      setIsMarkingAsRead(true);
-      await markMessagesAsRead(leadId);
-      
-      // Update local state
-      setConversations(prev => 
-        prev.map(conv => 
-          conv.leadId === leadId 
-            ? { ...conv, unreadCount: 0 }
-            : conv
-        )
-      );
-      
-      console.log('✅ [SMART INBOX] Marked messages as read for lead:', leadId);
+      setSelectedConversation(conversation);
+      await handleSelectConversation(conversation.leadId);
     } catch (err) {
-      console.error('❌ [SMART INBOX] Error marking as read:', err);
-      setError(err instanceof Error ? err.message : 'Failed to mark as read');
-    } finally {
-      setIsMarkingAsRead(false);
+      console.error('Error selecting conversation:', err);
+      setError('Failed to load conversation');
     }
-  };
+  }, [handleSelectConversation]);
 
-  // Load conversations on mount
+  // Handle sending messages
+  const handleMessageSend = useCallback(async (message: string) => {
+    if (!selectedConversation) return;
+    
+    try {
+      await handleSendMessage(
+        selectedConversation.leadId,
+        selectedConversation,
+        message
+      );
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setError('Failed to send message');
+    }
+  }, [selectedConversation, handleSendMessage]);
+
+  // Handle marking as read
+  const handleMarkAsRead = useCallback(async (leadId: string) => {
+    try {
+      await markAsRead(leadId);
+      // Refresh conversations to update unread counts
+      refetchConversations();
+    } catch (err) {
+      console.error('Error marking as read:', err);
+      setError('Failed to mark as read');
+    }
+  }, [markAsRead, refetchConversations]);
+
+  // Quick filter toggle
+  const handleQuickFilterToggle = useCallback((filterId: string) => {
+    const newFilters = new Set(activeQuickFilters);
+    if (newFilters.has(filterId)) {
+      newFilters.delete(filterId);
+    } else {
+      newFilters.add(filterId);
+    }
+    setActiveQuickFilters(newFilters);
+  }, [activeQuickFilters]);
+
+  // Apply search and quick filters to conversations
+  const processedConversations = React.useMemo(() => {
+    let filtered = filteredConversations;
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(conv => 
+        conv.leadName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        conv.leadPhone.includes(searchQuery) ||
+        conv.vehicleInterest.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Apply quick filters
+    if (activeQuickFilters.has('unread')) {
+      filtered = filtered.filter(conv => conv.unreadCount > 0);
+    }
+    if (activeQuickFilters.has('urgent')) {
+      filtered = filtered.filter(conv => conv.unreadCount > 5);
+    }
+
+    return filtered;
+  }, [filteredConversations, searchQuery, activeQuickFilters]);
+
+  // Auto-select conversation if leadId provided
   useEffect(() => {
-    loadConversations();
-  }, [profile]);
+    if (leadId && conversations.length > 0 && !selectedConversation) {
+      const conversation = conversations.find(c => c.leadId === leadId);
+      if (conversation) {
+        handleConversationSelect(conversation);
+      }
+    }
+  }, [leadId, conversations, selectedConversation, handleConversationSelect]);
+
+  // Show conversation view if selected
+  if (selectedConversation) {
+    return (
+      <ErrorBoundary>
+        <ConversationView
+          conversation={selectedConversation}
+          messages={messages}
+          onBack={() => setSelectedConversation(null)}
+          onSendMessage={handleMessageSend}
+          sending={sendingMessage}
+          onMarkAsRead={() => handleMarkAsRead(selectedConversation.leadId)}
+          canReply={canReply(selectedConversation)}
+          loading={loading}
+          error={error}
+        />
+      </ErrorBoundary>
+    );
+  }
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="border-b bg-white p-4">
-        <div className="flex items-center justify-between mb-4">
+    <ErrorBoundary>
+      <div className="h-screen flex flex-col bg-background">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b bg-card">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4" />
             </Button>
             <h1 className="text-xl font-semibold">Smart Inbox</h1>
+            <Badge variant="secondary">
+              {processedConversations.length} conversations
+            </Badge>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
-            </Button>
-            <Button variant="outline" size="sm" onClick={loadConversations}>
-              Refresh
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refetchConversations}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Refresh
+          </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        {/* Filters */}
-        {showFilters && (
-          <div className="mt-4">
-            <SmartFilters
-              filters={filters}
-        onFiltersChange={(partialFilters) => {
-          Object.entries(partialFilters).forEach(([key, value]) => {
-            updateFilter(key as keyof InboxFilters, value);
-          });
-        }}
-              conversations={conversations}
-              filteredConversations={filteredConversations}
-              hasActiveFilters={hasActiveFilters}
-              filterSummary={getFilterSummary()}
-              onClearFilters={clearFilters}
-              userRole={profile?.role}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Conversations List */}
-        <div className="w-1/3 border-r">
-          <InboxConversationsList
-            conversations={filteredConversations}
-            selectedConversationId={selectedConversation?.leadId || null}
-            onConversationSelect={handleConversationSelect}
-            loading={loading}
-            searchQuery={searchQuery}
-            onMarkAsRead={handleMarkAsRead}
-            isMarkingAsRead={isMarkingAsRead}
-          />
-        </div>
-
-        {/* Conversation View */}
-        <div className="flex-1 p-4">
-          {selectedConversation ? (
-            <SimpleConversationView conversation={selectedConversation} />
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
-                <p>Choose a conversation from the list to view details</p>
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar with filters and conversations */}
+          <div className="w-96 flex flex-col border-r bg-card">
+            {/* Search */}
+            <div className="p-4 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
               </div>
             </div>
-          )}
+
+            {/* Quick Filters */}
+            <div className="p-4 border-b">
+              <QuickFilters
+                activeFilters={activeQuickFilters}
+                onFilterToggle={handleQuickFilterToggle}
+                unreadCount={conversations.filter(c => c.unreadCount > 0).length}
+                urgentCount={conversations.filter(c => c.unreadCount > 5).length}
+              />
+            </div>
+
+            {/* Conversations List */}
+            <div className="flex-1 overflow-hidden">
+              <InboxConversationsList
+                conversations={processedConversations}
+                selectedConversationId={selectedConversation?.leadId || null}
+                onConversationSelect={handleConversationSelect}
+                loading={loading}
+                searchQuery={searchQuery}
+                onMarkAsRead={handleMarkAsRead}
+                isMarkingAsRead={isMarkingAsRead}
+              />
+            </div>
+          </div>
+
+          {/* Main content area with advanced filters */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Smart Filters */}
+            <div className="p-4 border-b bg-muted/30 max-h-96 overflow-y-auto">
+              <SmartFilters
+                filters={filters}
+                onFiltersChange={handleFiltersChange}
+                conversations={conversations}
+                filteredConversations={filteredConversations}
+                hasActiveFilters={hasActiveFilters}
+                filterSummary={filterSummary}
+                onClearFilters={clearAllFilters}
+                userRole={profile?.role}
+              />
+            </div>
+
+            {/* Empty state */}
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center">
+                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Select a conversation to start
+                </h3>
+                <p className="text-muted-foreground">
+                  Choose a conversation from the list to view messages and send replies
+                </p>
+                {error && (
+                  <div className="mt-4 p-3 bg-destructive/10 text-destructive rounded-md">
+                    {error}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Debug Panels */}
-      <InboxDebugPanel
-        conversations={conversations}
-        filteredConversations={filteredConversations}
-        onRefresh={loadConversations}
-      />
-      
-      <MessageDebugPanel
-        isOpen={debugPanelOpen}
-        onToggle={() => setDebugPanelOpen(!debugPanelOpen)}
-        leadId={selectedConversation?.leadId}
-      />
-    </div>
+    </ErrorBoundary>
   );
 };
 
