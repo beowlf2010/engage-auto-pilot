@@ -8,10 +8,11 @@ import { fetchConversations, markMessagesAsRead } from '@/services/conversations
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useInboxFilters } from '@/hooks/useInboxFilters';
 import type { ConversationListItem } from '@/types/conversation';
+import type { InboxFilters } from '@/hooks/useInboxFilters';
 import SmartFilters from './SmartFilters';
 import InboxConversationsList from './InboxConversationsList';
 import InboxDebugPanel from './InboxDebugPanel';
-import MessageDebugPanel from './MessageDebugPanel';
+import MessageDebugPanel from '../debug/MessageDebugPanel';
 
 interface SmartInboxProps {
   onBack: () => void;
@@ -200,7 +201,11 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
           <div className="mt-4">
             <SmartFilters
               filters={filters}
-              onFiltersChange={updateFilter}
+        onFiltersChange={(partialFilters) => {
+          Object.entries(partialFilters).forEach(([key, value]) => {
+            updateFilter(key as keyof InboxFilters, value);
+          });
+        }}
               conversations={conversations}
               filteredConversations={filteredConversations}
               hasActiveFilters={hasActiveFilters}
