@@ -30,21 +30,31 @@ export const useMessageFiltering = () => {
     });
   };
 
+  // Universal sorting function that always prioritizes unread conversations
+  const sortConversationsWithUnreadFirst = (conversations: ConversationListItem[]): ConversationListItem[] => {
+    return [...conversations].sort((a, b) => {
+      // First priority: Unread conversations always come first
+      if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+      if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+      
+      // If both have unread messages, sort by unread count (most unread first)
+      if (a.unreadCount > 0 && b.unreadCount > 0) {
+        if (a.unreadCount !== b.unreadCount) {
+          return b.unreadCount - a.unreadCount;
+        }
+      }
+      
+      // Final tiebreaker: Sort by last message time (newest first)
+      return (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0);
+    });
+  };
+
   const getFilteredConversations = useMemo(() => {
     return (conversations: ConversationListItem[]) => {
       const filtered = filterConversations(conversations, conversationFilter);
       
-      // Sort unread conversations by priority (most unread first, then by time)
-      if (conversationFilter === 'unread') {
-        return filtered.sort((a, b) => {
-          if (a.unreadCount !== b.unreadCount) {
-            return b.unreadCount - a.unreadCount;
-          }
-          return (b.lastMessageDate?.getTime() || 0) - (a.lastMessageDate?.getTime() || 0);
-        });
-      }
-      
-      return filtered;
+      // Always apply unread-first sorting regardless of filter type
+      return sortConversationsWithUnreadFirst(filtered);
     };
   }, [conversationFilter]);
 
