@@ -9,7 +9,7 @@ import { useMessageFiltering } from '@/components/inbox/useMessageFiltering';
 import { useStableRealtimeInbox } from '@/hooks/useStableRealtimeInbox';
 import ConversationItem from '@/components/inbox/ConversationItem';
 import ConversationView from '@/components/inbox/ConversationView';
-import { markAllMessagesAsRead } from '@/services/conversationsService';
+import { markMessagesAsRead } from '@/services/conversationsService';
 
 interface MobileSmartInboxProps {
   onBack: () => void;
@@ -105,7 +105,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
     setIsMarkingAsRead(true);
     try {
       console.log('📖 [MOBILE INBOX] Marking messages as read for lead:', leadId);
-      await markAllMessagesAsRead(leadId);
+      await markMessagesAsRead(leadId);
       
       // Refresh conversations to update unread counts
       await refetch();

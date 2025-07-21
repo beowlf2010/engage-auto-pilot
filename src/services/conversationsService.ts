@@ -107,19 +107,23 @@ export const fetchConversations = async (profile: any): Promise<ConversationList
       const phoneNumber = lead.phone_numbers?.[0]?.number || '';
       
       const conversationItem: ConversationListItem = {
-        id: lead.id,
         leadId: lead.id,
-        customerName: `${lead.first_name} ${lead.last_name}`.trim(),
-        phoneNumber,
+        leadName: `${lead.first_name} ${lead.last_name}`.trim(),
+        primaryPhone: phoneNumber,
+        leadPhone: phoneNumber,
+        leadEmail: lead.email || '',
         lastMessage: lastMessage?.body || '',
         lastMessageTime: lastMessage?.sent_at || lead.created_at,
+        lastMessageDirection: lastMessage?.direction as 'in' | 'out' || 'out',
         unreadCount,
-        direction: lastMessage?.direction || 'out',
-        leadStatus: lead.lead_status_type_name || 'New',
-        source: lead.lead_source_name || 'Unknown',
+        messageCount: leadConversations.length,
+        salespersonId: lead.salesperson_id,
         vehicleInterest: lead.vehicle_interest || '',
-        isAiGenerated: lastMessage?.ai_generated || false,
-        salespersonId: lead.salesperson_id
+        leadSource: lead.lead_source_name || 'Unknown',
+        leadType: 'Unknown',
+        status: lead.lead_status_type_name || 'New',
+        lastMessageDate: new Date(lastMessage?.sent_at || lead.created_at),
+        isAiGenerated: lastMessage?.ai_generated || false
       };
 
       conversationMap.set(lead.id, conversationItem);
@@ -153,7 +157,17 @@ export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
       throw error;
     }
 
-    return data || [];
+    return (data || []).map(msg => ({
+      id: msg.id,
+      leadId: msg.lead_id,
+      direction: msg.direction as 'in' | 'out',
+      body: msg.body,
+      sentAt: msg.sent_at,
+      readAt: msg.read_at,
+      aiGenerated: msg.ai_generated,
+      smsStatus: msg.sms_status || 'delivered',
+      smsError: msg.sms_error
+    }));
   } catch (error) {
     console.error('Error in fetchMessages:', error);
     return [];

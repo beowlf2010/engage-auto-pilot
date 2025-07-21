@@ -1,7 +1,7 @@
 
 import { useCallback } from 'react';
 import { useSearchParams } from "react-router-dom";
-import { assignCurrentUserToLead } from "@/services/conversationsService";
+// import { assignCurrentUserToLead } from "@/services/conversationsService"; // Function not available
 import { findMatchingInventory } from "@/services/inventory/inventoryMatching";
 import { processConversationForAI } from "@/services/conversationAnalysis";
 import { toast } from "@/hooks/use-toast";
@@ -104,18 +104,9 @@ export const useEnhancedInboxOperations = ({
           return;
         }
         
-        // Auto-assign lead if needed
+        // Auto-assign lead if needed (temporarily disabled - function not available)
         if (!selectedConversation.salespersonId && canReply(selectedConversation)) {
-          console.log(`🎯 [ENHANCED INBOX] Auto-assigning lead ${selectedLead} to user ${user.id}`);
-          
-          const assigned = await assignCurrentUserToLead(selectedLead, user.id);
-          if (assigned) {
-            toast({
-              title: "Lead Assigned",
-              description: "This lead has been assigned to you",
-            });
-            selectedConversation.salespersonId = user.id;
-          }
+          console.log(`🎯 [ENHANCED INBOX] Would auto-assign lead ${selectedLead} to user ${user.id} (feature disabled)`);
         }
         
         // Send message
