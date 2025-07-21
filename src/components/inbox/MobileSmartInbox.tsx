@@ -2,18 +2,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationOperations } from '@/hooks/useConversationOperations';
-import { useInboxOperations } from '@/hooks/inbox/useInboxOperations';
-import { useInboxFilters } from '@/hooks/inbox/useInboxFilters';
+import { useInboxFilters } from '@/hooks/useInboxFilters';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
 import InboxConversationsList from './InboxConversationsList';
 import ConversationView from './ConversationView';
-import InboxFilters from './InboxFilters';
+import SmartFilters from './SmartFilters';
 import InboxStatusDisplay from './InboxStatusDisplay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, Filter } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Search, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { toast } from '@/hooks/use-toast';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import type { ConversationListItem } from '@/types/conversation';
 
 interface MobileSmartInboxProps {
@@ -25,7 +24,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   // Use the working conversation operations hook
   const {
@@ -38,19 +37,6 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
     sendMessage,
     manualRefresh
   } = useConversationOperations();
-
-  // Inbox operations for permissions and message handling
-  const {
-    canReply,
-    handleSelectConversation,
-    handleSendMessage
-  } = useInboxOperations({
-    user: profile || { role: 'user', id: '' },
-    loadMessages,
-    sendMessage,
-    sendingMessage: false,
-    setError: () => {}
-  });
 
   // Filtering functionality
   const {
@@ -77,10 +63,10 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
       if (conversation) {
         console.log('📱 [MOBILE SMART INBOX] Auto-selecting conversation for lead:', leadId);
         setSelectedConversation(conversation);
-        handleSelectConversation(leadId);
+        loadMessages(leadId);
       }
     }
-  }, [leadId, conversations, selectedConversation, handleSelectConversation]);
+  }, [leadId, conversations, selectedConversation, loadMessages]);
 
   // Apply filters to conversations
   const displayConversations = applyFilters(conversations, filters, searchQuery);
@@ -89,7 +75,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
     console.log('📱 [MOBILE SMART INBOX] Selecting conversation:', conversation.leadId);
     setSelectedConversation(conversation);
     try {
-      await handleSelectConversation(conversation.leadId);
+      await loadMessages(conversation.leadId);
     } catch (error) {
       console.error('Error selecting conversation:', error);
       toast({
@@ -98,22 +84,18 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
         variant: "destructive"
       });
     }
-  }, [handleSelectConversation]);
+  }, [loadMessages]);
 
   const handleSendMessageWrapper = useCallback(async (message: string) => {
     if (!selectedConversation) return;
     
     try {
-      await handleSendMessage(
-        selectedConversation.leadId,
-        selectedConversation,
-        message
-      );
+      await sendMessage(selectedConversation.leadId, message);
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
     }
-  }, [selectedConversation, handleSendMessage]);
+  }, [selectedConversation, sendMessage]);
 
   const handleMarkAsReadWrapper = useCallback(async () => {
     if (!selectedConversation) return;
@@ -178,7 +160,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
         onSendMessage={handleSendMessageWrapper}
         sending={false}
         onMarkAsRead={handleMarkAsReadWrapper}
-        canReply={canReply(selectedConversation)}
+        canReply={true}
         loading={loading}
         error={error}
       />
@@ -198,28 +180,34 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
           )}
           <h1 className="text-lg font-semibold">Inbox</h1>
           <span className="text-xs text-muted-foreground">
-            ({displayConversations.length})
+            {displayConversations.length}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Sheet open={showFilters} onOpenChange={setShowFilters}>
+        <div className="flex gap-1">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowSearch(!showSearch)}
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+          <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="ghost" size="sm">
                 <Filter className="h-4 w-4" />
               </Button>
             </SheetTrigger>
-            <SheetContent>
-              <SheetHeader>
-                <SheetTitle>Filters</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4">
-                <InboxFilters
-                  filters={filters}
-                  onFiltersChange={updateFilters}
-                  onClearFilters={clearFilters}
-                  conversationCount={displayConversations.length}
-                />
-              </div>
+            <SheetContent side="bottom" className="h-[80vh]">
+              <SmartFilters
+                filters={filters}
+                onFiltersChange={updateFilters}
+                conversations={conversations}
+                filteredConversations={displayConversations}
+                hasActiveFilters={Object.values(filters).some(v => v !== null && v !== false && v !== '' && (!Array.isArray(v) || v.length > 0))}
+                filterSummary={[]}
+                onClearFilters={clearFilters}
+                userRole={profile?.role}
+              />
             </SheetContent>
           </Sheet>
           <Button variant="outline" size="sm" onClick={handleRetry}>
@@ -229,14 +217,16 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
       </div>
 
       {/* Mobile Search */}
-      <div className="p-4 border-b bg-card">
-        <Input
-          placeholder="Search conversations..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full"
-        />
-      </div>
+      {showSearch && (
+        <div className="p-4 border-b bg-card">
+          <Input
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full"
+          />
+        </div>
+      )}
 
       {/* Mobile Conversations List */}
       <div className="flex-1 overflow-hidden">

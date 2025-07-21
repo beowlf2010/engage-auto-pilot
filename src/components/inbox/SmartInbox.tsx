@@ -2,12 +2,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationOperations } from '@/hooks/useConversationOperations';
-import { useInboxOperations } from '@/hooks/inbox/useInboxOperations';
-import { useInboxFilters } from '@/hooks/inbox/useInboxFilters';
+import { useInboxFilters } from '@/hooks/useInboxFilters';
 import { useMarkAsRead } from '@/hooks/useMarkAsRead';
 import InboxConversationsList from './InboxConversationsList';
 import ConversationView from './ConversationView';
-import InboxFilters from './InboxFilters';
+import SmartFilters from './SmartFilters';
 import InboxStatusDisplay from './InboxStatusDisplay';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
@@ -37,19 +36,6 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
     manualRefresh
   } = useConversationOperations();
 
-  // Inbox operations for permissions and message handling
-  const {
-    canReply,
-    handleSelectConversation,
-    handleSendMessage
-  } = useInboxOperations({
-    user: profile || { role: 'user', id: '' },
-    loadMessages,
-    sendMessage,
-    sendingMessage: false,
-    setError: () => {}
-  });
-
   // Filtering functionality
   const {
     filters,
@@ -75,10 +61,10 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
       if (conversation) {
         console.log('📱 [SMART INBOX] Auto-selecting conversation for lead:', leadId);
         setSelectedConversation(conversation);
-        handleSelectConversation(leadId);
+        loadMessages(leadId);
       }
     }
-  }, [leadId, conversations, selectedConversation, handleSelectConversation]);
+  }, [leadId, conversations, selectedConversation, loadMessages]);
 
   // Apply filters to conversations
   const displayConversations = applyFilters(conversations, filters, searchQuery);
@@ -87,7 +73,7 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
     console.log('📱 [SMART INBOX] Selecting conversation:', conversation.leadId);
     setSelectedConversation(conversation);
     try {
-      await handleSelectConversation(conversation.leadId);
+      await loadMessages(conversation.leadId);
     } catch (error) {
       console.error('Error selecting conversation:', error);
       toast({
@@ -96,22 +82,18 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
         variant: "destructive"
       });
     }
-  }, [handleSelectConversation]);
+  }, [loadMessages]);
 
   const handleSendMessageWrapper = useCallback(async (message: string) => {
     if (!selectedConversation) return;
     
     try {
-      await handleSendMessage(
-        selectedConversation.leadId,
-        selectedConversation,
-        message
-      );
+      await sendMessage(selectedConversation.leadId, message);
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
     }
-  }, [selectedConversation, handleSendMessage]);
+  }, [selectedConversation, sendMessage]);
 
   const handleMarkAsReadWrapper = useCallback(async () => {
     if (!selectedConversation) return;
@@ -177,7 +159,7 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
         onSendMessage={handleSendMessageWrapper}
         sending={false}
         onMarkAsRead={handleMarkAsReadWrapper}
-        canReply={canReply(selectedConversation)}
+        canReply={true}
         loading={loading}
         error={error}
       />
@@ -218,11 +200,15 @@ const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId }) => {
 
       {/* Filters */}
       <div className="border-b bg-card">
-        <InboxFilters
+        <SmartFilters
           filters={filters}
           onFiltersChange={updateFilters}
+          conversations={conversations}
+          filteredConversations={displayConversations}
+          hasActiveFilters={Object.values(filters).some(v => v !== null && v !== false && v !== '' && (!Array.isArray(v) || v.length > 0))}
+          filterSummary={[]}
           onClearFilters={clearFilters}
-          conversationCount={displayConversations.length}
+          userRole={profile?.role}
         />
       </div>
 
