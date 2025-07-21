@@ -19,9 +19,9 @@ export const fetchConversations = async (profile: any): Promise<ConversationList
           salesperson_id,
           lead_source_name,
           lead_type_name,
-          status
-        ),
-        phone_numbers!inner(number)
+          status,
+          phone_numbers(number)
+        )
       `)
       .order('sent_at', { ascending: false });
 
@@ -55,7 +55,7 @@ export const fetchConversations = async (profile: any): Promise<ConversationList
     conversationsByLead.forEach((leadConversations, leadId) => {
       const latestConversation = leadConversations[0]; // Already sorted by sent_at desc
       const lead = latestConversation.leads;
-      const primaryPhone = latestConversation.phone_numbers?.number || '';
+      const primaryPhone = lead.phone_numbers?.[0]?.number || '';
 
       if (!lead) {
         console.warn('⚠️ [CONVERSATIONS SERVICE] No lead data for conversation:', leadId);

@@ -6349,6 +6349,36 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_suppression_list: {
+        Row: {
+          added_at: string | null
+          added_by: string | null
+          created_at: string | null
+          id: string
+          phone_number: string
+          reason: string
+          updated_at: string | null
+        }
+        Insert: {
+          added_at?: string | null
+          added_by?: string | null
+          created_at?: string | null
+          id?: string
+          phone_number: string
+          reason: string
+          updated_at?: string | null
+        }
+        Update: {
+          added_at?: string | null
+          added_by?: string | null
+          created_at?: string | null
+          id?: string
+          phone_number?: string
+          reason?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       successful_conversation_patterns: {
         Row: {
           conversation_flow: Json
