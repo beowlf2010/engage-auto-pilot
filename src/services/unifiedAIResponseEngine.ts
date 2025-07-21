@@ -48,6 +48,16 @@ class UnifiedAIResponseEngine {
       if (data?.success && data?.message) {
         console.log('✅ [UNIFIED AI] Successfully generated AI response');
         
+        // CRITICAL: Validate message content before returning
+        const validation = await this.validateMessageContent(data.message, context.leadId);
+        if (!validation.isValid) {
+          console.error('🚫 [UNIFIED AI] Message failed validation:', validation.failures);
+          
+          // Use fallback response
+          console.log('🔄 [UNIFIED AI] Using fallback response due to validation failure');
+          return this.generateFallbackResponse(context);
+        }
+        
         return {
           message: data.message,
           intent: {
@@ -66,6 +76,48 @@ class UnifiedAIResponseEngine {
     } catch (error) {
       console.error('❌ [UNIFIED AI] Error generating response:', error);
       return this.generateFallbackResponse(context);
+    }
+  }
+
+  // CRITICAL: Database-level validation using the prevention system
+  async validateMessageContent(message: string, leadId?: string): Promise<{ isValid: boolean; failures: string[] }> {
+    try {
+      console.log('🔍 [VALIDATION] Checking message content:', {
+        length: message?.length,
+        leadId,
+        preview: message?.substring(0, 50)
+      });
+
+      // Call the database validation function
+      const { data, error } = await supabase.rpc('validate_ai_message_content', {
+        p_message_content: message,
+        p_lead_id: leadId || null
+      });
+
+      if (error) {
+        console.error('❌ [VALIDATION] Database validation error:', error);
+        // Fail safe - reject on validation error
+        return { 
+          isValid: false, 
+          failures: [`Validation system error: ${error.message}`] 
+        };
+      }
+
+      console.log('✅ [VALIDATION] Database validation result:', data);
+      
+      // Type-safe parsing of the JSON response
+      const result = data as any;
+      return {
+        isValid: result?.valid === true,
+        failures: Array.isArray(result?.failures) ? result.failures : []
+      };
+    } catch (error) {
+      console.error('❌ [VALIDATION] Validation exception:', error);
+      // Fail safe - reject on exception
+      return { 
+        isValid: false, 
+        failures: [`Validation exception: ${error instanceof Error ? error.message : 'Unknown error'}`] 
+      };
     }
   }
 

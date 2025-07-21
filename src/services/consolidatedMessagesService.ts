@@ -59,6 +59,48 @@ export const validateLead = async (leadId: string): Promise<{ isValid: boolean; 
   }
 };
 
+// CRITICAL: AI message content validation using the prevention system
+export const validateMessageContent = async (message: string, leadId?: string): Promise<{ isValid: boolean; failures: string[] }> => {
+  try {
+    console.log('🔍 [MESSAGE VALIDATION] Checking content:', {
+      length: message?.length,
+      leadId,
+      preview: message?.substring(0, 50)
+    });
+
+    // Call the database validation function
+    const { data, error } = await supabase.rpc('validate_ai_message_content', {
+      p_message_content: message,
+      p_lead_id: leadId || null
+    });
+
+    if (error) {
+      console.error('❌ [MESSAGE VALIDATION] Database validation error:', error);
+      // Fail safe - reject on validation error
+      return { 
+        isValid: false, 
+        failures: [`Validation system error: ${error.message}`] 
+      };
+    }
+
+    console.log('✅ [MESSAGE VALIDATION] Database validation result:', data);
+    
+    // Type-safe parsing of the JSON response
+    const result = data as any;
+    return {
+      isValid: result?.valid === true,
+      failures: Array.isArray(result?.failures) ? result.failures : []
+    };
+  } catch (error) {
+    console.error('❌ [MESSAGE VALIDATION] Validation exception:', error);
+    // Fail safe - reject on exception
+    return { 
+      isValid: false, 
+      failures: [`Validation exception: ${error instanceof Error ? error.message : 'Unknown error'}`] 
+    };
+  }
+};
+
 export const getLeadPhoneNumber = async (leadId: string): Promise<{ phoneNumber: string | null; error?: string }> => {
   try {
     console.log(`📱 [CONSOLIDATED] Looking up phone for lead: ${leadId}`);
@@ -127,6 +169,20 @@ export const consolidatedSendMessage = async (params: ConsolidatedMessageParams)
       console.error(`❌ [CONSOLIDATED] ${error}`);
       return { success: false, error };
     }
+
+    // CRITICAL: Validate message content using the AI prevention system
+    console.log(`🔍 [CONSOLIDATED] Validating message content...`);
+    const validation = await validateMessageContent(messageBody.trim(), leadId);
+    if (!validation.isValid) {
+      console.error(`🚫 [CONSOLIDATED] Message failed validation:`, validation.failures);
+      return { 
+        success: false, 
+        error: `Message blocked: ${validation.failures.join('; ')}`,
+        blocked: true,
+        compliance: true
+      };
+    }
+    console.log(`✅ [CONSOLIDATED] Message validation passed`);
     
     if (!profileId) {
       const error = 'Profile ID is required';

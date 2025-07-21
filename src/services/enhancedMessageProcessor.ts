@@ -15,6 +15,12 @@ export class EnhancedMessageProcessor {
       return null;
     }
 
+    // CRITICAL: Check if AI processing is allowed
+    if (!await this.shouldProcessMessage(leadId)) {
+      console.log('🚫 [PROCESSOR] AI processing disabled for this lead');
+      return null;
+    }
+
     this.isProcessing = true;
 
     try {

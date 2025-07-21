@@ -2,6 +2,48 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+// CRITICAL: AI message content validation using the prevention system
+const validateMessageContent = async (message: string, leadId?: string): Promise<{ isValid: boolean; failures: string[] }> => {
+  try {
+    console.log('🔍 [MESSAGE VALIDATION] Checking content:', {
+      length: message?.length,
+      leadId,
+      preview: message?.substring(0, 50)
+    });
+
+    // Call the database validation function
+    const { data, error } = await supabase.rpc('validate_ai_message_content', {
+      p_message_content: message,
+      p_lead_id: leadId || null
+    });
+
+    if (error) {
+      console.error('❌ [MESSAGE VALIDATION] Database validation error:', error);
+      // Fail safe - reject on validation error
+      return { 
+        isValid: false, 
+        failures: [`Validation system error: ${error.message}`] 
+      };
+    }
+
+    console.log('✅ [MESSAGE VALIDATION] Database validation result:', data);
+    
+    // Type-safe parsing of the JSON response
+    const result = data as any;
+    return {
+      isValid: result?.valid === true,
+      failures: Array.isArray(result?.failures) ? result.failures : []
+    };
+  } catch (error) {
+    console.error('❌ [MESSAGE VALIDATION] Validation exception:', error);
+    // Fail safe - reject on exception
+    return { 
+      isValid: false, 
+      failures: [`Validation exception: ${error instanceof Error ? error.message : 'Unknown error'}`] 
+    };
+  }
+};
+
 export const sendMessage = async (
   leadId: string,
   messageContent: string,
@@ -29,6 +71,16 @@ export const sendMessage = async (
     console.error(`❌ [FIXED MESSAGES SERVICE] ${error.message}`);
     throw error;
   }
+
+  // CRITICAL: Validate message content using the AI prevention system
+  console.log(`🔍 [FIXED MESSAGES SERVICE] Validating message content...`);
+  const validation = await validateMessageContent(messageContent.trim(), leadId);
+  if (!validation.isValid) {
+    console.error(`🚫 [FIXED MESSAGES SERVICE] Message failed validation:`, validation.failures);
+    const error = new Error(`Message blocked: ${validation.failures.join('; ')}`);
+    throw error;
+  }
+  console.log(`✅ [FIXED MESSAGES SERVICE] Message validation passed`);
 
   if (!leadId) {
     const error = new Error('Lead ID is required');

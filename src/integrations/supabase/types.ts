@@ -1022,6 +1022,36 @@ export type Database = {
           },
         ]
       }
+      ai_message_blacklist: {
+        Row: {
+          block_type: string
+          blocked_content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          reason: string
+        }
+        Insert: {
+          block_type?: string
+          blocked_content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          reason: string
+        }
+        Update: {
+          block_type?: string
+          blocked_content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          reason?: string
+        }
+        Relationships: []
+      }
       ai_message_feedback: {
         Row: {
           conversation_id: string | null
@@ -1128,6 +1158,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_message_monitoring: {
+        Row: {
+          blocked_at: string | null
+          created_at: string | null
+          id: string
+          lead_id: string | null
+          message_content: string
+          message_length: number
+          quality_score: number | null
+          validation_failures: Json | null
+          validation_status: string
+        }
+        Insert: {
+          blocked_at?: string | null
+          created_at?: string | null
+          id?: string
+          lead_id?: string | null
+          message_content: string
+          message_length: number
+          quality_score?: number | null
+          validation_failures?: Json | null
+          validation_status: string
+        }
+        Update: {
+          blocked_at?: string | null
+          created_at?: string | null
+          id?: string
+          lead_id?: string | null
+          message_content?: string
+          message_length?: number
+          quality_score?: number | null
+          validation_failures?: Json | null
+          validation_status?: string
+        }
+        Relationships: []
+      }
+      ai_message_safeguards: {
+        Row: {
+          configuration: Json
+          created_at: string | null
+          id: string
+          is_enabled: boolean
+          last_triggered_at: string | null
+          safeguard_type: string
+          system_name: string
+          trigger_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          configuration?: Json
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean
+          last_triggered_at?: string | null
+          safeguard_type: string
+          system_name: string
+          trigger_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          configuration?: Json
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean
+          last_triggered_at?: string | null
+          safeguard_type?: string
+          system_name?: string
+          trigger_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       ai_message_schedule: {
         Row: {
@@ -7820,6 +7922,10 @@ export type Database = {
       user_is_authenticated_simple: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      validate_ai_message_content: {
+        Args: { p_message_content: string; p_lead_id?: string }
+        Returns: Json
       }
       validate_upload_context: {
         Args: { p_user_id: string }
