@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Search, MessageCircle, Filter } from 'lucide-react';
+import { ArrowLeft, Search, MessageCircle, Filter, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import ConversationItem from './ConversationItem';
 import MessageThread from './MessageThread';
@@ -32,11 +32,20 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
   const totalUnread = conversations.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0);
   const messagesLoading = conversationsLoading;
 
+  console.log('📱 [MOBILE INBOX] Render state:', {
+    conversationsCount: conversations.length,
+    totalUnread,
+    loading: conversationsLoading,
+    error: error?.message,
+    selectedConversation: selectedConversation?.leadId
+  });
+
   // Auto-select conversation if leadId is provided in URL
   useEffect(() => {
     if (leadId && conversations.length > 0 && !selectedConversation) {
       const conversation = conversations.find(c => c.leadId === leadId);
       if (conversation) {
+        console.log('🎯 [MOBILE INBOX] Auto-selecting conversation from URL:', leadId);
         setSelectedConversation(conversation);
       }
     }
@@ -48,6 +57,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
   );
 
   const handleConversationSelect = (conversation: ConversationListItem) => {
+    console.log('📞 [MOBILE INBOX] Selecting conversation:', conversation.leadId);
     setSelectedConversation(conversation);
     // Update URL to reflect selected conversation
     const url = new URL(window.location.href);
@@ -56,6 +66,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
   };
 
   const handleBackToList = () => {
+    console.log('⬅️ [MOBILE INBOX] Going back to conversations list');
     setSelectedConversation(null);
     // Remove leadId from URL
     const url = new URL(window.location.href);
@@ -81,6 +92,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
   };
 
   const handleRefresh = () => {
+    console.log('🔄 [MOBILE INBOX] Manual refresh triggered');
     refreshData();
   };
 
@@ -88,8 +100,9 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-400 animate-pulse" />
           <p className="text-gray-600">Loading conversations...</p>
+          <p className="text-sm text-gray-500 mt-2">Found {totalUnread} unread messages</p>
         </div>
       </div>
     );
@@ -100,7 +113,9 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <p className="text-red-600 mb-4">Error loading conversations</p>
+          <p className="text-sm text-gray-500 mb-4">{error.message}</p>
           <Button onClick={refreshData} variant="outline">
+            <RefreshCw className="w-4 h-4 mr-2" />
             Try Again
           </Button>
         </div>
@@ -153,8 +168,8 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
                 </Badge>
               )}
             </div>
-            <Button variant="ghost" size="sm">
-              <Filter className="w-4 h-4" />
+            <Button variant="ghost" size="sm" onClick={handleRefresh}>
+              <RefreshCw className="w-4 h-4" />
             </Button>
           </div>
 
@@ -180,6 +195,11 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
                   <p className="text-gray-600">
                     {searchTerm ? 'No conversations match your search' : 'No conversations yet'}
                   </p>
+                  {totalUnread > 0 && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      {totalUnread} unread messages found in database
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (
