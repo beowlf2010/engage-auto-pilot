@@ -1,7 +1,7 @@
 
 import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useConversationOperations } from './useConversationOperations';
-import { consolidatedRealtimeManager } from '@/services/consolidatedRealtimeManager';
+import { stableRealtimeManager } from '@/services/stableRealtimeManager';
 
 export const useStableRealtimeInbox = () => {
   const currentLeadIdRef = useRef<string | null>(null);
@@ -22,7 +22,7 @@ export const useStableRealtimeInbox = () => {
   } = useConversationOperations();
 
   const [connectionState, setConnectionState] = useState(() => 
-    consolidatedRealtimeManager.getConnectionState()
+    stableRealtimeManager.getConnectionState()
   );
 
   const fetchMessages = useCallback(async (leadId: string) => {
@@ -40,7 +40,7 @@ export const useStableRealtimeInbox = () => {
 
   const handleConversationUpdate = useCallback(() => {
     const now = Date.now();
-    if (now - lastRefreshRef.current < 1000) {
+    if (now - lastRefreshRef.current < 2000) { // Increased debounce to 2 seconds
       console.log('⏱️ [STABLE INBOX] Debouncing conversation update');
       return;
     }
@@ -65,7 +65,7 @@ export const useStableRealtimeInbox = () => {
         console.log('🔄 [STABLE INBOX] Refreshing messages for current lead');
         loadMessages(leadId);
       }
-    }, 500);
+    }, 1000); // Increased delay to 1 second
   }, [loadConversations, loadMessages]);
 
   const setupRealtimeSubscription = useCallback(() => {
@@ -77,7 +77,7 @@ export const useStableRealtimeInbox = () => {
     console.log('🔗 [STABLE INBOX] Setting up realtime subscription');
     isSubscribedRef.current = true;
     
-    const unsubscribe = consolidatedRealtimeManager.subscribe({
+    const unsubscribe = stableRealtimeManager.subscribe({
       id: subscriptionIdRef.current,
       callback: (payload) => {
         console.log('🔄 [STABLE INBOX] Received realtime update:', payload.eventType);
@@ -112,7 +112,7 @@ export const useStableRealtimeInbox = () => {
   }, [setupRealtimeSubscription]);
 
   useEffect(() => {
-    const removeListener = consolidatedRealtimeManager.addConnectionListener(setConnectionState);
+    const removeListener = stableRealtimeManager.addConnectionListener(setConnectionState);
     return removeListener;
   }, []);
 
@@ -146,7 +146,7 @@ export const useStableRealtimeInbox = () => {
     
     if (!connectionState.isConnected) {
       console.log('🔌 [STABLE INBOX] Reconnecting before refresh');
-      consolidatedRealtimeManager.forceReconnect();
+      stableRealtimeManager.forceReconnect();
     }
     
     manualRefresh();
@@ -171,8 +171,8 @@ export const useStableRealtimeInbox = () => {
     isRealtimeConnected: connectionState.isConnected,
     connectionState,
     forceRefresh: enhancedRefresh,
-    forceReconnect: () => consolidatedRealtimeManager.forceReconnect(),
-    getHealthStatus: () => consolidatedRealtimeManager.getHealthStatus()
+    forceReconnect: () => stableRealtimeManager.forceReconnect(),
+    getHealthStatus: () => stableRealtimeManager.getHealthStatus()
   }), [
     conversations,
     messages,

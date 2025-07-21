@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { connectionHealthService } from './connectionHealthService';
 
@@ -32,6 +31,7 @@ class StableRealtimeManager {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isSubscribing = false;
   private channelName = 'stable-realtime-channel';
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
   getConnectionState(): ConnectionState {
     return { ...this.connectionState };
@@ -125,7 +125,13 @@ class StableRealtimeManager {
 
       console.log('🔗 [STABLE REALTIME] Creating new channel');
       
-      this.channel = supabase.channel(this.channelName);
+      this.channel = supabase.channel(this.channelName, {
+        config: {
+          presence: {
+            key: 'user_presence'
+          }
+        }
+      });
 
       // Set up postgres changes listener
       this.channel.on(
@@ -137,7 +143,7 @@ class StableRealtimeManager {
         }
       );
 
-      // Subscribe to the channel
+      // Subscribe to the channel with proper error handling
       const status = await this.channel.subscribe((status: string) => {
         console.log('📡 [STABLE REALTIME] Channel status:', status);
         
@@ -148,6 +154,7 @@ class StableRealtimeManager {
             reconnectAttempts: 0
           });
           connectionHealthService.recordConnectionSuccess();
+          this.startHeartbeat();
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           this.handleConnectionError();
         }
@@ -161,6 +168,23 @@ class StableRealtimeManager {
     } finally {
       this.isSubscribing = false;
     }
+  }
+
+  private startHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+
+    // Send a heartbeat every 30 seconds to keep connection alive
+    this.heartbeatInterval = setInterval(() => {
+      if (this.channel && this.connectionState.isConnected) {
+        this.channel.send({
+          type: 'heartbeat',
+          event: 'ping',
+          payload: { timestamp: Date.now() }
+        });
+      }
+    }, 30000);
   }
 
   private handleRealtimeEvent(payload: any) {
@@ -210,6 +234,11 @@ class StableRealtimeManager {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
 
     if (this.channel) {
