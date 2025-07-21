@@ -1,254 +1,243 @@
 
-import React, { useState, useEffect } from 'react';
-import { useStableRealtimeInbox } from '@/hooks/useStableRealtimeInbox';
-import { useInboxOperations } from '@/hooks/inbox/useInboxOperations';
-import ConversationsList from './ConversationsList';
-import EnhancedChatView from './EnhancedChatView';
-import LeadContextPanel from './LeadContextPanel';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useSearchParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Filter, MessageSquare } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { fetchConversations, markMessagesAsRead } from '@/services/conversationsService';
+import { stableRealtimeManager } from '@/services/stableRealtimeManager';
+import InboxHeader from './InboxHeader';
+import InboxSidebar from './InboxSidebar';
+import InboxConversationsList from './InboxConversationsList';
+import ConversationView from './ConversationView';
+import InboxDebugPanel from './InboxDebugPanel';
 import type { ConversationListItem } from '@/types/conversation';
 
 interface SmartInboxProps {
-  onBack?: () => void;
+  onBack: () => void;
   leadId?: string;
 }
 
-const SmartInbox: React.FC<SmartInboxProps> = ({ onBack, leadId: propLeadId }) => {
+const SmartInbox = ({ onBack, leadId }: SmartInboxProps) => {
   const { profile } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const urlLeadId = propLeadId || searchParams.get('leadId');
+  const { toast } = useToast();
   
-  const [selectedLead, setSelectedLead] = useState<string | null>(urlLeadId);
-  const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [markingAsRead, setMarkingAsRead] = useState<string | null>(null);
-  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
+  const [filteredConversations, setFilteredConversations] = useState<ConversationListItem[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(leadId || null);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
+  const [isMarkingAsRead, setIsMarkingAsRead] = useState(false);
 
-  // Use the stable realtime inbox system
-  const {
-    conversations,
-    messages,
-    loading,
-    error,
-    fetchMessages,
-    sendMessage: stableSendMessage,
-    refetch,
-    isRealtimeConnected
-  } = useStableRealtimeInbox();
-
-  // Get user operations
-  const user = {
-    role: profile?.role || 'user',
-    id: profile?.id || ''
-  };
-
-  const {
-    canReply,
-    handleSelectConversation,
-    handleSendMessage
-  } = useInboxOperations({
-    user,
-    loadMessages: fetchMessages,
-    sendMessage: stableSendMessage,
-    sendingMessage: loading,
-    setError: () => {} // Error handling is done in the hook
-  });
-
-  // Filter conversations based on unread only setting
-  const filteredConversations = React.useMemo(() => {
-    if (!showUnreadOnly) return conversations;
-    return conversations.filter(conversation => conversation.unreadCount > 0);
-  }, [conversations, showUnreadOnly]);
-
-  // Calculate unread counts for display
-  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-  const filteredUnread = filteredConversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-
-  // Enhanced conversation selection with immediate feedback
-  const onSelectConversation = async (leadId: string) => {
-    console.log('🔄 [SMART INBOX] Selecting conversation:', leadId);
-    setSelectedLead(leadId);
-    
-    // Update URL
-    if (leadId !== urlLeadId) {
-      setSearchParams({ leadId });
+  const loadConversations = useCallback(async () => {
+    if (!profile) {
+      console.log('⏳ [SMART INBOX] No profile available, skipping load');
+      return;
     }
     
-    // Find the conversation
-    const conversation = conversations.find(c => c.leadId === leadId);
-    if (conversation) {
-      setSelectedConversation(conversation);
-    }
-    
-    // Enhanced: Show immediate loading state for better UX
-    console.log('📖 [SMART INBOX] Auto-marking as read for selected conversation');
-    
-    // Load messages using stable operations (includes auto-mark-as-read)
-    await handleSelectConversation(leadId);
-  };
-
-  // Handle sending messages
-  const onSendMessage = async (message: string, isTemplate?: boolean) => {
-    if (selectedLead && selectedConversation) {
-      await handleSendMessage(selectedLead, selectedConversation, message, isTemplate);
-    }
-  };
-
-  // Enhanced mark as read with immediate feedback
-  const markAsRead = async (leadId: string) => {
-    setMarkingAsRead(leadId);
+    console.log('🔄 [SMART INBOX] Loading conversations...');
+    setLoading(true);
     
     try {
-      console.log('📖 [SMART INBOX] Manually marking as read for lead:', leadId);
+      const data = await fetchConversations(profile);
+      console.log('✅ [SMART INBOX] Conversations loaded:', {
+        total: data.length,
+        withUnread: data.filter(c => c.unreadCount > 0).length,
+        totalUnreadMessages: data.reduce((sum, c) => sum + c.unreadCount, 0)
+      });
       
-      // Messages are automatically marked as read when loaded
-      await fetchMessages(leadId);
+      setConversations(data);
       
-      // Enhanced: Immediate global unread count refresh
-      console.log('🔄 [SMART INBOX] Triggering global unread count refresh after manual mark');
-      window.dispatchEvent(new CustomEvent('unread-count-changed'));
-      
+      // If leadId was provided and we don't have a selected conversation, try to find and select it
+      if (leadId && !selectedConversationId) {
+        const targetConversation = data.find(c => c.leadId === leadId);
+        if (targetConversation) {
+          console.log('🎯 [SMART INBOX] Auto-selecting conversation for leadId:', leadId);
+          setSelectedConversationId(leadId);
+        } else {
+          console.warn('⚠️ [SMART INBOX] Could not find conversation for leadId:', leadId);
+        }
+      }
     } catch (error) {
-      console.error('❌ [SMART INBOX] Failed to mark as read:', error);
+      console.error('❌ [SMART INBOX] Error loading conversations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load conversations. Please try again.",
+        variant: "destructive"
+      });
     } finally {
-      setMarkingAsRead(null);
+      setLoading(false);
+    }
+  }, [profile, leadId, selectedConversationId, toast]);
+
+  // Apply filters whenever conversations, search, or filter settings change
+  useEffect(() => {
+    console.log('🔍 [SMART INBOX] Applying filters:', {
+      totalConversations: conversations.length,
+      searchQuery,
+      filterUnreadOnly,
+      conversationsWithUnread: conversations.filter(c => c.unreadCount > 0).length
+    });
+
+    let filtered = [...conversations];
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(conv =>
+        conv.leadName.toLowerCase().includes(query) ||
+        conv.leadPhone.toLowerCase().includes(query) ||
+        conv.lastMessage.toLowerCase().includes(query) ||
+        conv.vehicleInterest.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply unread filter
+    if (filterUnreadOnly) {
+      filtered = filtered.filter(conv => conv.unreadCount > 0);
+    }
+    
+    console.log('✅ [SMART INBOX] Filters applied:', {
+      filteredCount: filtered.length,
+      withUnread: filtered.filter(c => c.unreadCount > 0).length,
+      totalUnreadInFiltered: filtered.reduce((sum, c) => sum + c.unreadCount, 0)
+    });
+    
+    setFilteredConversations(filtered);
+  }, [conversations, searchQuery, filterUnreadOnly]);
+
+  // Load conversations on mount and when profile changes
+  useEffect(() => {
+    if (profile) {
+      loadConversations();
+    }
+  }, [profile, loadConversations]);
+
+  // Set up realtime subscription
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    console.log('🔗 [SMART INBOX] Setting up realtime subscription');
+
+    const unsubscribe = stableRealtimeManager.subscribe({
+      id: `smart-inbox-${profile.id}`,
+      callback: (payload) => {
+        console.log('🔄 [SMART INBOX] Realtime update received:', payload.eventType);
+        
+        if (payload.table === 'conversations') {
+          if (payload.eventType === 'INSERT' && payload.new?.direction === 'in') {
+            console.log('📬 [SMART INBOX] New incoming message - refreshing conversations');
+            loadConversations();
+          } else if (payload.eventType === 'UPDATE' && 
+                     payload.new?.read_at && !payload.old?.read_at) {
+            console.log('📖 [SMART INBOX] Message marked as read - refreshing conversations');
+            loadConversations();
+          }
+        }
+      },
+      filters: {
+        event: '*',
+        schema: 'public',
+        table: 'conversations'
+      }
+    });
+
+    return () => {
+      console.log('🔌 [SMART INBOX] Cleaning up realtime subscription');
+      unsubscribe();
+    };
+  }, [profile?.id, loadConversations]);
+
+  const handleConversationSelect = (conversation: ConversationListItem) => {
+    console.log('👆 [SMART INBOX] Conversation selected:', {
+      leadId: conversation.leadId,
+      leadName: conversation.leadName,
+      unreadCount: conversation.unreadCount
+    });
+    setSelectedConversationId(conversation.leadId);
+  };
+
+  const handleMarkAsRead = async (leadId: string) => {
+    console.log('📖 [SMART INBOX] Marking messages as read for:', leadId);
+    setIsMarkingAsRead(true);
+    
+    try {
+      await markMessagesAsRead(leadId);
+      
+      // Refresh conversations to update unread counts
+      await loadConversations();
+      
+      toast({
+        title: "Messages marked as read",
+        description: "All messages for this conversation have been marked as read.",
+      });
+    } catch (error) {
+      console.error('❌ [SMART INBOX] Error marking messages as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark messages as read. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsMarkingAsRead(false);
     }
   };
 
-  // Load initial conversation if specified
-  useEffect(() => {
-    if (urlLeadId && conversations.length > 0) {
-      const conversation = conversations.find(c => c.leadId === urlLeadId);
-      if (conversation && selectedLead !== urlLeadId) {
-        onSelectConversation(urlLeadId);
-      }
-    }
-  }, [urlLeadId, conversations]);
-
-  // Enhanced connection status indicator
-  const connectionStatus = isRealtimeConnected ? 'Connected' : 'Reconnecting...';
-
-  if (!profile) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="text-lg font-medium text-gray-700">Authentication Required</div>
-          <div className="text-sm text-gray-500 mt-1">Please sign in to access the inbox</div>
-        </div>
-      </div>
-    );
-  }
+  const selectedConversation = conversations.find(c => c.leadId === selectedConversationId);
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Enhanced header with connection status, filter, and auto-mark indicator */}
-      <div className="border-b border-border px-4 py-2 flex items-center justify-between bg-card">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-lg font-semibold text-foreground">Smart Inbox</h1>
-          
-          {/* Unread Filter Button */}
-          <Button
-            variant={showUnreadOnly ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-            className="h-8"
-          >
-            <Filter className="h-3 w-3 mr-1" />
-            {showUnreadOnly ? `Unread (${filteredUnread})` : 'Show All'}
-          </Button>
+    <div className="h-full w-full bg-background flex flex-col relative">
+      <InboxHeader 
+        onBack={onBack}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        filterUnreadOnly={filterUnreadOnly}
+        onFilterChange={setFilterUnreadOnly}
+        conversationCount={filteredConversations.length}
+        unreadCount={filteredConversations.reduce((sum, c) => sum + c.unreadCount, 0)}
+      />
+      
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-80 border-r bg-muted/30 flex flex-col">
+          <InboxConversationsList
+            conversations={filteredConversations}
+            selectedConversationId={selectedConversationId}
+            onConversationSelect={handleConversationSelect}
+            loading={loading}
+            searchQuery={searchQuery}
+            onMarkAsRead={handleMarkAsRead}
+            isMarkingAsRead={isMarkingAsRead}
+          />
         </div>
         
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500' : 'bg-orange-500'}`} />
-            <span className="text-xs text-muted-foreground">{connectionStatus}</span>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Auto-mark enabled ✓
-          </div>
-          {totalUnread > 0 && (
-            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-              <MessageSquare className="h-3 w-3" />
-              <span>{totalUnread} total unread</span>
+        <div className="flex-1">
+          {selectedConversation ? (
+            <ConversationView
+              conversation={selectedConversation}
+              onClose={() => setSelectedConversationId(null)}
+              onRefresh={loadConversations}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Select a conversation
+                </h3>
+                <p className="text-gray-500">
+                  Choose a conversation from the list to view messages
+                </p>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Filter Status Indicator */}
-      {showUnreadOnly && (
-        <div className="px-4 py-2 bg-blue-50 border-b border-border">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-blue-700">
-              📊 Showing {filteredConversations.length} conversations with unread messages
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowUnreadOnly(false)}
-              className="h-6 text-xs text-blue-600 hover:text-blue-800"
-            >
-              Show All ({conversations.length})
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Conversations List */}
-        <div className="w-1/3 border-r border-border flex flex-col">
-          <ConversationsList
-            conversations={filteredConversations}
-            selectedLead={selectedLead}
-            onSelectConversation={onSelectConversation}
-            markAsRead={markAsRead}
-            markingAsRead={markingAsRead}
-            canReply={canReply}
-          />
-        </div>
-
-        {/* Chat View */}
-        <div className="flex-1 flex flex-col">
-          <EnhancedChatView
-            messages={messages}
-            selectedConversation={selectedConversation}
-            showTemplates={showTemplates}
-            onSendMessage={onSendMessage}
-            onToggleTemplates={() => setShowTemplates(!showTemplates)}
-            user={user}
-            isLoading={loading}
-          />
-        </div>
-
-        {/* Lead Context Panel */}
-        {selectedConversation && (
-          <div className="w-80 border-l border-border">
-            <LeadContextPanel
-              conversation={{
-                leadId: selectedConversation.leadId,
-                leadName: selectedConversation.leadName,
-                leadPhone: selectedConversation.primaryPhone,
-                vehicleInterest: selectedConversation.vehicleInterest,
-                status: selectedConversation.status,
-                lastMessageTime: selectedConversation.lastMessageTime,
-                salespersonId: selectedConversation.salespersonId
-              }}
-              messages={messages}
-              onSendMessage={onSendMessage}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Enhanced error display */}
-      {error && (
-        <div className="border-t border-border bg-destructive/10 px-4 py-2">
-          <div className="text-sm text-destructive">{error}</div>
-        </div>
+      {/* Debug Panel */}
+      {process.env.NODE_ENV === 'development' && (
+        <InboxDebugPanel
+          conversations={conversations}
+          filteredConversations={filteredConversations}
+          onRefresh={loadConversations}
+        />
       )}
     </div>
   );
