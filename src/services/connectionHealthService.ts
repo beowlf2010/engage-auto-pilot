@@ -45,10 +45,29 @@ class ConnectionHealthService {
       ? this.metrics.connectionSuccesses / this.metrics.connectionAttempts 
       : 0;
 
+    const isHealthy = this.metrics.consecutiveFailures < 3 && successRate > 0.5;
+    
+    // Determine network quality based on connection health
+    let networkQuality: 'excellent' | 'good' | 'poor' | 'critical' = 'good';
+    if (successRate > 0.9) {
+      networkQuality = 'excellent';
+    } else if (successRate > 0.7) {
+      networkQuality = 'good';
+    } else if (successRate > 0.3) {
+      networkQuality = 'poor';
+    } else {
+      networkQuality = 'critical';
+    }
+
+    // Should use polling if connection quality is poor or we have too many failures
+    const shouldUsePolling = !isHealthy || this.metrics.consecutiveFailures >= 3;
+
     return {
       ...this.metrics,
       successRate,
-      isHealthy: this.metrics.consecutiveFailures < 3 && successRate > 0.5
+      isHealthy,
+      networkQuality,
+      shouldUsePolling
     };
   }
 
