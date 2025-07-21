@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -32,38 +31,101 @@ export const useGlobalUnreadCount = () => {
 
       if (emailError) throw emailError;
 
-      // Define rejection patterns to filter out
+      // Define comprehensive rejection patterns to filter out
       const rejectionPatterns = [
-        /\bstop\b/i,
-        /\bunsubscribe\b/i,
-        /\bnot interested\b/i,
-        /\bfound already\b/i,
-        /\bbought already\b/i,
-        /\balready bought\b/i,
-        /\bno thanks\b/i,
-        /\bno thank you\b/i,
-        /\bremove me\b/i,
-        /\bdelete my number\b/i,
-        /\bdo not contact\b/i,
-        /\bdon't contact\b/i,
-        /\bleave me alone\b/i,
-        /\bnot looking\b/i,
-        /\bwrong number\b/i,
-        /\bwho is this\b/i,
-        /\bwhat is this\b/i,
-        /\bdont text me\b/i,
-        /\bdon't text me\b/i
+        // Basic rejections
+        /stop/i,
+        /unsubscribe/i,
+        /not interested/i,
+        /no thanks/i,
+        /no thank you/i,
+        /remove me/i,
+        /delete my number/i,
+        /do not contact/i,
+        /don't contact/i,
+        /dont contact/i,
+        /leave me alone/i,
+        /wrong number/i,
+        
+        // Already purchased variations
+        /found already/i,
+        /bought already/i,
+        /already bought/i,
+        /already purchased/i,
+        /purchased already/i,
+        /just bought/i,
+        /we bought/i,
+        /we purchased/i,
+        /got a/i,
+        /picked up a/i,
+        /found one/i,
+        /found a vehicle/i,
+        /purchased from/i,
+        /bought from/i,
+        /decided on another/i,
+        /chose another/i,
+        /went with another/i,
+        
+        // Not in market
+        /not in the market/i,
+        /not buying/i,
+        /not looking/i,
+        /not ready/i,
+        /maybe later/i,
+        /in the future/i,
+        /next year/i,
+        /couple months/i,
+        /few months/i,
+        /check back/i,
+        /will check back/i,
+        /not ready yet/i,
+        /maybe in a/i,
+        
+        // Confused/Wrong contact
+        /who is this/i,
+        /what is this/i,
+        /what car lot/i,
+        /dont text me/i,
+        /don't text me/i,
+        /bad experience/i,
+        /can't use y'all/i,
+        
+        // Single word rejections (when they're standalone)
+        /^stop$/i,
+        /^no$/i,
+        /^nope$/i,
+        
+        // Working on getting ready (timing objections)
+        /working on getting/i,
+        /getting ready/i,
+        /house ready/i,
+        /getting my house/i,
+        /working on my house/i,
+        /house situation/i,
+        /personal situation/i,
+        /family situation/i,
+        /moving/i,
+        /relocating/i,
+        
+        // Decision made
+        /decided not to/i,
+        /not purchasing/i,
+        /changed my mind/i,
+        /not interested anymore/i,
+        /at this time/i
       ];
 
       // Filter SMS conversations to only actionable ones
       const actionableSmsConversations = smsConversations?.filter(conv => {
         // Exclude messages from leads marked as lost or closed
         if (conv.leads?.status === 'lost' || conv.leads?.status === 'closed') {
+          console.log('📋 [FILTER] Excluding SMS from closed/lost lead:', conv.lead_id);
           return false;
         }
 
         // Exclude messages that match rejection patterns
         if (conv.body && rejectionPatterns.some(pattern => pattern.test(conv.body))) {
+          console.log('📋 [FILTER] Excluding rejection SMS:', conv.body.substring(0, 50) + '...');
           return false;
         }
 
@@ -75,11 +137,13 @@ export const useGlobalUnreadCount = () => {
       const actionableEmailConversations = emailConversations?.filter(conv => {
         // Exclude messages from leads marked as lost or closed
         if (conv.leads?.status === 'lost' || conv.leads?.status === 'closed') {
+          console.log('📋 [FILTER] Excluding email from closed/lost lead:', conv.lead_id);
           return false;
         }
 
         // Exclude messages that match rejection patterns
         if (conv.body && rejectionPatterns.some(pattern => pattern.test(conv.body))) {
+          console.log('📋 [FILTER] Excluding rejection email:', conv.body.substring(0, 50) + '...');
           return false;
         }
 
@@ -98,6 +162,14 @@ export const useGlobalUnreadCount = () => {
         filteredOutSms: (smsConversations?.length || 0) - smsUnread,
         filteredOutEmail: (emailConversations?.length || 0) - emailUnread
       });
+      
+      // Log some examples of what we're keeping vs filtering out
+      if (smsConversations && smsConversations.length > 0) {
+        console.log('📋 [FILTER EXAMPLES] First few actionable SMS messages:');
+        actionableSmsConversations.slice(0, 3).forEach(conv => {
+          console.log('  ✅ KEEPING:', conv.body?.substring(0, 50) + '...');
+        });
+      }
       
       setUnreadCount(totalUnread);
     } catch (error) {
