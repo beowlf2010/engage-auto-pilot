@@ -6,6 +6,7 @@ import { Navigate } from "react-router-dom";
 const DashboardPage = () => {
   const { user, profile, loading } = useAuth();
 
+  // Show loading state while auth is initializing
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background/50 to-muted flex items-center justify-center">
@@ -17,7 +18,7 @@ const DashboardPage = () => {
     );
   }
 
-  // Check for user instead of profile to match ProtectedRoute logic
+  // Redirect to auth if no user
   if (!user) {
     return <Navigate to="/auth" replace />;
   }

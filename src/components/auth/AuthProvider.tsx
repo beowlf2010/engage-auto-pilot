@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  const fetchProfile = async (userId: string, retryCount = 0): Promise<Profile | null> => {
+  const fetchProfile = async (userId: string) => {
     try {
       console.log('🔍 [AUTH PROVIDER] Fetching profile for user:', userId);
       
@@ -58,15 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
-        console.error('❌ [AUTH PROVIDER] Profile fetch error:', error);
-        
-        // Retry once on error
-        if (retryCount < 1) {
-          console.log('🔄 [AUTH PROVIDER] Retrying profile fetch...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return fetchProfile(userId, retryCount + 1);
-        }
-        
+        console.warn('⚠️ [AUTH PROVIDER] Profile fetch failed:', error);
         return null;
       }
 
@@ -81,31 +72,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('🔐 [AUTH PROVIDER] Initializing auth state...');
 
-    // Set up auth state listener
+    // Set up auth state listener - SYNCHRONOUS ONLY
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log('🔐 [AUTH PROVIDER] Auth state changed:', event, !!session);
         
+        // Set auth state IMMEDIATELY and synchronously
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Try to fetch profile, but don't block on it
-          const fetchedProfile = await fetchProfile(session.user.id);
+          // Create fallback profile immediately
+          const fallbackProfile = createFallbackProfile(session.user);
+          setProfile(fallbackProfile);
           
-          if (fetchedProfile) {
-            setProfile(fetchedProfile);
-          } else {
-            // Create fallback profile if database fetch fails
-            console.log('⚠️ [AUTH PROVIDER] Using fallback profile');
-            const fallbackProfile = createFallbackProfile(session.user);
-            setProfile(fallbackProfile);
-          }
+          // Fetch actual profile in background without blocking
+          fetchProfile(session.user.id).then(fetchedProfile => {
+            if (fetchedProfile) {
+              setProfile(fetchedProfile);
+            }
+            // Keep fallback if fetch fails
+          });
         } else {
           console.log('🚫 [AUTH PROVIDER] No session, clearing profile');
           setProfile(null);
         }
         
+        // CRITICAL: Set loading to false immediately after auth state is processed
         setLoading(false);
       }
     );
@@ -123,10 +116,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    initializeAuth();
+    // Add timeout protection to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('⚠️ [AUTH PROVIDER] Auth initialization timeout, setting loading to false');
+      setLoading(false);
+    }, 5000);
+
+    initializeAuth().then(() => {
+      clearTimeout(timeoutId);
+    });
 
     return () => {
       console.log('🔌 [AUTH PROVIDER] Cleaning up auth subscription');
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
