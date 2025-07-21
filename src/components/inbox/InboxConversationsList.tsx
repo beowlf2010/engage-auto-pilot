@@ -53,29 +53,15 @@ const InboxConversationsList = ({
           <p className="text-gray-500">
             {searchQuery ? 'Try adjusting your search or filters' : 'New conversations will appear here'}
           </p>
-          <div className="mt-4 text-xs text-gray-400">
-            Debug: {conversations.length} total conversations loaded
-          </div>
         </div>
       </div>
     );
   }
 
   const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-  const conversationsWithUnread = conversations.filter(c => c.unreadCount > 0).length;
 
   return (
     <div className="h-full overflow-y-auto">
-      {/* Enhanced debug info */}
-      <div className="p-3 bg-blue-50 border-b text-xs">
-        <div className="grid grid-cols-2 gap-2 text-blue-700">
-          <div>📊 {conversations.length} conversations</div>
-          <div>🔴 {totalUnread} unread messages</div>
-          <div>💬 {conversationsWithUnread} with unread</div>
-          <div>🔍 Search: {searchQuery || 'none'}</div>
-        </div>
-      </div>
-      
       <div className="p-4 space-y-2">
         {conversations.map((conversation) => {
           const isUnassigned = !conversation.salespersonId;
@@ -150,13 +136,6 @@ const InboxConversationsList = ({
                           Mark Read
                         </Button>
                       )}
-                    </div>
-                    
-                    {/* Debug info for each conversation */}
-                    <div className="mt-2 text-xs text-gray-400 border-t pt-1">
-                      ID: {conversation.leadId.slice(0, 8)}... | 
-                      Sales: {conversation.salespersonId?.slice(0, 8) || 'none'}... | 
-                      Unread: {conversation.unreadCount}
                     </div>
                   </div>
                 </div>
