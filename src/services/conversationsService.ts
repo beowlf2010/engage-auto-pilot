@@ -1,15 +1,34 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import type { ConversationListItem, MessageData } from '@/types/conversation';
+import type { ConversationListItem } from '@/types/conversation';
 
 export const fetchConversations = async (profile: any): Promise<ConversationListItem[]> => {
-  if (!profile) return [];
+  const startTime = performance.now();
+  console.log('🔄 [CONV SERVICE] Starting conversation fetch', {
+    profileId: profile?.id,
+    timestamp: new Date().toISOString()
+  });
+
+  if (!profile) {
+    console.log('❌ [CONV SERVICE] No profile provided');
+    return [];
+  }
 
   try {
-    console.log('🔄 [CONVERSATIONS SERVICE] Starting conversation fetch...');
+    // Step 1: Get all conversations with explicit ordering
+    const { data: allConversations, error: convError } = await supabase
+      .from('conversations')
+      .select('*')
+      .order('sent_at', { ascending: false });
 
-    // Get all leads with their basic info, phone numbers, and AI opt-in status
-    const { data: leadsData, error: leadsError } = await supabase
+    if (convError) {
+      console.error('❌ [CONV SERVICE] Error fetching conversations:', convError);
+      throw convError;
+    }
+
+    console.log('📊 [CONV SERVICE] Raw conversations fetched:', allConversations?.length || 0);
+
+    // Step 2: Get all leads with their associated data
+    const { data: allLeads, error: leadsError } = await supabase
       .from('leads')
       .select(`
         id,
@@ -30,220 +49,225 @@ export const fetchConversations = async (profile: any): Promise<ConversationList
           first_name,
           last_name
         )
-      `)
-      .order('created_at', { ascending: false });
+      `);
 
-    if (leadsError) throw leadsError;
+    if (leadsError) {
+      console.error('❌ [CONV SERVICE] Error fetching leads:', leadsError);
+      throw leadsError;
+    }
 
-    // Get all conversations grouped by lead
-    const { data: conversationsData, error: conversationsError } = await supabase
-      .from('conversations')
-      .select('*')
-      .order('sent_at', { ascending: false });
+    console.log('📊 [CONV SERVICE] Leads fetched:', allLeads?.length || 0);
 
-    if (conversationsError) throw conversationsError;
+    // Step 3: Process conversations and group by lead
+    const conversationMap = new Map<string, {
+      leadData: any;
+      latestConversation: any;
+      unreadCount: number;
+      totalMessages: number;
+      unreadConversations: any[];
+    }>();
 
-    console.log('📊 [CONVERSATIONS SERVICE] Found', conversationsData?.length || 0, 'total conversations');
+    // Debug: Track unread checking
+    let totalUnreadFound = 0;
+    let unreadCheckResults: any[] = [];
 
-    // Group conversations by lead and calculate metrics
-    const conversationMap = new Map();
-    const leadIdsWithMessages = new Set();
-
-    conversationsData?.forEach(conv => {
+    allConversations?.forEach((conv: any) => {
       const leadId = conv.lead_id;
-      leadIdsWithMessages.add(leadId);
-      
-      if (!conversationMap.has(leadId)) {
-        conversationMap.set(leadId, {
-          latestConversation: conv,
-          unreadCount: 0,
-          totalMessages: 0,
-          incomingCount: 0,
-          outgoingCount: 0
-        });
+      if (!leadId) return;
+
+      // Find matching lead data
+      const leadData = allLeads?.find(lead => lead.id === leadId);
+      if (!leadData) {
+        console.warn('⚠️ [CONV SERVICE] No lead data found for conversation:', leadId);
+        return;
       }
-      
-      const group = conversationMap.get(leadId);
-      
-      // Update latest conversation
-      if (new Date(conv.sent_at) > new Date(group.latestConversation.sent_at)) {
-        group.latestConversation = conv;
-      }
-      
-      // Count messages by direction
+
+      // FIXED: More explicit unread checking with multiple methods
+      const isUnread = conv.direction === 'in' && (
+        conv.read_at === null || 
+        conv.read_at === undefined || 
+        conv.read_at === '' ||
+        !conv.read_at
+      );
+
+      // Debug logging for unread detection
       if (conv.direction === 'in') {
-        group.incomingCount++;
-        // Count unread incoming messages
-        if (!conv.read_at) {
-          group.unreadCount++;
+        const debugInfo = {
+          conversationId: conv.id,
+          leadId: leadId,
+          direction: conv.direction,
+          read_at: conv.read_at,
+          read_at_type: typeof conv.read_at,
+          isUnread: isUnread,
+          sent_at: conv.sent_at
+        };
+        unreadCheckResults.push(debugInfo);
+        
+        if (isUnread) {
+          totalUnreadFound++;
+          console.log('🔴 [CONV SERVICE] Found unread message:', debugInfo);
         }
-      } else {
-        group.outgoingCount++;
       }
+
+      // Get or create conversation group for this lead
+      const existing = conversationMap.get(leadId);
       
-      group.totalMessages++;
+      if (!existing) {
+        // First conversation for this lead
+        conversationMap.set(leadId, {
+          leadData,
+          latestConversation: conv,
+          unreadCount: isUnread ? 1 : 0,
+          totalMessages: 1,
+          unreadConversations: isUnread ? [conv] : []
+        });
+      } else {
+        // Update existing group
+        // Keep the latest conversation (conversations are ordered by sent_at desc)
+        if (new Date(conv.sent_at) > new Date(existing.latestConversation.sent_at)) {
+          existing.latestConversation = conv;
+        }
+        
+        // Count unread messages
+        if (isUnread) {
+          existing.unreadCount++;
+          existing.unreadConversations.push(conv);
+        }
+        existing.totalMessages++;
+      }
     });
 
-    // Filter leads to only include those with actual conversations
-    const leadsWithConversations = leadsData?.filter(lead => 
-      leadIdsWithMessages.has(lead.id)
-    ) || [];
+    console.log('🔴 [CONV SERVICE] Unread analysis:', {
+      totalIncomingMessages: unreadCheckResults.length,
+      totalUnreadFound: totalUnreadFound,
+      conversationGroupsWithUnread: Array.from(conversationMap.values()).filter(g => g.unreadCount > 0).length
+    });
 
-    console.log('📊 [CONVERSATIONS SERVICE] Processing', leadsWithConversations.length, 'leads with conversations');
+    // Log first few unread check results for debugging
+    if (unreadCheckResults.length > 0) {
+      console.log('🔍 [CONV SERVICE] Sample unread checks:', unreadCheckResults.slice(0, 5));
+    }
 
-    // Transform leads data to ConversationListItem format
-    const transformedConversations: ConversationListItem[] = leadsWithConversations.map(lead => {
-      const group = conversationMap.get(lead.id);
-      const latestConv = group.latestConversation;
+    console.log('📊 [CONV SERVICE] Conversation groups created:', conversationMap.size);
+
+    // Step 4: Convert to ConversationListItem format
+    const result: ConversationListItem[] = Array.from(conversationMap.entries()).map(([leadId, group]) => {
+      const { leadData, latestConversation, unreadCount, totalMessages } = group;
       
       // Get primary phone or fallback
-      const primaryPhone = lead.phone_numbers?.find(p => p.is_primary)?.number || 
-                          lead.phone_numbers?.[0]?.number || 
+      const primaryPhone = leadData.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+                          leadData.phone_numbers?.[0]?.number || 
                           'No phone';
 
       const conversationItem: ConversationListItem = {
-        leadId: lead.id,
-        leadName: `${lead.first_name || 'Unknown'} ${lead.last_name || 'Lead'}`.trim(),
+        leadId,
+        leadName: `${leadData.first_name || 'Unknown'} ${leadData.last_name || 'Lead'}`.trim(),
         primaryPhone,
-        leadPhone: primaryPhone, // Keep both for compatibility
-        leadEmail: lead.email || '',
-        lastMessage: latestConv.body || 'No message content',
-        lastMessageTime: new Date(latestConv.sent_at).toLocaleString(),
-        lastMessageDirection: latestConv.direction as 'in' | 'out',
-        lastMessageDate: new Date(latestConv.sent_at),
-        unreadCount: group.unreadCount,
-        messageCount: group.totalMessages,
-        salespersonId: lead.salesperson_id,
-        vehicleInterest: lead.vehicle_interest || 'Not specified',
-        leadSource: lead.source || 'Unknown',
-        leadType: lead.lead_type_name || 'Unknown',
-        status: lead.status || 'new',
-        salespersonName: lead.profiles ? 
-          `${lead.profiles.first_name} ${lead.profiles.last_name}`.trim() : undefined,
-        aiOptIn: lead.ai_opt_in || false,
-        incomingCount: group.incomingCount,
-        outgoingCount: group.outgoingCount
+        leadPhone: primaryPhone,
+        leadEmail: leadData.email || '',
+        lastMessage: latestConversation.body || 'No message content',
+        lastMessageTime: new Date(latestConversation.sent_at).toLocaleString(),
+        lastMessageDirection: latestConversation.direction as 'in' | 'out',
+        lastMessageDate: new Date(latestConversation.sent_at),
+        unreadCount,
+        messageCount: totalMessages,
+        salespersonId: leadData.salesperson_id,
+        vehicleInterest: leadData.vehicle_interest || 'Not specified',
+        leadSource: leadData.source || '',
+        leadType: leadData.lead_type_name || 'unknown',
+        status: leadData.status || 'new',
+        salespersonName: leadData.profiles ? 
+          `${leadData.profiles.first_name} ${leadData.profiles.last_name}`.trim() : undefined,
+        aiOptIn: leadData.ai_opt_in || false
       };
+
+      // Debug log conversations with unread messages
+      if (unreadCount > 0) {
+        console.log('🔴 [CONV SERVICE] Conversation with unread messages:', {
+          leadName: conversationItem.leadName,
+          leadId: conversationItem.leadId,
+          unreadCount: conversationItem.unreadCount,
+          lastMessage: conversationItem.lastMessage?.substring(0, 50) + '...'
+        });
+      }
 
       return conversationItem;
     });
 
-    // Sort by unread first, then by last message time
-    transformedConversations.sort((a, b) => {
+    // Step 5: Sort by unread first, then by last message time
+    result.sort((a, b) => {
       // Prioritize unread conversations
       if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
       if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
-      
-      // If both have unread messages, sort by unread count (most unread first)
-      if (a.unreadCount > 0 && b.unreadCount > 0) {
-        if (a.unreadCount !== b.unreadCount) {
-          return b.unreadCount - a.unreadCount;
-        }
-      }
       
       // Then sort by last message time (newest first)
       return b.lastMessageDate.getTime() - a.lastMessageDate.getTime();
     });
 
-    const totalUnread = transformedConversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+    const endTime = performance.now();
     
-    console.log('✅ [CONVERSATIONS SERVICE] Processed conversations:', {
-      totalConversations: transformedConversations.length,
-      withUnread: transformedConversations.filter(c => c.unreadCount > 0).length,
-      totalUnreadMessages: totalUnread
-    });
-
-    return transformedConversations;
-  } catch (error) {
-    console.error('❌ [CONVERSATIONS SERVICE] Error fetching conversations:', error);
-    return [];
-  }
-};
-
-export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
-  try {
-    const { data: messagesData, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('sent_at', { ascending: true });
-
-    if (error) throw error;
-
-    return messagesData?.map(msg => ({
-      id: msg.id,
-      leadId: msg.lead_id,
-      body: msg.body,
-      direction: msg.direction as 'in' | 'out',
-      sentAt: msg.sent_at,
-      readAt: msg.read_at,
-      smsStatus: msg.sms_status,
-      twilioMessageId: msg.twilio_message_id,
-      aiGenerated: msg.ai_generated
-    })) || [];
-  } catch (error) {
-    console.error('Error fetching messages:', error);
-    throw error;
-  }
-};
-
-export const assignCurrentUserToLead = async (leadId: string, profileId: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('leads')
-      .update({ salesperson_id: profileId })
-      .eq('id', leadId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error assigning lead:', error);
-    return false;
-  }
-};
-
-export const markMessagesAsRead = async (leadId: string): Promise<void> => {
-  try {
-    console.log('📖 Marking messages as read for lead:', leadId);
+    const finalStats = {
+      totalConversations: result.length,
+      withUnread: result.filter(c => c.unreadCount > 0).length,
+      totalUnreadMessages: result.reduce((sum, c) => sum + c.unreadCount, 0),
+      processingTime: Math.round(endTime - startTime) + 'ms'
+    };
     
-    const { data, error } = await supabase
-      .from('conversations')
-      .update({ read_at: new Date().toISOString() })
-      .eq('lead_id', leadId)
-      .eq('direction', 'in')
-      .is('read_at', null)
-      .select('id');
-
-    if (error) {
-      console.error('❌ Error marking messages as read:', error);
-      throw error;
+    console.log('✅ [CONV SERVICE] Processing complete:', finalStats);
+    
+    // Log conversations with unread for verification
+    const unreadConversations = result.filter(c => c.unreadCount > 0);
+    if (unreadConversations.length > 0) {
+      console.log('🔴 [CONV SERVICE] Final unread conversations:', 
+        unreadConversations.map(c => ({
+          leadName: c.leadName,
+          unreadCount: c.unreadCount
+        }))
+      );
+    } else {
+      console.log('⚠️ [CONV SERVICE] No unread conversations found in final result!');
     }
     
-    console.log('✅ Marked', data?.length || 0, 'messages as read');
-  } catch (error) {
-    console.error('Error marking messages as read:', error);
-    throw error;
+    return result;
+
+  } catch (err) {
+    console.error('❌ [CONV SERVICE] Error processing conversations:', err);
+    throw err;
   }
 };
 
-export const markAllMessagesAsRead = async (leadId: string): Promise<void> => {
-  try {
-    console.log('📖 Marking ALL messages as read for lead:', leadId);
-    
-    const { error } = await supabase
-      .from('conversations')
-      .update({ read_at: new Date().toISOString() })
-      .eq('lead_id', leadId)
-      .is('read_at', null);
+export const fetchMessages = async (leadId: string) => {
+  console.log('📬 [CONV SERVICE] Fetching messages for lead:', leadId);
+  
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('lead_id', leadId)
+    .order('sent_at', { ascending: true });
 
-    if (error) {
-      console.error('❌ Error marking all messages as read:', error);
-      throw error;
-    }
-    
-    console.log('✅ All messages marked as read for lead:', leadId);
-  } catch (error) {
-    console.error('Error marking all messages as read:', error);
+  if (error) {
+    console.error('❌ [CONV SERVICE] Error fetching messages:', error);
     throw error;
   }
+
+  console.log('✅ [CONV SERVICE] Messages fetched:', data?.length || 0);
+  return data || [];
+};
+
+export const markMessagesAsRead = async (leadId: string) => {
+  console.log('👁️ [CONV SERVICE] Marking messages as read for lead:', leadId);
+  
+  const { error } = await supabase
+    .from('conversations')
+    .update({ read_at: new Date().toISOString() })
+    .eq('lead_id', leadId)
+    .eq('direction', 'in')
+    .is('read_at', null);
+
+  if (error) {
+    console.error('❌ [CONV SERVICE] Error marking messages as read:', error);
+    throw error;
+  }
+
+  console.log('✅ [CONV SERVICE] Messages marked as read');
 };

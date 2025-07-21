@@ -46,7 +46,7 @@ export const useStableRealtimeInbox = () => {
     }
     lastRefreshRef.current = now;
     
-    console.log('🔄 [STABLE INBOX] Conversation update - refreshing');
+    console.log('🔄 [STABLE INBOX] Conversation update - refreshing immediately');
     loadConversations();
   }, [loadConversations]);
 
@@ -58,6 +58,7 @@ export const useStableRealtimeInbox = () => {
     }
     
     pendingRefreshRef.current = setTimeout(() => {
+      console.log('🔄 [STABLE INBOX] Executing delayed refresh after message update');
       loadConversations();
       
       if (currentLeadIdRef.current === leadId) {
@@ -79,7 +80,7 @@ export const useStableRealtimeInbox = () => {
     const unsubscribe = consolidatedRealtimeManager.subscribe({
       id: subscriptionIdRef.current,
       callback: (payload) => {
-        console.log('🔄 [STABLE INBOX] Received update:', payload.eventType);
+        console.log('🔄 [STABLE INBOX] Received realtime update:', payload.eventType);
 
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           if (payload.table === 'conversations') {
@@ -116,16 +117,17 @@ export const useStableRealtimeInbox = () => {
   }, []);
 
   useEffect(() => {
-    console.log('🔄 [STABLE INBOX] Loading initial conversations');
+    console.log('🔄 [STABLE INBOX] Loading initial conversations with enhanced logging');
     loadConversations();
   }, [loadConversations]);
 
   const enhancedSendMessage = useCallback(async (leadId: string, message: string) => {
     try {
-      console.log('📤 [STABLE INBOX] Sending message');
+      console.log('📤 [STABLE INBOX] Sending message with immediate refresh');
       
       await sendMessage(leadId, message);
       
+      // Immediate refresh for instant UI updates
       const refreshPromises = [
         loadConversations(),
         currentLeadIdRef.current === leadId ? loadMessages(leadId) : Promise.resolve()
@@ -140,7 +142,7 @@ export const useStableRealtimeInbox = () => {
   }, [sendMessage, loadConversations, loadMessages]);
 
   const enhancedRefresh = useCallback(() => {
-    console.log('🔄 [STABLE INBOX] Manual refresh triggered');
+    console.log('🔄 [STABLE INBOX] Manual refresh triggered with connection check');
     
     if (!connectionState.isConnected) {
       console.log('🔌 [STABLE INBOX] Reconnecting before refresh');
