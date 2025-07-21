@@ -1,248 +1,353 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { isSuppressed, enforceConsent } from '@/utils/compliance/complianceUtils';
+import { errorHandlingService } from './errorHandlingService';
 
-export interface SendMessageParams {
+export interface ConsolidatedMessageParams {
   leadId: string;
   messageBody: string;
   profileId: string;
   isAIGenerated?: boolean;
 }
 
-export interface MessageResult {
+export interface ConsolidatedMessageResult {
   success: boolean;
   conversationId?: string;
+  messageSid?: string;
   error?: string;
+  errorDetails?: any;
+  blocked?: boolean;
+  compliance?: boolean;
 }
 
-// Consolidated message sending service with proper error handling and phone fallback
-export const consolidatedSendMessage = async (params: SendMessageParams): Promise<MessageResult> => {
-  const { leadId, messageBody, profileId, isAIGenerated = false } = params;
+export const validateProfile = (profile: any): { isValid: boolean; profileId: string | null; error?: string } => {
+  if (!profile) {
+    return { isValid: false, profileId: null, error: 'Profile is null or undefined' };
+  }
+  
+  if (!profile.id) {
+    return { isValid: false, profileId: null, error: 'Profile missing ID field' };
+  }
+  
+  return { isValid: true, profileId: profile.id };
+};
 
+export const validateLead = async (leadId: string): Promise<{ isValid: boolean; lead: any; error?: string }> => {
   try {
-    console.log(`📤 [CONSOLIDATED] Sending message to lead: ${leadId}`);
-    console.log(`👤 [CONSOLIDATED] Profile ID: ${profileId}`);
-
-    // Validate inputs
-    if (!leadId || !messageBody.trim() || !profileId) {
-      throw new Error('Lead ID, message body, and profile ID are required');
-    }
-
-    // Get lead data including current status
-    const { data: leadData, error: leadError } = await supabase
+    console.log(`🔍 [CONSOLIDATED] Validating lead: ${leadId}`);
+    
+    const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('status')
+      .select('id, first_name, last_name, status')
       .eq('id', leadId)
       .single();
-
-    if (leadError) {
-      throw new Error(`Failed to fetch lead data: ${leadError.message}`);
-    }
-
-    // Get phone number for the lead with fallback logic
-    console.log(`📱 [CONSOLIDATED] Looking for phone numbers for lead: ${leadId}`);
     
-    // First try to get primary phone number
-    let { data: phoneData, error: phoneError } = await supabase
+    if (leadError) {
+      console.error(`❌ [CONSOLIDATED] Lead lookup error:`, leadError);
+      return { isValid: false, lead: null, error: `Lead lookup failed: ${leadError.message}` };
+    }
+    
+    if (!lead) {
+      console.error(`❌ [CONSOLIDATED] Lead not found: ${leadId}`);
+      return { isValid: false, lead: null, error: 'Lead not found' };
+    }
+    
+    console.log(`✅ [CONSOLIDATED] Lead validated: ${lead.first_name} ${lead.last_name}`);
+    return { isValid: true, lead };
+  } catch (error) {
+    console.error(`❌ [CONSOLIDATED] Lead validation error:`, error);
+    return { isValid: false, lead: null, error: `Lead validation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
+  }
+};
+
+export const getLeadPhoneNumber = async (leadId: string): Promise<{ phoneNumber: string | null; error?: string }> => {
+  try {
+    console.log(`📱 [CONSOLIDATED] Looking up phone for lead: ${leadId}`);
+    
+    const { data: phoneData, error: phoneError } = await supabase
       .from('phone_numbers')
       .select('number')
       .eq('lead_id', leadId)
       .eq('is_primary', true)
       .maybeSingle();
-
-    // If no primary phone found, get any phone number
-    if (!phoneData && !phoneError) {
-      console.log(`📱 [CONSOLIDATED] No primary phone found, trying any phone number`);
-      const { data: anyPhoneData, error: anyPhoneError } = await supabase
+    
+    if (phoneError) {
+      console.error(`❌ [CONSOLIDATED] Phone lookup error:`, phoneError);
+      
+      // Try fallback: get any phone number for this lead
+      console.log(`🔄 [CONSOLIDATED] Trying fallback phone lookup`);
+      const { data: fallbackPhone, error: fallbackError } = await supabase
         .from('phone_numbers')
         .select('number')
         .eq('lead_id', leadId)
-        .order('priority', { ascending: true })
         .limit(1)
         .maybeSingle();
       
-      phoneData = anyPhoneData;
-      phoneError = anyPhoneError;
+      if (fallbackError || !fallbackPhone) {
+        console.error(`❌ [CONSOLIDATED] Fallback phone lookup failed:`, fallbackError);
+        return { phoneNumber: null, error: 'No phone number found for this lead' };
+      }
+      
+      console.log(`✅ [CONSOLIDATED] Using fallback phone: ${fallbackPhone.number}`);
+      return { phoneNumber: fallbackPhone.number };
     }
-
-    if (phoneError || !phoneData) {
-      throw new Error('No phone number found for this lead');
-    }
-
-    console.log(`📱 [CONSOLIDATED] Using phone: ${phoneData.number}`);
-
-    // CRITICAL COMPLIANCE CHECKS - Stop spam before creating conversation
-    const phoneNumber = phoneData.number;
     
-    // Check if phone number is suppressed (blocked)
-    const isPhoneSuppressed = await isSuppressed(phoneNumber, 'sms');
-    if (isPhoneSuppressed) {
-      console.warn(`🚫 [COMPLIANCE] Phone ${phoneNumber} is suppressed - blocking message`);
-      throw new Error(`Phone number ${phoneNumber} is on the suppression list and cannot receive messages`);
+    if (!phoneData || !phoneData.number) {
+      console.error(`❌ [CONSOLIDATED] No phone number found for lead: ${leadId}`);
+      return { phoneNumber: null, error: 'No phone number found for this lead' };
     }
-
-    // Check rate limiting to prevent spam
-    const { data: rateLimitCheck, error: rateLimitError } = await supabase
-      .rpc('check_message_rate_limit', { p_phone_number: phoneNumber, p_limit_minutes: 10 });
     
-    if (rateLimitError) {
-      console.warn(`⚠️ [COMPLIANCE] Rate limit check failed:`, rateLimitError);
-    } else if (!rateLimitCheck) {
-      console.warn(`🚫 [COMPLIANCE] Rate limit exceeded for ${phoneNumber} - blocking message`);
-      throw new Error(`Rate limit exceeded for ${phoneNumber}. Please wait before sending another message.`);
+    console.log(`✅ [CONSOLIDATED] Found phone: ${phoneData.number}`);
+    return { phoneNumber: phoneData.number };
+  } catch (error) {
+    console.error(`❌ [CONSOLIDATED] Phone lookup exception:`, error);
+    return { phoneNumber: null, error: `Phone lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
+  }
+};
+
+export const consolidatedSendMessage = async (params: ConsolidatedMessageParams): Promise<ConsolidatedMessageResult> => {
+  const { leadId, messageBody, profileId, isAIGenerated = false } = params;
+  
+  console.log(`📤 [CONSOLIDATED] === ENHANCED SEND MESSAGE START ===`);
+  console.log(`📤 [CONSOLIDATED] Lead ID: ${leadId}`);
+  console.log(`📤 [CONSOLIDATED] Profile ID: ${profileId}`);
+  console.log(`📤 [CONSOLIDATED] Message length: ${messageBody?.length || 0}`);
+  console.log(`📤 [CONSOLIDATED] AI Generated: ${isAIGenerated}`);
+  console.log(`📤 [CONSOLIDATED] Message preview: ${messageBody?.substring(0, 100)}...`);
+
+  try {
+    // Step 1: Validate inputs
+    if (!leadId) {
+      const error = 'Lead ID is required';
+      console.error(`❌ [CONSOLIDATED] ${error}`);
+      return { success: false, error };
+    }
+    
+    if (!messageBody?.trim()) {
+      const error = 'Message body is required and cannot be empty';
+      console.error(`❌ [CONSOLIDATED] ${error}`);
+      return { success: false, error };
+    }
+    
+    if (!profileId) {
+      const error = 'Profile ID is required';
+      console.error(`❌ [CONSOLIDATED] ${error}`);
+      return { success: false, error };
     }
 
-    // Check consent for the lead (optional but recommended)
-    try {
-      await enforceConsent(leadId, 'sms');
-      console.log(`✅ [COMPLIANCE] Consent verified for lead ${leadId}`);
-    } catch (consentError) {
-      console.warn(`⚠️ [COMPLIANCE] No consent found for lead ${leadId}:`, consentError);
-      // Continue anyway - consent check is warning only for now
-      // In production, you might want to block messages without consent
+    // Step 2: Validate lead exists
+    const leadValidation = await validateLead(leadId);
+    if (!leadValidation.isValid) {
+      console.error(`❌ [CONSOLIDATED] Lead validation failed: ${leadValidation.error}`);
+      errorHandlingService.handleError(new Error(leadValidation.error!), {
+        operation: 'consolidated_send_message_lead_validation',
+        leadId,
+        additionalData: { profileId, messageLength: messageBody.length }
+      });
+      return { success: false, error: leadValidation.error };
     }
 
-    console.log(`✅ [COMPLIANCE] All compliance checks passed for ${phoneNumber}`);
+    // Step 3: Get phone number
+    const phoneResult = await getLeadPhoneNumber(leadId);
+    if (!phoneResult.phoneNumber) {
+      console.error(`❌ [CONSOLIDATED] Phone lookup failed: ${phoneResult.error}`);
+      errorHandlingService.handleError(new Error(phoneResult.error!), {
+        operation: 'consolidated_send_message_phone_lookup',
+        leadId,
+        additionalData: { profileId, leadName: `${leadValidation.lead.first_name} ${leadValidation.lead.last_name}` }
+      });
+      return { success: false, error: phoneResult.error };
+    }
 
-    // Create conversation record
-    const conversationData = {
-      lead_id: leadId,
-      profile_id: profileId,
-      body: messageBody.trim(),
-      direction: 'out' as const,
-      sent_at: new Date().toISOString(),
-      ai_generated: isAIGenerated,
-      sms_status: 'pending' as const
-    };
-
+    // Step 4: Create conversation record
+    console.log(`💾 [CONSOLIDATED] Creating conversation record...`);
+    
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
-      .insert(conversationData)
+      .insert({
+        lead_id: leadId,
+        profile_id: profileId,
+        body: messageBody.trim(),
+        direction: 'out',
+        ai_generated: isAIGenerated,
+        sent_at: new Date().toISOString(),
+        sms_status: 'pending'
+      })
       .select()
       .single();
 
     if (conversationError) {
-      console.error('❌ [CONSOLIDATED] Conversation creation failed:', conversationError);
-      throw new Error(`Failed to create conversation: ${conversationError.message}`);
+      console.error(`❌ [CONSOLIDATED] Conversation creation failed:`, conversationError);
+      errorHandlingService.handleError(conversationError, {
+        operation: 'consolidated_send_message_conversation_creation',
+        leadId,
+        additionalData: { profileId, phoneNumber: phoneResult.phoneNumber, messageLength: messageBody.length }
+      });
+      return { success: false, error: `Failed to create conversation record: ${conversationError.message}`, errorDetails: conversationError };
     }
 
     console.log(`✅ [CONSOLIDATED] Created conversation: ${conversation.id}`);
 
-    // Send SMS via edge function
-    console.log(`📤 [CONSOLIDATED] Calling send-sms function for conversation: ${conversation.id}`);
+    // Step 5: Send SMS via edge function with enhanced payload
+    console.log(`📤 [CONSOLIDATED] Sending SMS via edge function...`);
+    
+    const smsPayload = {
+      to: phoneResult.phoneNumber,
+      message: messageBody.trim(),
+      conversationId: conversation.id,
+      leadId: leadId,
+      profileId: profileId,
+      isAIGenerated: isAIGenerated
+    };
+
+    console.log(`📤 [CONSOLIDATED] SMS payload details:`, {
+      to: smsPayload.to,
+      messageLength: smsPayload.message.length,
+      conversationId: smsPayload.conversationId,
+      leadId: smsPayload.leadId,
+      profileId: smsPayload.profileId,
+      isAIGenerated: smsPayload.isAIGenerated
+    });
+
     const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
-      body: {
-        to: phoneData.number,
-        body: messageBody.trim(),
-        conversationId: conversation.id
-      }
+      body: smsPayload
     });
 
-    // Enhanced error logging for debugging
-    console.log(`📬 [CONSOLIDATED] SMS function response:`, {
+    console.log(`📤 [CONSOLIDATED] SMS function response:`, {
       success: smsResult?.success,
-      error: smsResult?.error,
-      smsError: smsError,
-      phone: phoneData.number,
-      conversationId: conversation.id
+      error: smsError?.message || smsResult?.error,
+      messageSid: smsResult?.messageSid || smsResult?.telnyxMessageId,
+      blocked: smsResult?.blocked,
+      compliance: smsResult?.compliance,
+      emergency: smsResult?.emergency
     });
 
-    if (smsError || !smsResult?.success) {
-      // Enhanced error details for troubleshooting
-      const errorDetails = {
-        smsResult: smsResult,
-        smsError: smsError,
-        phone: phoneData.number,
-        messageLength: messageBody.length,
-        timestamp: new Date().toISOString()
-      };
+    if (smsError) {
+      console.error(`❌ [CONSOLIDATED] SMS function error:`, smsError);
       
-      console.error(`❌ [CONSOLIDATED] SMS sending failed with details:`, errorDetails);
-      
-      // Update conversation with detailed error
+      // Update conversation with error
       await supabase
         .from('conversations')
-        .update({ 
+        .update({
           sms_status: 'failed',
-          sms_error: JSON.stringify(errorDetails)
+          sms_error: smsError.message
         })
         .eq('id', conversation.id);
       
-      // Auto-suppress numbers with repeated failures to prevent spam
-      console.log(`🔄 [COMPLIANCE] Running auto-suppression check for failed messages`);
-      try {
-        await supabase.rpc('auto_suppress_failed_numbers');
-      } catch (autoSuppressError) {
-        console.warn(`⚠️ [COMPLIANCE] Auto-suppression check failed:`, autoSuppressError);
+      errorHandlingService.handleError(smsError, {
+        operation: 'consolidated_send_message_sms_function_error',
+        leadId,
+        additionalData: { 
+          conversationId: conversation.id, 
+          phoneNumber: phoneResult.phoneNumber,
+          profileId,
+          errorType: 'function_error'
+        }
+      });
+      
+      return { 
+        success: false, 
+        error: `SMS function error: ${smsError.message}`, 
+        errorDetails: smsError,
+        conversationId: conversation.id 
+      };
+    }
+
+    if (!smsResult?.success) {
+      console.error(`❌ [CONSOLIDATED] SMS send failed:`, smsResult);
+      
+      // Update conversation with error
+      await supabase
+        .from('conversations')
+        .update({
+          sms_status: 'failed',
+          sms_error: smsResult?.error || 'SMS sending failed'
+        })
+        .eq('id', conversation.id);
+      
+      // Handle specific failure types
+      if (smsResult?.blocked) {
+        console.error(`🚫 [CONSOLIDATED] Message blocked due to compliance: ${smsResult.reason || 'Unknown reason'}`);
+        return {
+          success: false,
+          error: `Message blocked: ${smsResult.reason || 'Compliance violation'}`,
+          errorDetails: smsResult,
+          blocked: true,
+          compliance: smsResult?.compliance,
+          conversationId: conversation.id
+        };
+      }
+
+      if (smsResult?.emergency) {
+        console.error(`🚨 [CONSOLIDATED] Emergency shutdown active`);
+        return {
+          success: false,
+          error: 'AI messaging system is currently disabled',
+          errorDetails: smsResult,
+          blocked: true,
+          conversationId: conversation.id
+        };
       }
       
-      throw new Error(`SMS sending failed: ${JSON.stringify(errorDetails)}`);
+      errorHandlingService.handleError(new Error(smsResult?.error || 'SMS sending failed'), {
+        operation: 'consolidated_send_message_sms_send_failed',
+        leadId,
+        additionalData: { 
+          conversationId: conversation.id, 
+          phoneNumber: phoneResult.phoneNumber,
+          profileId,
+          smsResult,
+          errorType: 'send_failure'
+        }
+      });
+      
+      return { 
+        success: false, 
+        error: smsResult?.error || 'Failed to send SMS', 
+        errorDetails: smsResult,
+        conversationId: conversation.id 
+      };
     }
 
-    // Update conversation with success
-    await supabase
-      .from('conversations')
-      .update({
-        sms_status: 'sent',
-        twilio_message_id: smsResult.telnyxMessageId || smsResult.messageSid
-      })
-      .eq('id', conversation.id);
-
-    // Update lead status to "engaged" if currently "new"
-    if (leadData.status === 'new') {
-      console.log(`🔄 [CONSOLIDATED] Updating lead status from "new" to "engaged"`);
-      const { error: statusUpdateError } = await supabase
-        .from('leads')
-        .update({ status: 'engaged' })
-        .eq('id', leadId);
-
-      if (statusUpdateError) {
-        console.warn('⚠️ [CONSOLIDATED] Failed to update lead status:', statusUpdateError);
-        // Don't throw error for status update failure - message was sent successfully
-      } else {
-        console.log(`✅ [CONSOLIDATED] Lead status updated to "engaged"`);
-      }
+    // Step 6: Update conversation with success
+    console.log(`✅ [CONSOLIDATED] SMS sent successfully, updating conversation...`);
+    
+    if (smsResult.messageSid || smsResult.telnyxMessageId) {
+      await supabase
+        .from('conversations')
+        .update({
+          sms_status: 'sent',
+          twilio_message_id: smsResult.messageSid || smsResult.telnyxMessageId
+        })
+        .eq('id', conversation.id);
     }
 
-    console.log(`✅ [CONSOLIDATED] Message sent successfully`);
-
+    console.log(`✅ [CONSOLIDATED] === SEND MESSAGE COMPLETE ===`);
+    
     return {
       success: true,
-      conversationId: conversation.id
+      conversationId: conversation.id,
+      messageSid: smsResult.messageSid || smsResult.telnyxMessageId
     };
 
   } catch (error) {
-    console.error('❌ [CONSOLIDATED] Send message error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    console.error(`❌ [CONSOLIDATED] === SEND MESSAGE FAILED ===`);
+    console.error(`❌ [CONSOLIDATED] Unexpected error:`, error);
+    
+    errorHandlingService.handleError(error, {
+      operation: 'consolidated_send_message_unexpected_error',
+      leadId,
+      additionalData: { 
+        profileId, 
+        messageLength: messageBody?.length || 0,
+        errorType: 'unexpected_exception'
+      }
+    });
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unexpected error occurred';
+    return { 
+      success: false, 
+      error: errorMessage, 
+      errorDetails: error 
     };
   }
-};
-
-// Helper function to validate profile data structure
-export const validateProfile = (profile: any): { isValid: boolean; profileId?: string; error?: string } => {
-  if (!profile) {
-    return { isValid: false, error: 'Profile is required' };
-  }
-
-  let profileId: string;
-  
-  if (typeof profile === 'string') {
-    profileId = profile;
-  } else if (profile.id) {
-    profileId = typeof profile.id === 'string' ? profile.id : profile.id?.value || profile.id?.toString();
-  } else {
-    return { isValid: false, error: 'Invalid profile structure - missing ID' };
-  }
-
-  // Validate UUID format (allow special AI system UUID)
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const specialAISystemUUID = '00000000-0000-0000-0000-000000000001';
-  
-  if (!uuidRegex.test(profileId) && profileId !== specialAISystemUUID) {
-    return { isValid: false, error: 'Invalid profile ID format' };
-  }
-
-  return { isValid: true, profileId };
 };
