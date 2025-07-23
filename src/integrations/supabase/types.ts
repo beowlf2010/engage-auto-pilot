@@ -7423,18 +7423,15 @@ export type Database = {
       }
       v_monthly_retail_summary: {
         Row: {
-          dealer_trade_gross_mtd: number | null
-          dealer_trade_units_mtd: number | null
-          new_gross_mtd: number | null
-          new_units_mtd: number | null
-          retail_gross_mtd: number | null
-          retail_units_mtd: number | null
-          total_profit_mtd: number | null
-          total_units_mtd: number | null
-          used_gross_mtd: number | null
-          used_units_mtd: number | null
-          wholesale_gross_mtd: number | null
-          wholesale_units_mtd: number | null
+          dealer_trade_gross: number | null
+          dealer_trade_units: number | null
+          month: string | null
+          retail_gross: number | null
+          retail_units: number | null
+          total_gross: number | null
+          total_units: number | null
+          wholesale_gross: number | null
+          wholesale_units: number | null
         }
         Relationships: []
       }
