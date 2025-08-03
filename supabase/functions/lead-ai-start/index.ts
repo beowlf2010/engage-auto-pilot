@@ -19,6 +19,83 @@ interface StartAIRequest {
   customStartDelay?: number; // minutes
 }
 
+// Rate limiting storage
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+// Input validation
+function validateStartAIRequest(data: any): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!data || typeof data !== 'object') {
+    errors.push('Invalid request body');
+    return { isValid: false, errors };
+  }
+  
+  if (!data.leadId || typeof data.leadId !== 'string') {
+    errors.push('leadId is required and must be a string');
+  } else if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.leadId)) {
+    errors.push('leadId must be a valid UUID');
+  }
+  
+  const validSequenceTypes = ['new_lead', 'followup', 'service', 'post_sale'];
+  if (data.sequenceType && !validSequenceTypes.includes(data.sequenceType)) {
+    errors.push('sequenceType must be one of: ' + validSequenceTypes.join(', '));
+  }
+  
+  const validTones = ['friendly', 'urgent', 'budget'];
+  if (data.tonePreference && !validTones.includes(data.tonePreference)) {
+    errors.push('tonePreference must be one of: ' + validTones.join(', '));
+  }
+  
+  const validMessageTypes = ['sms', 'email', 'both'];
+  if (data.messageType && !validMessageTypes.includes(data.messageType)) {
+    errors.push('messageType must be one of: ' + validMessageTypes.join(', '));
+  }
+  
+  if (data.customStartDelay !== undefined) {
+    if (typeof data.customStartDelay !== 'number' || data.customStartDelay < 0 || data.customStartDelay > 1440) {
+      errors.push('customStartDelay must be a number between 0 and 1440 (minutes)');
+    }
+  }
+  
+  return { isValid: errors.length === 0, errors };
+}
+
+// Rate limiting check
+function checkRateLimit(identifier: string): boolean {
+  const now = Date.now();
+  const windowMs = 60000; // 1 minute
+  const maxRequests = 5; // Lower limit for AI start operations
+  
+  const current = rateLimitMap.get(identifier);
+  
+  if (!current || now > current.resetTime) {
+    rateLimitMap.set(identifier, { count: 1, resetTime: now + windowMs });
+    return true;
+  }
+  
+  if (current.count >= maxRequests) {
+    return false;
+  }
+  
+  current.count++;
+  return true;
+}
+
+// Security logging
+async function logSecurityEvent(supabase: any, event: string, details: any, severity: 'low' | 'medium' | 'high' | 'critical' = 'medium') {
+  try {
+    await supabase.from('security_audit_log').insert({
+      action: event,
+      resource_type: 'edge_function',
+      details: { function: 'lead-ai-start', ...details },
+      created_at: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Failed to log security event:', error);
+  }
+}
+
 interface AISequenceConfig {
   sequenceType: string;
   totalDays: number;
@@ -35,16 +112,131 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  let requestData: any = null;
+
   try {
     const supabase = createClient(supabaseUrl!, supabaseKey!);
     
-    const { leadId, sequenceType = 'new_lead', tonePreference = 'friendly', messageType = 'sms', customStartDelay = 0 }: StartAIRequest = await req.json();
+    // Get client IP for rate limiting and logging
+    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    
+    // Rate limiting
+    if (!checkRateLimit(clientIP)) {
+      await logSecurityEvent(supabase, 'rate_limit_exceeded', { 
+        ip: clientIP, 
+        endpoint: 'lead-ai-start'
+      }, 'high');
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Rate limit exceeded. Please try again later.'
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      await logSecurityEvent(supabase, 'unauthorized_access_attempt', { 
+        ip: clientIP, 
+        endpoint: 'lead-ai-start'
+      }, 'high');
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Authentication required'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      await logSecurityEvent(supabase, 'invalid_authentication', { 
+        ip: clientIP, 
+        error: authError?.message 
+      }, 'high');
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid authentication'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Parse and validate input
+    try {
+      requestData = await req.json();
+    } catch (parseError) {
+      await logSecurityEvent(supabase, 'invalid_json_input', { 
+        ip: clientIP, 
+        user_id: user.id,
+        error: parseError.message 
+      }, 'medium');
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid JSON in request body'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const validation = validateStartAIRequest(requestData);
+    if (!validation.isValid) {
+      await logSecurityEvent(supabase, 'input_validation_failed', { 
+        ip: clientIP, 
+        user_id: user.id,
+        errors: validation.errors,
+        input: requestData
+      }, 'medium');
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Input validation failed',
+        details: validation.errors
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { leadId, sequenceType = 'new_lead', tonePreference = 'friendly', messageType = 'sms', customStartDelay = 0 }: StartAIRequest = requestData;
 
     console.log('🚀 [AI START] Starting AI sequence for lead:', leadId);
 
-    // TODO: Validate user permissions
-    // TODO: Check if lead exists and is eligible for AI
-    // TODO: Integrate with existing lead validation system
+    // Verify user has permission to start AI sequences
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const hasPermission = userRoles?.some(r => ['admin', 'manager', 'sales'].includes(r.role));
+    if (!hasPermission) {
+      await logSecurityEvent(supabase, 'unauthorized_ai_start_attempt', { 
+        user_id: user.id, 
+        lead_id: leadId 
+      }, 'high');
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Insufficient permissions to start AI sequences'
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Fetch lead data
     const { data: lead, error: leadError } = await supabase
@@ -173,6 +365,16 @@ serve(async (req) => {
 
     console.log('✅ [AI START] AI activated for lead:', leadId);
 
+    // Log successful operation
+    await logSecurityEvent(supabase, 'ai_sequence_started', { 
+      user_id: user.id, 
+      lead_id: leadId,
+      sequence_type: sequenceType,
+      tone_preference: tonePreference,
+      message_type: messageType,
+      execution_time_ms: Date.now() - startTime
+    }, 'low');
+
     return new Response(JSON.stringify({
       success: true,
       leadId,
@@ -189,6 +391,16 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ [AI START] Unexpected error:', error);
+    
+    // Log error with context
+    const supabase = createClient(supabaseUrl!, supabaseKey!);
+    await logSecurityEvent(supabase, 'function_execution_error', { 
+      error: error.message,
+      stack: error.stack,
+      request_data: requestData,
+      execution_time_ms: Date.now() - startTime
+    }, 'critical');
+    
     return new Response(JSON.stringify({
       success: false,
       error: 'Internal server error'
