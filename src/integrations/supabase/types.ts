@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_lockouts: {
+        Row: {
+          created_at: string | null
+          email: string
+          failed_attempts: number | null
+          id: string
+          locked_at: string | null
+          locked_until: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          failed_attempts?: number | null
+          id?: string
+          locked_at?: string | null
+          locked_until?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          failed_attempts?: number | null
+          id?: string
+          locked_at?: string | null
+          locked_until?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ai_automation_control: {
         Row: {
           automation_enabled: boolean | null
@@ -5864,6 +5897,33 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          created_at: string | null
+          endpoint: string
+          id: string
+          identifier: string
+          requests_count: number | null
+          window_start: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          identifier: string
+          requests_count?: number | null
+          window_start?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          identifier?: string
+          requests_count?: number | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       real_time_call_monitoring: {
         Row: {
           call_log_id: string
@@ -7497,6 +7557,15 @@ export type Database = {
         Args: { p_phone_number: string; p_limit_minutes?: number }
         Returns: boolean
       }
+      check_rate_limit: {
+        Args: {
+          p_identifier: string
+          p_endpoint: string
+          p_max_requests?: number
+          p_window_minutes?: number
+        }
+        Returns: boolean
+      }
       classify_deal_by_stock: {
         Args: { stock_number: string }
         Returns: string
@@ -7752,6 +7821,14 @@ export type Database = {
         }
         Returns: Json
       }
+      is_account_locked: {
+        Args: { p_email: string }
+        Returns: boolean
+      }
+      log_failed_login: {
+        Args: { p_email: string; p_ip_address?: string }
+        Returns: undefined
+      }
       log_failed_login_attempt: {
         Args: { p_email: string; p_ip_address?: unknown; p_user_agent?: string }
         Returns: undefined
@@ -7815,6 +7892,10 @@ export type Database = {
           p_user_id: string
           p_role: Database["public"]["Enums"]["app_role"]
         }
+        Returns: undefined
+      }
+      track_failed_login: {
+        Args: { p_email: string }
         Returns: undefined
       }
       trigger_ai_automation_manual: {
