@@ -1,17 +1,19 @@
 
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, MessageSquare, Clock, Settings, Zap, Activity } from 'lucide-react';
+import { BarChart3, MessageSquare, Clock, Settings, Activity, Shield, AlertTriangle } from 'lucide-react';
 import EnhancedAIQueueTab from './EnhancedAIQueueTab';
 import AdvancedAnalyticsDashboard from './AdvancedAnalyticsDashboard';
 import MessageScheduleOverview from './MessageScheduleOverview';
 import QualityControlDashboard from './QualityControlDashboard';
 import SettingsTab from './SettingsTab';
+import { SecurityDashboard } from '../security/SecurityDashboard';
+import { SecurityAlertSystem } from '../security/SecurityAlertSystem';
 
 const AIMonitorTabs = () => {
   return (
     <Tabs defaultValue="queue" className="w-full">
-      <TabsList className="grid w-full grid-cols-5">
+      <TabsList className="grid w-full grid-cols-7">
         <TabsTrigger value="queue" className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4" />
           AI Queue
@@ -27,6 +29,14 @@ const AIMonitorTabs = () => {
         <TabsTrigger value="quality" className="flex items-center gap-2">
           <Activity className="w-4 h-4" />
           Quality
+        </TabsTrigger>
+        <TabsTrigger value="security" className="flex items-center gap-2">
+          <Shield className="w-4 h-4" />
+          Security
+        </TabsTrigger>
+        <TabsTrigger value="alerts" className="flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          Alerts
         </TabsTrigger>
         <TabsTrigger value="settings" className="flex items-center gap-2">
           <Settings className="w-4 h-4" />
@@ -48,6 +58,14 @@ const AIMonitorTabs = () => {
 
       <TabsContent value="quality" className="mt-6">
         <QualityControlDashboard />
+      </TabsContent>
+
+      <TabsContent value="security" className="mt-6">
+        <SecurityDashboard />
+      </TabsContent>
+
+      <TabsContent value="alerts" className="mt-6">
+        <SecurityAlertSystem />
       </TabsContent>
 
       <TabsContent value="settings" className="mt-6">
