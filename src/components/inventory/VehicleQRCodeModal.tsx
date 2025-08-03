@@ -22,44 +22,46 @@ const VehicleQRCodeModal: React.FC<VehicleQRCodeModalProps> = ({
   const qrValue = vehicle.vin || vehicle.stock_number || vehicle.id;
 
   const handlePrint = () => {
-    // Print only the QR code content
+    // Secure print implementation - avoid document.write
     if (printRef.current) {
       const content = printRef.current.innerHTML;
-      const printWindow = window.open("", "_blank", "width=400,height=600");
+      const blob = new Blob([`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Print QR Code</title>
+          <style>
+            body {
+              font-family: sans-serif;
+              text-align: center;
+              padding: 0.5in;
+            }
+            .qr-info { margin-bottom: 12px; font-size: 1rem; }
+            .qr-vin { font-size: 1.1rem; font-weight: bold; }
+            .qr-title { margin-top: 0.5in; }
+          </style>
+        </head>
+        <body>
+          <div class="qr-title">
+            <div class="qr-info">${vehicle.year || ""} ${vehicle.make || ""} ${vehicle.model || ""}</div>
+            <div class="qr-vin">VIN: ${vehicle.vin || ""}</div>
+            <div class="qr-vin">Stock #: ${vehicle.stock_number || ""}</div>
+          </div>
+          <div style="margin-top: 1in;">
+            ${content}
+          </div>
+        </body>
+        </html>
+      `], { type: 'text/html' });
+      
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, "_blank", "width=400,height=600");
+      
       if (printWindow) {
-        printWindow.document.write(`
-          <html>
-          <head>
-            <title>Print QR Code</title>
-            <style>
-              body {
-                font-family: sans-serif;
-                text-align: center;
-                padding: 0.5in;
-              }
-              .qr-info { margin-bottom: 12px; font-size: 1rem; }
-              .qr-vin { font-size: 1.1rem; font-weight: bold; }
-              .qr-title { margin-top: 0.5in; }
-            </style>
-          </head>
-          <body>
-            <div class="qr-title">
-              <div class="qr-info">${vehicle.year || ""} ${vehicle.make || ""} ${vehicle.model || ""}</div>
-              <div class="qr-vin">VIN: ${vehicle.vin || ""}</div>
-              <div class="qr-vin">Stock #: ${vehicle.stock_number || ""}</div>
-            </div>
-            <div style="margin-top: 1in;">
-              ${content}
-            </div>
-          </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
+        printWindow.onload = () => {
           printWindow.print();
-          printWindow.close();
-        }, 350);
+          URL.revokeObjectURL(url);
+        };
       }
     }
   };

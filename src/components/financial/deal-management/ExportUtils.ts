@@ -65,16 +65,23 @@ export const openPrintableView = (
   packAdjustment: number, 
   packAdjustmentEnabled: boolean
 ) => {
-  const printWindow = window.open('', '_blank', 'width=1200,height=800');
+  // Secure print implementation using blob URLs instead of document.write
+  const htmlContent = generateMultiPageHTML(deals, packAdjustment, packAdjustmentEnabled);
+  
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  
+  const printWindow = window.open(url, '_blank', 'width=1200,height=800');
   if (!printWindow) {
     alert('Please allow pop-ups to view the printable report');
+    URL.revokeObjectURL(url);
     return;
   }
 
-  const htmlContent = generateMultiPageHTML(deals, packAdjustment, packAdjustmentEnabled);
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
-  printWindow.focus();
+  printWindow.onload = () => {
+    printWindow.focus();
+    URL.revokeObjectURL(url);
+  };
 };
 
 const generateMultiPageHTML = (

@@ -2,6 +2,7 @@ import React from 'react';
 import { User, MessageSquare, Car, Calendar, ExternalLink, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { SearchResult } from './UnifiedSearchProvider';
+import { safeHighlightText } from '@/utils/securityMiddleware';
 
 interface SearchResultCardProps {
   result: SearchResult;
@@ -40,17 +41,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
   };
 
   const highlightText = (text: string, searchTerm: string) => {
-    if (!searchTerm) return text;
-    
-    const terms = searchTerm.toLowerCase().split(' ').filter(term => term.length > 1);
-    let highlightedText = text;
-    
-    terms.forEach(term => {
-      const regex = new RegExp(`(${term})`, 'gi');
-      highlightedText = highlightedText.replace(regex, '<mark class="bg-yellow-200 px-1 rounded">$1</mark>');
-    });
-    
-    return highlightedText;
+    return safeHighlightText(text, searchTerm);
   };
 
   const formatResultType = (type: SearchResult['type']) => {
