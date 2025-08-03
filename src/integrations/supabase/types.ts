@@ -7654,12 +7654,19 @@ export type Database = {
         Returns: boolean
       }
       check_security_rate_limit: {
-        Args: {
-          p_user_id: string
-          p_operation_type: string
-          p_max_per_hour?: number
-          p_max_per_day?: number
-        }
+        Args:
+          | {
+              p_identifier: string
+              p_endpoint: string
+              p_max_requests?: number
+              p_window_minutes?: number
+            }
+          | {
+              p_user_id: string
+              p_operation_type: string
+              p_max_per_hour?: number
+              p_max_per_day?: number
+            }
         Returns: boolean
       }
       classify_deal_by_stock: {
