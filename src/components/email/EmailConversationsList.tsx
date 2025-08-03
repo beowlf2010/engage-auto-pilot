@@ -6,7 +6,7 @@ import { useEmailConversations } from '@/hooks/useEmailConversations';
 import { formatDistanceToNow } from 'date-fns';
 import { Mail, MailOpen, MailX, Clock, CheckCircle, Bot, User } from 'lucide-react';
 import { EmailConversation } from '@/types/email';
-import { sanitizeEmailContent } from '@/utils/sanitization';
+import { SafeEmailContent } from '@/components/security/SafeHtmlRenderer';
 
 interface EmailConversationsListProps {
   leadId: string;
@@ -113,9 +113,9 @@ const EmailConversationsList = ({ leadId }: EmailConversationsListProps) => {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div 
+            <SafeEmailContent 
+              content={email.body}
               className="text-sm text-gray-700 line-clamp-3"
-              dangerouslySetInnerHTML={{ __html: sanitizeEmailContent(email.body) }}
             />
             {email.email_error && (
               <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">

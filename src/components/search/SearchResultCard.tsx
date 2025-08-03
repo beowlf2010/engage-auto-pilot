@@ -2,7 +2,7 @@ import React from 'react';
 import { User, MessageSquare, Car, Calendar, ExternalLink, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { SearchResult } from './UnifiedSearchProvider';
-import { safeHighlightText } from '@/utils/securityMiddleware';
+import { useSafeHighlight } from '@/components/security/SafeHtmlRenderer';
 
 interface SearchResultCardProps {
   result: SearchResult;
@@ -40,9 +40,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
     return colors[type] || 'text-gray-600 bg-gray-50';
   };
 
-  const highlightText = (text: string, searchTerm: string) => {
-    return safeHighlightText(text, searchTerm);
-  };
+  const { highlightText } = useSafeHighlight();
 
   const formatResultType = (type: SearchResult['type']) => {
     const labels = {

@@ -2,6 +2,7 @@
 import { BrowserRouter as Router } from 'react-router-dom';
 import { QueryProvider } from './providers/QueryProvider';
 import { AuthProvider, useAuth } from './components/auth/AuthProvider';
+import { SecurityEnhancedLayout } from './components/security/SecurityEnhancedLayout';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from '@/components/ui/toaster';
 
@@ -33,10 +34,12 @@ function App() {
   return (
     <QueryProvider>
       <AuthProvider>
-        <div className="min-h-screen bg-gray-50 w-full">
-          <AppContent />
-          <Toaster />
-        </div>
+        <SecurityEnhancedLayout>
+          <div className="min-h-screen bg-gray-50 w-full">
+            <AppContent />
+            <Toaster />
+          </div>
+        </SecurityEnhancedLayout>
       </AuthProvider>
     </QueryProvider>
   );

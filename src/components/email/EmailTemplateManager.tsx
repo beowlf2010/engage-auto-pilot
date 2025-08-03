@@ -11,7 +11,7 @@ import { useEmailTemplates, useCreateEmailTemplate, useUpdateEmailTemplate, useD
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, FileText, Save } from 'lucide-react';
 import { EmailTemplate } from '@/types/email';
-import { sanitizeEmailContent } from '@/utils/sanitization';
+import { SafeEmailContent } from '@/components/security/SafeHtmlRenderer';
 
 const EmailTemplateManager = () => {
   const [isCreating, setIsCreating] = useState(false);
@@ -183,9 +183,9 @@ const EmailTemplateManager = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Content Preview:</p>
-                  <div 
+                  <SafeEmailContent 
+                    content={template.content}
                     className="text-sm text-gray-700 line-clamp-3"
-                    dangerouslySetInnerHTML={{ __html: sanitizeEmailContent(template.content) }}
                   />
                 </div>
                 <div className="flex justify-end space-x-2">
