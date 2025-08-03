@@ -9,11 +9,13 @@ import QualityControlDashboard from './QualityControlDashboard';
 import SettingsTab from './SettingsTab';
 import { SecurityDashboard } from '../security/SecurityDashboard';
 import { SecurityAlertSystem } from '../security/SecurityAlertSystem';
+import { SecurityAuditViewer } from '../security/SecurityAuditViewer';
+import { SecurityManagementPanel } from '../security/SecurityManagementPanel';
 
 const AIMonitorTabs = () => {
   return (
     <Tabs defaultValue="queue" className="w-full">
-      <TabsList className="grid w-full grid-cols-7">
+      <TabsList className="grid w-full grid-cols-9">
         <TabsTrigger value="queue" className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4" />
           AI Queue
@@ -37,6 +39,14 @@ const AIMonitorTabs = () => {
         <TabsTrigger value="alerts" className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" />
           Alerts
+        </TabsTrigger>
+        <TabsTrigger value="audit" className="flex items-center gap-2">
+          <BarChart3 className="w-4 h-4" />
+          Audit
+        </TabsTrigger>
+        <TabsTrigger value="management" className="flex items-center gap-2">
+          <Settings className="w-4 h-4" />
+          Management
         </TabsTrigger>
         <TabsTrigger value="settings" className="flex items-center gap-2">
           <Settings className="w-4 h-4" />
@@ -64,9 +74,17 @@ const AIMonitorTabs = () => {
         <SecurityDashboard />
       </TabsContent>
 
-      <TabsContent value="alerts" className="mt-6">
-        <SecurityAlertSystem />
-      </TabsContent>
+          <TabsContent value="alerts" className="mt-6">
+            <SecurityAlertSystem />
+          </TabsContent>
+
+          <TabsContent value="audit" className="mt-6">
+            <SecurityAuditViewer />
+          </TabsContent>
+
+          <TabsContent value="management" className="mt-6">
+            <SecurityManagementPanel />
+          </TabsContent>
 
       <TabsContent value="settings" className="mt-6">
         <SettingsTab />
