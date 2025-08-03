@@ -7867,6 +7867,10 @@ export type Database = {
           has_valid_phone: boolean
         }[]
       }
+      get_user_roles: {
+        Args: { p_user_id: string }
+        Returns: string[]
+      }
       has_role: {
         Args: {
           _user_id: string
@@ -7893,6 +7897,16 @@ export type Database = {
           p_email: string
           p_first_name?: string
           p_last_name?: string
+        }
+        Returns: Json
+      }
+      initialize_user_secure: {
+        Args: {
+          p_user_id: string
+          p_email: string
+          p_first_name?: string
+          p_last_name?: string
+          p_default_role?: Database["public"]["Enums"]["app_role"]
         }
         Returns: Json
       }
@@ -8103,6 +8117,10 @@ export type Database = {
           p_data: Json
         }
         Returns: string
+      }
+      user_has_any_role: {
+        Args: { p_user_id: string; p_roles: string[] }
+        Returns: boolean
       }
       user_has_manager_access: {
         Args: Record<PropertyKey, never>

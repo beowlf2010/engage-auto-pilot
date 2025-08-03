@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUserManagement, UserProfile } from '@/hooks/useUserManagement';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Plus, Search, Edit2, Trash2, Users, Loader2 } from 'lucide-react';
 import AddUserModal from './AddUserModal';
 import EditUserModal from './EditUserModal';
@@ -13,10 +14,11 @@ import DeleteUserDialog from './DeleteUserDialog';
 import { format } from 'date-fns';
 
 interface UserManagementTableProps {
-  currentUserRole: string;
+  // No longer need currentUserRole prop - using permissions hook
 }
 
-const UserManagementTable = ({ currentUserRole }: UserManagementTableProps) => {
+const UserManagementTable = ({ }: UserManagementTableProps) => {
+  const permissions = useUserPermissions();
   const {
     users,
     loading,
@@ -36,8 +38,8 @@ const UserManagementTable = ({ currentUserRole }: UserManagementTableProps) => {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
   const canManageUser = (userRole: string) => {
-    if (currentUserRole === 'admin') return true;
-    if (currentUserRole === 'manager' && userRole === 'sales') return true;
+    if (permissions.isAdmin) return true;
+    if (permissions.isManager && userRole === 'sales') return true;
     return false;
   };
 
@@ -60,7 +62,7 @@ const UserManagementTable = ({ currentUserRole }: UserManagementTableProps) => {
     setShowDeleteDialog(true);
   };
 
-  if (!['manager', 'admin'].includes(currentUserRole)) {
+  if (!permissions.canManageUsers) {
     return (
       <div className="text-center py-12">
         <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
@@ -75,7 +77,7 @@ const UserManagementTable = ({ currentUserRole }: UserManagementTableProps) => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Team Members</CardTitle>
-          {currentUserRole === 'admin' && (
+          {permissions.isAdmin && (
             <Button onClick={() => setShowAddModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add User
@@ -157,7 +159,7 @@ const UserManagementTable = ({ currentUserRole }: UserManagementTableProps) => {
                           >
                             <Edit2 className="w-4 h-4" />
                           </Button>
-                          {currentUserRole === 'admin' && (
+                          {permissions.isAdmin && (
                             <Button
                               variant="ghost"
                               size="sm"

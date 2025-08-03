@@ -33,7 +33,7 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
     try {
       console.log('🔧 [RLS VALIDATION] Initializing user via database function');
       
-      const { data: initResult, error: initError } = await supabase.rpc('initialize_user_for_csv_clean', {
+      const { data: initResult, error: initError } = await supabase.rpc('initialize_user_secure', {
         p_user_id: user.id,
         p_email: user.email || '',
         p_first_name: user.user_metadata?.first_name || 'User',

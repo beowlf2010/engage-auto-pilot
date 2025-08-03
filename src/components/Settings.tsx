@@ -76,7 +76,7 @@ const Settings = () => {
 
         {(['manager', 'admin'].includes(userRole)) && (
           <TabsContent value="users" className="mt-6">
-            <UserManagementTable currentUserRole={userRole} />
+            <UserManagementTable />
           </TabsContent>
         )}
       </Tabs>
