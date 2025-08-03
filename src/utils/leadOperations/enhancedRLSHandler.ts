@@ -63,38 +63,57 @@ export const validateRLSPermissions = async (): Promise<RLSValidationResult> => 
       };
     }
 
-    // Create consistent profile data (we know user is properly initialized now)
-    const userProfile = {
-      id: user.id,
-      email: user.email,
-      first_name: user.user_metadata?.first_name || 'User',
-      last_name: user.user_metadata?.last_name || 'Name',
-      role: 'manager'
-    };
+  // Get actual user roles from database
+  const { data: userRoles, error: rolesError } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id);
 
-    const userRoles = ['manager'];
-
-    console.log('✅ [RLS VALIDATION] Validation complete:', {
-      userId: user.id,
-      profileRole: userProfile.role,
-      systemRoles: userRoles,
-      hasRequiredRole: true,
-      sessionValid: !!session
-    });
-
+  if (rolesError) {
+    console.error('⚠️ [RLS VALIDATION] Failed to fetch user roles:', rolesError);
     return {
-      canInsert: true,
-      userProfile,
-      userRoles,
-      debugInfo: {
-        userId: user.id,
-        profileRole: userProfile.role,
-        systemRoles: userRoles,
-        hasRequiredRole: true,
-        sessionValid: !!session,
-        cleanValidation: true
-      }
+      canInsert: false,
+      userProfile: null,
+      userRoles: [],
+      error: `Failed to fetch user roles: ${rolesError.message}`,
+      debugInfo: { rolesError, userId: user.id }
     };
+  }
+
+  const roles = userRoles?.map(r => r.role) || [];
+  
+  // Create consistent profile data with actual roles
+  const userProfile = {
+    id: user.id,
+    email: user.email,
+    first_name: user.user_metadata?.first_name || 'User',
+    last_name: user.user_metadata?.last_name || 'Name',
+    roles: roles
+  };
+
+  // Check if user has required permissions (manager or admin role)
+  const hasRequiredRole = roles.includes('manager') || roles.includes('admin');
+
+  console.log('✅ [RLS VALIDATION] Validation complete:', {
+    userId: user.id,
+    roles: roles,
+    hasRequiredRole,
+    sessionValid: !!session
+  });
+
+  return {
+    canInsert: hasRequiredRole,
+    userProfile,
+    userRoles: roles,
+    error: hasRequiredRole ? undefined : 'User lacks required permissions (manager or admin role required)',
+    debugInfo: {
+      userId: user.id,
+      roles: roles,
+      hasRequiredRole,
+      sessionValid: !!session,
+      cleanValidation: true
+    }
+  };
   } catch (error) {
     console.error('💥 [RLS VALIDATION] Unexpected error:', error);
     return {
