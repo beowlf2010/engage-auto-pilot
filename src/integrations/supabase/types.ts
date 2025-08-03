@@ -1990,6 +1990,51 @@ export type Database = {
           },
         ]
       }
+      api_key_backups: {
+        Row: {
+          backup_created_at: string
+          backup_expires_at: string
+          created_at: string
+          emergency_rotation: boolean
+          id: string
+          original_key: string
+          original_value: string
+          restored_at: string | null
+          restored_by: string | null
+          rotated_by: string
+          rotation_reason: string
+          updated_at: string
+        }
+        Insert: {
+          backup_created_at?: string
+          backup_expires_at?: string
+          created_at?: string
+          emergency_rotation?: boolean
+          id?: string
+          original_key: string
+          original_value: string
+          restored_at?: string | null
+          restored_by?: string | null
+          rotated_by: string
+          rotation_reason: string
+          updated_at?: string
+        }
+        Update: {
+          backup_created_at?: string
+          backup_expires_at?: string
+          created_at?: string
+          emergency_rotation?: boolean
+          id?: string
+          original_key?: string
+          original_value?: string
+          restored_at?: string | null
+          restored_by?: string | null
+          rotated_by?: string
+          rotation_reason?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       appointment_slots: {
         Row: {
           created_at: string | null
@@ -6481,6 +6526,33 @@ export type Database = {
         }
         Relationships: []
       }
+      security_rate_limits: {
+        Row: {
+          client_ip: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          operation_type: string
+          user_id: string
+        }
+        Insert: {
+          client_ip?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          operation_type: string
+          user_id: string
+        }
+        Update: {
+          client_ip?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          operation_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           created_at: string
@@ -7481,6 +7553,17 @@ export type Database = {
         }
         Relationships: []
       }
+      security_dashboard_metrics: {
+        Row: {
+          daily_operations: number | null
+          emergency_rotations_month: number | null
+          hourly_operations: number | null
+          rate_limit_hits_today: number | null
+          suspicious_events_today: number | null
+          weekly_rotations: number | null
+        }
+        Relationships: []
+      }
       v_monthly_retail_summary: {
         Row: {
           dealer_trade_gross_mtd: number | null
@@ -7566,11 +7649,24 @@ export type Database = {
         }
         Returns: boolean
       }
+      check_security_rate_limit: {
+        Args: {
+          p_user_id: string
+          p_operation_type: string
+          p_max_per_hour?: number
+          p_max_per_day?: number
+        }
+        Returns: boolean
+      }
       classify_deal_by_stock: {
         Args: { stock_number: string }
         Returns: string
       }
       clean_vehicle_interest_data: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      cleanup_expired_api_key_backups: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
