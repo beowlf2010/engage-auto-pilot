@@ -7636,6 +7636,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      check_auth_security_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_message_rate_limit: {
         Args: { p_phone_number: string; p_limit_minutes?: number }
         Returns: boolean
@@ -7868,8 +7872,10 @@ export type Database = {
         }[]
       }
       get_user_roles: {
-        Args: { p_user_id: string }
-        Returns: string[]
+        Args: { _user_id: string }
+        Returns: {
+          role: string
+        }[]
       }
       has_role: {
         Args: {
@@ -8010,10 +8016,12 @@ export type Database = {
         Returns: undefined
       }
       synchronize_user_roles: {
-        Args: {
-          p_user_id: string
-          p_role: Database["public"]["Enums"]["app_role"]
-        }
+        Args:
+          | {
+              p_user_id: string
+              p_role: Database["public"]["Enums"]["app_role"]
+            }
+          | { p_user_id: string; p_role: string }
         Returns: undefined
       }
       track_failed_login: {

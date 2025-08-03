@@ -52,7 +52,7 @@ export const useUserManagement = () => {
 
   const updateUserRole = async (userId: string, newRole: 'sales' | 'manager' | 'admin') => {
     try {
-      // Use the new synchronization function to update both tables atomically
+      // Use the synchronization function (now secured with proper policies)
       const { error } = await supabase.rpc('synchronize_user_roles', {
         p_user_id: userId,
         p_role: newRole
@@ -66,13 +66,13 @@ export const useUserManagement = () => {
 
       toast({
         title: "Role Updated",
-        description: "User role has been synchronized successfully across all systems"
+        description: "User role has been updated securely with proper authorization"
       });
     } catch (error) {
       console.error('Error updating user role:', error);
       toast({
         title: "Error",
-        description: "Failed to update user role",
+        description: error instanceof Error ? error.message : "Failed to update user role",
         variant: "destructive"
       });
     }

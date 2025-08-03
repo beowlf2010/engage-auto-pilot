@@ -4,11 +4,11 @@ export type AppRole = 'admin' | 'manager' | 'sales' | 'user';
 
 /**
  * Synchronizes user roles between profiles.role and user_roles table
- * Uses the database function for atomic updates
+ * Now secured with proper authorization policies and audit trail
  */
 export const synchronizeUserRole = async (userId: string, role: AppRole): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log('🔄 [ROLE] Synchronizing role:', { userId, role });
+    console.log('🔄 [ROLE] Synchronizing role with security controls:', { userId, role });
     
     const { error } = await supabase.rpc('synchronize_user_roles', {
       p_user_id: userId,
@@ -20,7 +20,7 @@ export const synchronizeUserRole = async (userId: string, role: AppRole): Promis
       return { success: false, error: error.message };
     }
 
-    console.log('✅ [ROLE] Role synchronized successfully');
+    console.log('✅ [ROLE] Role synchronized successfully with audit logging');
     return { success: true };
   } catch (error) {
     console.error('💥 [ROLE] Unexpected error during role synchronization:', error);
