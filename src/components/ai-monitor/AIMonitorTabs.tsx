@@ -7,7 +7,7 @@ import AdvancedAnalyticsDashboard from './AdvancedAnalyticsDashboard';
 import MessageScheduleOverview from './MessageScheduleOverview';
 import QualityControlDashboard from './QualityControlDashboard';
 import SettingsTab from './SettingsTab';
-import { SecurityDashboard } from '../security/SecurityDashboard';
+import SecurityDashboard from '../security/SecurityDashboard';
 import { SecurityAlertSystem } from '../security/SecurityAlertSystem';
 import { SecurityAuditViewer } from '../security/SecurityAuditViewer';
 import { SecurityManagementPanel } from '../security/SecurityManagementPanel';

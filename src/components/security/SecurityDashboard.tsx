@@ -1,294 +1,367 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Shield, AlertTriangle, Activity, Users, Clock, Ban } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-
-interface SecurityMetrics {
-  daily_operations: number;
-  emergency_rotations_month: number;
-  hourly_operations: number;
-  rate_limit_hits_today: number;
-  suspicious_events_today: number;
-  weekly_rotations: number;
-}
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertTriangle, Shield, Eye, Activity, Users, Lock } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface SecurityEvent {
   id: string;
+  user_id: string | null;
   action: string;
   resource_type: string;
   details: any;
   created_at: string;
-  user_id?: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
-export const SecurityDashboard = () => {
-  const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
-  const [recentEvents, setRecentEvents] = useState<SecurityEvent[]>([]);
-  const [alerts, setAlerts] = useState<SecurityEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+interface SecurityMetrics {
+  totalEvents: number;
+  criticalEvents: number;
+  failedLogins: number;
+  suspiciousActivity: number;
+  recentEvents: SecurityEvent[];
+}
+
+const SecurityDashboard = () => {
+  const { isAdmin } = useUserPermissions();
   const { toast } = useToast();
+  const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedTimeframe, setSelectedTimeframe] = useState('24h');
 
   useEffect(() => {
-    loadSecurityData();
-    setupRealTimeSubscriptions();
-  }, []);
+    if (isAdmin) {
+      loadSecurityMetrics();
+      // Set up real-time monitoring
+      const interval = setInterval(loadSecurityMetrics, 30000); // Every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [isAdmin, selectedTimeframe]);
 
-  const loadSecurityData = async () => {
+  const loadSecurityMetrics = async () => {
     try {
-      // Load security metrics
-      const { data: metricsData, error: metricsError } = await supabase
-        .from('security_dashboard_metrics')
-        .select('*')
-        .single();
+      const timeframeHours = selectedTimeframe === '24h' ? 24 : selectedTimeframe === '7d' ? 168 : 720;
+      const since = new Date(Date.now() - (timeframeHours * 60 * 60 * 1000)).toISOString();
 
-      if (metricsError) throw metricsError;
-      setMetrics(metricsData);
-
-      // Load recent security events
-      const { data: eventsData, error: eventsError } = await supabase
+      // Get security events
+      const { data: events, error: eventsError } = await supabase
         .from('security_audit_log')
         .select('*')
+        .gte('created_at', since)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(100);
 
       if (eventsError) throw eventsError;
-      
-      const processedEvents = eventsData.map(event => ({
-        ...event,
-        severity: determineSeverity(event.action)
-      }));
 
-      setRecentEvents(processedEvents);
-      setAlerts(processedEvents.filter(e => e.severity === 'critical' || e.severity === 'high'));
+      // Calculate metrics
+      const totalEvents = events?.length || 0;
+      const criticalEvents = events?.filter(e => 
+        e.action.includes('unauthorized') || 
+        e.action.includes('failed_login') ||
+        e.action.includes('rate_limit_exceeded')
+      ).length || 0;
+
+      const failedLogins = events?.filter(e => e.action === 'failed_login_attempt').length || 0;
       
+      const suspiciousActivity = events?.filter(e => 
+        e.action.includes('xss_attempt') ||
+        e.action.includes('unauthorized') ||
+        e.action.includes('invalid_input')
+      ).length || 0;
+
+      setMetrics({
+        totalEvents,
+        criticalEvents,
+        failedLogins,
+        suspiciousActivity,
+        recentEvents: events?.slice(0, 20) || []
+      });
+
+      // Check for critical alerts
+      if (criticalEvents > 10) {
+        toast({
+          title: "High Security Alert",
+          description: `${criticalEvents} critical security events detected in the last ${selectedTimeframe}`,
+          variant: "destructive"
+        });
+      }
+
     } catch (error) {
-      console.error('Error loading security data:', error);
+      console.error('Error loading security metrics:', error);
       toast({
         title: "Error",
-        description: "Failed to load security dashboard data",
+        description: "Failed to load security metrics",
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const setupRealTimeSubscriptions = () => {
-    // Subscribe to security audit log changes
-    const subscription = supabase
-      .channel('security-events')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'security_audit_log'
-        },
-        (payload) => {
-          const newEvent = {
-            ...payload.new,
-            severity: determineSeverity(payload.new.action)
-          } as SecurityEvent;
+  const handleSecurityResponse = async (action: string, details: any) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('security-response', {
+        body: { action, ...details }
+      });
 
-          setRecentEvents(prev => [newEvent, ...prev.slice(0, 19)]);
-          
-          if (newEvent.severity === 'critical' || newEvent.severity === 'high') {
-            setAlerts(prev => [newEvent, ...prev]);
-            
-            toast({
-              title: "Security Alert",
-              description: `${newEvent.action}: ${getEventDescription(newEvent)}`,
-              variant: newEvent.severity === 'critical' ? "destructive" : "default"
-            });
-          }
-        }
-      )
-      .subscribe();
+      if (error) throw error;
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  };
+      toast({
+        title: "Security Action Executed",
+        description: data.message || "Security response action completed",
+      });
 
-  const determineSeverity = (action: string): 'low' | 'medium' | 'high' | 'critical' => {
-    const criticalActions = ['account_locked', 'multiple_failed_logins', 'suspicious_activity_detected'];
-    const highActions = ['failed_login_attempt', 'rate_limit_exceeded', 'unauthorized_access_attempt'];
-    const mediumActions = ['api_key_rotated', 'settings_updated', 'password_changed'];
-    
-    if (criticalActions.includes(action)) return 'critical';
-    if (highActions.includes(action)) return 'high';
-    if (mediumActions.includes(action)) return 'medium';
-    return 'low';
-  };
-
-  const getEventDescription = (event: SecurityEvent): string => {
-    switch (event.action) {
-      case 'failed_login_attempt':
-        return `Failed login for ${event.details?.email || 'unknown user'}`;
-      case 'account_locked':
-        return `Account locked: ${event.details?.email || 'unknown user'}`;
-      case 'rate_limit_exceeded':
-        return `Rate limit exceeded for ${event.details?.endpoint || 'unknown endpoint'}`;
-      case 'api_key_rotated':
-        return `API key rotated: ${event.details?.key_type || 'unknown type'}`;
-      default:
-        return event.action.replace(/_/g, ' ');
+      // Reload metrics
+      loadSecurityMetrics();
+    } catch (error) {
+      console.error('Security response error:', error);
+      toast({
+        title: "Security Action Failed",
+        description: error.message || "Failed to execute security response",
+        variant: "destructive"
+      });
     }
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'bg-destructive text-destructive-foreground';
-      case 'high': return 'bg-orange-500 text-white';
-      case 'medium': return 'bg-yellow-500 text-white';
-      default: return 'bg-muted text-muted-foreground';
-    }
+  const getSeverityColor = (action: string) => {
+    if (action.includes('unauthorized') || action.includes('failed_login')) return 'destructive';
+    if (action.includes('rate_limit') || action.includes('xss_attempt')) return 'destructive';
+    if (action.includes('invalid_input')) return 'secondary';
+    return 'default';
   };
 
-  if (isLoading) {
+  const formatEventDetails = (event: SecurityEvent) => {
+    const details = event.details || {};
+    return Object.entries(details)
+      .filter(([key, value]) => key !== 'function' && value !== null)
+      .map(([key, value]) => `${key}: ${String(value)}`)
+      .join(', ');
+  };
+
+  if (!isAdmin) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="h-24 bg-muted rounded"></div>
-            ))}
-          </div>
-        </div>
+      <Alert>
+        <Lock className="h-4 w-4" />
+        <AlertDescription>
+          Access denied. Admin privileges required to view security dashboard.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Activity className="h-6 w-6 animate-spin" />
+        <span className="ml-2">Loading security dashboard...</span>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Security Dashboard</h1>
-        <Badge variant="outline" className="flex items-center gap-2">
-          <Shield className="w-4 h-4" />
-          Live Monitoring
-        </Badge>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Security Dashboard</h1>
+          <p className="text-muted-foreground">Monitor security events and respond to threats</p>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          {['24h', '7d', '30d'].map((timeframe) => (
+            <Button
+              key={timeframe}
+              variant={selectedTimeframe === timeframe ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedTimeframe(timeframe)}
+            >
+              {timeframe}
+            </Button>
+          ))}
+        </div>
       </div>
 
-      {alerts.length > 0 && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Security Alerts ({alerts.length})</AlertTitle>
-          <AlertDescription>
-            Critical security events detected. Review the events below for details.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Security Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* Security Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Failed Logins</p>
-                <p className="text-2xl font-bold">{metrics?.suspicious_events_today || 0}</p>
-              </div>
-              <Ban className="w-8 h-8 text-destructive" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Events</CardTitle>
+            <Eye className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics?.totalEvents || 0}</div>
+            <p className="text-xs text-muted-foreground">Last {selectedTimeframe}</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Lockouts</p>
-                <p className="text-2xl font-bold">{metrics?.hourly_operations || 0}</p>
-              </div>
-              <Users className="w-8 h-8 text-orange-500" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Critical Alerts</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{metrics?.criticalEvents || 0}</div>
+            <p className="text-xs text-muted-foreground">Requires attention</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Rate Limits</p>
-                <p className="text-2xl font-bold">{metrics?.rate_limit_hits_today || 0}</p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Failed Logins</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics?.failedLogins || 0}</div>
+            <p className="text-xs text-muted-foreground">Authentication failures</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Suspicious Activity</p>
-                <p className="text-2xl font-bold">{metrics?.suspicious_events_today || 0}</p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-destructive" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">API Rotations</p>
-                <p className="text-2xl font-bold">{metrics?.weekly_rotations || 0}</p>
-              </div>
-              <Shield className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Emergency Rotations</p>
-                <p className="text-2xl font-bold">{metrics?.emergency_rotations_month || 0}</p>
-              </div>
-              <Activity className="w-8 h-8 text-blue-500" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Suspicious Activity</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics?.suspiciousActivity || 0}</div>
+            <p className="text-xs text-muted-foreground">Potential threats</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Security Events */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Security Events</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentEvents.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">No recent security events</p>
-            ) : (
-              recentEvents.map((event) => (
-                <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Badge className={getSeverityColor(event.severity)}>
-                      {event.severity}
-                    </Badge>
-                    <div>
-                      <p className="font-medium">{getEventDescription(event)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(event.created_at).toLocaleString()}
-                      </p>
+      <Tabs defaultValue="events" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="events">Recent Events</TabsTrigger>
+          <TabsTrigger value="response">Incident Response</TabsTrigger>
+          <TabsTrigger value="analysis">Threat Analysis</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="events" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security Events</CardTitle>
+              <CardDescription>Real-time security event monitoring</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {metrics?.recentEvents.map((event) => (
+                  <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={getSeverityColor(event.action)}>
+                          {event.action.replace(/_/g, ' ').toUpperCase()}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(event.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm mt-1">{formatEventDetails(event)}</p>
+                      {event.user_id && (
+                        <p className="text-xs text-muted-foreground mt-1">User: {event.user_id}</p>
+                      )}
                     </div>
                   </div>
-                  <Badge variant="outline">{event.resource_type}</Badge>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                ))}
+                
+                {!metrics?.recentEvents.length && (
+                  <p className="text-center text-muted-foreground py-8">No security events in the selected timeframe</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="response" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Incident Response Actions</CardTitle>
+              <CardDescription>Take immediate security response actions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Button
+                  variant="destructive"
+                  onClick={() => handleSecurityResponse('emergency_lockdown', {
+                    reason: 'Manual emergency lockdown from security dashboard'
+                  })}
+                >
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Emergency Lockdown
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => handleSecurityResponse('rate_limit_reset', {
+                    reason: 'Manual rate limit reset from dashboard'
+                  })}
+                >
+                  <Activity className="h-4 w-4 mr-2" />
+                  Reset Rate Limits
+                </Button>
+              </div>
+              
+              <Alert>
+                <Shield className="h-4 w-4" />
+                <AlertDescription>
+                  Emergency actions will be logged and may affect system availability. Use with caution.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analysis" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Threat Analysis</CardTitle>
+              <CardDescription>Security pattern analysis and recommendations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {metrics?.criticalEvents > 5 && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      High number of critical security events detected. Consider implementing additional security measures.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {metrics?.failedLogins > 10 && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Multiple failed login attempts detected. Consider implementing account lockout policies.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {metrics?.suspiciousActivity > 3 && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Suspicious activity patterns detected. Review input validation and access controls.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {!metrics?.criticalEvents && !metrics?.failedLogins && !metrics?.suspiciousActivity && (
+                  <Alert>
+                    <Shield className="h-4 w-4" />
+                    <AlertDescription>
+                      No significant security threats detected. System security appears normal.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
+
+export default SecurityDashboard;
