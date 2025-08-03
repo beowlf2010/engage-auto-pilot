@@ -7842,6 +7842,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      log_security_event_enhanced: {
+        Args: {
+          p_action: string
+          p_resource_type: string
+          p_resource_id?: string
+          p_details?: Json
+          p_severity?: string
+          p_user_agent?: string
+          p_ip_address?: string
+        }
+        Returns: undefined
+      }
       make_current_user_admin: {
         Args: Record<PropertyKey, never>
         Returns: Json
