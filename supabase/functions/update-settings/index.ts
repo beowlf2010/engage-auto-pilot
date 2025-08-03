@@ -6,6 +6,163 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Security constants
+const MAX_API_KEY_OPERATIONS_PER_HOUR = 10
+const MAX_API_KEY_OPERATIONS_PER_DAY = 50
+const SUSPICIOUS_ACTIVITY_THRESHOLD = 3
+
+// Enhanced API key validation with security checks
+function validateApiKeyFormat(settingType: string, value: string): { valid: boolean; error?: string; securityScore: number } {
+  let securityScore = 0
+  
+  switch (settingType) {
+    case 'OPENAI_API_KEY':
+      if (!value.startsWith('sk-')) {
+        return { valid: false, error: 'OpenAI API key must start with sk-', securityScore: 0 }
+      }
+      if (value.length < 50) {
+        return { valid: false, error: 'OpenAI API key appears to be invalid length', securityScore: 0 }
+      }
+      securityScore = value.length > 60 ? 100 : 80
+      break
+      
+    case 'TELNYX_API_KEY':
+      if (!value.startsWith('KEY')) {
+        return { valid: false, error: 'Telnyx API key must start with KEY', securityScore: 0 }
+      }
+      if (value.length < 30) {
+        return { valid: false, error: 'Telnyx API key appears to be invalid length', securityScore: 0 }
+      }
+      securityScore = 90
+      break
+      
+    case 'TWILIO_ACCOUNT_SID':
+      if (!value.startsWith('AC')) {
+        return { valid: false, error: 'Twilio Account SID must start with AC', securityScore: 0 }
+      }
+      if (value.length !== 34) {
+        return { valid: false, error: 'Twilio Account SID must be exactly 34 characters', securityScore: 0 }
+      }
+      securityScore = 95
+      break
+      
+    case 'TWILIO_AUTH_TOKEN':
+      if (value.length !== 32) {
+        return { valid: false, error: 'Twilio Auth Token must be exactly 32 characters', securityScore: 0 }
+      }
+      // Check for suspicious patterns
+      if (value.includes('test') || value.includes('demo') || value.includes('sample')) {
+        securityScore = 30
+      } else {
+        securityScore = 95
+      }
+      break
+      
+    case 'TWILIO_PHONE_NUMBER':
+      const phoneRegex = /^\+1[0-9]{10}$/
+      if (!phoneRegex.test(value)) {
+        return { valid: false, error: 'Twilio Phone Number must be in E.164 format: +1XXXXXXXXXX', securityScore: 0 }
+      }
+      securityScore = 90
+      break
+      
+    case 'TELNYX_MESSAGING_PROFILE_ID':
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(value)) {
+        return { valid: false, error: 'Telnyx Messaging Profile ID must be a valid UUID', securityScore: 0 }
+      }
+      securityScore = 85
+      break
+      
+    default:
+      return { valid: false, error: 'Unknown setting type', securityScore: 0 }
+  }
+  
+  return { valid: true, securityScore }
+}
+
+// Check for rate limiting and suspicious activity
+async function checkSecurityLimits(supabase: any, userId: string, clientIP?: string): Promise<{ allowed: boolean; reason?: string }> {
+  const now = new Date()
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  
+  try {
+    // Check hourly rate limit
+    const { data: hourlyRequests, error: hourlyError } = await supabase
+      .from('security_rate_limits')
+      .select('count(*)')
+      .eq('user_id', userId)
+      .eq('operation_type', 'api_key_update')
+      .gte('created_at', oneHourAgo.toISOString())
+    
+    if (hourlyError) {
+      console.error('Error checking hourly rate limit:', hourlyError)
+      return { allowed: false, reason: 'Security check failed' }
+    }
+    
+    const hourlyCount = hourlyRequests?.[0]?.count || 0
+    if (hourlyCount >= MAX_API_KEY_OPERATIONS_PER_HOUR) {
+      console.warn(`Rate limit exceeded for user ${userId}: ${hourlyCount} operations in past hour`)
+      return { allowed: false, reason: 'Too many API key operations in the past hour. Please wait before trying again.' }
+    }
+    
+    // Check daily rate limit
+    const { data: dailyRequests, error: dailyError } = await supabase
+      .from('security_rate_limits')
+      .select('count(*)')
+      .eq('user_id', userId)
+      .eq('operation_type', 'api_key_update')
+      .gte('created_at', oneDayAgo.toISOString())
+    
+    if (dailyError) {
+      console.error('Error checking daily rate limit:', dailyError)
+      return { allowed: false, reason: 'Security check failed' }
+    }
+    
+    const dailyCount = dailyRequests?.[0]?.count || 0
+    if (dailyCount >= MAX_API_KEY_OPERATIONS_PER_DAY) {
+      console.warn(`Daily rate limit exceeded for user ${userId}: ${dailyCount} operations today`)
+      return { allowed: false, reason: 'Daily API key operation limit reached. Please try again tomorrow.' }
+    }
+    
+    // Check for suspicious activity patterns
+    if (hourlyCount >= SUSPICIOUS_ACTIVITY_THRESHOLD) {
+      console.warn(`Suspicious activity detected for user ${userId}: ${hourlyCount} operations in past hour`)
+      // Log but don't block - just increase monitoring
+      await logSecurityEvent(supabase, userId, 'suspicious_api_key_activity', {
+        hourly_count: hourlyCount,
+        daily_count: dailyCount,
+        client_ip: clientIP
+      })
+    }
+    
+    return { allowed: true }
+    
+  } catch (error) {
+    console.error('Error in security check:', error)
+    return { allowed: false, reason: 'Security validation failed' }
+  }
+}
+
+// Enhanced security event logging
+async function logSecurityEvent(supabase: any, userId: string, eventType: string, details: any) {
+  try {
+    await supabase.rpc('log_security_event', {
+      p_action: eventType,
+      p_resource_type: 'api_keys',
+      p_resource_id: userId,
+      p_details: {
+        ...details,
+        timestamp: new Date().toISOString(),
+        function: 'update-settings'
+      }
+    })
+  } catch (error) {
+    console.error('Failed to log security event:', error)
+  }
+}
+
 Deno.serve(async (req) => {
   console.log('=== UPDATE SETTINGS FUNCTION START ===');
   
@@ -75,75 +232,74 @@ Deno.serve(async (req) => {
 
     const requestBody = await req.json()
     const { settingType, value } = requestBody
-    console.log('📝 Updating setting:', settingType, 'Value length:', value?.length);
+    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    
+    console.log('📝 Updating setting:', settingType, 'Value length:', value?.length, 'Client IP:', clientIP);
 
     if (!settingType || !value) {
+      await logSecurityEvent(supabase, user.id, 'invalid_api_key_request', {
+        reason: 'Missing settingType or value',
+        client_ip: clientIP
+      })
       return new Response(
         JSON.stringify({ error: 'Missing settingType or value' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Validate OpenAI API key format
-    if (settingType === 'OPENAI_API_KEY') {
-      if (!value.startsWith('sk-') || value.length < 50) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid OpenAI API key format' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+    // Enhanced security checks
+    console.log('🔒 Performing security validation...');
+    
+    // Check rate limits and suspicious activity
+    const securityCheck = await checkSecurityLimits(supabase, user.id, clientIP)
+    if (!securityCheck.allowed) {
+      await logSecurityEvent(supabase, user.id, 'rate_limit_exceeded', {
+        reason: securityCheck.reason,
+        client_ip: clientIP,
+        setting_type: settingType
+      })
+      return new Response(
+        JSON.stringify({ error: securityCheck.reason }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
-
-    // Validate Telnyx API key format
-    if (settingType === 'TELNYX_API_KEY') {
-      if (!value.startsWith('KEY') || value.length < 30) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid Telnyx API key format' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+    
+    // Enhanced API key format validation
+    const validation = validateApiKeyFormat(settingType, value)
+    if (!validation.valid) {
+      await logSecurityEvent(supabase, user.id, 'invalid_api_key_format', {
+        setting_type: settingType,
+        error: validation.error,
+        security_score: validation.securityScore,
+        client_ip: clientIP
+      })
+      return new Response(
+        JSON.stringify({ error: validation.error }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
-
-    // Validate Telnyx Messaging Profile ID format (UUID)
-    if (settingType === 'TELNYX_MESSAGING_PROFILE_ID') {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(value)) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid Telnyx Messaging Profile ID format (must be a UUID)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-    }
-
-    // Validate Twilio Account SID format
-    if (settingType === 'TWILIO_ACCOUNT_SID') {
-      if (!value.startsWith('AC') || value.length !== 34) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid Twilio Account SID format (must start with AC and be 34 characters)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-    }
-
-    // Validate Twilio Auth Token format
-    if (settingType === 'TWILIO_AUTH_TOKEN') {
-      if (value.length !== 32) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid Twilio Auth Token format (must be 32 characters)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-    }
-
-    // Validate Twilio Phone Number format
-    if (settingType === 'TWILIO_PHONE_NUMBER') {
-      const phoneRegex = /^\+1[0-9]{10}$/
-      if (!phoneRegex.test(value)) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid Twilio Phone Number format (must be in E.164 format: +1XXXXXXXXXX)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+    
+    // Log successful validation with security score
+    await logSecurityEvent(supabase, user.id, 'api_key_validation_success', {
+      setting_type: settingType,
+      security_score: validation.securityScore,
+      client_ip: clientIP
+    })
+    
+    // Record the rate limit entry
+    try {
+      await supabase.from('security_rate_limits').insert({
+        user_id: user.id,
+        operation_type: 'api_key_update',
+        client_ip: clientIP,
+        metadata: {
+          setting_type: settingType,
+          security_score: validation.securityScore
+        }
+      })
+    } catch (rateLimitError) {
+      console.error('Failed to record rate limit entry:', rateLimitError)
+      // Don't fail the operation, just log the error
     }
 
     console.log('🔄 Attempting to update/insert setting...');

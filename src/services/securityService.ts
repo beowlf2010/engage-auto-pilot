@@ -119,7 +119,7 @@ class SecurityService {
   }
 
   /**
-   * Rate limiting check (client-side)
+   * Enhanced rate limiting with server-side integration
    */
   private rateLimitMap = new Map<string, number[]>();
 
@@ -131,6 +131,17 @@ class SecurityService {
     const recentAttempts = attempts.filter(time => now - time < windowMs);
     
     if (recentAttempts.length >= maxAttempts) {
+      // Log rate limit violation for security monitoring
+      this.logSecurityEvent({
+        action: 'client_rate_limit_exceeded',
+        resource_type: 'api_operations',
+        details: {
+          key,
+          attempts: recentAttempts.length,
+          maxAttempts,
+          windowMs
+        }
+      });
       return false; // Rate limit exceeded
     }
     
@@ -139,6 +150,133 @@ class SecurityService {
     this.rateLimitMap.set(key, recentAttempts);
     
     return true; // Within rate limit
+  }
+
+  /**
+   * Enhanced API key rotation with backup
+   */
+  async rotateApiKey(settingType: string, newValue: string, reason: string, emergencyRotation: boolean = false): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Client-side rate limiting check
+      const rateLimitKey = `rotate-${settingType}`;
+      if (!this.checkRateLimit(rateLimitKey, 3, 3600000)) { // 3 attempts per hour
+        return { 
+          success: false, 
+          error: 'Rate limit exceeded for API key rotations. Please wait before trying again.' 
+        };
+      }
+
+      // Log rotation attempt
+      await this.logSecurityEvent({
+        action: 'api_key_rotation_initiated',
+        resource_type: 'api_keys',
+        resource_id: settingType,
+        details: {
+          reason,
+          emergency: emergencyRotation,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      const { data, error } = await supabase.functions.invoke('rotate-api-keys', {
+        body: {
+          settingType,
+          newValue,
+          reason,
+          emergencyRotation
+        }
+      });
+
+      if (error) {
+        console.error('API key rotation failed:', error);
+        await this.logSecurityEvent({
+          action: 'api_key_rotation_failed',
+          resource_type: 'api_keys',
+          resource_id: settingType,
+          details: {
+            error: error.message,
+            reason
+          }
+        });
+        throw error;
+      }
+
+      await this.logSecurityEvent({
+        action: 'api_key_rotation_completed',
+        resource_type: 'api_keys',
+        resource_id: settingType,
+        details: {
+          reason,
+          emergency: emergencyRotation,
+          backup_created: data.backupCreated
+        }
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Error rotating API key:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to rotate API key' 
+      };
+    }
+  }
+
+  /**
+   * Enhanced security monitoring for suspicious patterns
+   */
+  async detectSuspiciousActivity(userId?: string): Promise<{ suspicious: boolean; patterns: string[] }> {
+    try {
+      const patterns: string[] = [];
+      
+      // Check for rapid API key operations
+      const apiKeyOperations = Array.from(this.rateLimitMap.entries())
+        .filter(([key]) => key.includes('api-key') || key.includes('setting'))
+        .reduce((total, [, attempts]) => total + attempts.length, 0);
+      
+      if (apiKeyOperations > 10) {
+        patterns.push('High frequency API key operations');
+      }
+      
+      // Check for multiple failed validation attempts
+      const validationAttempts = this.rateLimitMap.get('validation-attempts') || [];
+      if (validationAttempts.length > 5) {
+        patterns.push('Multiple API key validation failures');
+      }
+      
+      // Check for unusual access patterns (different time zones, etc.)
+      const accessTimes = this.rateLimitMap.get('access-times') || [];
+      const currentHour = new Date().getHours();
+      const unusualHours = accessTimes.filter(time => {
+        const hour = new Date(time).getHours();
+        return Math.abs(hour - currentHour) > 8; // Different timezone
+      });
+      
+      if (unusualHours.length > 0) {
+        patterns.push('Unusual access time patterns');
+      }
+      
+      const suspicious = patterns.length > 0;
+      
+      if (suspicious && userId) {
+        await this.logSecurityEvent({
+          action: 'suspicious_activity_detected',
+          resource_type: 'user_activity',
+          resource_id: userId,
+          details: {
+            patterns,
+            api_key_operations: apiKeyOperations,
+            validation_attempts: validationAttempts.length,
+            unusual_access_count: unusualHours.length
+          }
+        });
+      }
+      
+      return { suspicious, patterns };
+    } catch (error) {
+      console.error('Error detecting suspicious activity:', error);
+      return { suspicious: false, patterns: [] };
+    }
   }
 
   /**
