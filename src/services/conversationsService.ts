@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { ConversationListItem, MessageData } from '@/types/conversation';
 
+const MAX_LEADS = 200;
+
 export const fetchConversations = async (profile: any): Promise<ConversationListItem[]> => {
   console.log('🔄 [CONVERSATIONS SERVICE] Starting fetchConversations for profile:', profile.id);
   
@@ -35,7 +37,8 @@ export const fetchConversations = async (profile: any): Promise<ConversationList
         salesperson_id,
         phone_numbers:phone_numbers(number)
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(MAX_LEADS);
 
     // If not admin/manager, only show assigned leads
     if (!isAdminOrManager) {
