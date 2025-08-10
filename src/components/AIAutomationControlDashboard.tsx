@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -53,6 +54,10 @@ export const AIAutomationControlDashboard = () => {
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [sinceHours, setSinceHours] = useState<number>(24);
+  const [totalToEnable, setTotalToEnable] = useState<number>(50);
+  const [maxPerHour, setMaxPerHour] = useState<number>(20);
+  const [startAt, setStartAt] = useState<string>('');
   const { toast } = useToast();
 
   const fetchSystemStatus = async () => {
@@ -171,6 +176,28 @@ export const AIAutomationControlDashboard = () => {
         description: "Failed to trigger manual run",
         variant: "destructive"
       });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const triggerPacedEnable = async () => {
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase.functions.invoke('ai-paced-enable', {
+        body: {
+          sinceHours,
+          totalToEnable,
+          maxPerHour,
+          startAt: startAt || null,
+          source: 'manual_dashboard'
+        }
+      });
+      if (error) throw error;
+      toast({ title: 'Paced enable queued', description: `Enabling ${totalToEnable} leads over time`, variant: 'default' });
+    } catch (error) {
+      console.error('Error pacing enable:', error);
+      toast({ title: 'Error', description: 'Failed to start paced enable', variant: 'destructive' });
     } finally {
       setIsUpdating(false);
     }
@@ -348,6 +375,43 @@ export const AIAutomationControlDashboard = () => {
             </div>
             <div>
               <span className="font-medium">Global Timeout:</span> {controlSettings?.global_timeout_minutes} minutes
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Paced AI Enable */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Paced AI Enable</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div>
+              <label className="text-sm font-medium">Since (hours)</label>
+              <Input type="number" min={1} max={168} value={sinceHours} onChange={(e) => setSinceHours(Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Total to enable</label>
+              <Input type="number" min={1} max={1000} value={totalToEnable} onChange={(e) => setTotalToEnable(Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Max per hour</label>
+              <Input type="number" min={1} max={200} value={maxPerHour} onChange={(e) => setMaxPerHour(Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Start at (optional)</label>
+              <Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={triggerPacedEnable} disabled={isUpdating || controlSettings?.emergency_stop}>
+                <Play className="w-4 h-4 mr-2" />
+                Start Paced Enable
+              </Button>
+              <Button variant="outline" size="sm" onClick={fetchSystemStatus} disabled={isUpdating}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
             </div>
           </div>
         </CardContent>
