@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationOperations } from '@/hooks/useConversationOperations';
@@ -17,6 +16,7 @@ import { ConversationListSkeleton } from '@/components/ui/skeletons/Conversation
 import { MessageListSkeleton } from '@/components/ui/skeletons/MessageSkeleton';
 import { Switch } from '@/components/ui/switch';
 import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting';
+import { NetworkStatus } from '@/components/ui/error/NetworkStatus';
 
 interface SmartInboxRobustProps {
   onBack?: () => void;
@@ -162,7 +162,8 @@ const handleMarkAsRead = useCallback(async () => {
             )}
             <h1 className="text-xl font-semibold">Smart Inbox</h1>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
+            <NetworkStatus isOnline={navigator.onLine} lastUpdated={new Date()} />
             <Button
               onClick={handleRefresh}
               disabled={loading}

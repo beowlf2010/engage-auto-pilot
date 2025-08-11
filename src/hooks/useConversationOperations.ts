@@ -20,6 +20,7 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
   const { toast } = useToast();
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
 
+
   const loadConversations = useCallback(async () => {
     console.log('🔄 [CONV OPS] Load conversations called', {
       profileId: profile?.id,
@@ -42,24 +43,49 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
     setLoading(true);
     setError(null);
     
+    const backoff = async <T,>(fn: () => Promise<T>, retries = 2) => {
+      let attempt = 0;
+      let lastErr: any;
+      while (attempt <= retries) {
+        try { return await fn(); } catch (e) {
+          lastErr = e; attempt += 1;
+          await new Promise(r => setTimeout(r, Math.min(1500, 300 * Math.pow(2, attempt))));
+        }
+      }
+      throw lastErr;
+    };
+    
     try {
       console.log('📞 [CONV OPS] Fetching conversations for profile:', profile.id);
-      const data = await fetchConversations(profile);
+      const data = await backoff(() => fetchConversations(profile));
       console.log('✅ [CONV OPS] Conversations loaded:', data.length);
       console.log('🔴 [CONV OPS] Unread conversations:', data.filter(c => c.unreadCount > 0).length);
       setConversations(data);
+      // Cache last successful payload
+      try { localStorage.setItem('conversations:last', JSON.stringify({ at: Date.now(), data })); } catch {}
     } catch (err) {
       console.error('❌ [CONV OPS] Error loading conversations:', err);
-      setError('Failed to load conversations');
-      toast({
-        title: "Error",
-        description: "Failed to load conversations. Please try again.",
-        variant: "destructive"
-      });
+      // Fallback to cached data if available
+      try {
+        const cached = localStorage.getItem('conversations:last');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setConversations(parsed.data || []);
+          setError('Showing cached conversations due to network issues');
+          toast({ title: 'Network issue', description: 'Showing cached conversations.', variant: 'default' });
+        } else {
+          setError('Failed to load conversations');
+          toast({ title: 'Error', description: 'Failed to load conversations. Please try again.', variant: 'destructive' });
+        }
+      } catch {
+        setError('Failed to load conversations');
+        toast({ title: 'Error', description: 'Failed to load conversations. Please try again.', variant: 'destructive' });
+      }
     } finally {
       setLoading(false);
     }
   }, [profile, authLoading, toast]);
+
 
   const loadMessages = useCallback(async (leadId: string) => {
     console.log('📬 [CONV OPS] Loading messages for lead:', leadId);
@@ -73,11 +99,21 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
 
     setLoading(true);
     setError(null);
+
+    const backoff = async <T,>(fn: () => Promise<T>, retries = 2) => {
+      let attempt = 0; let lastErr: any;
+      while (attempt <= retries) {
+        try { return await fn(); } catch (e) { lastErr = e; attempt += 1; await new Promise(r => setTimeout(r, Math.min(1500, 300 * Math.pow(2, attempt)))); }
+      }
+      throw lastErr;
+    };
     
     try {      
-      const data = await fetchMessages(leadId);
+      const data = await backoff(() => fetchMessages(leadId));
       console.log('✅ [CONV OPS] Messages loaded:', data.length);
       setMessages(data);
+      // Cache
+      try { localStorage.setItem(`messages:${leadId}`, JSON.stringify({ at: Date.now(), data })); } catch {}
       
       if (autoMarkEnabled) {
         await markMessagesAsRead(leadId);
@@ -90,12 +126,22 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
       
     } catch (err) {
       console.error('❌ [CONV OPS] Error loading messages:', err);
-      setError('Failed to load messages');
-      toast({
-        title: "Error",
-        description: "Failed to load messages. Please try again.",
-        variant: "destructive"
-      });
+      // Fallback to cached messages
+      try {
+        const cached = localStorage.getItem(`messages:${leadId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setMessages(parsed.data || []);
+          setError('Showing cached messages due to network issues');
+          toast({ title: 'Network issue', description: 'Showing cached messages.', variant: 'default' });
+        } else {
+          setError('Failed to load messages');
+          toast({ title: 'Error', description: 'Failed to load messages. Please try again.', variant: 'destructive' });
+        }
+      } catch {
+        setError('Failed to load messages');
+        toast({ title: 'Error', description: 'Failed to load messages. Please try again.', variant: 'destructive' });
+      }
     } finally {
       setLoading(false);
     }

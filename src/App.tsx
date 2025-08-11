@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import { SecurityEnhancedLayout } from './components/security/SecurityEnhancedLayout';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from '@/components/ui/toaster';
+import { NetworkBanner } from '@/components/ui/error/NetworkBanner';
 
 const AppContent = () => {
   const { loading } = useAuth();
@@ -36,6 +37,8 @@ function App() {
       <AuthProvider>
         <SecurityEnhancedLayout>
           <div className="min-h-screen bg-gray-50 w-full">
+            {/* Global network health banner */}
+            <NetworkBanner />
             <AppContent />
             <Toaster />
           </div>
