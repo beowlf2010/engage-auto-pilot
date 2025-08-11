@@ -16,7 +16,7 @@ interface ConversationsListProps {
   showUrgencyIndicator?: boolean;
   showTimestamps?: boolean;
   markAsRead?: (leadId: string) => Promise<void>;
-  markingAsRead?: string | null;
+  isMarkingAsRead?: boolean;
 }
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
@@ -27,7 +27,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   showUrgencyIndicator = false,
   showTimestamps = false,
   markAsRead,
-  markingAsRead
+  isMarkingAsRead
 }) => {
   const { handleRefresh, isRefreshing } = useManualRefresh({
     onRefresh: () => {
@@ -39,13 +39,17 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
 
   const getUrgencyColor = (conversation: ConversationListItem) => {
     if (!showUrgencyIndicator) return '';
-    
-    const hoursSinceLastMessage = conversation.lastMessageDate ? 
+
+    // Red only when there are unread messages
+    if (conversation.unreadCount > 0) return 'border-l-4 border-red-500';
+
+    // Time-based urgency uses orange/yellow without implying unread
+    const hoursSinceLastMessage = conversation.lastMessageDate ?
       (Date.now() - conversation.lastMessageDate.getTime()) / (1000 * 60 * 60) : 0;
-    
-    if (conversation.unreadCount > 3 || hoursSinceLastMessage > 24) return 'border-l-4 border-red-500';
-    if (conversation.unreadCount > 1 || hoursSinceLastMessage > 4) return 'border-l-4 border-orange-500';
-    return 'border-l-4 border-yellow-500';
+
+    if (hoursSinceLastMessage > 24) return 'border-l-4 border-orange-500';
+    if (hoursSinceLastMessage > 4) return 'border-l-4 border-yellow-500';
+    return '';
   };
 
   if (conversations.length === 0) {
@@ -154,7 +158,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
                           e.stopPropagation();
                           markAsRead(conversation.leadId);
                         }}
-                        disabled={markingAsRead === conversation.leadId}
+                        disabled={isMarkingAsRead}
                         className="text-xs h-6 px-2"
                       >
                         <CheckCheck className="h-3 w-3 mr-1" />

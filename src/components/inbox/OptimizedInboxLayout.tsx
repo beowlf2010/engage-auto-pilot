@@ -52,7 +52,7 @@ const OptimizedInboxLayout: React.FC<OptimizedInboxLayoutProps> = ({
           selectedLead={selectedLead}
           onSelectConversation={onSelectConversation}
           markAsRead={markAsRead}
-          markingAsRead={markingAsRead}
+          isMarkingAsRead={Boolean(markingAsRead)}
           canReply={(conversation) => canReply}
         />
       </div>

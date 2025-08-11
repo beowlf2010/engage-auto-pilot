@@ -120,7 +120,7 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
               canReply={canReply}
               showUrgencyIndicator={true}
               markAsRead={markAsRead}
-              markingAsRead={markingAsRead}
+              isMarkingAsRead={Boolean(markingAsRead)}
             />
           )}
         </div>
@@ -149,7 +149,7 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
               canReply={canReply}
               showTimestamps={true}
               markAsRead={markAsRead}
-              markingAsRead={markingAsRead}
+              isMarkingAsRead={Boolean(markingAsRead)}
             />
           )}
         </div>
@@ -165,7 +165,7 @@ const EnhancedInboxTabs: React.FC<EnhancedInboxTabsProps> = ({
             onSelectConversation={onSelectConversation}
             canReply={canReply}
             markAsRead={markAsRead}
-            markingAsRead={markingAsRead}
+            isMarkingAsRead={Boolean(markingAsRead)}
           />
         )}
       </TabsContent>

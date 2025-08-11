@@ -15,6 +15,8 @@ import { RefreshCw, MessageSquare, Users, Clock, CheckCircle } from 'lucide-reac
 import type { ConversationListItem } from '@/types/conversation';
 import { ConversationListSkeleton } from '@/components/ui/skeletons/ConversationSkeleton';
 import { MessageListSkeleton } from '@/components/ui/skeletons/MessageSkeleton';
+import { Switch } from '@/components/ui/switch';
+import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting';
 
 interface SmartInboxRobustProps {
   onBack?: () => void;
@@ -25,6 +27,8 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const { profile, loading: authLoading } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showUrgencyColors, setShowUrgencyColors] = useState(true);
+  const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
 
   const {
     conversations,
@@ -70,21 +74,23 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
     }
   }, [authLoading, profile, loadConversations]);
 
-  // Auto-select conversation if leadId provided
-  useEffect(() => {
-    if (leadId && filteredConversations.length > 0) {
-      const conversation = filteredConversations.find(c => c.leadId === leadId);
-      if (conversation) {
-        setSelectedConversation(conversation);
-        loadMessages(leadId);
-      }
+// Auto-select conversation if leadId provided
+useEffect(() => {
+  if (leadId && filteredConversations.length > 0) {
+    const conversation = filteredConversations.find(c => c.leadId === leadId);
+    if (conversation) {
+      const initialSelection = autoMarkEnabled ? { ...conversation, unreadCount: 0 } : conversation;
+      setSelectedConversation(initialSelection);
+      loadMessages(leadId);
     }
-  }, [leadId, filteredConversations, loadMessages]);
+  }
+}, [leadId, filteredConversations, loadMessages, autoMarkEnabled]);
 
-  const handleSelectConversation = useCallback((conversation: ConversationListItem) => {
-    setSelectedConversation(conversation);
-    loadMessages(conversation.leadId);
-  }, [loadMessages]);
+const handleSelectConversation = useCallback((conversation: ConversationListItem) => {
+  const selection = autoMarkEnabled ? { ...conversation, unreadCount: 0 } : conversation;
+  setSelectedConversation(selection);
+  loadMessages(conversation.leadId);
+}, [loadMessages, autoMarkEnabled]);
 
   const handleSendMessage = useCallback(async (messageText: string) => {
     if (selectedConversation) {
@@ -92,12 +98,14 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
     }
   }, [selectedConversation, sendMessage]);
 
-  const handleMarkAsRead = useCallback(async () => {
-    if (selectedConversation) {
-      await markAsRead(selectedConversation.leadId);
-      manualRefresh(); // Use manualRefresh here too
-    }
-  }, [selectedConversation, markAsRead, manualRefresh]);
+const handleMarkAsRead = useCallback(async () => {
+  if (selectedConversation) {
+    await markAsRead(selectedConversation.leadId);
+    manualRefresh(); // Use manualRefresh here too
+    // Also update selectedConversation locally to reflect zero unread
+    setSelectedConversation(prev => prev ? { ...prev, unreadCount: 0 } : prev);
+  }
+}, [selectedConversation, markAsRead, manualRefresh]);
 
   const handleRefresh = useCallback(async () => {
     console.log('🔄 [SMART INBOX ROBUST] Manual refresh triggered');
@@ -195,15 +203,21 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
       <div className="flex-1 flex overflow-hidden">
         {/* Conversations List */}
         <div className="w-1/3 border-r bg-card flex flex-col">
-          <div className="p-4 border-b bg-muted/50">
-            <div className="flex items-center justify-between">
-              <h2 className="font-medium">Conversations</h2>
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <Users className="h-4 w-4" />
-                <span>{filteredConversations.length}</span>
-              </div>
-            </div>
-          </div>
+<div className="p-4 border-b bg-muted/50">
+  <div className="flex items-center justify-between">
+    <h2 className="font-medium">Conversations</h2>
+    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+      <div className="flex items-center space-x-2">
+        <Users className="h-4 w-4" />
+        <span>{filteredConversations.length}</span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <span className="text-xs">Urgency</span>
+        <Switch checked={showUrgencyColors} onCheckedChange={setShowUrgencyColors} />
+      </div>
+    </div>
+  </div>
+</div>
           <div className="flex-1 overflow-auto">
             {loading ? (
               <ConversationListSkeleton />
@@ -225,18 +239,18 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
                 </div>
               </div>
             ) : (
-              <ConversationsList
-                conversations={filteredConversations}
-                selectedLead={selectedConversation?.leadId}
-                onSelectConversation={(leadId) => {
-                  const conversation = filteredConversations.find(c => c.leadId === leadId);
-                  if (conversation) handleSelectConversation(conversation);
-                }}
-                showUrgencyIndicator={true}
-                showTimestamps={true}
-                markAsRead={markAsRead}
-                markingAsRead={isMarkingAsRead.toString()}
-              />
+<ConversationsList
+  conversations={filteredConversations}
+  selectedLead={selectedConversation?.leadId}
+  onSelectConversation={(leadId) => {
+    const conversation = filteredConversations.find(c => c.leadId === leadId);
+    if (conversation) handleSelectConversation(conversation);
+  }}
+  showUrgencyIndicator={showUrgencyColors}
+  showTimestamps={true}
+  markAsRead={markAsRead}
+  isMarkingAsRead={isMarkingAsRead}
+/>
             )}
           </div>
         </div>
