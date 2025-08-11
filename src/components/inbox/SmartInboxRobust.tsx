@@ -30,6 +30,7 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showUrgencyColors, setShowUrgencyColors] = useState(false);
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
+  const [scope, setScope] = useState<'my' | 'all'>('my');
 
   const {
     conversations,

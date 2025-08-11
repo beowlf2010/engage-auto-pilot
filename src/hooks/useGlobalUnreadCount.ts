@@ -89,6 +89,7 @@ export const useGlobalUnreadCount = () => {
       console.log('🔌 [GLOBAL UNREAD] Cleaning up enhanced subscription');
       unsubscribe();
       window.removeEventListener('unread-count-changed', handleUnreadCountChanged);
+      clearInterval(intervalId);
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
