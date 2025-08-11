@@ -20,7 +20,7 @@ import { NetworkStatus } from '@/components/ui/error/NetworkStatus';
 import { useOptimisticUnreadCounts } from '@/hooks/useOptimisticUnreadCounts';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useToast } from '@/hooks/use-toast';
-import { markOlderMessagesAsReadForScope, resetInboxGlobally } from '@/services/conversationsService';
+import { markOlderMessagesAsReadForScope, resetInboxGlobally, setGlobalDnc } from '@/services/conversationsService';
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -262,6 +262,39 @@ const handleMarkAsRead = useCallback(async () => {
                           try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
                         } else {
                           toast({ title: 'Reset failed', description: res.error || 'Please try again.', variant: 'destructive' });
+                        }
+                      }}
+                    >
+                      Confirm
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {(isAdmin || isManager) && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    Global Opt-Out (DNC)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Opt out all leads?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This sets Do Not Call, Do Not Email, and Do Not Mail to ON for all leads and pauses AI. You can revert later per lead.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        const res = await setGlobalDnc();
+                        if (res.success) {
+                          toast({ title: 'Global opt-out applied', description: `Updated ${res.updated || 0} leads.` });
+                          await manualRefresh(scope);
+                        } else {
+                          toast({ title: 'Opt-out failed', description: res.error || 'Please try again.', variant: 'destructive' });
                         }
                       }}
                     >

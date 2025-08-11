@@ -329,3 +329,22 @@ export const resetInboxGlobally = async (cutoff: Date): Promise<{ success: boole
     return { success: false, error: err?.message || 'Unknown error' };
   }
 };
+
+export const setGlobalDnc = async (
+  opts?: { call?: boolean; email?: boolean; mail?: boolean; reason?: string }
+): Promise<{ success: boolean; updated?: number; error?: string }> => {
+  try {
+    const { data, error } = await supabase.rpc('set_global_dnc', {
+      p_call: opts?.call ?? true,
+      p_email: opts?.email ?? true,
+      p_mail: opts?.mail ?? true,
+      p_reason: opts?.reason ?? 'Temporary global opt-out',
+    });
+    if (error) throw error;
+    const payload = (data as any) || {};
+    return { success: Boolean(payload.success), updated: payload.updated };
+  } catch (err: any) {
+    console.error('❌ [CONVERSATIONS SERVICE] Global DNC failed:', err);
+    return { success: false, error: err?.message || 'Unknown error' };
+  }
+};

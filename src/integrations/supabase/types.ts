@@ -8022,6 +8022,15 @@ export type Database = {
         Args: { lead_uuid: string }
         Returns: undefined
       }
+      set_global_dnc: {
+        Args: {
+          p_call: boolean
+          p_email: boolean
+          p_mail: boolean
+          p_reason?: string
+        }
+        Returns: Json
+      }
       set_primary_phone: {
         Args: { p_lead_id: string; p_phone_id: string }
         Returns: undefined
