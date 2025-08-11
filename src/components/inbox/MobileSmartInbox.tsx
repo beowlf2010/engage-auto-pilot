@@ -21,7 +21,8 @@ interface MobileSmartInboxProps {
 }
 
 const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) => {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
+  const [initialized, setInitialized] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -53,9 +54,20 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
 
   // Load conversations on mount
   useEffect(() => {
-    console.log('📱 [MOBILE SMART INBOX] Loading conversations on mount');
-    loadConversations();
-  }, [loadConversations]);
+    if (authLoading || !profile) return;
+    console.log('📱 [MOBILE SMART INBOX] Auth ready, loading conversations');
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadConversations();
+      } finally {
+        if (!cancelled) setInitialized(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, profile, loadConversations]);
 
   // Auto-select conversation if leadId provided
   useEffect(() => {
@@ -121,7 +133,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
   }, [manualRefresh]);
 
   // Show status display for loading, error, or empty states
-  if (loading || error || conversations.length === 0) {
+  if (authLoading || loading || error || (initialized && conversations.length === 0)) {
     return (
       <div className="h-full flex flex-col bg-background">
         {/* Mobile Header */}
@@ -140,7 +152,7 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
         </div>
 
         <InboxStatusDisplay
-          loading={loading}
+          loading={authLoading || loading}
           error={error}
           conversationsCount={conversations.length}
           onRetry={handleRetry}
