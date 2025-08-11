@@ -18,7 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting';
 import { NetworkStatus } from '@/components/ui/error/NetworkStatus';
 import { useOptimisticUnreadCounts } from '@/hooks/useOptimisticUnreadCounts';
-
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 interface SmartInboxRobustProps {
   onBack?: () => void;
   leadId?: string;
@@ -31,6 +31,8 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const [showUrgencyColors, setShowUrgencyColors] = useState(false);
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
   const [scope, setScope] = useState<'my' | 'all'>('my');
+  const { isAdmin, isManager, loading: permsLoading } = useUserPermissions();
+  const initializedScopeRef = useRef(false);
 
   const {
     conversations,
@@ -86,13 +88,13 @@ const statusTabs = smartInboxDataLoader.statusTabs.map(tab => ({
          tab.id === 'unassigned' ? displayedConversations.filter(c => !c.salespersonId).length : 0
 }));
 
-  // Load conversations on mount
+  // Initialize and load conversations when scope/profile ready
   useEffect(() => {
     if (!authLoading && profile) {
-      console.log('🚀 [SMART INBOX ROBUST] Loading initial conversations');
-      loadConversations();
+      console.log('🚀 [SMART INBOX ROBUST] Loading conversations with scope:', scope);
+      loadConversations(scope);
     }
-  }, [authLoading, profile, loadConversations]);
+  }, [authLoading, profile, scope, loadConversations]);
 
 // Auto-select conversation if leadId provided
 useEffect(() => {
@@ -112,6 +114,30 @@ useEffect(() => {
   }
 }, [scope, selectedConversation, profile?.id]);
 
+// Initialize scope from localStorage and roles
+useEffect(() => {
+  if (initializedScopeRef.current) return;
+  if (authLoading || permsLoading) return;
+  const saved = (typeof window !== 'undefined' && localStorage.getItem('smartInboxScope')) as 'my' | 'all' | null;
+  const defaultScope = (isAdmin || isManager) ? 'all' : 'my';
+  setScope(saved === 'my' || saved === 'all' ? saved : defaultScope);
+  initializedScopeRef.current = true;
+}, [authLoading, permsLoading, isAdmin, isManager]);
+
+// Persist scope
+useEffect(() => {
+  try { localStorage.setItem('smartInboxScope', scope); } catch {}
+}, [scope]);
+
+// Auto-switch if My is empty for admin/manager
+useEffect(() => {
+  if (loading) return;
+  if ((isAdmin || isManager) && scope === 'my' && conversations.length === 0) {
+    setScope('all');
+    loadConversations('all');
+  }
+}, [loading, scope, isAdmin, isManager, conversations.length, loadConversations]);
+
 const handleSelectConversation = useCallback((conversation: ConversationListItem) => {
   const selection = autoMarkEnabled ? { ...conversation, unreadCount: 0 } : conversation;
   setSelectedConversation(selection);
@@ -127,11 +153,11 @@ const handleSelectConversation = useCallback((conversation: ConversationListItem
 const markAsReadWithRefresh = useCallback(async (leadId: string) => {
   optimisticZeroUnread(leadId);
   await markAsRead(leadId);
-  await manualRefresh();
+  await manualRefresh(scope);
   if (selectedConversation?.leadId === leadId) {
     setSelectedConversation(prev => prev ? { ...prev, unreadCount: 0 } : prev);
   }
-}, [optimisticZeroUnread, markAsRead, manualRefresh, selectedConversation?.leadId]);
+}, [optimisticZeroUnread, markAsRead, manualRefresh, selectedConversation?.leadId, scope]);
 
 const handleMarkAsRead = useCallback(async () => {
   if (selectedConversation) {
@@ -142,8 +168,8 @@ const handleMarkAsRead = useCallback(async () => {
 
   const handleRefresh = useCallback(async () => {
     console.log('🔄 [SMART INBOX ROBUST] Manual refresh triggered');
-    await manualRefresh();
-  }, [manualRefresh]);
+    await manualRefresh(scope);
+  }, [manualRefresh, scope]);
 
   if (authLoading) {
     return (
@@ -268,6 +294,11 @@ const handleMarkAsRead = useCallback(async () => {
                   {hasActiveFilters && (
                     <Button variant="outline" size="sm" onClick={clearFilters} className="mr-2">
                       Clear filters
+                    </Button>
+                  )}
+                  {(scope === 'my' && (isAdmin || isManager)) && (
+                    <Button variant="outline" size="sm" onClick={() => { setScope('all'); loadConversations('all'); }} className="mr-2">
+                      Show All
                     </Button>
                   )}
                   <Button variant="secondary" size="sm" onClick={handleRefresh} disabled={loading}>
