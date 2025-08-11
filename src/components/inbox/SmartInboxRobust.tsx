@@ -38,7 +38,8 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
     loadConversations,
     loadMessages,
     sendMessage,
-    manualRefresh // Use manualRefresh instead of refreshConversations
+    manualRefresh, // Use manualRefresh instead of refreshConversations
+    optimisticZeroUnread
   } = useConversationOperations({
     onLeadsRefresh: () => {
       console.log('🔄 [SMART INBOX ROBUST] Leads refresh triggered');
@@ -97,6 +98,15 @@ const handleSelectConversation = useCallback((conversation: ConversationListItem
       await sendMessage(selectedConversation.leadId, messageText);
     }
   }, [selectedConversation, sendMessage]);
+
+const markAsReadWithRefresh = useCallback(async (leadId: string) => {
+  optimisticZeroUnread(leadId);
+  await markAsRead(leadId);
+  await manualRefresh();
+  if (selectedConversation?.leadId === leadId) {
+    setSelectedConversation(prev => prev ? { ...prev, unreadCount: 0 } : prev);
+  }
+}, [optimisticZeroUnread, markAsRead, manualRefresh, selectedConversation?.leadId]);
 
 const handleMarkAsRead = useCallback(async () => {
   if (selectedConversation) {
@@ -249,7 +259,7 @@ const handleMarkAsRead = useCallback(async () => {
   }}
   showUrgencyIndicator={showUrgencyColors}
   showTimestamps={true}
-  markAsRead={markAsRead}
+  markAsRead={markAsReadWithRefresh}
   isMarkingAsRead={isMarkingAsRead}
 />
             )}

@@ -187,6 +187,11 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
     }
   }, [profile, loadMessages, toast, props?.onLeadsRefresh]);
 
+  const optimisticZeroUnread = useCallback((leadId: string) => {
+    setConversations(prev => prev.map(c => c.leadId === leadId ? { ...c, unreadCount: 0 } : c));
+    try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
+  }, []);
+
   const manualRefresh = useCallback(async () => {
     console.log('🔄 [CONV OPS] Manual refresh triggered');
     await loadConversations();
@@ -206,6 +211,7 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
     loadConversations,
     loadMessages,
     sendMessage,
+    optimisticZeroUnread,
     manualRefresh
   };
 };
