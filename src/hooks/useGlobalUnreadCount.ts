@@ -15,7 +15,7 @@ export const useGlobalUnreadCount = () => {
       console.log('🔍 [GLOBAL UNREAD] Querying conversations for unread count...');
       
       // Use the unified service with proper role filtering
-      const userRoles = ['manager']; // TODO: Get actual user roles from auth context
+      const userRoles: string[] = []; // Count only leads assigned to this user (treat as non-admin/manager)
       
       const count = await UnreadCountService.getUnreadCount({
         respectUserRole: true,
