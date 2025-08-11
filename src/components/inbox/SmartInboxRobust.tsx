@@ -17,6 +17,7 @@ import { MessageListSkeleton } from '@/components/ui/skeletons/MessageSkeleton';
 import { Switch } from '@/components/ui/switch';
 import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting';
 import { NetworkStatus } from '@/components/ui/error/NetworkStatus';
+import { useOptimisticUnreadCounts } from '@/hooks/useOptimisticUnreadCounts';
 
 interface SmartInboxRobustProps {
   onBack?: () => void;
@@ -56,16 +57,21 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   } = useInboxFilters();
   const { markAsRead, isMarkingAsRead } = useMarkAsRead();
 
-  // Apply filters to conversations
-  const filteredConversations = applyFilters(conversations);
-
-  const statusTabs = smartInboxDataLoader.statusTabs.map(tab => ({
-    ...tab,
-    count: tab.id === 'all' ? filteredConversations.length :
-           tab.id === 'unread' ? filteredConversations.filter(c => c.unreadCount > 0).length :
-           tab.id === 'assigned' ? filteredConversations.filter(c => c.salespersonId).length :
-           tab.id === 'unassigned' ? filteredConversations.filter(c => !c.salespersonId).length : 0
-  }));
+// Apply filters to conversations
+const filteredConversations = applyFilters(conversations);
+// Optimistic unread handling for display
+const { markAsReadOptimistically, getEffectiveUnreadCount } = useOptimisticUnreadCounts();
+const displayedConversations = filteredConversations.map(c => ({
+  ...c,
+  unreadCount: getEffectiveUnreadCount(c)
+}));
+const statusTabs = smartInboxDataLoader.statusTabs.map(tab => ({
+  ...tab,
+  count: tab.id === 'all' ? displayedConversations.length :
+         tab.id === 'unread' ? displayedConversations.filter(c => c.unreadCount > 0).length :
+         tab.id === 'assigned' ? displayedConversations.filter(c => c.salespersonId).length :
+         tab.id === 'unassigned' ? displayedConversations.filter(c => !c.salespersonId).length : 0
+}));
 
   // Load conversations on mount
   useEffect(() => {
@@ -110,12 +116,10 @@ const markAsReadWithRefresh = useCallback(async (leadId: string) => {
 
 const handleMarkAsRead = useCallback(async () => {
   if (selectedConversation) {
-    await markAsRead(selectedConversation.leadId);
-    manualRefresh(); // Use manualRefresh here too
-    // Also update selectedConversation locally to reflect zero unread
-    setSelectedConversation(prev => prev ? { ...prev, unreadCount: 0 } : prev);
+    markAsReadOptimistically(selectedConversation.leadId);
+    await markAsReadWithRefresh(selectedConversation.leadId);
   }
-}, [selectedConversation, markAsRead, manualRefresh]);
+}, [selectedConversation, markAsReadWithRefresh, markAsReadOptimistically]);
 
   const handleRefresh = useCallback(async () => {
     console.log('🔄 [SMART INBOX ROBUST] Manual refresh triggered');
@@ -220,7 +224,7 @@ const handleMarkAsRead = useCallback(async () => {
     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
       <div className="flex items-center space-x-2">
         <Users className="h-4 w-4" />
-        <span>{filteredConversations.length}</span>
+        <span>{displayedConversations.length}</span>
       </div>
       <div className="flex items-center space-x-2">
         <span className="text-xs">Urgency</span>
@@ -251,15 +255,18 @@ const handleMarkAsRead = useCallback(async () => {
               </div>
             ) : (
 <ConversationsList
-  conversations={filteredConversations}
+  conversations={displayedConversations}
   selectedLead={selectedConversation?.leadId}
   onSelectConversation={(leadId) => {
-    const conversation = filteredConversations.find(c => c.leadId === leadId);
+    const conversation = displayedConversations.find(c => c.leadId === leadId);
     if (conversation) handleSelectConversation(conversation);
   }}
   showUrgencyIndicator={showUrgencyColors}
   showTimestamps={true}
-  markAsRead={markAsReadWithRefresh}
+  markAsRead={async (leadId) => {
+    markAsReadOptimistically(leadId);
+    await markAsReadWithRefresh(leadId);
+  }}
   isMarkingAsRead={isMarkingAsRead}
 />
             )}
