@@ -20,7 +20,7 @@ import { NetworkStatus } from '@/components/ui/error/NetworkStatus';
 import { useOptimisticUnreadCounts } from '@/hooks/useOptimisticUnreadCounts';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useToast } from '@/hooks/use-toast';
-import { markOlderMessagesAsReadForScope } from '@/services/conversationsService';
+import { markOlderMessagesAsReadForScope, resetInboxGlobally } from '@/services/conversationsService';
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -45,6 +45,7 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
   const [scope, setScope] = useState<'my' | 'all'>('my');
   const { isAdmin, isManager, loading: permsLoading } = useUserPermissions();
+  const { toast } = useToast();
   const initializedScopeRef = useRef(false);
 
   const {
@@ -236,6 +237,40 @@ const handleMarkAsRead = useCallback(async () => {
           </div>
           <div className="flex items-center space-x-3">
             <NetworkStatus isOnline={navigator.onLine} lastUpdated={new Date()} />
+            {(isAdmin || isManager) && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    Start Fresh (All)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Start fresh for everyone?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will mark all existing unread incoming messages as read up to this moment for all users. Future messages will still appear as unread.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        const res = await resetInboxGlobally(new Date());
+                        if (res.success) {
+                          toast({ title: 'Inbox reset', description: `Marked ${res.updated || 0} messages as read for everyone.` });
+                          await manualRefresh(scope);
+                          try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
+                        } else {
+                          toast({ title: 'Reset failed', description: res.error || 'Please try again.', variant: 'destructive' });
+                        }
+                      }}
+                    >
+                      Confirm
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <Button
               onClick={handleRefresh}
               disabled={loading}

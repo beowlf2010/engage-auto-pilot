@@ -316,3 +316,16 @@ export const markOlderMessagesAsReadForScope = async (
     return { updated: 0 };
   }
 };
+
+export const resetInboxGlobally = async (cutoff: Date): Promise<{ success: boolean; updated?: number; error?: string }> => {
+  try {
+    const { data, error } = await supabase.rpc('reset_inbox_globally', { p_cutoff: cutoff.toISOString() });
+    if (error) throw error;
+    const payload = (data as any) || {};
+    try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
+    return { success: Boolean(payload.success), updated: payload.updated };
+  } catch (err: any) {
+    console.error('❌ [CONVERSATIONS SERVICE] Global reset failed:', err);
+    return { success: false, error: err?.message || 'Unknown error' };
+  }
+};

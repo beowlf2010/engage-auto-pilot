@@ -8010,6 +8010,10 @@ export type Database = {
         Args: { p_upload_id: string }
         Returns: Json
       }
+      reset_inbox_globally: {
+        Args: { p_cutoff?: string }
+        Returns: Json
+      }
       revoke_all_user_sessions: {
         Args: { p_user_id: string }
         Returns: number
