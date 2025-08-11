@@ -20,14 +20,14 @@ const ActiveFilterTags: React.FC<ActiveFilterTagsProps> = ({
   }
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-      <span className="text-sm font-medium text-blue-800">Active Filters:</span>
+    <div className="flex items-center gap-2 p-2 rounded-md border">
+      <span className="text-xs font-medium">Active Filters:</span>
       <div className="flex flex-wrap gap-1">
         {filterSummary.map((filter, index) => (
           <Badge
             key={index}
             variant="secondary"
-            className="text-xs bg-blue-100 text-blue-800 border-blue-200"
+            className="text-[10px]"
           >
             {filter}
           </Badge>
@@ -37,7 +37,7 @@ const ActiveFilterTags: React.FC<ActiveFilterTagsProps> = ({
         variant="ghost"
         size="sm"
         onClick={onClearFilters}
-        className="ml-auto text-blue-700 hover:bg-blue-100"
+        className="ml-auto"
       >
         <X className="h-3 w-3 mr-1" />
         Clear All

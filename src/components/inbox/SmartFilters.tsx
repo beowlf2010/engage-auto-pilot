@@ -2,12 +2,9 @@
 import React from 'react';
 import { InboxFilters } from '@/hooks/useInboxFilters';
 import { ConversationListItem } from '@/types/conversation';
-import QuickFiltersSection from './filters/QuickFiltersSection';
-import AdvancedFiltersSection from './filters/AdvancedFiltersSection';
-import SearchFiltersSection from './filters/SearchFiltersSection';
-import DateSortSection from './filters/DateSortSection';
 import ActiveFilterTags from './filters/ActiveFilterTags';
-import FilterStatusBanner from './FilterStatusBanner';
+import CompactFiltersBar from './filters/CompactFiltersBar';
+import AdvancedFiltersSheet from './filters/AdvancedFiltersSheet';
 
 interface SmartFiltersProps {
   filters: InboxFilters;
@@ -30,42 +27,30 @@ const SmartFilters: React.FC<SmartFiltersProps> = ({
   onClearFilters,
   userRole
 }) => {
-  const hiddenCount = conversations.length - filteredConversations.length;
+  const [open, setOpen] = React.useState(false);
 
   return (
-    <div className="space-y-4">
-      <FilterStatusBanner
+    <div className="space-y-3">
+      <CompactFiltersBar
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+        onOpenAdvanced={() => setOpen(true)}
         hasActiveFilters={hasActiveFilters}
         filterSummary={filterSummary}
-        hiddenCount={hiddenCount}
-        totalCount={conversations.length}
         onClearFilters={onClearFilters}
-        userRole={userRole}
-      />
-
-      <QuickFiltersSection
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-      />
-
-      <AdvancedFiltersSection
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-      />
-
-      <SearchFiltersSection
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-      />
-
-      <DateSortSection
-        filters={filters}
-        onFiltersChange={onFiltersChange}
       />
 
       <ActiveFilterTags
         filterSummary={filterSummary}
         hasActiveFilters={hasActiveFilters}
+        onClearFilters={onClearFilters}
+      />
+
+      <AdvancedFiltersSheet
+        open={open}
+        onOpenChange={setOpen}
+        filters={filters}
+        onFiltersChange={onFiltersChange}
         onClearFilters={onClearFilters}
       />
     </div>
