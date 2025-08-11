@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Send, Phone, User, CheckCheck, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ConversationListItem } from '@/types/conversation';
-
+import { Switch } from '@/components/ui/switch';
+import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting';
 interface Message {
   id: string;
   body: string;
@@ -42,6 +43,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
 }) => {
   const [messageText, setMessageText] = useState('');
   const [sendingLocal, setSendingLocal] = useState(false);
+  const { enabled, setEnabled } = useAutoMarkAsReadSetting();
 
   const handleSendMessage = useCallback(async () => {
     if (!messageText.trim() || sendingLocal || sending) return;
@@ -88,7 +90,15 @@ const ConversationView: React.FC<ConversationViewProps> = ({
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 mr-2">
+            <span className="text-xs text-muted-foreground">Auto-mark on open</span>
+            <Switch
+              checked={enabled}
+              onCheckedChange={setEnabled}
+              aria-label="Auto-mark messages as read when opening a conversation"
+            />
+          </div>
           {conversation.unreadCount > 0 && (
             <Button
               variant="outline"

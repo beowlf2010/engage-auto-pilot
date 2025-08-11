@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { fetchConversations, fetchMessages, markMessagesAsRead } from '@/services/conversationsService';
 import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
 import type { ConversationListItem, MessageData } from '@/types/conversation';
+import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting';
 
 interface UseConversationOperationsProps {
   onLeadsRefresh?: () => void;
@@ -17,6 +18,7 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
   const [error, setError] = useState<string | null>(null);
   const { profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
 
   const loadConversations = useCallback(async () => {
     console.log('🔄 [CONV OPS] Load conversations called', {
@@ -61,6 +63,14 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
 
   const loadMessages = useCallback(async (leadId: string) => {
     console.log('📬 [CONV OPS] Loading messages for lead:', leadId);
+
+    // Optimistic: immediately zero unread count for this lead when opening, if enabled
+    if (autoMarkEnabled) {
+      setConversations(prev => prev.map(c => c.leadId === leadId ? { ...c, unreadCount: 0 } : c));
+      // Trigger global listeners (badges, headers) to refresh
+      window.dispatchEvent(new CustomEvent('unread-count-changed'));
+    }
+
     setLoading(true);
     setError(null);
     
@@ -87,7 +97,7 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
     } finally {
       setLoading(false);
     }
-  }, [loadConversations, toast]);
+  }, [loadConversations, toast, autoMarkEnabled]);
 
   const sendMessage = useCallback(async (leadId: string, messageText: string) => {
     if (!profile || !messageText.trim()) {
