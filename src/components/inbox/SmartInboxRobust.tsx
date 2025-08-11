@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, MessageSquare, Users, Clock, CheckCircle } from 'lucide-react';
 import type { ConversationListItem } from '@/types/conversation';
+import { ConversationListSkeleton } from '@/components/ui/skeletons/ConversationSkeleton';
+import { MessageListSkeleton } from '@/components/ui/skeletons/MessageSkeleton';
 
 interface SmartInboxRobustProps {
   onBack?: () => void;
@@ -202,35 +204,60 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
               </div>
             </div>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <ConversationsList
-              conversations={filteredConversations}
-              selectedLead={selectedConversation?.leadId}
-              onSelectConversation={(leadId) => {
-                const conversation = filteredConversations.find(c => c.leadId === leadId);
-                if (conversation) handleSelectConversation(conversation);
-              }}
-              showUrgencyIndicator={true}
-              showTimestamps={true}
-              markAsRead={markAsRead}
-              markingAsRead={isMarkingAsRead.toString()}
-            />
+          <div className="flex-1 overflow-auto">
+            {loading ? (
+              <ConversationListSkeleton />
+            ) : filteredConversations.length === 0 ? (
+              <div className="h-full flex items-center justify-center p-6 text-center">
+                <div>
+                  <h3 className="text-base font-medium text-muted-foreground mb-2">
+                    {hasActiveFilters ? 'No conversations match your filters' : 'No conversations yet'}
+                  </h3>
+                  {hasActiveFilters && (
+                    <Button variant="outline" size="sm" onClick={clearFilters} className="mr-2">
+                      Clear filters
+                    </Button>
+                  )}
+                  <Button variant="secondary" size="sm" onClick={handleRefresh} disabled={loading}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <ConversationsList
+                conversations={filteredConversations}
+                selectedLead={selectedConversation?.leadId}
+                onSelectConversation={(leadId) => {
+                  const conversation = filteredConversations.find(c => c.leadId === leadId);
+                  if (conversation) handleSelectConversation(conversation);
+                }}
+                showUrgencyIndicator={true}
+                showTimestamps={true}
+                markAsRead={markAsRead}
+                markingAsRead={isMarkingAsRead.toString()}
+              />
+            )}
           </div>
         </div>
 
         {/* Conversation View */}
         <div className="flex-1 flex flex-col">
           {selectedConversation ? (
-            <ConversationView
-              conversation={selectedConversation}
-              messages={messages.map(msg => ({ ...msg, sent_at: msg.sentAt }))}
-              onBack={() => setSelectedConversation(null)}
-              onSendMessage={handleSendMessage}
-              onMarkAsRead={handleMarkAsRead}
-              sending={loading}
-              loading={loading}
-              canReply={true}
-            />
+            loading ? (
+              <MessageListSkeleton />
+            ) : (
+              <ConversationView
+                conversation={selectedConversation}
+                messages={messages.map(msg => ({ ...msg, sent_at: msg.sentAt }))}
+                onBack={() => setSelectedConversation(null)}
+                onSendMessage={handleSendMessage}
+                onMarkAsRead={handleMarkAsRead}
+                sending={loading}
+                loading={loading}
+                canReply={true}
+              />
+            )
           ) : (
             <div className="h-full flex items-center justify-center bg-muted/20">
               <div className="text-center">
@@ -246,6 +273,12 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
           )}
         </div>
       </div>
+
+      {process.env.NODE_ENV === 'development' && (
+        <div className="px-3 py-1 text-xs bg-muted text-muted-foreground border-t">
+          dev: authLoading={String(authLoading)} | loading={String(loading)} | conv={conversations.length} | filtered={filteredConversations.length} | selected={selectedConversation?.leadId ?? 'none'} | leadIdParam={leadId ?? 'none'}
+        </div>
+      )}
 
       {/* Debug Panel */}
       {showDebugPanel && (

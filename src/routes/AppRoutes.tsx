@@ -10,6 +10,7 @@ import InventoryLayout from '@/components/layout/InventoryLayout';
 import { SimpleLoading } from '@/components/ui/SimpleLoading';
 import { AppErrorBoundary } from '@/components/error/AppErrorBoundary';
 
+import SmartInboxPageEager from '@/pages/SmartInboxPage';
 // Lazy load pages for better performance
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const LeadsPage = lazy(() => import('@/pages/LeadsPage'));
@@ -87,7 +88,7 @@ const AppRoutes = () => {
         {/* Smart Inbox */}
         <Route path="/smart-inbox" element={
           <RouteWrapper LayoutComponent={LayoutComponent} routeName="Smart Inbox">
-            <SmartInboxPage />
+            <SmartInboxPageEager />
           </RouteWrapper>
         } />
         
