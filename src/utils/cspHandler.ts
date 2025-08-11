@@ -19,6 +19,23 @@ export interface CSPViolation {
   'script-sample': string;
 }
 
+// Simple quiet-mode controls for security logs
+const isSecurityQuiet = (): boolean => {
+  try {
+    return localStorage.getItem('security.quietLogs') === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const setSecurityQuietMode = (enabled: boolean): void => {
+  try {
+    localStorage.setItem('security.quietLogs', enabled ? '1' : '0');
+  } catch {
+    // no-op
+  }
+};
+
 /**
  * Apply CSP headers to prevent XSS attacks
  */
@@ -28,6 +45,11 @@ export const applyCSPHeaders = (): void => {
 
   try {
     const cspHeader = generateCSPHeader();
+    // Remove unsupported directives for meta-delivered CSP (e.g., frame-ancestors)
+    const sanitizedHeader = cspHeader
+      .replace(/(^|;)\s*frame-ancestors[^;]*;?/gi, '$1')
+      .replace(/;;+/g, ';')
+      .replace(/^\s*;|;\s*$/g, '');
     
     // Create or update CSP meta tag
     let cspMeta = document.querySelector('meta[http-equiv="Content-Security-Policy"]') as HTMLMetaElement;
@@ -38,9 +60,11 @@ export const applyCSPHeaders = (): void => {
       document.head.appendChild(cspMeta);
     }
     
-    cspMeta.setAttribute('content', cspHeader);
+    cspMeta.setAttribute('content', sanitizedHeader);
     
-    console.log('🛡️ CSP headers applied successfully');
+    if (!isSecurityQuiet()) {
+      console.log('🛡️ CSP headers applied successfully');
+    }
   } catch (error) {
     console.error('❌ Failed to apply CSP headers:', error);
   }
@@ -102,7 +126,9 @@ export const initCSPReporting = (): void => {
     });
   });
 
-  console.log('🛡️ CSP violation reporting initialized');
+  if (!isSecurityQuiet()) {
+    console.log('🛡️ CSP violation reporting initialized');
+  }
 };
 
 /**
@@ -165,5 +191,7 @@ export const initCSPProtection = (): void => {
     return originalSetAttribute.call(this, name, value);
   };
   
-  console.log('🛡️ Comprehensive CSP protection initialized');
+  if (!isSecurityQuiet()) {
+    console.log('🛡️ Comprehensive CSP protection initialized');
+  }
 };
