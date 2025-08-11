@@ -21,6 +21,7 @@ import { useOptimisticUnreadCounts } from '@/hooks/useOptimisticUnreadCounts';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useToast } from '@/hooks/use-toast';
 import { markOlderMessagesAsReadForScope, resetInboxGlobally, setGlobalDnc } from '@/services/conversationsService';
+import { getGlobalAdminMetrics } from '@/services/admin/adminMetricsService';
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -46,7 +47,29 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const [scope, setScope] = useState<'my' | 'all'>('my');
   const { isAdmin, isManager, loading: permsLoading } = useUserPermissions();
   const { toast } = useToast();
-  const initializedScopeRef = useRef(false);
+const initializedScopeRef = useRef(false);
+
+const [adminMetrics, setAdminMetrics] = useState<{
+  totalLeads: number;
+  aiPausedCount: number;
+  dncCall: number;
+  dncEmail: number;
+  dncMail: number;
+} | null>(null);
+const [metricsLoading, setMetricsLoading] = useState(false);
+
+const refreshAdminMetrics = useCallback(async () => {
+  if (!(isAdmin || isManager)) return;
+  setMetricsLoading(true);
+  try {
+    const m = await getGlobalAdminMetrics();
+    setAdminMetrics(m);
+  } catch (e) {
+    console.warn('[AdminMetrics] Failed to fetch metrics', e);
+  } finally {
+    setMetricsLoading(false);
+  }
+}, [isAdmin, isManager]);
 
   const {
     conversations,
@@ -142,6 +165,11 @@ useEffect(() => {
 useEffect(() => {
   try { localStorage.setItem('smartInboxScope', scope); } catch {}
 }, [scope]);
+
+// Admin metrics
+useEffect(() => {
+  refreshAdminMetrics();
+}, [refreshAdminMetrics]);
 
 // Auto-switch if My is empty for admin/manager
 useEffect(() => {
@@ -260,6 +288,7 @@ const handleMarkAsRead = useCallback(async () => {
                           toast({ title: 'Inbox reset', description: `Marked ${res.updated || 0} messages as read for everyone.` });
                           await manualRefresh(scope);
                           try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
+                          await refreshAdminMetrics();
                         } else {
                           toast({ title: 'Reset failed', description: res.error || 'Please try again.', variant: 'destructive' });
                         }
@@ -293,6 +322,7 @@ const handleMarkAsRead = useCallback(async () => {
                         if (res.success) {
                           toast({ title: 'Global opt-out applied', description: `Updated ${res.updated || 0} leads.` });
                           await manualRefresh(scope);
+                          await refreshAdminMetrics();
                         } else {
                           toast({ title: 'Opt-out failed', description: res.error || 'Please try again.', variant: 'destructive' });
                         }
@@ -343,6 +373,62 @@ const handleMarkAsRead = useCallback(async () => {
           onClearFilters={clearFilters}
         />
       </div>
+
+      {/* Admin Utilities Bar */}
+      {(isAdmin || isManager) && (
+        <div className="flex-shrink-0 border-b bg-card/60 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <span className="font-medium">Admin Utilities</span>
+              <span>
+                AI paused: {metricsLoading ? '...' : (adminMetrics ? `${adminMetrics.aiPausedCount}/${adminMetrics.totalLeads}` : '—')}
+              </span>
+              <span>DNC Call: {metricsLoading ? '...' : (adminMetrics ? adminMetrics.dncCall : '—')}</span>
+              <span>DNC Email: {metricsLoading ? '...' : (adminMetrics ? adminMetrics.dncEmail : '—')}</span>
+              <span>DNC Mail: {metricsLoading ? '...' : (adminMetrics ? adminMetrics.dncMail : '—')}</span>
+              <span>Unread (visible): {displayedConversations.filter(c => c.unreadCount > 0).length}</span>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="secondary">
+                  Apply Both Now
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Apply both actions?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will mark all current messages as read and set DNC for all leads (pausing AI). Continue?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      const resetRes = await resetInboxGlobally(new Date());
+                      if (!resetRes.success) {
+                        toast({ title: 'Reset failed', description: resetRes.error || 'Please try again.', variant: 'destructive' });
+                        return;
+                      }
+                      const dncRes = await setGlobalDnc();
+                      if (!dncRes.success) {
+                        toast({ title: 'Global opt-out failed', description: dncRes.error || 'Please try again.', variant: 'destructive' });
+                      } else {
+                        toast({ title: 'Both applied', description: `Reset inbox and updated ${dncRes.updated || 0} leads.` });
+                      }
+                      await manualRefresh(scope);
+                      try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
+                      await refreshAdminMetrics();
+                    }}
+                  >
+                    Confirm
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
