@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { UnreadCountService } from '@/services/unreadCountService';
 
 export const useUnreadCount = () => {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -10,18 +11,20 @@ export const useUnreadCount = () => {
     if (!profile?.id) return;
     
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('direction', 'in')
-        .is('read_at', null);
-
-      if (error) {
-        console.warn('Error fetching unread count:', error);
-        return;
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', profile.id);
+      if (rolesError) {
+        console.warn('⚠️ [UNREAD COUNT] Could not fetch user roles:', rolesError);
       }
-
-      setUnreadCount(data?.length || 0);
+      const userRoles = rolesData?.map(r => r.role) || [];
+      const count = await UnreadCountService.getUnreadCount({
+        respectUserRole: true,
+        userId: profile.id,
+        userRoles
+      });
+      setUnreadCount(count);
     } catch (error) {
       console.warn('Error in fetchUnreadCount:', error);
     }

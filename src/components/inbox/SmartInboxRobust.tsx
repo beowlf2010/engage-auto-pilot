@@ -61,7 +61,10 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
 const filteredConversations = applyFilters(conversations);
 // Optimistic unread handling for display
 const { markAsReadOptimistically, getEffectiveUnreadCount } = useOptimisticUnreadCounts();
-const displayedConversations = filteredConversations
+const scopedConversations = scope === 'my' 
+  ? filteredConversations.filter(c => c.salespersonId === profile?.id)
+  : filteredConversations;
+const displayedConversations = scopedConversations
   .map(c => ({
     ...c,
     unreadCount: getEffectiveUnreadCount(c)
@@ -101,6 +104,12 @@ useEffect(() => {
     }
   }
 }, [leadId, filteredConversations, loadMessages, autoMarkEnabled]);
+
+useEffect(() => {
+  if (scope === 'my' && selectedConversation && selectedConversation.salespersonId !== profile?.id) {
+    setSelectedConversation(null);
+  }
+}, [scope, selectedConversation, profile?.id]);
 
 const handleSelectConversation = useCallback((conversation: ConversationListItem) => {
   const selection = autoMarkEnabled ? { ...conversation, unreadCount: 0 } : conversation;
@@ -199,6 +208,10 @@ const handleMarkAsRead = useCallback(async () => {
                 <RefreshCw className="h-4 w-4" />
               )}
             </Button>
+            <div className="inline-flex items-center rounded-md border p-0.5">
+              <Button size="sm" variant={scope === 'my' ? 'secondary' : 'ghost'} onClick={() => setScope('my')}>My</Button>
+              <Button size="sm" variant={scope === 'all' ? 'secondary' : 'ghost'} onClick={() => setScope('all')}>All</Button>
+            </div>
             <Button
               onClick={() => setShowDebugPanel(!showDebugPanel)}
               variant="outline"

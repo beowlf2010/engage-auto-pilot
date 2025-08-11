@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { UnreadCountService } from '@/services/unreadCountService';
 import { stableRealtimeManager } from '@/services/stableRealtimeManager';
@@ -7,6 +7,7 @@ import { stableRealtimeManager } from '@/services/stableRealtimeManager';
 export const useGlobalUnreadCount = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { profile } = useAuth();
+  const debounceRef = useRef<number | null>(null);
 
   const fetchUnreadCount = useCallback(async () => {
     if (!profile?.id) return;
@@ -67,7 +68,13 @@ export const useGlobalUnreadCount = () => {
     // Enhanced: More responsive custom event listener
     const handleUnreadCountChanged = () => {
       console.log('🔄 [GLOBAL UNREAD] Custom event received, refreshing count immediately');
-      fetchUnreadCount();
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      debounceRef.current = window.setTimeout(() => {
+        fetchUnreadCount();
+        debounceRef.current = null;
+      }, 250);
     };
 
     window.addEventListener('unread-count-changed', handleUnreadCountChanged);
@@ -82,7 +89,10 @@ export const useGlobalUnreadCount = () => {
       console.log('🔌 [GLOBAL UNREAD] Cleaning up enhanced subscription');
       unsubscribe();
       window.removeEventListener('unread-count-changed', handleUnreadCountChanged);
-      clearInterval(intervalId);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
     };
   }, [profile?.id, fetchUnreadCount]);
 

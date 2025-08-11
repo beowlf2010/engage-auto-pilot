@@ -1,14 +1,16 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { UnreadCountService } from '@/services/unreadCountService';
 import { stableRealtimeManager } from '@/services/stableRealtimeManager';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useUnifiedUnreadCount = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const { profile } = useAuth();
+  const refreshDebounceRef = useRef<number | null>(null);
 
   const fetchUnreadCount = useCallback(async () => {
     if (!profile?.id) {
@@ -20,8 +22,15 @@ export const useUnifiedUnreadCount = () => {
     try {
       console.log('🔄 [UNIFIED UNREAD] Fetching unread count for user:', profile.id);
       
-      // Get user roles - for now assume manager role, but this should come from proper role system
-      const userRoles = ['manager']; // TODO: Get actual user roles
+      // Fetch actual user roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', profile.id);
+      if (rolesError) {
+        console.warn('⚠️ [UNIFIED UNREAD] Could not fetch user roles, defaulting to assigned-only:', rolesError);
+      }
+      const userRoles = rolesData?.map(r => r.role) || [];
       
       const count = await UnreadCountService.getUnreadCount({
         respectUserRole: true,
@@ -77,10 +86,16 @@ export const useUnifiedUnreadCount = () => {
       }
     });
 
-    // Also listen for custom events
+    // Also listen for custom events (debounced)
     const handleCustomRefresh = () => {
       console.log('🔄 [UNIFIED UNREAD] Custom refresh event received');
-      fetchUnreadCount();
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+      }
+      refreshDebounceRef.current = window.setTimeout(() => {
+        fetchUnreadCount();
+        refreshDebounceRef.current = null;
+      }, 250);
     };
 
     window.addEventListener('unread-count-changed', handleCustomRefresh);
@@ -89,6 +104,10 @@ export const useUnifiedUnreadCount = () => {
       console.log('🔌 [UNIFIED UNREAD] Cleaning up subscription');
       unsubscribe();
       window.removeEventListener('unread-count-changed', handleCustomRefresh);
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+        refreshDebounceRef.current = null;
+      }
     };
   }, [profile?.id, fetchUnreadCount]);
 
