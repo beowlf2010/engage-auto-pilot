@@ -79,7 +79,9 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
       console.log('✅ [CONV OPS] Messages loaded:', data.length);
       setMessages(data);
       
-      await markMessagesAsRead(leadId);
+      if (autoMarkEnabled) {
+        await markMessagesAsRead(leadId);
+      }
       
       // Refresh conversations after a short delay
       setTimeout(() => {
