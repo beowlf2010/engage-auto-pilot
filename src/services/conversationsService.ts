@@ -3,7 +3,7 @@ import type { ConversationListItem, MessageData } from '@/types/conversation';
 
 const MAX_LEADS = 200;
 
-export const fetchConversations = async (profile: any, options?: { scope?: 'my' | 'all' }): Promise<ConversationListItem[]> => {
+export const fetchConversations = async (profile: any, options?: { scope?: 'my' | 'all', dateScope?: 'today' | 'all' }): Promise<ConversationListItem[]> => {
   console.log('🔄 [CONVERSATIONS SERVICE] Starting fetchConversations for profile:', profile.id);
   
   try {
@@ -77,22 +77,32 @@ export const fetchConversations = async (profile: any, options?: { scope?: 'my' 
       }))
     });
 
-    // Get conversations for these leads
-    const leadIds = leads.map(lead => lead.id);
-    
-    const { data: conversations, error: conversationsError } = await supabase
-      .from('conversations')
-      .select(`
-        id,
-        lead_id,
-        body,
-        direction,
-        sent_at,
-        read_at,
-        ai_generated
-      `)
-      .in('lead_id', leadIds)
-      .order('sent_at', { ascending: false });
+// Get conversations for these leads
+const leadIds = leads.map(lead => lead.id);
+
+// Build conversations query with optional date scope
+let convQuery = supabase
+  .from('conversations')
+  .select(`
+    id,
+    lead_id,
+    body,
+    direction,
+    sent_at,
+    read_at,
+    ai_generated
+  `)
+  .in('lead_id', leadIds)
+  .order('sent_at', { ascending: false });
+
+if (options?.dateScope === 'today') {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  console.log('🗓️ [CONVERSATIONS SERVICE] Applying dateScope=today from', startOfToday.toISOString());
+  convQuery = convQuery.gte('sent_at', startOfToday.toISOString());
+}
+
+const { data: conversations, error: conversationsError } = await convQuery;
 
     if (conversationsError) {
       console.error('❌ [CONVERSATIONS SERVICE] Error fetching conversations:', conversationsError);
@@ -249,5 +259,60 @@ export const markMessagesAsRead = async (leadId: string) => {
 
   } catch (error) {
     console.error('Error in markMessagesAsRead:', error);
+  }
+};
+
+export const markOlderMessagesAsReadForScope = async (
+  profile: any,
+  scope: 'my' | 'all',
+  before: Date
+): Promise<{ updated: number }> => {
+  try {
+    // Determine roles to enforce effective scope
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', profile.id);
+
+    const roles = userRoles?.map(r => r.role) || [];
+    const isAdminOrManager = roles.some(role => ['admin', 'manager'].includes(role));
+    const effectiveScope = isAdminOrManager ? scope : 'my';
+
+    // Fetch lead IDs for scope
+    let leadsQuery = supabase
+      .from('leads')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(MAX_LEADS);
+
+    if (effectiveScope === 'my') {
+      leadsQuery = leadsQuery.eq('salesperson_id', profile.id);
+    }
+
+    const { data: leads, error: leadsError } = await leadsQuery;
+    if (leadsError) throw leadsError;
+
+    const leadIds = (leads || []).map(l => l.id);
+    if (leadIds.length === 0) return { updated: 0 };
+
+    // Bulk mark as read for incoming messages before the given date
+    const { data, error } = await supabase
+      .from('conversations')
+      .update({ read_at: new Date().toISOString() })
+      .in('lead_id', leadIds)
+      .eq('direction', 'in')
+      .is('read_at', null)
+      .lt('sent_at', before.toISOString())
+      .select('id');
+
+    if (error) throw error;
+
+    // Trigger global unread count refresh
+    try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
+
+    return { updated: data?.length || 0 };
+  } catch (err) {
+    console.error('❌ [CONVERSATIONS SERVICE] Error bulk marking older messages as read:', err);
+    return { updated: 0 };
   }
 };

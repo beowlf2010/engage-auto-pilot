@@ -19,6 +19,19 @@ import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting
 import { NetworkStatus } from '@/components/ui/error/NetworkStatus';
 import { useOptimisticUnreadCounts } from '@/hooks/useOptimisticUnreadCounts';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useToast } from '@/hooks/use-toast';
+import { markOlderMessagesAsReadForScope } from '@/services/conversationsService';
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction
+} from '@/components/ui/alert-dialog';
 interface SmartInboxRobustProps {
   onBack?: () => void;
   leadId?: string;

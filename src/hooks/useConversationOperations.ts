@@ -21,12 +21,13 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
 
 
-  const loadConversations = useCallback(async (scope?: 'my' | 'all') => {
+  const loadConversations = useCallback(async (scope?: 'my' | 'all', dateScope?: 'today' | 'all') => {
     console.log('🔄 [CONV OPS] Load conversations called', {
       profileId: profile?.id,
       authLoading,
       hasProfile: !!profile,
-      scope: scope ?? 'my'
+      scope: scope ?? 'my',
+      dateScope: dateScope ?? 'all'
     });
 
     if (authLoading) {
@@ -57,8 +58,8 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
     };
     
     try {
-      console.log('📞 [CONV OPS] Fetching conversations for profile:', profile.id, 'scope:', scope ?? 'my');
-      const data = await backoff(() => fetchConversations(profile, { scope }));
+      console.log('📞 [CONV OPS] Fetching conversations for profile:', profile.id, 'scope:', scope ?? 'my', 'dateScope:', dateScope ?? 'all');
+      const data = await backoff(() => fetchConversations(profile, { scope, dateScope }));
       console.log('✅ [CONV OPS] Conversations loaded:', data.length);
       console.log('🔴 [CONV OPS] Unread conversations:', data.filter(c => c.unreadCount > 0).length);
       setConversations(data);
@@ -193,9 +194,9 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
     try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
   }, []);
 
-  const manualRefresh = useCallback(async (scope?: 'my' | 'all') => {
-    console.log('🔄 [CONV OPS] Manual refresh triggered', { scope: scope ?? 'my' });
-    await loadConversations(scope);
+  const manualRefresh = useCallback(async (scope?: 'my' | 'all', dateScope?: 'today' | 'all') => {
+    console.log('🔄 [CONV OPS] Manual refresh triggered', { scope: scope ?? 'my', dateScope: dateScope ?? 'all' });
+    await loadConversations(scope, dateScope);
     
     // Also trigger leads refresh if available
     if (props?.onLeadsRefresh) {
