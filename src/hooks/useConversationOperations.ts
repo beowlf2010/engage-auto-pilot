@@ -21,11 +21,12 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
 
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (scope?: 'my' | 'all') => {
     console.log('🔄 [CONV OPS] Load conversations called', {
       profileId: profile?.id,
       authLoading,
-      hasProfile: !!profile
+      hasProfile: !!profile,
+      scope: scope ?? 'my'
     });
 
     if (authLoading) {
@@ -56,8 +57,8 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
     };
     
     try {
-      console.log('📞 [CONV OPS] Fetching conversations for profile:', profile.id);
-      const data = await backoff(() => fetchConversations(profile));
+      console.log('📞 [CONV OPS] Fetching conversations for profile:', profile.id, 'scope:', scope ?? 'my');
+      const data = await backoff(() => fetchConversations(profile, { scope }));
       console.log('✅ [CONV OPS] Conversations loaded:', data.length);
       console.log('🔴 [CONV OPS] Unread conversations:', data.filter(c => c.unreadCount > 0).length);
       setConversations(data);
@@ -192,9 +193,9 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
     try { window.dispatchEvent(new CustomEvent('unread-count-changed')); } catch {}
   }, []);
 
-  const manualRefresh = useCallback(async () => {
-    console.log('🔄 [CONV OPS] Manual refresh triggered');
-    await loadConversations();
+  const manualRefresh = useCallback(async (scope?: 'my' | 'all') => {
+    console.log('🔄 [CONV OPS] Manual refresh triggered', { scope: scope ?? 'my' });
+    await loadConversations(scope);
     
     // Also trigger leads refresh if available
     if (props?.onLeadsRefresh) {

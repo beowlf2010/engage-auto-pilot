@@ -3,7 +3,7 @@ import type { ConversationListItem, MessageData } from '@/types/conversation';
 
 const MAX_LEADS = 200;
 
-export const fetchConversations = async (profile: any): Promise<ConversationListItem[]> => {
+export const fetchConversations = async (profile: any, options?: { scope?: 'my' | 'all' }): Promise<ConversationListItem[]> => {
   console.log('🔄 [CONVERSATIONS SERVICE] Starting fetchConversations for profile:', profile.id);
   
   try {
@@ -22,7 +22,7 @@ export const fetchConversations = async (profile: any): Promise<ConversationList
     
     console.log('🔍 [CONVERSATIONS SERVICE] User roles:', roles, 'isAdminOrManager:', isAdminOrManager);
 
-    // Build the leads query based on user role
+    // Build the leads query based on user role and requested scope
     let leadsQuery = supabase
       .from('leads')
       .select(`
@@ -40,12 +40,15 @@ export const fetchConversations = async (profile: any): Promise<ConversationList
       .order('created_at', { ascending: false })
       .limit(MAX_LEADS);
 
-    // If not admin/manager, only show assigned leads
-    if (!isAdminOrManager) {
-      console.log('🔍 [CONVERSATIONS SERVICE] Filtering to assigned leads only');
+    // Determine effective scope (role-aware)
+    const requestedScope = options?.scope ?? 'my';
+    const effectiveScope = isAdminOrManager ? requestedScope : 'my';
+
+    if (effectiveScope === 'my') {
+      console.log('🔍 [CONVERSATIONS SERVICE] Scope=MY - filtering to assigned leads');
       leadsQuery = leadsQuery.eq('salesperson_id', profile.id);
     } else {
-      console.log('🔍 [CONVERSATIONS SERVICE] Admin/Manager - showing all leads including unassigned');
+      console.log('🔍 [CONVERSATIONS SERVICE] Scope=ALL - role allows viewing all leads including unassigned');
     }
 
     const { data: leads, error: leadsError } = await leadsQuery;

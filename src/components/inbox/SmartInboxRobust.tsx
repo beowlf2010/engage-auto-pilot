@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useConversationOperations } from '@/hooks/useConversationOperations';
 import { useInboxFilters } from '@/hooks/useInboxFilters';
