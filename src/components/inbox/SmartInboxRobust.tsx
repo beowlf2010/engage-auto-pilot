@@ -28,7 +28,7 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const { profile, loading: authLoading } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [showUrgencyColors, setShowUrgencyColors] = useState(true);
+  const [showUrgencyColors, setShowUrgencyColors] = useState(false);
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
 
   const {

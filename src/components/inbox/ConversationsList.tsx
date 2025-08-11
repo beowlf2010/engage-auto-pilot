@@ -43,12 +43,6 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
     // Red only when there are unread messages
     if (conversation.unreadCount > 0) return 'border-l-4 border-red-500';
 
-    // Time-based urgency uses orange/yellow without implying unread
-    const hoursSinceLastMessage = conversation.lastMessageDate ?
-      (Date.now() - conversation.lastMessageDate.getTime()) / (1000 * 60 * 60) : 0;
-
-    if (hoursSinceLastMessage > 24) return 'border-l-4 border-orange-500';
-    if (hoursSinceLastMessage > 4) return 'border-l-4 border-yellow-500';
     return '';
   };
 
