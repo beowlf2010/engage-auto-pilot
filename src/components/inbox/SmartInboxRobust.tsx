@@ -61,10 +61,19 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
 const filteredConversations = applyFilters(conversations);
 // Optimistic unread handling for display
 const { markAsReadOptimistically, getEffectiveUnreadCount } = useOptimisticUnreadCounts();
-const displayedConversations = filteredConversations.map(c => ({
-  ...c,
-  unreadCount: getEffectiveUnreadCount(c)
-}));
+const displayedConversations = filteredConversations
+  .map(c => ({
+    ...c,
+    unreadCount: getEffectiveUnreadCount(c)
+  }))
+  .sort((a, b) => {
+    const aUnread = a.unreadCount > 0 ? 1 : 0;
+    const bUnread = b.unreadCount > 0 ? 1 : 0;
+    if (aUnread !== bUnread) return bUnread - aUnread; // Unread first
+    const aTime = a.lastMessageDate ? a.lastMessageDate.getTime() : 0;
+    const bTime = b.lastMessageDate ? b.lastMessageDate.getTime() : 0;
+    return bTime - aTime; // Newest first
+  });
 const statusTabs = smartInboxDataLoader.statusTabs.map(tab => ({
   ...tab,
   count: tab.id === 'all' ? displayedConversations.length :
