@@ -132,7 +132,7 @@ export class SMSPipelineMonitor {
           const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
             body: {
               to: phoneData.number,
-              body: message.body,
+              message: message.body,
               conversationId: message.id
             }
           });

@@ -214,7 +214,7 @@ export const useConversationData = () => {
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: {
           to: phoneData.number,
-          body: messageBody.trim(),
+          message: messageBody.trim(),
           conversationId: conversation.id
         }
       });

@@ -45,7 +45,7 @@ export const SMSDebugPanel = () => {
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: {
           to: '+13345640639',
-          body: 'DEBUG TEST: Direct SMS test - please ignore',
+          message: 'DEBUG TEST: Direct SMS test - please ignore',
           conversationId: null
         }
       });

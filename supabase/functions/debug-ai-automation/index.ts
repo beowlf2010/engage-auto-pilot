@@ -128,7 +128,7 @@ serve(async (req) => {
     
     const smsPayload = {
       to: primaryPhone,
-      body: testMessage,
+      message: testMessage,
       conversationId: conversation.id
     };
 

@@ -117,7 +117,7 @@ export const testDirectSMS = async () => {
     // Test with a more realistic phone number format
     const testPayload = {
       to: '+12345678900', // Changed to a more standard test format
-      body: 'Test SMS from CRM system - Enhanced debugging',
+      message: 'Test SMS from CRM system - Enhanced debugging',
       conversationId: null
     };
     

@@ -155,7 +155,7 @@ serve(async (req) => {
       try {
         const smsPayload = {
           to: leadTest.details.phoneNumber,
-          body: 'TEST MESSAGE: SMS pipeline verification - please ignore',
+          message: 'TEST MESSAGE: SMS pipeline verification - please ignore',
           conversationId: null
         };
 

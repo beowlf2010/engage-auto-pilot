@@ -347,7 +347,7 @@ async function processLeadSafely(supabase: any, lead: any) {
     const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
       body: {
         to: phoneData.number,
-        body: aiResponse.message,
+        message: aiResponse.message,
         conversationId: conversationData.id
       }
     });

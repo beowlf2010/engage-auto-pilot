@@ -83,7 +83,7 @@ export const useAIMessageSender = (leadId: string, onMessageSent?: () => void) =
       const { data: smsResult, error: sendError } = await supabase.functions.invoke('send-sms', {
         body: {
           to: phoneData.number,
-          body: generatedMessage,
+          message: generatedMessage,
           conversationId: conversationData.id
         }
       });

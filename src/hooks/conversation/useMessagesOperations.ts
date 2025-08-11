@@ -87,7 +87,7 @@ export const useMessagesOperations = () => {
       
       const smsPayload = {
         to: phoneData.number,
-        body: messageBody.trim(),
+        message: messageBody.trim(),
         conversationId: conversation.id,
         leadId: leadId,
         profileId: profile.id,
@@ -96,7 +96,7 @@ export const useMessagesOperations = () => {
 
       console.log(`📤 [MESSAGES OPERATIONS] SMS payload:`, {
         to: smsPayload.to,
-        bodyLength: smsPayload.body.length,
+        messageLength: smsPayload.message.length,
         conversationId: smsPayload.conversationId,
         leadId: smsPayload.leadId,
         profileId: smsPayload.profileId,

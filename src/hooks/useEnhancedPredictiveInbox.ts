@@ -211,7 +211,7 @@ export const useEnhancedPredictiveInbox = ({
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: {
           to: phoneData.number,
-          body: messageContent.trim(),
+          message: messageContent.trim(),
           conversationId: conversation.id
         }
       });

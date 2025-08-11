@@ -160,7 +160,7 @@ export const sendMessage = async (
     const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
       body: {
         to: phoneNumber,
-        body: messageContent.trim(),
+        message: messageContent.trim(),
         conversationId: conversation.id,
         leadId: leadId,
         profileId: profile.id,

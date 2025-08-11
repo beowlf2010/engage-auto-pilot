@@ -243,7 +243,7 @@ export const sendEnhancedMessage = async (params: SendMessageParams): Promise<Me
     const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-sms', {
       body: {
         to: leadValidation.leadData!.selectedPhone,
-        body: messageBody.trim(),
+        message: messageBody.trim(),
         conversationId: conversation.id
       }
     });
