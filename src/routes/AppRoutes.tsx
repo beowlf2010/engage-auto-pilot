@@ -43,6 +43,7 @@ const SimplifiedAIDashboard = lazy(() => import('@/pages/SimplifiedAIDashboard')
 const CallAnalysisPage = lazy(() => import('@/pages/CallAnalysisPage'));
 const WorkflowEnginePage = lazy(() => import('@/pages/WorkflowEnginePage'));
 const LeadIntelligencePage = lazy(() => import('@/pages/LeadIntelligencePage'));
+const DataHygienePage = lazy(() => import('@/pages/DataHygienePage'));
 
 import { RouteWrapper } from '@/components/routes/RouteWrapper';
 
@@ -226,6 +227,12 @@ const AppRoutes = () => {
         <Route path="/admin-dashboard" element={
           <RouteWrapper LayoutComponent={LayoutComponent} routeName="Admin Dashboard">
             <AdminDashboardPage />
+          </RouteWrapper>
+        } />
+        
+        <Route path="/admin/data-hygiene" element={
+          <RouteWrapper LayoutComponent={LayoutComponent} routeName="Data Hygiene">
+            <DataHygienePage />
           </RouteWrapper>
         } />
         
