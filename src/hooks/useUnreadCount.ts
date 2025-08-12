@@ -53,8 +53,12 @@ export const useUnreadCount = () => {
       )
       .subscribe();
 
+    // Polling fallback to keep count fresh even if realtime degrades
+    const interval = setInterval(fetchUnreadCount, 30000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [profile?.id, fetchUnreadCount]);
 

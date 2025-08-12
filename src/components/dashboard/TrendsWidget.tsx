@@ -41,12 +41,26 @@ export const TrendsWidget: React.FC<TrendsWidgetProps> = ({ trends, loading }) =
   const earlierLeads = trends.weeklyLeads.slice(0, 3).reduce((sum, day) => sum + day.count, 0);
   const leadsChange = earlierLeads > 0 ? ((recentLeads - earlierLeads) / earlierLeads) * 100 : 0;
 
-  const chartData = trends.weeklyLeads.map((day, index) => ({
+  const rawLeads = Array.isArray(trends.weeklyLeads) ? trends.weeklyLeads : [];
+  const rawMsgs = Array.isArray(trends.weeklyMessages) ? trends.weeklyMessages : [];
+  const sanitizedLeads = rawLeads
+    .filter((d) => d && typeof d.count === 'number' && !Number.isNaN(d.count))
+    .map((d) => ({ ...d, count: Math.max(0, d.count) }));
+  const sanitizedMsgs = rawMsgs.map((d) => ({
+    date: d?.date,
+    sent: Math.max(0, Number(d?.sent || 0)),
+    received: Math.max(0, Number(d?.received || 0)),
+  }));
+  const chartData = sanitizedLeads.map((day, index) => ({
     date: formatDate(day.date),
     leads: day.count,
-    sent: trends.weeklyMessages[index]?.sent || 0,
-    received: trends.weeklyMessages[index]?.received || 0,
+    sent: sanitizedMsgs[index]?.sent || 0,
+    received: sanitizedMsgs[index]?.received || 0,
   }));
+  if (import.meta.env.DEV) {
+    console.debug('[TrendsWidget] chartData points:', chartData.length);
+  }
+  const hasEnoughData = chartData.length >= 2;
 
   return (
     <Card>
@@ -97,43 +111,49 @@ export const TrendsWidget: React.FC<TrendsWidgetProps> = ({ trends, loading }) =
         {/* Weekly Leads Chart */}
         <div className="space-y-2">
           <h4 className="text-sm font-medium">Daily New Leads (Last 7 Days)</h4>
-          <ResponsiveContainer width="100%" height={120}>
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="leadsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <XAxis 
-                dataKey="date" 
-                axisLine={false}
-                tickLine={false}
-                fontSize={12}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis hide />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                  fontSize: '12px'
-                }}
-                labelStyle={{ color: 'hsl(var(--foreground))' }}
-              />
-              <Area
-                type="monotone"
-                dataKey="leads"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                fill="url(#leadsGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {hasEnoughData ? (
+            <ResponsiveContainer width="100%" height={120}>
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="leadsGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="date" 
+                  axisLine={false}
+                  tickLine={false}
+                  fontSize={12}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis hide />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="leads"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  fill="url(#leadsGradient)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-28 rounded bg-muted/50 flex items-center justify-center text-xs text-muted-foreground">
+              Not enough data to render chart
+            </div>
+          )}
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{totalLeadsThisWeek} total leads</span>
-            <span className={`flex items-center gap-1 ${leadsChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <span className={`flex items-center gap-1 ${leadsChange >= 0 ? 'text-green-600' : 'text-orange-600'}`}>
               {leadsChange >= 0 ? (
                 <TrendingUp className="h-3 w-3" />
               ) : (

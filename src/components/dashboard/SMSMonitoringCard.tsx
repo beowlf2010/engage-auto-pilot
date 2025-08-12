@@ -42,7 +42,7 @@ export const SMSMonitoringCard = () => {
         .select('sms_status, sent_at')
         .eq('direction', 'out')
         .not('sms_status', 'is', null)
-        .gte('sent_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days
+        .gte('sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
 
       if (convoError) throw convoError;
 
@@ -172,8 +172,16 @@ export const SMSMonitoringCard = () => {
             <div className="text-sm text-muted-foreground">Delivered</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">{stats?.failed || 0}</div>
-            <div className="text-sm text-muted-foreground">Failed</div>
+            <div className={`text-2xl font-bold ${(() => {
+              const total = stats?.total_sent || 0;
+              const failed = stats?.failed || 0;
+              const rate = total > 0 ? (failed / total) * 100 : 0;
+              return rate > 10 ? 'text-red-600' : 'text-amber-600';
+            })()}`}>{stats?.failed || 0}</div>
+            <div className="text-sm text-muted-foreground">
+              Failed
+              <span className="ml-1 align-middle" title="Turns red only if failure rate > 10% in last 24h">❓</span>
+            </div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-yellow-600">{stats?.pending || 0}</div>

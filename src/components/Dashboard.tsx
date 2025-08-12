@@ -15,6 +15,7 @@ import { AIStatusDashboard } from '@/components/ai/AIStatusDashboard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { StatusRibbon } from './dashboard/StatusRibbon';
 
 interface DashboardProps {
   user: {
@@ -93,11 +94,8 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
             </div>
           </div>
           
-          {error && (
-            <div className="mt-2 text-xs text-primary-foreground/90 bg-white/10 rounded p-2">
-              ⚠️ {error}
-            </div>
-          )}
+          <StatusRibbon isStale={isStale} hasError={Boolean(error)} />
+ 
         </div>
 
         {/* Enhanced Stats Overview */}
