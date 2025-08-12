@@ -87,7 +87,7 @@ const DataHygienePage: React.FC = () => {
   const handleSaveSchedule = async () => {
     try {
       setScheduling(true);
-      const { data, error } = await supabase.rpc("upsert_purge_schedule", {
+      const { data, error } = await (supabase as any).rpc("upsert_purge_schedule", {
         p_jobname: "purge_old_leads_recurring",
         p_schedule: cron,
         p_cutoff_days: cutoffDays,
@@ -106,7 +106,7 @@ const DataHygienePage: React.FC = () => {
   const handleRemoveSchedule = async () => {
     try {
       setScheduling(true);
-      const { data, error } = await supabase.rpc("remove_purge_schedule", {
+      const { data, error } = await (supabase as any).rpc("remove_purge_schedule", {
         p_jobname: "purge_old_leads_recurring",
       });
       if (error) throw error;
