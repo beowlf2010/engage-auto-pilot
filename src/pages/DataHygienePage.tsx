@@ -22,7 +22,7 @@ const downloadJson = (data: any, filename = "purge-report.json") => {
 };
 
 const DataHygienePage: React.FC = () => {
-  const [cutoffDays, setCutoffDays] = useState<number>(90);
+  const [cutoffDays, setCutoffDays] = useState<number>(7);
   const [cron, setCron] = useState<string>("0 3 * * 0"); // Sundays at 3am
   const [running, setRunning] = useState<boolean>(false);
   const [scheduling, setScheduling] = useState<boolean>(false);
