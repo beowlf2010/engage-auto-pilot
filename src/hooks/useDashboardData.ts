@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getCorrectLeadCounts } from '@/services/leadStatusTransitionService';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { withTimeout, TimeoutError } from '@/utils/withTimeout';
+import { networkHealthService } from '@/services/networkHealthService';
 
 interface DashboardData {
   leadCounts: {
@@ -52,14 +54,30 @@ export const useDashboardData = () => {
   const { safeExecute } = useErrorHandler();
 
   const fetchLeadCounts = useCallback(async () => {
-    const counts = await safeExecute(
-      () => getCorrectLeadCounts(),
-      { totalLeads: 0, newLeads: 0, engagedLeads: 0, aiEnabledLeads: 0, needsAttention: 0 },
-      'Dashboard lead counts'
-    );
-    
-    setData(prev => ({ ...prev, leadCounts: counts, lastUpdated: new Date() }));
-    setLoading(prev => ({ ...prev, leadCounts: false }));
+    const defaultCounts = { totalLeads: 0, newLeads: 0, engagedLeads: 0, aiEnabledLeads: 0, needsAttention: 0 };
+    try {
+      const counts = await withTimeout(
+        () => safeExecute(() => getCorrectLeadCounts(), defaultCounts, 'Dashboard lead counts'),
+        8000
+      );
+      setData(prev => ({ ...prev, leadCounts: counts, lastUpdated: new Date() }));
+      setLoading(prev => ({ ...prev, leadCounts: false }));
+      networkHealthService.reportSuccess();
+    } catch (err) {
+      if (err instanceof TimeoutError) {
+        networkHealthService.reportTimeout('dashboard:leadCounts');
+        setData(prev => ({ ...prev, leadCounts: defaultCounts, lastUpdated: new Date() }));
+        setLoading(prev => ({ ...prev, leadCounts: false }));
+      } else {
+        const counts = await safeExecute(
+          () => getCorrectLeadCounts(),
+          defaultCounts,
+          'Dashboard lead counts'
+        );
+        setData(prev => ({ ...prev, leadCounts: counts, lastUpdated: new Date() }));
+        setLoading(prev => ({ ...prev, leadCounts: false }));
+      }
+    }
   }, [safeExecute]);
 
   const fetchMessageStats = useCallback(async () => {
@@ -72,80 +90,116 @@ export const useDashboardData = () => {
       change_replies: 0
     };
 
-    const stats = await safeExecute(
-      async () => {
-        const [todayOutbound, todayInbound, yesterdayKpis] = await Promise.all([
-          supabase
-            .from('conversations')
-            .select('id', { count: 'exact', head: true })
-            .eq('direction', 'out')
-            .gte('sent_at', `${today}T00:00:00`)
-            .lt('sent_at', `${today}T23:59:59`),
-          
-          supabase
-            .from('conversations')
-            .select('id', { count: 'exact', head: true })
-            .eq('direction', 'in')
-            .gte('sent_at', `${today}T00:00:00`)
-            .lt('sent_at', `${today}T23:59:59`),
-          
-          supabase
-            .from('kpis')
-            .select('messages_sent, replies_in')
-            .order('date', { ascending: false })
-            .limit(1)
-        ]);
+    try {
+      const stats = await withTimeout(
+        () => safeExecute(
+          async () => {
+            const [todayOutbound, todayInbound, yesterdayKpis] = await Promise.all([
+              supabase
+                .from('conversations')
+                .select('id', { count: 'exact', head: true })
+                .eq('direction', 'out')
+                .gte('sent_at', `${today}T00:00:00`)
+                .lt('sent_at', `${today}T23:59:59`),
+              
+              supabase
+                .from('conversations')
+                .select('id', { count: 'exact', head: true })
+                .eq('direction', 'in')
+                .gte('sent_at', `${today}T00:00:00`)
+                .lt('sent_at', `${today}T23:59:59`),
+              
+              supabase
+                .from('kpis')
+                .select('messages_sent, replies_in')
+                .order('date', { ascending: false })
+                .limit(1)
+            ]);
 
-        const todayMessagesSent = todayOutbound.count || 0;
-        const todayRepliesIn = todayInbound.count || 0;
-        
-        let changeSent = 0;
-        let changeReplies = 0;
-        
-        if (yesterdayKpis.data && yesterdayKpis.data.length > 0) {
-          const yesterday = yesterdayKpis.data[0];
-          changeSent = yesterday.messages_sent 
-            ? ((todayMessagesSent - yesterday.messages_sent) / Math.max(yesterday.messages_sent, 1)) * 100
-            : 0;
-          changeReplies = yesterday.replies_in
-            ? ((todayRepliesIn - yesterday.replies_in) / Math.max(yesterday.replies_in, 1)) * 100
-            : 0;
-        }
+            const todayMessagesSent = todayOutbound.count || 0;
+            const todayRepliesIn = todayInbound.count || 0;
+            
+            let changeSent = 0;
+            let changeReplies = 0;
+            
+            if (yesterdayKpis.data && yesterdayKpis.data.length > 0) {
+              const yesterday = yesterdayKpis.data[0];
+              changeSent = yesterday.messages_sent 
+                ? ((todayMessagesSent - yesterday.messages_sent) / Math.max(yesterday.messages_sent, 1)) * 100
+                : 0;
+              changeReplies = yesterday.replies_in
+                ? ((todayRepliesIn - yesterday.replies_in) / Math.max(yesterday.replies_in, 1)) * 100
+                : 0;
+            }
 
-        return {
-          date: today,
-          messages_sent: todayMessagesSent,
-          replies_in: todayRepliesIn,
-          change_sent: Math.round(changeSent),
-          change_replies: Math.round(changeReplies)
-        };
-      },
-      defaultStats,
-      'Dashboard message stats'
-    );
+            return {
+              date: today,
+              messages_sent: todayMessagesSent,
+              replies_in: todayRepliesIn,
+              change_sent: Math.round(changeSent),
+              change_replies: Math.round(changeReplies)
+            };
+          },
+          defaultStats,
+          'Dashboard message stats'
+        ),
+        8000
+      );
 
-    setData(prev => ({ ...prev, messageStats: stats, lastUpdated: new Date() }));
-    setLoading(prev => ({ ...prev, messageStats: false }));
+      setData(prev => ({ ...prev, messageStats: stats, lastUpdated: new Date() }));
+      setLoading(prev => ({ ...prev, messageStats: false }));
+      networkHealthService.reportSuccess();
+    } catch (err) {
+      if (err instanceof TimeoutError) {
+        networkHealthService.reportTimeout('dashboard:messageStats');
+        setData(prev => ({ ...prev, messageStats: defaultStats, lastUpdated: new Date() }));
+        setLoading(prev => ({ ...prev, messageStats: false }));
+      } else {
+        const stats = await safeExecute(
+          async () => defaultStats,
+          defaultStats,
+          'Dashboard message stats'
+        );
+        setData(prev => ({ ...prev, messageStats: stats, lastUpdated: new Date() }));
+        setLoading(prev => ({ ...prev, messageStats: false }));
+      }
+    }
   }, [safeExecute]);
 
   const fetchUnreadMessages = useCallback(async () => {
-    const count = await safeExecute(
-      async () => {
-        const { count, error } = await supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .eq('direction', 'in')
-          .is('read_at', null);
+    try {
+      const count = await withTimeout(
+        () => safeExecute(
+          async () => {
+            const { count, error } = await supabase
+              .from('conversations')
+              .select('*', { count: 'exact', head: true })
+              .eq('direction', 'in')
+              .is('read_at', null);
 
-        if (error) throw error;
-        return count || 0;
-      },
-      0,
-      'Dashboard unread messages'
-    );
+            if (error) throw error;
+            return count || 0;
+          },
+          0,
+          'Dashboard unread messages'
+        ),
+        8000
+      );
 
-    setData(prev => ({ ...prev, unreadMessages: count, lastUpdated: new Date() }));
-    setLoading(prev => ({ ...prev, unreadMessages: false }));
+      setData(prev => ({ ...prev, unreadMessages: count, lastUpdated: new Date() }));
+      setLoading(prev => ({ ...prev, unreadMessages: false }));
+      networkHealthService.reportSuccess();
+    } catch (err) {
+      if (err instanceof TimeoutError) {
+        networkHealthService.reportTimeout('dashboard:unreadMessages');
+        setData(prev => ({ ...prev, unreadMessages: 0, lastUpdated: new Date() }));
+        setLoading(prev => ({ ...prev, unreadMessages: false }));
+      } else {
+        const count = await safeExecute(async () => 0, 0, 'Dashboard unread messages');
+        setData(prev => ({ ...prev, unreadMessages: count, lastUpdated: new Date() }));
+        setLoading(prev => ({ ...prev, unreadMessages: false }));
+      }
+    }
   }, [safeExecute]);
 
   // Unified data fetch with parallel loading
