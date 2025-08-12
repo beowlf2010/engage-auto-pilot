@@ -8002,6 +8002,10 @@ export type Database = {
         Args: { target_user_id: string; justification?: string }
         Returns: Json
       }
+      purge_old_leads: {
+        Args: { p_cutoff?: string; p_dry_run?: boolean }
+        Returns: Json
+      }
       repair_upload_inconsistencies: {
         Args: Record<PropertyKey, never>
         Returns: Json
