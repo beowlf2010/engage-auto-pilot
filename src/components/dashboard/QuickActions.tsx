@@ -39,6 +39,37 @@ export const QuickActions = React.memo<QuickActionsProps>(({
       handleError(error, 'navigate');
     }
   };
+
+  type Severity = 'none' | 'low' | 'med' | 'high';
+
+  const getSeverityForAction = (title: string, count: number | null): Severity => {
+    if (!count || count <= 0) return 'none';
+    if (title === 'Smart Inbox') {
+      if (count <= 5) return 'low';
+      if (count <= 20) return 'med';
+      return 'high';
+    }
+    if (title === 'Leads') {
+      if (count <= 3) return 'low';
+      if (count <= 10) return 'med';
+      return 'high';
+    }
+    return 'low';
+  };
+
+  const badgeVariantForSeverity = (severity: Severity): "default" | "secondary" | "destructive" | "outline" => {
+    switch (severity) {
+      case 'low':
+        return 'secondary';
+      case 'med':
+        return 'default';
+      case 'high':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
+
   const quickActions: QuickAction[] = [
     {
       title: 'Smart Inbox',
@@ -99,11 +130,28 @@ export const QuickActions = React.memo<QuickActionsProps>(({
                   </div>
                 </div>
               </div>
-              {action.badge && (
-                <Badge className="absolute top-2 right-2" variant="destructive">
-                  {action.badge}
-                </Badge>
-              )}
+              {(() => {
+                const severity = getSeverityForAction(action.title, action.badge);
+                if (severity === 'none') return null;
+                const variant = badgeVariantForSeverity(severity);
+                const label = action.title === 'Smart Inbox'
+                  ? `${action.badge} unread messages`
+                  : action.title === 'Leads'
+                  ? `${action.badge} leads need attention`
+                  : `${action.badge} notifications`;
+
+                return (
+                  <Badge
+                    variant={variant}
+                    className="absolute top-2 right-2 h-5 min-w-[1.25rem] px-1.5 flex items-center justify-center text-[10px]"
+                    role="status"
+                    aria-label={label}
+                    title={label}
+                  >
+                    {action.badge}
+                  </Badge>
+                );
+              })()}
             </Button>
           ))}
         </div>
