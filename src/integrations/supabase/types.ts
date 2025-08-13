@@ -8006,6 +8006,10 @@ export type Database = {
         Args: { p_cutoff?: string; p_dry_run?: boolean }
         Returns: Json
       }
+      remove_purge_schedule: {
+        Args: { p_jobname: string }
+        Returns: Json
+      }
       repair_upload_inconsistencies: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -8122,6 +8126,15 @@ export type Database = {
           p_upload_history_id: string
         }
         Returns: string
+      }
+      upsert_purge_schedule: {
+        Args: {
+          p_jobname: string
+          p_schedule: string
+          p_cutoff_days: number
+          p_dry_run?: boolean
+        }
+        Returns: Json
       }
       upsert_rpo_intelligence: {
         Args: {
