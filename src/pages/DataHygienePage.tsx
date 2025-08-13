@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 const toIsoCutoff = (days: number) => {
   const ms = days * 24 * 60 * 60 * 1000;
@@ -22,6 +24,7 @@ const downloadJson = (data: any, filename = "purge-report.json") => {
 };
 
 const DataHygienePage: React.FC = () => {
+  const { user, session } = useAuth();
   const [cutoffDays, setCutoffDays] = useState<number>(7);
   const [cron, setCron] = useState<string>("0 3 * * 0"); // Sundays at 3am
   const [running, setRunning] = useState<boolean>(false);
@@ -44,18 +47,40 @@ const DataHygienePage: React.FC = () => {
   }, [cutoffDays]);
 
   const handleDryRun = async () => {
+    if (!user || !session) {
+      toast.error("You must be logged in to perform this action");
+      return;
+    }
+
     try {
       setRunning(true);
+      console.log("Starting dry run with user:", user.id, "cutoff days:", cutoffDays);
+      
+      // Ensure we have a fresh session
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) {
+        throw new Error("No active session found");
+      }
+
       const { data, error } = await supabase.rpc("purge_old_leads", {
         p_cutoff: toIsoCutoff(cutoffDays),
         p_dry_run: true,
       });
-      if (error) throw error;
+      
+      console.log("RPC response:", { data, error });
+      
+      if (error) {
+        console.error("RPC error details:", error);
+        throw error;
+      }
+      
       setResult(data);
-      toast.success("Dry run completed");
+      const result = data as any;
+      toast.success(`Dry run completed: ${result?.lead_count || 0} leads would be purged`);
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Dry run failed");
+      console.error("Dry run error:", err);
+      const errorMsg = err.message || err.details || "Dry run failed";
+      toast.error(`Error: ${errorMsg}`);
     } finally {
       setRunning(false);
     }
@@ -144,7 +169,14 @@ const DataHygienePage: React.FC = () => {
                 </div>
                 <div className="flex gap-2 sm:col-span-2">
                   <Button onClick={handleDryRun} disabled={running} variant="secondary">
-                    {running ? "Running..." : "Run Dry-Run"}
+                    {running ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Running...
+                      </>
+                    ) : (
+                      "Run Dry-Run"
+                    )}
                   </Button>
                   <Button onClick={handleLivePurge} disabled={running} variant="destructive">
                     {running ? "Processing..." : "Run Live Purge"}
