@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -7602,9 +7602,9 @@ export type Database = {
       calculate_ai_strategy_for_lead: {
         Args: {
           p_lead_id: string
+          p_lead_source_name?: string
           p_lead_status_type_name?: string
           p_lead_type_name?: string
-          p_lead_source_name?: string
         }
         Returns: undefined
       }
@@ -7621,14 +7621,14 @@ export type Database = {
         Returns: number
       }
       calculate_leads_count: {
-        Args: { p_vin: string; p_stock_number: string }
+        Args: { p_stock_number: string; p_vin: string }
         Returns: number
       }
       calculate_next_ai_send_time: {
         Args: {
+          p_base_interval_hours?: number
           p_lead_id: string
           p_sequence_day: number
-          p_base_interval_hours?: number
         }
         Returns: string
       }
@@ -7641,13 +7641,13 @@ export type Database = {
         Returns: Json
       }
       check_message_rate_limit: {
-        Args: { p_phone_number: string; p_limit_minutes?: number }
+        Args: { p_limit_minutes?: number; p_phone_number: string }
         Returns: boolean
       }
       check_rate_limit: {
         Args: {
-          p_identifier: string
           p_endpoint: string
+          p_identifier: string
           p_max_requests?: number
           p_window_minutes?: number
         }
@@ -7656,16 +7656,16 @@ export type Database = {
       check_security_rate_limit: {
         Args:
           | {
-              p_identifier: string
               p_endpoint: string
+              p_identifier: string
               p_max_requests?: number
               p_window_minutes?: number
             }
           | {
-              p_user_id: string
-              p_operation_type: string
-              p_max_per_hour?: number
               p_max_per_day?: number
+              p_max_per_hour?: number
+              p_operation_type: string
+              p_user_id: string
             }
         Returns: boolean
       }
@@ -7694,7 +7694,7 @@ export type Database = {
         Returns: undefined
       }
       detect_suspicious_activity: {
-        Args: { p_user_id: string; p_time_window_minutes?: number }
+        Args: { p_time_window_minutes?: number; p_user_id: string }
         Returns: boolean
       }
       detect_vehicle_duplicates: {
@@ -7707,10 +7707,10 @@ export type Database = {
       }
       ensure_user_profile: {
         Args: {
-          p_user_id: string
           p_email: string
           p_first_name?: string
           p_last_name?: string
+          p_user_id: string
         }
         Returns: string
       }
@@ -7718,12 +7718,12 @@ export type Database = {
         Args: { p_lead_id: string }
         Returns: {
           inventory_id: string
-          match_score: number
-          vin: string
-          year: number
           make: string
+          match_score: number
           model: string
           price: number
+          vin: string
+          year: number
         }[]
       }
       fix_failed_upload_insertion: {
@@ -7739,11 +7739,11 @@ export type Database = {
         Returns: undefined
       }
       get_available_appointment_slots: {
-        Args: { start_date?: string; end_date?: string }
+        Args: { end_date?: string; start_date?: string }
         Returns: {
+          available_spots: number
           slot_date: string
           slot_time: string
-          available_spots: number
         }[]
       }
       get_dealership_context: {
@@ -7759,123 +7759,123 @@ export type Database = {
         }[]
       }
       get_gm_orders_by_delivery_timeline: {
-        Args: { p_start_date?: string; p_end_date?: string }
+        Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
-          id: string
-          gm_order_number: string
-          customer_name: string
-          estimated_delivery_date: string
           actual_delivery_date: string
+          customer_name: string
+          delivery_variance_days: number
+          estimated_delivery_date: string
+          gm_order_number: string
+          gm_status_description: string
+          id: string
+          is_overdue: boolean
           make: string
           model: string
-          year: number
           status: string
-          gm_status_description: string
-          delivery_variance_days: number
-          is_overdue: boolean
+          year: number
         }[]
       }
       get_inbox_conversations_prioritized: {
         Args: Record<PropertyKey, never>
         Returns: {
-          lead_id: string
+          ai_opt_in: boolean
           body: string
           direction: string
-          sent_at: string
-          read_at: string
-          first_name: string
-          last_name: string
           email: string
-          status: string
-          vehicle_interest: string
-          source: string
+          first_name: string
+          has_unread_inbound: boolean
+          last_name: string
+          latest_inbound_at: string
+          lead_id: string
           lead_type_name: string
-          salesperson_id: string
           profiles_first_name: string
           profiles_last_name: string
-          ai_opt_in: boolean
-          has_unread_inbound: boolean
+          read_at: string
+          salesperson_id: string
+          sent_at: string
+          source: string
+          status: string
           unread_count: number
-          latest_inbound_at: string
+          vehicle_interest: string
         }[]
       }
       get_inbox_conversations_prioritized_limited: {
         Args: Record<PropertyKey, never>
         Returns: {
-          lead_id: string
+          ai_opt_in: boolean
           body: string
           direction: string
-          sent_at: string
-          read_at: string
-          first_name: string
-          last_name: string
           email: string
-          status: string
-          vehicle_interest: string
-          source: string
+          first_name: string
+          has_unread_inbound: boolean
+          last_name: string
+          latest_inbound_at: string
+          lead_id: string
           lead_type_name: string
-          salesperson_id: string
+          primary_phone: string
           profiles_first_name: string
           profiles_last_name: string
-          ai_opt_in: boolean
-          has_unread_inbound: boolean
+          read_at: string
+          salesperson_id: string
+          sent_at: string
+          source: string
+          status: string
           unread_count: number
-          latest_inbound_at: string
-          primary_phone: string
+          vehicle_interest: string
         }[]
       }
       get_inventory_status_summary: {
         Args: Record<PropertyKey, never>
         Returns: {
-          status_name: string
-          vehicle_count: number
           latest_upload_date: string
           oldest_upload_date: string
+          status_name: string
+          vehicle_count: number
         }[]
       }
       get_latest_conversations_per_lead: {
         Args: Record<PropertyKey, never>
         Returns: {
-          id: string
-          lead_id: string
+          ai_opt_in: boolean
           body: string
           direction: string
-          sent_at: string
-          read_at: string
-          first_name: string
-          last_name: string
           email: string
-          vehicle_interest: string
-          salesperson_id: string
-          status: string
-          ai_opt_in: boolean
-          source: string
+          first_name: string
+          id: string
+          last_name: string
+          lead_id: string
           lead_type_name: string
           profiles_first_name: string
           profiles_last_name: string
+          read_at: string
+          salesperson_id: string
+          sent_at: string
+          source: string
+          status: string
+          vehicle_interest: string
         }[]
       }
       get_rpo_analytics: {
         Args: Record<PropertyKey, never>
         Returns: {
-          rpo_code: string
-          total_vehicles: number
-          sold_vehicles: number
           avg_days_to_sell: number
+          rpo_code: string
+          sold_vehicles: number
           total_sales_value: number
+          total_vehicles: number
         }[]
       }
       get_stuck_leads_report: {
         Args: Record<PropertyKey, never>
         Returns: {
-          lead_id: string
-          first_name: string
-          last_name: string
-          phone_number: string
           ai_stage: string
-          next_ai_send_at: string
-          minutes_overdue: number
+          first_name: string
           has_valid_phone: boolean
+          last_name: string
+          lead_id: string
+          minutes_overdue: number
+          next_ai_send_at: string
+          phone_number: string
         }[]
       }
       get_user_roles: {
@@ -7886,8 +7886,8 @@ export type Database = {
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
@@ -7897,50 +7897,50 @@ export type Database = {
       }
       initialize_user_for_csv: {
         Args: {
-          p_user_id: string
           p_email: string
           p_first_name?: string
           p_last_name?: string
+          p_user_id: string
         }
         Returns: Json
       }
       initialize_user_for_csv_clean: {
         Args: {
-          p_user_id: string
           p_email: string
           p_first_name?: string
           p_last_name?: string
+          p_user_id: string
         }
         Returns: Json
       }
       initialize_user_secure: {
         Args: {
-          p_user_id: string
+          p_default_role?: Database["public"]["Enums"]["app_role"]
           p_email: string
           p_first_name?: string
           p_last_name?: string
-          p_default_role?: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
         }
         Returns: Json
       }
       insert_inventory_secure: {
-        Args: { p_vehicles: Json; p_upload_history_id: string }
+        Args: { p_upload_history_id: string; p_vehicles: Json }
         Returns: Json
       }
       insert_inventory_with_context: {
         Args: {
-          p_vehicles: Json
           p_upload_history_id: string
           p_user_id: string
+          p_vehicles: Json
         }
         Returns: Json
       }
       insert_inventory_with_duplicate_handling: {
         Args: {
-          p_vehicles: Json
+          p_handle_duplicates?: string
           p_upload_history_id: string
           p_user_id: string
-          p_handle_duplicates?: string
+          p_vehicles: Json
         }
         Returns: Json
       }
@@ -7959,21 +7959,21 @@ export type Database = {
       log_security_event: {
         Args: {
           p_action: string
-          p_resource_type: string
-          p_resource_id?: string
           p_details?: Json
+          p_resource_id?: string
+          p_resource_type: string
         }
         Returns: undefined
       }
       log_security_event_enhanced: {
         Args: {
           p_action: string
-          p_resource_type: string
-          p_resource_id?: string
           p_details?: Json
+          p_ip_address?: string
+          p_resource_id?: string
+          p_resource_type: string
           p_severity?: string
           p_user_agent?: string
-          p_ip_address?: string
         }
         Returns: undefined
       }
@@ -7988,10 +7988,10 @@ export type Database = {
       merge_duplicate_leads_by_phone: {
         Args: Record<PropertyKey, never>
         Returns: {
-          phone_number: string
+          conversations_moved: number
           kept_lead_id: string
           merged_lead_ids: string[]
-          conversations_moved: number
+          phone_number: string
         }[]
       }
       normalize_phone: {
@@ -7999,7 +7999,11 @@ export type Database = {
         Returns: string
       }
       promote_user_to_admin: {
-        Args: { target_user_id: string; justification?: string }
+        Args: { justification?: string; target_user_id: string }
+        Returns: Json
+      }
+      purge_all_leads: {
+        Args: { p_dry_run?: boolean }
         Returns: Json
       }
       purge_old_leads: {
@@ -8046,10 +8050,10 @@ export type Database = {
       synchronize_user_roles: {
         Args:
           | {
-              p_user_id: string
               p_role: Database["public"]["Enums"]["app_role"]
+              p_user_id: string
             }
-          | { p_user_id: string; p_role: string }
+          | { p_role: string; p_user_id: string }
         Returns: undefined
       }
       track_failed_login: {
@@ -8091,80 +8095,80 @@ export type Database = {
       upsert_expanded_profit_snapshot: {
         Args: {
           p_date: string
-          p_retail_units: number
-          p_retail_gross: number
-          p_dealer_trade_units: number
           p_dealer_trade_gross: number
-          p_wholesale_units: number
-          p_wholesale_gross: number
-          p_new_units: number
+          p_dealer_trade_units: number
           p_new_gross: number
-          p_used_units: number
-          p_used_gross: number
-          p_total_units: number
-          p_total_sales: number
-          p_total_gross: number
-          p_total_fi_profit: number
-          p_total_profit: number
-          p_upload_history_id: string
+          p_new_units: number
           p_pack_adjustment_used?: number
+          p_retail_gross: number
+          p_retail_units: number
+          p_total_fi_profit: number
+          p_total_gross: number
+          p_total_profit: number
+          p_total_sales: number
+          p_total_units: number
+          p_upload_history_id: string
+          p_used_gross: number
+          p_used_units: number
+          p_wholesale_gross: number
+          p_wholesale_units: number
         }
         Returns: string
       }
       upsert_profit_snapshot: {
         Args: {
           p_date: string
-          p_total_units: number
-          p_total_sales: number
-          p_total_gross: number
-          p_total_fi_profit: number
-          p_total_profit: number
-          p_new_units: number
           p_new_gross: number
-          p_used_units: number
-          p_used_gross: number
+          p_new_units: number
+          p_total_fi_profit: number
+          p_total_gross: number
+          p_total_profit: number
+          p_total_sales: number
+          p_total_units: number
           p_upload_history_id: string
+          p_used_gross: number
+          p_used_units: number
         }
         Returns: string
       }
       upsert_purge_schedule: {
         Args: {
-          p_jobname: string
-          p_schedule: string
           p_cutoff_days: number
           p_dry_run?: boolean
+          p_jobname: string
+          p_schedule: string
         }
         Returns: Json
       }
       upsert_rpo_intelligence: {
         Args: {
-          p_rpo_code: string
           p_category: string
+          p_confidence_score?: number
           p_description: string
           p_feature_type?: string
           p_mapped_value?: string
-          p_confidence_score?: number
-          p_vehicle_makes?: string[]
           p_model_years?: number[]
+          p_rpo_code: string
+          p_vehicle_makes?: string[]
         }
         Returns: string
       }
       upsert_vehicle_master: {
         Args: {
-          p_vin: string
-          p_stock_number: string
+          p_data: Json
           p_gm_order_number: string
           p_make: string
           p_model: string
-          p_year: number
-          p_status: string
           p_source_report: string
-          p_data: Json
+          p_status: string
+          p_stock_number: string
+          p_vin: string
+          p_year: number
         }
         Returns: string
       }
       user_has_any_role: {
-        Args: { p_user_id: string; p_roles: string[] }
+        Args: { p_roles: string[]; p_user_id: string }
         Returns: boolean
       }
       user_has_manager_access: {
@@ -8176,7 +8180,7 @@ export type Database = {
         Returns: boolean
       }
       validate_ai_message_content: {
-        Args: { p_message_content: string; p_lead_id?: string }
+        Args: { p_lead_id?: string; p_message_content: string }
         Returns: Json
       }
       validate_upload_context: {
