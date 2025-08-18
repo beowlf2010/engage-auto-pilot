@@ -56,21 +56,46 @@ export const useAIInsights = () => {
   const { data: templateData } = useQuery({
     queryKey: ['ai-insights-templates'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ai_template_performance')
-        .select('*')
-        .order('last_used_at', { ascending: false })
-        .limit(20);
-      
-      if (error) throw error;
-      return data;
+      console.log('🔍 [AI INSIGHTS] Fetching template performance data...');
+      try {
+        const { data, error } = await supabase
+          .from('ai_template_performance')
+          .select('*')
+          .order('last_used_at', { ascending: false })
+          .limit(20);
+        
+        if (error) {
+          console.error('❌ [AI INSIGHTS] Template performance query failed:', error);
+          throw error;
+        }
+        console.log('✅ [AI INSIGHTS] Template performance data fetched:', data?.length || 0, 'records');
+        return data || [];
+      } catch (err) {
+        console.error('❌ [AI INSIGHTS] Template performance fetch error:', err);
+        return []; // Return empty array to prevent component crash
+      }
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
   // Generate insights when data changes
   useEffect(() => {
-    if (!leadData || !conversationData || !templateData) return;
+    console.log('🔍 [AI INSIGHTS] Data availability check:', {
+      leadData: !!leadData,
+      conversationData: !!conversationData,
+      templateData: !!templateData,
+      leadCount: leadData?.length || 0,
+      conversationCount: conversationData?.length || 0,
+      templateCount: templateData?.length || 0
+    });
+    
+    if (!leadData || !conversationData) {
+      console.log('🚫 [AI INSIGHTS] Missing required data, skipping insight generation');
+      return;
+    }
+    
+    // Template data is optional - use empty array if not available
+    const templates = templateData || [];
 
     const generatedInsights: AIInsight[] = [];
 
@@ -98,7 +123,7 @@ export const useAIInsights = () => {
     }
 
     // 2. Template performance analysis
-    const lowPerformingTemplates = templateData.filter(template => 
+    const lowPerformingTemplates = templates.filter(template => 
       template.response_rate < 0.15 && template.usage_count > 10
     );
 
@@ -193,7 +218,7 @@ export const useAIInsights = () => {
     setInsights(sortedInsights.slice(0, 5)); // Show top 5 insights
   }, [leadData, conversationData, templateData]);
 
-  const isLoading = !leadData || !conversationData || !templateData;
+  const isLoading = !leadData || !conversationData;
 
   return {
     insights,
