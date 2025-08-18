@@ -2,11 +2,12 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, AlertCircle } from "lucide-react";
+import { CheckCircle, AlertCircle, Save } from "lucide-react";
 import { FieldMapping } from './csv-mapper/types';
 import { fieldSections } from './csv-mapper/fieldMappingConfig';
 import { performAutoDetection } from './csv-mapper/fieldMappingUtils';
 import FieldSection from './csv-mapper/FieldSection';
+import { useMappingPersistence } from '@/hooks/useMappingPersistence';
 
 interface CSVFieldMapperProps {
   csvHeaders: string[];
@@ -19,13 +20,27 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
     firstName: '',
     lastName: ''
   });
+  
+  const { saveMapping, loadMapping, hasSavedMapping } = useMappingPersistence<FieldMapping>({
+    storageKey: 'csv-field-mappings'
+  });
 
-  // Auto-detect common field mappings
+  // Auto-detect or load saved mappings
   useEffect(() => {
     console.log('Sample data in CSVFieldMapper:', sampleData);
-    const autoMapping = performAutoDetection(csvHeaders);
-    setMapping(autoMapping);
-  }, [csvHeaders]);
+    
+    // First try to load saved mapping for this CSV structure
+    const savedMapping = loadMapping(csvHeaders);
+    
+    if (savedMapping) {
+      console.log('📋 Using saved CSV mapping');
+      setMapping(savedMapping);
+    } else {
+      console.log('🔍 No saved mapping found, auto-detecting');
+      const autoMapping = performAutoDetection(csvHeaders);
+      setMapping(autoMapping);
+    }
+  }, [csvHeaders, loadMapping]);
 
   const requiredFields = ['firstName', 'lastName'];
   const isValid = requiredFields.every(field => mapping[field as keyof FieldMapping]);
@@ -34,11 +49,18 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
     setMapping({ ...mapping, [key]: value });
   };
 
+  const handleMappingComplete = () => {
+    // Save the mapping for future use
+    saveMapping(csvHeaders, mapping);
+    onMappingComplete(mapping);
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <span>Map CSV Fields</span>
+          {hasSavedMapping(csvHeaders) && <Save className="w-4 h-4 text-blue-500" />}
           {isValid ? (
             <CheckCircle className="w-5 h-5 text-green-600" />
           ) : (
@@ -46,7 +68,11 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
           )}
         </CardTitle>
         <p className="text-sm text-slate-600">
-          {Object.values(mapping).filter(value => value).length} of {csvHeaders.length} fields auto-detected
+          {hasSavedMapping(csvHeaders) ? (
+            <>Using saved mapping • {Object.values(mapping).filter(value => value).length} fields mapped</>
+          ) : (
+            <>{Object.values(mapping).filter(value => value).length} of {csvHeaders.length} fields auto-detected</>
+          )}
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -63,7 +89,7 @@ const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldM
 
         <div className="pt-4 border-t">
           <Button 
-            onClick={() => onMappingComplete(mapping)}
+            onClick={handleMappingComplete}
             disabled={!isValid}
             className="w-full"
           >
