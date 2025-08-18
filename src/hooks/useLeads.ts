@@ -10,6 +10,10 @@ export const useLeads = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  const [todayOnly, setTodayOnly] = useState(() => {
+    const saved = localStorage.getItem('leads-today-only');
+    return saved ? JSON.parse(saved) : true;
+  });
   
   const { updateAiOptIn: updateAiOptInOperation, updateDoNotContact: updateDoNotContactOperation } = useLeadsOperations();
 
@@ -19,7 +23,7 @@ export const useLeads = () => {
       setError(null);
 
       const [leadsData, conversationsData] = await Promise.all([
-        fetchLeadsData(showHidden),
+        fetchLeadsData(showHidden, todayOnly),
         fetchConversationsData()
       ]);
 
@@ -31,7 +35,12 @@ export const useLeads = () => {
     } finally {
       setLoading(false);
     }
-  }, [showHidden]);
+  }, [showHidden, todayOnly]);
+
+  const toggleTodayOnly = (value: boolean) => {
+    setTodayOnly(value);
+    localStorage.setItem('leads-today-only', JSON.stringify(value));
+  };
 
   const toggleLeadHidden = (leadId: string, hidden: boolean) => {
     setLeads(prevLeads => {
@@ -102,6 +111,8 @@ export const useLeads = () => {
     showHidden,
     setShowHidden,
     hiddenCount,
-    toggleLeadHidden
+    toggleLeadHidden,
+    todayOnly,
+    toggleTodayOnly
   };
 };

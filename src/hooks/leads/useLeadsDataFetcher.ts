@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { LeadDataFromDB, ConversationFromDB } from './useLeadsTypes';
 
-export const fetchLeadsData = async (showHidden: boolean) => {
+export const fetchLeadsData = async (showHidden: boolean, todayOnly: boolean = false) => {
   // Build the query based on whether to show hidden leads
   let query = supabase
     .from('leads')
@@ -22,6 +22,13 @@ export const fetchLeadsData = async (showHidden: boolean) => {
       )
     `)
     .order('created_at', { ascending: false });
+
+  // Filter to today's leads only if requested
+  if (todayOnly) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    query = query.gte('created_at', today.toISOString());
+  }
 
   // Filter out hidden leads if showHidden is false
   if (!showHidden) {

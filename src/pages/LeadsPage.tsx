@@ -1,10 +1,13 @@
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Navigate } from 'react-router-dom';
+import { useLeads } from '@/hooks/useLeads';
 import LeadsManagement from '@/components/leads/LeadsManagement';
+import TodayOnlyToggle from '@/components/leads/TodayOnlyToggle';
 
 const LeadsPage = () => {
   const { profile, loading } = useAuth();
+  const { todayOnly, toggleTodayOnly } = useLeads();
 
   if (loading) {
     return (
@@ -21,7 +24,21 @@ const LeadsPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  return <LeadsManagement />;
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between p-4 bg-card border rounded-lg">
+        <div>
+          <h2 className="text-lg font-semibold">Lead Filter Options</h2>
+          <p className="text-sm text-muted-foreground">Control which leads are displayed</p>
+        </div>
+        <TodayOnlyToggle
+          todayOnly={todayOnly}
+          onToggle={toggleTodayOnly}
+        />
+      </div>
+      <LeadsManagement />
+    </div>
+  );
 };
 
 export default LeadsPage;

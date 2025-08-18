@@ -10,6 +10,7 @@ import LeadQuickView from '@/components/leads/LeadQuickView';
 import BulkActionsPanel from '@/components/leads/BulkActionsPanel';
 import FilterRestorationBanner from '@/components/leads/FilterRestorationBanner';
 import AIInsightBanner from '@/components/leads/AIInsightBanner';
+import TodayOnlyToggle from '@/components/leads/TodayOnlyToggle';
 import { Lead } from '@/types/lead';
 
 const LeadsList = () => {

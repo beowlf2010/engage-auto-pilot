@@ -15,10 +15,11 @@ type LeadStatusFilter =
   | "not_opted_in"
   | "messaged_not_opted_in"
   | "never_contacted"
-  | "needs_reply";
+  | "needs_reply"
+  | "today";
 
 export function useLeadFilters() {
-  const [filter, setFilter] = useState<LeadStatusFilter>("all");
+  const [filter, setFilter] = useState<LeadStatusFilter>("today");
 
   // Enhanced filtering logic with messaging and opt-in status
   const filterLeads = (leads: any[]) => {
@@ -52,6 +53,16 @@ export function useLeadFilters() {
       case "needs_reply":
         // Leads with unread incoming messages or unreplied messages
         return leads.filter(l => l.unreadCount > 0 || l.unrepliedCount > 0);
+      
+      case "today":
+        // Leads created today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return leads.filter(l => {
+          const leadDate = new Date(l.createdAt);
+          leadDate.setHours(0, 0, 0, 0);
+          return leadDate >= today;
+        });
       
       default:
         if (filter === "all") return leads;
