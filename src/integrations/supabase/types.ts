@@ -8006,6 +8006,10 @@ export type Database = {
         Args: { p_dry_run?: boolean }
         Returns: Json
       }
+      purge_all_leads_as_admin: {
+        Args: { p_dry_run?: boolean; p_user_id: string }
+        Returns: Json
+      }
       purge_old_leads: {
         Args: { p_cutoff?: string; p_dry_run?: boolean }
         Returns: Json
