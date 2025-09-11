@@ -13,9 +13,17 @@ interface CSVFieldMapperProps {
   csvHeaders: string[];
   sampleData: Record<string, string>;
   onMappingComplete: (mapping: FieldMapping) => void;
+  csvText?: string; // Add CSV text for preview processing
+  fileName?: string;
 }
 
-const CSVFieldMapper = ({ csvHeaders, sampleData, onMappingComplete }: CSVFieldMapperProps) => {
+const CSVFieldMapper = ({ 
+  csvHeaders, 
+  sampleData, 
+  onMappingComplete,
+  csvText,
+  fileName 
+}: CSVFieldMapperProps) => {
   const [mapping, setMapping] = useState<FieldMapping>({
     firstName: '',
     lastName: ''

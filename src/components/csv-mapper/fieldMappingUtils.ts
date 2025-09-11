@@ -1,7 +1,8 @@
 
 import { FieldMapping } from './types';
+import { parseClientName, parseSalesperson } from '@/utils/csvDataParsers';
 
-// Common patterns for field detection - UPDATED to prioritize customer fields over salesperson fields
+// Enhanced patterns for field detection - includes user's specific CSV format
 const fieldPatterns: Record<keyof FieldMapping, string[]> = {
   // Customer name fields - prioritize actual customer fields over salesperson fields
   firstName: ['firstname', 'first_name', 'first name', 'fname', 'given_name', 'customer_first_name', 'cust_first_name'],
@@ -34,17 +35,45 @@ const fieldPatterns: Record<keyof FieldMapping, string[]> = {
   // AI Strategy Fields - exact matches for CSV columns
   leadStatusTypeName: ['leadstatustypename', 'lead_status_type_name', 'statustype', 'status_type'],
   leadTypeName: ['leadtypename', 'lead_type_name', 'type_name'],
-  leadSourceName: ['leadsourcename', 'lead_source_name', 'source_name']
+  leadSourceName: ['leadsourcename', 'lead_source_name', 'source_name'],
+  
+  // Enhanced fields for user's specific CSV format
+  clientName: ['client name', 'clientname', 'customer_name', 'full_name', 'name'],
+  prospectType: ['prospect type', 'prospecttype', 'customer_type', 'lead_category'],
+  businessUnit: ['business unit', 'businessunit', 'unit', 'department', 'division'],
+  phonePrivacy: ['phone privacy', 'phoneprivacy', 'phone_opt_out', 'call_privacy'],
+  emailPrivacy: ['email privacy', 'emailprivacy', 'email_opt_out', 'email_preference'],
+  letterPrivacy: ['letterprivacy', 'letter_privacy', 'mail_privacy', 'mail_opt_out'],
+  contactPhone: ['contact phone', 'contactphone', 'phone', 'primary_phone', 'main_phone'],
+  contactEmail: ['contact email', 'contactemail', 'primary_email', 'main_email'],
+  historySold: ['history sold', 'historysold', 'sales_history', 'sold_count'],
+  historyService: ['history service', 'historyservice', 'service_history', 'service_count'],
+  bookValue: ['book value', 'bookvalue', 'trade_value', 'vehicle_value'],
+  estPayoff: ['est. payoff', 'est payoff', 'estimated_payoff', 'payoff_amount'],
+  equityAmount: ['equity amount', 'equityamount', 'equity', 'trade_equity'],
+  estMileage: ['est. mileage', 'est mileage', 'estimated_mileage', 'mileage'],
+  paymentsLeft: ['# of payments left', 'payments left', 'paymentsleft', 'remaining_payments'],
+  lastActivityType: ['last activity type', 'lastactivitytype', 'activity_type', 'last_action'],
+  lastActivityDate: ['last activity date', 'lastactivitydate', 'activity_date', 'last_contact'],
+  lastActivityCompletedBy: ['last activity completed by', 'lastactivitycompletedby', 'completed_by', 'contact_by'],
+  lastActivityNote: ['last activity note', 'lastactivitynote', 'activity_note', 'notes'],
+  dmsId: ['dms id #', 'dms id', 'dmsid', 'dealer_id', 'customer_id'],
+  vipStatus: ['vip', 'vip_status', 'priority', 'special_customer'],
+  firstDesiredVehicle: ['first desired vehicle', 'firstdesiredvehicle', 'desired_vehicle_1', 'interest_1'],
+  secondDesiredVehicle: ['second desired vehicle', 'seconddesiredvehicle', 'desired_vehicle_2', 'interest_2'],
+  firstOwnedVehicle: ['first owned vehicle', 'firstownedvehicle', 'owned_vehicle_1', 'trade_1'],
+  secondOwnedVehicle: ['second owned vehicle', 'secondownedvehicle', 'owned_vehicle_2', 'trade_2'],
+  salesperson: ['salesperson', 'sales_person', 'advisor', 'consultant', 'rep']
 };
 
 export const performAutoDetection = (headers: string[]): FieldMapping => {
   const mapping: Partial<FieldMapping> = {};
   
   // Convert headers to lowercase for comparison
-  const lowerHeaders = headers.map(h => h.toLowerCase());
+  const lowerHeaders = headers.map(h => h.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim());
   
   console.log('🔍 [FIELD MAPPING] Headers found:', headers);
-  console.log('🔍 [FIELD MAPPING] Lowercase headers:', lowerHeaders);
+  console.log('🔍 [FIELD MAPPING] Normalized headers:', lowerHeaders);
   
   // Auto-detect each field with improved logic
   Object.entries(fieldPatterns).forEach(([fieldKey, patterns]) => {
@@ -65,6 +94,11 @@ export const performAutoDetection = (headers: string[]): FieldMapping => {
     }
   });
 
+  // Special handling for combined client name field
+  if (mapping.clientName && !mapping.firstName && !mapping.lastName) {
+    console.log('🔄 [FIELD MAPPING] Found combined client name field, will parse during processing');
+  }
+
   // Special validation to prevent salesperson names from being mapped to customer names
   if (mapping.firstName && mapping.firstName.toLowerCase().includes('salesperson')) {
     console.warn('⚠️ [FIELD MAPPING] Removing incorrect firstName mapping from salesperson field:', mapping.firstName);
@@ -76,25 +110,22 @@ export const performAutoDetection = (headers: string[]): FieldMapping => {
     delete mapping.lastName;
   }
 
-  // Try to find actual customer name fields if we don't have them
-  if (!mapping.firstName) {
-    const customerFirstNameIndex = lowerHeaders.findIndex(h => 
-      h === 'firstname' || h === 'first_name' || h === 'fname'
+  // Enhanced name field detection for combined formats
+  if (!mapping.firstName && !mapping.lastName && !mapping.clientName) {
+    // Look for any name-like field
+    const nameFieldIndex = lowerHeaders.findIndex(h => 
+      h.includes('name') || h.includes('client') || h.includes('customer')
     );
-    if (customerFirstNameIndex !== -1) {
-      mapping.firstName = headers[customerFirstNameIndex];
-      console.log(`🔄 [FIELD MAPPING] Found customer firstName: ${headers[customerFirstNameIndex]}`);
+    if (nameFieldIndex !== -1) {
+      mapping.clientName = headers[nameFieldIndex];
+      console.log(`🔄 [FIELD MAPPING] Found name field: ${headers[nameFieldIndex]}`);
     }
   }
 
-  if (!mapping.lastName) {
-    const customerLastNameIndex = lowerHeaders.findIndex(h => 
-      h === 'lastname' || h === 'last_name' || h === 'lname'
-    );
-    if (customerLastNameIndex !== -1) {
-      mapping.lastName = headers[customerLastNameIndex];
-      console.log(`🔄 [FIELD MAPPING] Found customer lastName: ${headers[customerLastNameIndex]}`);
-    }
+  // Map contact phone if no specific phone fields found
+  if (!mapping.cellphone && !mapping.dayphone && mapping.contactPhone) {
+    mapping.cellphone = mapping.contactPhone;
+    console.log('🔄 [FIELD MAPPING] Mapped contact phone to cellphone');
   }
 
   console.log('🎯 [FIELD MAPPING] Final mapping result:', mapping);
@@ -104,12 +135,19 @@ export const performAutoDetection = (headers: string[]): FieldMapping => {
 export const validateMapping = (mapping: FieldMapping): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
   
-  if (!mapping.firstName) {
-    errors.push('First Name is required');
+  // Check for name fields - either separate first/last names OR combined client name
+  const hasNameFields = (mapping.firstName && mapping.lastName) || mapping.clientName;
+  
+  if (!hasNameFields) {
+    errors.push('Name information is required (either First Name & Last Name, or Client Name)');
   }
   
-  if (!mapping.lastName) {
-    errors.push('Last Name is required');
+  // Validate that we have some form of contact information
+  const hasContactInfo = mapping.cellphone || mapping.dayphone || mapping.contactPhone || 
+                        mapping.email || mapping.contactEmail;
+  
+  if (!hasContactInfo) {
+    errors.push('At least one form of contact information (phone or email) is required');
   }
   
   return {

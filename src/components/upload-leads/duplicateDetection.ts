@@ -21,10 +21,13 @@ export interface ProcessedLead {
   doNotEmail: boolean;
   doNotMail: boolean;
   status: string;
-  // New lead factors for AI strategy
+  // AI strategy fields
   leadStatusTypeName?: string;
   leadTypeName?: string;
   leadSourceName?: string;
+  // Enhanced fields for advanced CSV processing
+  externalId?: string;
+  rawUploadData?: Record<string, any>;
 }
 
 export interface DuplicateCheckResult {

@@ -1,6 +1,15 @@
 
 import { createPhoneNumbers, getPrimaryPhone } from "@/utils/phoneUtils";
 import { checkForDuplicate, ProcessedLead } from "./duplicateDetection";
+import { 
+  parseClientName, 
+  parseVehicleString, 
+  parseSalesperson, 
+  parsePrivacyFlag, 
+  parseProspectTypeToStatus,
+  cleanFieldValue,
+  parseDmsId
+} from "@/utils/csvDataParsers";
 
 export interface ProcessingResult {
   validLeads: ProcessedLead[];
@@ -71,73 +80,153 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
 
   csvData.rows.forEach((row: any, index: number) => {
     try {
-      // Data is already cleaned by the unified CSV parser
-      // No need for additional quote removal since cleanFieldValue handles it
+      // Enhanced name parsing - handle combined client name field
+      let firstName = cleanFieldValue(row[mapping.firstName]);
+      let lastName = cleanFieldValue(row[mapping.lastName]);
+      let middleName = cleanFieldValue(row[mapping.middleName]);
       
-      // Create phone numbers with priority - handle new return format
-      const phoneResult = createPhoneNumbers(
+      // If we have a combined client name field, parse it
+      if (mapping.clientName && row[mapping.clientName] && !firstName && !lastName) {
+        const parsedName = parseClientName(cleanFieldValue(row[mapping.clientName]));
+        firstName = parsedName.firstName;
+        lastName = parsedName.lastName;
+        middleName = parsedName.middleName || middleName;
+        console.log(`📝 [PROCESS LEADS] Parsed client name "${row[mapping.clientName]}" -> First: "${firstName}", Last: "${lastName}"`);
+      }
+      
+      // Enhanced phone number handling - try multiple phone field sources
+      const phoneFields = [
+        row[mapping.contactPhone] || '',
         row[mapping.cellphone] || '',
         row[mapping.dayphone] || '',
         row[mapping.evephone] || ''
+      ].filter(Boolean);
+      
+      const phoneResult = createPhoneNumbers(
+        phoneFields[0] || '',
+        phoneFields[1] || '',
+        phoneFields[2] || ''
       );
 
       const phoneNumbers = phoneResult.phones;
       const primaryPhone = getPrimaryPhone(phoneNumbers);
       
-      // Skip leads without valid phone numbers
-      if (!primaryPhone) {
+      // Enhanced email handling
+      const email = cleanFieldValue(row[mapping.contactEmail] || row[mapping.email]);
+      const emailAlt = cleanFieldValue(row[mapping.emailAlt]);
+      
+      // Skip leads without basic contact info (name and phone/email)
+      if (!firstName || !lastName) {
         errors.push({
           rowIndex: index + 1,
-          error: 'No valid phone number found'
+          error: 'First name and last name are required'
+        });
+        return;
+      }
+      
+      if (!primaryPhone && !email) {
+        errors.push({
+          rowIndex: index + 1,
+          error: 'At least one valid contact method (phone or email) is required'
         });
         return;
       }
 
-      // Combine vehicle information - data is already clean
-      const vehicleParts = [
-        row[mapping.vehicleYear] || '',
-        row[mapping.vehicleMake] || '',
-        row[mapping.vehicleModel] || ''
-      ].filter(Boolean);
+      // Enhanced vehicle interest parsing
+      let vehicleInterest = 'Not specified';
       
-      const vehicleInterest = vehicleParts.length > 0 ? vehicleParts.join(' ') : 'Not specified';
+      // Try first desired vehicle
+      if (mapping.firstDesiredVehicle && row[mapping.firstDesiredVehicle]) {
+        const parsed = parseVehicleString(cleanFieldValue(row[mapping.firstDesiredVehicle]));
+        vehicleInterest = parsed.fullString || vehicleInterest;
+      } else {
+        // Fallback to individual vehicle fields
+        const vehicleParts = [
+          cleanFieldValue(row[mapping.vehicleYear]),
+          cleanFieldValue(row[mapping.vehicleMake]),
+          cleanFieldValue(row[mapping.vehicleModel])
+        ].filter(Boolean);
+        
+        if (vehicleParts.length > 0) {
+          vehicleInterest = vehicleParts.join(' ');
+        }
+      }
 
-      // Handle contact preferences
-      const doNotCall = row[mapping.doNotCall]?.toLowerCase() === 'true';
-      const doNotEmail = row[mapping.doNotEmail]?.toLowerCase() === 'true';
+      // Enhanced privacy flag parsing
+      const doNotCall = parsePrivacyFlag(row[mapping.phonePrivacy]) || parsePrivacyFlag(row[mapping.doNotCall]);
+      const doNotEmail = parsePrivacyFlag(row[mapping.emailPrivacy]) || parsePrivacyFlag(row[mapping.doNotEmail]);
+      const doNotMail = parsePrivacyFlag(row[mapping.letterPrivacy]) || parsePrivacyFlag(row[mapping.doNotMail]);
 
-      // Map the status from CSV to our system status
-      const mappedStatus = mapStatusToSystemStatus(row[mapping.status] || '');
+      // Enhanced status mapping - try prospect type first
+      let mappedStatus = 'new';
+      if (mapping.prospectType && row[mapping.prospectType]) {
+        mappedStatus = parseProspectTypeToStatus(cleanFieldValue(row[mapping.prospectType]));
+      } else if (mapping.status && row[mapping.status]) {
+        mappedStatus = mapStatusToSystemStatus(cleanFieldValue(row[mapping.status]));
+      }
 
-      // Capture lead factors for AI strategy
-      const leadStatusTypeName = row[mapping.leadstatustypename] || '';
-      const leadTypeName = row[mapping.LeadTypeName] || '';
-      const leadSourceName = row[mapping.leadsourcename] || row[mapping.source] || '';
+      // Enhanced salesperson parsing
+      let salesPersonName = '';
+      if (mapping.salesperson && row[mapping.salesperson]) {
+        const parsedSales = parseSalesperson(cleanFieldValue(row[mapping.salesperson]));
+        salesPersonName = `${parsedSales.firstName} ${parsedSales.lastName}`.trim();
+      } else {
+        salesPersonName = [
+          cleanFieldValue(row[mapping.salesPersonFirstName]), 
+          cleanFieldValue(row[mapping.salesPersonLastName])
+        ].filter(Boolean).join(' ');
+      }
+
+      // Enhanced AI strategy field mapping
+      const leadStatusTypeName = cleanFieldValue(row[mapping.leadStatusTypeName]);
+      const leadTypeName = cleanFieldValue(row[mapping.leadTypeName] || row[mapping.prospectType]);
+      const leadSourceName = cleanFieldValue(row[mapping.leadSourceName] || row[mapping.source]);
+      
+      // Create raw data object for fields not in main schema
+      const rawUploadData: Record<string, any> = {};
+      
+      // Store additional fields that don't have direct schema mappings
+      const additionalFields = [
+        'businessUnit', 'historySold', 'historyService', 'bookValue', 
+        'estPayoff', 'equityAmount', 'estMileage', 'paymentsLeft',
+        'lastActivityType', 'lastActivityDate', 'lastActivityCompletedBy', 
+        'lastActivityNote', 'vipStatus', 'secondDesiredVehicle',
+        'firstOwnedVehicle', 'secondOwnedVehicle'
+      ];
+      
+      additionalFields.forEach(field => {
+        if (mapping[field as keyof typeof mapping] && row[mapping[field as keyof typeof mapping]]) {
+          rawUploadData[field] = cleanFieldValue(row[mapping[field as keyof typeof mapping]]);
+        }
+      });
 
       const newLead: ProcessedLead = {
-        firstName: row[mapping.firstName] || '',
-        lastName: row[mapping.lastName] || '',
-        middleName: row[mapping.middleName] || '',
+        firstName,
+        lastName,
+        middleName,
         phoneNumbers,
         primaryPhone,
-        email: row[mapping.email] || '',
-        emailAlt: row[mapping.emailAlt] || '',
-        address: row[mapping.address] || '',
-        city: row[mapping.city] || '',
-        state: row[mapping.state] || '',
-        postalCode: row[mapping.postalCode] || '',
+        email,
+        emailAlt,
+        address: cleanFieldValue(row[mapping.address]),
+        city: cleanFieldValue(row[mapping.city]),
+        state: cleanFieldValue(row[mapping.state]),
+        postalCode: cleanFieldValue(row[mapping.postalCode]),
         vehicleInterest,
-        vehicleVIN: row[mapping.vehicleVIN] || '',
-        source: row[mapping.source] || 'CSV Import',
-        salesPersonName: [row[mapping.salesPersonFirstName], row[mapping.salesPersonLastName]].filter(Boolean).join(' '),
+        vehicleVIN: cleanFieldValue(row[mapping.vehicleVIN]),
+        source: cleanFieldValue(row[mapping.source]) || leadSourceName || 'CSV Import',
+        salesPersonName,
         doNotCall,
         doNotEmail,
-        doNotMail: row[mapping.doNotMail]?.toLowerCase() === 'true',
+        doNotMail,
         status: mappedStatus,
-        // New lead factors for AI strategy
+        // Enhanced AI strategy fields
         leadStatusTypeName,
         leadTypeName,
-        leadSourceName
+        leadSourceName,
+        // Store DMS ID and other system fields
+        externalId: parseDmsId(cleanFieldValue(row[mapping.dmsId])),
+        rawUploadData
       };
 
       // Check for duplicates against already processed leads
@@ -155,12 +244,12 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
         validLeads.push(newLead);
         
         // Track sold customers separately
-        if (newLead.status === 'sold') {
+        if (newLead.status === 'sold' || mappedStatus === 'bought elsewhere') {
           soldCustomers.push(newLead);
           console.log(`✅ Sold customer processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Source: ${newLead.source})`);
         }
         
-        console.log(`Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status}, Factors: ${leadStatusTypeName}/${leadTypeName}/${leadSourceName})`);
+        console.log(`✅ Valid lead processed at row ${index + 1}: ${newLead.firstName} ${newLead.lastName} (Status: ${newLead.status}, Type: ${leadTypeName}, Source: ${leadSourceName})`);
       }
 
     } catch (error) {
@@ -168,6 +257,7 @@ export const processLeads = (csvData: any, mapping: any): ProcessingResult => {
         rowIndex: index + 1,
         error: `Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
+      console.error(`💥 Error processing row ${index + 1}:`, error);
     }
   });
 

@@ -1,5 +1,5 @@
 
-import { LucideIcon, User, Phone, Mail, MapPin, Car, Briefcase, Settings, Brain } from "lucide-react";
+import { LucideIcon, User, Phone, Mail, MapPin, Car, Briefcase, Settings, Brain, Building, FileText, Star } from "lucide-react";
 import { FieldMapping } from './types';
 
 export interface FieldDefinition {
@@ -16,11 +16,12 @@ export interface FieldSection {
 
 export const fieldSections: FieldSection[] = [
   {
-    title: "Required Fields",
+    title: "Customer Name",
     icon: User,
     fields: [
-      { key: "firstName", label: "First Name", required: true },
-      { key: "lastName", label: "Last Name", required: true },
+      { key: "clientName", label: "Client Name (Combined)" },
+      { key: "firstName", label: "First Name" },
+      { key: "lastName", label: "Last Name" },
       { key: "middleName", label: "Middle Name" }
     ]
   },
@@ -28,11 +29,25 @@ export const fieldSections: FieldSection[] = [
     title: "Contact Information",
     icon: Phone,
     fields: [
+      { key: "contactPhone", label: "Contact Phone" },
+      { key: "contactEmail", label: "Contact Email" },
       { key: "cellphone", label: "Cell Phone" },
       { key: "dayphone", label: "Day Phone" },
       { key: "evephone", label: "Evening Phone" },
       { key: "email", label: "Email" },
       { key: "emailAlt", label: "Alternate Email" }
+    ]
+  },
+  {
+    title: "Privacy Settings",
+    icon: Settings,
+    fields: [
+      { key: "phonePrivacy", label: "Phone Privacy" },
+      { key: "emailPrivacy", label: "Email Privacy" },
+      { key: "letterPrivacy", label: "Letter Privacy" },
+      { key: "doNotCall", label: "Do Not Call" },
+      { key: "doNotEmail", label: "Do Not Email" },
+      { key: "doNotMail", label: "Do Not Mail" }
     ]
   },
   {
@@ -42,13 +57,26 @@ export const fieldSections: FieldSection[] = [
       { key: "address", label: "Street Address" },
       { key: "city", label: "City" },
       { key: "state", label: "State" },
-      { key: "postalCode", label: "Postal Code" }
+      { key: "postalCode", label: "ZIP Code" }
     ]
   },
   {
-    title: "Vehicle Information",
+    title: "Lead Classification",
+    icon: Briefcase,
+    fields: [
+      { key: "prospectType", label: "Prospect Type" },
+      { key: "status", label: "Status" },
+      { key: "source", label: "Source" },
+      { key: "leadType", label: "Lead Type" },
+      { key: "vipStatus", label: "VIP Status" }
+    ]
+  },
+  {
+    title: "Vehicle Interests",
     icon: Car,
     fields: [
+      { key: "firstDesiredVehicle", label: "First Desired Vehicle" },
+      { key: "secondDesiredVehicle", label: "Second Desired Vehicle" },
       { key: "vehicleYear", label: "Vehicle Year" },
       { key: "vehicleMake", label: "Vehicle Make" },
       { key: "vehicleModel", label: "Vehicle Model" },
@@ -57,33 +85,49 @@ export const fieldSections: FieldSection[] = [
     ]
   },
   {
-    title: "AI Strategy Fields",
-    icon: Brain,
+    title: "Trade Information",
+    icon: Car,
     fields: [
-      { key: "leadStatusTypeName", label: "Lead Status Type" },
-      { key: "leadTypeName", label: "Lead Type" },
-      { key: "leadSourceName", label: "Lead Source" }
+      { key: "firstOwnedVehicle", label: "First Owned Vehicle" },
+      { key: "secondOwnedVehicle", label: "Second Owned Vehicle" },
+      { key: "bookValue", label: "Book Value" },
+      { key: "estPayoff", label: "Estimated Payoff" },
+      { key: "equityAmount", label: "Equity Amount" },
+      { key: "estMileage", label: "Estimated Mileage" },
+      { key: "paymentsLeft", label: "Payments Left" }
     ]
   },
   {
-    title: "Sales Information",
-    icon: Briefcase,
+    title: "Sales Team & Business",
+    icon: Building,
     fields: [
-      { key: "source", label: "Lead Source" },
-      { key: "status", label: "Lead Status" },
+      { key: "salesperson", label: "Salesperson" },
       { key: "salesPersonFirstName", label: "Salesperson First Name" },
       { key: "salesPersonLastName", label: "Salesperson Last Name" },
-      { key: "leadType", label: "Lead Type" },
+      { key: "businessUnit", label: "Business Unit" },
       { key: "dealerId", label: "Dealer ID" }
     ]
   },
   {
-    title: "Preferences",
-    icon: Settings,
+    title: "Activity & History",
+    icon: FileText,
     fields: [
-      { key: "doNotCall", label: "Do Not Call" },
-      { key: "doNotEmail", label: "Do Not Email" },
-      { key: "doNotMail", label: "Do Not Mail" }
+      { key: "lastActivityType", label: "Last Activity Type" },
+      { key: "lastActivityDate", label: "Last Activity Date" },
+      { key: "lastActivityCompletedBy", label: "Last Activity Completed By" },
+      { key: "lastActivityNote", label: "Last Activity Note" },
+      { key: "historySold", label: "History Sold" },
+      { key: "historyService", label: "History Service" }
+    ]
+  },
+  {
+    title: "System Fields",
+    icon: Star,
+    fields: [
+      { key: "dmsId", label: "DMS ID #" },
+      { key: "leadStatusTypeName", label: "Lead Status Type Name" },
+      { key: "leadTypeName", label: "Lead Type Name" },
+      { key: "leadSourceName", label: "Lead Source Name" }
     ]
   }
 ];
