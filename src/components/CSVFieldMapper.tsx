@@ -50,8 +50,10 @@ const CSVFieldMapper = ({
     }
   }, [csvHeaders, loadMapping]);
 
-  const requiredFields = ['firstName', 'lastName'];
-  const isValid = requiredFields.every(field => mapping[field as keyof FieldMapping]);
+  // Validation: Either individual names OR combined client name
+  const hasIndividualNames = mapping.firstName && mapping.lastName;
+  const hasCombinedName = mapping.clientName;
+  const isValid = hasIndividualNames || hasCombinedName;
 
   const handleMappingChange = (key: keyof FieldMapping, value: string) => {
     setMapping({ ...mapping, [key]: value });
