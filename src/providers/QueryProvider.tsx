@@ -27,9 +27,11 @@ export const QueryProvider: React.FC<QueryProviderProps> = ({ children }) => {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <ReactQueryDevtools 
-        initialIsOpen={false} 
-      />
+      {process.env.NODE_ENV !== 'production' && (
+        <ReactQueryDevtools 
+          initialIsOpen={false} 
+        />
+      )}
     </QueryClientProvider>
   );
 };
