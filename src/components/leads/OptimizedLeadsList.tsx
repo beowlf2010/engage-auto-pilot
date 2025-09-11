@@ -6,7 +6,8 @@ import { useLeadsSelection } from '@/components/leads/useLeadsSelection';
 import LeadsStatsCards from '@/components/leads/LeadsStatsCards';
 import LeadsStatusTabs from '@/components/leads/LeadsStatusTabs';
 import LeadQuickView from '@/components/leads/LeadQuickView';
-import BulkActionsPanel from '@/components/leads/BulkActionsPanel';
+import EnhancedBulkActionsPanel from '@/components/leads/EnhancedBulkActionsPanel';
+import BulkSelectionControls from '@/components/leads/BulkSelectionControls';
 import FilterRestorationBanner from '@/components/leads/FilterRestorationBanner';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Download } from 'lucide-react';
@@ -320,9 +321,20 @@ const OptimizedLeadsList = () => {
         stats={enhancedStats}
       />
 
-      {/* Bulk Actions Panel */}
+      {/* Enhanced Bulk Selection Controls */}
+      <BulkSelectionControls
+        selectedCount={selectedLeads.length}
+        totalCount={enhancedStats.total}
+        currentPageCount={filteredLeads.length}
+        onSelectAll={() => selectAllVisible(filteredLeads.map(l => l.id.toString()))}
+        onSelectNone={clearSelection}
+        onSelectPage={() => selectAllVisible(filteredLeads.map(l => l.id.toString()))}
+        className="bg-card p-4 rounded-lg border"
+      />
+
+      {/* Enhanced Bulk Actions Panel */}
       {selectedLeads.length > 0 && (
-        <BulkActionsPanel
+        <EnhancedBulkActionsPanel
           selectedLeads={selectedLeadObjects}
           onClearSelection={clearSelection}
           onBulkStatusUpdate={handleBulkStatusUpdate}
