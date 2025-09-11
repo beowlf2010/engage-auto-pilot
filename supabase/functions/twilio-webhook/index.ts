@@ -245,8 +245,20 @@ serve(async (req) => {
           })
           .eq('id', leadId);
 
-        console.log('✅ Inbound message processed successfully');
-        return new Response('OK', { status: 200, headers: corsHeaders })
+        console.log('✅ Inbound message processed successfully - NO AUTO-REPLY SENT');
+        console.log('🚫 IMPORTANT: If you see "OK" replies, they are NOT from this function');
+        
+        // Return empty TwiML to ensure NO automatic response
+        return new Response(
+          '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+          { 
+            status: 200, 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'text/xml' 
+            } 
+          }
+        )
 
       } catch (error) {
         console.error('💥 Error processing inbound message:', error);
