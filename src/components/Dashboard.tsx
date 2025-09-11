@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusRibbon } from './dashboard/StatusRibbon';
+import { ProfileUpdate } from './ProfileUpdate';
 
 interface DashboardProps {
   user: {
@@ -97,6 +98,9 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
           <StatusRibbon isStale={isStale} hasError={Boolean(error)} />
  
         </div>
+
+        {/* Profile Update Notice */}
+        <ProfileUpdate />
 
         {/* Enhanced Stats Overview */}
         <SafeErrorBoundary>
