@@ -45,15 +45,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "account_lockouts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       ai_automation_control: {
         Row: {
@@ -1055,24 +1047,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "ai_message_approval_queue_approved_by_fkey"
-            columns: ["approved_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "ai_message_approval_queue_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_message_approval_queue_rejected_by_fkey"
-            columns: ["rejected_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
             referencedColumns: ["id"]
           },
         ]
@@ -1165,13 +1143,6 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_message_feedback_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
             referencedColumns: ["id"]
           },
           {
@@ -1437,15 +1408,7 @@ export type Database = {
           times_seen?: number
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "ai_name_validations_decided_by_fkey"
-            columns: ["decided_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       ai_notifications: {
         Row: {
@@ -1928,15 +1891,7 @@ export type Database = {
           updated_at?: string
           vehicle_text?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "ai_vehicle_validations_decided_by_fkey"
-            columns: ["decided_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       alert_automation_rules: {
         Row: {
@@ -2509,13 +2464,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "call_history_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "call_history_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -2709,13 +2657,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "call_outcomes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "call_outcomes_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -2783,13 +2724,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "call_queue_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "call_queue_lead_id_fkey"
             columns: ["lead_id"]
@@ -3632,15 +3566,7 @@ export type Database = {
           total_sent?: number | null
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "email_campaigns_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       email_conversation_analysis: {
         Row: {
@@ -3793,15 +3719,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "email_settings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       email_templates: {
         Row: {
@@ -3840,15 +3758,7 @@ export type Database = {
           updated_at?: string
           variables?: Json | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "email_templates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       enhanced_behavioral_triggers: {
         Row: {
@@ -4346,13 +4256,6 @@ export type Database = {
             columns: ["upload_history_id"]
             isOneToOne: false
             referencedRelation: "upload_history"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_uploaded_by_fkey"
-            columns: ["uploaded_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
             referencedColumns: ["id"]
           },
         ]
@@ -5813,15 +5716,7 @@ export type Database = {
           total_leads?: number
           total_messages?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "message_exports_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       message_import_mapping: {
         Row: {
@@ -6010,13 +5905,6 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notification_log_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
             referencedColumns: ["id"]
           },
         ]
@@ -6261,13 +6149,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "profiles_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "profiles_notification_preferences_id_fkey"
             columns: ["notification_preferences_id"]
@@ -6845,15 +6726,7 @@ export type Database = {
           user_id?: string
           years_experience?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "sales_professional_profiles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       sales_professional_testimonials: {
         Row: {
@@ -6939,15 +6812,7 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "security_audit_log_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       security_rate_limits: {
         Row: {
@@ -7004,15 +6869,7 @@ export type Database = {
           updated_by?: string | null
           value?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "settings_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       sms_suppression_list: {
         Row: {
@@ -7042,15 +6899,7 @@ export type Database = {
           reason?: string
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "sms_suppression_list_added_by_fkey"
-            columns: ["added_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       soft_exits: {
         Row: {
@@ -7725,22 +7574,7 @@ export type Database = {
           uploaded_by?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "upload_history_uploaded_by_fkey"
-            columns: ["uploaded_by"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "upload_history_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_notification_preferences: {
         Row: {
@@ -7782,15 +7616,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_notification_preferences_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -7847,15 +7673,7 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_sessions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_roles_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       vauto_vehicles: {
         Row: {
@@ -8378,17 +8196,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_roles_view: {
-        Row: {
-          all_roles: string[] | null
-          email: string | null
-          has_manager_access: boolean | null
-          id: string | null
-          is_admin: boolean | null
-          primary_role: string | null
-        }
-        Relationships: []
-      }
       v_monthly_retail_summary: {
         Row: {
           dealer_trade_gross_mtd: number | null
@@ -8713,6 +8520,10 @@ export type Database = {
           next_ai_send_at: string
           phone_number: string
         }[]
+      }
+      get_user_role_info: {
+        Args: { p_user_id?: string }
+        Returns: Json
       }
       get_user_roles: {
         Args: { _user_id: string }
