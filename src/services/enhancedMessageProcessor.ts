@@ -40,7 +40,8 @@ export class EnhancedMessageProcessor {
         leadName: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'there',
         latestMessage: messageBody,
         conversationHistory,
-        vehicleInterest: leadData.vehicle_interest || ''
+        vehicleInterest: leadData.vehicle_interest || '',
+        leadSource: leadData.source
       };
 
       const response = await unifiedAIResponseEngine.generateResponse(messageContext);

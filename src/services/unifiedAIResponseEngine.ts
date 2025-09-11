@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { enhancedQualityScoring, LeadContext } from './enhancedQualityScoring';
 import { conversationSentimentAnalysis, ConversationContext } from './conversationSentimentAnalysis';
 import { smartMessageTemplates, TemplateContext } from './smartMessageTemplates';
+import { leadSourceStrategy } from './leadSourceStrategy';
+import type { LeadSourceData, SourceConversationStrategy } from '@/types/leadSource';
 
 export interface MessageContext {
   leadId: string;
@@ -10,6 +12,8 @@ export interface MessageContext {
   latestMessage: string;
   conversationHistory: string[];
   vehicleInterest: string;
+  leadSource?: string;
+  leadSourceData?: LeadSourceData;
 }
 
 export interface UnifiedAIResponse {
@@ -27,6 +31,18 @@ class UnifiedAIResponseEngine {
   async generateResponse(context: MessageContext): Promise<UnifiedAIResponse | null> {
     try {
       console.log('🤖 [UNIFIED AI] Enhanced response generation for lead:', context.leadId);
+      
+      // 0. Get lead source context for tailored approach
+      const sourceData = await this.getLeadSourceContext(context);
+      const sourceStrategy = this.getSourceConversationStrategy(sourceData);
+      
+      console.log('📊 [UNIFIED AI] Lead source strategy:', {
+        source: sourceData.source,
+        category: sourceData.sourceCategory,
+        urgency: sourceData.urgencyLevel,
+        style: sourceData.communicationStyle,
+        probability: sourceData.conversionProbability
+      });
       
       // 1. Analyze conversation sentiment for prioritization
       const sentimentContext: ConversationContext = {
@@ -71,7 +87,7 @@ class UnifiedAIResponseEngine {
         }
       }
       
-      // 3. Call the intelligent conversation AI edge function
+      // 3. Call the intelligent conversation AI edge function with source context
       const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
         body: {
           leadId: context.leadId,
@@ -80,9 +96,15 @@ class UnifiedAIResponseEngine {
           latestCustomerMessage: context.latestMessage,
           conversationHistory: context.conversationHistory.join('\n'),
           hasConversationalSignals: context.latestMessage.length > 0,
-          leadSource: 'unified_ai',
-          leadSourceData: { sentiment, urgency: sentiment.urgency },
-          vehicleInterest: context.vehicleInterest
+          leadSource: sourceData.source,
+          leadSourceData: { 
+            ...sourceData,
+            sentiment, 
+            urgency: sentiment.urgency,
+            conversationStrategy: sourceStrategy
+          },
+          vehicleInterest: context.vehicleInterest,
+          sourceStrategy: sourceStrategy
         }
       });
 
@@ -228,6 +250,126 @@ class UnifiedAIResponseEngine {
       confidence: 0.5,
       reasoning: 'General fallback response'
     };
+  }
+
+  private async getLeadSourceContext(context: MessageContext): Promise<LeadSourceData> {
+    // Use provided source data if available
+    if (context.leadSourceData) {
+      return context.leadSourceData;
+    }
+
+    // Fetch lead source from database if needed
+    if (context.leadSource) {
+      return leadSourceStrategy.getLeadSourceData(context.leadSource);
+    }
+
+    try {
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('source')
+        .eq('id', context.leadId)
+        .single();
+
+      if (lead?.source) {
+        return leadSourceStrategy.getLeadSourceData(lead.source);
+      }
+    } catch (error) {
+      console.warn('⚠️ [UNIFIED AI] Could not fetch lead source:', error);
+    }
+
+    // Fallback to unknown source
+    return leadSourceStrategy.getLeadSourceData('unknown');
+  }
+
+  private getSourceConversationStrategy(sourceData: LeadSourceData): SourceConversationStrategy {
+    const strategies: Record<string, SourceConversationStrategy> = {
+      high_intent_digital: {
+        category: 'high_intent_digital',
+        initialTone: 'professional and confident',
+        keyFocusAreas: ['specific vehicle details', 'pricing and financing', 'immediate next steps'],
+        avoidanceTopics: ['lengthy introductions', 'general dealership info'],
+        responseTemplates: {
+          greeting: `Hi ${sourceData.source === 'AutoTrader' ? 'there' : 'valued customer'}! I see you're interested in our vehicles. Let me help you find exactly what you're looking for.`,
+          pricing: 'I have competitive pricing information ready for you. Let me share the details and available incentives.',
+          availability: 'This vehicle is available for immediate viewing. Would you like to schedule a visit today?',
+          followUp: 'Based on your high interest, I want to ensure we move quickly to secure your ideal vehicle.'
+        },
+        conversationGoals: ['qualify quickly', 'schedule appointment', 'discuss financing'],
+        urgencyHandling: 'immediate'
+      },
+      value_focused: {
+        category: 'value_focused',
+        initialTone: 'friendly and consultative',
+        keyFocusAreas: ['value proposition', 'cost comparisons', 'total ownership benefits'],
+        avoidanceTopics: ['high-pressure tactics', 'premium features they didnt ask for'],
+        responseTemplates: {
+          greeting: 'Thanks for your interest! I understand value is important to you. Let me show you the best options within your range.',
+          pricing: 'Let me break down the total value, including warranties, maintenance, and financing options.',
+          availability: 'I have several great value options available. Would you like to compare a few?',
+          followUp: 'I want to make sure you get the best deal possible. Have you had a chance to review the information?'
+        },
+        conversationGoals: ['build trust', 'demonstrate value', 'compare options'],
+        urgencyHandling: 'same_day'
+      },
+      credit_ready: {
+        category: 'credit_ready',
+        initialTone: 'professional and supportive',
+        keyFocusAreas: ['financing approval', 'payment options', 'credit advantages'],
+        avoidanceTopics: ['credit concerns', 'lengthy approval processes'],
+        responseTemplates: {
+          greeting: 'Great news about your financing! Let me help you find the perfect vehicle with your approved terms.',
+          pricing: 'With your financing in place, we can focus on finding the right vehicle within your approved amount.',
+          availability: 'Since financing is ready, we can move quickly. Would you like to see this vehicle today?',
+          followUp: 'Your financing approval has a timeline - let me help you secure your vehicle promptly.'
+        },
+        conversationGoals: ['leverage pre-approval', 'expedite selection', 'close quickly'],
+        urgencyHandling: 'immediate'
+      },
+      social_discovery: {
+        category: 'social_discovery',
+        initialTone: 'casual and engaging',
+        keyFocusAreas: ['lifestyle fit', 'social proof', 'easy exploration'],
+        avoidanceTopics: ['aggressive sales tactics', 'complex technical details'],
+        responseTemplates: {
+          greeting: 'Hey! Thanks for checking us out on social media. What caught your eye about this vehicle?',
+          pricing: 'Let me share some pricing that fits different lifestyles. What works best for you?',
+          availability: 'Want to take a look in person? No pressure - just come check it out when convenient.',
+          followUp: 'Hope you found our info helpful! Any questions as you explore your options?'
+        },
+        conversationGoals: ['build relationship', 'educate gently', 'remove barriers'],
+        urgencyHandling: 'flexible'
+      },
+      referral_based: {
+        category: 'referral_based',
+        initialTone: 'warm and appreciative',
+        keyFocusAreas: ['referrer connection', 'family/friend discount', 'trust building'],
+        avoidanceTopics: ['cold sales pitches', 'ignoring referral source'],
+        responseTemplates: {
+          greeting: 'Thanks for the referral! It means so much when satisfied customers recommend us to friends and family.',
+          pricing: 'As a referral, you qualify for our family pricing. Let me share those exclusive rates.',
+          availability: 'Your referrer had a great experience with us, and I want to ensure yours is even better!',
+          followUp: 'I want to make sure you have the same great experience that prompted your referral.'
+        },
+        conversationGoals: ['honor referral', 'exceed expectations', 'create advocate'],
+        urgencyHandling: 'next_day'
+      },
+      service_related: {
+        category: 'service_related',
+        initialTone: 'helpful and relationship-focused',
+        keyFocusAreas: ['current relationship value', 'loyalty benefits', 'trade considerations'],
+        avoidanceTopics: ['ignoring service history', 'treating as cold lead'],
+        responseTemplates: {
+          greeting: 'Great to hear from a valued service customer! How can I help with your vehicle needs?',
+          pricing: 'As a loyal customer, you have access to special pricing and trade advantages.',
+          availability: 'Since you know our service quality, let me show you our sales excellence too.',
+          followUp: 'Your continued trust in our service means everything. Let me earn your sales business too.'
+        },
+        conversationGoals: ['leverage relationship', 'convert service to sales', 'maximize loyalty'],
+        urgencyHandling: 'flexible'
+      }
+    };
+
+    return strategies[sourceData.sourceCategory] || strategies['value_focused'];
   }
 }
 

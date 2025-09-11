@@ -11,7 +11,8 @@ export const useEnhancedConversationAI = (leadId: string) => {
     leadName: string,
     customerMessage: string,
     conversationHistory: string[],
-    vehicleInterest?: string
+    vehicleInterest?: string,
+    leadSource?: string
   ) => {
     if (!leadId || isGenerating) return null;
 
@@ -24,7 +25,8 @@ export const useEnhancedConversationAI = (leadId: string) => {
         leadName,
         latestMessage: customerMessage,
         conversationHistory,
-        vehicleInterest: vehicleInterest || ''
+        vehicleInterest: vehicleInterest || '',
+        leadSource
       };
 
       const response = await unifiedAIResponseEngine.generateResponse(messageContext);

@@ -53,7 +53,9 @@ serve(async (req) => {
       latestCustomerMessage,
       conversationHistory: rawConversationHistory,
       vehicleInterest,
-      leadSource
+      leadSource,
+      leadSourceData,
+      sourceStrategy
     } = await req.json();
 
     // Ensure conversationHistory is a string
@@ -84,6 +86,13 @@ serve(async (req) => {
 
     console.log('🤖 [FINN AI] Processing request for lead:', leadId);
     console.log('🤖 [FINN AI] Customer message:', messageBody?.substring(0, 100));
+    console.log('📊 [FINN AI] Lead source context:', {
+      source: leadSource,
+      category: leadSourceData?.sourceCategory,
+      urgency: leadSourceData?.urgencyLevel,
+      style: leadSourceData?.communicationStyle,
+      conversion: leadSourceData?.conversionProbability
+    });
 
     // Simple intent analysis
     const customerMessage = messageBody || latestCustomerMessage || '';
@@ -125,35 +134,54 @@ serve(async (req) => {
     const dealershipLocation = dealershipContext?.DEALERSHIP_LOCATION || 'our location';
     const dealershipPhone = dealershipContext?.DEALERSHIP_PHONE || 'our dealership';
 
+    // Build source-specific context
+    const sourceContext = getSourceSpecificContext(leadSourceData, sourceStrategy);
+    
     let systemPrompt = '';
 
     if (isInitialContact) {
-      // For initial contact, use warm introduction style
-      systemPrompt = `You are ${salespersonName}, a friendly car sales professional at ${dealershipName} in ${dealershipLocation}.
+      // For initial contact, use warm introduction style with source-specific approach
+      systemPrompt = `You are ${salespersonName}, a ${sourceContext.tonalAdjustments} car sales professional at ${dealershipName} in ${dealershipLocation}.
 
-This is your FIRST contact with this customer, so introduce yourself professionally:
-- Start with a brief, warm introduction
-- Mention you're from ${dealershipName}
+This is your FIRST contact with this customer who came from: ${leadSource || 'direct inquiry'}
+
+${sourceContext.systemPromptAdditions}
+
+Communication approach for this lead source:
+${sourceContext.communicationGuidelines}
+
+Initial contact guidelines:
+- Use ${sourceContext.tonalAdjustments} tone
+- ${sourceContext.urgencyModifiers}
 - Reference their interest in ${vehicleInterest || 'finding the right vehicle'}
 - Keep it under 160 characters for SMS
-- Be helpful and inviting
-- Ask one relevant question to start the conversation
+- Focus on: ${sourceContext.conversionFocusAreas.slice(0, 2).join(', ')}
 
 Customer location: ${leadGeoData?.city || 'Unknown'}, ${leadGeoData?.state || 'Unknown'}
-Customer interest: ${vehicleInterest || 'General inquiry'}`;
+Customer interest: ${vehicleInterest || 'General inquiry'}
+Source urgency level: ${leadSourceData?.urgencyLevel || 'medium'}
+Expected response style: ${leadSourceData?.communicationStyle || 'professional'}`;
     } else {
-      // For follow-up messages, maintain professional identity
+      // For follow-up messages, maintain source-appropriate approach
       systemPrompt = `You are ${salespersonName} from ${dealershipName} in ${dealershipLocation}.
 
-You're continuing an existing conversation with this customer:
-- Be conversational and helpful
+Continuing conversation with customer from: ${leadSource || 'direct inquiry'}
+
+${sourceContext.systemPromptAdditions}
+
+Communication approach:
+${sourceContext.communicationGuidelines}
+
+Conversation guidelines:
+- Maintain ${sourceContext.tonalAdjustments} tone
+- ${sourceContext.urgencyModifiers}
 - Keep responses under 160 characters for SMS
 - Focus on ${vehicleInterest || 'helping them find the right vehicle'}
-- Be professional but friendly
-- Ask one question to move the conversation forward
+- Key focus areas: ${sourceContext.conversionFocusAreas.slice(0, 3).join(', ')}
 
 Customer location: ${leadGeoData?.city || 'Unknown'}, ${leadGeoData?.state || 'Unknown'}
-Customer interest: ${vehicleInterest || 'General inquiry'}`;
+Customer interest: ${vehicleInterest || 'General inquiry'}
+Source conversion probability: ${leadSourceData?.conversionProbability || 0.5}`;
     }
 
     let userPrompt = '';
@@ -161,19 +189,31 @@ Customer interest: ${vehicleInterest || 'General inquiry'}`;
     if (isInitialContact) {
       userPrompt = `Customer message: "${customerMessage}"
 
-This is your first outreach to this customer. ${vehicleInterest ? `They've shown interest in: ${vehicleInterest}` : 'They are a new lead.'}
+This is your first outreach to this customer from ${leadSource}. ${vehicleInterest ? `They've shown interest in: ${vehicleInterest}` : 'They are a new lead.'}
 
-Respond with a warm, professional introduction that:
-- Identifies you as ${salespersonName} from ${dealershipName}
-- Acknowledges their interest
-- Invites them to connect
+Use this source-appropriate response pattern: ${sourceContext.responsePatterns[0] || 'Professional greeting'}
+
+Respond with an introduction that:
+- Follows the ${leadSourceData?.communicationStyle || 'professional'} style for ${leadSourceData?.sourceCategory || 'general'} leads
+- Uses appropriate ${sourceContext.tonalAdjustments}
+- Acknowledges their ${leadSourceData?.urgencyLevel || 'medium'} urgency level
 - Stays under 160 characters`;
     } else {
+      const responsePattern = sourceContext.responsePatterns[1] || sourceContext.responsePatterns[0] || 'Helpful response';
+      
       userPrompt = `Customer message: "${customerMessage}"
 
 Previous conversation context: ${conversationHistory ? conversationHistory.slice(-500) : 'No previous conversation'}
 
-Please respond as ${salespersonName} with a helpful, brief message (under 160 characters).`;
+This customer came from ${leadSource} (${leadSourceData?.sourceCategory || 'general'} source).
+
+Use this response pattern: ${responsePattern}
+
+Respond as ${salespersonName} with:
+- ${sourceContext.tonalAdjustments} tone
+- Focus on: ${sourceContext.conversionFocusAreas[0] || 'helping the customer'}
+- ${sourceContext.urgencyModifiers}
+- Under 160 characters`;
     }
 
     console.log('📝 [FINN AI] Contact type:', isInitialContact ? 'Initial' : 'Follow-up');
@@ -253,6 +293,73 @@ Please respond as ${salespersonName} with a helpful, brief message (under 160 ch
     });
   }
 });
+
+// Source-specific context helper
+function getSourceSpecificContext(leadSourceData: any, sourceStrategy: any) {
+  const defaultStrategy = {
+    systemPromptAdditions: 'This lead requires professional, helpful service.',
+    communicationGuidelines: 'Be professional and responsive to their needs.',
+    responsePatterns: [
+      'Thank you for your interest! How can I help you today?',
+      'I appreciate you reaching out. Let me assist you with that.',
+      'Thanks for contacting us about your vehicle needs.'
+    ],
+    tonalAdjustments: 'professional and helpful',
+    urgencyModifiers: 'Respond promptly and professionally.',
+    conversionFocusAreas: ['professional service', 'helpful information', 'next steps']
+  };
+
+  if (!sourceStrategy || !leadSourceData) {
+    return defaultStrategy;
+  }
+
+  // Map source categories to specific communication approaches
+  const sourceEnhancements: Record<string, any> = {
+    high_intent_digital: {
+      systemPromptAdditions: `This lead came from a high-intent platform (${leadSourceData.source}) where they actively searched for vehicles. They expect professional, knowledgeable responses with specific details and quick action. Conversion probability: ${Math.round((leadSourceData.conversionProbability || 0.85) * 100)}% - treat as hot lead.`,
+      communicationGuidelines: 'Be direct and professional. Provide specific details quickly. Focus on availability and next steps. Assume they are comparison shopping.',
+      responsePatterns: sourceStrategy.responseTemplates ? Object.values(sourceStrategy.responseTemplates) : defaultStrategy.responsePatterns,
+      tonalAdjustments: 'professional, confident, solution-focused',
+      urgencyModifiers: 'Create appropriate urgency about inventory and pricing without being pushy.',
+      conversionFocusAreas: ['immediate scheduling', 'specific vehicle details', 'competitive advantages']
+    },
+    value_focused: {
+      systemPromptAdditions: `This lead came from value-focused platforms where price and value matter most. They want to understand total ownership value. Conversion probability: ${Math.round((leadSourceData.conversionProbability || 0.75) * 100)}%.`,
+      communicationGuidelines: 'Emphasize total value proposition. Be patient with comparisons. Highlight long-term savings. Build trust through transparency.',
+      responsePatterns: sourceStrategy.responseTemplates ? Object.values(sourceStrategy.responseTemplates) : defaultStrategy.responsePatterns,
+      tonalAdjustments: 'consultative, patient, educational',
+      urgencyModifiers: 'Gentle urgency around good deals, but respect their research process.',
+      conversionFocusAreas: ['total value demonstration', 'cost comparisons', 'trust building']
+    },
+    credit_ready: {
+      systemPromptAdditions: `This lead has financing pre-approval or came through credit process. They are ready to buy and expect quick service. Conversion probability: ${Math.round((leadSourceData.conversionProbability || 0.90) * 100)}% - highest priority.`,
+      communicationGuidelines: 'Acknowledge financing status immediately. Focus on vehicle selection within approval. Expedite process respectfully.',
+      responsePatterns: sourceStrategy.responseTemplates ? Object.values(sourceStrategy.responseTemplates) : defaultStrategy.responsePatterns,
+      tonalAdjustments: 'professional, respectful, action-oriented',
+      urgencyModifiers: 'Strong urgency due to financing timeline and readiness to purchase.',
+      conversionFocusAreas: ['immediate vehicle selection', 'same-day appointments', 'closing preparation']
+    },
+    social_discovery: {
+      systemPromptAdditions: `This lead discovered us through social media and may be early in their journey. They need gentle nurturing rather than aggressive sales tactics. Conversion probability: ${Math.round((leadSourceData.conversionProbability || 0.45) * 100)}%.`,
+      communicationGuidelines: 'Keep tone casual and friendly. Focus on lifestyle and experience. Avoid high-pressure tactics. Build relationship first.',
+      responsePatterns: sourceStrategy.responseTemplates ? Object.values(sourceStrategy.responseTemplates) : defaultStrategy.responsePatterns,
+      tonalAdjustments: 'casual, friendly, approachable',
+      urgencyModifiers: 'Very gentle urgency. Focus on opportunity rather than pressure.',
+      conversionFocusAreas: ['relationship building', 'lifestyle alignment', 'easy engagement']
+    },
+    referral_based: {
+      systemPromptAdditions: `This lead came through referral and has pre-existing trust but expects special treatment. Conversion probability: ${Math.round((leadSourceData.conversionProbability || 0.70) * 100)}%.`,
+      communicationGuidelines: 'Acknowledge the referral immediately. Emphasize family/friend treatment. Highlight referral benefits.',
+      responsePatterns: sourceStrategy.responseTemplates ? Object.values(sourceStrategy.responseTemplates) : defaultStrategy.responsePatterns,
+      tonalAdjustments: 'warm, appreciative, family-oriented',
+      urgencyModifiers: 'Respectful urgency based on honoring the referral relationship.',
+      conversionFocusAreas: ['referral appreciation', 'exceeding expectations', 'relationship leverage']
+    }
+  };
+
+  const category = leadSourceData.sourceCategory || 'unknown';
+  return sourceEnhancements[category] || defaultStrategy;
+}
 
 async function updateConversationContext(supabase: any, leadId: string, context: any) {
   try {
