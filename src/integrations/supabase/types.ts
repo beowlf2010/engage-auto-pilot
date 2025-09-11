@@ -1228,6 +1228,74 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_message_performance: {
+        Row: {
+          actual_sent_time: string
+          created_at: string
+          id: string
+          jitter_applied_minutes: number | null
+          lead_id: string
+          message_effectiveness_score: number | null
+          message_id: string | null
+          original_scheduled_time: string | null
+          responded_at: string | null
+          response_received: boolean | null
+          response_time_hours: number | null
+          sent_at: string
+          sent_day_of_week: number
+          sent_hour: number
+          template_content: string
+          template_stage: string
+          updated_at: string
+        }
+        Insert: {
+          actual_sent_time?: string
+          created_at?: string
+          id?: string
+          jitter_applied_minutes?: number | null
+          lead_id: string
+          message_effectiveness_score?: number | null
+          message_id?: string | null
+          original_scheduled_time?: string | null
+          responded_at?: string | null
+          response_received?: boolean | null
+          response_time_hours?: number | null
+          sent_at?: string
+          sent_day_of_week: number
+          sent_hour: number
+          template_content: string
+          template_stage: string
+          updated_at?: string
+        }
+        Update: {
+          actual_sent_time?: string
+          created_at?: string
+          id?: string
+          jitter_applied_minutes?: number | null
+          lead_id?: string
+          message_effectiveness_score?: number | null
+          message_id?: string | null
+          original_scheduled_time?: string | null
+          responded_at?: string | null
+          response_received?: boolean | null
+          response_time_hours?: number | null
+          sent_at?: string
+          sent_day_of_week?: number
+          sent_hour?: number
+          template_content?: string
+          template_stage?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_message_performance_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_message_safeguards: {
         Row: {
           configuration: Json
@@ -1475,6 +1543,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_optimal_timing: {
+        Row: {
+          confidence_score: number
+          created_at: string
+          id: string
+          last_analysis: string
+          recommended_day_offset_hours: number
+          recommended_hour: number
+          sample_size: number
+          template_stage: string
+          updated_at: string
+        }
+        Insert: {
+          confidence_score?: number
+          created_at?: string
+          id?: string
+          last_analysis?: string
+          recommended_day_offset_hours: number
+          recommended_hour: number
+          sample_size?: number
+          template_stage: string
+          updated_at?: string
+        }
+        Update: {
+          confidence_score?: number
+          created_at?: string
+          id?: string
+          last_analysis?: string
+          recommended_day_offset_hours?: number
+          recommended_hour?: number
+          sample_size?: number
+          template_stage?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       ai_personalization_rules: {
         Row: {
@@ -1799,6 +1903,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_timing_analytics: {
+        Row: {
+          avg_response_time_hours: number | null
+          created_at: string
+          day_of_week: number
+          hour_of_day: number
+          id: string
+          last_updated: string
+          response_rate: number
+          template_stage: string
+          total_responses: number
+          total_sent: number
+        }
+        Insert: {
+          avg_response_time_hours?: number | null
+          created_at?: string
+          day_of_week: number
+          hour_of_day: number
+          id?: string
+          last_updated?: string
+          response_rate?: number
+          template_stage: string
+          total_responses?: number
+          total_sent?: number
+        }
+        Update: {
+          avg_response_time_hours?: number | null
+          created_at?: string
+          day_of_week?: number
+          hour_of_day?: number
+          id?: string
+          last_updated?: string
+          response_rate?: number
+          template_stage?: string
+          total_responses?: number
+          total_sent?: number
+        }
+        Relationships: []
       }
       ai_trigger_messages: {
         Row: {

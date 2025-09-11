@@ -2,33 +2,87 @@ import { supabase } from '@/integrations/supabase/client';
 import { getLeadMemory } from './aiMemoryService';
 import { findMatchingInventory } from './inventoryService';
 import { addDisclaimersToMessage, detectsPricing } from './pricingDisclaimerService';
+import { getBusinessHours, isWithinBusinessHours } from './businessHours';
 
 export interface AIMessageTemplate {
   stage: string;
   template: string;
   delayHours: number;
+  jitterMinutes?: number;
+  priority: 'high' | 'medium' | 'low';
 }
 
+// Aggressive Cadence: 3 messages in 24h, 2 in next 24h, then daily
 const AI_MESSAGE_TEMPLATES: AIMessageTemplate[] = [
   {
     stage: 'initial',
     template: `Hi {firstName}! I'm Finn from the dealership. I see you're interested in {vehicleInterest}. {inventoryMessage} Would you like to schedule a time to see it?`,
-    delayHours: 0
+    delayHours: 0,
+    jitterMinutes: 0,
+    priority: 'high'
   },
   {
     stage: 'follow_up_1',
     template: `Hi {firstName}, just wanted to follow up on {vehicleInterest}. {inventoryMessage} {availabilityMessage} Any questions I can help with?`,
-    delayHours: 24
+    delayHours: 7,
+    jitterMinutes: 60,
+    priority: 'high'
   },
   {
     stage: 'follow_up_2',
     template: `Hey {firstName}! {inventoryMessage} {pricingMessage} Would you like to come in for a test drive this week?`,
-    delayHours: 72
+    delayHours: 18,
+    jitterMinutes: 90,
+    priority: 'high'
   },
   {
     stage: 'follow_up_3',
-    template: `Hi {firstName}, {memoryMessage} {inventoryMessage} We're here to help when you're ready!`,
-    delayHours: 168
+    template: `Hi {firstName}, hope you had a chance to think about {vehicleInterest}. {inventoryMessage} What questions can I answer for you?`,
+    delayHours: 34,
+    jitterMinutes: 90,
+    priority: 'medium'
+  },
+  {
+    stage: 'follow_up_4',
+    template: `{firstName}, wanted to check in about {vehicleInterest}. {inventoryMessage} We're here when you're ready to move forward!`,
+    delayHours: 46,
+    jitterMinutes: 120,
+    priority: 'medium'
+  },
+  {
+    stage: 'follow_up_5',
+    template: `Hi {firstName}! {memoryMessage} {inventoryMessage} Any updates on your vehicle search?`,
+    delayHours: 72,
+    jitterMinutes: 90,
+    priority: 'low'
+  },
+  {
+    stage: 'follow_up_6',
+    template: `{firstName}, just wanted to touch base on {vehicleInterest}. {inventoryMessage} Let me know how I can help!`,
+    delayHours: 96,
+    jitterMinutes: 120,
+    priority: 'low'
+  },
+  {
+    stage: 'follow_up_7',
+    template: `Hi {firstName}, {memoryMessage} Still thinking about {vehicleInterest}? {inventoryMessage} No pressure - here when you need us!`,
+    delayHours: 120,
+    jitterMinutes: 180,
+    priority: 'low'
+  },
+  {
+    stage: 'follow_up_8',
+    template: `{firstName}, hope all is well! {inventoryMessage} Just checking if anything has changed with your vehicle needs?`,
+    delayHours: 168,
+    jitterMinutes: 240,
+    priority: 'low'
+  },
+  {
+    stage: 'follow_up_9',
+    template: `Hi {firstName}! {memoryMessage} {inventoryMessage} Still here to help whenever you're ready to move forward.`,
+    delayHours: 240,
+    jitterMinutes: 360,
+    priority: 'low'
   }
 ];
 
@@ -218,12 +272,94 @@ export const generateAIMessage = async (leadId: string): Promise<string | null> 
   }
 };
 
+// Smart timing with business hours and jitter
+const generateSmartSendTime = async (delayHours: number, jitterMinutes: number = 90): Promise<Date> => {
+  const businessHours = await getBusinessHours();
+  const centralTimeZone = 'America/Chicago'; // Central Time
+  
+  // Calculate base send time
+  const baseSendTime = new Date();
+  baseSendTime.setHours(baseSendTime.getHours() + delayHours);
+  
+  // Apply random jitter (±30-90 minutes)
+  const jitterMs = (Math.random() * jitterMinutes * 2 - jitterMinutes) * 60 * 1000;
+  baseSendTime.setTime(baseSendTime.getTime() + jitterMs);
+  
+  // Convert to Central Time for business hours check
+  const centralTime = new Date(baseSendTime.toLocaleString("en-US", { timeZone: centralTimeZone }));
+  
+  // Block Sundays (day 0)
+  if (centralTime.getDay() === 0) {
+    // Move to Monday
+    baseSendTime.setDate(baseSendTime.getDate() + 1);
+    baseSendTime.setHours(10, 0, 0, 0); // Start Monday at 10 AM
+  }
+  
+  // Ensure within business hours (9 AM - 7 PM Central)
+  if (!isWithinBusinessHours(baseSendTime, { 
+    start: "09:00", 
+    end: "19:00", 
+    timezone: centralTimeZone 
+  })) {
+    const centralHour = new Date(baseSendTime.toLocaleString("en-US", { timeZone: centralTimeZone })).getHours();
+    
+    if (centralHour < 9) {
+      // Too early, move to 9 AM
+      baseSendTime.setHours(9, Math.floor(Math.random() * 60), 0, 0);
+    } else if (centralHour >= 19) {
+      // Too late, move to next business day 9 AM
+      baseSendTime.setDate(baseSendTime.getDate() + 1);
+      // Skip if next day is Sunday
+      if (baseSendTime.getDay() === 0) {
+        baseSendTime.setDate(baseSendTime.getDate() + 1);
+      }
+      baseSendTime.setHours(9, Math.floor(Math.random() * 60), 0, 0);
+    }
+  }
+  
+  return baseSendTime;
+};
+
+// Track message performance for learning
+const trackMessagePerformance = async (
+  leadId: string, 
+  messageId: string | null,
+  template: AIMessageTemplate, 
+  messageContent: string, 
+  scheduledTime: Date,
+  actualTime: Date,
+  jitterApplied: number
+): Promise<void> => {
+  try {
+    const sentTime = new Date();
+    const performanceData = {
+      lead_id: leadId,
+      message_id: messageId,
+      template_stage: template.stage,
+      template_content: messageContent,
+      sent_at: sentTime.toISOString(),
+      sent_hour: sentTime.getHours(),
+      sent_day_of_week: sentTime.getDay(),
+      jitter_applied_minutes: jitterApplied,
+      original_scheduled_time: scheduledTime.toISOString(),
+      actual_sent_time: actualTime.toISOString()
+    };
+    
+    // Use type assertion since the types haven't been regenerated yet
+    await (supabase.from('ai_message_performance') as any).insert(performanceData);
+    
+    console.log(`📊 [AI LEARNING] Tracked performance for ${template.stage} message to lead ${leadId}`);
+  } catch (error) {
+    console.error('❌ [AI LEARNING] Error tracking message performance:', error);
+  }
+};
+
 export const scheduleNextAIMessage = async (leadId: string): Promise<void> => {
   try {
     // Get current stage
     const { data: lead, error } = await supabase
       .from('leads')
-      .select('ai_stage')
+      .select('ai_stage, last_reply_at')
       .eq('id', leadId)
       .single();
 
@@ -232,11 +368,25 @@ export const scheduleNextAIMessage = async (leadId: string): Promise<void> => {
     const currentStage = lead.ai_stage || 'initial';
     const currentIndex = AI_MESSAGE_TEMPLATES.findIndex(t => t.stage === currentStage);
     
+    // Check if lead responded recently (pause if response in last 24h)
+    if (lead.last_reply_at) {
+      const lastReply = new Date(lead.last_reply_at);
+      const hoursAgo = (Date.now() - lastReply.getTime()) / (1000 * 60 * 60);
+      if (hoursAgo < 24) {
+        console.log(`⏸️ [AI SCHEDULING] Pausing automation for lead ${leadId} - recent response ${hoursAgo.toFixed(1)}h ago`);
+        return;
+      }
+    }
+    
     // Move to next stage
     if (currentIndex < AI_MESSAGE_TEMPLATES.length - 1) {
       const nextTemplate = AI_MESSAGE_TEMPLATES[currentIndex + 1];
-      const nextSendTime = new Date();
-      nextSendTime.setHours(nextSendTime.getHours() + nextTemplate.delayHours);
+      
+      // Generate smart send time with jitter and business hours
+      const nextSendTime = await generateSmartSendTime(
+        nextTemplate.delayHours, 
+        nextTemplate.jitterMinutes
+      );
 
       await supabase
         .from('leads')
@@ -245,6 +395,8 @@ export const scheduleNextAIMessage = async (leadId: string): Promise<void> => {
           next_ai_send_at: nextSendTime.toISOString()
         })
         .eq('id', leadId);
+        
+      console.log(`📅 [AI SCHEDULING] Scheduled ${nextTemplate.stage} for lead ${leadId} at ${nextSendTime.toLocaleString()}`);
     } else {
       // No more messages, clear schedule
       await supabase
@@ -253,8 +405,13 @@ export const scheduleNextAIMessage = async (leadId: string): Promise<void> => {
           next_ai_send_at: null
         })
         .eq('id', leadId);
+        
+      console.log(`✅ [AI SCHEDULING] Completed message sequence for lead ${leadId}`);
     }
   } catch (error) {
     console.error('Error scheduling next AI message:', error);
   }
 };
+
+// Export tracking function for use in message sending
+export { trackMessagePerformance };
