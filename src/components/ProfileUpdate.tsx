@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { updateCurrentUserProfile, ensureUserRole, updateDealershipSettings } from '@/services/profileService';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { DataPurgePanel } from './DataPurgePanel';
 
 export const ProfileUpdate = () => {
   const { toast } = useToast();
@@ -56,12 +55,11 @@ export const ProfileUpdate = () => {
     return (
       <div className="space-y-4">
         <div className="p-6 bg-success/10 border border-success rounded-lg">
-          <h3 className="text-lg font-semibold text-success mb-2">Profile Updated Successfully</h3>
+          <h3 className="text-lg font-semibold text-success mb-2">U-J Chevrolet Used Car Department</h3>
           <p className="text-sm text-muted-foreground">
-            You are now set up as Used Car Manager at U-J Chevrolet.
+            Ready to manage your used car inventory and leads. System has been cleared and configured for U-J Chevrolet operations.
           </p>
         </div>
-        <DataPurgePanel />
       </div>
     );
   }
@@ -81,7 +79,6 @@ export const ProfileUpdate = () => {
           {isUpdating ? 'Updating...' : 'Update to Used Car Manager at U-J Chevrolet'}
         </Button>
       </div>
-      <DataPurgePanel />
     </div>
   );
 };
