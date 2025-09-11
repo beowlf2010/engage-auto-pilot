@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import {
   Thermometer, Zap, Target, Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import AIOptInButton from '@/components/leads/management/AIOptInButton';
 
 interface Lead {
   id: string;
@@ -33,6 +34,7 @@ const LeadsManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: leads = [], isLoading, error } = useQuery({
     queryKey: ['leads', searchTerm, selectedFilter],
@@ -94,6 +96,15 @@ const LeadsManagement = () => {
       description: `${method} contact initiated for lead ${leadId}`,
     });
   }, [toast]);
+
+  const handleAIOptInChange = useCallback(() => {
+    // Invalidate and refetch the leads query to get updated data
+    queryClient.invalidateQueries({ queryKey: ['leads'] });
+    toast({
+      title: "AI Enabled",
+      description: "AI messaging has been enabled for this lead",
+    });
+  }, [queryClient, toast]);
 
   if (error) {
     return (
@@ -276,6 +287,14 @@ const LeadsManagement = () => {
                     <Mail className="h-3 w-3 mr-1" />
                     Email
                   </Button>
+                </div>
+
+                {/* AI Opt-In Section */}
+                <div className="pt-2">
+                  <AIOptInButton
+                    lead={lead}
+                    onAIOptInChange={handleAIOptInChange}
+                  />
                 </div>
 
                 {lead.last_reply_at && (
