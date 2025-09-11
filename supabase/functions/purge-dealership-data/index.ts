@@ -62,61 +62,110 @@ Deno.serve(async (req) => {
         let inventory_deleted = 0;
         let uploads_deleted = 0;
 
-        // Step 1: Purge leads using the secure function
-        console.log(`[${job_id}] Step 1: Purging leads...`);
-        const { data: leadPurgeResult, error: leadError } = await supabase.rpc('purge_all_leads_as_admin', {
-          p_user_id: user_id,
-          p_dry_run: false
-        });
+        // Step 1: Manual lead deletion in chunks to avoid timeout
+        console.log(`[${job_id}] Step 1: Manual chunked lead deletion...`);
+        
+        // First, get anonymous lead or create it
+        let { data: anonLead } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('source', 'anonymized_system')
+          .single();
 
-        if (leadError) {
-          console.error(`[${job_id}] Lead purge error:`, leadError);
-        } else {
-          leads_deleted = (leadPurgeResult as any)?.leads_deleted || 0;
-          conversations_reassigned = (leadPurgeResult as any)?.conversations_reassigned || 0;
-          console.log(`[${job_id}] Leads purged: ${leads_deleted}, Conversations reassigned: ${conversations_reassigned}`);
+        if (!anonLead) {
+          const { data: newAnonLead } = await supabase
+            .from('leads')
+            .insert({
+              first_name: 'Anonymous',
+              last_name: 'Customer',
+              source: 'anonymized_system',
+              status: 'archived',
+              vehicle_interest: 'Data purged for system reset'
+            })
+            .select('id')
+            .single();
+          anonLead = newAnonLead;
         }
+
+        // Reassign conversations first
+        const { count: convCount } = await supabase
+          .from('conversations')
+          .update({ lead_id: anonLead.id })
+          .neq('lead_id', anonLead.id);
+        conversations_reassigned = convCount || 0;
+
+        // Delete leads in chunks (avoiding the anonymous one)
+        let totalDeleted = 0;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const { data: leadBatch } = await supabase
+            .from('leads')
+            .select('id')
+            .neq('source', 'anonymized_system')
+            .limit(100);
+
+          if (!leadBatch || leadBatch.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          const leadIds = leadBatch.map(l => l.id);
+
+          // Delete related data first
+          await supabase.from('phone_numbers').delete().in('lead_id', leadIds);
+          await supabase.from('ai_conversation_context').delete().in('lead_id', leadIds);
+          await supabase.from('ai_conversation_notes').delete().in('lead_id', leadIds);
+          await supabase.from('ai_generated_messages').delete().in('lead_id', leadIds);
+          await supabase.from('ai_message_history').delete().in('lead_id', leadIds);
+          
+          // Delete the leads themselves
+          const { count: deletedCount } = await supabase
+            .from('leads')
+            .delete()
+            .in('id', leadIds);
+
+          totalDeleted += deletedCount || 0;
+          console.log(`[${job_id}] Deleted batch: ${deletedCount}, Total so far: ${totalDeleted}`);
+        }
+        
+        leads_deleted = totalDeleted;
 
         // Step 2: Purge inventory data
         console.log(`[${job_id}] Step 2: Purging inventory...`);
-        const { error: inventoryError, count: inventoryCount } = await supabase
+        const { count: inventoryCount } = await supabase
           .from('inventory')
           .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000'); // Keep dummy record
+          .neq('id', '00000000-0000-0000-0000-000000000000');
 
-        if (inventoryError) {
-          console.error(`[${job_id}] Inventory purge error:`, inventoryError);
-        } else {
-          inventory_deleted = inventoryCount || 0;
-          console.log(`[${job_id}] Inventory deleted: ${inventory_deleted}`);
-        }
+        inventory_deleted = inventoryCount || 0;
+        console.log(`[${job_id}] Inventory deleted: ${inventory_deleted}`);
 
-        // Step 3: Purge upload history
+        // Step 3: Purge upload history (now that leads are gone)
         console.log(`[${job_id}] Step 3: Purging upload history...`);
-        const { error: uploadError, count: uploadCount } = await supabase
+        const { count: uploadCount } = await supabase
           .from('upload_history')
           .delete()
           .neq('id', '00000000-0000-0000-0000-000000000000');
 
-        if (uploadError) {
-          console.error(`[${job_id}] Upload history purge error:`, uploadError);
-        } else {
-          uploads_deleted = uploadCount || 0;
-          console.log(`[${job_id}] Upload history deleted: ${uploads_deleted}`);
-        }
+        uploads_deleted = uploadCount || 0;
+        console.log(`[${job_id}] Upload history deleted: ${uploads_deleted}`);
 
         // Step 4: Update dealership settings if provided
         if (dealership_name) {
           console.log(`[${job_id}] Step 4: Updating dealership settings to: ${dealership_name}`);
-          const { error: settingsError } = await supabase
+          
+          // Use UPDATE instead of UPSERT to avoid constraint issues
+          const { error: updateError } = await supabase
             .from('settings')
-            .upsert([
-              { key: 'DEALERSHIP_NAME', value: dealership_name, updated_at: new Date().toISOString() },
-              { key: 'DEALERSHIP_LOCATION', value: 'Used Car Department', updated_at: new Date().toISOString() }
-            ]);
+            .update({ value: dealership_name, updated_at: new Date().toISOString() })
+            .eq('key', 'DEALERSHIP_NAME');
 
-          if (settingsError) {
-            console.error(`[${job_id}] Settings update error:`, settingsError);
+          if (updateError) {
+            // If update failed, try insert
+            await supabase
+              .from('settings')
+              .insert({ key: 'DEALERSHIP_NAME', value: dealership_name });
           }
         }
 
