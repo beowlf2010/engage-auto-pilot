@@ -27,9 +27,9 @@ export const QueryProvider: React.FC<QueryProviderProps> = ({ children }) => {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {process.env.NODE_ENV !== 'production' && (
+      {import.meta.env.DEV && import.meta.env.VITE_ENABLE_RQ_DEVTOOLS && (
         <ReactQueryDevtools 
-          initialIsOpen={false} 
+          initialIsOpen={false}
         />
       )}
     </QueryClientProvider>
