@@ -19,8 +19,8 @@ const MessagePreviewCard: React.FC<MessagePreviewCardProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500">
-          <div className="text-sm">{generatedMessage}</div>
+        <div className="bg-muted p-3 rounded-lg border-l-4 border-primary">
+          <div className="text-sm text-foreground">{generatedMessage}</div>
         </div>
       </CardContent>
     </Card>

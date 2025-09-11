@@ -9,15 +9,15 @@ const SchedulingInfoCard: React.FC = () => {
   nextMessageTime.setTime(nextMessageTime.getTime() + (24 * 60 * 60 * 1000));
 
   return (
-    <Card className="bg-green-50 border-green-200">
+    <Card className="bg-primary/5 border-primary/20">
       <CardContent className="p-3">
         <div className="flex items-center gap-2 text-sm">
-          <Clock className="w-4 h-4 text-green-600" />
+          <Clock className="w-4 h-4 text-primary" />
           <div>
-            <div className="font-medium text-green-900">
+            <div className="font-medium text-foreground">
               Next AI message scheduled for:
             </div>
-            <div className="text-green-700">
+            <div className="text-muted-foreground">
               {nextMessageTime.toLocaleDateString()} at{' '}
               {nextMessageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </div>

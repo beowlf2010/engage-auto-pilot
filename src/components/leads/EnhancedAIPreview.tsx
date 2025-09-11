@@ -148,7 +148,7 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Bot className="w-5 h-5 text-blue-600" />
+              <Bot className="w-5 h-5 text-primary" />
               Enable AI for {leadName}
             </div>
             <Button 
@@ -165,9 +165,9 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
         <div className="space-y-4">
           {/* Error State */}
           {error && (
-            <Alert className="border-red-200 bg-red-50">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">
+            <Alert className="border-destructive/20 bg-destructive/10">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-destructive">
                 {error}
                 <div className="mt-2 flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => reset()}>
@@ -184,9 +184,9 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
           {/* Analyzing State */}
           {isAnalyzing && !error && (
             <div className="text-center py-8">
-              <Brain className="w-8 h-8 text-blue-600 mx-auto mb-4 animate-pulse" />
-              <h3 className="font-medium mb-2">Analyzing Lead Data</h3>
-              <p className="text-sm text-gray-600 mb-4">
+              <Brain className="w-8 h-8 text-primary mx-auto mb-4 animate-pulse" />
+              <h3 className="font-medium mb-2 text-foreground">Analyzing Lead Data</h3>
+              <p className="text-sm text-muted-foreground mb-4">
                 AI is reviewing name and vehicle information for quality...
               </p>
               <div className="space-y-2">
@@ -234,7 +234,7 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
           {/* Initial State */}
           {!isAnalyzing && !showDecisionStep && !showPreview && !error && (
             <>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 Finn AI will analyze data quality and let you approve the name and vehicle information before generating a personalized message for {leadName}.
               </div>
 
@@ -250,8 +250,8 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
 
           {/* Force close option if stuck */}
           {(isAnalyzing || isGenerating) && !error && (
-            <div className="text-center pt-4 border-t">
-              <p className="text-xs text-gray-500 mb-2">
+            <div className="text-center pt-4 border-t border-border">
+              <p className="text-xs text-muted-foreground mb-2">
                 Taking longer than expected?
               </p>
               <div className="flex gap-2 justify-center">
