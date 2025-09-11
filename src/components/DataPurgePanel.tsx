@@ -22,24 +22,35 @@ export const DataPurgePanel = () => {
 
     setIsPurging(true);
     try {
-      // First, let's try a dry run to see what will be deleted
-      const { data: dryRun, error: dryRunError } = await supabase.rpc('purge_all_leads', {
+      // Get current user ID
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('Authentication required');
+      }
+
+      // First, let's try a dry run to see what will be deleted using admin function
+      const { data: dryRun, error: dryRunError } = await supabase.rpc('purge_all_leads_as_admin', {
+        p_user_id: user.id,
         p_dry_run: true
       });
 
       if (dryRunError) {
-        throw dryRunError;
+        console.error('Dry run error:', dryRunError);
+        throw new Error(`Dry run failed: ${dryRunError.message}`);
       }
 
       console.log('Dry run results:', dryRun);
 
       // If dry run is successful, proceed with actual purge
-      const { data: purgeResult, error: purgeError } = await supabase.rpc('purge_all_leads', {
+      const { data: purgeResult, error: purgeError } = await supabase.rpc('purge_all_leads_as_admin', {
+        p_user_id: user.id,
         p_dry_run: false
       });
 
       if (purgeError) {
-        throw purgeError;
+        console.error('Purge error:', purgeError);
+        throw new Error(`Purge failed: ${purgeError.message}`);
       }
 
       // Also purge inventory data
@@ -69,11 +80,11 @@ export const DataPurgePanel = () => {
         description: `Deleted ${(purgeResult as any)?.leads_deleted || 0} leads and reassigned ${(purgeResult as any)?.conversations_reassigned || 0} conversations. Ready for fresh start at U-J Chevrolet.`,
       });
 
-    } catch (error) {
-      console.error('Purge error:', error);
+    } catch (error: any) {
+      console.error('Purge error details:', error);
       toast({
         title: "Purge Failed",
-        description: "Failed to purge data. Please contact support if this continues.",
+        description: error?.message || "Failed to purge data. Please contact support if this continues.",
         variant: "destructive"
       });
     } finally {
