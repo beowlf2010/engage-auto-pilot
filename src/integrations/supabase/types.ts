@@ -45,7 +45,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "account_lockouts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_automation_control: {
         Row: {
@@ -1047,10 +1055,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ai_message_approval_queue_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ai_message_approval_queue_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_message_approval_queue_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
             referencedColumns: ["id"]
           },
         ]
@@ -1143,6 +1165,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_message_feedback_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
             referencedColumns: ["id"]
           },
           {
@@ -1408,7 +1437,15 @@ export type Database = {
           times_seen?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_name_validations_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_notifications: {
         Row: {
@@ -1891,7 +1928,15 @@ export type Database = {
           updated_at?: string
           vehicle_text?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_vehicle_validations_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       alert_automation_rules: {
         Row: {
@@ -2275,6 +2320,57 @@ export type Database = {
         }
         Relationships: []
       }
+      buy_lists: {
+        Row: {
+          created_by: string | null
+          generated_at: string | null
+          id: string
+          recommendations: Json | null
+          store_id: string
+          strategy_config_id: string | null
+          total_budget: number | null
+          total_capacity: number | null
+          window_days: number | null
+        }
+        Insert: {
+          created_by?: string | null
+          generated_at?: string | null
+          id?: string
+          recommendations?: Json | null
+          store_id: string
+          strategy_config_id?: string | null
+          total_budget?: number | null
+          total_capacity?: number | null
+          window_days?: number | null
+        }
+        Update: {
+          created_by?: string | null
+          generated_at?: string | null
+          id?: string
+          recommendations?: Json | null
+          store_id?: string
+          strategy_config_id?: string | null
+          total_budget?: number | null
+          total_capacity?: number | null
+          window_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buy_lists_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buy_lists_strategy_config_id_fkey"
+            columns: ["strategy_config_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_conversation_analysis: {
         Row: {
           ai_recommendations: string | null
@@ -2412,6 +2508,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "call_history_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "call_history_lead_id_fkey"
             columns: ["lead_id"]
@@ -2606,6 +2709,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "call_outcomes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "call_outcomes_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -2673,6 +2783,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "call_queue_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "call_queue_lead_id_fkey"
             columns: ["lead_id"]
@@ -3515,7 +3632,15 @@ export type Database = {
           total_sent?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "email_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_conversation_analysis: {
         Row: {
@@ -3668,7 +3793,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "email_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_templates: {
         Row: {
@@ -3707,7 +3840,15 @@ export type Database = {
           updated_at?: string
           variables?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       enhanced_behavioral_triggers: {
         Row: {
@@ -3750,6 +3891,36 @@ export type Database = {
           },
         ]
       }
+      header_mappings: {
+        Row: {
+          created_at: string | null
+          header_signature: string
+          id: string
+          importer_type: string | null
+          last_used_at: string | null
+          mapping_config: Json
+          usage_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          header_signature: string
+          id?: string
+          importer_type?: string | null
+          last_used_at?: string | null
+          mapping_config?: Json
+          usage_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          header_signature?: string
+          id?: string
+          importer_type?: string | null
+          last_used_at?: string | null
+          mapping_config?: Json
+          usage_count?: number | null
+        }
+        Relationships: []
+      }
       historical_messages: {
         Row: {
           content: string
@@ -3790,6 +3961,47 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_issues: {
+        Row: {
+          created_at: string | null
+          id: string
+          issue_description: string | null
+          issue_type: string | null
+          resolved_at: string | null
+          row_data: Json | null
+          severity: string | null
+          snapshot_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          issue_description?: string | null
+          issue_type?: string | null
+          resolved_at?: string | null
+          row_data?: Json | null
+          severity?: string | null
+          snapshot_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          issue_description?: string | null
+          issue_type?: string | null
+          resolved_at?: string | null
+          row_data?: Json | null
+          severity?: string | null
+          snapshot_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_issues_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_snapshots"
             referencedColumns: ["id"]
           },
         ]
@@ -4136,6 +4348,13 @@ export type Database = {
             referencedRelation: "upload_history"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "inventory_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       inventory_alerts: {
@@ -4316,6 +4535,172 @@ export type Database = {
             columns: ["inventory_id"]
             isOneToOne: false
             referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_snapshot_rows: {
+        Row: {
+          acquisition_date: string | null
+          acquisition_type: string | null
+          body_style: string | null
+          cost: number | null
+          cr_grade: number | null
+          doc_fee: number | null
+          engine: string | null
+          exterior_color: string | null
+          id: string
+          interior_color: string | null
+          leads: number | null
+          list_price: number | null
+          listed_date: string | null
+          location: string | null
+          make: string | null
+          mds: number | null
+          mileage: number | null
+          model: string | null
+          notes: string | null
+          ordered_options: string | null
+          pack: number | null
+          peg: string | null
+          price_to_market: number | null
+          raw_columns: Json | null
+          snapshot_id: string | null
+          srp: number | null
+          stock_number: string | null
+          trim: string | null
+          vdp: number | null
+          vin: string
+          year: number | null
+        }
+        Insert: {
+          acquisition_date?: string | null
+          acquisition_type?: string | null
+          body_style?: string | null
+          cost?: number | null
+          cr_grade?: number | null
+          doc_fee?: number | null
+          engine?: string | null
+          exterior_color?: string | null
+          id?: string
+          interior_color?: string | null
+          leads?: number | null
+          list_price?: number | null
+          listed_date?: string | null
+          location?: string | null
+          make?: string | null
+          mds?: number | null
+          mileage?: number | null
+          model?: string | null
+          notes?: string | null
+          ordered_options?: string | null
+          pack?: number | null
+          peg?: string | null
+          price_to_market?: number | null
+          raw_columns?: Json | null
+          snapshot_id?: string | null
+          srp?: number | null
+          stock_number?: string | null
+          trim?: string | null
+          vdp?: number | null
+          vin: string
+          year?: number | null
+        }
+        Update: {
+          acquisition_date?: string | null
+          acquisition_type?: string | null
+          body_style?: string | null
+          cost?: number | null
+          cr_grade?: number | null
+          doc_fee?: number | null
+          engine?: string | null
+          exterior_color?: string | null
+          id?: string
+          interior_color?: string | null
+          leads?: number | null
+          list_price?: number | null
+          listed_date?: string | null
+          location?: string | null
+          make?: string | null
+          mds?: number | null
+          mileage?: number | null
+          model?: string | null
+          notes?: string | null
+          ordered_options?: string | null
+          pack?: number | null
+          peg?: string | null
+          price_to_market?: number | null
+          raw_columns?: Json | null
+          snapshot_id?: string | null
+          srp?: number | null
+          stock_number?: string | null
+          trim?: string | null
+          vdp?: number | null
+          vin?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_snapshot_rows_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_snapshots: {
+        Row: {
+          arrival_count: number | null
+          change_count: number | null
+          created_at: string | null
+          exit_count: number | null
+          file_hash: string
+          file_name: string
+          id: string
+          import_status: string | null
+          mapping_used: Json
+          row_count: number
+          snapshot_at: string
+          store_id: string
+          validation_errors: number | null
+        }
+        Insert: {
+          arrival_count?: number | null
+          change_count?: number | null
+          created_at?: string | null
+          exit_count?: number | null
+          file_hash: string
+          file_name: string
+          id?: string
+          import_status?: string | null
+          mapping_used?: Json
+          row_count: number
+          snapshot_at: string
+          store_id: string
+          validation_errors?: number | null
+        }
+        Update: {
+          arrival_count?: number | null
+          change_count?: number | null
+          created_at?: string | null
+          exit_count?: number | null
+          file_hash?: string
+          file_name?: string
+          id?: string
+          import_status?: string | null
+          mapping_used?: Json
+          row_count?: number
+          snapshot_at?: string
+          store_id?: string
+          validation_errors?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_snapshots_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
@@ -5428,7 +5813,15 @@ export type Database = {
           total_leads?: number
           total_messages?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "message_exports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       message_import_mapping: {
         Row: {
@@ -5617,6 +6010,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
             referencedColumns: ["id"]
           },
         ]
@@ -5861,6 +6261,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_notification_preferences_id_fkey"
             columns: ["notification_preferences_id"]
@@ -6438,7 +6845,15 @@ export type Database = {
           user_id?: string
           years_experience?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_professional_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_professional_testimonials: {
         Row: {
@@ -6524,7 +6939,15 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "security_audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       security_rate_limits: {
         Row: {
@@ -6581,7 +7004,15 @@ export type Database = {
           updated_by?: string | null
           value?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sms_suppression_list: {
         Row: {
@@ -6611,7 +7042,139 @@ export type Database = {
           reason?: string
           updated_at?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "sms_suppression_list_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      soft_exits: {
+        Row: {
+          confirmed_at: string | null
+          days_missing: number | null
+          exit_channel: string | null
+          id: string
+          reverted_at: string | null
+          soft_exit_at: string
+          vehicle_vin: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          days_missing?: number | null
+          exit_channel?: string | null
+          id?: string
+          reverted_at?: string | null
+          soft_exit_at: string
+          vehicle_vin?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          days_missing?: number | null
+          exit_channel?: string | null
+          id?: string
+          reverted_at?: string | null
+          soft_exit_at?: string
+          vehicle_vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soft_exits_vehicle_vin_fkey"
+            columns: ["vehicle_vin"]
+            isOneToOne: false
+            referencedRelation: "vauto_vehicles"
+            referencedColumns: ["vin"]
+          },
+        ]
+      }
+      stores: {
+        Row: {
+          created_at: string | null
+          id: string
+          location: string
+          lot_capacity: number | null
+          name: string
+          timezone: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          location?: string
+          lot_capacity?: number | null
+          name?: string
+          timezone?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          location?: string
+          lot_capacity?: number | null
+          name?: string
+          timezone?: string
+          updated_at?: string | null
+        }
         Relationships: []
+      }
+      strategy_configs: {
+        Row: {
+          budget_cap: number | null
+          created_at: string | null
+          exit_confirm_after_missing_days: number | null
+          id: string
+          is_active: boolean | null
+          lot_capacity: number | null
+          min_exits_per_segment: number | null
+          name: string
+          safety_factor: number | null
+          speed_vs_profit_weight: number | null
+          store_id: string
+          target_days_supply: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          budget_cap?: number | null
+          created_at?: string | null
+          exit_confirm_after_missing_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          lot_capacity?: number | null
+          min_exits_per_segment?: number | null
+          name?: string
+          safety_factor?: number | null
+          speed_vs_profit_weight?: number | null
+          store_id: string
+          target_days_supply?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          budget_cap?: number | null
+          created_at?: string | null
+          exit_confirm_after_missing_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          lot_capacity?: number | null
+          min_exits_per_segment?: number | null
+          name?: string
+          safety_factor?: number | null
+          speed_vs_profit_weight?: number | null
+          store_id?: string
+          target_days_supply?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_configs_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       successful_conversation_patterns: {
         Row: {
@@ -7162,7 +7725,22 @@ export type Database = {
           uploaded_by?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "upload_history_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_notification_preferences: {
         Row: {
@@ -7204,7 +7782,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -7261,7 +7847,185 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_roles_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vauto_vehicles: {
+        Row: {
+          acquired_at: string | null
+          acquisition_type: string | null
+          body_style: string | null
+          created_at: string | null
+          current_cost: number | null
+          current_cr_grade: number | null
+          current_leads: number | null
+          current_list_price: number | null
+          current_mds: number | null
+          current_mileage: number | null
+          current_ptm: number | null
+          current_srp: number | null
+          current_stock_number: string | null
+          current_vdp: number | null
+          doc_fee: number | null
+          engine: string | null
+          exit_channel: string | null
+          exterior_color: string | null
+          first_seen_at: string | null
+          interior_color: string | null
+          last_seen_at: string | null
+          listed_at: string | null
+          location: string | null
+          make: string | null
+          model: string | null
+          pack: number | null
+          peg: string | null
+          raw_columns: Json | null
+          sold_at: string | null
+          status: string | null
+          store_id: string
+          trim: string | null
+          updated_at: string | null
+          vin: string
+          year: number | null
+        }
+        Insert: {
+          acquired_at?: string | null
+          acquisition_type?: string | null
+          body_style?: string | null
+          created_at?: string | null
+          current_cost?: number | null
+          current_cr_grade?: number | null
+          current_leads?: number | null
+          current_list_price?: number | null
+          current_mds?: number | null
+          current_mileage?: number | null
+          current_ptm?: number | null
+          current_srp?: number | null
+          current_stock_number?: string | null
+          current_vdp?: number | null
+          doc_fee?: number | null
+          engine?: string | null
+          exit_channel?: string | null
+          exterior_color?: string | null
+          first_seen_at?: string | null
+          interior_color?: string | null
+          last_seen_at?: string | null
+          listed_at?: string | null
+          location?: string | null
+          make?: string | null
+          model?: string | null
+          pack?: number | null
+          peg?: string | null
+          raw_columns?: Json | null
+          sold_at?: string | null
+          status?: string | null
+          store_id: string
+          trim?: string | null
+          updated_at?: string | null
+          vin: string
+          year?: number | null
+        }
+        Update: {
+          acquired_at?: string | null
+          acquisition_type?: string | null
+          body_style?: string | null
+          created_at?: string | null
+          current_cost?: number | null
+          current_cr_grade?: number | null
+          current_leads?: number | null
+          current_list_price?: number | null
+          current_mds?: number | null
+          current_mileage?: number | null
+          current_ptm?: number | null
+          current_srp?: number | null
+          current_stock_number?: string | null
+          current_vdp?: number | null
+          doc_fee?: number | null
+          engine?: string | null
+          exit_channel?: string | null
+          exterior_color?: string | null
+          first_seen_at?: string | null
+          interior_color?: string | null
+          last_seen_at?: string | null
+          listed_at?: string | null
+          location?: string | null
+          make?: string | null
+          model?: string | null
+          pack?: number | null
+          peg?: string | null
+          raw_columns?: Json | null
+          sold_at?: string | null
+          status?: string | null
+          store_id?: string
+          trim?: string | null
+          updated_at?: string | null
+          vin?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vauto_vehicles_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_changes: {
+        Row: {
+          after_values: Json | null
+          before_values: Json | null
+          change_type: string | null
+          changed_at: string
+          fields_changed: Json | null
+          id: string
+          snapshot_id: string | null
+          vehicle_vin: string | null
+        }
+        Insert: {
+          after_values?: Json | null
+          before_values?: Json | null
+          change_type?: string | null
+          changed_at?: string
+          fields_changed?: Json | null
+          id?: string
+          snapshot_id?: string | null
+          vehicle_vin?: string | null
+        }
+        Update: {
+          after_values?: Json | null
+          before_values?: Json | null
+          change_type?: string | null
+          changed_at?: string
+          fields_changed?: Json | null
+          id?: string
+          snapshot_id?: string | null
+          vehicle_vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_changes_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_changes_vehicle_vin_fkey"
+            columns: ["vehicle_vin"]
+            isOneToOne: false
+            referencedRelation: "vauto_vehicles"
+            referencedColumns: ["vin"]
+          },
+        ]
       }
       vehicle_duplicates: {
         Row: {
@@ -7360,6 +8124,56 @@ export type Database = {
           year?: number | null
         }
         Relationships: []
+      }
+      vehicle_history_snapshots: {
+        Row: {
+          days_in_stock: number | null
+          id: string
+          list_price: number | null
+          location: string | null
+          price_to_market: number | null
+          raw_columns: Json | null
+          snapshot_at: string
+          srp: number | null
+          status: string | null
+          vdp: number | null
+          vehicle_vin: string | null
+        }
+        Insert: {
+          days_in_stock?: number | null
+          id?: string
+          list_price?: number | null
+          location?: string | null
+          price_to_market?: number | null
+          raw_columns?: Json | null
+          snapshot_at: string
+          srp?: number | null
+          status?: string | null
+          vdp?: number | null
+          vehicle_vin?: string | null
+        }
+        Update: {
+          days_in_stock?: number | null
+          id?: string
+          list_price?: number | null
+          location?: string | null
+          price_to_market?: number | null
+          raw_columns?: Json | null
+          snapshot_at?: string
+          srp?: number | null
+          status?: string | null
+          vdp?: number | null
+          vehicle_vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_history_snapshots_vehicle_vin_fkey"
+            columns: ["vehicle_vin"]
+            isOneToOne: false
+            referencedRelation: "vauto_vehicles"
+            referencedColumns: ["vin"]
+          },
+        ]
       }
       vehicle_master: {
         Row: {
@@ -7564,6 +8378,17 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles_view: {
+        Row: {
+          all_roles: string[] | null
+          email: string | null
+          has_manager_access: boolean | null
+          id: string | null
+          is_admin: boolean | null
+          primary_role: string | null
+        }
+        Relationships: []
+      }
       v_monthly_retail_summary: {
         Row: {
           dealer_trade_gross_mtd: number | null
@@ -7587,6 +8412,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      assign_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       auto_suppress_failed_numbers: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -7607,6 +8439,10 @@ export type Database = {
           p_lead_type_name?: string
         }
         Returns: undefined
+      }
+      calculate_days_in_stock: {
+        Args: { acquired_date: string; sold_date?: string }
+        Returns: number
       }
       calculate_delivery_variance: {
         Args: Record<PropertyKey, never>
@@ -8018,6 +8854,13 @@ export type Database = {
         Args: { p_jobname: string }
         Returns: Json
       }
+      remove_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       repair_upload_inconsistencies: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -8176,7 +9019,11 @@ export type Database = {
         Returns: boolean
       }
       user_has_manager_access: {
-        Args: Record<PropertyKey, never>
+        Args: Record<PropertyKey, never> | { p_user_id?: string }
+        Returns: boolean
+      }
+      user_is_admin: {
+        Args: { p_user_id?: string }
         Returns: boolean
       }
       user_is_authenticated_simple: {
