@@ -46,15 +46,11 @@ export const AppSidebar = React.memo(function AppSidebar({ unreadCount = 0 }: Ap
       primary: filteredItems.filter(item => 
         ['Dashboard', 'Smart Inbox', 'Leads', 'Upload Data', 'Auto-Dialing'].includes(item.label)
       ),
-      inventory: filteredItems.filter(item => 
-        ['Inventory', 'RPO Insights', 'RPO Database'].includes(item.label)
-      ),
+      inventory: [], // Hidden for focus on leads and AI
       ai: filteredItems.filter(item => 
         ['AI Monitor', 'AI Dashboard', 'AI Opt-In Manager', 'Call Analysis'].includes(item.label)
       ),
-      analytics: filteredItems.filter(item => 
-        ['Financial', 'Sales Dashboard', 'Analytics'].includes(item.label)
-      ),
+      analytics: [], // Hidden for focus on leads and AI
       tools: filteredItems.filter(item => 
         ['Predictive Analytics', 'Message Export', 'Personalization'].includes(item.label)
       ),
@@ -129,9 +125,7 @@ export const AppSidebar = React.memo(function AppSidebar({ unreadCount = 0 }: Ap
 
       <SidebarContent>
         {renderGroup("Main", navigationGroups.primary)}
-        {renderGroup("Inventory", navigationGroups.inventory)}
         {renderGroup("AI Intelligence", navigationGroups.ai)}
-        {renderGroup("Analytics", navigationGroups.analytics)}
         {renderGroup("Tools", navigationGroups.tools)}
         {renderGroup("Admin", navigationGroups.admin)}
         {renderGroup("Profile", navigationGroups.profile)}
