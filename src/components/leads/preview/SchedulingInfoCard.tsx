@@ -18,8 +18,15 @@ const SchedulingInfoCard: React.FC = () => {
               Next AI message scheduled for:
             </div>
             <div className="text-muted-foreground">
-              {nextMessageTime.toLocaleDateString()} at{' '}
-              {nextMessageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {nextMessageTime.toLocaleDateString('en-US', { 
+                month: 'numeric', 
+                day: 'numeric', 
+                year: 'numeric' 
+              })} at {nextMessageTime.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+              })}
             </div>
           </div>
         </div>
