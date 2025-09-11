@@ -273,7 +273,7 @@ export const generateAIMessage = async (leadId: string): Promise<string | null> 
 };
 
 // Smart timing with business hours and jitter
-const generateSmartSendTime = async (delayHours: number, jitterMinutes: number = 90): Promise<Date> => {
+export const generateSmartSendTime = async (delayHours: number, jitterMinutes: number = 90): Promise<Date> => {
   const businessHours = await getBusinessHours();
   const centralTimeZone = 'America/Chicago'; // Central Time
   

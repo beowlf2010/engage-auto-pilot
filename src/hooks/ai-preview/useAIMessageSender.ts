@@ -131,6 +131,11 @@ export const useAIMessageSender = (leadId: string, onMessageSent?: () => void) =
 
       console.log('✅ [AI MESSAGE SENDER] Message sent successfully');
 
+      // Schedule next AI message
+      const { scheduleNextAIMessage } = await import('@/services/aiMessageService');
+      await scheduleNextAIMessage(leadId);
+      console.log('📅 [AI MESSAGE SENDER] Scheduled next AI message');
+
       toast({
         title: "AI Enabled Successfully",
         description: "The lead has been opted into AI messaging and the initial message has been sent.",

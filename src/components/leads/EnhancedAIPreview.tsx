@@ -220,7 +220,7 @@ const EnhancedAIPreview: React.FC<EnhancedAIPreviewProps> = ({
           {showPreview && generatedMessage && !error && (
             <>
               <MessagePreviewCard generatedMessage={generatedMessage} />
-              <SchedulingInfoCard />
+              <SchedulingInfoCard leadId={leadId} />
               <AIPreviewActions
                 generatedMessage={generatedMessage}
                 isGenerating={false}
