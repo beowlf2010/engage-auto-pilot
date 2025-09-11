@@ -1,5 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { enhancedQualityScoring, LeadContext } from './enhancedQualityScoring';
+import { conversationSentimentAnalysis, ConversationContext } from './conversationSentimentAnalysis';
+import { smartMessageTemplates, TemplateContext } from './smartMessageTemplates';
 
 export interface MessageContext {
   leadId: string;
@@ -23,9 +26,52 @@ export interface UnifiedAIResponse {
 class UnifiedAIResponseEngine {
   async generateResponse(context: MessageContext): Promise<UnifiedAIResponse | null> {
     try {
-      console.log('🤖 [UNIFIED AI] Generating response for lead:', context.leadId);
+      console.log('🤖 [UNIFIED AI] Enhanced response generation for lead:', context.leadId);
       
-      // Call the intelligent conversation AI edge function
+      // 1. Analyze conversation sentiment for prioritization
+      const sentimentContext: ConversationContext = {
+        leadId: context.leadId,
+        messages: context.conversationHistory.map((msg, index) => ({
+          content: msg,
+          direction: index % 2 === 0 ? 'in' : 'out',
+          timestamp: new Date().toISOString()
+        })),
+        leadData: { status: 'contacted', daysInFunnel: 1 }
+      };
+      
+      const sentiment = await conversationSentimentAnalysis.analyzeConversationSentiment(sentimentContext);
+      
+      // 2. Try smart template first for high-urgency situations
+      if (sentiment.urgency === 'critical' || sentiment.urgency === 'high') {
+        const templateContext: TemplateContext = {
+          leadId: context.leadId,
+          leadName: context.leadName,
+          vehicleInterest: context.vehicleInterest,
+          leadStatus: 'contacted',
+          sentiment,
+          conversationHistory: context.conversationHistory,
+          leadData: { daysInFunnel: 1 }
+        };
+        
+        const templateResponse = await smartMessageTemplates.generateMessage(templateContext);
+        if (templateResponse && templateResponse.confidence > 0.7) {
+          console.log('✅ [UNIFIED AI] Using smart template for urgent lead');
+          
+          // Validate template response
+          const validation = await this.enhancedValidation(templateResponse.content, context);
+          if (validation.approved) {
+            return {
+              message: templateResponse.content,
+              intent: { primary: sentiment.intent, confidence: templateResponse.confidence },
+              responseStrategy: 'template_optimized',
+              confidence: templateResponse.confidence,
+              reasoning: `Smart template: ${templateResponse.reasoning}`
+            };
+          }
+        }
+      }
+      
+      // 3. Call the intelligent conversation AI edge function
       const { data, error } = await supabase.functions.invoke('intelligent-conversation-ai', {
         body: {
           leadId: context.leadId,
@@ -35,7 +81,7 @@ class UnifiedAIResponseEngine {
           conversationHistory: context.conversationHistory.join('\n'),
           hasConversationalSignals: context.latestMessage.length > 0,
           leadSource: 'unified_ai',
-          leadSourceData: null,
+          leadSourceData: { sentiment, urgency: sentiment.urgency },
           vehicleInterest: context.vehicleInterest
         }
       });
@@ -46,27 +92,24 @@ class UnifiedAIResponseEngine {
       }
 
       if (data?.success && data?.message) {
-        console.log('✅ [UNIFIED AI] Successfully generated AI response');
+        console.log('✅ [UNIFIED AI] AI response generated, validating quality...');
         
-        // CRITICAL: Validate message content before returning
-        const validation = await this.validateMessageContent(data.message, context.leadId);
-        if (!validation.isValid) {
-          console.error('🚫 [UNIFIED AI] Message failed validation:', validation.failures);
-          
-          // Use fallback response
-          console.log('🔄 [UNIFIED AI] Using fallback response due to validation failure');
+        // 4. Enhanced validation with quality scoring
+        const validation = await this.enhancedValidation(data.message, context);
+        if (!validation.approved) {
+          console.error('🚫 [UNIFIED AI] Message failed enhanced validation');
           return this.generateFallbackResponse(context);
         }
         
         return {
           message: data.message,
           intent: {
-            primary: data.intent || 'general_inquiry',
-            confidence: data.confidence || 0.7
+            primary: data.intent || sentiment.intent,
+            confidence: validation.score / 100
           },
-          responseStrategy: data.strategy || 'informative',
-          confidence: data.confidence || 0.7,
-          reasoning: `AI-generated response based on ${data.intent} intent`
+          responseStrategy: data.strategy || 'ai_optimized',
+          confidence: validation.score / 100,
+          reasoning: `Enhanced AI response (Quality: ${validation.score})`
         };
       }
 
@@ -74,9 +117,21 @@ class UnifiedAIResponseEngine {
       return this.generateFallbackResponse(context);
 
     } catch (error) {
-      console.error('❌ [UNIFIED AI] Error generating response:', error);
+      console.error('❌ [UNIFIED AI] Error generating enhanced response:', error);
       return this.generateFallbackResponse(context);
     }
+  }
+
+  private async enhancedValidation(message: string, context: MessageContext) {
+    const leadContext: LeadContext = {
+      leadId: context.leadId,
+      leadName: context.leadName,
+      vehicleInterest: context.vehicleInterest,
+      conversationHistory: context.conversationHistory,
+      leadData: {}
+    };
+    
+    return await enhancedQualityScoring.assessMessageQuality(message, leadContext);
   }
 
   // CRITICAL: Database-level validation using the prevention system
