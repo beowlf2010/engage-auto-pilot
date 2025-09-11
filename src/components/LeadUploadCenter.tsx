@@ -8,6 +8,8 @@ import { parseEnhancedInventoryFile } from "@/utils/enhancedFileParsingUtils";
 import { processLeads } from "./upload-leads/processLeads";
 import { FieldMapping } from "./csv-mapper/types";
 import { toast } from "@/hooks/use-toast";
+import { insertLeadsToDatabase } from "@/utils/supabaseLeadOperations";
+import { createUploadHistory, updateUploadHistory } from "@/utils/leadOperations/uploadHistoryService";
 import SimpleUploadArea from './leads/SimpleUploadArea';
 import LeadUploadInfoCard from './leads/LeadUploadInfoCard';
 import LeadUploadResult from './leads/LeadUploadResult';
@@ -104,17 +106,39 @@ const LeadUploadCenter = ({ user }: LeadUploadCenterProps) => {
         errors: processResult.errors.length
       });
 
-      // Simulate upload (replace with actual upload logic)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create upload history record
+      const uploadHistoryId = await createUploadHistory(
+        csvData.headers.join(','), // fileName placeholder
+        csvData.rows.length,
+        'CSV',
+        mapping
+      );
 
-      // Mock successful upload result
+      // Actually upload leads to database
+      const bulkResult = await insertLeadsToDatabase(
+        processResult.validLeads,
+        uploadHistoryId,
+        { updateExistingLeads: false, allowPartialData: true }
+      );
+
+      // Update upload history with results
+      await updateUploadHistory(uploadHistoryId, {
+        total_rows: processResult.validLeads.length,
+        successful_imports: bulkResult.successfulInserts,
+        failed_imports: bulkResult.errors.length,
+        duplicate_imports: bulkResult.duplicates.length,
+        processing_errors: bulkResult.errors,
+        upload_status: bulkResult.successfulInserts > 0 ? 'completed' : 'failed'
+      });
+
+      // Create result based on actual database operations
       const result: UploadResult = {
-        success: true,
+        success: bulkResult.successfulInserts > 0,
         totalProcessed: processResult.validLeads.length,
-        successfulInserts: processResult.validLeads.length,
-        errors: processResult.errors,
-        duplicates: processResult.duplicates,
-        message: 'Leads uploaded successfully',
+        successfulInserts: bulkResult.successfulInserts,
+        errors: [...processResult.errors, ...bulkResult.errors],
+        duplicates: [...processResult.duplicates, ...bulkResult.duplicates],
+        message: bulkResult.successfulInserts > 0 ? 'Leads uploaded successfully' : 'Upload failed',
         timestamp: new Date().toISOString()
       };
 
