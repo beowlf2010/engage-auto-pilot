@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom';
 import { useLeads } from '@/hooks/useLeads';
 import LeadsManagement from '@/components/leads/LeadsManagement';
 import TodayOnlyToggle from '@/components/leads/TodayOnlyToggle';
+import ManualLeadEntry from '@/components/leads/ManualLeadEntry';
 
 const LeadsPage = () => {
   const { profile, loading } = useAuth();
@@ -37,6 +38,7 @@ const LeadsPage = () => {
         />
       </div>
       <LeadsManagement />
+      <ManualLeadEntry />
     </div>
   );
 };
