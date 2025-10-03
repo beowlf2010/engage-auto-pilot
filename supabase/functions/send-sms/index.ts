@@ -1,6 +1,7 @@
 // EMERGENCY SHUTDOWN ENABLED - Enhanced safety checks for all outgoing messages
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2'
+import { normalizePhoneNumber } from './phoneUtils.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -120,23 +121,42 @@ serve(async (req) => {
     }
 
     const { to, message, leadId, conversationId } = await req.json()
-
+    
+    // Normalize phone number for consistent matching
+    const normalizedTo = normalizePhoneNumber(to);
+    
     console.log(`📱 Received request: {
   to: "${to}",
+  normalized: "${normalizedTo}",
   messageLength: ${message?.length || 0},
   conversationId: "${conversationId}",
   leadId: ${leadId || 'undefined'},
   profileId: ${leadId || 'undefined'},
   isAIGenerated: ${leadId || 'undefined'}
 }`);
+    
+    if (!normalizedTo) {
+      console.error(`❌ [VALIDATION] Failed to normalize phone number: ${to}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid phone number format',
+          conversationId
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
 
-    // Check suppression list
-    console.log(`🚫 [COMPLIANCE] Checking suppression list for: ${to}`);
+    // Check suppression list with normalized phone
+    console.log(`🚫 [COMPLIANCE] Checking suppression list for: ${normalizedTo}`);
     
     const { data: suppressionData, error: suppressionError } = await supabase
       .from('sms_suppression_list')
       .select('*')
-      .eq('phone_number', to)
+      .eq('phone_number', normalizedTo)
       .single();
 
     if (suppressionData) {
