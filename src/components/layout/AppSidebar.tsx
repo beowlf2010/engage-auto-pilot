@@ -106,16 +106,24 @@ export const AppSidebar = React.memo(function AppSidebar({ unreadCount = 0 }: Ap
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border">
-      <SidebarHeader className="border-b border-border p-4">
-        <div className="flex items-center gap-3">
-          <AutoVantageLogo />
+    <Sidebar 
+      collapsible="icon" 
+      className="border-r border-border/50 bg-sidebar-background/95 backdrop-blur-xl"
+    >
+      <SidebarHeader className="border-b border-border/50 p-4 bg-gradient-to-b from-sidebar-background/50 to-transparent">
+        <div className="flex items-center gap-3 transition-[var(--transition-smooth)]">
+          <div className="relative">
+            <AutoVantageLogo />
+            {!collapsed && (
+              <div className="absolute inset-0 bg-primary/5 blur-xl -z-10 rounded-xl" />
+            )}
+          </div>
           {!collapsed && profile && (
-            <div className="flex flex-col text-sm">
-              <span className="font-medium text-foreground">
+            <div className="flex flex-col text-sm animate-in fade-in-0 slide-in-from-left-2 duration-300">
+              <span className="font-semibold text-sidebar-foreground">
                 {profile.first_name} {profile.last_name}
               </span>
-              <span className="text-xs text-muted-foreground capitalize">
+              <span className="text-xs text-sidebar-foreground/60 capitalize">
                 {profile.role}
               </span>
             </div>
@@ -123,7 +131,7 @@ export const AppSidebar = React.memo(function AppSidebar({ unreadCount = 0 }: Ap
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2 py-3">
         {renderGroup("Main", navigationGroups.primary)}
         {renderGroup("AI Intelligence", navigationGroups.ai)}
         {renderGroup("Tools", navigationGroups.tools)}
@@ -131,12 +139,12 @@ export const AppSidebar = React.memo(function AppSidebar({ unreadCount = 0 }: Ap
         {renderGroup("Profile", navigationGroups.profile)}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border p-4">
+      <SidebarFooter className="border-t border-border/50 p-4 bg-gradient-to-t from-sidebar-background/50 to-transparent">
         <Button
           variant="ghost"
           onClick={handleSignOut}
           className={cn(
-            "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10",
+            "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 transition-[var(--transition-smooth)] hover:scale-[1.02]",
             collapsed && "px-2"
           )}
         >

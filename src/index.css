@@ -57,12 +57,15 @@
     --gradient-primary: linear-gradient(135deg, hsl(217 89% 61%), hsl(217 89% 71%));
     --gradient-surface: linear-gradient(145deg, hsl(0 0% 100%), hsl(210 11% 98%));
     --gradient-subtle: linear-gradient(180deg, hsl(210 11% 98%), hsl(0 0% 100%));
+    --gradient-mesh: radial-gradient(ellipse at top right, hsl(217 89% 61% / 0.05), hsl(0 0% 98%), hsl(262 83% 58% / 0.05));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(0 0% 100% / 0.95));
 
     /* Shadows */
     --shadow-elegant: 0 4px 12px -2px hsl(210 11% 15% / 0.08);
     --shadow-glow: 0 0 20px hsl(217 89% 61% / 0.15);
     --shadow-card: 0 2px 8px -1px hsl(210 11% 15% / 0.06);
     --shadow-floating: 0 8px 25px -5px hsl(210 11% 15% / 0.1);
+    --shadow-modern: 0 2px 8px -1px hsl(210 11% 15% / 0.1), 0 0 0 1px hsl(210 11% 15% / 0.02);
 
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -121,12 +124,15 @@
     --gradient-primary: linear-gradient(135deg, hsl(217 89% 65%), hsl(217 89% 75%));
     --gradient-surface: linear-gradient(145deg, hsl(210 11% 8%), hsl(210 11% 10%));
     --gradient-subtle: linear-gradient(180deg, hsl(210 11% 6%), hsl(210 11% 8%));
+    --gradient-mesh: radial-gradient(ellipse at top right, hsl(217 89% 65% / 0.1), hsl(210 11% 6%), hsl(262 83% 58% / 0.05));
+    --gradient-card: linear-gradient(145deg, hsl(210 11% 8%), hsl(210 11% 8% / 0.95));
 
     /* Dark shadows */
     --shadow-elegant: 0 4px 12px -2px hsl(0 0% 0% / 0.25);
     --shadow-glow: 0 0 20px hsl(217 89% 65% / 0.3);
     --shadow-card: 0 2px 8px -1px hsl(0 0% 0% / 0.2);
     --shadow-floating: 0 8px 25px -5px hsl(0 0% 0% / 0.4);
+    --shadow-modern: 0 2px 8px -1px hsl(0 0% 0% / 0.2), 0 0 0 1px hsl(0 0% 0% / 0.05);
   }
 }
 
