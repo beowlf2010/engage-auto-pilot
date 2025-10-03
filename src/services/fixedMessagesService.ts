@@ -130,14 +130,15 @@ export const sendMessage = async (
 
     console.log(`📱 [FIXED MESSAGES SERVICE] Found phone: ${phoneNumber}`);
 
-    // Step 2: Create conversation record first
-    console.log(`💾 [FIXED MESSAGES SERVICE] Creating conversation record...`);
+    // Step 2: Create conversation record first with phone_number for thread matching
+    console.log(`💾 [FIXED MESSAGES SERVICE] Creating conversation record with phone: ${phoneNumber}...`);
     
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
       .insert({
         lead_id: leadId,
         profile_id: profile.id,
+        phone_number: phoneNumber, // For phone-based thread matching
         body: messageContent.trim(),
         direction: 'out',
         ai_generated: isAIGenerated,

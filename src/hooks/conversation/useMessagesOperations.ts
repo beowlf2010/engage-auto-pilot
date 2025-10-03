@@ -58,14 +58,15 @@ export const useMessagesOperations = () => {
 
       console.log(`📱 [MESSAGES OPERATIONS] Found phone number: ${phoneData.number}`);
 
-      // Store the conversation record with profile_id
-      console.log(`💾 [MESSAGES OPERATIONS] Creating conversation record...`);
+      // Store the conversation record with profile_id and phone_number for thread matching
+      console.log(`💾 [MESSAGES OPERATIONS] Creating conversation record with phone: ${phoneData.number}...`);
       
       const { data: conversation, error: conversationError } = await supabase
         .from('conversations')
         .insert({
           lead_id: leadId,
           profile_id: profile.id,
+          phone_number: phoneData.number, // For phone-based thread matching
           body: messageBody.trim(),
           direction: 'out',
           ai_generated: false,

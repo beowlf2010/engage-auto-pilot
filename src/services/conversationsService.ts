@@ -77,7 +77,7 @@ export const fetchConversations = async (profile: any, options?: { scope?: 'my' 
       }))
     });
 
-// Get conversations for these leads
+// Get conversations for these leads, including phone_number for thread matching
 const leadIds = leads.map(lead => lead.id);
 
 // Build conversations query with optional date scope
@@ -86,6 +86,7 @@ let convQuery = supabase
   .select(`
     id,
     lead_id,
+    phone_number,
     body,
     direction,
     sent_at,
@@ -118,10 +119,17 @@ const { data: conversations, error: conversationsError } = await convQuery;
     });
 
     // Process conversations into the format expected by the UI
+    // Group by phone_number first for thread matching, then by lead_id
     const conversationMap = new Map<string, ConversationListItem>();
 
     leads.forEach(lead => {
-      const leadConversations = conversations?.filter(conv => conv.lead_id === lead.id) || [];
+      const phoneNumber = lead.phone_numbers?.[0]?.number || '';
+      
+      // Match conversations by phone_number first (for thread continuity), fallback to lead_id
+      const leadConversations = conversations?.filter(conv => 
+        (phoneNumber && conv.phone_number === phoneNumber) || conv.lead_id === lead.id
+      ) || [];
+      
       const lastMessage = leadConversations[0]; // Most recent due to ordering
       
       // Calculate unread count more carefully
@@ -135,10 +143,9 @@ const { data: conversations, error: conversationsError } = await convQuery;
         unreadMessages: unreadMessages.length,
         unreadCount,
         salespersonId: lead.salesperson_id,
-        hasLastMessage: !!lastMessage
+        hasLastMessage: !!lastMessage,
+        phoneNumber
       });
-
-      const phoneNumber = lead.phone_numbers?.[0]?.number || '';
       
       const conversationItem: ConversationListItem = {
         leadId: lead.id,

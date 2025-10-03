@@ -3410,6 +3410,7 @@ export type Database = {
           id: string
           is_initial_contact: boolean | null
           lead_id: string
+          phone_number: string | null
           profile_id: string | null
           read_at: string | null
           sent_at: string
@@ -3428,6 +3429,7 @@ export type Database = {
           id?: string
           is_initial_contact?: boolean | null
           lead_id: string
+          phone_number?: string | null
           profile_id?: string | null
           read_at?: string | null
           sent_at?: string
@@ -3446,6 +3448,7 @@ export type Database = {
           id?: string
           is_initial_contact?: boolean | null
           lead_id?: string
+          phone_number?: string | null
           profile_id?: string | null
           read_at?: string | null
           sent_at?: string
