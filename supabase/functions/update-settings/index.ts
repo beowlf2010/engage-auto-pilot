@@ -89,9 +89,9 @@ async function checkSecurityLimits(supabase: any, userId: string, clientIP?: str
   
   try {
     // Check hourly rate limit
-    const { data: hourlyRequests, error: hourlyError } = await supabase
+    const { data: hourlyRequests, error: hourlyError, count: hourlyCount } = await supabase
       .from('security_rate_limits')
-      .select('count(*)')
+      .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('operation_type', 'api_key_update')
       .gte('created_at', oneHourAgo.toISOString())
@@ -101,16 +101,16 @@ async function checkSecurityLimits(supabase: any, userId: string, clientIP?: str
       return { allowed: false, reason: 'Security check failed' }
     }
     
-    const hourlyCount = hourlyRequests?.[0]?.count || 0
-    if (hourlyCount >= MAX_API_KEY_OPERATIONS_PER_HOUR) {
-      console.warn(`Rate limit exceeded for user ${userId}: ${hourlyCount} operations in past hour`)
+    const actualHourlyCount = hourlyCount || 0
+    if (actualHourlyCount >= MAX_API_KEY_OPERATIONS_PER_HOUR) {
+      console.warn(`Rate limit exceeded for user ${userId}: ${actualHourlyCount} operations in past hour`)
       return { allowed: false, reason: 'Too many API key operations in the past hour. Please wait before trying again.' }
     }
     
     // Check daily rate limit
-    const { data: dailyRequests, error: dailyError } = await supabase
+    const { data: dailyRequests, error: dailyError, count: dailyCount } = await supabase
       .from('security_rate_limits')
-      .select('count(*)')
+      .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('operation_type', 'api_key_update')
       .gte('created_at', oneDayAgo.toISOString())
@@ -120,19 +120,19 @@ async function checkSecurityLimits(supabase: any, userId: string, clientIP?: str
       return { allowed: false, reason: 'Security check failed' }
     }
     
-    const dailyCount = dailyRequests?.[0]?.count || 0
-    if (dailyCount >= MAX_API_KEY_OPERATIONS_PER_DAY) {
-      console.warn(`Daily rate limit exceeded for user ${userId}: ${dailyCount} operations today`)
+    const actualDailyCount = dailyCount || 0
+    if (actualDailyCount >= MAX_API_KEY_OPERATIONS_PER_DAY) {
+      console.warn(`Daily rate limit exceeded for user ${userId}: ${actualDailyCount} operations today`)
       return { allowed: false, reason: 'Daily API key operation limit reached. Please try again tomorrow.' }
     }
     
     // Check for suspicious activity patterns
-    if (hourlyCount >= SUSPICIOUS_ACTIVITY_THRESHOLD) {
-      console.warn(`Suspicious activity detected for user ${userId}: ${hourlyCount} operations in past hour`)
+    if (actualHourlyCount >= SUSPICIOUS_ACTIVITY_THRESHOLD) {
+      console.warn(`Suspicious activity detected for user ${userId}: ${actualHourlyCount} operations in past hour`)
       // Log but don't block - just increase monitoring
       await logSecurityEvent(supabase, userId, 'suspicious_api_key_activity', {
-        hourly_count: hourlyCount,
-        daily_count: dailyCount,
+        hourly_count: actualHourlyCount,
+        daily_count: actualDailyCount,
         client_ip: clientIP
       })
     }
