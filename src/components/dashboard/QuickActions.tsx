@@ -106,25 +106,25 @@ export const QuickActions = React.memo<QuickActionsProps>(({
   ];
 
   return (
-    <Card>
+    <Card variant="floating" className="h-full">
       <CardHeader>
-        <CardTitle>Quick Actions</CardTitle>
+        <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           {quickActions.map((action, index) => (
             <Button
               key={index}
-              variant="outline"
-              className="h-auto p-4 flex flex-col items-start gap-3 relative hover:bg-accent transition-colors"
+              variant="glass"
+              className={`h-auto p-4 flex flex-col items-start gap-3 relative hover:scale-[1.03] hover:-translate-y-0.5 transition-[var(--transition-smooth)] hover:shadow-[var(--shadow-floating)] animate-in fade-in-0 slide-in-from-bottom-2 duration-300 delay-[${index * 100}ms]`}
               onClick={action.action}
             >
               <div className="flex items-center gap-3 w-full">
-                <div className={`p-2 rounded-lg ${action.color} text-white`}>
-                  <action.icon className="w-4 h-4" />
+                <div className={`p-2.5 rounded-xl ${action.color} text-white shadow-lg`}>
+                  <action.icon className="w-5 h-5" />
                 </div>
                 <div className="text-left">
-                  <div className="font-medium">{action.title}</div>
+                  <div className="font-semibold text-sm">{action.title}</div>
                   <div className="text-xs text-muted-foreground">
                     {action.description}
                   </div>
@@ -142,8 +142,8 @@ export const QuickActions = React.memo<QuickActionsProps>(({
 
                 return (
                   <Badge
-                    variant={variant}
-                    className="absolute top-2 right-2 h-5 min-w-[1.25rem] px-1.5 flex items-center justify-center text-[10px]"
+                    variant={variant === 'default' ? 'gradient' : variant}
+                    className="absolute top-2 right-2 h-5 min-w-[1.25rem] px-2 flex items-center justify-center text-[10px] font-bold shadow-sm animate-pulse-glow"
                     role="status"
                     aria-label={label}
                     title={label}

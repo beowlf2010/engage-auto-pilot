@@ -58,39 +58,42 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
 
   return (
     <SafeErrorBoundary>
-      <div className="space-y-4">
-        {/* Compact Welcome Header */}
-        <div className="bg-gradient-to-r from-primary to-primary/80 rounded-lg p-4 text-primary-foreground">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold">Welcome back, {user.firstName}! 👋</h1>
-              <p className="text-primary-foreground/90 text-sm">Sales performance overview</p>
+      <div className="space-y-6 animate-in fade-in-0 duration-500">
+        {/* Modern Welcome Header with Glassmorphism */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-primary/90 to-primary-glow p-6 text-primary-foreground shadow-[var(--shadow-glow)]">
+          {/* Animated mesh gradient overlay */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary-glow/20 via-transparent to-transparent opacity-50" />
+          
+          <div className="relative flex items-center justify-between">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold tracking-tight">Welcome back, {user.firstName}! 👋</h1>
+              <p className="text-primary-foreground/80 text-sm font-medium">Sales performance overview</p>
             </div>
             
             <div className="flex items-center gap-2">
               {hasAnyData ? (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xl rounded-full px-3 py-1.5 border border-white/20">
                   {isRefetching ? (
-                    <Database className="h-4 w-4 text-yellow-300 animate-pulse" />
+                    <Database className="h-4 w-4 text-white animate-pulse" />
                   ) : (
-                    <Wifi className="h-4 w-4 text-green-300" />
+                    <Wifi className="h-4 w-4 text-white" />
                   )}
-                  <Badge variant="secondary" className="bg-white/20 text-white text-xs">
+                  <Badge variant="glass" className="bg-white/20 text-white text-xs border-0">
                     {isRefetching ? 'Syncing...' : 'Live'}
                   </Badge>
                 </div>
               ) : (
-                <WifiOff className="h-4 w-4 text-yellow-300" />
+                <WifiOff className="h-4 w-4 text-white/60" />
               )}
               
               <Button
-                variant="ghost"
+                variant="glass"
                 size="sm"
                 onClick={refetch}
                 disabled={isLoading}
-                className="text-white hover:bg-white/20 h-8 px-2"
+                className="text-white hover:bg-white/20 h-9 px-3 border-white/30 transition-[var(--transition-smooth)] hover:scale-105"
               >
-                <RefreshCw className={`h-3 w-3 ${isLoading || isRefetching ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${isLoading || isRefetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </div>
@@ -115,8 +118,8 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
           )}
         </SafeErrorBoundary>
 
-        {/* Compact Grid Layout */}
-        <div className="grid grid-cols-1 xl:grid-cols-6 gap-4">
+        {/* Modern Grid Layout with Staggered Animation */}
+        <div className="grid grid-cols-1 xl:grid-cols-6 gap-6">
           {/* Quick Actions */}
           <div className="xl:col-span-2">
             <SafeErrorBoundary>

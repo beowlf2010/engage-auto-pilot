@@ -95,17 +95,17 @@ const AIInsightsWidget = () => {
   }
 
   return (
-    <Card className="h-full">
+    <Card variant="floating" className="h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <Brain className="h-5 w-5 text-primary" />
           AI Insights
         </CardTitle>
         <Button
-          variant="ghost"
+          variant="glass"
           size="sm"
           onClick={refresh}
-          className="h-8 px-2"
+          className="h-8 px-2 hover:scale-110 transition-transform"
         >
           <TrendingUp className="h-4 w-4" />
         </Button>
@@ -131,33 +131,35 @@ const AIInsightsWidget = () => {
               return (
                 <div
                   key={insight.id}
-                  className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${colorClasses}`}
+                  className={`p-4 rounded-xl border backdrop-blur-xl transition-[var(--transition-smooth)] hover:scale-[1.02] hover:shadow-[var(--shadow-elegant)] animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ${colorClasses}`}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 flex-1">
-                      <IconComponent className="h-4 w-4 flex-shrink-0" />
+                      <div className="p-1.5 rounded-lg bg-background/50 backdrop-blur-sm">
+                        <IconComponent className="h-4 w-4 flex-shrink-0" />
+                      </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-medium text-sm leading-tight">
+                        <h4 className="font-semibold text-sm leading-tight">
                           {insight.title}
                         </h4>
                       </div>
                     </div>
                     <Badge 
-                      variant="secondary" 
-                      className={`text-xs ml-2 ${badgeColor}`}
+                      variant={insight.priority === 'high' ? 'destructive' : insight.priority === 'medium' ? 'warning' : 'glass'}
+                      className={`text-xs ml-2 shadow-sm`}
                     >
                       {insight.priority}
                     </Badge>
                   </div>
                   
-                  <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
+                  <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
                     {insight.description}
                   </p>
                   
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-xs">
+                    <div className="flex items-center gap-1 text-xs bg-background/30 rounded-full px-2 py-1">
                       <CheckCircle className="h-3 w-3" />
-                      <span className="text-muted-foreground">
+                      <span className="text-muted-foreground font-medium">
                         {Math.round(insight.confidence * 100)}% confidence
                       </span>
                     </div>
@@ -166,7 +168,7 @@ const AIInsightsWidget = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleInsightAction(insight)}
-                      className="h-6 px-2 text-xs"
+                      className="h-7 px-2 text-xs hover:bg-background/50 transition-[var(--transition-smooth)]"
                     >
                       {insight.actionText}
                       <ArrowRight className="h-3 w-3 ml-1" />
@@ -174,7 +176,7 @@ const AIInsightsWidget = () => {
                   </div>
                   
                   {insight.impact && (
-                    <div className="mt-2 pt-2 border-t border-current/10">
+                    <div className="mt-3 pt-3 border-t border-current/10 bg-background/20 rounded-lg p-2">
                       <p className="text-xs text-muted-foreground italic">
                         💡 {insight.impact}
                       </p>

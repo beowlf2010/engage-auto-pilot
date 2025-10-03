@@ -76,11 +76,11 @@ export const EnhancedDashboardStats = React.memo<EnhancedDashboardStatsProps>(({
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
-        {/* Time Filter Controls */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">View:</span>
-          <div className="flex gap-1">
+      <div className="space-y-6">
+        {/* Modern Time Filter Controls */}
+        <div className="flex items-center gap-3 animate-in fade-in-0 slide-in-from-top-2 duration-300">
+          <span className="text-sm font-semibold text-foreground">View:</span>
+          <div className="flex gap-2">
             {[
               { key: 'today' as const, label: 'Today', icon: Calendar },
               { key: 'week' as const, label: 'This Week', icon: CalendarDays },
@@ -88,10 +88,10 @@ export const EnhancedDashboardStats = React.memo<EnhancedDashboardStatsProps>(({
             ].map(({ key, label, icon: Icon }) => (
               <Button
                 key={key}
-                variant={timeFilter === key ? "default" : "outline"}
+                variant={timeFilter === key ? "gradient" : "glass"}
                 size="sm"
                 onClick={() => setTimeFilter(key)}
-                className="text-xs"
+                className="text-xs font-medium transition-[var(--transition-smooth)]"
               >
                 <Icon className="h-3 w-3 mr-1" />
                 {label}
@@ -100,27 +100,27 @@ export const EnhancedDashboardStats = React.memo<EnhancedDashboardStatsProps>(({
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Modern Stats Grid with Glass Cards */}
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           {/* Messages Sent */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card className="hover:shadow-md transition-shadow">
+              <Card variant="floating" interactive className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300 delay-[100ms]">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
+                  <CardTitle className="text-sm font-semibold">
                     Messages Sent
-                    <Badge variant="secondary" className="ml-2 text-xs">
+                    <Badge variant="glass" className="ml-2 text-xs">
                       {timeFilter === 'today' ? 'Today' : timeFilter === 'week' ? 'Week' : 'Total'}
                     </Badge>
                   </CardTitle>
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  <MessageSquare className="h-5 w-5 text-primary" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-3xl font-bold tracking-tight">
                     {timeFilter === 'today' ? (messageStats?.messages_sent || 0) : 
                      timeFilter === 'week' ? '---' : '---'}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {timeFilter === 'today' && formatChangeText(messageStats?.change_sent, "Today's outbound messages")}
                     {timeFilter === 'week' && "Weekly outbound activity"}
                     {timeFilter === 'total' && "All-time sent messages"}
@@ -136,22 +136,22 @@ export const EnhancedDashboardStats = React.memo<EnhancedDashboardStatsProps>(({
           {/* Replies Received */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card className="hover:shadow-md transition-shadow">
+              <Card variant="floating" interactive className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300 delay-[200ms]">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
+                  <CardTitle className="text-sm font-semibold">
                     Replies Received
-                    <Badge variant="secondary" className="ml-2 text-xs">
+                    <Badge variant="glass" className="ml-2 text-xs">
                       {timeFilter === 'today' ? 'Today' : timeFilter === 'week' ? 'Week' : 'Total'}
                     </Badge>
                   </CardTitle>
-                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <Mail className="h-5 w-5 text-success" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-3xl font-bold tracking-tight">
                     {timeFilter === 'today' ? (messageStats?.replies_in || 0) :
                      timeFilter === 'week' ? '---' : '---'}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {timeFilter === 'today' && formatChangeText(messageStats?.change_replies, "Today's inbound messages")}
                     {timeFilter === 'week' && "Weekly response activity"}
                     {timeFilter === 'total' && "All-time received replies"}

@@ -63,45 +63,45 @@ export const TrendsWidget: React.FC<TrendsWidgetProps> = ({ trends, loading }) =
   const hasEnoughData = chartData.length >= 2;
 
   return (
-    <Card>
+    <Card variant="floating" className="h-full">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+          <Activity className="h-5 w-5 text-primary" />
           Trends & Analytics
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Key Metrics */}
+        {/* Key Metrics with Glass Effect */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
+          <div className="space-y-2 p-3 rounded-lg bg-card/40 backdrop-blur-xl border border-border/30 transition-[var(--transition-smooth)] hover:bg-card/60">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Response Rate</span>
-              <Badge variant={trends.responseRate > 30 ? 'default' : 'secondary'}>
+              <span className="text-sm font-medium text-foreground">Response Rate</span>
+              <Badge variant={trends.responseRate > 30 ? 'gradient' : 'glass'} className="shadow-sm">
                 {trends.responseRate}%
               </Badge>
             </div>
             <div className="flex items-center gap-1 text-xs">
               {trends.responseRate > 30 ? (
-                <TrendingUp className="h-3 w-3 text-green-500" />
+                <TrendingUp className="h-3 w-3 text-success" />
               ) : (
-                <TrendingDown className="h-3 w-3 text-orange-500" />
+                <TrendingDown className="h-3 w-3 text-warning" />
               )}
-              <span className="text-muted-foreground">
+              <span className="text-muted-foreground font-medium">
                 {trends.responseRate > 30 ? 'Above average' : 'Needs improvement'}
               </span>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 p-3 rounded-lg bg-card/40 backdrop-blur-xl border border-border/30 transition-[var(--transition-smooth)] hover:bg-card/60">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Conversion</span>
-              <Badge variant={trends.conversionRate > 15 ? 'default' : 'secondary'}>
+              <span className="text-sm font-medium text-foreground">Conversion</span>
+              <Badge variant={trends.conversionRate > 15 ? 'gradient' : 'glass'} className="shadow-sm">
                 {trends.conversionRate}%
               </Badge>
             </div>
             <div className="flex items-center gap-1 text-xs">
-              <Target className="h-3 w-3 text-blue-500" />
-              <span className="text-muted-foreground">
+              <Target className="h-3 w-3 text-primary" />
+              <span className="text-muted-foreground font-medium">
                 {totalLeadsThisWeek} leads this week
               </span>
             </div>
