@@ -116,18 +116,19 @@ serve(async (req) => {
           lead_id: leadId,
           number: normalizedPhone,
           is_primary: true,
-          type: 'mobile'
+          type: 'cell' // Use 'cell' - valid types are 'cell', 'day', 'eve'
         });
 
       console.log('✅ [SMS WEBHOOK] Created new lead:', leadId);
     }
 
     // Insert the conversation with normalized phone_number for thread matching
+    // CRITICAL: Always explicitly set phone_number to ensure thread matching works
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
       .insert({
         lead_id: leadId,
-        phone_number: normalizedPhone, // Critical for thread matching
+        phone_number: normalizedPhone, // Explicitly set for phone-based thread matching
         body: messageBody,
         direction: 'in',
         sent_at: new Date().toISOString(),
