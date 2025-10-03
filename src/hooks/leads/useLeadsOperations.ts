@@ -17,10 +17,20 @@ export const useLeadsOperations = () => {
 
       if (fetchError) throw fetchError;
 
-      const { error } = await supabase
-        .from('leads')
-        .update({ ai_opt_in: aiOptIn })
-        .eq('id', leadId);
+    const updateData: any = { ai_opt_in: aiOptIn };
+
+    // If enabling AI, set immediate send time and clear pause
+    if (aiOptIn) {
+      updateData.next_ai_send_at = new Date().toISOString();
+      updateData.ai_stage = 'ready_for_contact';
+      updateData.ai_sequence_paused = false;
+      updateData.ai_pause_reason = null;
+    }
+
+    const { error } = await supabase
+      .from('leads')
+      .update(updateData)
+      .eq('id', leadId);
 
       if (error) throw error;
 
