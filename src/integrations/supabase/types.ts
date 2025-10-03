@@ -8801,6 +8801,10 @@ export type Database = {
         Args: { phone_input: string }
         Returns: string
       }
+      normalize_phone_number: {
+        Args: { phone: string }
+        Returns: string
+      }
       promote_user_to_admin: {
         Args: { justification?: string; target_user_id: string }
         Returns: Json

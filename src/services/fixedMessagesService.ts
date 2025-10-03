@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { normalizePhoneNumber } from '@/utils/phoneUtils';
 
 // CRITICAL: AI message content validation using the prevention system
 const validateMessageContent = async (message: string, leadId?: string): Promise<{ isValid: boolean; failures: string[] }> => {
@@ -129,16 +130,26 @@ export const sendMessage = async (
     }
 
     console.log(`📱 [FIXED MESSAGES SERVICE] Found phone: ${phoneNumber}`);
+    
+    // Normalize phone number for consistent thread matching
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    
+    if (!normalizedPhone) {
+      console.error(`❌ [FIXED MESSAGES SERVICE] Failed to normalize phone number: ${phoneNumber}`);
+      throw new Error('Invalid phone number format');
+    }
+    
+    console.log(`📱 [FIXED MESSAGES SERVICE] Normalized phone: ${phoneNumber} → ${normalizedPhone}`);
 
-    // Step 2: Create conversation record first with phone_number for thread matching
-    console.log(`💾 [FIXED MESSAGES SERVICE] Creating conversation record with phone: ${phoneNumber}...`);
+    // Step 2: Create conversation record first with normalized phone_number for thread matching
+    console.log(`💾 [FIXED MESSAGES SERVICE] Creating conversation record with normalized phone: ${normalizedPhone}...`);
     
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')
       .insert({
         lead_id: leadId,
         profile_id: profile.id,
-        phone_number: phoneNumber, // For phone-based thread matching
+        phone_number: normalizedPhone, // Normalized for consistent thread matching
         body: messageContent.trim(),
         direction: 'out',
         ai_generated: isAIGenerated,

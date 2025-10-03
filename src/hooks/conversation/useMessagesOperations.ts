@@ -4,6 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import type { MessageData } from './conversationTypes';
+import { normalizePhoneNumber } from '@/utils/phoneUtils';
+import { toast } from 'sonner';
 
 export const useMessagesOperations = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
@@ -58,15 +60,27 @@ export const useMessagesOperations = () => {
 
       console.log(`📱 [MESSAGES OPERATIONS] Found phone number: ${phoneData.number}`);
 
-      // Store the conversation record with profile_id and phone_number for thread matching
-      console.log(`💾 [MESSAGES OPERATIONS] Creating conversation record with phone: ${phoneData.number}...`);
+      // Normalize phone number for consistent thread matching
+      const normalizedPhone = normalizePhoneNumber(phoneData.number);
+      
+      if (!normalizedPhone) {
+        console.error(`❌ [MESSAGES OPERATIONS] Failed to normalize phone number: ${phoneData.number}`);
+        toast.error("Invalid phone number format");
+        setSendingMessage(false);
+        return;
+      }
+      
+      console.log(`📱 [MESSAGES OPERATIONS] Normalized phone: ${phoneData.number} → ${normalizedPhone}`);
+      
+      // Store the conversation record with normalized phone_number for thread matching
+      console.log(`💾 [MESSAGES OPERATIONS] Creating conversation record with normalized phone: ${normalizedPhone}...`);
       
       const { data: conversation, error: conversationError } = await supabase
         .from('conversations')
         .insert({
           lead_id: leadId,
           profile_id: profile.id,
-          phone_number: phoneData.number, // For phone-based thread matching
+          phone_number: normalizedPhone, // Normalized for consistent thread matching
           body: messageBody.trim(),
           direction: 'out',
           ai_generated: false,

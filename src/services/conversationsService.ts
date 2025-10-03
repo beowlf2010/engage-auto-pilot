@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { ConversationListItem, MessageData } from '@/types/conversation';
+import { normalizePhoneNumber } from '@/utils/phoneUtils';
 
 const MAX_LEADS = 200;
 
@@ -35,7 +36,7 @@ export const fetchConversations = async (profile: any, options?: { scope?: 'my' 
         lead_source_name,
         vehicle_interest,
         salesperson_id,
-        phone_numbers:phone_numbers(number)
+        phone_numbers:phone_numbers(number, is_primary)
       `)
       .order('created_at', { ascending: false })
       .limit(MAX_LEADS);
@@ -123,12 +124,31 @@ const { data: conversations, error: conversationsError } = await convQuery;
     const conversationMap = new Map<string, ConversationListItem>();
 
     leads.forEach(lead => {
-      const phoneNumber = lead.phone_numbers?.[0]?.number || '';
+      // Get primary phone for thread matching and normalize it
+      const phoneNumber = lead.phone_numbers?.find(p => p.is_primary)?.number || 
+                         lead.phone_numbers?.[0]?.number;
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
       
-      // Match conversations by phone_number first (for thread continuity), fallback to lead_id
-      const leadConversations = conversations?.filter(conv => 
-        (phoneNumber && conv.phone_number === phoneNumber) || conv.lead_id === lead.id
-      ) || [];
+      if (!normalizedPhone) {
+        console.warn(`⚠️ [THREAD MATCHING] No valid phone number for lead ${lead.id}`);
+      }
+      
+      // Group conversations by normalized phone_number first (for thread continuity), then by lead_id
+      const leadConversations = conversations?.filter(conv => {
+        // First priority: exact normalized phone number match
+        if (normalizedPhone && conv.phone_number) {
+          const convNormalized = normalizePhoneNumber(conv.phone_number);
+          if (convNormalized === normalizedPhone) {
+            return true;
+          }
+        }
+        // Fallback: exact lead_id match
+        return conv.lead_id === lead.id;
+      }) || [];
+      
+      if (leadConversations.length > 0) {
+        console.log(`📞 [THREAD MATCHING] Found ${leadConversations.length} conversations for lead ${lead.id} (phone: ${normalizedPhone})`);
+      }
       
       const lastMessage = leadConversations[0]; // Most recent due to ordering
       
