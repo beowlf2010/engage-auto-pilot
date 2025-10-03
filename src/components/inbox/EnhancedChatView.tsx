@@ -122,42 +122,53 @@ const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
   const canReply = true; // Always allow replies
 
   return (
-    <Card className="h-full flex flex-col">
-      {/* Header */}
-      <CardHeader className="flex-shrink-0 border-b bg-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center space-x-2">
-              <span>{selectedConversation.leadName}</span>
-              {selectedConversation.unreadCount > 0 && (
-                <Badge variant="destructive">{selectedConversation.unreadCount} unread</Badge>
-              )}
-            </CardTitle>
-            <div className="flex items-center space-x-4 text-sm text-gray-600 mt-2">
-              <div className="flex items-center space-x-1">
-                <Phone className="h-4 w-4" />
-                <span>{selectedConversation.leadPhone}</span>
+    <Card className="h-full flex flex-col bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-800 border-none shadow-none">
+      {/* Modern Floating Header with Glass Effect */}
+      <div className="flex-shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/30 shadow-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <CardTitle className="flex items-center space-x-3 text-xl">
+                <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent font-bold">
+                  {selectedConversation.leadName}
+                </span>
+                {selectedConversation.unreadCount > 0 && (
+                  <Badge 
+                    variant="default" 
+                    className="bg-gradient-to-r from-primary to-blue-600 shadow-lg shadow-primary/30 animate-pulse-glow px-3 py-1"
+                  >
+                    {selectedConversation.unreadCount} unread
+                  </Badge>
+                )}
+              </CardTitle>
+              <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-3">
+                <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-full border border-blue-100 dark:border-blue-800/30">
+                  <Phone className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{selectedConversation.leadPhone}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-muted-foreground/50">•</span>
+                  <span className="font-medium">{selectedConversation.vehicleInterest}</span>
+                </div>
               </div>
-              <span>•</span>
-              <span>{selectedConversation.vehicleInterest}</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {latestInbound && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={scrollToLatestInbound}
+                  className="flex items-center space-x-2 hover:bg-primary/10 hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span>Latest Message</span>
+                </Button>
+              )}
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            {latestInbound && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={scrollToLatestInbound}
-                className="flex items-center space-x-2"
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span>Latest Message</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
+        </CardHeader>
+      </div>
 
       {/* Messages Container - Flexible height */}
       <div className="flex-1 relative min-h-0">
@@ -176,24 +187,30 @@ const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
               <div
                 key={message.id || index}
                 id={`message-${message.id}`}
-                className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'} animate-in fade-in-0 slide-in-from-bottom-2 duration-400`}
+                style={{ animationDelay: `${Math.min(index * 50, 500)}ms`, animationFillMode: 'backwards' }}
               >
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  className={`max-w-xs lg:max-w-md px-5 py-3 rounded-2xl transition-all duration-300 ${
                     message.direction === 'out'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-900 border-l-4 border-blue-500'
+                      ? 'bg-gradient-to-br from-primary via-blue-600 to-blue-700 text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40'
+                      : 'bg-white/80 dark:bg-gray-800/80 backdrop-blur-md text-foreground border-l-4 border-primary shadow-md hover:shadow-lg'
                   }`}
                 >
-                  <p className="text-sm">{message.body}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className={`text-xs ${
-                      message.direction === 'out' ? 'text-blue-100' : 'text-gray-500'
+                  <p className="text-sm leading-relaxed">{message.body}</p>
+                  <div className="flex items-center justify-between mt-2 gap-2">
+                    <span className={`text-xs font-medium ${
+                      message.direction === 'out' ? 'text-white/80' : 'text-muted-foreground'
                     }`}>
                       {formatDistanceToNow(new Date(message.sentAt), { addSuffix: true })}
                     </span>
                     {message.direction === 'out' && message.aiGenerated && (
-                      <Badge variant="secondary" className="text-xs ml-2">AI</Badge>
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs ml-2 bg-white/20 dark:bg-white/10 backdrop-blur-sm border-white/30 text-white shadow-sm"
+                      >
+                        AI
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -203,45 +220,53 @@ const EnhancedChatView: React.FC<EnhancedChatViewProps> = ({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Scroll to bottom button */}
+        {/* Modern Floating Scroll to Bottom Button */}
         {showScrollToBottom && (
           <Button
-            className="absolute bottom-4 right-4 rounded-full h-10 w-10 p-0 shadow-lg"
+            className="absolute bottom-6 right-6 rounded-full h-12 w-12 p-0 bg-gradient-to-br from-primary to-blue-600 shadow-xl shadow-primary/40 hover:shadow-2xl hover:shadow-primary/50 hover:scale-110 transition-all duration-300 border-2 border-white dark:border-gray-800"
             onClick={() => scrollToBottom()}
             size="sm"
           >
-            <ArrowDown className="h-4 w-4" />
+            <ArrowDown className="h-5 w-5 text-white" />
           </Button>
         )}
       </div>
 
-      {/* Message Input - Fixed at bottom */}
+      {/* Modern Floating Input with Glass Effect */}
       {canReply && (
-        <div className="flex-shrink-0 border-t bg-white p-4">
-          <div className="flex space-x-2">
-            <Textarea
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              className="flex-1 min-h-[44px] max-h-32 resize-none"
-              disabled={sending || isLoading}
-            />
+        <div className="flex-shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/30 p-4 shadow-lg">
+          <div className="flex space-x-3">
+            <div className="flex-1 relative">
+              <Textarea
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                className="flex-1 min-h-[56px] max-h-32 resize-none bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200 dark:border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300 rounded-xl shadow-sm focus:shadow-md"
+                disabled={sending || isLoading}
+              />
+              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                {messageText.length > 0 && `${messageText.length} chars`}
+              </div>
+            </div>
             <Button
               onClick={handleSendMessage}
               disabled={!messageText.trim() || sending || isLoading}
-              size="sm"
-              className="self-end px-4 h-[44px]"
+              size="lg"
+              className="self-end px-6 h-[56px] bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all duration-300 hover:scale-105"
             >
               {sending || isLoading ? (
-                <Clock className="h-4 w-4 animate-pulse" />
+                <Clock className="h-5 w-5 animate-spin" />
               ) : (
-                <Send className="h-4 w-4" />
+                <Send className="h-5 w-5" />
               )}
             </Button>
           </div>
-          <div className="text-xs text-gray-500 mt-1">
-            Press Enter to send, Shift+Enter for new line
+          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 px-1">
+            <span>Press Enter to send, Shift+Enter for new line</span>
+            {messageText.length > 0 && messageText.length < 20 && (
+              <span className="text-amber-600 dark:text-amber-400 font-medium">Min 20 characters</span>
+            )}
           </div>
         </div>
       )}
