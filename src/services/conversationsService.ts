@@ -120,7 +120,7 @@ const { data: conversations, error: conversationsError } = await convQuery;
     });
 
     // Process conversations into the format expected by the UI
-    // Group by phone_number first for thread matching, then by lead_id
+    // GROUP BY PHONE NUMBER to consolidate duplicate leads into single threads
     const conversationMap = new Map<string, ConversationListItem>();
 
     leads.forEach(lead => {
@@ -130,35 +130,51 @@ const { data: conversations, error: conversationsError } = await convQuery;
       const normalizedPhone = normalizePhoneNumber(phoneNumber);
       
       if (!normalizedPhone) {
-        console.warn(`⚠️ [THREAD MATCHING] No valid phone number for lead ${lead.id}`);
+        console.warn(`⚠️ [THREAD MATCHING] Skipping lead ${lead.id} - no valid phone number`);
+        return; // Skip leads without phone numbers
       }
       
-      // Group conversations by normalized phone_number first (for thread continuity), then by lead_id
-      const leadConversations = conversations?.filter(conv => {
-        // First priority: exact normalized phone number match
-        if (normalizedPhone && conv.phone_number) {
-          const convNormalized = normalizePhoneNumber(conv.phone_number);
-          if (convNormalized === normalizedPhone) {
-            return true;
-          }
+      // Check if we already have a thread for this phone number
+      if (conversationMap.has(normalizedPhone)) {
+        const existing = conversationMap.get(normalizedPhone)!;
+        
+        // Prefer lead with actual name over "Unknown Caller"
+        const isUnknown = lead.first_name?.includes('Unknown') || lead.last_name?.includes('Unknown');
+        const existingIsUnknown = existing.leadName.includes('Unknown');
+        
+        if (!isUnknown && existingIsUnknown) {
+          console.log(`📝 [THREAD MATCHING] Upgrading thread name from "${existing.leadName}" to "${lead.first_name} ${lead.last_name}" for phone ${normalizedPhone}`);
+          existing.leadName = `${lead.first_name} ${lead.last_name}`.trim();
+          existing.leadId = lead.id; // Use better lead ID
+          existing.leadEmail = lead.email || existing.leadEmail;
+          existing.vehicleInterest = lead.vehicle_interest || existing.vehicleInterest;
+          existing.salespersonId = lead.salesperson_id || existing.salespersonId;
         }
-        // Fallback: exact lead_id match
-        return conv.lead_id === lead.id;
+        
+        // Continue to next lead (already processed this phone)
+        return;
+      }
+      
+      // Get ALL conversations matching this normalized phone number (across all leads)
+      const phoneConversations = conversations?.filter(conv => {
+        if (!conv.phone_number) return false;
+        const convNormalized = normalizePhoneNumber(conv.phone_number);
+        return convNormalized === normalizedPhone;
       }) || [];
       
-      if (leadConversations.length > 0) {
-        console.log(`📞 [THREAD MATCHING] Found ${leadConversations.length} conversations for lead ${lead.id} (phone: ${normalizedPhone})`);
+      if (phoneConversations.length > 0) {
+        console.log(`📞 [THREAD MATCHING] Found ${phoneConversations.length} conversations for phone ${normalizedPhone} (lead: ${lead.id})`);
       }
       
-      const lastMessage = leadConversations[0]; // Most recent due to ordering
+      const lastMessage = phoneConversations[0]; // Most recent due to ordering
       
-      // Calculate unread count more carefully
-      const incomingMessages = leadConversations.filter(conv => conv.direction === 'in');
+      // Calculate unread count across ALL conversations for this phone
+      const incomingMessages = phoneConversations.filter(conv => conv.direction === 'in');
       const unreadMessages = incomingMessages.filter(conv => !conv.read_at);
       const unreadCount = unreadMessages.length;
 
-      console.log(`🔍 [CONVERSATIONS SERVICE] Lead ${lead.id} (${lead.first_name} ${lead.last_name}) processing:`, {
-        totalMessages: leadConversations.length,
+      console.log(`🔍 [CONVERSATIONS SERVICE] Phone ${normalizedPhone} (lead ${lead.id}) processing:`, {
+        totalMessages: phoneConversations.length,
         incomingMessages: incomingMessages.length,
         unreadMessages: unreadMessages.length,
         unreadCount,
@@ -177,7 +193,7 @@ const { data: conversations, error: conversationsError } = await convQuery;
         lastMessageTime: lastMessage?.sent_at || lead.created_at,
         lastMessageDirection: lastMessage?.direction as 'in' | 'out' || 'out',
         unreadCount,
-        messageCount: leadConversations.length,
+        messageCount: phoneConversations.length,
         salespersonId: lead.salesperson_id,
         vehicleInterest: lead.vehicle_interest || '',
         leadSource: lead.lead_source_name || 'Unknown',
@@ -187,12 +203,13 @@ const { data: conversations, error: conversationsError } = await convQuery;
         isAiGenerated: lastMessage?.ai_generated || false
       };
 
-      // Only add to map if lead has conversations OR unread messages OR is part of conversations
-      if (leadConversations.length > 0 || unreadCount > 0) {
-        conversationMap.set(lead.id, conversationItem);
-        console.log(`✅ [CONVERSATIONS SERVICE] Added conversation for lead ${lead.id} with ${unreadCount} unread`);
+      // Only add to map if there are actual conversations for this phone
+      if (phoneConversations.length > 0 || unreadCount > 0) {
+        // KEY CHANGE: Group by normalized phone, not lead ID
+        conversationMap.set(normalizedPhone, conversationItem);
+        console.log(`✅ [CONVERSATIONS SERVICE] Added conversation for phone ${normalizedPhone} (lead ${lead.id}) with ${unreadCount} unread`);
       } else {
-        console.log(`⏭️ [CONVERSATIONS SERVICE] Skipped lead ${lead.id} (no conversations)`);
+        console.log(`⏭️ [CONVERSATIONS SERVICE] Skipped phone ${normalizedPhone} (no conversations)`);
       }
     });
 
@@ -239,16 +256,42 @@ const { data: conversations, error: conversationsError } = await convQuery;
 
 export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
   try {
+    // First, get the lead's phone number
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('phone_numbers:phone_numbers(number, is_primary)')
+      .eq('id', leadId)
+      .single();
+
+    if (leadError) {
+      console.error('Error fetching lead for messages:', leadError);
+      throw leadError;
+    }
+
+    const phoneNumber = lead?.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+                       lead?.phone_numbers?.[0]?.number;
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+
+    if (!normalizedPhone) {
+      console.error('No phone number found for lead:', leadId);
+      return [];
+    }
+
+    console.log(`📞 [FETCH MESSAGES] Fetching ALL messages for phone ${normalizedPhone} (lead: ${leadId})`);
+
+    // Fetch ALL messages for this phone number (across all leads with same phone)
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
-      .eq('lead_id', leadId)
+      .eq('phone_number', normalizedPhone) // Match by phone, not lead_id
       .order('sent_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching messages:', error);
       throw error;
     }
+
+    console.log(`✅ [FETCH MESSAGES] Found ${data?.length || 0} messages for phone ${normalizedPhone}`);
 
     return (data || []).map(msg => ({
       id: msg.id,
@@ -269,10 +312,34 @@ export const fetchMessages = async (leadId: string): Promise<MessageData[]> => {
 
 export const markMessagesAsRead = async (leadId: string) => {
   try {
+    // Get the lead's phone number
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('phone_numbers:phone_numbers(number, is_primary)')
+      .eq('id', leadId)
+      .single();
+
+    if (leadError) {
+      console.error('Error fetching lead for mark as read:', leadError);
+      throw leadError;
+    }
+
+    const phoneNumber = lead?.phone_numbers?.find((p: any) => p.is_primary)?.number || 
+                       lead?.phone_numbers?.[0]?.number;
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+
+    if (!normalizedPhone) {
+      console.warn('No phone number found for lead:', leadId);
+      return;
+    }
+
+    console.log(`📞 [MARK AS READ] Marking ALL messages as read for phone ${normalizedPhone} (lead: ${leadId})`);
+
+    // Mark ALL messages for this phone number as read (across all leads)
     const { error } = await supabase
       .from('conversations')
       .update({ read_at: new Date().toISOString() })
-      .eq('lead_id', leadId)
+      .eq('phone_number', normalizedPhone) // Match by phone, not lead_id
       .eq('direction', 'in')
       .is('read_at', null);
 
@@ -280,6 +347,8 @@ export const markMessagesAsRead = async (leadId: string) => {
       console.error('Error marking messages as read:', error);
       throw error;
     }
+    
+    console.log(`✅ [MARK AS READ] Successfully marked messages as read for phone ${normalizedPhone}`);
     
     // Trigger global unread count refresh
     window.dispatchEvent(new CustomEvent('unread-count-changed'));
