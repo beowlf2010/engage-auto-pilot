@@ -251,17 +251,22 @@ const handleMarkAsRead = useCallback(async () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b bg-card p-4">
+    <div className="h-full flex flex-col bg-background relative">
+      {/* Animated mesh gradient background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-transparent -z-10 pointer-events-none" />
+      
+      {/* Header with Glassmorphism */}
+      <div className="flex-shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-xl p-4 shadow-[var(--shadow-card)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             {onBack && (
-              <Button onClick={onBack} variant="ghost" size="sm">
+              <Button onClick={onBack} variant="glass" size="sm" className="hover:scale-105 transition-transform">
                 ← Back
               </Button>
             )}
-            <h1 className="text-xl font-semibold">Smart Inbox</h1>
+            <h1 className="text-xl font-semibold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+              Smart Inbox
+            </h1>
           </div>
           <div className="flex items-center space-x-3">
             <NetworkStatus isOnline={navigator.onLine} lastUpdated={new Date()} />
@@ -337,8 +342,9 @@ const handleMarkAsRead = useCallback(async () => {
             <Button
               onClick={handleRefresh}
               disabled={loading}
-              variant="outline"
+              variant="glass"
               size="sm"
+              className="hover:scale-110 transition-transform"
             >
               {loading ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -346,14 +352,15 @@ const handleMarkAsRead = useCallback(async () => {
                 <RefreshCw className="h-4 w-4" />
               )}
             </Button>
-            <div className="inline-flex items-center rounded-md border p-0.5">
-              <Button size="sm" variant={scope === 'my' ? 'secondary' : 'ghost'} onClick={() => setScope('my')}>My</Button>
-              <Button size="sm" variant={scope === 'all' ? 'secondary' : 'ghost'} onClick={() => setScope('all')}>All</Button>
+            <div className="inline-flex items-center rounded-md border border-border/30 bg-card/40 backdrop-blur-xl p-0.5 shadow-[var(--shadow-elegant)]">
+              <Button size="sm" variant={scope === 'my' ? 'gradient' : 'ghost'} onClick={() => setScope('my')}>My</Button>
+              <Button size="sm" variant={scope === 'all' ? 'gradient' : 'ghost'} onClick={() => setScope('all')}>All</Button>
             </div>
             <Button
               onClick={() => setShowDebugPanel(!showDebugPanel)}
-              variant="outline"
+              variant="glass"
               size="sm"
+              className="hover:scale-110 transition-transform"
             >
               Debug
             </Button>
@@ -361,9 +368,9 @@ const handleMarkAsRead = useCallback(async () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex-shrink-0 border-b bg-card p-4">
-        <SmartFilters 
+      {/* Filters with Glassmorphism */}
+      <div className="flex-shrink-0 border-b border-border/30 bg-card/60 backdrop-blur-xl p-4">
+        <SmartFilters
           filters={filters} 
           onFiltersChange={(updates) => Object.entries(updates).forEach(([key, value]) => updateFilter(key as any, value))}
           conversations={conversations}
@@ -374,9 +381,9 @@ const handleMarkAsRead = useCallback(async () => {
         />
       </div>
 
-      {/* Admin Utilities Bar */}
+      {/* Admin Utilities Bar with Glassmorphism */}
       {(isAdmin || isManager) && (
-        <div className="flex-shrink-0 border-b bg-card/60 p-3">
+        <div className="flex-shrink-0 border-b border-border/30 bg-gradient-to-r from-card/40 to-card/60 backdrop-blur-xl p-3 shadow-[var(--shadow-elegant)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <span className="font-medium">Admin Utilities</span>

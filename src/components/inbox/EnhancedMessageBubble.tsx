@@ -59,18 +59,18 @@ const EnhancedMessageBubble: React.FC<EnhancedMessageBubbleProps> = ({
   };
 
   return (
-    <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div className={`max-w-xs lg:max-w-md relative ${
+    <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-4 animate-fade-in`}>
+      <div className={`max-w-xs lg:max-w-md relative transition-all duration-200 hover:shadow-[var(--shadow-elegant)] ${
         isOutgoing 
-          ? 'bg-blue-600 text-white rounded-l-lg rounded-tr-lg' 
-          : 'bg-gray-200 text-gray-900 rounded-r-lg rounded-tl-lg'
+          ? 'bg-gradient-to-br from-primary to-primary-glow text-primary-foreground rounded-l-lg rounded-tr-lg shadow-[var(--shadow-glow)]' 
+          : 'bg-card/60 backdrop-blur-xl border border-border/30 rounded-r-lg rounded-tl-lg'
       } px-4 py-2`}>
         
         {/* AI Generated Badge */}
         {message.aiGenerated && (
           <div className="flex items-center gap-1 mb-1">
             <Bot className="w-3 h-3" />
-            <Badge variant="secondary" className="text-xs py-0 px-1">
+            <Badge variant="gradient" className="text-xs py-0 px-1 shadow-[var(--shadow-glow)]">
               AI Generated
             </Badge>
           </div>

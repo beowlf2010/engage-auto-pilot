@@ -9,6 +9,7 @@ import ConversationView from './ConversationView';
 import SmartFilters from './SmartFilters';
 import InboxStatusDisplay from './InboxStatusDisplay';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, RefreshCw, Search, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
@@ -136,17 +137,19 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
   if (authLoading || loading || error || (initialized && conversations.length === 0)) {
     return (
       <div className="h-full flex flex-col bg-background">
-        {/* Mobile Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-card">
+        {/* Mobile Header with Glassmorphism */}
+        <div className="flex items-center justify-between p-4 border-b border-border/50 bg-card/80 backdrop-blur-xl shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-2">
             {onBack && (
-              <Button variant="ghost" size="sm" onClick={onBack}>
+              <Button variant="ghost" size="sm" onClick={onBack} className="hover:scale-110 transition-transform">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            <h1 className="text-lg font-semibold">Inbox</h1>
+            <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+              Inbox
+            </h1>
           </div>
-          <Button variant="outline" size="sm" onClick={handleRetry}>
+          <Button variant="glass" size="sm" onClick={handleRetry}>
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -187,35 +190,41 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
 
   // Show main mobile inbox view
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Mobile Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-card">
+    <div className="h-full flex flex-col bg-background relative">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-transparent -z-10 pointer-events-none" />
+      
+      {/* Mobile Header with Glassmorphism */}
+      <div className="flex items-center justify-between p-4 border-b border-border/50 bg-card/80 backdrop-blur-xl shadow-[var(--shadow-card)]">
         <div className="flex items-center gap-2">
           {onBack && (
-            <Button variant="ghost" size="sm" onClick={onBack}>
+            <Button variant="ghost" size="sm" onClick={onBack} className="hover:scale-110 transition-transform">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
-          <h1 className="text-lg font-semibold">Inbox</h1>
-          <span className="text-xs text-muted-foreground">
+          <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+            Inbox
+          </h1>
+          <Badge variant="glass" className="text-xs">
             {displayConversations.length}
-          </span>
+          </Badge>
         </div>
         <div className="flex gap-1">
           <Button 
-            variant="ghost" 
+            variant="glass" 
             size="sm" 
             onClick={() => setShowSearch(!showSearch)}
+            className="hover:scale-110 transition-transform"
           >
             <Search className="h-4 w-4" />
           </Button>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="glass" size="sm" className="hover:scale-110 transition-transform">
                 <Filter className="h-4 w-4" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="h-[80vh]">
+            <SheetContent side="bottom" className="h-[80vh] bg-card/95 backdrop-blur-xl">
               <SmartFilters
                 filters={filters}
                 onFiltersChange={(updates) => {
@@ -232,20 +241,20 @@ const MobileSmartInbox: React.FC<MobileSmartInboxProps> = ({ onBack, leadId }) =
               />
             </SheetContent>
           </Sheet>
-          <Button variant="outline" size="sm" onClick={handleRetry}>
+          <Button variant="glass" size="sm" onClick={handleRetry} className="hover:scale-110 transition-transform">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Mobile Search */}
+      {/* Mobile Search with Glassmorphism */}
       {showSearch && (
-        <div className="p-4 border-b bg-card">
+        <div className="p-4 border-b border-border/30 bg-card/60 backdrop-blur-xl animate-fade-in">
           <Input
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
+            className="w-full bg-background/60 backdrop-blur-xl border-border/30 focus:shadow-[var(--shadow-glow)] transition-shadow"
           />
         </div>
       )}

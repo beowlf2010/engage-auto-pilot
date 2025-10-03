@@ -199,22 +199,28 @@ const AIMetricsDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Animated mesh gradient background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-background to-transparent -z-10 pointer-events-none" />
+      
       {/* Time Range Selector */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">AI Performance Metrics</h2>
+      <div className="flex items-center justify-between animate-fade-in">
+        <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+          AI Performance Metrics
+        </h2>
         <div className="flex items-center space-x-2">
           {(['24h', '7d', '30d'] as const).map((range) => (
             <Button
               key={range}
-              variant={timeRange === range ? 'default' : 'outline'}
+              variant={timeRange === range ? 'gradient' : 'glass'}
               size="sm"
               onClick={() => setTimeRange(range)}
+              className="hover:scale-105 transition-transform"
             >
               {range}
             </Button>
           ))}
-          <Button variant="outline" size="sm" onClick={fetchMetrics}>
+          <Button variant="glass" size="sm" onClick={fetchMetrics} className="hover:scale-110 transition-transform">
             <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
@@ -223,7 +229,7 @@ const AIMetricsDashboard = () => {
       {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card>
+          <Card variant="floating" className="animate-fade-in hover:shadow-[var(--shadow-floating)] transition-all">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center justify-between">
                 Total Messages
@@ -240,7 +246,7 @@ const AIMetricsDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card variant="floating" className="animate-fade-in hover:shadow-[var(--shadow-floating)] transition-all" style={{ animationDelay: '0.1s' }}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center justify-between">
                 Response Rate
@@ -257,7 +263,7 @@ const AIMetricsDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card variant="floating" className="animate-fade-in hover:shadow-[var(--shadow-floating)] transition-all" style={{ animationDelay: '0.2s' }}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center justify-between">
                 Quality Score
@@ -274,7 +280,7 @@ const AIMetricsDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card variant="floating" className="animate-fade-in hover:shadow-[var(--shadow-floating)] transition-all" style={{ animationDelay: '0.3s' }}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center">
                 <Clock className="w-4 h-4 mr-2" />
@@ -291,7 +297,7 @@ const AIMetricsDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card variant="floating" className="animate-fade-in hover:shadow-[var(--shadow-floating)] transition-all" style={{ animationDelay: '0.4s' }}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center">
                 <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
@@ -311,7 +317,7 @@ const AIMetricsDashboard = () => {
       )}
 
       {/* Response Rate Chart */}
-      <Card>
+      <Card variant="floating" className="animate-fade-in">
         <CardHeader>
           <CardTitle>Response Rate Trend</CardTitle>
         </CardHeader>
@@ -335,7 +341,7 @@ const AIMetricsDashboard = () => {
       </Card>
 
       {/* Quality & Performance Chart */}
-      <Card>
+      <Card variant="floating" className="animate-fade-in">
         <CardHeader>
           <CardTitle>Quality & Performance Metrics</CardTitle>
         </CardHeader>

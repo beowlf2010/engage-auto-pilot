@@ -22,20 +22,22 @@ const InventoryDashboardHeader = () => {
   return (
     <div className="space-y-6">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Inventory Dashboard</h1>
-          <p className="text-slate-600">Manage and monitor your vehicle inventory with AI-powered insights</p>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent mb-2">
+            Inventory Dashboard
+          </h1>
+          <p className="text-muted-foreground">Manage and monitor your vehicle inventory with AI-powered insights</p>
         </div>
         <div className="flex items-center space-x-3">
           <Link to="/inventory-upload">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+            <Button variant="gradient" className="shadow-[var(--shadow-glow)] hover:scale-105 transition-transform">
               <Upload className="w-4 h-4 mr-2" />
               Upload Inventory
             </Button>
           </Link>
           <Link to="/rpo-insights">
-            <Button variant="outline" className="border-slate-300 hover:bg-slate-50">
+            <Button variant="glass" className="hover:scale-105 transition-transform">
               <BarChart3 className="w-4 h-4 mr-2" />
               RPO Insights
             </Button>
@@ -45,10 +47,10 @@ const InventoryDashboardHeader = () => {
 
       {/* Live Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+        <Card variant="floating" className="p-4 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20 hover:shadow-[var(--shadow-floating)] transition-all animate-fade-in">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-500 rounded-lg">
-              <Package className="w-6 h-6 text-white" />
+            <div className="p-2 bg-gradient-to-br from-primary to-primary-glow rounded-lg shadow-[var(--shadow-glow)]">
+              <Package className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
               <p className="text-sm font-medium text-blue-700">Total Active Vehicles</p>
@@ -59,10 +61,10 @@ const InventoryDashboardHeader = () => {
           </div>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+        <Card variant="floating" className="p-4 bg-gradient-to-r from-success/10 to-success/5 border-success/20 hover:shadow-[var(--shadow-floating)] transition-all animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-green-500 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-white" />
+            <div className="p-2 bg-gradient-to-br from-success to-success/80 rounded-lg shadow-[var(--shadow-glow)]">
+              <TrendingUp className="w-6 h-6 text-success-foreground" />
             </div>
             <div>
               <p className="text-sm font-medium text-green-700">GM Global Orders</p>
@@ -74,10 +76,10 @@ const InventoryDashboardHeader = () => {
           </div>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-200">
+        <Card variant="floating" className="p-4 bg-gradient-to-r from-warning/10 to-warning/5 border-warning/20 hover:shadow-[var(--shadow-floating)] transition-all animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-yellow-500 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-white" />
+            <div className="p-2 bg-gradient-to-br from-warning to-warning/80 rounded-lg shadow-[var(--shadow-glow)]">
+              <AlertCircle className="w-6 h-6 text-warning-foreground" />
             </div>
             <div>
               <p className="text-sm font-medium text-yellow-700">Used Available</p>
@@ -88,10 +90,10 @@ const InventoryDashboardHeader = () => {
           </div>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+        <Card variant="floating" className="p-4 bg-gradient-to-r from-accent/10 to-accent/5 border-accent/20 hover:shadow-[var(--shadow-floating)] transition-all animate-fade-in" style={{ animationDelay: '0.3s' }}>
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-purple-500 rounded-lg">
-              <Zap className="w-6 h-6 text-white" />
+            <div className="p-2 bg-gradient-to-br from-accent to-accent/80 rounded-lg shadow-[var(--shadow-glow)]">
+              <Zap className="w-6 h-6 text-accent-foreground" />
             </div>
             <div>
               <p className="text-sm font-medium text-purple-700">Avg Days in Stock</p>

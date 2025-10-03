@@ -184,17 +184,19 @@ const MessageThread: React.FC<MessageThreadProps> = ({
 
   return (
     <div className="flex-1 flex flex-col relative">
-      {/* Header with Actions Toggle */}
-      <div className="flex items-center justify-between p-4 border-b bg-white">
+      {/* Header with Glassmorphism */}
+      <div className="flex items-center justify-between p-4 border-b border-border/50 bg-card/80 backdrop-blur-xl shadow-[var(--shadow-card)]">
         <div>
-          <h3 className="font-semibold">{conversation.leadName}</h3>
-          <p className="text-sm text-gray-600">{conversation.vehicleInterest}</p>
+          <h3 className="font-semibold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+            {conversation.leadName}
+          </h3>
+          <p className="text-sm text-muted-foreground">{conversation.vehicleInterest}</p>
         </div>
         <Button
-          variant="ghost"
+          variant="glass"
           size="sm"
           onClick={() => setShowActions(!showActions)}
-          className="p-2"
+          className="p-2 hover:scale-110 transition-transform"
         >
           {showActions ? <X className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
         </Button>
@@ -215,11 +217,14 @@ const MessageThread: React.FC<MessageThreadProps> = ({
                   key={message.id}
                   className={`flex ${message.direction === 'out' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <Card className={`max-w-[80%] p-3 ${
-                    message.direction === 'out'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}>
+                  <Card 
+                    variant="floating"
+                    className={`max-w-[80%] p-3 shadow-[var(--shadow-elegant)] transition-all duration-200 hover:shadow-[var(--shadow-floating)] ${
+                      message.direction === 'out'
+                        ? 'bg-gradient-to-br from-primary to-primary-glow text-primary-foreground'
+                        : 'bg-card/60 backdrop-blur-xl border-border/30'
+                    }`}
+                  >
                     <div className="space-y-1">
                       <p className="text-sm">{message.body}</p>
                       <div className={`flex items-center justify-between text-xs ${
@@ -248,23 +253,24 @@ const MessageThread: React.FC<MessageThreadProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Message Input */}
+          {/* Message Input with Glassmorphism */}
           {canReply ? (
-            <div className="border-t p-4">
+            <div className="border-t border-border/30 bg-card/60 backdrop-blur-xl p-4">
               <div className="flex space-x-2">
                 <Textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Type your message..."
-                  className="flex-1 min-h-[40px] max-h-[120px]"
+                  className="flex-1 min-h-[40px] max-h-[120px] bg-background/60 backdrop-blur-xl border-border/30 focus:shadow-[var(--shadow-glow)] transition-shadow"
                   disabled={sending}
                 />
                 <Button
                   onClick={handleSendMessage}
                   disabled={!newMessage.trim() || sending}
                   size="sm"
-                  className="px-3"
+                  variant="gradient"
+                  className="px-3 hover:scale-110 transition-transform"
                 >
                   {sending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -281,9 +287,9 @@ const MessageThread: React.FC<MessageThreadProps> = ({
           )}
         </div>
 
-        {/* Actions Panel */}
+        {/* Actions Panel with Glassmorphism */}
         {showActions && (
-          <div className="w-80 border-l bg-gray-50 p-4 overflow-y-auto">
+          <div className="w-80 border-l border-border/30 bg-card/40 backdrop-blur-xl p-4 overflow-y-auto animate-slide-in-right">
             <LeadActionsSection
               conversation={conversation}
               onMarkAsLost={handleMarkAsLost}

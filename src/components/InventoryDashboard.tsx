@@ -23,7 +23,11 @@ const InventoryDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-background relative">
+      {/* Animated mesh gradient background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-primary-glow/5 -z-10" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent -z-10" />
+      
       <div className="container mx-auto p-6 space-y-6">
         <InventoryDashboardHeader />
         

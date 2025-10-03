@@ -77,10 +77,10 @@ const LeadsManagement = () => {
   });
 
   const getTemperatureColor = (temp: number) => {
-    if (temp >= 80) return 'text-red-600 bg-red-50 border-red-200';
-    if (temp >= 60) return 'text-orange-600 bg-orange-50 border-orange-200';
-    if (temp >= 40) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    return 'text-blue-600 bg-blue-50 border-blue-200';
+    if (temp >= 80) return 'gradient'; // Hot leads get gradient badge
+    if (temp >= 60) return 'warning'; // Warm leads
+    if (temp >= 40) return 'secondary'; // Medium leads
+    return 'outline'; // Cold leads
   };
 
   const getTemperatureIcon = (temp: number) => {
@@ -122,15 +122,20 @@ const LeadsManagement = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 relative">
+      {/* Animated mesh gradient background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-primary/5 via-background to-transparent -z-10 pointer-events-none" />
+      
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Lead Management</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+            Lead Management
+          </h1>
           <p className="text-muted-foreground">Manage and track your automotive sales leads</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-primary">
+          <Badge variant="glass" className="shadow-[var(--shadow-elegant)]">
             <Users className="h-3 w-3 mr-1" />
             {leads.length} Total Leads
           </Badge>
@@ -138,45 +143,42 @@ const LeadsManagement = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4 animate-fade-in">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Search leads by name, email, or vehicle interest..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-card/60 backdrop-blur-xl border-border/30 focus:shadow-[var(--shadow-glow)] transition-shadow"
           />
         </div>
         <div className="flex gap-2">
           <Button
-            variant={selectedFilter === 'all' ? 'default' : 'outline'}
+            variant={selectedFilter === 'all' ? 'gradient' : 'glass'}
             size="sm"
             onClick={() => setSelectedFilter('all')}
           >
             All
           </Button>
           <Button
-            variant={selectedFilter === 'hot' ? 'default' : 'outline'}
+            variant={selectedFilter === 'hot' ? 'gradient' : 'glass'}
             size="sm"
             onClick={() => setSelectedFilter('hot')}
-            className="text-red-600 border-red-200 hover:bg-red-50"
           >
             🔥 Hot
           </Button>
           <Button
-            variant={selectedFilter === 'warm' ? 'default' : 'outline'}
+            variant={selectedFilter === 'warm' ? 'gradient' : 'glass'}
             size="sm"
             onClick={() => setSelectedFilter('warm')}
-            className="text-orange-600 border-orange-200 hover:bg-orange-50"
           >
             ⚡ Warm
           </Button>
           <Button
-            variant={selectedFilter === 'ai_enabled' ? 'default' : 'outline'}
+            variant={selectedFilter === 'ai_enabled' ? 'gradient' : 'glass'}
             size="sm"
             onClick={() => setSelectedFilter('ai_enabled')}
-            className="text-purple-600 border-purple-200 hover:bg-purple-50"
           >
             <Zap className="h-3 w-3 mr-1" />
             AI Enabled
@@ -217,18 +219,23 @@ const LeadsManagement = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {leads.map((lead) => (
-            <Card key={lead.id} className="hover:shadow-md transition-shadow">
+          {leads.map((lead, index) => (
+            <Card 
+              key={lead.id} 
+              variant="floating"
+              className="hover:shadow-[var(--shadow-floating)] transition-all duration-300 hover:-translate-y-1 group animate-fade-in"
+              style={{ animationDelay: `${index * 0.05}s` }}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-lg">
+                    <CardTitle className="text-lg group-hover:text-primary transition-colors">
                       {lead.first_name} {lead.last_name}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground">{lead.email}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Badge className={`text-xs ${getTemperatureColor(lead.lead_temperature)}`}>
+                    <Badge variant={getTemperatureColor(lead.lead_temperature)} className="text-xs">
                       {getTemperatureIcon(lead.lead_temperature)}
                       {lead.lead_temperature}°
                     </Badge>
@@ -249,12 +256,12 @@ const LeadsManagement = () => {
 
                 <div className="flex items-center gap-2">
                   {lead.ai_opt_in && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="gradient" className="text-xs">
                       <Zap className="h-3 w-3 mr-1" />
                       AI Enabled
                     </Badge>
                   )}
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="glass" className="text-xs">
                     {lead.message_intensity}
                   </Badge>
                 </div>
@@ -262,27 +269,27 @@ const LeadsManagement = () => {
                 <div className="flex gap-2 pt-2">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="glass"
                     onClick={() => handleContactLead(lead.id, 'Call')}
-                    className="flex-1"
+                    className="flex-1 hover:scale-105 transition-transform"
                   >
                     <Phone className="h-3 w-3 mr-1" />
                     Call
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="glass"
                     onClick={() => handleContactLead(lead.id, 'Message')}
-                    className="flex-1"
+                    className="flex-1 hover:scale-105 transition-transform"
                   >
                     <MessageCircle className="h-3 w-3 mr-1" />
                     Message
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="glass"
                     onClick={() => handleContactLead(lead.id, 'Email')}
-                    className="flex-1"
+                    className="flex-1 hover:scale-105 transition-transform"
                   >
                     <Mail className="h-3 w-3 mr-1" />
                     Email
