@@ -45,7 +45,7 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showUrgencyColors, setShowUrgencyColors] = useState(false);
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
-  const [scope, setScope] = useState<'my' | 'all'>('my');
+  const [scope, setScope] = useState<'my' | 'all'>('all');
   const { isAdmin, isManager, loading: permsLoading } = useUserPermissions();
   const { toast } = useToast();
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
@@ -568,10 +568,6 @@ const handleMarkAsRead = useCallback(async () => {
             setFollowUpModalLeadId(null);
           }}
           leadId={followUpModalLeadId}
-          leadName={displayedConversations.find(c => c.leadId === followUpModalLeadId)?.leadName || ''}
-          vehicleInterest={displayedConversations.find(c => c.leadId === followUpModalLeadId)?.vehicleInterest || ''}
-          currentStatus={displayedConversations.find(c => c.leadId === followUpModalLeadId)?.status || 'new'}
-          aiOptIn={displayedConversations.find(c => c.leadId === followUpModalLeadId)?.aiOptIn || false}
         />
       )}
     </div>

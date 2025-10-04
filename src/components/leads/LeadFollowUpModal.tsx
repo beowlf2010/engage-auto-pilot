@@ -26,27 +26,18 @@ import {
 import { projectFollowUpSequence, ProjectedSequence, ProjectedTouch } from '@/services/followUpSequenceProjector';
 import { format, formatDistanceToNow, addHours } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LeadFollowUpModalProps {
   open: boolean;
   onClose: () => void;
   leadId: string;
-  leadName: string;
-  vehicleInterest?: string;
-  currentStatus: string;
-  aiOptIn: boolean;
-  nextAiSendAt?: string;
 }
 
 export function LeadFollowUpModal({
   open,
   onClose,
-  leadId,
-  leadName,
-  vehicleInterest,
-  currentStatus,
-  aiOptIn,
-  nextAiSendAt
+  leadId
 }: LeadFollowUpModalProps) {
   const [sequence, setSequence] = useState<ProjectedSequence | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,12 +45,50 @@ export function LeadFollowUpModal({
   const [editedTouches, setEditedTouches] = useState<ProjectedTouch[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
   const { toast } = useToast();
+  
+  // Lead data fetched from Supabase
+  const [leadData, setLeadData] = useState<{
+    leadName: string;
+    vehicleInterest?: string;
+    currentStatus: string;
+    aiOptIn: boolean;
+    nextAiSendAt?: string;
+  } | null>(null);
 
+  // Fetch lead data when modal opens
   useEffect(() => {
     if (open && leadId) {
+      fetchLeadData();
       loadSequence();
     }
   }, [open, leadId]);
+
+  const fetchLeadData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('first_name, last_name, vehicle_interest, status, ai_opt_in, next_ai_send_at')
+        .eq('id', leadId)
+        .single();
+
+      if (error) throw error;
+
+      setLeadData({
+        leadName: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'Unknown',
+        vehicleInterest: data.vehicle_interest,
+        currentStatus: data.status || 'new',
+        aiOptIn: data.ai_opt_in || false,
+        nextAiSendAt: data.next_ai_send_at
+      });
+    } catch (error) {
+      console.error('Error fetching lead data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load lead information",
+        variant: "destructive"
+      });
+    }
+  };
 
   const loadSequence = async (customOptions?: any) => {
     setLoading(true);
@@ -213,17 +242,17 @@ export function LeadFollowUpModal({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        {loading && !sequence ? (
+        {(loading && !sequence) || !leadData ? (
           <div className="flex items-center justify-center p-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ) : sequence && (
+        ) : sequence && leadData && (
           <>
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <DialogTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
-                  Follow-Up Plan: {leadName}
+                  Follow-Up Plan: {leadData.leadName}
                 </DialogTitle>
                 <div className="flex items-center gap-2">
                   {!editMode ? (
@@ -278,12 +307,12 @@ export function LeadFollowUpModal({
                   <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                     <div>
                       <p className="text-sm font-medium">Status</p>
-                      <p className="text-xs text-muted-foreground">{currentStatus}</p>
+                      <p className="text-xs text-muted-foreground">{leadData.currentStatus}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium">AI Status</p>
-                      <Badge variant={aiOptIn ? "default" : "secondary"}>
-                        {aiOptIn ? "Enabled" : "Disabled"}
+                      <Badge variant={leadData.aiOptIn ? "default" : "secondary"}>
+                        {leadData.aiOptIn ? "Enabled" : "Disabled"}
                       </Badge>
                     </div>
                     <div>

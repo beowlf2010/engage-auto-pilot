@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { messageOrderingService, OrderedMessage } from '@/services/messageOrderingService';
-import { realtimeMessageProcessor } from '@/services/realtimeMessageProcessor';
 
 export const useIntelligentMessageFlow = (leadId: string | null) => {
   const [messages, setMessages] = useState<OrderedMessage[]>([]);
@@ -46,23 +45,12 @@ export const useIntelligentMessageFlow = (leadId: string | null) => {
     
     console.log('📨 [MESSAGE FLOW] Processing incoming message:', messageBody.substring(0, 50) + '...');
     
-    // Trigger AI processing
-    const success = await realtimeMessageProcessor.processNewCustomerMessage(leadId, messageBody);
-    
-    if (success) {
-      // Reload messages to show the AI response
-      setTimeout(() => {
-        loadMessages();
-      }, 2000); // Give time for AI response to be generated and saved
-    }
+    // Note: AI processing is now handled by edge function
+    // Just reload messages after a short delay
+    setTimeout(() => {
+      loadMessages();
+    }, 2000);
   }, [leadId, loadMessages]);
-
-  // Setup realtime listener
-  useEffect(() => {
-    console.log('🔗 [MESSAGE FLOW] Setting up realtime listener');
-    const cleanup = realtimeMessageProcessor.setupRealtimeListener();
-    return cleanup;
-  }, []);
 
   // Load messages when leadId changes
   useEffect(() => {

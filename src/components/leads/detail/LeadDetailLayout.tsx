@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useConversationData } from "@/hooks/useConversationData";
-import { useEnhancedAIScheduler } from "@/hooks/useEnhancedAIScheduler";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { toggleFinnAI } from '@/services/finnAIService';
@@ -33,7 +32,6 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
   onPhoneSelect
 }) => {
   const { messages, messagesLoading, loadMessages, sendMessage } = useConversationData();
-  const { processing: aiProcessing } = useEnhancedAIScheduler();
   const [aiLoading, setAiLoading] = useState(false);
 
   // Debug AI data when component mounts
@@ -173,13 +171,6 @@ const LeadDetailLayout: React.FC<LeadDetailLayoutProps> = ({
           {/* Main Content - Messages and Tabs */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg border border-gray-200 h-[700px] relative">
-              {aiProcessing && (
-                <div className="absolute top-2 right-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs flex items-center space-x-2 z-10">
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-600"></div>
-                  <span>Finn is analyzing...</span>
-                </div>
-              )}
-              
               <LeadDetailTabsSection
                 lead={lead}
                 messages={conversationMessages}
