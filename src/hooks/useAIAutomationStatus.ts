@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { optimizedRealtimeManager } from '@/services/optimizedRealtimeManager';
 
 interface AutomationStatus {
   isRunning: boolean;
@@ -136,32 +135,14 @@ export const useAIAutomationStatus = () => {
     }
   };
 
-  // Real-time subscription to new messages
+  // Polling-based data refresh
   useEffect(() => {
     fetchAutomationData();
 
-    const unsubscribe = optimizedRealtimeManager.subscribe({
-      id: 'ai-automation-status',
-      callback: (payload) => {
-        if (payload.table === 'conversations' && payload.eventType === 'INSERT') {
-          const newConversation = payload.new;
-          if (newConversation.direction === 'out' && newConversation.ai_generated) {
-            // Refresh data when new AI messages are sent
-            fetchAutomationData();
-          }
-        }
-      },
-      filters: {
-        event: '*',
-        schema: 'public',
-        table: 'conversations'
-      }
-    });
-
-    const interval = setInterval(fetchAutomationData, 60000); // Refresh every minute
+    // Refresh every minute
+    const interval = setInterval(fetchAutomationData, 60000);
 
     return () => {
-      unsubscribe();
       clearInterval(interval);
     };
   }, []);
