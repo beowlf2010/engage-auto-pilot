@@ -8,6 +8,7 @@ import ConversationsList from './ConversationsList';
 import ConversationView from './ConversationView';
 import SmartFilters from './SmartFilters';
 import InboxDebugPanel from './InboxDebugPanel';
+import { LeadFollowUpModal } from '@/components/leads/LeadFollowUpModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, MessageSquare, Users, Clock, CheckCircle } from 'lucide-react';
@@ -47,6 +48,8 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const [scope, setScope] = useState<'my' | 'all'>('my');
   const { isAdmin, isManager, loading: permsLoading } = useUserPermissions();
   const { toast } = useToast();
+  const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+  const [followUpModalLeadId, setFollowUpModalLeadId] = useState<string | null>(null);
 const initializedScopeRef = useRef(false);
 
 const [adminMetrics, setAdminMetrics] = useState<{
@@ -496,6 +499,13 @@ const handleMarkAsRead = useCallback(async () => {
     await markAsReadWithRefresh(leadId);
   }}
   isMarkingAsRead={isMarkingAsRead}
+  onViewPlan={(leadId) => {
+    const conversation = displayedConversations.find(c => c.leadId === leadId);
+    if (conversation) {
+      setFollowUpModalLeadId(leadId);
+      setFollowUpModalOpen(true);
+    }
+  }}
 />
             )}
           </div>
@@ -546,6 +556,22 @@ const handleMarkAsRead = useCallback(async () => {
           conversations={conversations}
           filteredConversations={filteredConversations}
           onRefresh={handleRefresh}
+        />
+      )}
+
+      {/* Follow-Up Plan Modal */}
+      {followUpModalLeadId && (
+        <LeadFollowUpModal
+          open={followUpModalOpen}
+          onClose={() => {
+            setFollowUpModalOpen(false);
+            setFollowUpModalLeadId(null);
+          }}
+          leadId={followUpModalLeadId}
+          leadName={displayedConversations.find(c => c.leadId === followUpModalLeadId)?.leadName || ''}
+          vehicleInterest={displayedConversations.find(c => c.leadId === followUpModalLeadId)?.vehicleInterest || ''}
+          currentStatus={displayedConversations.find(c => c.leadId === followUpModalLeadId)?.status || 'new'}
+          aiOptIn={displayedConversations.find(c => c.leadId === followUpModalLeadId)?.aiOptIn || false}
         />
       )}
     </div>

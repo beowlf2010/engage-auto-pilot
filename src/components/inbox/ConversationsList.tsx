@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Phone, Clock, CheckCheck, RefreshCw, AlertTriangle } from 'lucide-react';
+import { MessageSquare, Phone, Clock, CheckCheck, RefreshCw, AlertTriangle, Calendar } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useManualRefresh } from '@/hooks/useManualRefresh';
 import type { ConversationListItem } from '@/hooks/conversation/conversationTypes';
@@ -17,6 +17,7 @@ interface ConversationsListProps {
   showTimestamps?: boolean;
   markAsRead?: (leadId: string) => Promise<void>;
   isMarkingAsRead?: boolean;
+  onViewPlan?: (leadId: string) => void;
 }
 
 const ConversationsList: React.FC<ConversationsListProps> = ({
@@ -27,7 +28,8 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   showUrgencyIndicator = false,
   showTimestamps = false,
   markAsRead,
-  isMarkingAsRead
+  isMarkingAsRead,
+  onViewPlan
 }) => {
   const { handleRefresh, isRefreshing } = useManualRefresh({
     onRefresh: () => {
@@ -161,21 +163,37 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
                         </span>
                       </div>
                       
-                      {conversation.unreadCount > 0 && markAsRead && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markAsRead(conversation.leadId);
-                          }}
-                          disabled={isMarkingAsRead}
-                          className="text-xs h-7 px-3 hover:bg-primary/10 hover:text-primary transition-all duration-300 opacity-0 group-hover:opacity-100"
-                        >
-                          <CheckCheck className="h-3.5 w-3.5 mr-1" />
-                          Mark Read
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {conversation.aiOptIn && onViewPlan && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onViewPlan(conversation.leadId);
+                            }}
+                            className="text-xs h-7 px-2 hover:bg-blue-500/10 hover:text-blue-600 transition-all duration-300 opacity-0 group-hover:opacity-100"
+                            title="View AI follow-up plan"
+                          >
+                            <Calendar className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {conversation.unreadCount > 0 && markAsRead && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead(conversation.leadId);
+                            }}
+                            disabled={isMarkingAsRead}
+                            className="text-xs h-7 px-3 hover:bg-primary/10 hover:text-primary transition-all duration-300 opacity-0 group-hover:opacity-100"
+                          >
+                            <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                            Mark Read
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
