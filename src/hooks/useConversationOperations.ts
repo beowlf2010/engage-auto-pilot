@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
@@ -204,6 +204,63 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
       props.onLeadsRefresh();
     }
   }, [loadConversations, props?.onLeadsRefresh]);
+
+  // Real-time subscription for new messages
+  useEffect(() => {
+    if (!profile) return;
+
+    console.log('🔔 [CONV OPS] Setting up realtime subscription');
+
+    const channel = supabase
+      .channel('conversations-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations'
+        },
+        async (payload) => {
+          console.log('🔔 [CONV OPS] New message received:', payload);
+          
+          const newConversation = payload.new as any;
+          
+          // Only process incoming messages
+          if (newConversation.direction === 'in') {
+            // Fetch lead name for toast
+            const { data: leadData } = await supabase
+              .from('leads')
+              .select('first_name, last_name')
+              .eq('id', newConversation.lead_id)
+              .single();
+
+            const leadName = leadData 
+              ? `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() 
+              : 'Unknown Lead';
+
+            // Show toast notification
+            toast({
+              title: "New message",
+              description: `${leadName}: ${newConversation.body?.substring(0, 50) || 'New message'}...`,
+            });
+
+            // Reload conversations to update list
+            loadConversations();
+            
+            // Dispatch event for other components
+            window.dispatchEvent(new CustomEvent('new-message-received', {
+              detail: { leadId: newConversation.lead_id, leadName }
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔔 [CONV OPS] Cleaning up realtime subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [profile, loadConversations, toast]);
 
   return {
     conversations,

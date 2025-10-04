@@ -1,5 +1,7 @@
-
 project_id = "tevtajmaofvnffzcsiuu"
+
+[functions.conversation-intelligence]
+verify_jwt = true
 
 [functions.ai-automation]
 verify_jwt = true

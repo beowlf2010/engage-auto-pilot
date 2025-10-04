@@ -26,11 +26,72 @@ export interface AIResponseSuggestion {
 }
 
 class AIResponseIntelligence {
+  private cache: Map<string, { data: any, timestamp: number }> = new Map();
+  private cacheTimeout = 30000; // 30 seconds
+
+  private getCacheKey(leadId: string, messagesLength: number): string {
+    return `${leadId}-${messagesLength}`;
+  }
+
+  private getFromCache(key: string): any | null {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.data;
+    }
+    this.cache.delete(key);
+    return null;
+  }
+
+  private setCache(key: string, data: any): void {
+    this.cache.set(key, { data, timestamp: Date.now() });
+  }
+
   async analyzeConversation(
     leadId: string,
     messages: any[],
     leadContext: any
   ): Promise<ConversationAnalysis> {
+    const cacheKey = this.getCacheKey(leadId, messages.length);
+    const cached = this.getFromCache(cacheKey);
+    if (cached?.analysis) {
+      console.log('✅ Using cached AI analysis');
+      return cached.analysis;
+    }
+
+    // Try AI analysis first
+    try {
+      const { data, error } = await supabase.functions.invoke('conversation-intelligence', {
+        body: {
+          leadId,
+          messages: messages.map(m => ({
+            direction: m.direction,
+            body: m.body,
+            sentAt: m.sent_at
+          })),
+          leadContext: {
+            name: leadContext.name,
+            vehicleInterest: leadContext.vehicle_interest,
+            status: leadContext.status
+          }
+        }
+      });
+
+      if (!error && data && !data.error && data.analysis) {
+        console.log('✅ AI analysis successful');
+        this.setCache(cacheKey, { analysis: data.analysis, suggestions: data.suggestions });
+        return data.analysis;
+      }
+
+      if (data?.error) {
+        console.warn('⚠️ AI analysis error:', data.error, '- falling back to rule-based');
+      }
+    } catch (error) {
+      console.warn('⚠️ AI analysis failed:', error, '- falling back to rule-based');
+    }
+
+    // Fallback to rule-based analysis
+    console.log('📋 Using rule-based analysis');
+
     try {
       console.log('🔍 Analyzing conversation for AI intelligence:', leadId);
 
@@ -76,8 +137,16 @@ class AIResponseIntelligence {
     lastMessage: string,
     leadContext: any
   ): Promise<AIResponseSuggestion[]> {
+    // Check if we have AI suggestions in cache from analyzeConversation
+    const cacheKey = this.getCacheKey(leadContext.id, 0);
+    const cached = this.getFromCache(cacheKey);
+    if (cached?.suggestions && Array.isArray(cached.suggestions)) {
+      console.log('✅ Using cached AI suggestions');
+      return cached.suggestions;
+    }
+
     try {
-      console.log('🤖 Generating AI response suggestions');
+      console.log('🤖 Generating rule-based response suggestions');
 
       const suggestions: AIResponseSuggestion[] = [];
 
