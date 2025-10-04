@@ -172,7 +172,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
                               e.stopPropagation();
                               onViewPlan(conversation.leadId);
                             }}
-                            className="text-xs h-7 px-2 hover:bg-blue-500/10 hover:text-blue-600 transition-all duration-300 opacity-0 group-hover:opacity-100"
+                            className="text-xs h-7 px-2 hover:bg-blue-500/10 hover:text-blue-600 transition-all duration-300"
                             title="View AI follow-up plan"
                           >
                             <Calendar className="h-3.5 w-3.5" />
