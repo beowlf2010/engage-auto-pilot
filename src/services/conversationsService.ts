@@ -144,7 +144,8 @@ const { data: conversations, error: conversationsError } = await convQuery;
         
         if (!isUnknown && existingIsUnknown) {
           console.log(`📝 [THREAD MATCHING] Upgrading thread name from "${existing.leadName}" to "${lead.first_name} ${lead.last_name}" for phone ${normalizedPhone}`);
-          existing.leadName = `${lead.first_name} ${lead.last_name}`.trim();
+          const displayName = `${lead.first_name} ${lead.last_name}`.trim();
+          existing.leadName = displayName;
           existing.leadId = lead.id; // Use better lead ID
           existing.leadEmail = lead.email || existing.leadEmail;
           existing.vehicleInterest = lead.vehicle_interest || existing.vehicleInterest;
@@ -183,9 +184,14 @@ const { data: conversations, error: conversationsError } = await convQuery;
         phoneNumber
       });
       
+      // Use phone number if name is unknown
+      const isUnknown = lead.first_name?.includes('Unknown') || lead.last_name?.includes('Unknown') || 
+                       !lead.first_name || !lead.last_name;
+      const displayName = isUnknown ? phoneNumber : `${lead.first_name} ${lead.last_name}`.trim();
+      
       const conversationItem: ConversationListItem = {
         leadId: lead.id,
-        leadName: `${lead.first_name} ${lead.last_name}`.trim(),
+        leadName: displayName,
         primaryPhone: phoneNumber,
         leadPhone: phoneNumber,
         leadEmail: lead.email || '',
