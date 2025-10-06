@@ -3,11 +3,23 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Brain, Settings, Target, MessageSquare, User, Phone, Mail, Calendar } from 'lucide-react';
+import { Brain, Settings, Target, MessageSquare, User, Phone, Mail, Calendar, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import EnhancedProcessSelector from '@/components/processes/EnhancedProcessSelector';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import LeadStatusActions from '@/components/leads/detail/LeadStatusActions';
+import { restartAISequence } from '@/services/aiRestartService';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { LeadDetailData } from '@/services/leadDetailService';
 
 interface LeadDetailSidebarProps {
@@ -24,6 +36,9 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   onStatusChanged
 }) => {
   const [showProcessSelector, setShowProcessSelector] = useState(false);
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
+  const { toast } = useToast();
 
   const handleProcessAssigned = (processId: string, logic: any) => {
     console.log('Process assigned:', processId, logic);
@@ -36,6 +51,29 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
       onStatusChanged();
     }
     onMessageSent(); // Also refresh message data
+  };
+
+  const handleRestartAISequence = async () => {
+    setIsRestarting(true);
+    
+    const result = await restartAISequence(lead.id);
+    
+    setIsRestarting(false);
+    setShowRestartConfirm(false);
+    
+    if (result.success) {
+      toast({
+        title: "AI Sequence Restarted",
+        description: "The AI messaging sequence has been restarted for this lead.",
+      });
+      onMessageSent(); // Refresh data
+    } else {
+      toast({
+        title: "Restart Failed",
+        description: result.error || "Failed to restart AI sequence. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -213,15 +251,28 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
             </div>
           )}
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full"
-            onClick={() => onAIOptInChange(!lead.aiOptIn)}
-            disabled={lead.status === 'closed' || lead.status === 'lost'}
-          >
-            {lead.aiOptIn ? 'Disable' : 'Enable'} AI
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+              onClick={() => onAIOptInChange(!lead.aiOptIn)}
+              disabled={lead.status === 'closed' || lead.status === 'lost'}
+            >
+              {lead.aiOptIn ? 'Disable' : 'Enable'} AI
+            </Button>
+            
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="flex-1"
+              onClick={() => setShowRestartConfirm(true)}
+              disabled={lead.status === 'closed' || lead.status === 'lost' || isRestarting}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Restart
+            </Button>
+          </div>
           
           {(lead.status === 'closed' || lead.status === 'lost') && (
             <div className="text-xs text-gray-500 text-center">
@@ -230,6 +281,33 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
           )}
         </CardContent>
       </Card>
+
+      {/* Restart Confirmation Dialog */}
+      <AlertDialog open={showRestartConfirm} onOpenChange={setShowRestartConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restart AI Sequence?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will restart the AI messaging sequence for this lead. The AI will:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Enable AI messaging (ai_opt_in = true)</li>
+                <li>Reset to initial contact stage</li>
+                <li>Schedule next message immediately</li>
+                <li>Clear any pause reasons</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRestarting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleRestartAISequence}
+              disabled={isRestarting}
+            >
+              {isRestarting ? 'Restarting...' : 'Restart AI Sequence'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

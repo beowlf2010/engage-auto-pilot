@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Navigate } from 'react-router-dom';
 import { useLeads } from '@/hooks/useLeads';
 import LeadsManagement from '@/components/leads/LeadsManagement';
 import TodayOnlyToggle from '@/components/leads/TodayOnlyToggle';
 import ManualLeadEntry from '@/components/leads/ManualLeadEntry';
+import EnhancedLeadDetailModal from '@/components/leads/EnhancedLeadDetailModal';
 
 const LeadsPage = () => {
   const { profile, loading } = useAuth();
   const { todayOnly, toggleTodayOnly } = useLeads();
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -37,8 +39,14 @@ const LeadsPage = () => {
           onToggle={toggleTodayOnly}
         />
       </div>
-      <LeadsManagement />
+      <LeadsManagement onOpenLeadDetail={setSelectedLeadId} />
       <ManualLeadEntry />
+      
+      <EnhancedLeadDetailModal
+        leadId={selectedLeadId}
+        open={!!selectedLeadId}
+        onClose={() => setSelectedLeadId(null)}
+      />
     </div>
   );
 };

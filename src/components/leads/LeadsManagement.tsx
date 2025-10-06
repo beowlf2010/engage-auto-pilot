@@ -30,7 +30,11 @@ interface Lead {
   created_at: string;
 }
 
-const LeadsManagement = () => {
+interface LeadsManagementProps {
+  onOpenLeadDetail?: (leadId: string) => void;
+}
+
+const LeadsManagement: React.FC<LeadsManagementProps> = ({ onOpenLeadDetail }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const { toast } = useToast();
@@ -267,6 +271,19 @@ const LeadsManagement = () => {
                 </div>
 
                 <div className="flex gap-2 pt-2">
+                  {onOpenLeadDetail && (
+                    <Button
+                      size="sm"
+                      variant="gradient"
+                      onClick={() => onOpenLeadDetail(lead.id)}
+                      className="w-full hover:scale-105 transition-transform"
+                    >
+                      View Details
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
                   <Button
                     size="sm"
                     variant="glass"
