@@ -18,6 +18,15 @@ export const transformLeadData = (leadData: LeadData, conversationsData: Convers
 
   const primaryPhone = getPrimaryPhone(phoneNumbers);
 
+  // Check if name is unknown and use phone number instead
+  const hasUnknownName = !leadData.first_name || 
+                        !leadData.last_name || 
+                        leadData.first_name.includes('Unknown') || 
+                        leadData.last_name.includes('Unknown');
+  
+  const displayFirstName = hasUnknownName && primaryPhone ? primaryPhone : (leadData.first_name || '');
+  const displayLastName = hasUnknownName && primaryPhone ? '' : (leadData.last_name || '');
+
   // Filter conversations for this lead
   const leadConversations = conversationsData.filter(conv => conv.lead_id === leadData.id);
   
@@ -69,8 +78,8 @@ export const transformLeadData = (leadData: LeadData, conversationsData: Convers
 
   return {
     id: leadData.id,
-    firstName: leadData.first_name || '',
-    lastName: leadData.last_name || '',
+    firstName: displayFirstName,
+    lastName: displayLastName,
     middleName: leadData.middle_name || '',
     phoneNumbers,
     primaryPhone: primaryPhone || '',
