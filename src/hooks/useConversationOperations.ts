@@ -6,6 +6,7 @@ import { fetchConversations, fetchMessages, markMessagesAsRead } from '@/service
 import { sendMessage as fixedSendMessage } from '@/services/fixedMessagesService';
 import type { ConversationListItem, MessageData } from '@/types/conversation';
 import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting';
+import { enhancedMessageProcessor } from '@/services/enhancedMessageProcessor';
 
 interface UseConversationOperationsProps {
   onLeadsRefresh?: () => void;
@@ -227,10 +228,10 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
           
           // Only process incoming messages
           if (newConversation.direction === 'in') {
-            // Fetch lead name for toast
+            // Fetch lead data for toast and AI processing
             const { data: leadData } = await supabase
               .from('leads')
-              .select('first_name, last_name')
+              .select('first_name, last_name, ai_opt_in')
               .eq('id', newConversation.lead_id)
               .single();
 
@@ -251,6 +252,18 @@ export const useConversationOperations = (props?: UseConversationOperationsProps
             window.dispatchEvent(new CustomEvent('new-message-received', {
               detail: { leadId: newConversation.lead_id, leadName }
             }));
+
+            // Trigger AI processing if enabled
+            if (leadData?.ai_opt_in) {
+              console.log('🤖 [CONV OPS] Triggering AI response for lead:', newConversation.lead_id);
+              enhancedMessageProcessor.processIncomingMessage(
+                newConversation.lead_id,
+                newConversation.body,
+                leadData
+              ).catch(err => {
+                console.error('❌ [CONV OPS] AI processing failed:', err);
+              });
+            }
           }
         }
       )
