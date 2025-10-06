@@ -4,6 +4,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { useGlobalUnreadCount } from '@/hooks/useGlobalUnreadCount';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -28,6 +29,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <header className="h-12 flex items-center border-b border-border/50 bg-background/80 backdrop-blur-xl px-4 shadow-[var(--shadow-card)]">
               <SidebarTrigger className="mr-4 hover:scale-110 transition-transform duration-200" />
               <div className="flex-1" />
+              <ThemeToggle />
             </header>
             
             <main className="flex-1 overflow-auto">

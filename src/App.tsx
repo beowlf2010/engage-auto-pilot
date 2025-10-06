@@ -6,7 +6,7 @@ import { SecurityEnhancedLayout } from './components/security/SecurityEnhancedLa
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from '@/components/ui/toaster';
 import { NetworkBanner } from '@/components/ui/error/NetworkBanner';
-import { useEffect } from 'react';
+import { ThemeProvider } from 'next-themes';
 
 const AppContent = () => {
   const { loading } = useAuth();
@@ -33,24 +33,21 @@ const AppContent = () => {
 };
 
 function App() {
-  // Set dark mode by default for DriveCentric-style experience
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-  }, []);
-
   return (
-    <QueryProvider>
-      <AuthProvider>
-        <SecurityEnhancedLayout>
-          <div className="min-h-screen bg-background text-foreground w-full">
-            {/* Global network health banner */}
-            <NetworkBanner />
-            <AppContent />
-            <Toaster />
-          </div>
-        </SecurityEnhancedLayout>
-      </AuthProvider>
-    </QueryProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <QueryProvider>
+        <AuthProvider>
+          <SecurityEnhancedLayout>
+            <div className="min-h-screen bg-background text-foreground w-full">
+              {/* Global network health banner */}
+              <NetworkBanner />
+              <AppContent />
+              <Toaster />
+            </div>
+          </SecurityEnhancedLayout>
+        </AuthProvider>
+      </QueryProvider>
+    </ThemeProvider>
   );
 }
 
