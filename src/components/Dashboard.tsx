@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusRibbon } from './dashboard/StatusRibbon';
+import { AdminPromotion } from './AdminPromotion';
 
 
 interface DashboardProps {
@@ -59,6 +60,9 @@ const Dashboard = React.memo(({ user }: DashboardProps) => {
   return (
     <SafeErrorBoundary>
       <div className="space-y-6 animate-in fade-in-0 duration-500">
+        {/* Admin Promotion */}
+        <AdminPromotion />
+        
         {/* Modern Welcome Header with Glassmorphism */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-primary/90 to-primary-glow p-6 text-primary-foreground shadow-[var(--shadow-glow)]">
           {/* Animated mesh gradient overlay */}
