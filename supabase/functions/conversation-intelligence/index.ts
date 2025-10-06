@@ -110,13 +110,20 @@ Return ONLY valid JSON in this exact format:
       throw new Error('Invalid AI response format');
     }
 
-    // Ensure proper structure
-    if (!analysisResult.analysis || !analysisResult.suggestions) {
-      throw new Error('AI response missing required fields');
-    }
+    // Ensure proper structure with fallbacks
+    const safeResult = {
+      analysis: {
+        leadTemperature: analysisResult.analysis?.leadTemperature || 50,
+        stage: analysisResult.analysis?.stage || 'discovery',
+        conversationStage: analysisResult.analysis?.stage || 'discovery',
+        buyingSignals: analysisResult.analysis?.buyingSignals || [],
+        urgency: analysisResult.analysis?.urgency || 'medium'
+      },
+      suggestions: Array.isArray(analysisResult.suggestions) ? analysisResult.suggestions : []
+    };
 
     return new Response(
-      JSON.stringify(analysisResult),
+      JSON.stringify(safeResult),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

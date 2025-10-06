@@ -4,9 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 export interface ConversationAnalysis {
   leadTemperature: number; // 0-100
   conversationStage: 'discovery' | 'presentation' | 'objection_handling' | 'closing' | 'follow_up';
+  stage?: 'discovery' | 'presentation' | 'objection_handling' | 'closing' | 'follow_up'; // Fallback field
   buyingSignals: BuyingSignal[];
   sentimentTrend: 'positive' | 'neutral' | 'negative';
   urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
+  urgency?: 'low' | 'medium' | 'high' | 'critical'; // Fallback field
   nextBestActions: string[];
 }
 

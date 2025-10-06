@@ -197,10 +197,10 @@ const ConversationView: React.FC<ConversationViewProps> = ({
                       </CardHeader>
                       <CardContent>
                         <Badge variant="secondary" className="text-sm capitalize">
-                          {analysis.conversationStage.replace('_', ' ')}
+                          {(analysis.conversationStage || analysis.stage || 'discovery').replace('_', ' ')}
                         </Badge>
                         <p className="text-xs text-muted-foreground mt-2">
-                          Urgency: <span className="font-medium capitalize">{analysis.urgencyLevel}</span>
+                          Urgency: <span className="font-medium capitalize">{analysis.urgencyLevel || analysis.urgency || 'medium'}</span>
                         </p>
                       </CardContent>
                     </Card>
