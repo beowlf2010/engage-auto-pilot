@@ -42,9 +42,9 @@ export class IntelligentAIResponseGenerator {
   private async getDealershipContext() {
     const { data } = await supabase.functions.invoke('get-dealership-context');
     return data || {
-      dealershipName: 'Jason Pilger Chevrolet',
-      salespersonName: 'Finn',
-      location: 'Atmore, AL'
+      dealershipName: 'U-J Chevrolet',
+      salespersonName: 'Tommy',
+      location: 'Mobile, AL'
     };
   }
 

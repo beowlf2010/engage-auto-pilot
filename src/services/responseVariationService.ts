@@ -195,7 +195,7 @@ class ResponseVariationService {
   // Enhanced fallback with more professional options
   generateDiverseFallback(leadName: string, vehicleInterest?: string, customerMessage?: string): string {
     const fallbacks = [
-      `Hi ${leadName}! I'm Finn with Jason Pilger Chevrolet. How can I assist you today?`,
+      `Hi ${leadName}! I'm Tommy with U-J Chevrolet. How can I assist you today?`,
       `Hello ${leadName}! Thank you for reaching out. What information can I provide?`,
       `Hi there ${leadName}! I'm here to help with any questions you might have.`,
       `Hello ${leadName}! What can I help you with regarding your automotive needs?`,

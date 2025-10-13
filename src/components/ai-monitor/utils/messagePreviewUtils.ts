@@ -11,16 +11,16 @@ export const getMessageQuality = (msg: string, leadName: string, vehicleInterest
   const hasVehicle = msg.toLowerCase().includes(vehicleInterest.toLowerCase());
   const goodLength = msg.length > 50 && msg.length < 300;
   const hasCall2Action = /\?|call|visit|appointment|interested|available/i.test(msg);
-  const hasFinnIntro = msg.toLowerCase().includes('finn') && conversationHistory.filter(msg => msg.direction === 'in').length === 0;
-  const hasJasonPilger = msg.toLowerCase().includes('jason pilger chevrolet');
+  const hasTommyIntro = msg.toLowerCase().includes('tommy') && conversationHistory.filter(msg => msg.direction === 'in').length === 0;
+  const hasUJChevrolet = msg.toLowerCase().includes('u-j chevrolet');
   
   let score = 5;
   if (hasPersonalization) score += 1;
   if (hasVehicle) score += 1;
   if (goodLength) score += 1;
   if (hasCall2Action) score += 2;
-  if (hasFinnIntro) score += 1;
-  if (hasJasonPilger) score += 1;
+  if (hasTommyIntro) score += 1;
+  if (hasUJChevrolet) score += 1;
   
   if (score >= 9) return { score, color: 'text-green-600' };
   if (score >= 7) return { score, color: 'text-yellow-600' };

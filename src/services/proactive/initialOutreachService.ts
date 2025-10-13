@@ -69,8 +69,8 @@ export const generateInitialOutreachMessage = async (
   try {
     console.log(`🚀 [INITIAL OUTREACH] Generating diverse message for ${request.firstName}`);
 
-    const salespersonName = request.salespersonName || 'Finn';
-    const dealershipName = request.dealershipName || 'Jason Pilger Chevrolet';
+    const salespersonName = request.salespersonName || 'Tommy';
+    const dealershipName = request.dealershipName || 'U-J Chevrolet';
     const formattedName = formatProperName(request.firstName);
     const vehicleInterest = request.vehicleInterest || 'finding the right vehicle';
 

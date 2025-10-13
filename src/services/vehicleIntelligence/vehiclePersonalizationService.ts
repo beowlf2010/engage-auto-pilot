@@ -106,10 +106,10 @@ export class VehiclePersonalizationService {
     
     if (inventoryContext.similarVehicles.length > 0) {
       const topVehicle = inventoryContext.similarVehicles[0];
-      return `${greeting} I'm ${salesperson} with Jason Pilger Chevrolet. Great news about the ${vehicle} you're interested in! We currently have a ${topVehicle.year} ${topVehicle.make} ${topVehicle.model} in stock. What specific features are most important to you in your next vehicle?`;
+      return `${greeting} I'm ${salesperson} with U-J Chevrolet. Great news about the ${vehicle} you're interested in! We currently have a ${topVehicle.year} ${topVehicle.make} ${topVehicle.model} in stock. What specific features are most important to you in your next vehicle?`;
     }
     
-    return `${greeting} I'm ${salesperson} with Jason Pilger Chevrolet. I see you're interested in a ${vehicle}. I'd love to help you explore your options and find the perfect match. What draws you to this particular vehicle?`;
+    return `${greeting} I'm ${salesperson} with U-J Chevrolet. I see you're interested in a ${vehicle}. I'd love to help you explore your options and find the perfect match. What draws you to this particular vehicle?`;
   }
 
   private generateCategoryMessage(
@@ -123,14 +123,14 @@ export class VehiclePersonalizationService {
     const make = vehicleContext.extractedVehicle.make;
     
     if (category && inventoryContext.similarVehicles.length > 0) {
-      return `${greeting} I'm ${salesperson} with Jason Pilger Chevrolet. I see you're looking for a ${category}. We have some excellent options available${make ? ` in ${make}` : ''} that might be perfect for you. What's your main priority - fuel efficiency, space, or performance?`;
+      return `${greeting} I'm ${salesperson} with U-J Chevrolet. I see you're looking for a ${category}. We have some excellent options available${make ? ` in ${make}` : ''} that might be perfect for you. What's your main priority - fuel efficiency, space, or performance?`;
     }
     
     if (make) {
-      return `${greeting} I'm ${salesperson} with Jason Pilger Chevrolet. ${make.charAt(0).toUpperCase() + make.slice(1)} makes some fantastic vehicles! What type of driving do you do most - city, highway, or a mix of both?`;
+      return `${greeting} I'm ${salesperson} with U-J Chevrolet. ${make.charAt(0).toUpperCase() + make.slice(1)} makes some fantastic vehicles! What type of driving do you do most - city, highway, or a mix of both?`;
     }
     
-    return `${greeting} I'm ${salesperson} with Jason Pilger Chevrolet. I'd love to help you find the right vehicle for your needs. What type of vehicle fits your lifestyle best?`;
+    return `${greeting} I'm ${salesperson} with U-J Chevrolet. I'd love to help you find the right vehicle for your needs. What type of vehicle fits your lifestyle best?`;
   }
 
   private generateInventoryDrivenMessage(
@@ -141,13 +141,13 @@ export class VehiclePersonalizationService {
     const greeting = leadName ? `Hi ${leadName}!` : 'Hello!';
     const vehicle = inventoryContext.similarVehicles[0];
     
-    return `${greeting} I'm ${salesperson} with Jason Pilger Chevrolet. I wanted to reach out because we have some great vehicles available right now, including a ${vehicle.year} ${vehicle.make} ${vehicle.model} that's been popular with our customers. What type of vehicle would work best for your daily needs?`;
+    return `${greeting} I'm ${salesperson} with U-J Chevrolet. I wanted to reach out because we have some great vehicles available right now, including a ${vehicle.year} ${vehicle.make} ${vehicle.model} that's been popular with our customers. What type of vehicle would work best for your daily needs?`;
   }
 
   private generateExploratoryMessage(leadName: string, salesperson: string): string {
     const greeting = leadName ? `Hi ${leadName}!` : 'Hello!';
     
-    return `${greeting} I'm ${salesperson} with Jason Pilger Chevrolet. I'm here to help you find the perfect vehicle for your needs. What's most important to you - reliability, fuel economy, space, or something else?`;
+    return `${greeting} I'm ${salesperson} with U-J Chevrolet. I'm here to help you find the perfect vehicle for your needs. What's most important to you - reliability, fuel economy, space, or something else?`;
   }
 
   private generateSpecificFollowUps(vehicleContext: VehicleRecognitionResult): string[] {

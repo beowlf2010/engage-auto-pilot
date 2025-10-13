@@ -2,11 +2,11 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bot } from "lucide-react";
 
-interface FinnAvatarProps {
+interface SalespersonAvatarProps {
   size?: "sm" | "md" | "lg";
 }
 
-const FinnAvatar = ({ size = "md" }: FinnAvatarProps) => {
+const SalespersonAvatar = ({ size = "md" }: SalespersonAvatarProps) => {
   const sizeClasses = {
     sm: "w-6 h-6",
     md: "w-8 h-8", 
@@ -28,4 +28,4 @@ const FinnAvatar = ({ size = "md" }: FinnAvatarProps) => {
   );
 };
 
-export default FinnAvatar;
+export default SalespersonAvatar;

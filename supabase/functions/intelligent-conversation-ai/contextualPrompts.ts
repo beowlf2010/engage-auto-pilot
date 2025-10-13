@@ -27,20 +27,21 @@ export const buildContextualPrompt = (
 
   // Check if we've already introduced ourselves
   const hasIntroduced = conversationMemory?.hasIntroduced || 
-    conversationHistory.toLowerCase().includes('finn') ||
-    conversationHistory.toLowerCase().includes('jason pilger');
+    conversationHistory.toLowerCase().includes('tommy') ||
+    conversationHistory.toLowerCase().includes('u-j chevrolet');
 
   // Analyze geographic context for smart recommendations
   const isLocalCustomer = analyzeGeographicProximity(geoData);
   const locationContext = buildLocationContext(geoData, isLocalCustomer);
 
   // Build context-aware system prompt
-  let systemPrompt = `You are Finn, a knowledgeable and friendly automotive sales professional at Jason Pilger Chevrolet in Atmore, Alabama. Your goal is to be genuinely helpful and build rapport with customers through natural, engaging conversation.
+  let systemPrompt = `You are Tommy, a knowledgeable and friendly automotive sales professional at U-J Chevrolet in Mobile, Alabama. Your goal is to be genuinely helpful and build rapport with customers through natural, engaging conversation.
 
 CRITICAL LOCATION INFO:
-- You work at Jason Pilger Chevrolet in Atmore, Alabama (NOT Gonzales, LA)
-- When asked about location, ALWAYS say "I'm based here at Jason Pilger Chevrolet in Atmore, Alabama"
-- Never mention any other location - you are specifically in Atmore, AL
+- You work at U-J Chevrolet in Mobile, Alabama
+- Address: 7581 Airport Blvd, Mobile, AL 36608
+- When asked about location, ALWAYS say "I'm based here at U-J Chevrolet in Mobile, Alabama"
+- Never mention any other location - you are specifically in Mobile, AL
 
 CUSTOMER CONTEXT:
 - Customer: ${leadName}
@@ -143,7 +144,7 @@ ${isLocalCustomer.canVisit ?
 RESPONSE REQUIREMENTS:
 - Keep under 160 characters for SMS
 - Be specific about the ${mentionedVehicle}
-- ${hasIntroduced ? 'NEVER re-introduce yourself' : 'Introduce yourself as Finn from Jason Pilger Chevrolet'}
+- ${hasIntroduced ? 'NEVER re-introduce yourself' : 'Introduce yourself as Tommy from U-J Chevrolet'}
 - Ask engaging, specific questions
 - Show you understand what they mentioned
 - Be helpful and knowledgeable
@@ -188,9 +189,9 @@ OBJECTIVE: Generate a specific, contextually relevant response that acknowledges
 // Geographic analysis helper functions
 const analyzeGeographicProximity = (geoData?: LeadGeographicData) => {
   const dealershipLocation = {
-    city: 'Atmore',
+    city: 'Mobile',
     state: 'AL',
-    zipCode: '36502'
+    zipCode: '36608'
   };
 
   if (!geoData?.state || !geoData?.city) {
@@ -211,12 +212,13 @@ const analyzeGeographicProximity = (geoData?: LeadGeographicData) => {
     geoData.state?.toLowerCase().includes(state)
   );
 
-  // Check if customer is in Atmore area specifically
+  // Check if customer is in Mobile area specifically
   const isLocalArea = isInAlabama && (
-    geoData.city?.toLowerCase().includes('atmore') ||
     geoData.city?.toLowerCase().includes('mobile') ||
-    geoData.city?.toLowerCase().includes('bay minette') ||
-    geoData.city?.toLowerCase().includes('brewton')
+    geoData.city?.toLowerCase().includes('fairhope') ||
+    geoData.city?.toLowerCase().includes('daphne') ||
+    geoData.city?.toLowerCase().includes('spanish fort') ||
+    geoData.city?.toLowerCase().includes('theodore')
   );
 
   if (isLocalArea) {

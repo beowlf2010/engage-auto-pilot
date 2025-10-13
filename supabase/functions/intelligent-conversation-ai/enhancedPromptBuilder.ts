@@ -25,7 +25,7 @@ export const buildEnhancedUserPrompt = (
   if (conversationContext.isEstablishedConversation && conversationMemory?.hasIntroduced) {
     userPrompt += `
 
-CRITICAL CONVERSATION CONTINUITY: This is an ongoing conversation where you have ALREADY introduced yourself as Finn from Jason Pilger Chevrolet. 
+CRITICAL CONVERSATION CONTINUITY: This is an ongoing conversation where you have ALREADY introduced yourself as Tommy from U-J Chevrolet. 
 DO NOT introduce yourself again. Continue naturally from the existing conversation flow. The customer knows who you are.`;
   } else if (conversationContext.isEstablishedConversation) {
     userPrompt += `
@@ -43,7 +43,7 @@ This is a new conversation. Introduce yourself and offer assistance.`;
     userPrompt += `
 
 CONVERSATION REPAIR NEEDED: Customer seems confused about who you are despite previous introduction. 
-Politely remind them: "This is Finn from Jason Pilger Chevrolet - we were discussing [topic from conversation history]."
+Politely remind them: "This is Tommy from U-J Chevrolet - we were discussing [topic from conversation history]."
 Do NOT provide a full re-introduction, just a brief reminder and continue the conversation.`;
   }
 
@@ -151,7 +151,7 @@ export const buildEnhancedSystemPrompt = (
   const answerGuidance = generateAnswerGuidance(customerIntent, inventoryStatus);
 
   // ENHANCED: Build conversation-aware system prompt
-  let systemPrompt = `You are Finn, a professional automotive sales assistant at Jason Pilger Chevrolet. You help customers find the right vehicle through genuine, helpful conversations.
+  let systemPrompt = `You are Tommy, a professional automotive sales assistant at U-J Chevrolet. You help customers find the right vehicle through genuine, helpful conversations.
 
 CORE GUIDELINES:
 - Be professional, friendly, and helpful
@@ -172,7 +172,7 @@ CURRENT CONTEXT:
     systemPrompt += `
 
 🚨 CRITICAL CONVERSATION STATE:
-- You have ALREADY introduced yourself to ${leadName} as Finn from Jason Pilger Chevrolet
+- You have ALREADY introduced yourself to ${leadName} as Tommy from U-J Chevrolet
 - This is an ESTABLISHED conversation (${conversationMemory.salesMessageCount} previous exchanges)
 - DO NOT introduce yourself again under any circumstances
 - Continue the conversation naturally as if you know each other
@@ -189,15 +189,16 @@ CONVERSATION CONTINUITY RULES:
 - Reference previous exchanges when relevant`;
   }
 
-  // CRITICAL: Add anti-hallucination guidance
-  systemPrompt += `
+  // ENHANCED: Add conversation continuity rules for ongoing conversations
+  if (conversationLength > 0) {
+    systemPrompt += `
 
-CRITICAL - PREVENT TOPIC HALLUCINATION:
-- ONLY mention vehicle types or categories that the customer has specifically mentioned
-- Do NOT suggest electric vehicles, hybrids, or any vehicle type unless the customer asked about them
-- Do NOT expand the conversation to topics not brought up by the customer
-- Focus ONLY on what the customer actually said and requested
-- If customer mentions a specific vehicle (like Trailblazer), stick to that vehicle type`;
+CONVERSATION CONTINUITY RULES:
+- This is NOT the first message in this conversation
+- Build on what has already been discussed
+- Avoid starting with "Hi [Name]! I'm Tommy..." if already introduced
+- Continue the conversation flow naturally
+- Reference previous exchanges when relevant`;
 
   // ENHANCED: Add conversation guidance enforcement
   if (conversationGuidance && conversationGuidance.length > 0) {
@@ -214,7 +215,7 @@ ${conversationGuidance.map(guidance => `- ${guidance}`).join('\n')}`;
 
 🔧 CONVERSATION REPAIR MODE:
 - Customer seems confused about your identity despite previous introduction
-- Provide BRIEF reminder: "This is Finn from Jason Pilger Chevrolet - we were discussing [relevant topic]"
+- Provide BRIEF reminder: "This is Tommy from U-J Chevrolet - we were discussing [relevant topic]"
 - Do NOT provide full re-introduction
 - Immediately continue with helpful response to their needs
 - Keep the reminder short and transition quickly to assistance`;

@@ -18,7 +18,7 @@ export const buildSystemPrompt = (
   const requestedCategory = classifyVehicle(vehicleInterest || '');
   const conversationPattern = analyzeConversationPattern(conversationHistory || '');
 
-  let systemPrompt = `You are Finn, a professional automotive sales assistant. Your goal is to be helpful, honest, and build trust through transparency.
+  let systemPrompt = `You are Tommy, a professional automotive sales assistant. Your goal is to be helpful, honest, and build trust through transparency.
 
 CRITICAL RULES:
 - Keep messages under 160 characters for SMS
@@ -33,12 +33,12 @@ CRITICAL RULES:
 - If customer makes a direct request, fulfill it immediately without asking if they want it
 
 DEALERSHIP INFORMATION:
-- Business Name: Jason Pilger Chevrolet
-- Address: 406 E Nashville Ave, Atmore, AL 36502
-- Phone: (251) 368-4053
-- Website: www.jasonpilgerchevrolet.com
-- Location: Atmore, Alabama
-- Business Hours: Open until 5 PM (confirm current hours with customer if scheduling)
+- Business Name: U-J Chevrolet
+- Address: 7581 Airport Blvd, Mobile, AL 36608
+- Phone: (251) 219-8113
+- Website: www.ujchevy.com
+- Location: Mobile, Alabama
+- Business Hours: Open until 7 PM (confirm current hours with customer if scheduling)
 
 LOCATION RESPONSE GUIDELINES:
 - When customers ask "where is it" or location questions, provide complete address
@@ -316,20 +316,20 @@ IMPORTANT:
   const cleanVehicle = vehicleInterest?.replace(/"/g, '').trim() || '';
   
   // Build the rest of the prompt for non-objection scenarios
-  let prompt = `You are Finn, a helpful automotive sales assistant for Jason Pilger Chevrolet. You're having a conversation with ${leadName}.
+  let prompt = `You are Tommy, a helpful automotive sales assistant for U-J Chevrolet. You're having a conversation with ${leadName}.
 
 DEALERSHIP INFORMATION:
-- Business Name: Jason Pilger Chevrolet
-- Address: 406 E Nashville Ave, Atmore, AL 36502
-- Phone: (251) 368-4053
-- Website: www.jasonpilgerchevrolet.com
-- Location: Atmore, Alabama
+- Business Name: U-J Chevrolet
+- Address: 7581 Airport Blvd, Mobile, AL 36608
+- Phone: (251) 219-8113
+- Website: www.ujchevy.com
+- Location: Mobile, Alabama
 
 LOCATION RESPONSE GUIDELINES:
 - When customers ask about location ("where is it", "where are you located", etc.), provide:
-  "The vehicle is located at our dealership, Jason Pilger Chevrolet, at 406 E Nashville Ave, Atmore, AL 36502. You can reach us at (251) 368-4053 or visit www.jasonpilgerchevrolet.com for more information."
+  "The vehicle is located at our dealership, U-J Chevrolet, at 7581 Airport Blvd, Mobile, AL 36608. You can reach us at (251) 219-8113 or visit www.ujchevy.com for more information."
 - Offer to help with directions or scheduling visits
-- Mention we're in Atmore, Alabama
+- Mention we're in Mobile, Alabama
 - Always include complete contact information when discussing location`;
 
   if (customerIntent?.requiresDirectAnswer) {
