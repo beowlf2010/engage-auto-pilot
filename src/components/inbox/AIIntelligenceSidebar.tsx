@@ -43,7 +43,7 @@ const AIIntelligenceSidebar: React.FC<AIIntelligenceSidebarProps> = ({
 
   if (isCollapsed) {
     return (
-      <div className="w-12 border-l border-border/30 bg-card/60 backdrop-blur-xl flex flex-col items-center py-4">
+      <div className="w-full h-full border-l border-border/30 bg-card/60 backdrop-blur-xl flex flex-col items-center py-4">
         <Button
           variant="ghost"
           size="sm"
@@ -60,7 +60,7 @@ const AIIntelligenceSidebar: React.FC<AIIntelligenceSidebarProps> = ({
 
   if (!conversation) {
     return (
-      <div className="w-80 border-l border-border/30 bg-card/60 backdrop-blur-xl p-4">
+      <div className="w-full h-full border-l border-border/30 bg-card/60 backdrop-blur-xl p-4 flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-primary" />
@@ -78,7 +78,7 @@ const AIIntelligenceSidebar: React.FC<AIIntelligenceSidebarProps> = ({
   }
 
   return (
-    <div className="w-80 border-l border-border/30 bg-card/60 backdrop-blur-xl flex flex-col h-full">
+    <div className="w-full h-full border-l border-border/30 bg-card/60 backdrop-blur-xl flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border/30">
         <div className="flex items-center gap-2">
@@ -92,7 +92,7 @@ const AIIntelligenceSidebar: React.FC<AIIntelligenceSidebarProps> = ({
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 p-4 space-y-4">
         {messages.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             No messages to analyze yet

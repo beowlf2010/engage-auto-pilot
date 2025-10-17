@@ -268,7 +268,7 @@ const handleMarkAsRead = useCallback(async () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-background relative">
+    <div className="h-screen flex flex-col bg-background relative overflow-hidden">
       {/* Animated mesh gradient background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-transparent -z-10 pointer-events-none" />
       
@@ -455,9 +455,9 @@ const handleMarkAsRead = useCallback(async () => {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Conversations List */}
-        <div className="w-1/3 border-r bg-card flex flex-col">
+        <div className="w-[280px] md:w-[320px] lg:w-[360px] border-r bg-card flex flex-col flex-shrink-0 min-w-0">
 <div className="p-4 border-b bg-muted/50">
   <div className="flex items-center justify-between">
     <h2 className="font-medium">Conversations</h2>
@@ -473,7 +473,7 @@ const handleMarkAsRead = useCallback(async () => {
     </div>
   </div>
 </div>
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
             {loading ? (
               <ConversationListSkeleton />
             ) : filteredConversations.length === 0 ? (
@@ -526,7 +526,7 @@ const handleMarkAsRead = useCallback(async () => {
         </div>
 
         {/* Conversation View */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {selectedConversation ? (
             loading ? (
               <MessageListSkeleton />
@@ -560,13 +560,27 @@ const handleMarkAsRead = useCallback(async () => {
         </div>
 
         {/* AI Intelligence Sidebar */}
-        <AIIntelligenceSidebar
-          conversation={selectedConversation}
-          messages={messages.map(msg => ({ ...msg, sent_at: msg.sentAt }))}
-          onInsertSuggestion={(text) => setMessageInputText(text)}
-          isCollapsed={aiSidebarCollapsed}
-          onToggleCollapse={() => setAiSidebarCollapsed(!aiSidebarCollapsed)}
-        />
+        {!aiSidebarCollapsed ? (
+          <div className="w-[280px] md:w-[320px] lg:w-[360px] border-l flex-shrink-0 min-w-0">
+            <AIIntelligenceSidebar
+              conversation={selectedConversation}
+              messages={messages.map(msg => ({ ...msg, sent_at: msg.sentAt }))}
+              onInsertSuggestion={(text) => setMessageInputText(text)}
+              isCollapsed={aiSidebarCollapsed}
+              onToggleCollapse={() => setAiSidebarCollapsed(!aiSidebarCollapsed)}
+            />
+          </div>
+        ) : (
+          <div className="w-12 border-l flex-shrink-0">
+            <AIIntelligenceSidebar
+              conversation={selectedConversation}
+              messages={messages.map(msg => ({ ...msg, sent_at: msg.sentAt }))}
+              onInsertSuggestion={(text) => setMessageInputText(text)}
+              isCollapsed={aiSidebarCollapsed}
+              onToggleCollapse={() => setAiSidebarCollapsed(!aiSidebarCollapsed)}
+            />
+          </div>
+        )}
       </div>
 
       {process.env.NODE_ENV === 'development' && (
