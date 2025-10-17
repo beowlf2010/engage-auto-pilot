@@ -4,13 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Send, Phone, User, CheckCheck, Loader2, Brain, TrendingUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Send, Phone, User, CheckCheck, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { ConversationListItem } from '@/types/conversation';
 import { Switch } from '@/components/ui/switch';
 import { useAutoMarkAsReadSetting } from '@/hooks/inbox/useAutoMarkAsReadSetting';
-import { useAIIntelligence } from '@/hooks/useAIIntelligence';
 interface Message {
   id: string;
   body: string;
@@ -30,6 +28,8 @@ interface ConversationViewProps {
   canReply: boolean;
   loading: boolean;
   error?: string | null;
+  messageInputText?: string;
+  onMessageInputChange?: (text: string) => void;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({
@@ -41,24 +41,20 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   onMarkAsRead,
   canReply,
   loading,
-  error
+  error,
+  messageInputText,
+  onMessageInputChange
 }) => {
   const [messageText, setMessageText] = useState('');
   const [sendingLocal, setSendingLocal] = useState(false);
-  const [aiPanelOpen, setAiPanelOpen] = useState(true);
   const { enabled, setEnabled } = useAutoMarkAsReadSetting();
 
-  // AI Intelligence
-  const { analysis, suggestions, isAnalyzing, isGeneratingSuggestions } = useAIIntelligence(
-    conversation.leadId,
-    messages,
-    {
-      id: conversation.leadId,
-      name: conversation.leadName,
-      vehicle_interest: conversation.vehicleInterest,
-      status: conversation.status
+  // Sync external message input text
+  React.useEffect(() => {
+    if (messageInputText !== undefined) {
+      setMessageText(messageInputText);
     }
-  );
+  }, [messageInputText]);
 
   const handleSendMessage = useCallback(async () => {
     if (!messageText.trim() || sendingLocal || sending) return;
@@ -152,132 +148,6 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         </div>
       </div>
 
-      {/* AI Intelligence Panel */}
-      {messages.length > 0 && (
-        <Collapsible open={aiPanelOpen} onOpenChange={setAiPanelOpen}>
-          <div className="border-b bg-card">
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between p-4 h-auto hover:bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-primary" />
-                  <span className="font-medium">AI Intelligence</span>
-                  {isAnalyzing && <Loader2 className="h-4 w-4 animate-spin" />}
-                </div>
-                <ChevronDown className={`h-4 w-4 transition-transform ${aiPanelOpen ? 'rotate-180' : ''}`} />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="p-4 space-y-4">
-                {/* Lead Temperature & Stage */}
-                {analysis && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4" />
-                          Lead Temperature
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold">{analysis.leadTemperature}</span>
-                          <span className="text-sm text-muted-foreground">/100</span>
-                        </div>
-                        <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all" 
-                            style={{ width: `${analysis.leadTemperature}%` }}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Conversation Stage</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Badge variant="secondary" className="text-sm capitalize">
-                          {(analysis.conversationStage || analysis.stage || 'discovery').replace('_', ' ')}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Urgency: <span className="font-medium capitalize">{analysis.urgencyLevel || analysis.urgency || 'medium'}</span>
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-
-                {/* Buying Signals */}
-                {analysis && analysis.buyingSignals.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Buying Signals Detected</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {analysis.buyingSignals.slice(0, 3).map((signal, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
-                            <div className="flex items-center gap-2">
-                              <Badge 
-                                variant={signal.strength > 0.7 ? 'default' : 'outline'}
-                                className="text-xs"
-                              >
-                                {signal.type}
-                              </Badge>
-                              <span className="text-muted-foreground">"{signal.text}"</span>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {Math.round(signal.confidence * 100)}% confident
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* AI Response Suggestions */}
-                {suggestions && suggestions.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center justify-between">
-                        <span>Suggested Responses</span>
-                        {isGeneratingSuggestions && <Loader2 className="h-3 w-3 animate-spin" />}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {suggestions.slice(0, 3).map((suggestion, idx) => (
-                          <div key={idx} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <Badge variant="outline" className="text-xs">
-                                {Math.round(suggestion.confidence * 100)}% match
-                              </Badge>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="h-auto py-1 px-2 text-xs"
-                                onClick={() => setMessageText(suggestion.message)}
-                              >
-                                Use this
-                              </Button>
-                            </div>
-                            <p className="text-sm">{suggestion.message}</p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              💡 {suggestion.reasoning}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
-      )}
-
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {loading ? (
@@ -350,7 +220,11 @@ const ConversationView: React.FC<ConversationViewProps> = ({
             <Input
               placeholder="Type your message..."
               value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                setMessageText(newValue);
+                onMessageInputChange?.(newValue);
+              }}
               onKeyPress={handleKeyPress}
               disabled={sendingLocal || sending}
               className="flex-1"

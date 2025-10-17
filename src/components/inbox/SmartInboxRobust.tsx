@@ -7,6 +7,7 @@ import { smartInboxDataLoader } from '@/services/smartInboxDataLoader';
 import ConversationsList from './ConversationsList';
 import ConversationView from './ConversationView';
 import SmartFilters from './SmartFilters';
+import AIIntelligenceSidebar from './AIIntelligenceSidebar';
 import InboxDebugPanel from './InboxDebugPanel';
 import { LeadFollowUpModal } from '@/components/leads/LeadFollowUpModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +45,15 @@ const SmartInboxRobust: React.FC<SmartInboxRobustProps> = ({ onBack, leadId }) =
   const [selectedConversation, setSelectedConversation] = useState<ConversationListItem | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showUrgencyColors, setShowUrgencyColors] = useState(false);
+  const [aiSidebarCollapsed, setAiSidebarCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aiSidebarCollapsed');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [messageInputText, setMessageInputText] = useState('');
   const { enabled: autoMarkEnabled } = useAutoMarkAsReadSetting();
   const [scope, setScope] = useState<'my' | 'all'>('all');
   const { isAdmin, isManager, loading: permsLoading } = useUserPermissions();
@@ -164,10 +174,14 @@ useEffect(() => {
   initializedScopeRef.current = true;
 }, [authLoading, permsLoading, isAdmin, isManager]);
 
-// Persist scope
+// Persist scope and AI sidebar state
 useEffect(() => {
   try { localStorage.setItem('smartInboxScope', scope); } catch {}
 }, [scope]);
+
+useEffect(() => {
+  try { localStorage.setItem('aiSidebarCollapsed', String(aiSidebarCollapsed)); } catch {}
+}, [aiSidebarCollapsed]);
 
 // Admin metrics
 useEffect(() => {
@@ -526,6 +540,8 @@ const handleMarkAsRead = useCallback(async () => {
                 sending={loading}
                 loading={loading}
                 canReply={true}
+                messageInputText={messageInputText}
+                onMessageInputChange={setMessageInputText}
               />
             )
           ) : (
@@ -542,6 +558,15 @@ const handleMarkAsRead = useCallback(async () => {
             </div>
           )}
         </div>
+
+        {/* AI Intelligence Sidebar */}
+        <AIIntelligenceSidebar
+          conversation={selectedConversation}
+          messages={messages.map(msg => ({ ...msg, sent_at: msg.sentAt }))}
+          onInsertSuggestion={(text) => setMessageInputText(text)}
+          isCollapsed={aiSidebarCollapsed}
+          onToggleCollapse={() => setAiSidebarCollapsed(!aiSidebarCollapsed)}
+        />
       </div>
 
       {process.env.NODE_ENV === 'development' && (
