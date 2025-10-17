@@ -275,6 +275,49 @@ async function processLeadsWithConcurrency(supabase: any, leads: any[], maxConcu
 async function processLeadSafely(supabase: any, lead: any) {
   try {
     console.log(`🤖 [LEAD] Processing lead ${lead.id} (${lead.first_name} ${lead.last_name})`);
+
+    // CRITICAL CHECK: Has customer responded recently?
+    const { data: recentInbound, error: inboundError } = await supabase
+      .from('conversations')
+      .select('sent_at')
+      .eq('lead_id', lead.id)
+      .eq('direction', 'in')
+      .gte('sent_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()) // Last 48 hours
+      .limit(1);
+
+    if (!inboundError && recentInbound && recentInbound.length > 0) {
+      console.log(`⏸️ [LEAD] Customer responded recently, pausing AI for ${lead.id}`);
+      await supabase
+        .from('leads')
+        .update({
+          ai_sequence_paused: true,
+          ai_pause_reason: 'Customer responded - awaiting human follow-up',
+          next_ai_send_at: null
+        })
+        .eq('id', lead.id);
+      return { success: false, error: 'Customer responded - AI paused', leadId: lead.id };
+    }
+
+    // Check if we sent a message in last 24 hours (prevent duplicates)
+    const { data: recentOutbound } = await supabase
+      .from('conversations')
+      .select('sent_at')
+      .eq('lead_id', lead.id)
+      .eq('direction', 'out')
+      .gte('sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .limit(1);
+
+    if (recentOutbound && recentOutbound.length > 0) {
+      console.log(`⏰ [LEAD] Message sent < 24h ago, skipping ${lead.id}`);
+      // Reschedule for tomorrow
+      await supabase
+        .from('leads')
+        .update({
+          next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        })
+        .eq('id', lead.id);
+      return { success: false, error: 'Message sent recently', leadId: lead.id };
+    }
     
     // Call the intelligent conversation AI
     const { data: aiResponse, error: aiError } = await supabase.functions.invoke('intelligent-conversation-ai', {
@@ -378,13 +421,25 @@ async function processLeadSafely(supabase: any, lead: any) {
         .eq('id', conversationData.id);
     }
 
-    // Schedule next message (24 hours from now)
+    // Get current AI stage for exponential backoff scheduling
+    const { data: leadData } = await supabase
+      .from('leads')
+      .select('ai_stage, ai_messages_sent')
+      .eq('id', lead.id)
+      .single();
+
+    // Exponential backoff based on stage
+    const nextSendDelay = getNextSendDelay(leadData?.ai_stage || 'initial', leadData?.ai_messages_sent || 0);
+    
     await supabase
       .from('leads')
       .update({
-        next_ai_send_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        next_ai_send_at: new Date(Date.now() + nextSendDelay).toISOString(),
+        updated_at: new Date().toISOString()
       })
       .eq('id', lead.id);
+
+    console.log(`📅 [LEAD] Next message scheduled for ${lead.id} in ${Math.round(nextSendDelay / (60 * 60 * 1000))} hours`);
 
     console.log(`✅ [LEAD] Successfully processed ${lead.id}`);
     return { success: true, leadId: lead.id, messageSid: smsResult.messageSid };
@@ -493,5 +548,26 @@ async function updateRunRecord(supabase: any, runId: string, status: string, err
       
   } catch (error) {
     console.error('❌ [AUTOMATION] Error updating run record:', error);
+  }
+}
+
+// Smart scheduling with exponential backoff
+function getNextSendDelay(aiStage: string, messagesSent: number): number {
+  const HOUR = 60 * 60 * 1000;
+  
+  switch (aiStage) {
+    case 'initial':
+      return 24 * HOUR; // Day 1
+    case 'follow_up_1':
+      return 48 * HOUR; // Day 3 (24 + 48)
+    case 'follow_up_2':
+      return 96 * HOUR; // Day 7 (24 + 48 + 96)
+    case 'nurture':
+      // Exponential backoff in nurture: 7, 14, 30 days
+      if (messagesSent <= 3) return 7 * 24 * HOUR;
+      if (messagesSent <= 5) return 14 * 24 * HOUR;
+      return 30 * 24 * HOUR;
+    default:
+      return 24 * HOUR;
   }
 }

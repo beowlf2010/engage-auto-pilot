@@ -6,6 +6,20 @@ export class SmartInboxDataLoader {
   async loadConversationsRobustly(): Promise<ConversationListItem[]> {
     console.log('📊 [SMART INBOX DATA] Loading conversations robustly...');
 
+    // Timeout protection
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Loading timeout - please try again')), 10000);
+    });
+
+    try {
+      return await Promise.race([this._loadConversationsInternal(), timeoutPromise]);
+    } catch (error: any) {
+      console.error('❌ [SMART INBOX DATA] Error in loadConversationsRobustly:', error);
+      throw new Error(`Failed to load conversations: ${error.message}`);
+    }
+  }
+
+  private async _loadConversationsInternal(): Promise<ConversationListItem[]> {
     try {
       const { data, error } = await supabase
         .from('leads')
@@ -117,11 +131,16 @@ export class SmartInboxDataLoader {
       );
 
       console.log(`✅ [SMART INBOX DATA] Loaded ${conversations.length} conversations.`);
+      console.log(`📨 [SMART INBOX DATA] Messages breakdown:`, {
+        total: conversations.length,
+        withMessages: conversations.filter(c => c.messageCount > 0).length,
+        withUnread: conversations.filter(c => c.unreadCount > 0).length
+      });
       return conversations;
 
     } catch (error: any) {
-      console.error('❌ [SMART INBOX DATA] Error in loadConversationsRobustly:', error);
-      throw new Error(`Failed to load conversations: ${error.message}`);
+      console.error('❌ [SMART INBOX DATA] Error in _loadConversationsInternal:', error);
+      throw error;
     }
   }
 

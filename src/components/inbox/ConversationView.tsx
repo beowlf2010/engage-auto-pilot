@@ -285,6 +285,16 @@ const ConversationView: React.FC<ConversationViewProps> = ({
             <div className="text-center">
               <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Loading messages...</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {messages.length > 0 ? `Displaying ${messages.length} messages` : 'Fetching conversation...'}
+              </p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="text-center">
+              <p className="text-destructive mb-2">⚠️ Error loading messages</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
         ) : messages.length === 0 ? (

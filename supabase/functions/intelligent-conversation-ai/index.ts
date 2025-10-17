@@ -68,7 +68,16 @@ serve(async (req) => {
       .eq('id', leadId)
       .maybeSingle();
 
-    // Check if this is an initial contact by looking at conversation history
+    // Check message history for deduplication
+    const { data: recentMessages } = await supabase
+      .from('ai_message_history')
+      .select('message_content, created_at')
+      .eq('lead_id', leadId)
+      .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    // Check if this is an initial contact
     const { data: existingConversations } = await supabase
       .from('conversations')
       .select('id')
@@ -252,6 +261,66 @@ Respond as ${salespersonName} with:
 
     console.log('✅ [FINN AI] Generated response:', generatedMessage?.substring(0, 100));
 
+    // DEDUPLICATION CHECK: Compare with recent messages
+    if (recentMessages && recentMessages.length > 0) {
+      const messageHash = generateMessageHash(generatedMessage);
+      const isDuplicate = recentMessages.some(msg => {
+        const oldHash = generateMessageHash(msg.message_content);
+        const similarity = calculateSimilarity(messageHash, oldHash);
+        return similarity > 0.8; // 80% similar = duplicate
+      });
+
+      if (isDuplicate) {
+        console.warn('⚠️ [FINN AI] Duplicate message detected, skipping send');
+        return new Response(JSON.stringify({
+          message: generatedMessage,
+          intent: intentAnalysis.primaryIntent,
+          confidence: 0,
+          strategy: 'duplicate_prevented',
+          conversationPattern,
+          success: false,
+          skipReason: 'duplicate_message'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Store in message history for deduplication
+    await supabase
+      .from('ai_message_history')
+      .insert({
+        lead_id: leadId,
+        message_content: generatedMessage,
+        message_hash: generateMessageHash(generatedMessage),
+        context_data: {
+          isInitialContact,
+          vehicleInterest,
+          leadSource,
+          intentPrimary: intentAnalysis.primaryIntent
+        }
+      });
+
+    // Update AI stage progression
+    const { data: currentLead } = await supabase
+      .from('leads')
+      .select('ai_stage')
+      .eq('id', leadId)
+      .single();
+
+    const newStage = getNextAIStage(currentLead?.ai_stage || 'initial', isInitialContact);
+    
+    await supabase
+      .from('leads')
+      .update({
+        ai_stage: newStage,
+        ai_messages_sent: supabase.raw('COALESCE(ai_messages_sent, 0) + 1'),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', leadId);
+
+    console.log('📈 [FINN AI] AI stage updated:', currentLead?.ai_stage, '->', newStage);
+
     // Update conversation context
     await updateConversationContext(supabase, leadId, {
       lastInteractionType: intentAnalysis.primaryIntent,
@@ -372,5 +441,42 @@ async function updateConversationContext(supabase: any, leadId: string, context:
       });
   } catch (error) {
     console.error('❌ [FINN AI] Error updating conversation context:', error);
+  }
+}
+
+// Message deduplication helpers
+function generateMessageHash(message: string): string {
+  return message
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .sort()
+    .join(' ')
+    .substring(0, 100);
+}
+
+function calculateSimilarity(hash1: string, hash2: string): number {
+  const words1 = new Set(hash1.split(' '));
+  const words2 = new Set(hash2.split(' '));
+  const intersection = new Set([...words1].filter(x => words2.has(x)));
+  const union = new Set([...words1, ...words2]);
+  return intersection.size / union.size;
+}
+
+// AI stage progression logic
+function getNextAIStage(currentStage: string | null, isInitial: boolean): string {
+  if (isInitial) return 'follow_up_1';
+  
+  switch (currentStage) {
+    case 'initial':
+      return 'follow_up_1';
+    case 'follow_up_1':
+      return 'follow_up_2';
+    case 'follow_up_2':
+      return 'nurture';
+    case 'nurture':
+      return 'nurture'; // Stay in nurture
+    default:
+      return 'follow_up_1';
   }
 }
